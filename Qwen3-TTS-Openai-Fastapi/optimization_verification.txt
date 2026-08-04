@@ -1,0 +1,28 @@
+🧪 Testing Optimized Qwen3-TTS Backend
+============================================================
+
+⏳ Waiting for API to be ready...
+✅ API is ready!
+   Backend: official
+   Model: Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice
+   Device: NVIDIA GeForce RTX 3090
+
+🔥 Warmup request (torch.compile compilation)...
+   Warmup completed in 5.42s
+
+📊 Performance Test (with optimizations)
+------------------------------------------------------------
+   Short      ( 2w):  1.78s  RTF: 1.49
+   Sentence   ( 9w):  3.94s  RTF: 0.73
+   Medium     (14w):  7.60s  RTF: 0.91
+------------------------------------------------------------
+
+📈 Results:
+   Average RTF: 1.04
+   Average Latency: 4.44s
+   ⚠️ Performance similar to or slower than baseline
+      (May need more warmup requests)
+
+============================================================
+✅ Optimization verification complete!
+============================================================

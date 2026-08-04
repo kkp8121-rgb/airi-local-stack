@@ -1,0 +1,105 @@
+services:
+  qwen3-tts-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: qwen3-tts-api
+    ports:
+      - "${TTS_PORT:-8880}:8880"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8880
+      WORKERS: 1
+      CORS_ORIGINS: "${CORS_ORIGINS:-*}"
+      TTS_BACKEND: official
+      TTS_MODEL_NAME: "${TTS_MODEL_NAME:-Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice}"
+      TTS_WARMUP_ON_START: "${TTS_WARMUP_ON_START:-false}"
+      TTS_IDLE_TIMEOUT_SECONDS: "${TTS_IDLE_TIMEOUT_SECONDS:-0}"
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - "${HF_CACHE_DIR:-~/.cache/huggingface}:/home/appuser/.cache/huggingface"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8880/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  qwen3-tts-vllm:
+    build:
+      context: .
+      dockerfile: Dockerfile.vllm
+    container_name: qwen3-tts-api-vllm
+    ports:
+      - "${TTS_PORT:-8880}:8880"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8880
+      WORKERS: 1
+      CORS_ORIGINS: "${CORS_ORIGINS:-*}"
+      TTS_BACKEND: vllm_omni
+      TTS_MODEL_NAME: "${TTS_MODEL_NAME:-Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice}"
+      TTS_WARMUP_ON_START: "${TTS_WARMUP_ON_START:-true}"
+      TTS_IDLE_TIMEOUT_SECONDS: "${TTS_IDLE_TIMEOUT_SECONDS:-0}"
+      VLLM_WORKER_MULTIPROC_METHOD: spawn
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      HF_HOME: /root/.cache/huggingface
+    volumes:
+      - "${HF_CACHE_DIR:-~/.cache/huggingface}:/root/.cache/huggingface"
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8880/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+    profiles: [vllm]
+
+  qwen3-tts-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: cpu-base
+    container_name: qwen3-tts-api-cpu
+    ports:
+      - "${TTS_PORT:-8880}:8880"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8880
+      WORKERS: 1
+      CORS_ORIGINS: "${CORS_ORIGINS:-*}"
+      TTS_BACKEND: pytorch
+      TTS_MODEL_NAME: "${TTS_MODEL_NAME:-Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice}"
+      TTS_DEVICE: cpu
+      TTS_DTYPE: float32
+      TTS_ATTN: sdpa
+      CPU_THREADS: "${CPU_THREADS:-12}"
+      CPU_INTEROP: "${CPU_INTEROP:-2}"
+      TTS_IDLE_TIMEOUT_SECONDS: "${TTS_IDLE_TIMEOUT_SECONDS:-0}"
+    volumes:
+      - "${HF_CACHE_DIR:-~/.cache/huggingface}:/home/appuser/.cache/huggingface"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8880/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+    profiles: [cpu]

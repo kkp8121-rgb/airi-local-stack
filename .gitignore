@@ -1,0 +1,62 @@
+# Local environments and dependency caches
+**/.venv/
+**/venv/
+**/env/
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/node_modules/
+**/*.egg-info/
+*.py[cod]
+
+# Downloaded model weights and caches
+stt/models/
+**/models--*/
+**/pretrained_models/
+**/checkpoints/
+**/.cache/
+*.safetensors
+*.ckpt
+*.pth
+*.pt
+*.onnx
+*.gguf
+
+# Personal/reference/generated audio and video
+*.wav
+*.mp3
+*.flac
+*.m4a
+*.aac
+*.ogg
+*.webm
+*.mp4
+
+# Runtime output
+*.log
+*.pid
+*.tmp
+*.temp
+**/outputs/
+**/output/
+**/generated/
+
+# Local credentials and machine-specific configuration
+.env
+.env.*
+!.env.example
+*.secret
+*.key
+
+# Diagnostic extraction and screenshots (regenerable)
+asar-inspect/
+/*.png
+chatterbox/voices/*-spectrum.png
+chatterbox/voices/*-waveform.png
+
+# OS and editor state
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

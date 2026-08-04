@@ -1,0 +1,36 @@
+services:
+  qwen3-tts-rocm:
+    build:
+      context: .
+      dockerfile: Dockerfile.rocm
+    container_name: qwen3-tts-api-rocm
+    ports:
+      - "8880:8880"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8880
+      - WORKERS=1
+      - TTS_BACKEND=optimized
+      - TTS_CONFIG=/root/qwen3-tts/config.yaml
+      - VOICE_LIBRARY_DIR=/root/qwen3-tts/voice_library
+      - GPU_KEEPALIVE_INTERVAL=15
+    volumes:
+      - ./config.yaml:/root/qwen3-tts/config.yaml:ro
+      - ./voice_library:/root/qwen3-tts/voice_library
+      - ${HOME}/.cache/huggingface:/root/.cache/huggingface
+    devices:
+      - /dev/kfd:/dev/kfd
+      # Adjust renderD128 if your AMD GPU exposes a different render node.
+      - /dev/dri/renderD128:/dev/dri/renderD128
+    group_add:
+      - video
+      - render
+    security_opt:
+      - seccomp=unconfined
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8880/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s

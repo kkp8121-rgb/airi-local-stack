@@ -1,0 +1,44 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.idea/
+.vscode/
+venv/
+env/
+.venv/
+.python-version
+uv.lock
+
+# Audio output files
+output/
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+*.aac
+*.opus
+
+
+# LLM infra
+CLAUDE.md
+# Runtime server logs
+server_*.log
+tts-server.*.log

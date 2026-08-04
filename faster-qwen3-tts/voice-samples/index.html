@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AIRI 한국어 보이스 비교</title>
+  <style>
+    :root { color-scheme: dark; font-family: "Segoe UI", "Malgun Gothic", sans-serif; }
+    body { max-width: 980px; margin: 0 auto; padding: 36px 22px 60px; background: #11131a; color: #f4f4f7; }
+    h1 { margin-bottom: 8px; font-size: 28px; }
+    .intro { color: #b9bdca; line-height: 1.65; }
+    .sentence { margin: 22px 0 28px; padding: 16px 18px; background: #1b1e29; border: 1px solid #303544; border-radius: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(275px, 1fr)); gap: 14px; }
+    .card { padding: 17px; background: #1b1e29; border: 1px solid #303544; border-radius: 14px; }
+    .name { display: flex; align-items: baseline; gap: 9px; margin-bottom: 5px; }
+    .name strong { font-size: 19px; }
+    .tag { color: #9ba5ff; font-size: 12px; }
+    .desc { min-height: 42px; color: #c7cad4; font-size: 14px; line-height: 1.5; }
+    audio { width: 100%; margin-top: 11px; height: 38px; }
+    .note { margin-top: 26px; color: #989eae; font-size: 13px; line-height: 1.6; }
+    code { padding: 2px 6px; border-radius: 5px; background: #292d3a; color: #dfe2ff; }
+  </style>
+</head>
+<body>
+  <h1>AIRI 한국어 보이스 비교</h1>
+  <p class="intro">Qwen3-TTS 0.6B CustomVoice의 9개 프리셋을 모두 한국어로 생성했습니다. 하나를 재생하면 재생 중이던 다른 샘플은 자동으로 멈춥니다.</p>
+  <div class="sentence"><strong>공통 문장</strong><br>안녕! 만나서 반가워. 오늘은 어떤 재미있는 이야기를 해 볼까?</div>
+  <main class="grid">
+    <section class="card"><div class="name"><strong>Vivian</strong><span class="tag">여성 · 중국어 기반</span></div><div class="desc">밝고 생기 있으며 약간 또렷하고 힘 있는 인상</div><audio controls preload="metadata" src="Vivian.wav"></audio></section>
+    <section class="card"><div class="name"><strong>Serena</strong><span class="tag">여성 · 중국어 기반</span></div><div class="desc">따뜻하고 부드러우며 차분한 인상</div><audio controls preload="metadata" src="Serena.wav"></audio></section>
+    <section class="card"><div class="name"><strong>Uncle_Fu</strong><span class="tag">남성 · 중국어 기반</span></div><div class="desc">낮고 여유로우며 성숙한 인상</div><audio controls preload="metadata" src="Uncle_Fu.wav"></audio></section>
+    <section class="card"><div class="name"><strong>Dylan</strong><span class="tag">남성 · 중국어 기반</span></div><div class="desc">젊고 자연스러우며 친근한 인상</div><audio controls preload="metadata" src="Dylan.wav"></audio></section>
+    <section class="card"><div class="name"><strong>Eric</strong><span class="tag">남성 · 중국어 기반</span></div><div class="desc">활기차고 살짝 허스키한 인상</div><audio controls preload="metadata" src="Eric.wav"></audio></section>
+    <section class="card"><div class="name"><strong>Ryan</strong><span class="tag">남성 · 영어 기반</span></div><div class="desc">역동적이고 리듬감 있는 인상</div><audio controls preload="metadata" src="Ryan.wav"></audio></section>
+    <section class="card"><div class="name"><strong>Aiden</strong><span class="tag">남성 · 영어 기반</span></div><div class="desc">맑고 밝으며 산뜻한 인상</div><audio controls preload="metadata" src="Aiden.wav"></audio></section>
+    <section class="card"><div class="name"><strong>Ono_Anna</strong><span class="tag">여성 · 일본어 기반</span></div><div class="desc">가볍고 장난스러워 애니 캐릭터에 가까운 인상</div><audio controls preload="metadata" src="Ono_Anna.wav"></audio></section>
+    <section class="card"><div class="name"><strong>Sohee</strong><span class="tag">여성 · 한국어 기반</span></div><div class="desc">따뜻하고 감정 표현이 풍부한 자연스러운 한국어 음성</div><audio controls preload="metadata" src="Sohee.wav"></audio></section>
+  </main>
+  <p class="note">AIRI에서 바꾸려면 음성 공급자의 Voice 칸에 위 이름을 대소문자와 밑줄까지 그대로 입력하세요. 현재 기본값은 <code>Sohee</code>입니다. 중국어·영어·일본어 기반 프리셋도 한국어 합성이 가능하지만 발음 억양은 Sohee와 다를 수 있습니다.</p>
+  <script>
+    const players = [...document.querySelectorAll('audio')];
+    players.forEach(player => player.addEventListener('play', () => {
+      players.filter(other => other !== player).forEach(other => other.pause());
+    }));
+  </script>
+</body>
+</html>

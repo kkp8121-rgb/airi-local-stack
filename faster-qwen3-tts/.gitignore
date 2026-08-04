@@ -1,0 +1,12 @@
+models/
+sample_*.wav
+*.wav
+*.json
+__pycache__/
+*.pyc
+.venv/
+tts-server.*.log
+.cache/
+outputs/
+artifacts/
+packages/qwentts_cpp_python/
