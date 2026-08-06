@@ -165,7 +165,7 @@
 2. 로컬 app.asar 패치의 실체 (스펙 기술과 업스트림 코드 불일치 3건 — §1-3)
 3. GPT-SoVITS v2ProPlus 3060 Ti 실측 (TTFA, LLM 동시 구동, VRAM)
 4. GPT-SoVITS Windows 한국어 G2P 설치 검증 (`eunjeon`/mecab)
-5. MOSS-TTS-Nano Ryzen 5600X 실측 RTF + 한국어 TN 우회 후 품질
+5. MOSS-TTS-Nano Ryzen 7 8700G 실측 RTF + 한국어 TN 우회 후 품질
 6. chatterbox pip 0.1.7 wheel과 main 브랜치 코드 차이 (`import chatterbox.tts_turbo` 가능 여부)
 
 ## 5. 후속 설치 시도 기록 (2026-08-06)

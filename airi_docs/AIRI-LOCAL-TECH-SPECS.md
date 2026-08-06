@@ -23,7 +23,7 @@
 | 항목 | 사양 |
 |---|---|
 | 운영체제 | Windows 11 Pro, 빌드 26200 |
-| CPU | AMD Ryzen 5 5600X, 6코어 12스레드 |
+| CPU | AMD Ryzen 7 8700G, 8코어 16스레드 |
 | GPU | NVIDIA GeForce RTX 3060 Ti, VRAM 8GB |
 | NVIDIA 드라이버 | 591.74 |
 | AIRI | 0.11.3, Electron 데스크톱 앱 |

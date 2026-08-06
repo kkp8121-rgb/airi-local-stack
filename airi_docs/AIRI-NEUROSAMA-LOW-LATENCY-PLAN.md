@@ -4,7 +4,7 @@
 - 프로젝트 위치: `C:\Projects\airi`
 - 기반 문서: `AIRI-LOCAL-TECH-SPECS.md`, `AIRI-CODE-AUDIT-2026-08-06.md`(AIRI 본체 실측), **`AIRI-RAG-REPOS-AUDIT-2026-08-06.md`**(RAG 레포 3종 실측 — 기억 계층 설계 결정표 §4)
 - 이전 판: `archive/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-v1-2026-08-06.md`, `archive/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-v2-2026-08-06.md`
-- 목표 플랫폼: Windows 단일 PC (Ryzen 5 5600X / RTX 3060 Ti 8GB)
+- 목표 플랫폼: Windows 단일 PC (Ryzen 7 8700G / RTX 3060 Ti 8GB)
 - 기준 애플리케이션: AIRI 0.11.3 (소스: `external/airi`, v0.11.3 태그 = 설치본 동일)
 
 ## v1 → v2 개정 요지
@@ -74,7 +74,7 @@
 
 ### 파이프라인과 하드웨어
 
-v1과 동일 (스펙 문서 참조): 마이크 → VAD → faster-whisper small(CPU INT8) → Ollama/EXAONE 2.4b(Q4, num_gpu=20) → Chatterbox(GPU) → Web Audio/Live2D. RTX 3060 Ti 8GB, Ryzen 5 5600X.
+v1과 동일 (스펙 문서 참조): 마이크 → VAD → faster-whisper small(CPU INT8) → Ollama/EXAONE 2.4b(Q4, num_gpu=20) → Chatterbox(GPU) → Web Audio/Live2D. RTX 3060 Ti 8GB, Ryzen 7 8700G.
 
 ### AIRI v0.11.3 내부 구현 현황 (코드 실측 — 감사 문서 §1)
 
@@ -231,7 +231,7 @@ Chatterbox 유지 시나리오는 폐기한다 (T3 구조 병목 + 스트리밍 
 MOSS-TTS-Nano 게이트 (모두 통과 시만 후보 유지):
 
 - 한국어 TN 우회(`--disable-wetext-processing`) 후 발음 품질 확인 (한글 미인식 → 중국어 정규화기 폴백 결함 확인됨)
-- Ryzen 5600X 실측 RTF < 1 (x86 공개 수치 전무 — 직접 측정 외 근거 없음)
+- Ryzen 7 8700G 실측 RTF < 1 (x86 공개 수치 전무 — 직접 측정 외 근거 없음)
 - Windows 설치 성공 (pynini 마찰 문서화됨)
 
 ### Phase 2. 취소 경로 완결
