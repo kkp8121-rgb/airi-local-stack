@@ -148,7 +148,7 @@
 #### 실행 절차 및 AIRI 적용 상태
 
 - 세 서비스를 재현하려면 `gpt-sovits/start-local-stack.ps1`를 실행한다. 이 스크립트는 Ollama(11434), GPT API(9880), OpenAI 음성 프록시(8880)를 이미 실행 중인지 확인한 뒤 필요한 것만 시작한다.
-- 설치된 AIRI 로그의 최근 상태는 `Provider: none`이었지만, 실제 저장소에는 `openai-compatible-audio`와 모델/Voice 설정이 이미 저장되어 있고 Base URL은 `http://127.0.0.1:8880`이었다. 따라서 기존 AIRI 설정과 충돌하지 않도록 프록시의 기본 포트를 8880으로 맞췄다.
+- 설치된 AIRI 로그의 `artistry-bridge ... Provider: none`은 Artistry 브리지 상태를 가리키는 로그이며 음성 provider 판정에 사용하지 않는다. 실제 저장소에는 `openai-compatible-audio`와 모델/Voice 설정이 이미 저장되어 있고 Base URL은 `http://127.0.0.1:8880`이었다. 따라서 기존 AIRI 설정과 충돌하지 않도록 프록시의 기본 포트를 8880으로 맞췄다.
   - Base URL: `http://127.0.0.1:8880/v1`
   - Model: `tts-1-ko`
   - Voice: `airi-vtuber`
