@@ -121,3 +121,11 @@
 4. GPT-SoVITS Windows 한국어 G2P 설치 검증 (`eunjeon`/mecab)
 5. MOSS-TTS-Nano Ryzen 5600X 실측 RTF + 한국어 TN 우회 후 품질
 6. chatterbox pip 0.1.7 wheel과 main 브랜치 코드 차이 (`import chatterbox.tts_turbo` 가능 여부)
+
+## 5. 후속 설치 시도 기록 (2026-08-06)
+
+- 공식 GPT-SoVITS 저장소 `RVC-Boss/GPT-SoVITS`를 커밋 `d523079`로 별도 `external/`에 확보했다.
+- v2ProPlus API 코드에서 `streaming_mode=2`, `min_chunk_length=16` 및 한국어 프런트엔드(`ko_pron`, `g2pk2`) 경로를 재확인했다.
+- Windows Python 3.11 별도 환경에서 CUDA PyTorch 설치를 시도했으나 120초 제한 내 완료되지 않았다. 기존 Chatterbox CUDA PyTorch를 `PYTHONPATH`로 재사용하는 우회는 `torch 2.6.0+cu124`, CUDA 사용 가능 상태까지 확인했다.
+- GPT-SoVITS 전체 requirements 설치는 `pyopenjtalk`가 Windows에서 CMake/NMake와 MSVC를 요구해 중단됐다. 한국어 전용 경로는 `pyopenjtalk`가 직접 필요하지 않지만, 나머지 의존성 및 모델 가중치 설치 후 별도 검증이 필요하다.
+- 따라서 3060 Ti TTFA/VRAM 실측은 아직 미완료이며, 설치 장애를 해결한 뒤에만 채택 판정을 진행한다. 외부 클론과 별도 가상환경은 프로젝트 Git에 포함하지 않는다.
