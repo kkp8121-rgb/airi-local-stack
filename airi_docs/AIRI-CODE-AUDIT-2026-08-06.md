@@ -129,4 +129,5 @@
 - Windows Python 3.11 별도 환경에서 CUDA PyTorch 설치를 시도했으나 120초 제한 내 완료되지 않았다. 기존 Chatterbox CUDA PyTorch를 `PYTHONPATH`로 재사용하는 우회는 `torch 2.6.0+cu124`, CUDA 사용 가능 상태까지 확인했다.
 - GPT-SoVITS 전체 requirements 설치는 `pyopenjtalk`가 Windows에서 CMake/NMake와 MSVC를 요구해 중단됐다. 한국어 전용 경로는 `pyopenjtalk`가 직접 필요하지 않지만, 나머지 의존성 및 모델 가중치 설치 후 별도 검증이 필요하다.
 - 추가 확인 결과 `pyopenjtalk-prebuilt==0.3.0`의 CPython 3.11 Windows 휠은 설치·import 가능했다. 그러나 한국어 모듈 import 시 `g2pk2`가 `eunjeon`을 실제 호출하고, `eunjeon`은 동일하게 Windows MSVC 확장을 요구해 한국어 G2P는 아직 실행되지 않는다. `jieba_fast`는 순수 Python `jieba` 호환 shim으로 대체 가능하지만 성능 저하가 있다.
+- 우회 검증 완료: `python-mecab-ko==1.2.9` + `python-mecab-ko-dic` Windows 휠을 설치하고 `gpt-sovits/setup-windows-korean-g2p.ps1`로 `eunjeon.Mecab -> mecab.MeCab` 호환 어댑터를 주입했다. `안녕하세요. 아이리입니다.`가 자모열로 변환되는 것까지 성공했다. 이는 한국어 G2P 블로커를 제거하지만, 전체 GPT-SoVITS 의존성·가중치 설치와 음질/TTFA 검증은 남아 있다.
 - 따라서 3060 Ti TTFA/VRAM 실측은 아직 미완료이며, 설치 장애를 해결한 뒤에만 채택 판정을 진행한다. 외부 클론과 별도 가상환경은 프로젝트 Git에 포함하지 않는다.
