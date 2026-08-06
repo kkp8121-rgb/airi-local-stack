@@ -32,7 +32,7 @@ The latest run passed with a `399.8 ms` first chunk and `1.64 s` total generatio
 To start all local services, including faster-whisper STT, use:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File C:\Projects\airi\start-airi-local-stack.ps1
+powershell -ExecutionPolicy Bypass -File C:\Projects\airi\start-gpt-sovits-airi-stack.ps1
 ```
 
 The integrated launcher keeps STT debug-audio persistence disabled.
