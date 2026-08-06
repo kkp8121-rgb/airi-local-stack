@@ -122,6 +122,21 @@
 - 측정 중 GPU 메모리는 약 **5,092/8,192MiB**였다. 따라서 Ollama가 GPU를 5GB 이상 점유하는 상태에서는 동시 상주가 불가능할 가능성이 높다. 다음 단계는 Ollama 동시 실행 상태에서 VRAM/TTFA를 재측정하는 것이다.
 - 재현 명령은 `gpt-sovits/benchmark-api.py`이며, GPT 서버를 먼저 실행한 뒤 프로젝트 루트에서 실행한다.
 
+#### Ollama 동시 실행 결과
+
+- Ollama `exaone-airi:2.4b`를 같은 RTX 3060 Ti에 로드한 뒤 GPT-SoVITS에 동시에 요청했다.
+- 최초 동시 요청은 Ollama 모델 로드가 포함되어 LLM 3.76초, GPT 첫 청크 0.45초였다.
+- 두 모델이 워밍업된 상태의 동시 요청은 **LLM 0.59초, GPT 첫 청크 0.59초, GPT 전체 1.58초**였다.
+- 동시 상주 후 GPU 메모리는 **5,975/8,192MiB**로 측정됐다. 현재 2.4B 양자화 모델과 v2ProPlus의 동시 실행은 가능하지만 여유가 약 2.2GB뿐이므로 다른 GPU 작업을 함께 시작하면 OOM 위험이 있다.
+- 따라서 현재 구성은 “LLM과 TTS를 번갈아 로드”할 필요 없이 동시 상주가 가능하다. 다만 AIRI 연결 후 실제 STT까지 포함한 최종 부하 측정은 남아 있다.
+
+#### AIRI OpenAI 음성 계약 연결
+
+- `gpt-sovits/openai_compatible_proxy.py`를 추가해 AIRI의 `POST /v1/audio/speech` 요청을 GPT-SoVITS `POST /tts`로 변환한다.
+- 프록시를 `127.0.0.1:8891`에서 실행하고 AIRI의 OpenAI Compatible Speech Base URL을 `http://127.0.0.1:8891/v1`로 지정하면 된다. API key는 로컬 프록시에서 사용하지 않는다.
+- 프록시 health와 실제 음성 요청을 확인했다: `/health` 정상, 한국어 문장 요청 HTTP 200, 첫 청크 약 **367ms**, 전체 약 **1.42초**.
+- 기본 출력은 WAV이며, 기준 음성은 `chatterbox/voices/airi-reference.wav`, 프롬프트 언어는 `ko`로 고정했다. 다른 샘플은 `GPT_SOVITS_REFERENCE_AUDIO` 환경 변수로 교체할 수 있다.
+
 ## 4. 남은 확인 필요 항목
 
 1. 로컬 STT/TTS 서버 코드와 패치된 app.asar의 실제 경로 (스펙 기재 위치에 없음)
