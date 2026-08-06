@@ -3,6 +3,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $gptRoot = Join-Path $projectRoot 'external\GPT-SoVITS'
 $python = Join-Path $gptRoot '.venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $python)) { throw "GPT-SoVITS environment not found: $python" }
+New-Item -ItemType Directory -Force -Path (Join-Path $gptRoot 'GPT_SoVITS\pretrained_models\fast_langdetect') | Out-Null
 
 function Test-Port([int]$Port) {
   return [bool](Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)

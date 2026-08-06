@@ -157,6 +157,7 @@
 - 기존 AIRI 저장 설정과 동일한 `127.0.0.1:8880`에서 프록시를 실행해 직접 호출을 재검증했다: HTTP 200, 첫 청크 **552ms**, 전체 **885ms**.
 - AIRI 앱 재기동 후 프록시 access log에서 `GET /v1/models` HTTP 200을 확인했다. 이는 AIRI가 저장된 OpenAI 호환 음성 provider의 Base URL에 실제 접속한 증거다. 아직 AIRI가 음성 생성까지 실행한 `POST /v1/audio/speech` 로그는 없어, 마지막 단계는 앱에서 실제 발화를 한 번 수행하는 것이다.
 - 설치된 AIRI 0.11.3 `app.asar` 소스도 확인했다. `openai-compatible-audio-speech.vue`는 `speechStore.speech`를 호출하고, `unspeech` 구현은 Base URL 뒤에 `audio/speech`를 붙여 POST한다. 프록시가 `/v1/audio/speech`와 `/audio/speech`를 모두 지원하도록 한 이유가 이 실제 호출 경로다.
+- AIRI와 동일한 요청을 재현하는 `gpt-sovits/test-airi-speech.ps1`를 추가했다. 첫 실행에서 GPT-SoVITS의 `fast_langdetect` 캐시 폴더 누락으로 500이 재현됐고, `pretrained_models/fast_langdetect/lid.176.bin`(125.2MB)을 준비해 해결했다. 이후 동일 요청은 HTTP 200, 워밍업 후 첫 청크 **574ms**, 전체 **1.59초**로 통과했다.
 
 ## 4. 남은 확인 필요 항목
 
