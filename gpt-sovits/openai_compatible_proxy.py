@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import threading
 from typing import Iterator
 
 import requests
@@ -25,6 +26,7 @@ PROMPT_LANG = os.environ.get("GPT_SOVITS_PROMPT_LANG", "ko")
 PROMPT_TEXT = os.environ.get("GPT_SOVITS_PROMPT_TEXT", "안녕하세요.")
 STREAMING_MODE = int(os.environ.get("GPT_SOVITS_STREAMING_MODE", "2"))
 MIN_CHUNK_LENGTH = int(os.environ.get("GPT_SOVITS_MIN_CHUNK_LENGTH", "16"))
+TTS_LOCK = threading.Lock()
 
 
 class SpeechRequest(BaseModel):
@@ -52,13 +54,16 @@ def models():
 
 
 def _stream_backend(payload: dict) -> Iterator[bytes]:
-    try:
-        with HTTP.post(GPT_TTS_URL, json=payload, stream=True, timeout=180) as response:
-            if response.status_code != 200:
-                raise RuntimeError(f"GPT-SoVITS returned {response.status_code}: {response.text[:500]}")
-            yield from response.iter_content(4096)
-    except requests.RequestException as exc:
-        raise RuntimeError(f"GPT-SoVITS backend unavailable: {exc}") from exc
+    # GPT-SoVITS streaming generations must not overlap: mixed streams sound
+    # like murmuring when AIRI sends adjacent sentence chunks concurrently.
+    with TTS_LOCK:
+        try:
+            with HTTP.post(GPT_TTS_URL, json=payload, stream=True, timeout=180) as response:
+                if response.status_code != 200:
+                    raise RuntimeError(f"GPT-SoVITS returned {response.status_code}: {response.text[:500]}")
+                yield from response.iter_content(4096)
+        except requests.RequestException as exc:
+            raise RuntimeError(f"GPT-SoVITS backend unavailable: {exc}") from exc
 
 
 @app.post("/v1/audio/speech")
@@ -78,7 +83,7 @@ def speech(request: SpeechRequest, http_request: Request):
         "streaming_mode": STREAMING_MODE,
         "min_chunk_length": MIN_CHUNK_LENGTH,
         "speed_factor": request.speed,
-        "parallel_infer": True,
+        "parallel_infer": False,
         "media_type": "wav",
     }
     logger.info(
