@@ -1,12 +1,20 @@
 import unittest
 
 from openai_stt_server import (
+    DEBUG_AUDIO_DIR,
+    VERBOSE_TRANSCRIPTION_LOG,
     filter_implausible_transcription,
     filter_low_confidence_transcription,
+    preserve_debug_audio,
 )
 
 
 class TranscriptionFilterTests(unittest.TestCase):
+    def test_privacy_defaults_do_not_persist_audio_or_text_logging(self) -> None:
+        self.assertIsNone(DEBUG_AUDIO_DIR)
+        self.assertFalse(VERBOSE_TRANSCRIPTION_LOG)
+        self.assertIsNone(preserve_debug_audio(b"audio-bytes", ".webm"))
+
     def test_keeps_normal_short_korean_utterance(self) -> None:
         text, reason = filter_implausible_transcription(
             "안녕하세요 아이리야",
