@@ -33,3 +33,21 @@ $process = Start-Process `
     -PassThru
 
 Write-Output "Started AIRI local STT server (PID $($process.Id))."
+
+$ready = $false
+for ($attempt = 1; $attempt -le 60; $attempt++) {
+    Start-Sleep -Seconds 1
+    try {
+        $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8890/health' -TimeoutSec 2
+        if ($health.status -eq 'ok') {
+            $ready = $true
+            Write-Output "AIRI local STT ready (model=$($health.model), device=$($health.device), threads=$($health.cpu_threads))."
+            break
+        }
+    } catch {
+        # The model may still be loading; keep polling until the bounded timeout.
+    }
+}
+if (-not $ready) {
+    throw 'AIRI local STT did not become ready within 60 seconds. Check stt-server.err.log.'
+}
