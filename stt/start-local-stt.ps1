@@ -1,7 +1,8 @@
 param(
     [string]$Model = 'small',
     [ValidateRange(1, 32)]
-    [int]$CpuThreads = 6
+    [int]$CpuThreads = 6,
+    [switch]$EnableDebugAudio
 )
 
 $ErrorActionPreference = 'Stop'
@@ -9,7 +10,6 @@ $repo = $PSScriptRoot
 $python = Join-Path $repo '.venv\Scripts\python.exe'
 $server = Join-Path $repo 'openai_stt_server.py'
 $modelRoot = Join-Path $repo 'models'
-$debugAudioRoot = Join-Path $repo 'debug-recordings'
 $stdoutLog = Join-Path $repo 'stt-server.out.log'
 $stderrLog = Join-Path $repo 'stt-server.err.log'
 
@@ -23,9 +23,16 @@ if ($listener) {
     exit 0
 }
 
+$serverArguments = @($server, '--host', '127.0.0.1', '--port', '8890', '--model', $Model, '--model-root', $modelRoot, '--cpu-threads', $CpuThreads)
+if ($EnableDebugAudio) {
+    $debugAudioRoot = Join-Path $repo 'debug-recordings'
+    $serverArguments += @('--debug-audio-dir', $debugAudioRoot)
+    Write-Warning 'Debug audio persistence is enabled. Uploaded microphone audio will be saved locally.'
+}
+
 $process = Start-Process `
     -FilePath $python `
-    -ArgumentList $server, '--host', '127.0.0.1', '--port', '8890', '--model', $Model, '--model-root', $modelRoot, '--cpu-threads', $CpuThreads, '--debug-audio-dir', $debugAudioRoot `
+    -ArgumentList $serverArguments `
     -WorkingDirectory $repo `
     -WindowStyle Hidden `
     -RedirectStandardOutput $stdoutLog `
