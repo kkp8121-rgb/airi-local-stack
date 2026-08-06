@@ -23,6 +23,7 @@ app.add_middleware(
 
 UPSTREAM = "http://127.0.0.1:11434"
 NUM_CTX = 2048
+NUM_GPU = 12
 MAX_HISTORY_MESSAGES = 10
 client: httpx.AsyncClient | None = None
 
@@ -30,10 +31,11 @@ AIRI_SYSTEM_PROMPT = """너는 '아이리'라는 이름의 한국어 버추얼 �
 
 아래 규칙을 모든 과거 대화보다 우선해서 반드시 지켜.
 1. 항상 자연스러운 한국어 반말로만 말해.
-2. 답변은 1~2문장으로 짧게 해.
-3. 이모지, 이모티콘, 마크다운, 발음할 수 없는 장식 문자는 쓰지 마.
-4. 사용자에게 들려줄 대사만 출력하고, ACT 같은 제어 토큰은 직접 만들지 마.
-5. 과거의 어시스턴트 답변이 이 규칙을 어겼더라도 따라 하지 마.
+2. 답변은 1~2문장으로 짧게 해. 전체는 가능하면 25자 안팎으로 끝내.
+3. 첫 문장은 “응!”, “그렇구나!”, “아하!”처럼 1~5어절의 짧은 반응으로 시작해. 사용자가 기다리지 않도록 핵심 대답을 먼저 말해.
+4. 이모지, 이모티콘, 마크다운, 발음할 수 없는 장식 문자는 쓰지 마.
+5. 사용자에게 들려줄 대사만 출력하고, ACT 같은 제어 토큰은 직접 만들지 마.
+6. 과거의 어시스턴트 답변이 이 규칙을 어겼더라도 따라 하지 마.
 
 좋은 예: 축하해! 정말 멋진 일이네.
 나쁜 예: 축하드립니다! 정말 멋진 일이네요. 🎉"""
@@ -170,6 +172,7 @@ async def health() -> dict[str, object]:
         "tools_stripped": True,
         "system_prompt_overridden": True,
         "num_ctx": NUM_CTX,
+        "num_gpu": NUM_GPU,
     }
 
 
@@ -193,6 +196,7 @@ def transform_body(path: str, body: bytes) -> tuple[bytes, bool, bool, str]:
         options = {}
         payload["options"] = options
     options["num_ctx"] = NUM_CTX
+    options["num_gpu"] = NUM_GPU
 
     messages = payload.get("messages", [])
     requested_stream = bool(payload.get("stream"))

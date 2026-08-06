@@ -1,5 +1,5 @@
 param(
-    [string]$Model = 'base',
+    [string]$Model = 'small',
     [ValidateRange(1, 32)]
     [int]$CpuThreads = 6
 )
@@ -9,6 +9,7 @@ $repo = $PSScriptRoot
 $python = Join-Path $repo '.venv\Scripts\python.exe'
 $server = Join-Path $repo 'openai_stt_server.py'
 $modelRoot = Join-Path $repo 'models'
+$debugAudioRoot = Join-Path $repo 'debug-recordings'
 $stdoutLog = Join-Path $repo 'stt-server.out.log'
 $stderrLog = Join-Path $repo 'stt-server.err.log'
 
@@ -16,7 +17,7 @@ if (-not (Test-Path -LiteralPath $python)) {
     throw "Python environment not found: $python"
 }
 
-$listener = Get-NetTCPConnection -LocalPort 8890 -State Listen -ErrorAction SilentlyContinue
+$listener = Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort 8890 -State Listen -ErrorAction SilentlyContinue
 if ($listener) {
     Write-Output "A service is already listening on port 8890 (PID $($listener.OwningProcess))."
     exit 0
@@ -24,7 +25,7 @@ if ($listener) {
 
 $process = Start-Process `
     -FilePath $python `
-    -ArgumentList $server, '--host', '127.0.0.1', '--port', '8890', '--model', $Model, '--model-root', $modelRoot, '--cpu-threads', $CpuThreads `
+    -ArgumentList $server, '--host', '127.0.0.1', '--port', '8890', '--model', $Model, '--model-root', $modelRoot, '--cpu-threads', $CpuThreads, '--debug-audio-dir', $debugAudioRoot `
     -WorkingDirectory $repo `
     -WindowStyle Hidden `
     -RedirectStandardOutput $stdoutLog `

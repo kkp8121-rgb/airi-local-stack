@@ -288,6 +288,7 @@ class ChatterboxMultilingualTTS:
         repetition_penalty=1.2,
         min_p=0.05,
         top_p=1.0,
+        n_cfm_timesteps=10,
     ):
         # Validate language_id
         if language_id and language_id.lower() not in SUPPORTED_LANGUAGES:
@@ -309,12 +310,16 @@ class ChatterboxMultilingualTTS:
                 speaker_emb=_cond.speaker_emb,
                 cond_prompt_speech_tokens=_cond.cond_prompt_speech_tokens,
                 emotion_adv=exaggeration * torch.ones(1, 1, 1),
-            ).to(device=self.device)
+            ).to(device=self.device, dtype=_cond.speaker_emb.dtype)
 
         # Norm and tokenize text
         text = punc_norm(text)
         text_tokens = self.tokenizer.text_to_tokens(text, language_id=language_id.lower() if language_id else None).to(self.device)
-        text_tokens = torch.cat([text_tokens, text_tokens], dim=0)  # Need two seqs for CFG
+        # CFG needs a conditional/unconditional pair. When CFG is disabled,
+        # keep a single sequence so the autoregressive T3 pass does half the
+        # transformer work and uses substantially less VRAM.
+        if cfg_weight > 0.0:
+            text_tokens = torch.cat([text_tokens, text_tokens], dim=0)
 
         sot = self.t3.hp.start_text_token
         eot = self.t3.hp.stop_text_token
@@ -342,6 +347,7 @@ class ChatterboxMultilingualTTS:
             wav, _ = self.s3gen.inference(
                 speech_tokens=speech_tokens,
                 ref_dict=self.conds.gen,
+                n_cfm_timesteps=n_cfm_timesteps,
             )
             wav = wav.squeeze(0).detach().cpu().numpy()
 

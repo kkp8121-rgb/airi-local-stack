@@ -8,6 +8,7 @@ import logging
 import os
 import struct
 import threading
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -36,6 +37,7 @@ reference_audio: Optional[Path] = None
 default_exaggeration = 0.70
 default_cfg_weight = 0.30
 default_temperature = 0.65
+default_cfm_steps = 10
 sample_rate = 24000
 model_lock = threading.Lock()
 
@@ -58,6 +60,7 @@ class SpeechRequest(BaseModel):
     cfg_weight: Optional[float] = None
     temperature: Optional[float] = None
     seed: Optional[int] = None
+    cfm_steps: Optional[int] = None
 
 
 def _pcm16(audio: np.ndarray) -> bytes:
@@ -114,6 +117,7 @@ async def health():
         "default_exaggeration": default_exaggeration,
         "default_cfg_weight": default_cfg_weight,
         "default_temperature": default_temperature,
+        "default_cfm_steps": default_cfm_steps,
     }
 
 
@@ -144,10 +148,16 @@ async def create_speech(req: SpeechRequest):
         raise HTTPException(status_code=400, detail="input text exceeds 1000 characters")
 
     exaggeration, cfg_weight, temperature = _resolve_parameters(req)
+    cfm_steps = req.cfm_steps if req.cfm_steps is not None else default_cfm_steps
+    if not 2 <= cfm_steps <= 10:
+        raise HTTPException(status_code=400, detail="cfm_steps must be between 2 and 10")
     loop = asyncio.get_running_loop()
+    queued_at = time.perf_counter()
 
     def generate():
         with model_lock:
+            queue_seconds = time.perf_counter() - queued_at
+            started_at = time.perf_counter()
             if req.seed is not None:
                 torch.manual_seed(req.seed)
                 torch.cuda.manual_seed_all(req.seed)
@@ -157,18 +167,32 @@ async def create_speech(req: SpeechRequest):
                 exaggeration=exaggeration,
                 cfg_weight=cfg_weight,
                 temperature=temperature,
+                n_cfm_timesteps=cfm_steps,
             )
-            return audio.squeeze().detach().cpu().float().numpy()
+            generation_seconds = time.perf_counter() - started_at
+            return (
+                audio.squeeze().detach().cpu().float().numpy(),
+                queue_seconds,
+                generation_seconds,
+            )
 
     logger.info(
-        "Generating %d chars: voice=%s exaggeration=%.2f cfg_weight=%.2f temperature=%.2f",
+        "Generating %d chars: voice=%s exaggeration=%.2f cfg_weight=%.2f temperature=%.2f cfm_steps=%d",
         len(text),
         req.voice,
         exaggeration,
         cfg_weight,
         temperature,
+        cfm_steps,
     )
-    audio = await loop.run_in_executor(None, generate)
+    audio, queue_seconds, generation_seconds = await loop.run_in_executor(None, generate)
+    logger.info(
+        "Completed %d chars: queue=%.3fs generation=%.3fs total=%.3fs",
+        len(text),
+        queue_seconds,
+        generation_seconds,
+        queue_seconds + generation_seconds,
+    )
     fmt = req.response_format.casefold()
     if fmt == "pcm":
         return Response(_pcm16(audio), media_type="audio/pcm")
@@ -185,13 +209,14 @@ def parse_args():
     parser.add_argument("--exaggeration", type=float, default=0.70)
     parser.add_argument("--cfg-weight", type=float, default=0.30)
     parser.add_argument("--temperature", type=float, default=0.65)
+    parser.add_argument("--cfm-steps", type=int, choices=range(2, 11), default=10)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8880)
     return parser.parse_args()
 
 
 def main():
-    global model, reference_audio, default_exaggeration, default_cfg_weight, default_temperature, sample_rate
+    global model, reference_audio, default_exaggeration, default_cfg_weight, default_temperature, default_cfm_steps, sample_rate
     args = parse_args()
     reference_audio = Path(args.reference_audio).resolve()
     if not reference_audio.is_file():
@@ -205,6 +230,11 @@ def main():
     default_exaggeration = args.exaggeration
     default_cfg_weight = args.cfg_weight
     default_temperature = args.temperature
+    default_cfm_steps = args.cfm_steps
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    torch.backends.cudnn.benchmark = True
+    torch.set_float32_matmul_precision("high")
     from chatterbox.mtl_tts import ChatterboxMultilingualTTS
 
     logger.info("Loading Multilingual V3 on CUDA")

@@ -16,6 +16,7 @@ stt/models/
 **/pretrained_models/
 **/checkpoints/
 **/.cache/
+moss-tts-nano/
 *.safetensors
 *.ckpt
 *.pth
@@ -50,7 +51,9 @@ stt/models/
 *.key
 
 # Diagnostic extraction and screenshots (regenerable)
+.codex-remote-attachments/
 asar-inspect/
+stt/debug-recordings/
 /*.png
 chatterbox/voices/*-spectrum.png
 chatterbox/voices/*-waveform.png

@@ -1,0 +1,81 @@
+function useAudioRecorder(media) {
+	const mediaRef = toRef(media);
+	const recording = shallowRef();
+	const activeSession = shallowRef();
+	const isRecording = computed(() => !!activeSession.value);
+	const onStopRecordHooks = ref([]);
+	function onStopRecord(callback) {
+		onStopRecordHooks.value.push(callback);
+		return () => {
+			onStopRecordHooks.value = onStopRecordHooks.value.filter((hook) => hook !== callback);
+		};
+	}
+	function preferredMimeType() {
+		for (const mimeType of ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"])
+			if (MediaRecorder.isTypeSupported(mimeType)) return mimeType;
+		return "";
+	}
+	async function startRecord() {
+		if (activeSession.value) return;
+		await until(mediaRef).toBeTruthy();
+		const stream = mediaRef.value;
+		if (!stream.getAudioTracks().length) throw new Error("No audio tracks found in stream");
+		const mimeType = preferredMimeType();
+		const recorder = mimeType ? new MediaRecorder(stream, {
+			mimeType,
+			audioBitsPerSecond: 128000
+		}) : new MediaRecorder(stream);
+		const session = {
+			recorder,
+			chunks: [],
+			format: recorder.mimeType || mimeType || "audio/webm"
+		};
+		recorder.ondataavailable = (event) => {
+			if (event.data.size > 0) session.chunks.push(event.data);
+		};
+		activeSession.value = session;
+		try {
+			recorder.start(100);
+		} catch (error) {
+			if (activeSession.value === session) activeSession.value = void 0;
+			throw error;
+		}
+	}
+	async function stopRecord() {
+		const session = activeSession.value;
+		if (!session) return;
+		activeSession.value = void 0;
+		const audioBlob = await new Promise((resolve, reject) => {
+			let finished = false;
+			const finish = () => {
+				if (finished) return;
+				finished = true;
+				resolve(new Blob(session.chunks, { type: session.format }));
+			};
+			session.recorder.onerror = (event) => reject(event.error || new Error("Native microphone recording failed"));
+			session.recorder.onstop = finish;
+			if (session.recorder.state === "inactive") {
+				finish();
+				return;
+			}
+			try {
+				session.recorder.requestData();
+			} catch {}
+			session.recorder.stop();
+		});
+		recording.value = audioBlob;
+		for (const hook of onStopRecordHooks.value) try {
+			await hook(audioBlob);
+		} catch (error) {
+			console.error("onStopRecord hook failed:", error);
+		}
+		return audioBlob;
+	}
+	return {
+		startRecord,
+		stopRecord,
+		onStopRecord,
+		isRecording,
+		recording
+	};
+}
