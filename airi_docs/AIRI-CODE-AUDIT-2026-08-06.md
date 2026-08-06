@@ -155,6 +155,7 @@
   - Format: `wav`
 - AIRI 창에서 실제 STT→LLM→TTS 1회 대화가 실행되기 전까지 종단 TTFA와 음성 재생은 미검증으로 유지한다.
 - 기존 AIRI 저장 설정과 동일한 `127.0.0.1:8880`에서 프록시를 실행해 직접 호출을 재검증했다: HTTP 200, 첫 청크 **552ms**, 전체 **885ms**.
+- AIRI 앱 재기동 후 프록시 access log에서 `GET /v1/models` HTTP 200을 확인했다. 이는 AIRI가 저장된 OpenAI 호환 음성 provider의 Base URL에 실제 접속한 증거다. 아직 AIRI가 음성 생성까지 실행한 `POST /v1/audio/speech` 로그는 없어, 마지막 단계는 앱에서 실제 발화를 한 번 수행하는 것이다.
 
 ## 4. 남은 확인 필요 항목
 
