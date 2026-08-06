@@ -19,6 +19,14 @@ The reproducible local stack is:
 
 The proxy reuses a persistent `requests.Session` so repeated turns can use HTTP keep-alive.
 
+For a one-command check of all three listeners, the model advertisement, and the speech contract, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\Projects\airi\gpt-sovits\verify-local-stack.ps1
+```
+
+The latest run passed with a `399.8 ms` first chunk and `1.64 s` total generation.
+
 ## Verification boundary
 
 The scripted request proves the proxy-to-GPT-SoVITS contract, but it does not prove that a user-triggered AIRI UI turn reached the proxy. That final check must be confirmed from the proxy access log after speaking in AIRI.
