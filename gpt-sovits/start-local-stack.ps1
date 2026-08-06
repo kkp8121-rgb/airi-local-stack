@@ -23,13 +23,13 @@ if (-not (Test-Port 9880)) {
   Start-Process -FilePath $python -ArgumentList '-u','api_v2.py','-a','127.0.0.1','-p','9880','-c',(Join-Path $PSScriptRoot 'tts-infer-v2proplus.yaml') -WorkingDirectory $gptRoot -RedirectStandardOutput $out -RedirectStandardError $err -WindowStyle Hidden
 }
 
-if (-not (Test-Port 8891)) {
+if (-not (Test-Port 8880)) {
   $out = Join-Path $PSScriptRoot 'proxy.out.log'
   $err = Join-Path $PSScriptRoot 'proxy.err.log'
-  Start-Process -FilePath $python -ArgumentList '-u',(Join-Path $PSScriptRoot 'openai_compatible_proxy.py'),'--host','127.0.0.1','--port','8891' -WorkingDirectory $projectRoot -RedirectStandardOutput $out -RedirectStandardError $err -WindowStyle Hidden
+  Start-Process -FilePath $python -ArgumentList '-u',(Join-Path $PSScriptRoot 'openai_compatible_proxy.py'),'--host','127.0.0.1','--port','8880' -WorkingDirectory $projectRoot -RedirectStandardOutput $out -RedirectStandardError $err -WindowStyle Hidden
 }
 
 Start-Sleep -Seconds 2
-$ports = 11434, 9880, 8891 | ForEach-Object { [pscustomobject]@{ Port = $_; Listening = Test-Port $_ } }
+$ports = 11434, 9880, 8880 | ForEach-Object { [pscustomobject]@{ Port = $_; Listening = Test-Port $_ } }
 $ports | Format-Table -AutoSize
-Write-Output 'AIRI OpenAI Compatible Speech Base URL: http://127.0.0.1:8891/v1'
+Write-Output 'AIRI OpenAI Compatible Speech Base URL: http://127.0.0.1:8880/v1'
