@@ -42,6 +42,7 @@ def health():
 
 
 @app.get("/v1/models")
+@app.get("/models")
 def models():
     return {"object": "list", "data": [{"id": "tts-1-ko", "object": "model", "owned_by": "local-gpt-sovits"}]}
 
@@ -57,6 +58,7 @@ def _stream_backend(payload: dict) -> Iterator[bytes]:
 
 
 @app.post("/v1/audio/speech")
+@app.post("/audio/speech")
 def speech(request: SpeechRequest):
     text = request.input.strip()
     if not text:
