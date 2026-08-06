@@ -15,12 +15,17 @@ function Assert-Listening([int]$Port) {
 }
 
 Assert-Listening 11434
+Assert-Listening 11435
 Assert-Listening 9880
 Assert-Listening 8880
 
 $health = Invoke-RestMethod -Uri "$base/health" -Method Get -TimeoutSec 5
 if ($health.status -ne 'ok') { throw "speech proxy health is $($health.status)" }
 Write-Output "speech_health=ok engine=$($health.engine)"
+
+$llmHealth = Invoke-RestMethod -Uri 'http://127.0.0.1:11435/health' -Method Get -TimeoutSec 5
+if ($llmHealth.status -ne 'ok') { throw "Ollama compatibility proxy health is $($llmHealth.status)" }
+Write-Output "llm_proxy_health=ok num_ctx=$($llmHealth.num_ctx)"
 
 $models = Invoke-RestMethod -Uri "$base/v1/models" -Method Get -TimeoutSec 5
 $model = @($models.data | Where-Object { $_.id -eq 'tts-1-ko' })

@@ -5,6 +5,7 @@
 The reproducible local stack is:
 
 - Ollama: `http://127.0.0.1:11434`
+- AIRI Ollama compatibility proxy: `http://127.0.0.1:11435`
 - GPT-SoVITS v2ProPlus API: `http://127.0.0.1:9880`
 - AIRI OpenAI-compatible speech proxy: `http://127.0.0.1:8880/v1`
 
@@ -35,7 +36,7 @@ To start all local services, including faster-whisper STT, use:
 powershell -ExecutionPolicy Bypass -File C:\Projects\airi\start-gpt-sovits-airi-stack.ps1
 ```
 
-The integrated launcher keeps STT debug-audio persistence disabled.
+The integrated launcher starts the Ollama compatibility proxy as well and keeps STT debug-audio persistence disabled.
 
 ## Verification boundary
 

@@ -22,3 +22,5 @@ The scripted speech contract proves proxy-to-GPT-SoVITS behavior, but only an ac
 - Current GPT-SoVITS path: `start-gpt-sovits-airi-stack.ps1`
 - Legacy Ollama-proxy/Chatterbox path: `start-airi-local-stack.ps1`
 - Contract and listener check: `gpt-sovits/verify-local-stack.ps1`
+
+The GPT-SoVITS launcher also starts AIRI's Ollama compatibility proxy on `11435`; AIRI should use this URL for the local LLM, not the raw Ollama port when the proxy's prompt/tool normalization is required.
