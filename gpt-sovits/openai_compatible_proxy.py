@@ -20,7 +20,7 @@ REFERENCE_AUDIO = os.environ.get(
 PROMPT_LANG = os.environ.get("GPT_SOVITS_PROMPT_LANG", "ko")
 PROMPT_TEXT = os.environ.get("GPT_SOVITS_PROMPT_TEXT", "안녕하세요.")
 STREAMING_MODE = int(os.environ.get("GPT_SOVITS_STREAMING_MODE", "2"))
-MIN_CHUNK_LENGTH = int(os.environ.get("GPT_SOVITS_MIN_CHUNK_LENGTH", "8"))
+MIN_CHUNK_LENGTH = int(os.environ.get("GPT_SOVITS_MIN_CHUNK_LENGTH", "16"))
 
 
 class SpeechRequest(BaseModel):

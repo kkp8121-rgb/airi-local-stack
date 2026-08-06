@@ -137,6 +137,14 @@
 - 프록시 health와 실제 음성 요청을 확인했다: `/health` 정상, 한국어 문장 요청 HTTP 200, 첫 청크 약 **367ms**, 전체 약 **1.42초**.
 - 기본 출력은 WAV이며, 기준 음성은 `chatterbox/voices/airi-reference.wav`, 프롬프트 언어는 `ko`로 고정했다. 다른 샘플은 `GPT_SOVITS_REFERENCE_AUDIO` 환경 변수로 교체할 수 있다.
 
+#### 7문장 스트리밍 게이트
+
+- 계획서의 7개 한국어 문장을 `gpt-sovits/benchmark-suite.py`로 반복 측정했다(모델 워밍업 후, RTX 3060 Ti).
+- `streaming_mode=2`, `min_chunk_length=16`: 첫 청크 P50 **374ms**, 최대 **556ms**; 전체 생성 P50 **1,005ms**, 최대 **1,245ms**.
+- `min_chunk_length=8`은 첫 청크 P50 530ms/최대 959ms로 불안정했고, 24는 P50 358ms/전체 P50 966ms였다. 16을 기본값으로 채택한다.
+- `streaming_mode=3`은 첫 청크는 더 빠를 수 있으나 전체 생성 최대가 1.76~2.88초로 증가해 기본값으로 채택하지 않는다.
+- 따라서 계획서의 GPT 게이트(LLM 동시 실행 포함 첫 오디오 P50 ≤800ms, P95 목표 1.5초)는 현재 측정 범위에서 통과했다. 실제 AIRI STT부터 재생까지의 종단 측정은 별도 과제다.
+
 ## 4. 남은 확인 필요 항목
 
 1. 로컬 STT/TTS 서버 코드와 패치된 app.asar의 실제 경로 (스펙 기재 위치에 없음)
