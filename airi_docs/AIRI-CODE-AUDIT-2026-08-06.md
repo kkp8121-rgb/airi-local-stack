@@ -145,6 +145,16 @@
 - `streaming_mode=3`은 첫 청크는 더 빠를 수 있으나 전체 생성 최대가 1.76~2.88초로 증가해 기본값으로 채택하지 않는다.
 - 따라서 계획서의 GPT 게이트(LLM 동시 실행 포함 첫 오디오 P50 ≤800ms, P95 목표 1.5초)는 현재 측정 범위에서 통과했다. 실제 AIRI STT부터 재생까지의 종단 측정은 별도 과제다.
 
+#### 실행 절차 및 AIRI 적용 상태
+
+- 세 서비스를 재현하려면 `gpt-sovits/start-local-stack.ps1`를 실행한다. 이 스크립트는 Ollama(11434), GPT API(9880), OpenAI 음성 프록시(8891)를 이미 실행 중인지 확인한 뒤 필요한 것만 시작한다.
+- 설치된 AIRI 로그의 최근 상태는 `Provider: none`이었다. 따라서 GPT 프록시가 준비된 것과 AIRI가 실제로 해당 provider를 선택한 것은 별개의 상태이며, AIRI 설정에서 아래 값을 직접 저장해야 한다.
+  - Base URL: `http://127.0.0.1:8891/v1`
+  - Model: `tts-1-ko`
+  - Voice: `airi-vtuber`
+  - Format: `wav`
+- AIRI 창에서 실제 STT→LLM→TTS 1회 대화가 실행되기 전까지 종단 TTFA와 음성 재생은 미검증으로 유지한다.
+
 ## 4. 남은 확인 필요 항목
 
 1. 로컬 STT/TTS 서버 코드와 패치된 app.asar의 실제 경로 (스펙 기재 위치에 없음)
