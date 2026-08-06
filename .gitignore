@@ -53,6 +53,7 @@ moss-tts-nano/
 # Diagnostic extraction and screenshots (regenerable)
 .codex-remote-attachments/
 asar-inspect/
+external/
 stt/debug-recordings/
 /*.png
 chatterbox/voices/*-spectrum.png
