@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 from typing import Iterator
 
 import requests
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 app = FastAPI(title="GPT-SoVITS OpenAI-compatible speech proxy")
+logger = logging.getLogger("uvicorn.error")
+HTTP = requests.Session()
+HTTP.headers.update({"Connection": "keep-alive"})
 GPT_TTS_URL = os.environ.get("GPT_SOVITS_TTS_URL", "http://127.0.0.1:9880/tts")
 REFERENCE_AUDIO = os.environ.get(
     "GPT_SOVITS_REFERENCE_AUDIO",
@@ -34,7 +38,7 @@ class SpeechRequest(BaseModel):
 @app.get("/health")
 def health():
     try:
-        response = requests.get(GPT_TTS_URL.rsplit("/", 1)[0] + "/docs", timeout=2)
+        response = HTTP.get(GPT_TTS_URL.rsplit("/", 1)[0] + "/docs", timeout=2)
         backend = response.status_code < 500
     except requests.RequestException:
         backend = False
@@ -49,7 +53,7 @@ def models():
 
 def _stream_backend(payload: dict) -> Iterator[bytes]:
     try:
-        with requests.post(GPT_TTS_URL, json=payload, stream=True, timeout=180) as response:
+        with HTTP.post(GPT_TTS_URL, json=payload, stream=True, timeout=180) as response:
             if response.status_code != 200:
                 raise RuntimeError(f"GPT-SoVITS returned {response.status_code}: {response.text[:500]}")
             yield from response.iter_content(4096)
@@ -59,7 +63,7 @@ def _stream_backend(payload: dict) -> Iterator[bytes]:
 
 @app.post("/v1/audio/speech")
 @app.post("/audio/speech")
-def speech(request: SpeechRequest):
+def speech(request: SpeechRequest, http_request: Request):
     text = request.input.strip()
     if not text:
         raise HTTPException(status_code=400, detail="input text is empty")
@@ -77,6 +81,14 @@ def speech(request: SpeechRequest):
         "parallel_infer": True,
         "media_type": "wav",
     }
+    logger.info(
+        "speech request path=/audio/speech model=%s voice=%s chars=%d user_agent=%s origin=%s",
+        request.model,
+        request.voice,
+        len(text),
+        http_request.headers.get("user-agent", "-"),
+        http_request.headers.get("origin", "-"),
+    )
     return StreamingResponse(_stream_backend(payload), media_type="audio/wav")
 
 
