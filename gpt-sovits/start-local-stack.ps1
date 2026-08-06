@@ -33,4 +33,8 @@ if (-not (Test-Port 8880)) {
 Start-Sleep -Seconds 2
 $ports = 11434, 9880, 8880 | ForEach-Object { [pscustomobject]@{ Port = $_; Listening = Test-Port $_ } }
 $ports | Format-Table -AutoSize
+if (@($ports | Where-Object { -not $_.Listening }).Count -gt 0) {
+  $missing = ($ports | Where-Object { -not $_.Listening } | ForEach-Object Port) -join ', '
+  throw "Local stack failed to open port(s): $missing"
+}
 Write-Output 'AIRI OpenAI Compatible Speech Base URL: http://127.0.0.1:8880/v1'
