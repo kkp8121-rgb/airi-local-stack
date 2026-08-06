@@ -2,6 +2,8 @@
 
 This file reconciles older planning notes with the current workspace state.
 
+Older Chatterbox latency figures in the original plan are historical measurements, not the active GPT-SoVITS path; use `AIRI-LOCAL-TECH-SPECS.md` and the runtime verification documents for current numbers.
+
 ## Completed in the workspace
 
 - Local GPT-SoVITS v2ProPlus API and AIRI OpenAI-compatible speech proxy are running on `9880` and `8880`.
