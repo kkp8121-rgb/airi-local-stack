@@ -32,7 +32,7 @@ if (-not $ollamaListener) {
 }
 
 & (Join-Path $PSScriptRoot 'ollama-proxy\start-local-ollama-proxy.ps1')
-& (Join-Path $PSScriptRoot 'chatterbox\start-local-tts.ps1')
+& (Join-Path $PSScriptRoot 'gpt-sovits\start-local-stack.ps1')
 & (Join-Path $PSScriptRoot 'stt\start-local-stt.ps1')
 
 $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
@@ -43,6 +43,7 @@ $stt = Wait-LocalHealth -Uri 'http://127.0.0.1:8890/health'
     OllamaProxy = $proxy.status
     NumCtx = $proxy.num_ctx
     TTS = $tts.status
+    TTSEngine = $tts.engine
     VoiceReference = $tts.reference_audio
     STT = $stt.status
     STTModel = $stt.model

@@ -64,7 +64,8 @@ STT 기본 문맥은 `아이리, 내 말 들려?`를 포함하며 짧은 음성�
 - 녹음 코덱은 Opus/WebM이다.
 - 브라우저의 자동 게인, 에코 제거, 노이즈 억제는 비활성화했다.
 - VAD는 브라우저의 Silero VAD(ONNX 기반)를 사용한다.
-- VAD 기본값: speech threshold 0.3, exit threshold 0.1, 무음 400ms, speech padding 80ms.
+- VAD 런타임 기본값: speech threshold 0.52, exit threshold 0.156, 무음 1200ms, speech padding 360ms.
+- 볼륨 폴백은 VAD 실패 시 유지하되 자신이 시작한 세그먼트만 종료하도록 설치본을 패치했다.
 - STT 결과를 채팅으로 넘기는 AIRI 내부 버퍼 지연은 1.2초에서 0.4초로 패치했다.
 
 ## TTS
@@ -77,12 +78,10 @@ STT 기본 문맥은 `아이리, 내 말 들려?`를 포함하며 짧은 음성�
 | fallback | Chatterbox Multilingual V3 |
 | 참조 음성 | `chatterbox/voices/airi-reference.wav` |
 | 참조 음성 길이 | 8.9초, 24kHz, mono, PCM16 WAV |
+| 참조 언어 | 일본어 (`prompt_lang=ja`), 실제 참조 문장 사용 |
 | AIRI voice ID | `airi-vtuber` |
 | 모델 | `tts-1-ko` |
-| Exaggeration | 0.65 |
-| CFG weight | 0.00 |
-| Temperature | 0.80 |
-| CFM steps | 10 (음질 우선 안정값) |
+| 병렬 추론 | 비활성화, 프록시 전역 잠금으로 요청 직렬화 |
 | API | `http://127.0.0.1:8880/v1/audio/speech` |
 | 서버 | FastAPI 0.141.1 / Uvicorn 0.52.1 |
 
@@ -97,8 +96,8 @@ TTS 서버는 AIRI의 OpenAI Compatible provider로 연결되어 있다. `tts-1-
 | STT `small`, beam 5 시절 | 약 4.9~9.5초 |
 | STT `small`, beam 1 현재 | 약 3.0~3.5초 |
 | STT `base` | 약 1초지만 한국어 오인식으로 사용하지 않음 |
-| GPT-SoVITS 첫 청크 | 워밍업 후 약 0.4~0.6초 |
-| GPT-SoVITS 전체 생성 | 짧은 문장 약 1~2초 |
+| GPT-SoVITS 첫 청크 | 워밍업 후 약 0.4~1.2초 |
+| GPT-SoVITS 전체 생성 | 짧은 문장 약 1~3초 |
 | AIRI STT 결과 버퍼 | 1.2초 -> 0.4초 |
 
 이전 Chatterbox 측정에서 17~40초까지 늘어난 지연은 모델 생성 자체보다 직렬 큐가 원인이었다. 현재 활성 GPT-SoVITS 프록시는 스트리밍 청크와 요청별 지연을 측정한다.

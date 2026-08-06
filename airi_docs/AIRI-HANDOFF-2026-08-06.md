@@ -1,91 +1,103 @@
 # AIRI 인수인계 문서 (2026-08-06)
 
-## 현재 결론
+## 현재 판정
 
-- 로컬 LLM은 Ollama의 `exaone-airi:2.4b`를 사용한다.
-- AIRI 호환 LLM 프록시는 `http://127.0.0.1:11435`에서 동작한다.
-- STT 서버는 `http://127.0.0.1:8890`이다.
-- 현재 TTS 경로는 Chatterbox가 아니라 GPT-SoVITS v2ProPlus GPU 경로다.
-- TTS OpenAI 호환 프록시는 `http://127.0.0.1:8880/v1`이다.
-- AIRI TTS 설정값은 모델 `tts-1-ko`, 음성 `airi-vtuber`, WAV 출력이다.
+- AIRI 0.11.3의 텍스트 입력 → LLM → GPT-SoVITS → Web Audio 재생 경로는 실제 UI 턴으로 확인했다.
+- TTS의 속삭임·무음·혼합 언어 스트림 중단 원인은 해결했고 회귀 검사에 포함했다.
+- 실제 마이크 요청은 STT 서버까지 도달한다.
+- 약 0.899초로 반복되던 마이크 절단 원인은 AIRI의 900ms 볼륨 폴백이 VAD 소유 녹음까지 종료하던 프런트엔드 버그였다. 설치본 패치를 적용했다.
+- 패치 후 실제 사용자 발화 연속 5회 검증은 아직 남았다. 이 검증 전에는 음성 대화를 완료로 판정하지 않는다.
 
-## 실행 중인 포트
+## 실행 경로
 
-| 기능 | 주소 | 확인 |
+| 기능 | 주소 | 상태 |
 |---|---|---|
-| Ollama 원본 | `127.0.0.1:11434` | 로컬 모델 백엔드 |
-| AIRI LLM 호환 프록시 | `127.0.0.1:11435` | `/health` |
-| GPT-SoVITS API | `127.0.0.1:9880` | `/docs` |
-| AIRI TTS 호환 프록시 | `127.0.0.1:8880` | `/health`, `/v1/models` |
-| STT | `127.0.0.1:8890` | `/health` |
+| Ollama | `127.0.0.1:11434` | 동작 |
+| AIRI LLM 호환 프록시 | `127.0.0.1:11435` | 동작 |
+| GPT-SoVITS v2ProPlus API | `127.0.0.1:9880` | 동작 |
+| AIRI OpenAI 호환 TTS 프록시 | `127.0.0.1:8880/v1` | 동작 |
+| faster-whisper STT | `127.0.0.1:8890/v1` | 동작, 실제 마이크 사용자 검증 대기 |
 
-## 최근 확인된 요청 흐름
+현재 AIRI 설정은 다음과 같다.
 
-STT 인식과 LLM 응답은 `200 OK`까지 성공했다. 과거에는 TTS도 `200 OK`와 첫 청크 약 0.7~1.4초가 확인됐다. 그러나 마지막 증상 재현 시에는 LLM 요청 뒤 새 TTS 요청이 기록되지 않았다. 따라서 현재 남은 문제는 모델 추론보다 AIRI 프론트엔드의 스트리밍 응답 전달·세션 캐시·재생 단계일 가능성이 높다.
+- LLM 모델: `exaone-airi:2.4b`
+- TTS 모델/음성: `tts-1-ko` / `airi-vtuber`
+- STT 모델: `whisper-1`
+- 마이크: 기본 USB Audio Device
 
-사용자가 보고한 증상:
+## 이번에 해결한 TTS 문제
 
-- 음성 대신 영어 채팅이 표시된 적이 있음
-- 음성이 나와도 `데`, `헤` 같은 한 음절 또는 웅얼거림으로 들림
-- 서버 로그상 새 TTS 요청이 없는 경우가 있음
+참조 음성 `chatterbox/voices/airi-reference.wav`는 한국어가 아니라 일본어다. STT로 확인한 실제 문장을 TTS 기본 프롬프트로 사용하고 `prompt_lang=ja`로 수정했다. 기존 `prompt_lang=ko`, `안녕하세요.` 조합은 같은 WAV를 사용하면서도 일부 출력을 사실상 무음으로 만들었다.
 
-## 이번 세션에서 수정했지만 아직 커밋하지 않은 파일
+영문이 섞인 문장은 GPT-SoVITS의 지연 로딩 의존성 때문에 HTTP 200 이후 스트림이 끊겼다. `wordsegment`와 NLTK `averaged_perceptron_tagger_eng`를 환경에 준비했고, `gpt-sovits/start-local-stack.ps1`이 시작 시 이를 검사하고 보완한다.
 
-### `gpt-sovits/openai_compatible_proxy.py`
+`gpt-sovits/test-airi-speech.ps1`은 이제 영문+한글 혼합 문장을 보내고 다음을 모두 검사한다.
 
-- GPT-SoVITS 스트리밍 생성에 전역 잠금을 추가해 동시 요청이 음성에 섞이지 않도록 했다.
-- `parallel_infer`를 `False`로 변경했다.
-- 참조 음성 프롬프트 텍스트 기본값은 `안녕하세요.`이다.
+- 스트림 완결
+- RIFF/WAVE 및 PCM16 형식
+- 재생 시간 0.25초 이상
+- RMS 0.005 이상, 피크 0.02 이상
 
-### `gpt-sovits/start-openai-proxy.ps1`
+재시작 직후 첫 요청은 모델·참조 준비를 포함해 첫 청크 8.94초였다. 런처가 새 백엔드를 시작한 경우 내부 워밍업을 완료하도록 수정했으며, 그 뒤 계약 검사는 첫 청크 1.31초, 전체 2.93초, RMS 0.033810이었다. 순차 8회와 동시 4회 추가 테스트도 모두 유효하고 들리는 WAV를 만들었다.
 
-- 포트를 매개변수로 받을 수 있도록 수정했다.
-- AIRI 현재 포트인 `8880`으로 실행 가능하다.
+## 실제 AIRI UI TTS 증거
 
-현재 워킹 트리에는 위 두 파일의 수정이 남아 있으므로 다음 세션에서 검토 후 커밋해야 한다.
+채팅 창은 follower, 메인 Stage 창은 authority/TTS host로 정상 동작했다. 정상 인코딩된 실제 채팅 턴에서 다음 순서를 관찰했다.
 
-## 다음 세션 재현 절차
+1. 채팅 창 `requestIngest`
+2. 메인 창 `chat-orchestrator.ingest`
+3. `POST http://127.0.0.1:11435/v1/chat/completions` → 200
+4. `POST http://127.0.0.1:8880/v1/audio/speech` → 200
+5. 48 kHz 오디오 버퍼 1.50초와 2.18초가 `running` AudioContext에 재생 스케줄
 
-1. `C:\Projects\airi\start-gpt-sovits-airi-stack.ps1` 실행
-2. 필요하면 `gpt-sovits\start-openai-proxy.ps1 -Port 8880` 실행
-3. 다음 주소 확인:
+별도 브라우저 디코딩 검사에서도 206,124바이트 응답을 3.22초 오디오로 정상 디코딩했다. 즉 현재 문제는 TTS HTTP 계약이나 Web Audio 디코더가 아니다.
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:11435/health
-Invoke-RestMethod http://127.0.0.1:8880/health
-Invoke-RestMethod http://127.0.0.1:8890/health
-```
+## AIRI 마이크 분절 패치
 
-4. AIRI 제공자 설정에서 LLM은 `11435`, TTS Base URL은 `http://127.0.0.1:8880/v1`인지 확인
-5. 기존 대화를 새로고침하거나 새 세션으로 시작해 짧은 문장으로 테스트
-6. 테스트 중 다음 로그를 동시에 확인:
+설치 번들의 `useVoiceInputSession`은 Silero VAD와 볼륨 폴백을 동시에 시작한다. 볼륨 폴백은 900ms 동안 레벨이 낮으면 녹음을 끝내는데, 자신이 시작한 `volume` 세그먼트뿐 아니라 `vad` 세그먼트까지 종료했다. STT 로그의 반복 0.899초 청크와 정확히 일치한다.
 
-```powershell
-Get-Content ollama-proxy/ollama-proxy.out.log -Wait
-Get-Content gpt-sovits/proxy.out.log -Wait
-Get-Content stt/stt-server.out.log -Wait
-```
+`patch-airi-voice-input-segmentation.ps1`은 다음 두 지점만 동일 길이로 수정한다.
 
-LLM `POST /v1/chat/completions` 직후 TTS `POST /v1/audio/speech`가 없으면 AIRI 프론트엔드 단계 문제다. TTS 요청은 있지만 음성이 웅얼거리면 프록시 직렬화 수정과 참조 음성·프롬프트를 다시 검증한다.
+- 볼륨 폴백은 `volume` 소유 세그먼트만 종료한다. VAD가 실패했을 때의 폴백 기능은 유지한다.
+- HTTP 성공 후 빈 전사는 공급자 오류가 아니라 무음으로 취급한다. 실제 전송·HTTP·파싱 예외는 계속 오류다.
 
-## STT 개인정보 주의
+설치본 백업:
 
-- STT는 기본적으로 디버그 음성 파일을 저장하지 않는다.
-- `stt/start-local-stt.ps1 -EnableDebugAudio`를 명시적으로 사용할 때만 녹음 파일이 저장된다.
-- 기존 `stt/debug-recordings`에는 과거 테스트 파일이 남아 있으므로, 삭제 전 사용자 확인이 필요하다.
+`%LOCALAPPDATA%\Programs\airi\resources\app.asar.backup-before-voice-input-segmentation`
 
-## 후보 TTS 판단
+패치 스크립트는 재실행해도 추가 변경하지 않는 것을 확인했다.
 
-- 실시간성과 음질의 현재 우선 후보: GPT-SoVITS v2ProPlus GPU
-- GPU를 LLM에 양보해야 할 때의 후보: MOSS-TTS-Nano ONNX CPU
-- MOSS ONNX는 현재 환경에서 약 4.687 RTF로 실시간 게이트를 통과하지 못했다.
-- Chatterbox는 현재 AIRI 기본 경로가 아니다.
+## 재현 명령
 
-## 커밋 전 확인
+전체 스택 시작/종료:
 
 ```powershell
-git diff -- gpt-sovits/openai_compatible_proxy.py gpt-sovits/start-openai-proxy.ps1
-git status --short
+.\start-airi-local-stack.ps1
+.\stop-airi-local-stack.ps1
 ```
 
-검증이 끝나면 의미 있는 커밋 메시지로 커밋하고 원격 저장소에 푸시한다. 현재 최신 원격 관련 커밋은 `2e3aedc fix: start and verify AIRI Ollama compatibility proxy`다.
+GPT-SoVITS를 새로 시작하면 런처는 포트 9880을 최대 120초 기다린 뒤 참조 음성 워밍업까지 완료한다. 워밍업을 의도적으로 건너뛸 때만 `gpt-sovits/start-local-stack.ps1 -SkipWarmup`을 사용한다.
+
+서비스와 혼합 언어 TTS 계약 검사:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\gpt-sovits\verify-local-stack.ps1
+```
+
+STT 필터 테스트:
+
+```powershell
+Set-Location .\stt
+$env:PYTHONDONTWRITEBYTECODE='1'
+& .\.venv\Scripts\python.exe -m unittest -v test_transcription_filter.py
+```
+
+## 다음 작업
+
+1. 사용자가 AIRI에서 보통 크기의 한국어 문장을 한 번 말한다.
+2. `stt/stt-server.out.log`에서 새 청크가 900ms에 고정 절단되지 않는지 확인한다.
+3. 해당 턴의 STT → LLM → TTS → 재생을 확인한다.
+4. 스피커 출력의 마이크 재입력이나 중복 응답이 없는지 확인한다.
+5. 같은 검증을 연속 5회 통과한다.
+
+사용자 발화나 전사 원문을 저장하지 말 것. 현재 STT 기본값은 디버그 오디오와 전사 텍스트 로깅을 모두 비활성화한다.

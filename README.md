@@ -2,7 +2,7 @@
 
 Windows에서 AIRI 0.11.3을 로컬 LLM, 한국어 음성 합성, 로컬 음성 인식과 연결하기 위한 작업 저장소다.
 
-현재 텍스트 대화, EXAONE 기반 로컬 LLM, Chatterbox Multilingual 기반 TTS, Live2D 립싱크·표정 반응은 동작한다. **실제 사용자 마이크 음성 인식은 미해결**이며 완료로 간주하면 안 된다.
+현재 텍스트 대화, EXAONE 기반 로컬 LLM, GPT-SoVITS v2ProPlus 기반 TTS, Live2D 립싱크·표정 반응은 동작한다. AIRI UI에서 LLM → TTS 요청 → 오디오 재생 스케줄까지 확인했다. **실제 사용자 마이크 연속 5회 검증은 아직 남아 있으며 완료로 간주하면 안 된다.**
 
 ## 구성
 
@@ -10,9 +10,9 @@ Windows에서 AIRI 0.11.3을 로컬 LLM, 한국어 음성 합성, 로컬 음성 
 |---|---|---|
 | Ollama | `127.0.0.1:11434` | 동작 |
 | AIRI용 Ollama 호환 프록시 | `ollama-proxy/`, `127.0.0.1:11435` | 동작 |
-| Chatterbox Multilingual TTS | `chatterbox/`, `127.0.0.1:8880` | 동작 |
-| faster-whisper STT | `stt/`, `127.0.0.1:8890` | 파일 입력 동작, 실제 마이크 실패 |
-| AIRI 데스크톱 | 별도 설치, 0.11.3 | 텍스트/TTS/Live2D 동작 |
+| GPT-SoVITS v2ProPlus TTS | `gpt-sovits/`, API `127.0.0.1:9880`, 프록시 `127.0.0.1:8880` | 혼합 언어·동시 요청·AIRI 재생 검증 통과 |
+| faster-whisper STT | `stt/`, `127.0.0.1:8890` | 실제 마이크 요청 도달, VAD 분절 패치 적용, 사용자 검증 대기 |
+| AIRI 데스크톱 | 별도 설치, 0.11.3 | 텍스트/LLM/TTS 재생/Live2D 동작 |
 
 ## 시작과 종료
 
@@ -30,9 +30,9 @@ AIRI 애플리케이션 자체는 Windows에 별도로 설치되어 있으며 �
 
 ## 다음 세션이 먼저 읽을 문서
 
-1. `NEXT-SESSION.md`
-2. `AIRI-VOICE-INPUT-ISSUE-2026-08-05.md`
-3. `airi-setup-codex-2026-08-04.md`
+1. `airi_docs/AIRI-HANDOFF-2026-08-06.md`
+2. `NEXT-SESSION.md`
+3. `AIRI-VOICE-INPUT-ISSUE-2026-08-05.md`
 
 ## Git에 포함하지 않는 항목
 
@@ -41,4 +41,3 @@ AIRI 애플리케이션 자체는 Windows에 별도로 설치되어 있으며 �
 ## 제3자 소스
 
 이 저장소에는 작업 당시 사용한 세 프로젝트의 소스 스냅샷과 로컬 수정이 포함된다. 원본 저장소와 기준 커밋은 `THIRD-PARTY-SOURCES.md`에 기록했다. 각 프로젝트의 라이선스 파일을 유지한다.
-

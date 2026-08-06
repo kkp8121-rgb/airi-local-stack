@@ -22,8 +22,11 @@ REFERENCE_AUDIO = os.environ.get(
     "GPT_SOVITS_REFERENCE_AUDIO",
     r"C:\Projects\airi\chatterbox\voices\airi-reference.wav",
 )
-PROMPT_LANG = os.environ.get("GPT_SOVITS_PROMPT_LANG", "ko")
-PROMPT_TEXT = os.environ.get("GPT_SOVITS_PROMPT_TEXT", "안녕하세요.")
+PROMPT_LANG = os.environ.get("GPT_SOVITS_PROMPT_LANG", "ja")
+PROMPT_TEXT = os.environ.get(
+    "GPT_SOVITS_PROMPT_TEXT",
+    "声聞こえてるかどうかだけ教えてほしいんだけどなぁ。聞こえてる？あ、よかった。ふぅ。",
+)
 STREAMING_MODE = int(os.environ.get("GPT_SOVITS_STREAMING_MODE", "2"))
 MIN_CHUNK_LENGTH = int(os.environ.get("GPT_SOVITS_MIN_CHUNK_LENGTH", "16"))
 TTS_LOCK = threading.Lock()
