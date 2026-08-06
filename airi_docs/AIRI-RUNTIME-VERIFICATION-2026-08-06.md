@@ -29,6 +29,14 @@ The latest run passed with a `399.8 ms` first chunk and `1.64 s` total generatio
 
 `start-local-stack.ps1` now exits with an error when any required listener fails to open, instead of reporting a partial startup as successful.
 
+To start all local services, including faster-whisper STT, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\Projects\airi\start-airi-local-stack.ps1
+```
+
+The integrated launcher keeps STT debug-audio persistence disabled.
+
 ## Verification boundary
 
 The scripted request proves the proxy-to-GPT-SoVITS contract, but it does not prove that a user-triggered AIRI UI turn reached the proxy. That final check must be confirmed from the proxy access log after speaking in AIRI.
