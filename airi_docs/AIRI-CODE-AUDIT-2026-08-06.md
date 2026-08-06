@@ -113,6 +113,15 @@
 
 **신규 최우선 과제(계획서에 없던 것)**: 설치본 app.asar 패치 방식 → **소스 빌드 전환**. v0.11.3 소스가 확보됐고, 로컬 패치 3종(MediaRecorder·VAD값·AEC off)이 업스트림 dead code/dormant 값과 얽혀 있어 패치 유지보수가 취약함. TTS 스트리밍 계약 변경·suppression 해체 같은 중규모 개조는 app.asar 패치로 지속 불가능.
 
+### 2026-08-06 GPT-SoVITS v2ProPlus 실행 측정
+
+- 공식 `lj1995/GPT-SoVITS` 저장소에서 v2ProPlus에 필요한 파일만 내려받았다: `s1v3.ckpt`, `v2Pro/s2Gv2ProPlus.pth`, `sv/pretrained_eres2netv2w24s4ep4.ckpt`, Chinese RoBERTa/Hubert.
+- Windows Python 3.11 환경에서 GPT API가 실제로 기동했다. 설정은 `gpt-sovits/tts-infer-v2proplus.yaml`에 고정했다.
+- RTX 3060 Ti에서 모델 상주 후 한국어 24자 입력, `streaming_mode=2`, `min_chunk_length=8`, `parallel_infer=true` 측정 결과: **첫 청크 약 716ms, 전체 1,674ms, 138KB**. 첫 요청은 CUDA/참조 음성 준비 때문에 약 4.8초였으므로 워밍업 없는 TTFA로 사용하면 안 된다.
+- `streaming_mode=3` 동일 문장은 워밍업 후 첫 청크 약 4.8초가 관측되어 모드 2를 우선 사용한다. 이 값은 서버 재시작 직후 초기화 비용이 섞인 값이다.
+- 측정 중 GPU 메모리는 약 **5,092/8,192MiB**였다. 따라서 Ollama가 GPU를 5GB 이상 점유하는 상태에서는 동시 상주가 불가능할 가능성이 높다. 다음 단계는 Ollama 동시 실행 상태에서 VRAM/TTFA를 재측정하는 것이다.
+- 재현 명령은 `gpt-sovits/benchmark-api.py`이며, GPT 서버를 먼저 실행한 뒤 프로젝트 루트에서 실행한다.
+
 ## 4. 남은 확인 필요 항목
 
 1. 로컬 STT/TTS 서버 코드와 패치된 app.asar의 실제 경로 (스펙 기재 위치에 없음)
