@@ -16,6 +16,8 @@ The earlier debug configuration persisted every uploaded recording under `stt/de
 
 The STT server remains bound to `127.0.0.1`; it does not publish audio to the network. Input-device selection and OS mixer routing still determine which sound reaches AIRI, so a microphone-only device must be selected when recording other people's speech is not authorized.
 
+The server log now omits recognized text by default (`text_logged=false`). Use `--verbose-transcription-log` only for an intentional debugging session. Existing `stt-server.out.log` content from before this change may still contain text and was not rewritten automatically.
+
 ## Endpoint check
 
 An existing AIRI WebM recording was submitted to `POST /v1/audio/transcriptions` and returned a JSON transcription successfully. This proves the local server and multipart OpenAI-compatible route are operational; recognition quality still depends on the captured audio and should be evaluated from new user turns.

@@ -34,6 +34,7 @@ MODEL_ID = "whisper-1"
 MODEL_ROOT = Path(__file__).resolve().parent / "models"
 CPU_THREADS = max(1, min(6, (os.cpu_count() or 6) - 2))
 DEBUG_AUDIO_DIR: Path | None = None
+VERBOSE_TRANSCRIPTION_LOG = False
 DEBUG_AUDIO_LIMIT = 10
 whisper: WhisperModel | None = None
 
@@ -287,7 +288,8 @@ async def create_transcription(
                 "debug_audio_path": debug_audio_path,
                 **audio_metrics,
                 "language": detected_language,
-                "text": raw_text,
+                **({"text": raw_text} if VERBOSE_TRANSCRIPTION_LOG else {}),
+                "text_logged": VERBOSE_TRANSCRIPTION_LOG,
                 "text_chars": len(text),
                 "segments": len(segments),
                 "avg_logprob": min(
@@ -320,7 +322,7 @@ async def create_transcription(
 
 
 def main() -> None:
-    global MODEL_NAME, MODEL_ROOT, CPU_THREADS, DEBUG_AUDIO_DIR
+    global MODEL_NAME, MODEL_ROOT, CPU_THREADS, DEBUG_AUDIO_DIR, VERBOSE_TRANSCRIPTION_LOG
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="127.0.0.1")
@@ -329,12 +331,18 @@ def main() -> None:
     parser.add_argument("--model-root", default=str(MODEL_ROOT))
     parser.add_argument("--cpu-threads", type=int, default=CPU_THREADS)
     parser.add_argument("--debug-audio-dir")
+    parser.add_argument(
+        "--verbose-transcription-log",
+        action="store_true",
+        help="Include recognized text in server logs. Disabled by default for privacy.",
+    )
     args = parser.parse_args()
 
     MODEL_NAME = args.model
     MODEL_ROOT = Path(args.model_root).resolve()
     CPU_THREADS = max(1, args.cpu_threads)
     DEBUG_AUDIO_DIR = Path(args.debug_audio_dir).resolve() if args.debug_audio_dir else None
+    VERBOSE_TRANSCRIPTION_LOG = bool(args.verbose_transcription_log)
     uvicorn.run(app, host=args.host, port=args.port)
 
 
