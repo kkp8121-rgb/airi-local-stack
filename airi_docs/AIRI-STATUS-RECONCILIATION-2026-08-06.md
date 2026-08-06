@@ -13,14 +13,15 @@ Older Chatterbox latency figures in the original plan are historical measurement
 - STT startup waits for model readiness; debug audio persistence and transcription text logging are disabled by default.
 - MOSS-TTS-Nano ONNX Korean CPU voice cloning was measured and failed the realtime RTF<1 gate; it remains a fallback experiment, not the active AIRI TTS.
 
-## Still requiring an AIRI UI turn
+## AIRI UI runtime evidence
 
-The scripted speech contract proves proxy-to-GPT-SoVITS behavior, but only an actual user-triggered AIRI turn can prove the Electron client sent `POST /v1/audio/speech`. The same applies to confirming that AIRI's selected input device is microphone-only rather than a system/voice-chat mix.
+Actual AIRI 0.11.3 user-agent requests to `/v1/audio/speech` and actual Opus/WebM microphone POSTs to STT are now present in the local logs. Five consecutive accurate microphone turns and absence of speaker loopback still require user acceptance testing; effective AEC/NS/AGC settings also need `MediaStreamTrack.getSettings()` verification.
 
 ## Reproducible launchers
 
 - Current GPT-SoVITS path: `start-gpt-sovits-airi-stack.ps1`
-- Legacy Ollama-proxy/Chatterbox path: `start-airi-local-stack.ps1`
+- Current all-in-one local path: `start-airi-local-stack.ps1`
+- Latency dashboard: `show-airi-latency-dashboard.ps1`
 - Contract and listener check: `gpt-sovits/verify-local-stack.ps1`
 
 The GPT-SoVITS launcher also starts AIRI's Ollama compatibility proxy on `11435`; AIRI should use this URL for the local LLM, not the raw Ollama port when the proxy's prompt/tool normalization is required.

@@ -5,7 +5,9 @@ import asyncio
 from datetime import datetime, timezone
 import json
 import os
+import sys
 import tempfile
+import time
 from pathlib import Path
 from uuid import uuid4
 
@@ -15,9 +17,15 @@ os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 import av
 import numpy as np
 import uvicorn
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from faster_whisper import WhisperModel
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from latency_trace import elapsed_ms, emit_latency_event, request_id
 
 
 app = FastAPI(title="AIRI local Whisper transcription server")
@@ -32,7 +40,7 @@ app.add_middleware(
 MODEL_NAME = "small"
 MODEL_ID = "whisper-1"
 MODEL_ROOT = Path(__file__).resolve().parent / "models"
-CPU_THREADS = max(1, min(6, (os.cpu_count() or 6) - 2))
+CPU_THREADS = max(1, min(8, (os.cpu_count() or 8) - 2))
 DEBUG_AUDIO_DIR: Path | None = None
 VERBOSE_TRANSCRIPTION_LOG = False
 DEBUG_AUDIO_LIMIT = 10
@@ -230,6 +238,7 @@ def filter_low_confidence_transcription(
 
 @app.post("/v1/audio/transcriptions")
 async def create_transcription(
+    http_request: Request,
     file: UploadFile = File(...),
     model: str = Form(MODEL_ID),
     language: str | None = Form(None),
@@ -254,20 +263,43 @@ async def create_transcription(
     if len(contents) > 25 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Audio file exceeds 25 MiB")
 
+    trace_id = request_id(http_request.headers, uuid4().hex)
+    request_started = time.perf_counter()
+    emit_latency_event(
+        "stt",
+        "start",
+        trace_id,
+        meta={"audio_bytes": len(contents)},
+    )
+
     temp_path = ""
     debug_audio_path = await asyncio.to_thread(preserve_debug_audio, contents, suffix)
     audio_metrics: dict[str, float] = {}
+    analysis_ms = 0.0
+    inference_ms = 0.0
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
             temp_file.write(contents)
             temp_path = temp_file.name
+        analysis_started = time.perf_counter()
         audio_metrics = await asyncio.to_thread(analyze_audio, temp_path)
+        analysis_ms = elapsed_ms(analysis_started)
+        inference_started = time.perf_counter()
         raw_text, detected_language, duration, segments = await asyncio.to_thread(
             transcribe_file,
             temp_path,
             language,
             prompt,
         )
+        inference_ms = elapsed_ms(inference_started)
+    except Exception:
+        emit_latency_event(
+            "stt",
+            "error",
+            trace_id,
+            duration_ms=elapsed_ms(request_started),
+        )
+        raise
     finally:
         if temp_path:
             Path(temp_path).unlink(missing_ok=True)
@@ -277,6 +309,21 @@ async def create_transcription(
         text, rejected_reason = filter_low_confidence_transcription(text, segments)
     if rejected_reason:
         segments = []
+
+    emit_latency_event(
+        "stt",
+        "end",
+        trace_id,
+        duration_ms=elapsed_ms(request_started),
+        meta={
+            "audio_duration_ms": round(audio_metrics.get("duration_seconds", 0.0) * 1000, 1),
+            "speech_duration_ms": round(duration * 1000, 1),
+            "analysis_ms": analysis_ms,
+            "inference_ms": inference_ms,
+            "text_chars": len(text),
+            "accepted": rejected_reason is None,
+        },
+    )
 
     print(
         json.dumps(

@@ -1,6 +1,6 @@
 # AIRI 로컬 음성 대화 기술 사양
 
-최종 확인일: 2026-08-05  
+최종 확인일: 2026-08-06
 프로젝트 위치: `C:\Projects\airi`
 
 ## 전체 구성
@@ -12,7 +12,7 @@
   -> 로컬 STT (faster-whisper small)
   -> AIRI 채팅 세션
   -> Ollama / EXAONE LLM
-  -> 로컬 TTS (GPT-SoVITS v2ProPlus GPU; Chatterbox fallback)
+  -> 로컬 TTS (GPT-SoVITS v2ProPlus GPU)
   -> AIRI Web Audio API / Live2D 립싱크
 ```
 
@@ -23,7 +23,7 @@
 | 항목 | 사양 |
 |---|---|
 | 운영체제 | Windows 11 Pro, 빌드 26200 |
-| CPU | AMD Ryzen 7 8700G, 8코어 16스레드 |
+| CPU | AMD Ryzen 5 5600X, 6코어 12스레드 |
 | GPU | NVIDIA GeForce RTX 3060 Ti, VRAM 8GB |
 | NVIDIA 드라이버 | 591.74 |
 | AIRI | 0.11.3, Electron 데스크톱 앱 |
@@ -37,7 +37,7 @@
 | 실제 모델 정보 | EXAONE 계열, 2.7B parameters |
 | 양자화 | Q4_K_M |
 | 컨텍스트 | AIRI 프록시 기본 2,048 tokens |
-| GPU 사용 | `num_gpu=20`, CPU/GPU 혼합 실행 |
+| GPU 사용 | `num_gpu=12`, CPU/GPU 혼합 실행 |
 | 호환 주소 | `http://127.0.0.1:11435` |
 | 업스트림 | `http://127.0.0.1:11434` |
 
@@ -48,7 +48,7 @@
 | 엔진 | faster-whisper 1.2.1 |
 | 백엔드 | CTranslate2 4.8.1 |
 | 모델 | Whisper `small` |
-| 연산 | CPU INT8, 6 threads |
+| 연산 | CPU INT8, 8 threads (동일 음원 A/B에서 6 threads 대비 약 7% 단축) |
 | 탐색 | `beam_size=1`, `best_of=1` |
 | 언어 | 한국어(`ko`) |
 | 문맥 | 한국어 대화 프롬프트 및 `아이리`, `AIRI` hotword |
@@ -75,7 +75,7 @@ STT 기본 문맥은 `아이리, 내 말 들려?`를 포함하며 짧은 음성�
 | 엔진 | GPT-SoVITS v2ProPlus |
 | 실행 | RTX 3060 Ti GPU, fp16 |
 | 스트리밍 | `streaming_mode=2`, `min_chunk_length=16` |
-| fallback | Chatterbox Multilingual V3 |
+| fallback | 자동 fallback 없음; Chatterbox는 legacy 설치 후보 |
 | 참조 음성 | `chatterbox/voices/airi-reference.wav` |
 | 참조 음성 길이 | 8.9초, 24kHz, mono, PCM16 WAV |
 | 참조 언어 | 일본어 (`prompt_lang=ja`), 실제 참조 문장 사용 |
@@ -100,7 +100,7 @@ TTS 서버는 AIRI의 OpenAI Compatible provider로 연결되어 있다. `tts-1-
 | GPT-SoVITS 전체 생성 | 짧은 문장 약 1~3초 |
 | AIRI STT 결과 버퍼 | 1.2초 -> 0.4초 |
 
-이전 Chatterbox 측정에서 17~40초까지 늘어난 지연은 모델 생성 자체보다 직렬 큐가 원인이었다. 현재 활성 GPT-SoVITS 프록시는 스트리밍 청크와 요청별 지연을 측정한다.
+이전 Chatterbox 측정은 현재 활성 경로의 수치가 아니다. 현재 구간별 지연은 `show-airi-latency-dashboard.ps1`에서 STT·LLM·TTS 첫 바이트·전체 WAV로 분리해 측정한다.
 
 ## 적용된 프로젝트 변경
 
@@ -110,7 +110,7 @@ TTS 서버는 AIRI의 OpenAI Compatible provider로 연결되어 있다. `tts-1-
   - beam 1 저지연 설정
   - 저신뢰도·짧은 음성·무음 필터
   - 디버그 녹음 및 오디오 RMS/peak 기록
-- `chatterbox/openai_server.py`
+- `chatterbox/openai_server.py` (legacy, 현재 비활성)
   - OpenAI Compatible `/v1/audio/speech`
   - 참조 음성 conditionals 사전 준비
   - TTS 생성/대기시간 계측
@@ -121,6 +121,9 @@ TTS 서버는 AIRI의 OpenAI Compatible provider로 연결되어 있다. `tts-1-
   - 네이티브 MediaRecorder 녹음 경로 적용
   - 브라우저 자동 음성 필터 비활성화
   - STT 결과 버퍼 지연 400ms 적용
+- `latency_trace.py`, `latency-monitor/`
+  - STT·LLM·TTS 비차단 숫자 계측
+  - 최근 20턴 메모리 전용 waterfall 및 CPU/RAM/GPU/VRAM 표시
 
 패치 백업은 AIRI 설치 디렉터리의 `app.asar.backup-*` 파일에 보관되어 있다.
 
@@ -139,6 +142,7 @@ TTS 서버는 AIRI의 OpenAI Compatible provider로 연결되어 있다. `tts-1-
 ### 실시간 대화 우선 조정 (2026-08-05)
 
 - Ollama 시스템 프롬프트에 `응!`, `그렇구나!` 같은 짧은 첫 반응과 약 25자 안팎의 짧은 답변을 지시했다.
+- 통합 런처가 Ollama/EXAONE을 미리 호출해 모델 미상주 시 첫 사용자 턴에 붙던 약 4초의 cold-load를 시작 단계로 이동한다.
 - Ollama와 GPT-SoVITS v2ProPlus를 RTX 3060 Ti 8GB에서 동시 상주시키는 구성을 실측했다. GPU 여유가 제한적이므로 다른 GPU 작업은 피한다.
 - 12GB 이상 VRAM 업그레이드는 현재 보류한다.
 - GPT-SoVITS V4는 캐릭터 음성 확정 후 학습·교체하는 장기 단계로 유지한다.

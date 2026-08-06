@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AIRI 음성 지연 모니터</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f3f5f8; --panel: #ffffff; --ink: #172033; --muted: #687386;
+      --line: #dce2eb; --stt: #5275e8; --gap: #9aa5b5; --llm: #914cc9;
+      --tts: #0f9871; --play: #e08a17; --good: #087d5e;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #10151e; --panel: #19212d; --ink: #eef3fb; --muted: #a8b2c0; --line: #303b4b; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, sans-serif; }
+    .wrap { max-width: 1180px; margin: auto; padding: 20px; }
+    header, .turn-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+    h1 { font-size: 22px; margin: 0; }
+    .sub, .muted { color: var(--muted); }
+    .sub { margin: 5px 0 0; }
+    .resources { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 16px; }
+    .card, .turn { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+    .label { color: var(--muted); font-size: 12px; }
+    .value { font-size: 21px; font-weight: 720; margin-top: 4px; }
+    .legend, .details { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--muted); font-size: 12px; }
+    .legend { margin: 14px 2px; }
+    .key::before { content: ''; display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 2px; background: var(--color); }
+    .turns { display: grid; gap: 10px; }
+    .headline { text-align: right; }
+    .total { color: var(--good); font-size: 22px; font-weight: 760; }
+    .water { height: 34px; position: relative; overflow: hidden; margin: 12px 0 9px; border: 1px solid var(--line); border-radius: 7px; }
+    .bar { position: absolute; top: 0; height: 100%; min-width: 3px; border-right: 1px solid var(--panel); }
+    .empty { color: var(--muted); text-align: center; padding: 38px; }
+    .note { margin-top: 14px; color: var(--muted); font-size: 12px; }
+    @media (max-width: 680px) {
+      .wrap { padding: 13px; } .resources { grid-template-columns: repeat(2, 1fr); }
+      .turn-top { align-items: flex-start; } .total { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div>
+      <h1>AIRI 음성 파이프라인</h1>
+      <p class="sub">로컬 메모리 전용 · 0.5초 갱신 · 대화 내용과 오디오는 저장하지 않음</p>
+    </div>
+    <span id="updated" class="muted">연결 중…</span>
+  </header>
+  <section id="resources" class="resources"></section>
+  <div class="legend">
+    <span class="key" style="--color:var(--stt)">STT</span>
+    <span class="key" style="--color:var(--gap)">앱 전달</span>
+    <span class="key" style="--color:var(--llm)">LLM</span>
+    <span class="key" style="--color:var(--tts)">TTS</span>
+    <span class="key" style="--color:var(--play)">실제 재생(프런트 계측 시)</span>
+  </div>
+  <section id="turns" class="turns"><div class="empty">아직 수신한 대화가 없습니다.</div></section>
+  <p class="note">큰 숫자는 설치 AIRI의 VAD 무음 판정 설정 1200ms와 STT 접수→전체 WAV 완료를 합한 재생 직전 추정치입니다. 실제 스피커 시작은 AIRI 프런트 계측 전까지 수십~수백 ms 차이가 날 수 있습니다.</p>
+</main>
+<script>
+  const byId = id => document.getElementById(id);
+  const ms = value => value == null || Number.isNaN(value) ? '—' : `${Math.round(value)} ms`;
+  const delta = (end, start) => end != null && start != null ? end - start : null;
+  const VAD_END_WAIT_MS = 1200;
+
+  function stages(turn) {
+    const stt = turn.stt || {}, llm = turn.llm || {}, tts = turn.tts || {}, playback = turn.playback || {};
+    const base = stt.start || llm.start || tts.start || playback.start;
+    const items = [];
+    const add = (name, color, start, end) => {
+      if (start != null && end != null && end >= start) items.push({ name, color, start, end });
+    };
+    add('STT 요청 처리', 'var(--stt)', stt.start, stt.end || stt.first);
+    add('앱 전달', 'var(--gap)', stt.end, llm.start);
+    add('LLM 생성', 'var(--llm)', llm.start, llm.first || llm.end);
+    add('TTS 요청 준비', 'var(--gap)', llm.end || llm.first, tts.start);
+    add('TTS 첫 바이트', 'var(--tts)', tts.start, tts.first || tts.end);
+    add('TTS 남은 WAV', 'var(--tts)', tts.first || tts.start, tts.end);
+    add('실제 재생', 'var(--play)', playback.start, playback.end || playback.first);
+    return {
+      stt, llm, tts, playback, base, items,
+      requestToAudio: delta(tts.first, stt.start),
+      requestToComplete: delta(tts.end, stt.start),
+      afterStt: delta(tts.first, stt.end),
+    };
+  }
+
+  function render(data) {
+    const resources = data.resources || {}, gpu = resources.gpus && resources.gpus[0];
+    const cards = [
+      ['총 CPU', resources.cpu_percent == null ? '—' : `${resources.cpu_percent}%`],
+      ['RAM', resources.ram ? `${resources.ram.used_percent}% · ${resources.ram.used_mb}/${resources.ram.total_mb} MB` : '—'],
+      ['NVIDIA GPU', gpu ? `${gpu.utilization_percent}%` : '—'],
+      ['VRAM / 온도', gpu ? `${gpu.vram_used_mb}/${gpu.vram_total_mb} MB · ${gpu.temperature_c}°C` : '—'],
+    ];
+    byId('resources').innerHTML = cards.map(([label, value]) =>
+      `<div class="card"><div class="label">${label}</div><div class="value">${value}</div></div>`
+    ).join('');
+    byId('updated').textContent = `갱신 ${new Date(data.now_ms).toLocaleTimeString()}`;
+
+    const turns = data.turns || [];
+    if (!turns.length) {
+      byId('turns').innerHTML = '<div class="empty">아직 수신한 대화가 없습니다.</div>';
+      return;
+    }
+    byId('turns').innerHTML = turns.map((turn, index) => {
+      const view = stages(turn), all = view.items;
+      const low = Math.min(...all.map(item => item.start), view.base || Date.now());
+      const high = Math.max(...all.map(item => item.end), low + 1);
+      const range = Math.max(high - low, 1);
+      const bars = all.map(item =>
+        `<i class="bar" title="${item.name}: ${ms(item.end - item.start)}" style="background:${item.color};left:${(item.start-low)/range*100}%;width:${Math.max((item.end-item.start)/range*100,.6)}%"></i>`
+      ).join('');
+      const sm = view.stt.meta || {}, lm = view.llm.meta || {}, tm = view.tts.meta || {};
+      const llmName = lm.buffered ? 'LLM 전체 생성' : 'LLM 첫 응답';
+      const ttsState = view.tts.end
+        ? (view.playback.start ? '실제 재생 이벤트 수신' : 'WAV 완료 · 스피커 시작 미계측')
+        : (view.tts.start ? 'TTS 처리 중' : 'TTS 대기');
+      return `<article class="turn">
+        <div class="turn-top">
+          <div><strong>Turn ${turns.length-index}</strong><div class="label">${turn.turn_id}</div></div>
+          <div class="headline"><div class="label">발화 끝 → 재생 직전 추정 (VAD 1.2초 포함)</div><div class="total">${view.requestToComplete == null ? '측정 중' : ms(view.requestToComplete + VAD_END_WAIT_MS)}</div></div>
+        </div>
+        <div class="water">${bars}</div>
+        <div class="details">
+          <span>STT 전체 ${ms(delta(view.stt.end || view.stt.first, view.stt.start))}</span>
+          <span>오디오 분석 ${ms(sm.analysis_ms)}</span>
+          <span>Whisper ${ms(sm.inference_ms)}</span>
+          <span>${llmName} ${ms(delta(view.llm.first || view.llm.end, view.llm.start))}</span>
+          <span>STT 접수→첫 오디오 바이트 ${ms(view.requestToAudio)}</span>
+          <span>STT 접수→WAV 완료 ${ms(view.requestToComplete)}</span>
+          <span>STT 완료 후→첫 오디오 ${ms(view.afterStt)}</span>
+          <span>TTS lock 대기 ${ms(tm.lock_wait_ms)}</span>
+          <span>${ttsState}</span>
+          <span>TTS 세그먼트 ${view.tts.segments || 0}</span>
+        </div>
+      </article>`;
+    }).join('');
+  }
+
+  async function poll() {
+    try {
+      const response = await fetch('/api/snapshot', { cache: 'no-store' });
+      render(await response.json());
+    } catch (_) {
+      byId('updated').textContent = '서버 연결을 확인하세요';
+    }
+  }
+  poll();
+  setInterval(poll, 500);
+</script>
+</body>
+</html>

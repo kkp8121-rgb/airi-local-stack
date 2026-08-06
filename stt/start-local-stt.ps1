@@ -1,7 +1,7 @@
 param(
     [string]$Model = 'small',
     [ValidateRange(1, 32)]
-    [int]$CpuThreads = 6,
+    [int]$CpuThreads = 8,
     [switch]$EnableDebugAudio
 )
 

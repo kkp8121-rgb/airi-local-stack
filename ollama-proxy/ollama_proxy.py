@@ -3,13 +3,23 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
+import time
 from collections.abc import AsyncIterator
+from pathlib import Path
+from uuid import uuid4
 
 import httpx
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from latency_trace import elapsed_ms, emit_latency_event, request_id
 
 
 app = FastAPI(title="AIRI Ollama compatibility proxy")
@@ -242,6 +252,19 @@ async def proxy(path: str, request: Request):
     if client is None:
         return JSONResponse({"error": "proxy client is not ready"}, status_code=503)
 
+    is_chat_request = request.method == "POST" and (
+        path.endswith("chat/completions") or path.endswith("api/chat")
+    )
+    trace_id = request_id(request.headers, uuid4().hex)
+    request_started = time.perf_counter()
+    if is_chat_request:
+        emit_latency_event(
+            "llm",
+            "start",
+            trace_id,
+            meta={"buffered_openai_chat": int(path.endswith("chat/completions"))},
+        )
+
     body, stripped, requested_stream, last_user_text = transform_body(path, await request.body())
     request_headers = {
         key: value
@@ -255,7 +278,17 @@ async def proxy(path: str, request: Request):
         headers=request_headers,
         content=body,
     )
-    upstream_response = await client.send(upstream_request, stream=True)
+    try:
+        upstream_response = await client.send(upstream_request, stream=True)
+    except Exception:
+        if is_chat_request:
+            emit_latency_event(
+                "llm",
+                "error",
+                trace_id,
+                duration_ms=elapsed_ms(request_started),
+            )
+        raise
 
     response_headers = {
         key: value
@@ -266,8 +299,25 @@ async def proxy(path: str, request: Request):
     response_headers["X-AIRI-Num-Ctx"] = str(NUM_CTX)
 
     if path.endswith("chat/completions") and upstream_response.status_code < 400:
-        raw_body = await upstream_response.aread()
-        await upstream_response.aclose()
+        try:
+            raw_body = await upstream_response.aread()
+        except Exception:
+            emit_latency_event(
+                "llm",
+                "error",
+                trace_id,
+                duration_ms=elapsed_ms(request_started),
+            )
+            raise
+        finally:
+            await upstream_response.aclose()
+        emit_latency_event(
+            "llm",
+            "first",
+            trace_id,
+            duration_ms=elapsed_ms(request_started),
+            meta={"buffered": 1, "response_bytes": len(raw_body)},
+        )
         try:
             response_payload = json.loads(raw_body)
             choices = response_payload.get("choices", [])
@@ -276,6 +326,12 @@ async def proxy(path: str, request: Request):
             sanitized = sanitize_assistant_content(content, last_user_text)
             if requested_stream:
                 response_headers["content-type"] = "text/event-stream; charset=utf-8"
+                emit_latency_event(
+                    "llm",
+                    "end",
+                    trace_id,
+                    duration_ms=elapsed_ms(request_started),
+                )
                 return Response(
                     content=to_openai_sse(response_payload, sanitized),
                     status_code=upstream_response.status_code,
@@ -284,12 +340,25 @@ async def proxy(path: str, request: Request):
 
             message["content"] = sanitized
             response_headers["content-type"] = "application/json; charset=utf-8"
+            emit_latency_event(
+                "llm",
+                "end",
+                trace_id,
+                duration_ms=elapsed_ms(request_started),
+            )
             return Response(
                 content=json.dumps(response_payload, ensure_ascii=False).encode("utf-8"),
                 status_code=upstream_response.status_code,
                 headers=response_headers,
             )
         except (json.JSONDecodeError, KeyError, TypeError, IndexError):
+            emit_latency_event(
+                "llm",
+                "end",
+                trace_id,
+                duration_ms=elapsed_ms(request_started),
+                meta={"parsed": 0},
+            )
             return Response(
                 content=raw_body,
                 status_code=upstream_response.status_code,
@@ -297,11 +366,38 @@ async def proxy(path: str, request: Request):
             )
 
     async def stream_body() -> AsyncIterator[bytes]:
+        emitted_first = False
         try:
             async for chunk in upstream_response.aiter_raw():
+                if is_chat_request and chunk and not emitted_first:
+                    emit_latency_event(
+                        "llm",
+                        "first",
+                        trace_id,
+                        duration_ms=elapsed_ms(request_started),
+                        meta={"raw_chunk": 1},
+                    )
+                    emitted_first = True
                 yield chunk
+        except Exception:
+            if is_chat_request:
+                emit_latency_event(
+                    "llm",
+                    "error",
+                    trace_id,
+                    duration_ms=elapsed_ms(request_started),
+                )
+            raise
         finally:
             await upstream_response.aclose()
+            if is_chat_request:
+                emit_latency_event(
+                    "llm",
+                    "end",
+                    trace_id,
+                    duration_ms=elapsed_ms(request_started),
+                    meta={"status_ok": int(upstream_response.status_code < 400)},
+                )
 
     return StreamingResponse(
         stream_body(),
