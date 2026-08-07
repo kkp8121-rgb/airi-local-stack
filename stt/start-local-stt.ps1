@@ -1,5 +1,8 @@
 param(
     [string]$Model = 'small',
+    [ValidateSet('cuda', 'cpu')]
+    [string]$Device = 'cuda',
+    [string]$ComputeType = 'float16',
     [ValidateRange(1, 32)]
     [int]$CpuThreads = 8,
     [switch]$EnableDebugAudio
@@ -12,6 +15,7 @@ $server = Join-Path $repo 'openai_stt_server.py'
 $modelRoot = Join-Path $repo 'models'
 $stdoutLog = Join-Path $repo 'stt-server.out.log'
 $stderrLog = Join-Path $repo 'stt-server.err.log'
+$cudaRuntime = Join-Path $repo '..\external\GPT-SoVITS\.venv\Lib\site-packages\torch\lib'
 
 if (-not (Test-Path -LiteralPath $python)) {
     throw "Python environment not found: $python"
@@ -23,7 +27,23 @@ if ($listener) {
     exit 0
 }
 
-$serverArguments = @($server, '--host', '127.0.0.1', '--port', '8890', '--model', $Model, '--model-root', $modelRoot, '--cpu-threads', $CpuThreads)
+if ($Device -eq 'cuda') {
+    if (-not (Test-Path -LiteralPath (Join-Path $cudaRuntime 'cublas64_12.dll'))) {
+        throw "CUDA runtime DLLs were not found: $cudaRuntime"
+    }
+    $env:PATH = "$cudaRuntime;$env:PATH"
+}
+
+$serverArguments = @(
+    $server,
+    '--host', '127.0.0.1',
+    '--port', '8890',
+    '--model', $Model,
+    '--model-root', $modelRoot,
+    '--device', $Device,
+    '--compute-type', $ComputeType,
+    '--cpu-threads', $CpuThreads
+)
 if ($EnableDebugAudio) {
     $debugAudioRoot = Join-Path $repo 'debug-recordings'
     $serverArguments += @('--debug-audio-dir', $debugAudioRoot)

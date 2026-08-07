@@ -1,5 +1,24 @@
 # AIRI 지연 개선 인수인계 — 2026-08-07
 
+> 후속 구현이 적용됐다. 현재 구조와 최신 실측은 먼저 `AIRI-CLOUD-SEARCH-REACTION-2026-08-07.md`를 읽는다. 아래의 CPU STT, VAD 1200ms, buffered first-token 상태는 이 체크포인트 당시 기록이며 현재 런타임에는 CUDA STT, VAD 450ms, 즉시 SSE 선반응이 적용돼 있다.
+
+## 최신 후속 상태 — 커밋 인계 시점
+
+- 설치 AIRI 자동 검증에서 `음유잉여를 웹에서 검색해줘`가 실제 Codex 구독 검색으로 라우팅됐고, 검색 중 첫 `응!` 재생은 합성 입력 종료 기준 **1,184ms**였다.
+- 검색 최종 답변은 `음유잉여 = 이터널 리턴 이바 장인, 대회명 UmU`로 반환됐다. 이 값은 자동 텍스트 입력 경로이며 실제 마이크 5회 acceptance를 대체하지 않는다.
+- 첫 사용자 마이크 시도는 음성 청크 5개 중 4개가 Whisper 내부 VAD에서 segment 0개가 되어 무효였다. 비정숙 빈 결과만 `vad_filter=false`로 한 번 재시도하는 fallback을 추가했고 단위·실음원 HTTP 검증은 통과했지만, 사용자 물리 발화로는 아직 재검증하지 못했다.
+- latency monitor는 원문·오디오를 저장하지 않으며 **수치 계측도 메모리 전용**이다. 프로세스가 재시작되면 표본이 사라진다. 다음 에이전트는 테스트 중 monitor를 재시작하지 않거나, 원문 없는 JSONL/SQLite 수치 영속화를 먼저 구현한다.
+- 완료 판정은 최근 실제 마이크 검색 5회가 모두 `cloud_search=1`, 실제 `playback:start` 보유, 발화 종료 추정→재생 시작 **각각 2,000ms 이하**일 때만 한다.
+- 현재 자동 테스트는 proxy 7 + STT 12 + TTS 3 + monitor 5 = **27개**다.
+
+GPU 없는 PC에서는 통합 런처가 기본 CUDA를 요구하므로 STT를 다음과 같이 별도로 시작한다. CPU에서 2초 목표는 아직 증명되지 않았다.
+
+```powershell
+.\stt\start-local-stt.ps1 -Device cpu -ComputeType int8 -CpuThreads 8
+```
+
+그 뒤 latency monitor, Ollama proxy, GPT-SoVITS 스택을 각각 시작하거나 통합 런처에 STT device 인자를 전달하도록 후속 수정한다. 모델 가중치·Python 가상환경·Codex 로그인 세션·AIRI 설치본은 Git에 포함되지 않는다.
+
 ## 현재 사용자 체감 기준
 
 - 사용자가 직접 5회 측정한 `발화 종료 → AIRI 첫말` 체감 평균: **약 8초**
@@ -47,11 +66,13 @@ Set-Location .\airi-local-stack
 .\patch-airi-audio-constraints.ps1
 .\patch-airi-transcript-latency.ps1
 .\patch-airi-voice-input-segmentation.ps1
+.\patch-airi-reaction-latency.ps1
+.\patch-airi-playback-latency.ps1
 ```
 
 각 스크립트는 설치 `app.asar`를 수정하므로 대상 PC에서 AIRI를 종료하고 실행해야 한다. 백업 파일은 해당 AIRI 설치 디렉터리에 생성된다.
 
-## 다음 구현 목표: 8초 → 2초
+## 이전 체크포인트의 구현 계획: 8초 → 2초
 
 단순 GPU/스레드 상향으로는 불가능하다. 현재 VAD 1.2초 + STT 1.49초만으로 2초를 넘는다. 다음 순서로 파이프라인 대기를 제거한다.
 
@@ -109,4 +130,14 @@ Set-Location ..\latency-monitor
 & ..\stt\.venv\Scripts\python.exe -m unittest -v test_monitor_server.py
 ```
 
-현재 체크포인트에서 STT 테스트 8개와 latency monitor 테스트 4개가 통과했고, Python compile 및 PowerShell parse도 통과했다.
+아래 최신 검증 명령도 함께 실행한다.
+
+```powershell
+Set-Location .\ollama-proxy
+& ..\chatterbox\.venv\Scripts\python.exe -m unittest -v test_ollama_proxy.py
+
+Set-Location ..\gpt-sovits
+& ..\external\GPT-SoVITS\.venv\Scripts\python.exe -m unittest -v test_openai_compatible_proxy.py
+```
+
+커밋 인계 시점 기준 총 27개 테스트와 Python compile, PowerShell parse, `git diff --check`가 통과해야 한다.

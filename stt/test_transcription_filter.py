@@ -5,11 +5,32 @@ from openai_stt_server import (
     VERBOSE_TRANSCRIPTION_LOG,
     filter_implausible_transcription,
     filter_low_confidence_transcription,
+    normalize_proper_nouns,
     preserve_debug_audio,
+    should_retry_without_vad,
 )
 
 
 class TranscriptionFilterTests(unittest.TestCase):
+    def test_retries_without_internal_vad_for_nonquiet_empty_chunk(self) -> None:
+        self.assertTrue(
+            should_retry_without_vad(
+                {
+                    "duration_seconds": 4.079,
+                    "rms": 0.052,
+                    "peak": 1.0,
+                },
+                [],
+            )
+        )
+
+    def test_does_not_retry_quiet_or_already_transcribed_chunk(self) -> None:
+        quiet = {"duration_seconds": 1.5, "rms": 0.004, "peak": 0.04}
+        speech = {"duration_seconds": 1.5, "rms": 0.05, "peak": 0.5}
+
+        self.assertFalse(should_retry_without_vad(quiet, []))
+        self.assertFalse(should_retry_without_vad(speech, [object()]))
+
     def test_privacy_defaults_do_not_persist_audio_or_text_logging(self) -> None:
         self.assertIsNone(DEBUG_AUDIO_DIR)
         self.assertFalse(VERBOSE_TRANSCRIPTION_LOG)
@@ -80,6 +101,20 @@ class TranscriptionFilterTests(unittest.TestCase):
 
         self.assertEqual(text, expected)
         self.assertIsNone(reason)
+
+    def test_corrects_observed_proper_noun_failures(self) -> None:
+        for raw in ("음류인경 웹서팅해줘", "윤류린 여 검색해줘", "음료인 찾아봐"):
+            with self.subTest(raw=raw):
+                text, corrections = normalize_proper_nouns(raw)
+                self.assertIn("음유잉여", text)
+                self.assertNotIn("웹서팅", text)
+                self.assertGreaterEqual(corrections, 1)
+
+    def test_does_not_modify_unrelated_transcript(self) -> None:
+        text, corrections = normalize_proper_nouns("이건 음료인 것 같아")
+
+        self.assertEqual(text, "이건 음료인 것 같아")
+        self.assertEqual(corrections, 0)
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@
       color-scheme: light dark;
       --bg: #f3f5f8; --panel: #ffffff; --ink: #172033; --muted: #687386;
       --line: #dce2eb; --stt: #5275e8; --gap: #9aa5b5; --llm: #914cc9;
-      --tts: #0f9871; --play: #e08a17; --good: #087d5e;
+      --tts: #0f9871; --play: #e08a17; --good: #087d5e; --bad: #c43d4d;
     }
     @media (prefers-color-scheme: dark) {
       :root { --bg: #10151e; --panel: #19212d; --ink: #eef3fb; --muted: #a8b2c0; --line: #303b4b; }
@@ -31,6 +31,8 @@
     .turns { display: grid; gap: 10px; }
     .headline { text-align: right; }
     .total { color: var(--good); font-size: 22px; font-weight: 760; }
+    .status-good { color: var(--good); }
+    .status-bad { color: var(--bad); }
     .water { height: 34px; position: relative; overflow: hidden; margin: 12px 0 9px; border: 1px solid var(--line); border-radius: 7px; }
     .bar { position: absolute; top: 0; height: 100%; min-width: 3px; border-right: 1px solid var(--panel); }
     .empty { color: var(--muted); text-align: center; padding: 38px; }
@@ -51,6 +53,7 @@
     <span id="updated" class="muted">연결 중…</span>
   </header>
   <section id="resources" class="resources"></section>
+  <section id="acceptance" class="resources"></section>
   <div class="legend">
     <span class="key" style="--color:var(--stt)">STT</span>
     <span class="key" style="--color:var(--gap)">앱 전달</span>
@@ -59,13 +62,21 @@
     <span class="key" style="--color:var(--play)">실제 재생(프런트 계측 시)</span>
   </div>
   <section id="turns" class="turns"><div class="empty">아직 수신한 대화가 없습니다.</div></section>
-  <p class="note">큰 숫자는 설치 AIRI의 VAD 무음 판정 설정 1200ms와 STT 접수→전체 WAV 완료를 합한 재생 직전 추정치입니다. 실제 스피커 시작은 AIRI 프런트 계측 전까지 수십~수백 ms 차이가 날 수 있습니다.</p>
+  <p class="note">큰 숫자의 발화 종료는 VAD 설정 450ms로 역산한 추정 시점이며, 재생 시작은 AIRI의 실제 source.start(0) 이벤트입니다. 재생 이벤트가 없는 turn만 TTS 완료 시점으로 추정합니다.</p>
 </main>
 <script>
   const byId = id => document.getElementById(id);
   const ms = value => value == null || Number.isNaN(value) ? '—' : `${Math.round(value)} ms`;
   const delta = (end, start) => end != null && start != null ? end - start : null;
-  const VAD_END_WAIT_MS = 1200;
+  const VAD_END_WAIT_MS = 450;
+  const TARGET_MS = 2000;
+  const ACCEPTANCE_TURNS = 5;
+
+  function percentile(values, ratio) {
+    if (!values.length) return null;
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[Math.max(0, Math.ceil(sorted.length * ratio) - 1)];
+  }
 
   function stages(turn) {
     const stt = turn.stt || {}, llm = turn.llm || {}, tts = turn.tts || {}, playback = turn.playback || {};
@@ -80,11 +91,12 @@
     add('TTS 요청 준비', 'var(--gap)', llm.end || llm.first, tts.start);
     add('TTS 첫 바이트', 'var(--tts)', tts.start, tts.first || tts.end);
     add('TTS 남은 WAV', 'var(--tts)', tts.first || tts.start, tts.end);
-    add('실제 재생', 'var(--play)', playback.start, playback.end || playback.first);
+    add('실제 재생 시작', 'var(--play)', playback.start, playback.start != null ? playback.start + 1 : null);
     return {
       stt, llm, tts, playback, base, items,
       requestToAudio: delta(tts.first, stt.start),
       requestToComplete: delta(tts.end, stt.start),
+      requestToPlayback: delta(playback.start, stt.start),
       afterStt: delta(tts.first, stt.end),
     };
   }
@@ -103,6 +115,29 @@
     byId('updated').textContent = `갱신 ${new Date(data.now_ms).toLocaleTimeString()}`;
 
     const turns = data.turns || [];
+    const physicalSamples = turns
+      .filter(turn => !(turn.stt && turn.stt.meta && turn.stt.meta.synthetic))
+      .filter(turn => turn.llm && turn.llm.meta && turn.llm.meta.cloud_search)
+      .map(turn => stages(turn))
+      .filter(view => view.requestToPlayback != null)
+      .slice(0, ACCEPTANCE_TURNS)
+      .map(view => view.requestToPlayback + VAD_END_WAIT_MS);
+    const sampleCount = physicalSamples.length;
+    const worst = sampleCount ? Math.max(...physicalSamples) : null;
+    const passed = sampleCount >= ACCEPTANCE_TURNS && worst <= TARGET_MS;
+    const failed = sampleCount >= ACCEPTANCE_TURNS && worst > TARGET_MS;
+    const targetClass = passed ? 'status-good' : failed ? 'status-bad' : '';
+    const targetText = passed ? '통과 · 5/5' : failed ? `초과 · 최악 ${ms(worst)}` : `${sampleCount}/${ACCEPTANCE_TURNS} 수집 중`;
+    const acceptanceCards = [
+      ['실제 마이크 검색 재생 표본', `${sampleCount}/${ACCEPTANCE_TURNS}`],
+      ['최근 반응', sampleCount ? ms(physicalSamples[0]) : '—'],
+      ['P50 / P95', sampleCount ? `${ms(percentile(physicalSamples, .5))} / ${ms(percentile(physicalSamples, .95))}` : '—'],
+      ['2초 목표 · 최근 5회 모두', targetText, targetClass],
+    ];
+    byId('acceptance').innerHTML = acceptanceCards.map(([label, value, valueClass = '']) =>
+      `<div class="card"><div class="label">${label}</div><div class="value ${valueClass}">${value}</div></div>`
+    ).join('');
+
     if (!turns.length) {
       byId('turns').innerHTML = '<div class="empty">아직 수신한 대화가 없습니다.</div>';
       return;
@@ -120,10 +155,14 @@
       const ttsState = view.tts.end
         ? (view.playback.start ? '실제 재생 이벤트 수신' : 'WAV 완료 · 스피커 시작 미계측')
         : (view.tts.start ? 'TTS 처리 중' : 'TTS 대기');
+      const observedPlayback = view.requestToPlayback != null;
+      const speechEndToReaction = observedPlayback
+        ? view.requestToPlayback + VAD_END_WAIT_MS
+        : (view.requestToComplete == null ? null : view.requestToComplete + VAD_END_WAIT_MS);
       return `<article class="turn">
         <div class="turn-top">
           <div><strong>Turn ${turns.length-index}</strong><div class="label">${turn.turn_id}</div></div>
-          <div class="headline"><div class="label">발화 끝 → 재생 직전 추정 (VAD 1.2초 포함)</div><div class="total">${view.requestToComplete == null ? '측정 중' : ms(view.requestToComplete + VAD_END_WAIT_MS)}</div></div>
+          <div class="headline"><div class="label">${observedPlayback ? '발화 끝 추정 → 실제 재생 시작' : '발화 끝 → 재생 직전 추정'}</div><div class="total">${speechEndToReaction == null ? '측정 중' : ms(speechEndToReaction)}</div></div>
         </div>
         <div class="water">${bars}</div>
         <div class="details">
@@ -132,11 +171,14 @@
           <span>Whisper ${ms(sm.inference_ms)}</span>
           <span>${llmName} ${ms(delta(view.llm.first || view.llm.end, view.llm.start))}</span>
           <span>STT 접수→첫 오디오 바이트 ${ms(view.requestToAudio)}</span>
+          <span>STT 접수→실제 재생 ${ms(view.requestToPlayback)}</span>
           <span>STT 접수→WAV 완료 ${ms(view.requestToComplete)}</span>
           <span>STT 완료 후→첫 오디오 ${ms(view.afterStt)}</span>
           <span>TTS lock 대기 ${ms(tm.lock_wait_ms)}</span>
           <span>${ttsState}</span>
           <span>TTS 세그먼트 ${view.tts.segments || 0}</span>
+          <span>고유명사 보정 ${sm.proper_noun_corrections || 0}회</span>
+          <span>클라우드 검색 ${lm.cloud_search ? '예' : '아니오'}</span>
         </div>
       </article>`;
     }).join('');

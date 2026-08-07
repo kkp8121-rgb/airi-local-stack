@@ -57,6 +57,10 @@ if (-not (Test-Port 9880)) {
   $startedBackend = $true
 }
 
+# The speech proxy pre-generates fixed acknowledgement WAVs during startup.
+# Wait until GPT-SoVITS can accept those requests before starting the proxy.
+Wait-Port 9880 120
+
 if (-not (Test-Port 8880)) {
   $out = Join-Path $PSScriptRoot 'proxy.out.log'
   $err = Join-Path $PSScriptRoot 'proxy.err.log'
@@ -64,7 +68,6 @@ if (-not (Test-Port 8880)) {
 }
 
 Wait-Port 11434 10
-Wait-Port 9880 120
 Wait-Port 8880 30
 
 if ($startedBackend -and -not $SkipWarmup) {

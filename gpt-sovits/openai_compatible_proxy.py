@@ -14,7 +14,7 @@ from uuid import uuid4
 
 import requests
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -40,6 +40,12 @@ PROMPT_TEXT = os.environ.get(
 STREAMING_MODE = int(os.environ.get("GPT_SOVITS_STREAMING_MODE", "2"))
 MIN_CHUNK_LENGTH = int(os.environ.get("GPT_SOVITS_MIN_CHUNK_LENGTH", "16"))
 TTS_LOCK = threading.Lock()
+# These short acknowledgements are intentionally fixed application phrases.  Only
+# their synthesized WAV bytes live in memory; user-provided speech is never cached.
+IMMEDIATE_RESPONSE_TEXTS = ("응!", "바로 찾아볼게.")
+_WAV_CACHE: dict[str, bytes] = {}
+_WAV_CACHE_STATUS: dict[str, str] = {text: "pending" for text in IMMEDIATE_RESPONSE_TEXTS}
+_WAV_CACHE_LOCK = threading.Lock()
 
 
 class SpeechRequest(BaseModel):
@@ -57,13 +63,80 @@ def health():
         backend = response.status_code < 500
     except requests.RequestException:
         backend = False
-    return {"status": "ok" if backend else "degraded", "engine": "gpt-sovits-v2ProPlus", "backend_url": GPT_TTS_URL}
+    return {
+        "status": "ok" if backend else "degraded",
+        "engine": "gpt-sovits-v2ProPlus",
+        "backend_url": GPT_TTS_URL,
+        "immediate_response_cache": cache_health(),
+    }
 
 
 @app.get("/v1/models")
 @app.get("/models")
 def models():
     return {"object": "list", "data": [{"id": "tts-1-ko", "object": "model", "owned_by": "local-gpt-sovits"}]}
+
+
+def build_backend_payload(text: str, speed: float = 1.0) -> dict:
+    """Build the existing GPT-SoVITS payload in one testable place."""
+    return {
+        "text": text,
+        "text_lang": "ko",
+        "ref_audio_path": REFERENCE_AUDIO,
+        "prompt_lang": PROMPT_LANG,
+        "prompt_text": PROMPT_TEXT,
+        "streaming_mode": STREAMING_MODE,
+        "min_chunk_length": MIN_CHUNK_LENGTH,
+        "speed_factor": speed,
+        "parallel_infer": False,
+        "media_type": "wav",
+    }
+
+
+def cached_wav_for_request(text: str, response_format: str, speed: float) -> bytes | None:
+    """Return a preload only when it is byte-for-byte compatible with the request."""
+    if response_format.casefold() != "wav" or speed != 1.0 or text not in IMMEDIATE_RESPONSE_TEXTS:
+        return None
+    with _WAV_CACHE_LOCK:
+        return _WAV_CACHE.get(text)
+
+
+def cache_health() -> dict:
+    with _WAV_CACHE_LOCK:
+        states = dict(_WAV_CACHE_STATUS)
+    return {"ready": sum(state == "ready" for state in states.values()), "total": len(states), "states": states}
+
+
+def _fetch_wav_from_backend(payload: dict) -> bytes:
+    """Fetch a complete WAV for startup warmup while holding the engine lock."""
+    with TTS_LOCK:
+        with HTTP.post(GPT_TTS_URL, json=payload, stream=True, timeout=180) as response:
+            if response.status_code != 200:
+                raise RuntimeError(f"GPT-SoVITS returned {response.status_code}: {response.text[:500]}")
+            audio = b"".join(chunk for chunk in response.iter_content(4096) if chunk)
+    if not audio:
+        raise RuntimeError("GPT-SoVITS returned an empty WAV")
+    return audio
+
+
+def warm_immediate_response_cache() -> None:
+    """Best-effort server-start warmup. Each failure leaves normal streaming intact."""
+    for text in IMMEDIATE_RESPONSE_TEXTS:
+        try:
+            audio = _fetch_wav_from_backend(build_backend_payload(text))
+            with _WAV_CACHE_LOCK:
+                _WAV_CACHE[text] = audio
+                _WAV_CACHE_STATUS[text] = "ready"
+        except Exception as exc:
+            logger.warning("immediate response cache warmup failed for configured phrase: %s", exc)
+            with _WAV_CACHE_LOCK:
+                _WAV_CACHE.pop(text, None)
+                _WAV_CACHE_STATUS[text] = "failed"
+
+
+@app.on_event("startup")
+def warm_cache_on_startup() -> None:
+    warm_immediate_response_cache()
 
 
 def _stream_backend(
@@ -139,18 +212,7 @@ def speech(request: SpeechRequest, http_request: Request):
         trace_id,
         meta={"text_chars": len(text)},
     )
-    payload = {
-        "text": text,
-        "text_lang": "ko",
-        "ref_audio_path": REFERENCE_AUDIO,
-        "prompt_lang": PROMPT_LANG,
-        "prompt_text": PROMPT_TEXT,
-        "streaming_mode": STREAMING_MODE,
-        "min_chunk_length": MIN_CHUNK_LENGTH,
-        "speed_factor": request.speed,
-        "parallel_infer": False,
-        "media_type": "wav",
-    }
+    payload = build_backend_payload(text, request.speed)
     logger.info(
         "speech request path=/audio/speech model=%s voice=%s chars=%d user_agent=%s origin=%s",
         request.model,
@@ -159,6 +221,16 @@ def speech(request: SpeechRequest, http_request: Request):
         http_request.headers.get("user-agent", "-"),
         http_request.headers.get("origin", "-"),
     )
+    cached_audio = cached_wav_for_request(text, request.response_format, request.speed)
+    if cached_audio is not None:
+        latency = elapsed_ms(request_started)
+        emit_latency_event("tts", "first", trace_id, duration_ms=latency, meta={"cache_hit": 1})
+        emit_latency_event("tts", "end", trace_id, duration_ms=latency, meta={"cache_hit": 1})
+        return Response(
+            content=cached_audio,
+            media_type="audio/wav",
+            headers={"X-AIRI-Request-ID": trace_id, "X-AIRI-TTS-Cache": "hit"},
+        )
     return StreamingResponse(
         _stream_backend(payload, trace_id, request_started),
         media_type="audio/wav",

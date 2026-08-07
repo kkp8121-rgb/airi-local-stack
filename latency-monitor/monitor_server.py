@@ -81,6 +81,8 @@ class Correlator:
                 stage.setdefault("start", stamp)
             elif source == "tts" and phase == "first":
                 stage.setdefault("first", stamp)
+            elif source == "playback" and phase == "start":
+                stage.setdefault("start", stamp)
             else:
                 stage[phase] = stamp
             if event.get("duration_ms") is not None:

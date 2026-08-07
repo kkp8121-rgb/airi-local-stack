@@ -36,6 +36,18 @@ class CorrelationTests(unittest.TestCase):
         self.assertEqual(turn["tts"]["segments"], 2)
         self.assertEqual(turn["stt"]["meta"], {"audio_bytes": 10, "inference_ms": 7})
 
+    def test_playback_keeps_first_actual_start(self):
+        c = Correlator()
+        for item in [
+            event("stt", "start", "s1", 100),
+            event("tts", "start", "t1", 300),
+            event("playback", "start", "p1", 420),
+            event("playback", "start", "p1", 900),
+        ]:
+            self.assertTrue(c.add(item))
+
+        self.assertEqual(c.snapshot()[0]["playback"]["start"], 420)
+
     def test_rejects_raw_content_but_keeps_safe_meta(self):
         self.assertIsNone(validate({"source":"stt","phase":"start","request_id":"x","text":"secret"}))
         c=Correlator(); c.add(validate({"source":"stt","phase":"start","request_id":"x","meta":{"frames":3,"voice":True,"text":"secret"}}))

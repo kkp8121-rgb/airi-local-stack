@@ -40,6 +40,9 @@ app.add_middleware(
 MODEL_NAME = "small"
 MODEL_ID = "whisper-1"
 MODEL_ROOT = Path(__file__).resolve().parent / "models"
+PROPER_NOUNS_PATH = Path(__file__).resolve().parent / "proper_nouns.json"
+DEVICE = "cuda"
+COMPUTE_TYPE = "float16"
 CPU_THREADS = max(1, min(8, (os.cpu_count() or 8) - 2))
 DEBUG_AUDIO_DIR: Path | None = None
 VERBOSE_TRANSCRIPTION_LOG = False
@@ -53,8 +56,51 @@ SHORT_AUDIO_MAX_COMPACT_CHARS = 18
 MAX_COMPACT_CHARS_PER_SECOND = 14.0
 MAX_RATE_MIN_COMPACT_CHARS = 24
 MIN_ACCEPTED_AVG_LOGPROB = -1.0
+VAD_FALLBACK_MIN_DURATION_SECONDS = 0.6
+VAD_FALLBACK_RMS_THRESHOLD = 0.015
+VAD_FALLBACK_PEAK_THRESHOLD = 0.15
 DEFAULT_INITIAL_PROMPT = "한국어 대화입니다. 아이리, 내 말 들려? 아이리는 사용자의 말을 듣고 대답합니다."
 BEAM_SIZE = 1
+
+
+def load_proper_nouns(path: Path = PROPER_NOUNS_PATH) -> list[dict[str, object]]:
+    if not path.is_file():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    entries = payload.get("entries", []) if isinstance(payload, dict) else []
+    return [entry for entry in entries if isinstance(entry, dict) and entry.get("canonical")]
+
+
+PROPER_NOUNS = load_proper_nouns()
+
+
+def build_hotwords() -> str:
+    words = ["아이리", "AIRI"]
+    for entry in PROPER_NOUNS:
+        words.append(str(entry["canonical"]))
+        words.extend(str(value) for value in entry.get("context", []) if value)
+    return " ".join(dict.fromkeys(words))
+
+
+def normalize_proper_nouns(text: str) -> tuple[str, int]:
+    normalized = text.replace("웹서팅", "웹서칭")
+    corrections = int(normalized != text)
+    search_like = any(term in normalized for term in ("검색", "서칭", "서치", "찾아", "알아봐"))
+    for entry in PROPER_NOUNS:
+        canonical = str(entry["canonical"])
+        aliases = list(entry.get("aliases", []))
+        if search_like:
+            aliases.extend(entry.get("search_aliases", []))
+        for alias in aliases:
+            alias_text = str(alias).strip()
+            if alias_text and alias_text in normalized:
+                occurrences = normalized.count(alias_text)
+                normalized = normalized.replace(alias_text, canonical)
+                corrections += occurrences
+    return normalized, corrections
 
 
 def load_model() -> None:
@@ -62,12 +108,25 @@ def load_model() -> None:
     MODEL_ROOT.mkdir(parents=True, exist_ok=True)
     whisper = WhisperModel(
         MODEL_NAME,
-        device="cpu",
-        compute_type="int8",
+        device=DEVICE,
+        compute_type=COMPUTE_TYPE,
         cpu_threads=CPU_THREADS,
         num_workers=1,
         download_root=str(MODEL_ROOT),
     )
+    # Force CUDA kernels and model weights to initialize during service startup,
+    # not during the user's first utterance.
+    warmup_segments, _ = whisper.transcribe(
+        np.zeros(16000, dtype=np.float32),
+        language="ko",
+        beam_size=1,
+        best_of=1,
+        temperature=0,
+        vad_filter=False,
+        condition_on_previous_text=False,
+        max_new_tokens=1,
+    )
+    list(warmup_segments)
 
 
 @app.on_event("startup")
@@ -81,9 +140,10 @@ async def health() -> dict[str, object]:
         "status": "ok" if whisper is not None else "loading",
         "model": MODEL_NAME,
         "model_id": MODEL_ID,
-        "device": "cpu",
-        "compute_type": "int8",
+        "device": DEVICE,
+        "compute_type": COMPUTE_TYPE,
         "cpu_threads": CPU_THREADS,
+        "proper_nouns": len(PROPER_NOUNS),
     }
 
 
@@ -148,34 +208,66 @@ def preserve_debug_audio(contents: bytes, suffix: str) -> str | None:
     return str(debug_path)
 
 
-def transcribe_file(path: str, language: str | None, prompt: str | None) -> tuple[str, str, float, list[dict[str, object]]]:
+def should_retry_without_vad(
+    audio_metrics: dict[str, float],
+    segments: list[object],
+) -> bool:
+    """Retry speech-like AIRI chunks when Whisper's second VAD drops everything."""
+    if segments:
+        return False
+    duration = audio_metrics.get("duration_seconds", 0.0)
+    rms = audio_metrics.get("rms", 0.0)
+    peak = audio_metrics.get("peak", 0.0)
+    return (
+        duration >= VAD_FALLBACK_MIN_DURATION_SECONDS
+        and (rms >= VAD_FALLBACK_RMS_THRESHOLD or peak >= VAD_FALLBACK_PEAK_THRESHOLD)
+    )
+
+
+def transcribe_file(
+    path: str,
+    language: str | None,
+    prompt: str | None,
+    audio_metrics: dict[str, float],
+) -> tuple[str, str, float, list[dict[str, object]], bool]:
     if whisper is None:
         raise RuntimeError("Whisper model is not ready")
 
     normalized_language = language.split("-")[0].lower() if language else "ko"
+    transcription_options = {
+        "language": normalized_language,
+        "task": "transcribe",
+        "beam_size": BEAM_SIZE,
+        "best_of": BEAM_SIZE,
+        "temperature": 0,
+        "condition_on_previous_text": False,
+        "initial_prompt": prompt or DEFAULT_INITIAL_PROMPT,
+        "hotwords": build_hotwords(),
+        "no_speech_threshold": 0.6,
+        "log_prob_threshold": -1.0,
+        "repetition_penalty": 1.1,
+        "no_repeat_ngram_size": 3,
+        "max_new_tokens": 64,
+    }
     segments, info = whisper.transcribe(
         path,
-        language=normalized_language,
-        task="transcribe",
-        beam_size=BEAM_SIZE,
-        best_of=BEAM_SIZE,
-        temperature=0,
+        **transcription_options,
         vad_filter=True,
         vad_parameters={
             "min_silence_duration_ms": 300,
             "speech_pad_ms": 200,
         },
-        condition_on_previous_text=False,
-        initial_prompt=prompt or DEFAULT_INITIAL_PROMPT,
-        hotwords="아이리 AIRI",
-        no_speech_threshold=0.6,
-        log_prob_threshold=-1.0,
-        repetition_penalty=1.1,
-        no_repeat_ngram_size=3,
-        max_new_tokens=64,
     )
 
     completed = list(segments)
+    vad_fallback_used = should_retry_without_vad(audio_metrics, completed)
+    if vad_fallback_used:
+        fallback_segments, info = whisper.transcribe(
+            path,
+            **transcription_options,
+            vad_filter=False,
+        )
+        completed = list(fallback_segments)
     text = " ".join(segment.text.strip() for segment in completed if segment.text.strip()).strip()
     verbose_segments = [
         {
@@ -193,7 +285,7 @@ def transcribe_file(path: str, language: str | None, prompt: str | None) -> tupl
         for index, segment in enumerate(completed)
     ]
     duration = completed[-1].end if completed else 0.0
-    return text, info.language, duration, verbose_segments
+    return text, info.language, duration, verbose_segments, vad_fallback_used
 
 
 def filter_implausible_transcription(
@@ -285,11 +377,12 @@ async def create_transcription(
         audio_metrics = await asyncio.to_thread(analyze_audio, temp_path)
         analysis_ms = elapsed_ms(analysis_started)
         inference_started = time.perf_counter()
-        raw_text, detected_language, duration, segments = await asyncio.to_thread(
+        raw_text, detected_language, duration, segments, vad_fallback_used = await asyncio.to_thread(
             transcribe_file,
             temp_path,
             language,
             prompt,
+            audio_metrics,
         )
         inference_ms = elapsed_ms(inference_started)
     except Exception:
@@ -304,7 +397,8 @@ async def create_transcription(
         if temp_path:
             Path(temp_path).unlink(missing_ok=True)
 
-    text, rejected_reason = filter_implausible_transcription(raw_text, audio_metrics)
+    corrected_text, proper_noun_corrections = normalize_proper_nouns(raw_text)
+    text, rejected_reason = filter_implausible_transcription(corrected_text, audio_metrics)
     if rejected_reason is None:
         text, rejected_reason = filter_low_confidence_transcription(text, segments)
     if rejected_reason:
@@ -322,6 +416,8 @@ async def create_transcription(
             "inference_ms": inference_ms,
             "text_chars": len(text),
             "accepted": rejected_reason is None,
+            "proper_noun_corrections": proper_noun_corrections,
+            "vad_fallback_used": vad_fallback_used,
         },
     )
 
@@ -349,6 +445,8 @@ async def create_transcription(
                 ),
                 "accepted": rejected_reason is None,
                 "rejected_reason": rejected_reason,
+                "proper_noun_corrections": proper_noun_corrections,
+                "vad_fallback_used": vad_fallback_used,
             },
             ensure_ascii=False,
         ),
@@ -369,13 +467,15 @@ async def create_transcription(
 
 
 def main() -> None:
-    global MODEL_NAME, MODEL_ROOT, CPU_THREADS, DEBUG_AUDIO_DIR, VERBOSE_TRANSCRIPTION_LOG
+    global MODEL_NAME, MODEL_ROOT, DEVICE, COMPUTE_TYPE, CPU_THREADS, DEBUG_AUDIO_DIR, VERBOSE_TRANSCRIPTION_LOG
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8890)
     parser.add_argument("--model", default=MODEL_NAME)
     parser.add_argument("--model-root", default=str(MODEL_ROOT))
+    parser.add_argument("--device", choices=("cpu", "cuda"), default=DEVICE)
+    parser.add_argument("--compute-type", default=COMPUTE_TYPE)
     parser.add_argument("--cpu-threads", type=int, default=CPU_THREADS)
     parser.add_argument("--debug-audio-dir")
     parser.add_argument(
@@ -387,6 +487,8 @@ def main() -> None:
 
     MODEL_NAME = args.model
     MODEL_ROOT = Path(args.model_root).resolve()
+    DEVICE = args.device
+    COMPUTE_TYPE = args.compute_type
     CPU_THREADS = max(1, args.cpu_threads)
     DEBUG_AUDIO_DIR = Path(args.debug_audio_dir).resolve() if args.debug_audio_dir else None
     VERBOSE_TRANSCRIPTION_LOG = bool(args.verbose_transcription_log)

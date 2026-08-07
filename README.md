@@ -2,16 +2,16 @@
 
 Windows에서 AIRI 0.11.3을 로컬 LLM, 한국어 음성 합성, 로컬 음성 인식과 연결하기 위한 작업 저장소다.
 
-현재 텍스트 대화, EXAONE 기반 로컬 LLM, GPT-SoVITS v2ProPlus 기반 TTS, Live2D 립싱크·표정 반응은 동작한다. AIRI UI에서 LLM → TTS 요청 → 오디오 재생 스케줄까지 확인했다. **실제 사용자 마이크 연속 5회 검증은 아직 남아 있으며 완료로 간주하면 안 된다.**
+현재 텍스트 대화, EXAONE 기반 로컬 LLM, GPT-SoVITS v2ProPlus 기반 TTS, CUDA faster-whisper STT, Codex 구독 기반 웹 검색과 Live2D 립싱크·표정 반응이 동작한다. 검색 요청은 즉시 캐시 음성으로 반응한 뒤 실제 검색 결과를 같은 답변에 이어 붙인다. **설치 AIRI 자동 재생 검증은 1.184초를 기록했지만 합성 STT 시각을 사용했으므로, 실제 사용자 마이크 연속 5회 검증 전에는 2초 목표 완료로 간주하면 안 된다.**
 
 ## 구성
 
 | 구성 요소 | 경로/포트 | 상태 |
 |---|---|---|
 | Ollama | `127.0.0.1:11434` | 동작 |
-| AIRI용 Ollama 호환 프록시 | `ollama-proxy/`, `127.0.0.1:11435` | 동작 |
-| GPT-SoVITS v2ProPlus TTS | `gpt-sovits/`, API `127.0.0.1:9880`, 프록시 `127.0.0.1:8880` | 혼합 언어·동시 요청·AIRI 재생 검증 통과 |
-| faster-whisper STT | `stt/`, `127.0.0.1:8890` | 실제 마이크 요청 도달, VAD 분절 패치 적용, 사용자 검증 대기 |
+| AIRI용 Ollama/검색 프록시 | `ollama-proxy/`, `127.0.0.1:11435` | 즉시 SSE + Codex 구독 live search 동작 |
+| GPT-SoVITS v2ProPlus TTS | `gpt-sovits/`, API `127.0.0.1:9880`, 프록시 `127.0.0.1:8880` | 혼합 언어·동시 요청·선반응 WAV 캐시 동작 |
+| faster-whisper STT | `stt/`, `127.0.0.1:8890` | CUDA/float16, 고유명사 보정, 사용자 5회 검증 대기 |
 | AIRI 데스크톱 | 별도 설치, 0.11.3 | 텍스트/LLM/TTS 재생/Live2D 동작 |
 
 ## 시작과 종료
@@ -30,9 +30,9 @@ AIRI 애플리케이션 자체는 Windows에 별도로 설치되어 있으며 �
 
 ## 다음 세션이 먼저 읽을 문서
 
-1. `airi_docs/AIRI-HANDOFF-2026-08-06.md`
-2. `NEXT-SESSION.md`
-3. `AIRI-VOICE-INPUT-ISSUE-2026-08-05.md`
+1. `airi_docs/AIRI-CLOUD-SEARCH-REACTION-2026-08-07.md`
+2. `airi_docs/AIRI-HANDOFF-2026-08-07.md`
+3. `NEXT-SESSION.md`
 
 ## Git에 포함하지 않는 항목
 
