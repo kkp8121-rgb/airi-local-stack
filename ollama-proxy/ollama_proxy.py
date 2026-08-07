@@ -5,7 +5,6 @@ import asyncio
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -22,8 +21,22 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+MODULE_DIR = Path(__file__).resolve().parent
+if str(MODULE_DIR) not in sys.path:
+    sys.path.insert(0, str(MODULE_DIR))
 
 from latency_trace import elapsed_ms, emit_latency_event, request_id
+from llm_backends import (
+    LLMBackendError,
+    build_backend,
+    codex_program,
+    load_llm_config,
+    load_persona_prompt,
+    missing_llm_credential,
+    privacy_notice,
+    sentence_chunker,
+    sentence_chunker_options,
+)
 
 
 app = FastAPI(title="AIRI Ollama compatibility proxy")
@@ -135,6 +148,29 @@ SEARCH_IMMEDIATE_ACK = (
     '<|ACT {"emotion":"curious"}|> 응! 바로 찾아볼게. '
     '<|ACT {"emotion":"curious"}|>'
 )
+# Backend mode switch. `local` is the default and keeps the original path
+# byte-for-byte; cloud / open / hybrid stream an external provider instead.
+LLM_CONFIG = load_llm_config()
+DEFAULT_LLM_MODE = str(LLM_CONFIG.get("default_mode", "local"))
+LLM_MODE = os.environ.get("AIRI_LLM_MODE", DEFAULT_LLM_MODE).strip().lower() or DEFAULT_LLM_MODE
+# A mode is "external" purely because its provider leaves this machine, so
+# repointing a mode in llm_modes.json reroutes it without touching the code.
+LOCAL_LLM_PROVIDERS = frozenset({"ollama"})
+EXTERNAL_LLM_MODES = frozenset(
+    name
+    for name, mode_config in (LLM_CONFIG.get("modes") or {}).items()
+    if isinstance(mode_config, dict)
+    and str(mode_config.get("provider", "")).strip().lower() not in LOCAL_LLM_PROVIDERS
+)
+PERSONA_PROMPT = load_persona_prompt()
+# Assembly order is [static persona] -> [MEMORY_BLOCK] -> [last 10 turns].
+# M2 fills this in; an empty block keeps the cached persona prefix stable.
+MEMORY_BLOCK = ""
+SENTENCE_CHUNKER_OPTIONS = sentence_chunker_options(LLM_CONFIG)
+MAX_SENTENCES_PER_CHUNK = int(
+    (LLM_CONFIG.get("sentence_chunker") or {}).get("max_sentences_per_chunk", 4)
+)
+
 SEARCH_FALLBACK_PREFIX = "검색이 안 돼서 아는 만큼만 말할게."
 SEARCH_UNAVAILABLE_DIALOGUE = "검색 연결이 잠시 안 돼. 다시 한 번 말해줘."
 UPSTREAM_TIMEOUT_DIALOGUE = "답이 너무 늦어서 잠깐 멈췄어. 다시 말해줘."
@@ -303,21 +339,71 @@ def strip_leading_reaction(text: str) -> str:
     return stripped or "생각을 정리했어."
 
 
-def _codex_program() -> list[str] | None:
-    override = os.environ.get("AIRI_CODEX_EXECUTABLE")
-    if override:
-        return [override]
+def normalize_stream_sentence(text: str, *, is_first: bool) -> str:
+    """Light per-sentence cleanup for streamed external output.
 
-    codex_cmd = shutil.which("codex.cmd") or shutil.which("codex")
-    if not codex_cmd:
-        return None
-    codex_path = Path(codex_cmd)
-    if os.name == "nt" and codex_path.suffix.casefold() in {".cmd", ".ps1", ""}:
-        codex_js = codex_path.parent / "node_modules" / "@openai" / "codex" / "bin" / "codex.js"
-        node = shutil.which("node.exe") or shutil.which("node")
-        if node and codex_js.is_file():
-            return [node, str(codex_js)]
-    return [str(codex_path)]
+    The persona contract in persona_prompt.txt already asks for short casual
+    Korean, so only the presentation layer is enforced per sentence: control
+    tokens, emoji and markdown are dropped and the formal-speech table stays
+    as a backstop. The sentence budget is effectively disabled because the
+    chunker already hands over one sentence at a time, and the leading
+    reaction is stripped from the first sentence only (the immediate ack
+    already said it).
+    """
+    dialogue = normalize_dialogue(text, max_sentences=MAX_SENTENCES_PER_CHUNK, fallback="")
+    if is_first:
+        dialogue = LEADING_REACTION_RE.sub("", dialogue).strip()
+    return dialogue
+
+
+def llm_mode_config(mode: str) -> dict[str, object]:
+    modes = LLM_CONFIG.get("modes") or {}
+    config = modes.get(mode) or modes.get(DEFAULT_LLM_MODE) or {}
+    return config if isinstance(config, dict) else {}
+
+
+def validate_llm_mode(mode: str | None = None) -> None:
+    """Privacy opt-in gate: refuse to start an external mode without its key.
+
+    Also prints the one-line disclosure so nobody can enable an external mode
+    without seeing where the conversation text goes.
+    """
+    active = (mode or LLM_MODE).strip().lower()
+    if active not in EXTERNAL_LLM_MODES:
+        return
+    mode_config = llm_mode_config(active)
+    missing = missing_llm_credential(mode_config)
+    if missing:
+        # codex-cli needs an installed CLI, key-based providers need their env
+        # variable; either way the mode must not start half-configured.
+        requirement = (
+            f"the {missing}"
+            if missing.endswith("executable")
+            else f"the {missing} environment variable"
+        )
+        raise RuntimeError(
+            f"AIRI_LLM_MODE='{active}' requires {requirement}. "
+            "Set it, or switch back to AIRI_LLM_MODE=local."
+        )
+    print(
+        json.dumps(
+            {
+                "event": "llm_mode",
+                "mode": active,
+                "provider": str(mode_config.get("provider", "unknown")),
+                "model": str(mode_config.get("model", "")),
+                "notice": privacy_notice(active, mode_config, MAX_HISTORY_MESSAGES),
+            },
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
+
+
+def _codex_program() -> list[str] | None:
+    # Resolution moved to llm_backends.codex_program so the search sidecar and
+    # CodexBackend cannot drift apart; behaviour is unchanged.
+    return codex_program()
 
 
 def lookup_search_context(query: str) -> str:
@@ -478,6 +564,7 @@ HOP_BY_HOP_HEADERS = {
 @app.on_event("startup")
 async def startup() -> None:
     global client
+    validate_llm_mode()
     client = httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT)
 
 
@@ -538,11 +625,266 @@ async def fetch_local_dialogue(
     return strip_leading_reaction(normalize_dialogue(message_content(message)))
 
 
+async def fetch_local_reflex(user_text: str, mode_config: dict[str, object]) -> str:
+    """Ask the local model for a very short reaction. Failures are ignored.
+
+    The reflex only exists to cover the cloud's time-to-first-sentence, so it
+    is strictly fail-open: any error yields "" and the turn proceeds as a
+    plain cloud turn.
+    """
+    if client is None:
+        return ""
+    max_chars = int(mode_config.get("reflex_max_chars", 15))
+    prompt = str(mode_config.get("reflex_prompt", "")).replace("{max_chars}", str(max_chars))
+    if not prompt:
+        return ""
+    base_url = str(mode_config.get("reflex_base_url", f"{UPSTREAM}/v1")).rstrip("/")
+    timeout_s = float(mode_config.get("reflex_timeout_s", 1.5))
+    payload = {
+        "model": str(mode_config.get("reflex_model", "exaone-airi:2.4b")),
+        "stream": False,
+        "options": {"num_ctx": NUM_CTX, "num_gpu": NUM_GPU, "num_predict": 24},
+        "messages": [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": user_text},
+        ],
+    }
+    try:
+        response = await client.post(
+            f"{base_url}/chat/completions",
+            json=payload,
+            timeout=timeout_s,
+        )
+        if response.status_code >= 400:
+            return ""
+        body = json.loads(response.content)
+        choices = body.get("choices") or []
+        message = choices[0].get("message", {}) if choices else {}
+        dialogue = normalize_dialogue(message_content(message), max_sentences=1, fallback="")
+    except Exception:
+        return ""
+    return dialogue[:max_chars].strip()
+
+
+async def _next_sentence(sentences: AsyncIterator[str]) -> str:
+    """Return the next sentence, or "" once the stream is exhausted."""
+    try:
+        return await sentences.__anext__()
+    except StopAsyncIteration:
+        return ""
+
+
+def discard_task(task: asyncio.Task) -> None:
+    """Cancel a task and swallow its outcome so asyncio does not log it."""
+    task.cancel()
+
+    def consume(finished: asyncio.Task) -> None:
+        if not finished.cancelled():
+            finished.exception()
+
+    task.add_done_callback(consume)
+
+
+async def race_local_reflex(
+    reflex_task: asyncio.Task | None,
+    first_sentence_task: asyncio.Task,
+    timeout_s: float,
+) -> str:
+    """Speak the local reflex only when it beats the cloud's first sentence.
+
+    Late reflexes are discarded rather than queued: saying "응, 그렇구나" after
+    the real answer already started is worse than not saying it at all.
+    """
+    if reflex_task is None:
+        return ""
+    try:
+        done, _pending = await asyncio.wait(
+            {reflex_task, first_sentence_task},
+            timeout=timeout_s,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+    except asyncio.CancelledError:
+        discard_task(reflex_task)
+        raise
+    if reflex_task in done and first_sentence_task not in done:
+        try:
+            return reflex_task.result() or ""
+        except Exception:
+            return ""
+    discard_task(reflex_task)
+    return ""
+
+
+async def stream_external_dialogue(
+    *,
+    completion_id: str,
+    model: str,
+    mode: str,
+    mode_config: dict[str, object],
+    conversation: list[object],
+    last_user_text: str,
+    trace_id: str,
+    request_started: float,
+    fallback_request: tuple[str, str, object, dict[str, str], bytes],
+) -> AsyncIterator[bytes]:
+    """Ack -> per-sentence external deltas -> finish, with a local fallback."""
+    reflex_task: asyncio.Task | None = None
+    first_task: asyncio.Task | None = None
+    sentences = None
+    emitted = 0
+    reflex_text = ""
+    try:
+        emit_latency_event(
+            "llm",
+            "first",
+            trace_id,
+            duration_ms=elapsed_ms(request_started),
+            meta={"immediate_ack": 1, "external_llm": 1},
+        )
+        yield openai_sse_delta(completion_id, model, LOCAL_IMMEDIATE_ACK, include_role=True)
+
+        if mode == "hybrid" and bool(mode_config.get("reflex_enabled", True)):
+            reflex_task = asyncio.create_task(fetch_local_reflex(last_user_text, mode_config))
+
+        backend = build_backend(mode_config, client)
+        sentences = sentence_chunker(
+            backend.stream_completion(PERSONA_PROMPT, conversation, memory_block=MEMORY_BLOCK),
+            **SENTENCE_CHUNKER_OPTIONS,
+        )
+        first_task = asyncio.create_task(_next_sentence(sentences))
+        reflex_text = await race_local_reflex(
+            reflex_task,
+            first_task,
+            float(mode_config.get("reflex_timeout_s", 1.5)),
+        )
+        reflex_task = None
+        if reflex_text:
+            emotion = infer_emotion(last_user_text, reflex_text)
+            yield openai_sse_delta(
+                completion_id,
+                model,
+                f'<|ACT {{"emotion":"{emotion}"}}|> {reflex_text}',
+            )
+
+        sentence = await first_task
+        while sentence:
+            dialogue = normalize_stream_sentence(sentence, is_first=emitted == 0)
+            if dialogue:
+                emotion = infer_emotion(last_user_text, dialogue)
+                yield openai_sse_delta(
+                    completion_id,
+                    model,
+                    f'<|ACT {{"emotion":"{emotion}"}}|> {dialogue}',
+                )
+                emitted += 1
+            sentence = await _next_sentence(sentences)
+
+        if emitted == 0:
+            raise LLMBackendError(f"{mode} backend produced no dialogue")
+
+        yield openai_sse_finish(completion_id, model)
+        emit_latency_event(
+            "llm",
+            "end",
+            trace_id,
+            duration_ms=elapsed_ms(request_started),
+            meta={"external_llm": 1, "sentences": emitted, "reflex": int(bool(reflex_text))},
+        )
+        print(
+            json.dumps(
+                {
+                    "event": "external_chat",
+                    "status": "ok",
+                    "mode": mode,
+                    "provider": str(mode_config.get("provider", "")),
+                    "sentences": emitted,
+                    "reflex": bool(reflex_text),
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+    except asyncio.CancelledError:
+        if reflex_task is not None:
+            discard_task(reflex_task)
+        emit_latency_event(
+            "llm",
+            "error",
+            trace_id,
+            duration_ms=elapsed_ms(request_started),
+            meta={"external_llm": 1, "client_cancelled": 1},
+        )
+        raise
+    except Exception as exc:
+        if reflex_task is not None:
+            discard_task(reflex_task)
+        emit_latency_event(
+            "llm",
+            "error",
+            trace_id,
+            duration_ms=elapsed_ms(request_started),
+            meta={"external_llm": 1, "sentences": emitted},
+        )
+        # The provider is unreachable, but the local model still knows
+        # something - answer with what it has instead of an apology.
+        try:
+            fallback_dialogue = await fetch_local_dialogue(*fallback_request)
+        except Exception:
+            fallback_dialogue = ""
+        print(
+            json.dumps(
+                {
+                    "event": "external_chat",
+                    "status": "error",
+                    "mode": mode,
+                    "error_type": type(exc).__name__,
+                    "sentences": emitted,
+                    "fallback": "local" if fallback_dialogue else "none",
+                }
+            ),
+            flush=True,
+        )
+        if fallback_dialogue:
+            spoken = fallback_dialogue
+            emotion = infer_emotion(last_user_text, fallback_dialogue)
+        else:
+            spoken = (
+                UPSTREAM_TIMEOUT_DIALOGUE
+                if isinstance(exc, httpx.TimeoutException)
+                else LOCAL_ERROR_DIALOGUE
+            )
+            emotion = "sad"
+        yield openai_sse_delta(
+            completion_id,
+            model,
+            f'<|ACT {{"emotion":"{emotion}"}}|> {spoken}',
+        )
+        yield openai_sse_finish(completion_id, model)
+    finally:
+        # Cancel the pending read before closing, otherwise aclose() trips over
+        # a generator that is still running and the upstream socket leaks.
+        if first_task is not None and not first_task.done():
+            first_task.cancel()
+            try:
+                await first_task
+            except (asyncio.CancelledError, Exception):
+                pass
+        if sentences is not None:
+            try:
+                await sentences.aclose()
+            except (asyncio.CancelledError, Exception):
+                pass
+
+
 @app.get("/health")
 async def health() -> dict[str, object]:
+    active_mode_config = llm_mode_config(LLM_MODE)
     return {
         "status": "ok",
         "upstream": UPSTREAM,
+        "llm_mode": LLM_MODE,
+        "provider": str(active_mode_config.get("provider", "ollama")),
+        "llm_model": str(active_mode_config.get("model", "")),
         "tools_stripped": True,
         "cloud_search": "codex-subscription" if _codex_program() else "unavailable",
         "immediate_ack": True,
@@ -772,6 +1114,39 @@ async def proxy(path: str, request: Request):
 
             return StreamingResponse(
                 stream_cloud_search(),
+                status_code=200,
+                headers=immediate_headers,
+                media_type="text/event-stream",
+            )
+
+        if LLM_MODE in EXTERNAL_LLM_MODES:
+            # transform_body already sliced the history to MAX_HISTORY_MESSAGES
+            # and prepended the local system prompt; external modes carry the
+            # persona in their own system block, so drop it here.
+            transformed_messages = transformed_payload.get("messages")
+            conversation = [
+                message
+                for message in (transformed_messages if isinstance(transformed_messages, list) else [])
+                if isinstance(message, dict) and message.get("role") != "system"
+            ]
+            return StreamingResponse(
+                stream_external_dialogue(
+                    completion_id=completion_id,
+                    model=model,
+                    mode=LLM_MODE,
+                    mode_config=llm_mode_config(LLM_MODE),
+                    conversation=conversation,
+                    last_user_text=last_user_text,
+                    trace_id=trace_id,
+                    request_started=request_started,
+                    fallback_request=(
+                        request.method,
+                        path,
+                        request.query_params,
+                        request_headers,
+                        body,
+                    ),
+                ),
                 status_code=200,
                 headers=immediate_headers,
                 media_type="text/event-stream",
@@ -1036,6 +1411,13 @@ def main() -> None:
 
     UPSTREAM = args.upstream.rstrip("/")
     NUM_CTX = args.num_ctx
+    try:
+        validate_llm_mode()
+    except RuntimeError as exc:
+        # Privacy opt-in: never start an external mode that would silently fail
+        # back to local after already having been asked for.
+        print(f"error: {exc}", file=sys.stderr, flush=True)
+        raise SystemExit(2)
     uvicorn.run(app, host=args.host, port=args.port)
 
 

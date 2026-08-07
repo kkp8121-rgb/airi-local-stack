@@ -33,6 +33,31 @@
 5. **마이크 5회 acceptance 재도전**: 이제야 전제가 갖춰졌다 — (a) 패치 상태 확정됨 (b) 무음 폐기가 관측 가능해짐(빈 전사 accepted=false + 거부 사유 로깅) (c) 200 무음 증상 근절. 실패하면 이번에는 로그에 거부 사유·신뢰도가 남는다.
 6. **결과 기록**: acceptance 결과와 구간별 수치를 HANDOFF 관례대로 기록. 합성 STT 시각 수치는 acceptance에 쓰지 말 것(감사 보고서 §계측 참조).
 
+## 2.5 단계별 테스트 사다리 (2026-08-07 사용자 합의 — "포지가 미리 개발, 사용자는 순서대로 테스트, 막히면 그 지점부터 개발 PC에서 수정")
+
+| 단계 | 브랜치 | 내용 | 사용자 테스트 |
+|---|---|---|---|
+| 1 | `fix/code-audit-remediation-2026-08-07` | 감사 결함 전면 수정 (이 문서 §3~§6) | §2 절차: 테스트 4종 → `apply-airi-patches.ps1` → 스택 기동 → **마이크 5회 acceptance** |
+| 2 | `feat/llm-backend-modes-2026-08-07` (1 기반) | LLM 백엔드 모드 스위치 — env `AIRI_LLM_MODE`=`local`(현행 EXAONE, 기본)/`cloud`(Anthropic+캐싱+문장 스트리밍)/`open`(OpenAI 호환 오픈 모델)/`hybrid`(클라우드 본문+로컬 반사 응답) | 키 설정 → 모드별 재기동 체감 비교 + `ollama-proxy\bench-llm-modes.py`로 TTFT·비용·페르소나 비교표 |
+| 3 | `feat/memory-layer` (2 기반, 준비 중) | 트랙 M2 장기 기억 — SQLite 벡터+관계 1-hop, 백그라운드 추출(Stage A/B), 검색 주입(`{MEMORY_BLOCK}`) | 대화 → 재시작 → 기억 회상 확인, 회상 정확도·지연 측정 |
+| — | (개발 PC 전용) | Phase 2+5: AIRI 소스 빌드, 클라이언트 청크 재생, TTS 락 해체 | 이 PC에서 사전 개발 불가 영역 — 3단계 이후 착수 |
+
+각 단계 브랜치는 이전 단계를 포함한다(chained). 막힌 단계의 브랜치에서 수정 커밋을 쌓고, 통과하면 다음 단계 브랜치로 이동(또는 rebase). ABCD 비교는 브랜치가 아니라 2단계 안의 모드 스위치다 — 코드 95%가 공유라 브랜치 분리는 수정 중복만 만든다.
+
+### 2단계 상세 (구현 완료 — 감사 PC에서 라이브 검증됨)
+
+**모드**: env `AIRI_LLM_MODE` = `local`(기본, 현행 EXAONE 무변경 — diff상 local 경로 삭제 0라인) / `cloud`(codex pro 구독 CLI — **키 불필요**, 로그인만) / `cloud_anthropic`(Anthropic API 스트리밍+캐싱, `ANTHROPIC_API_KEY`) / `open`(OpenAI 호환 제네릭, `OPENROUTER_API_KEY`) / `hybrid`(클라우드 본문 + 로컬 반사 응답 race). 설정은 `ollama-proxy\llm_modes.json`(모델·요금·리플렉스 파라미터 — 매직넘버 금지 원칙). 외부 모드는 키/CLI 없으면 exit 2로 기동 거부(§12 옵트인), 기동 로그에 외부 전송 고지 1줄, `/health`에 `llm_mode`/`provider`/`llm_model` 노출. 벤치: `python ollama-proxy\bench-llm-modes.py --repeat 3` → 모드별 TTFT·첫 문장·완료·비용 비교표 + 응답 전문(페르소나 순응도 수동 평가).
+
+**감사 PC 라이브 실측 (2026-08-07)**:
+
+| 경로 | 실측 | 의미 |
+|---|---|---|
+| local (CPU EXAONE) | ack 0.04s → 본답변 5.5s | CPU 기준. 개발 PC GPU에선 0.6~1.5s 예상 |
+| cloud (codex 실호출) | **TTFT ≈ 완료 ≈ 8.3~15s**, 턴당 입력 20,744 tok | `--json`에 델타 이벤트 없음 = **비스트리밍 확정**. 첫 문장 조기 방출 불가 |
+| hybrid (codex+로컬 반사) | ack 0.05s → **반사 1.36s("정말 잘 봤구나 축하해!" happy 태그)** → 본문 15.1s | 반사 응답이 맥락·감정 맞춰 선착 — M+ ④ 실현 |
+
+**⚠️ 핵심 판단 자료**: codex 구독은 페르소나 순응은 우수하나 **실시간 대화 두뇌로는 부적합**(TTFT 8초+, 현행 로컬보다 느림 — 계획서 M0 ③의 CLI 금지 판정이 일반 대화에서도 재확인됨). 권장 역할 재배치: **실시간 대화 = local 또는 `cloud_anthropic`/`open`(스트리밍 — 개발 PC에서 벤치 비교) / codex 구독 = 검색 사이드카(기존) + 3단계 기억 추출 백그라운드 LLM(한계비용 0, 지연 무관)**. 상주 프로세스(`codex exec-server` 등, 실험적)로 턴당 ~2.5초 절감 여지는 조사만 해 둠(구현 보류 — 워커 보고 참조).
+
 ## 3. ollama-proxy 수정 내역 (`ollama_proxy.py`, 테스트 7→26개)
 
 | # | 위치 | 수정 | 왜 |

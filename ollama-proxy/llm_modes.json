@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "default_mode": "local",
+  "krw_per_usd": 1400,
+  "sentence_chunker": {
+    "boundary_chars": ".!?…",
+    "min_sentence_chars": 2,
+    "max_buffer_chars": 120,
+    "max_sentences_per_chunk": 4
+  },
+  "modes": {
+    "local": {
+      "provider": "ollama",
+      "model": "exaone-airi:2.4b",
+      "base_url": "http://127.0.0.1:11434/v1",
+      "api_key_env": null,
+      "pricing_usd_per_mtok": {"input": 0.0, "output": 0.0},
+      "timeout_s": {"connect": 5.0, "read": 120.0, "write": 30.0},
+      "max_tokens": 512
+    },
+    "cloud": {
+      "provider": "codex-cli",
+      "model": "gpt-5.6-sol",
+      "codex_reasoning_effort": "low",
+      "codex_cd": null,
+      "api_key_env": null,
+      "pricing_usd_per_mtok": {"input": 0.0, "output": 0.0},
+      "pricing_note": "codex pro 구독 요금제 - 턴당 한계비용 0, 사용량 한도만 존재",
+      "timeout_s": {"connect": 5.0, "read": 60.0, "write": 15.0},
+      "max_tokens": 300
+    },
+    "cloud_anthropic": {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5",
+      "base_url": "https://api.anthropic.com",
+      "anthropic_version": "2023-06-01",
+      "api_key_env": "ANTHROPIC_API_KEY",
+      "pricing_usd_per_mtok": {"input": 1.0, "output": 5.0},
+      "timeout_s": {"connect": 5.0, "read": 60.0, "write": 15.0},
+      "max_tokens": 300
+    },
+    "open": {
+      "provider": "openai_compat",
+      "model": "qwen/qwen3-30b-a3b-instruct-2507",
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "pricing_usd_per_mtok": {"input": 0.09, "output": 0.45},
+      "pricing_note": "example open-weight model rates - confirm on the provider dashboard before trusting the bench cost column",
+      "timeout_s": {"connect": 5.0, "read": 60.0, "write": 15.0},
+      "max_tokens": 300
+    },
+    "hybrid": {
+      "provider": "codex-cli",
+      "model": "gpt-5.6-sol",
+      "codex_reasoning_effort": "low",
+      "codex_cd": null,
+      "api_key_env": null,
+      "pricing_usd_per_mtok": {"input": 0.0, "output": 0.0},
+      "pricing_note": "codex pro 구독 요금제 - 턴당 한계비용 0, 사용량 한도만 존재",
+      "timeout_s": {"connect": 5.0, "read": 60.0, "write": 15.0},
+      "max_tokens": 300,
+      "reflex_enabled": true,
+      "reflex_provider": "ollama",
+      "reflex_model": "exaone-airi:2.4b",
+      "reflex_base_url": "http://127.0.0.1:11434/v1",
+      "reflex_max_chars": 15,
+      "reflex_timeout_s": 1.5,
+      "reflex_prompt": "사용자 발화에 대한 {max_chars}자 이내 한국어 반말 리액션 한 마디만 말해. 설명, 질문, 이모지, 따옴표는 쓰지 마."
+    }
+  },
+  "bench": {
+    "repeat": 1,
+    "utterances": [
+      "오늘 회사에서 승진했어!",
+      "강아지가 아파서 병원 다녀왔어.",
+      "양자컴퓨터가 뭔지 쉽게 설명해줘.",
+      "주말에 뭐 하면 좋을까?",
+      "어제 복권 당첨될 뻔했는데 한 끗 차이로 놓쳤어."
+    ]
+  }
+}
