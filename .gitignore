@@ -35,6 +35,7 @@ moss-tts-nano/
 *.mp4
 
 # Runtime output
+memory-data/
 *.log
 *.pid
 *.tmp

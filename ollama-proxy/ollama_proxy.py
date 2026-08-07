@@ -37,6 +37,7 @@ from llm_backends import (
     sentence_chunker,
     sentence_chunker_options,
 )
+from memory_layer import MemoryLayer
 
 
 app = FastAPI(title="AIRI Ollama compatibility proxy")
@@ -164,8 +165,13 @@ EXTERNAL_LLM_MODES = frozenset(
 )
 PERSONA_PROMPT = load_persona_prompt()
 # Assembly order is [static persona] -> [MEMORY_BLOCK] -> [last 10 turns].
-# M2 fills this in; an empty block keeps the cached persona prefix stable.
+# The per-turn block comes from MEMORY; this constant stays the fallback for a
+# turn that retrieves nothing, so the cached persona prefix never moves.
 MEMORY_BLOCK = ""
+MEMORY = MemoryLayer(LLM_CONFIG)
+# The extractor spawns an LLM (codex subprocess), so it only runs under the real
+# server entry point - importing `app` in a test must never start one.
+MEMORY_WORKER_ENABLED = False
 SENTENCE_CHUNKER_OPTIONS = sentence_chunker_options(LLM_CONFIG)
 MAX_SENTENCES_PER_CHUNK = int(
     (LLM_CONFIG.get("sentence_chunker") or {}).get("max_sentences_per_chunk", 4)
@@ -566,10 +572,12 @@ async def startup() -> None:
     global client
     validate_llm_mode()
     client = httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT)
+    MEMORY.start(run_worker=MEMORY_WORKER_ENABLED)
 
 
 @app.on_event("shutdown")
 async def shutdown() -> None:
+    await MEMORY.aclose()
     if client is not None:
         await client.aclose()
 
@@ -726,6 +734,7 @@ async def stream_external_dialogue(
     trace_id: str,
     request_started: float,
     fallback_request: tuple[str, str, object, dict[str, str], bytes],
+    memory_block: str = "",
 ) -> AsyncIterator[bytes]:
     """Ack -> per-sentence external deltas -> finish, with a local fallback."""
     reflex_task: asyncio.Task | None = None
@@ -733,6 +742,7 @@ async def stream_external_dialogue(
     sentences = None
     emitted = 0
     reflex_text = ""
+    spoken: list[str] = []
     try:
         emit_latency_event(
             "llm",
@@ -748,7 +758,9 @@ async def stream_external_dialogue(
 
         backend = build_backend(mode_config, client)
         sentences = sentence_chunker(
-            backend.stream_completion(PERSONA_PROMPT, conversation, memory_block=MEMORY_BLOCK),
+            backend.stream_completion(
+                PERSONA_PROMPT, conversation, memory_block=memory_block or MEMORY_BLOCK
+            ),
             **SENTENCE_CHUNKER_OPTIONS,
         )
         first_task = asyncio.create_task(_next_sentence(sentences))
@@ -776,6 +788,7 @@ async def stream_external_dialogue(
                     model,
                     f'<|ACT {{"emotion":"{emotion}"}}|> {dialogue}',
                 )
+                spoken.append(dialogue)
                 emitted += 1
             sentence = await _next_sentence(sentences)
 
@@ -783,6 +796,7 @@ async def stream_external_dialogue(
             raise LLMBackendError(f"{mode} backend produced no dialogue")
 
         yield openai_sse_finish(completion_id, model)
+        MEMORY.record_turn(last_user_text, " ".join(spoken))
         emit_latency_event(
             "llm",
             "end",
@@ -891,6 +905,7 @@ async def health() -> dict[str, object]:
         "system_prompt_overridden": True,
         "num_ctx": NUM_CTX,
         "num_gpu": NUM_GPU,
+        "memory": MEMORY.health(),
     }
 
 
@@ -955,6 +970,29 @@ def transform_body(path: str, body: bytes) -> tuple[bytes, bool, bool, str]:
     return json.dumps(payload, ensure_ascii=False).encode("utf-8"), stripped, requested_stream, last_user_text
 
 
+def apply_memory_block(body: bytes, memory_block: str) -> bytes:
+    """Append the retrieved memory to the local system turn.
+
+    AIRI_SYSTEM_PROMPT itself stays byte-identical; the block is appended to the
+    assembled message only, and only on turns that actually retrieved something.
+    External modes ignore this - they carry the block in their own system block.
+    """
+    if not memory_block:
+        return body
+    try:
+        payload = json.loads(body)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return body
+    messages = payload.get("messages")
+    if not isinstance(messages, list) or not messages:
+        return body
+    head = messages[0]
+    if not isinstance(head, dict) or head.get("role") != "system":
+        return body
+    head["content"] = f"{head.get('content', '')}\n\n{memory_block}"
+    return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
+
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 async def proxy(path: str, request: Request):
     if client is None:
@@ -974,6 +1012,10 @@ async def proxy(path: str, request: Request):
         )
 
     body, stripped, requested_stream, last_user_text = transform_body(path, await request.body())
+    # Retrieval is timeboxed inside the layer and fails soft to "", so this can
+    # never be what makes a turn late.
+    memory_block = await MEMORY.memory_block(last_user_text) if is_chat_request else ""
+    body = apply_memory_block(body, memory_block)
     request_headers = {
         key: value
         for key, value in request.headers.items()
@@ -1033,6 +1075,7 @@ async def proxy(path: str, request: Request):
                         f'<|ACT {{"emotion":"{final_emotion}"}}|> {result}',
                     )
                     yield openai_sse_finish(completion_id, model)
+                    MEMORY.record_turn(last_user_text, result)
                     emit_latency_event(
                         "llm",
                         "end",
@@ -1146,6 +1189,7 @@ async def proxy(path: str, request: Request):
                         request_headers,
                         body,
                     ),
+                    memory_block=memory_block,
                 ),
                 status_code=200,
                 headers=immediate_headers,
@@ -1199,6 +1243,7 @@ async def proxy(path: str, request: Request):
                     f'<|ACT {{"emotion":"{emotion}"}}|> {dialogue}',
                 )
                 yield openai_sse_finish(completion_id, model)
+                MEMORY.record_turn(last_user_text, dialogue)
                 emit_latency_event(
                     "llm",
                     "end",
@@ -1400,7 +1445,7 @@ async def proxy(path: str, request: Request):
 
 
 def main() -> None:
-    global UPSTREAM, NUM_CTX
+    global UPSTREAM, NUM_CTX, MEMORY_WORKER_ENABLED
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="127.0.0.1")
@@ -1418,6 +1463,8 @@ def main() -> None:
         # back to local after already having been asked for.
         print(f"error: {exc}", file=sys.stderr, flush=True)
         raise SystemExit(2)
+    # Only the long-lived server runs the background extractor.
+    MEMORY_WORKER_ENABLED = True
     uvicorn.run(app, host=args.host, port=args.port)
 
 

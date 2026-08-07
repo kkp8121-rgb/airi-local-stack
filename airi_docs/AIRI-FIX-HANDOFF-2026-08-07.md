@@ -39,7 +39,7 @@
 |---|---|---|---|
 | 1 | `fix/code-audit-remediation-2026-08-07` | 감사 결함 전면 수정 (이 문서 §3~§6) | §2 절차: 테스트 4종 → `apply-airi-patches.ps1` → 스택 기동 → **마이크 5회 acceptance** |
 | 2 | `feat/llm-backend-modes-2026-08-07` (1 기반) | LLM 백엔드 모드 스위치 — env `AIRI_LLM_MODE`=`local`(현행 EXAONE, 기본)/`cloud`(Anthropic+캐싱+문장 스트리밍)/`open`(OpenAI 호환 오픈 모델)/`hybrid`(클라우드 본문+로컬 반사 응답) | 키 설정 → 모드별 재기동 체감 비교 + `ollama-proxy\bench-llm-modes.py`로 TTFT·비용·페르소나 비교표 |
-| 3 | `feat/memory-layer` (2 기반, 준비 중) | 트랙 M2 장기 기억 — SQLite 벡터+관계 1-hop, 백그라운드 추출(Stage A/B), 검색 주입(`{MEMORY_BLOCK}`) | 대화 → 재시작 → 기억 회상 확인, 회상 정확도·지연 측정 |
+| 3 | `feat/memory-layer-2026-08-07` (2 기반) | 트랙 M2 장기 기억 — SQLite 벡터+관계 1-hop, 백그라운드 추출(Stage A/B, 기본 codex 구독), 검색 주입 | 대화 → 재시작 → 기억 회상 확인, KURE-v1 임베딩 전환·지연 측정 (아래 3단계 상세) |
 | — | (개발 PC 전용) | Phase 2+5: AIRI 소스 빌드, 클라이언트 청크 재생, TTS 락 해체 | 이 PC에서 사전 개발 불가 영역 — 3단계 이후 착수 |
 
 각 단계 브랜치는 이전 단계를 포함한다(chained). 막힌 단계의 브랜치에서 수정 커밋을 쌓고, 통과하면 다음 단계 브랜치로 이동(또는 rebase). ABCD 비교는 브랜치가 아니라 2단계 안의 모드 스위치다 — 코드 95%가 공유라 브랜치 분리는 수정 중복만 만든다.
@@ -57,6 +57,18 @@
 | hybrid (codex+로컬 반사) | ack 0.05s → **반사 1.36s("정말 잘 봤구나 축하해!" happy 태그)** → 본문 15.1s | 반사 응답이 맥락·감정 맞춰 선착 — M+ ④ 실현 |
 
 **⚠️ 핵심 판단 자료**: codex 구독은 페르소나 순응은 우수하나 **실시간 대화 두뇌로는 부적합**(TTFT 8초+, 현행 로컬보다 느림 — 계획서 M0 ③의 CLI 금지 판정이 일반 대화에서도 재확인됨). 권장 역할 재배치: **실시간 대화 = local 또는 `cloud_anthropic`/`open`(스트리밍 — 개발 PC에서 벤치 비교) / codex 구독 = 검색 사이드카(기존) + 3단계 기억 추출 백그라운드 LLM(한계비용 0, 지연 무관)**. 상주 프로세스(`codex exec-server` 등, 실험적)로 턴당 ~2.5초 절감 여지는 조사만 해 둠(구현 보류 — 워커 보고 참조).
+
+### 3단계 상세 (구현 완료 — 감사 PC에서 장기 기억 라이브 실증)
+
+**구조**: `ollama-proxy\memory_*.py` 6모듈. SQLite(WAL, 기본 `ollama-proxy\memory-data\` — gitignore) + 레퍼런스 §3 스키마(confidence knows/heard/believes, superseded_by 체인, content_hash 중복 제거, is_true epistemic firewall) + `conversation_turn` 큐·워터마크. Stage A/B 프롬프트는 `AIRI-MEMORY-TECH-REFERENCE.md` §1 **원문 그대로**(문자열 동일성 검증). 추출 = 백그라운드 워커(기본 6턴 배치, `codex-cli` 기본 → ollama 폴백 → dead-letter), 검색 = LLM 0회(0.7·cosine + 0.3·exp(−0.05·Δturn), caps 8/5/8, NameScanner→1-hop 5·3, 타임박스 150ms), 주입 = [Character Memory] 블록을 local/외부 모드 공통 배선. **fail-soft 전면**: 기억의 어떤 실패도 발화를 막지 않음(테스트 6종 고정). `/health`에 `memory:{enabled, embed_mode, rows, pending_jobs, ...}`.
+
+**임베딩 플러그블**: `AIRI_EMBED_MODE=fake`(기본 64차원 해시 — 테스트·감사 PC) / `local`(KURE-v1 1024차원 — 개발 PC, sentence-transformers 필요, 실패 시 fake로 fail-open). **⚠️ 모드 전환 시 DB 재생성 또는 재임베딩 필수**(차원 혼합 시 cosine 무의미 — 자동 재임베딩 미구현). `/health`의 `embed_mode`로 실동작 모드 확인.
+
+**감사 PC 라이브 실증 (fake 임베딩 + codex 추출 실호출)**: 대화 2턴 → 자동 추출 12.1s(백그라운드) → **프록시 재시작** → 관련 질문 → 블록 주입 성공("커피보다 홍차를 훨씬 좋아한다" trait + "보리: 사용자가 키우는 강아지" entity), 검색 0.5~14.9ms. Stage A/B codex 실호출 파싱 성공(12~33s).
+
+**개발 PC 확인 절차**: ① `pip install sentence-transformers` + KURE-v1 워밍업 → `AIRI_EMBED_MODE=local` → `/health`로 실모드 확인 ② `memory.extraction_batch_turns`를 2로 낮춰 이름·취향 대화 → rows 증가 대기 → 재시작 → 회상 확인 → 6으로 복원 ③ 검색 `duration_ms` 실측(목표 20~80ms, 150ms 초과 지속 시 GPU 점유 의심).
+
+**알려진 한계(다음 작업 후보)**: codex가 모순 기억(커피↔홍차)에 SUPERSEDE 대신 ADD를 선택하는 사례 관측 — 프롬프트 도메인 적응 필요할 수 있음(SUPERSEDE 경로 자체는 테스트 검증됨) / EXAONE 2.4b의 회상 후 발화 품질이 낮음("강아지 이름, 꼭!") — 기억 전달은 정상, 로컬 모델 품질 게이트 별건 / canon-snapshot 세션 격리·자동 재임베딩·다층 캐시 미구현(레퍼런스 §3~4 참조).
 
 ## 3. ollama-proxy 수정 내역 (`ollama_proxy.py`, 테스트 7→26개)
 

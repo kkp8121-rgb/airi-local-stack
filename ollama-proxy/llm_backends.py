@@ -554,6 +554,10 @@ class CodexBackend(LLMBackend):
         self.reasoning_effort = str(mode_config.get("codex_reasoning_effort", "low"))
         self.working_directory = str(mode_config.get("codex_cd") or CODEX_DEFAULT_CD)
         self.timeout_s = codex_timeout_s(mode_config)
+        # Dialogue turns need the "speak as AIRI" framing; the memory layer's
+        # extraction turns must not have it, so the header is a config knob.
+        header = mode_config.get("codex_prompt_header")
+        self.prompt_header = CODEX_PROMPT_HEADER if header is None else str(header)
 
     def build_command(self, program: list[str]) -> list[str]:
         command = [
@@ -586,7 +590,7 @@ class CodexBackend(LLMBackend):
         sections = [system_prompt.strip()]
         if memory_block.strip():
             sections.append(memory_block.strip())
-        sections.append(CODEX_PROMPT_HEADER)
+        sections.append(self.prompt_header)
         transcript = []
         for message in messages:
             if not isinstance(message, Mapping):

@@ -68,6 +68,39 @@
       "reflex_prompt": "사용자 발화에 대한 {max_chars}자 이내 한국어 반말 리액션 한 마디만 말해. 설명, 질문, 이모지, 따옴표는 쓰지 마."
     }
   },
+  "memory": {
+    "enabled": true,
+    "db_path": null,
+    "session_id": "default",
+    "character_name": "아이리",
+    "user_name": "사용자",
+    "embed_mode": "fake",
+    "embed_model": "nlpai-lab/KURE-v1",
+    "embed_note": "fake = 의존성 없는 해시 벡터(이 PC 기본). local = sentence-transformers KURE-v1, 미설치 시 fake로 자동 폴백. AIRI_EMBED_MODE로 덮어쓰기 가능",
+    "extraction_provider": "codex-cli",
+    "extraction_fallback_provider": "ollama",
+    "extraction_note": "추출은 백그라운드 배치라 지연 무관 - codex 구독은 턴당 한계비용 0, 실패 시 로컬 ollama로 폴백",
+    "extraction_batch_turns": 6,
+    "extraction_max_failures": 5,
+    "extraction_poll_seconds": 5.0,
+    "extraction_overrides": {
+      "max_tokens": 2048,
+      "timeout_s": {"connect": 5.0, "read": 180.0, "write": 30.0},
+      "codex_prompt_header": ""
+    },
+    "retrieval_timebox_ms": 150,
+    "caps": {
+      "traits": 8,
+      "moments": 5,
+      "scene_facts_raw": 20,
+      "scene_facts_final": 8,
+      "one_hop_relations": 5,
+      "one_hop_facts": 3,
+      "alpha": 0.7,
+      "beta": 0.3,
+      "lambda": 0.05
+    }
+  },
   "bench": {
     "repeat": 1,
     "utterances": [
