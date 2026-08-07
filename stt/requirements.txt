@@ -1,4 +1,6 @@
+av>=11,<19
 fastapi>=0.116,<1
 faster-whisper>=1.2,<2
+numpy>=1.26,<3
 python-multipart>=0.0.20,<1
 uvicorn[standard]>=0.35,<1
