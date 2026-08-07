@@ -10,7 +10,7 @@ Windows에서 AIRI 0.11.3을 로컬 LLM, 한국어 음성 합성, 로컬 음성 
 |---|---|---|
 | Ollama | `127.0.0.1:11434` | 동작 |
 | AIRI용 Ollama/검색 프록시 | `ollama-proxy/`, `127.0.0.1:11435` | 즉시 SSE + Codex 구독 live search 동작 |
-| GPT-SoVITS v2ProPlus TTS | `gpt-sovits/`, API `127.0.0.1:9880`, 프록시 `127.0.0.1:8880` | 혼합 언어·동시 요청·선반응 WAV 캐시 동작 |
+| GPT-SoVITS v2ProPlus TTS | `gpt-sovits/`, API `127.0.0.1:9880`, 프록시 `127.0.0.1:8880` | 혼합 언어·선반응 WAV 캐시 동작. 동시 요청은 오디오 중첩 방지를 위해 의도적으로 직렬화(전역 락) — Phase 2+5 전까지 유지 |
 | faster-whisper STT | `stt/`, `127.0.0.1:8890` | CUDA/float16, 고유명사 보정, 사용자 5회 검증 대기 |
 | AIRI 데스크톱 | 별도 설치, 0.11.3 | 텍스트/LLM/TTS 재생/Live2D 동작 |
 
@@ -30,9 +30,11 @@ AIRI 애플리케이션 자체는 Windows에 별도로 설치되어 있으며 �
 
 ## 다음 세션이 먼저 읽을 문서
 
-1. `airi_docs/AIRI-CLOUD-SEARCH-REACTION-2026-08-07.md`
-2. `airi_docs/AIRI-HANDOFF-2026-08-07.md`
-3. `NEXT-SESSION.md`
+1. `airi_docs/AIRI-FIX-HANDOFF-2026-08-07.md` — **감사 반영 수정 인수인계 (최신 진입점)**
+2. `airi_docs/AIRI-LOCAL-STACK-REVIEW-2026-08-07.md` — 코드 감사 보고서 (결함 근거·실측치)
+3. `airi_docs/AIRI-CLOUD-SEARCH-REACTION-2026-08-07.md`
+4. `airi_docs/AIRI-HANDOFF-2026-08-07.md`
+5. `NEXT-SESSION.md`
 
 ## Git에 포함하지 않는 항목
 

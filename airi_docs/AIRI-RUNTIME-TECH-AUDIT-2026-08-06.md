@@ -1,5 +1,7 @@
 # AIRI 문서 기술과 실제 런타임 대조 — 2026-08-06
 
+> **2026-08-07 주의:** 이 문서의 STT 항목(CPU INT8)은 CUDA float16 전환 이전 기록이며, 이후 코드 감사·수정(`AIRI-LOCAL-STACK-REVIEW-2026-08-07.md`, `AIRI-FIX-HANDOFF-2026-08-07.md`)이 반영되지 않았다. 현행 스펙 기준은 `AIRI-LOCAL-TECH-SPECS.md`를 사용한다.
+
 이 문서는 `airi_docs`의 설계·계획 문구와 현재 PC에서 실행되는 프로세스, 포트, health 응답, 실제 AIRI 요청 로그 및 설치 `app.asar`를 대조한 판정표다. 계획 문서보다 이 문서와 실시간 지연 대시보드를 현재 런타임의 기준으로 사용한다.
 
 ## 판정 기준

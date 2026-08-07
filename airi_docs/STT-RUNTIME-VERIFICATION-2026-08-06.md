@@ -1,5 +1,7 @@
 # AIRI Local STT Runtime Verification — 2026-08-06
 
+> **2026-08-07 주의:** 아래 Device/Threads(CPU INT8, 6 threads)는 CUDA float16 전환 이전 기록이다. 현행 기준은 `AIRI-LOCAL-TECH-SPECS.md`.
+
 ## Service
 
 - Endpoint: `http://127.0.0.1:8890`
