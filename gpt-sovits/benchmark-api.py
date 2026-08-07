@@ -7,13 +7,17 @@ from pathlib import Path
 
 import requests
 
+# Default to the production reference/prompt pair. Measuring a different pair
+# reports latency for audio the running proxy would never generate.
+import openai_compatible_proxy as proxy
+
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", default="http://127.0.0.1:9880/tts")
-    parser.add_argument("--reference", default="chatterbox/voices/airi-reference.wav")
-    parser.add_argument("--prompt-lang", default="ko")
-    parser.add_argument("--prompt-text", default="안녕하세요.")
+    parser.add_argument("--reference", default=proxy.REFERENCE_AUDIO)
+    parser.add_argument("--prompt-lang", default=proxy.PROMPT_LANG)
+    parser.add_argument("--prompt-text", default=proxy.PROMPT_TEXT)
     parser.add_argument("--text", default="안녕하세요. 오늘은 어떤 이야기를 해볼까요?")
     parser.add_argument("--mode", type=int, default=2)
     parser.add_argument("--min-chunk-length", type=int, default=8)

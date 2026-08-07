@@ -4,10 +4,40 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$gptRoot = Join-Path $projectRoot 'external\GPT-SoVITS'
+
+# GPT-SoVITS is a separate clone that this repository does not vendor, so accept
+# an explicit GPT_SOVITS_ROOT first and fall back to the known checkout layouts.
+function Resolve-GptSovitsRoot([string]$ProjectRoot) {
+  $clone = $null
+  $candidates = @(
+    $env:GPT_SOVITS_ROOT,
+    (Join-Path $ProjectRoot 'external\GPT-SoVITS'),
+    (Join-Path (Split-Path -Parent $ProjectRoot) 'external\GPT-SoVITS'),
+    'C:\Projects\airi\external\GPT-SoVITS'
+  )
+  foreach ($candidate in $candidates) {
+    if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+    if (-not (Test-Path -LiteralPath (Join-Path $candidate 'api_v2.py'))) { continue }
+    if (Test-Path -LiteralPath (Join-Path $candidate '.venv\Scripts\python.exe')) { return $candidate }
+    if (-not $clone) { $clone = $candidate }
+  }
+  # Separate the two failure modes: a missing clone and a clone without a venv
+  # need completely different fixes.
+  if ($clone) { throw "GPT-SoVITS at $clone has no virtual environment at .venv\Scripts\python.exe" }
+  throw 'GPT-SoVITS was not found. Clone GPT-SoVITS and set GPT_SOVITS_ROOT to the clone directory'
+}
+
+$gptRoot = Resolve-GptSovitsRoot $projectRoot
 $python = Join-Path $gptRoot '.venv\Scripts\python.exe'
-if (-not (Test-Path -LiteralPath $python)) { throw "GPT-SoVITS environment not found: $python" }
 New-Item -ItemType Directory -Force -Path (Join-Path $gptRoot 'GPT_SoVITS\pretrained_models\fast_langdetect') | Out-Null
+
+# The speech proxy resolves this itself, but pinning it here keeps the launched
+# process independent of whatever the caller inherited.
+$referenceAudio = Join-Path $projectRoot 'chatterbox\voices\airi-reference.wav'
+$env:GPT_SOVITS_REFERENCE_AUDIO = $referenceAudio
+if (-not (Test-Path -LiteralPath $referenceAudio)) {
+  Write-Warning "AIRI reference voice not found: $referenceAudio - speech synthesis fails until this file exists"
+}
 
 # GPT-SoVITS imports its English frontend lazily after the streaming response
 # has started. Missing data therefore looks like HTTP 200 followed by a broken
@@ -57,8 +87,8 @@ if (-not (Test-Port 9880)) {
   $startedBackend = $true
 }
 
-# The speech proxy pre-generates fixed acknowledgement WAVs during startup.
-# Wait until GPT-SoVITS can accept those requests before starting the proxy.
+# The speech proxy pre-generates fixed acknowledgement WAVs on a background
+# thread. Wait until GPT-SoVITS can accept those requests before starting it.
 Wait-Port 9880 120
 
 if (-not (Test-Port 8880)) {
@@ -68,7 +98,10 @@ if (-not (Test-Port 8880)) {
 }
 
 Wait-Port 11434 10
-Wait-Port 8880 30
+# The proxy binds immediately because the acknowledgement cache warms up in the
+# background, so this wait only covers process start.
+Wait-Port 8880 20
+Write-Output 'Speech proxy is listening on 8880; acknowledgement cache warmup continues in the background (see /health immediate_response_cache).'
 
 if ($startedBackend -and -not $SkipWarmup) {
   $previousProgressPreference = $ProgressPreference

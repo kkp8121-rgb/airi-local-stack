@@ -1,6 +1,15 @@
+# Minimal launcher for the GPT-SoVITS speech stack.
+#
+# This is NOT equivalent to start-airi-local-stack.ps1. That launcher also
+# starts the latency monitor (port 8892) and sends an Ollama warmup request that
+# removes roughly four seconds from the first reply. This script deliberately
+# does neither, so the first turn is slower and no latency dashboard is
+# available. Use start-airi-local-stack.ps1 for a normal AIRI session.
 param(
     [string]$SttModel = 'small',
     [ValidateRange(1, 32)]
+    # Only used when STT falls back to CPU; the STT server defaults to cuda.
+    # Raise this to 8 for a CPU-only run.
     [int]$SttCpuThreads = 6
 )
 

@@ -21,7 +21,16 @@ Assert-Listening 8880
 
 $health = Invoke-RestMethod -Uri "$base/health" -Method Get -TimeoutSec 5
 if ($health.status -ne 'ok') { throw "speech proxy health is $($health.status)" }
-Write-Output "speech_health=ok engine=$($health.engine)"
+if (-not $health.reference_audio_found) {
+  throw "speech proxy reference audio is missing: $($health.reference_audio)"
+}
+# The acknowledgement WAVs warm up in the background, so a verified stack must
+# actually have them: a miss silently costs the whole first-response latency win.
+$cache = $health.immediate_response_cache
+if ($cache.ready -lt 2) {
+  throw "immediate response cache is not ready: $($cache.ready)/$($cache.total)"
+}
+Write-Output "speech_health=ok engine=$($health.engine) cache_ready=$($cache.ready)/$($cache.total)"
 
 $llmHealth = Invoke-RestMethod -Uri 'http://127.0.0.1:11435/health' -Method Get -TimeoutSec 5
 if ($llmHealth.status -ne 'ok') { throw "Ollama compatibility proxy health is $($llmHealth.status)" }

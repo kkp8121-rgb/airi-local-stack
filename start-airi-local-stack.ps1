@@ -73,7 +73,7 @@ finally {
     NumCtx = $proxy.num_ctx
     TTS = $tts.status
     TTSEngine = $tts.engine
-    VoiceReference = $tts.reference_audio
+    VoiceReferenceFound = $tts.reference_audio_found
     STT = $stt.status
     STTModel = $stt.model
     STTDevice = $stt.device

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -12,7 +13,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MOSS_ROOT = ROOT / "external" / "MOSS-TTS-Nano"
-PYTHON = ROOT / "external" / "GPT-SoVITS" / ".venv" / "Scripts" / "python.exe"
+# GPT-SoVITS is a separate clone, so honour the same override the launch scripts use.
+GPT_SOVITS_ROOT = Path(os.environ.get("GPT_SOVITS_ROOT") or ROOT / "external" / "GPT-SoVITS")
+PYTHON = GPT_SOVITS_ROOT / ".venv" / "Scripts" / "python.exe"
 
 
 def main() -> int:
