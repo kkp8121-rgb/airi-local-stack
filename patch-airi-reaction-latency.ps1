@@ -1,10 +1,10 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Shortens AIRI's VAD silence window and the assistant transcript flush delay.
+    Tunes AIRI's VAD timing and assistant transcript flush delay.
 
 .DESCRIPTION
-    Two equal-length, in-place edits of the installed app.asar (no repack):
+    Three equal-length, in-place edits of the installed app.asar (no repack):
 
       1. DEFAULT_VAD_MIN_SILENCE_DURATION_MS  1200 ms -> 450 ms
          The dominant end-of-turn delay. Silero VAD must observe this much
@@ -13,6 +13,11 @@
       2. transcript flushDelayMs              1200 ms -> 400 ms
          How long the assistant transcript buffer waits for more STT text
          before flushing a sentence downstream.
+
+      3. DEFAULT_VAD_SPEECH_PAD_MS             360 ms -> 600 ms
+         Retains more audio before speech onset so a sentence-leading proper
+         noun is not clipped. This is pre-roll audio; it does not increase the
+         end-of-turn silence window.
 
     WHY flushDelayMs = 400 AND NOT 100 OR 700+
     ------------------------------------------
@@ -27,13 +32,12 @@
       * 400 ms  -> keeps the buffer meaningful for back-to-back fragments while
                    only adding 0.4 s to a turn. Chosen balance point.
 
-    REMOVED: DEFAULT_VAD_SPEECH_PAD_MS 360 -> 120
-    -------------------------------------------
-    An earlier revision also patched the VAD speech padding. The audit found it
-    is a no-op for reaction latency: speechPadMs only pads the audio handed to
-    the VAD event path, which this stack does not consume for segmentation
-    timing, so shrinking it changed nothing measurable while still consuming a
-    patch site. It is intentionally not patched any more.
+    WHY speechPadMs = 600
+    ---------------------
+    A physical microphone test clipped the first proper noun once in two turns;
+    that chunk was also about 240 ms shorter than the exact-recognition chunk.
+    Increasing pre-roll by the same 240 ms protects the leading word without
+    changing the 450 ms silence endpoint.
 
 .PARAMETER AsarPath
     Path to the installed AIRI app.asar.
@@ -160,6 +164,43 @@ public static class ReactionLatencyBinaryPatcher
         }
         throw new InvalidOperationException("No supported stock or previously patched latency block was found.");
     }
+
+    public static int PatchAllOneOf(
+        string path, string[] oldTexts, string newText, int expectedCount)
+    {
+        byte[] newBytes = Encoding.UTF8.GetBytes(newText);
+        using (var stream = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            int existingNewCount = FindAll(stream, newBytes).Count;
+            if (existingNewCount == expectedCount)
+                return 0;
+
+            var positions = new List<long>();
+            foreach (string oldText in oldTexts)
+            {
+                byte[] oldBytes = Encoding.UTF8.GetBytes(oldText);
+                if (oldBytes.Length != newBytes.Length)
+                    throw new InvalidOperationException("Replacement must have exactly the same byte length.");
+                positions.AddRange(FindAll(stream, oldBytes));
+            }
+
+            if (existingNewCount + positions.Count != expectedCount)
+                throw new InvalidOperationException(string.Format(
+                    "Expected {0} total latency blocks, found {1}.",
+                    expectedCount, existingNewCount + positions.Count
+                ));
+
+            foreach (long position in positions)
+            {
+                stream.Position = position;
+                stream.Write(newBytes, 0, newBytes.Length);
+            }
+            stream.Flush(true);
+            if (FindAll(stream, newBytes).Count != expectedCount)
+                throw new InvalidOperationException("Post-patch verification failed.");
+            return positions.Count;
+        }
+    }
 }
 '@
 }
@@ -178,11 +219,13 @@ function Test-MarkersPresent([string[]]$Markers) {
 # --- 3. Patch targets --------------------------------------------------------
 # Verified against the stock 0.11.3 install (app.asar, 1,130,829,614 bytes):
 #   "var DEFAULT_VAD_MIN_SILENCE_DURATION_MS = 1200;" -> 1 hit @   870,085,942
+#   "var DEFAULT_VAD_SPEECH_PAD_MS = 360;"            -> 1 hit
 #   "flushDelayMs: 1200,<LF><TAB><TAB><TAB>maxBufferedTextLength: 90," -> 1 hit @ 1,105,472,073
 $stockVadSilence = 'var DEFAULT_VAD_MIN_SILENCE_DURATION_MS = 1200;'
+$stockVadSpeechPad = 'var DEFAULT_VAD_SPEECH_PAD_MS = 360;'
 $stockFlushDelay = "flushDelayMs: 1200,`n`t`t`tmaxBufferedTextLength: 90,"
 
-$stockMarkers = @($stockVadSilence, $stockFlushDelay)
+$stockMarkers = @($stockVadSilence, $stockVadSpeechPad, $stockFlushDelay)
 
 $pristineBackupPath = "$resolvedAsar.backup-pristine"
 if (Test-Path -LiteralPath $pristineBackupPath) {
@@ -219,9 +262,18 @@ $transcriptFlush = [ReactionLatencyBinaryPatcher]::PatchOneOf(
     "flushDelayMs:  400,`n`t`t`tmaxBufferedTextLength: 90,"
 )
 
-Write-Output "AIRI reaction latency patch: VAD silence=$vadSilence transcript flush=$transcriptFlush."
-Write-Output 'Effective values: VAD silence 450 ms, transcript flush 400 ms.'
-Write-Output 'Not patched: DEFAULT_VAD_SPEECH_PAD_MS (audit found it is a no-op for reaction latency).'
+$vadSpeechPad = [ReactionLatencyBinaryPatcher]::PatchAllOneOf(
+    $resolvedAsar,
+    @(
+        $stockVadSpeechPad,
+        'var DEFAULT_VAD_SPEECH_PAD_MS = 120;'
+    ),
+    'var DEFAULT_VAD_SPEECH_PAD_MS = 600;',
+    1
+)
+
+Write-Output "AIRI reaction latency patch: VAD silence=$vadSilence transcript flush=$transcriptFlush speech pre-roll=$vadSpeechPad."
+Write-Output 'Effective values: VAD silence 450 ms, transcript flush 400 ms, speech pre-roll 600 ms.'
 if (Test-Path -LiteralPath $pristineBackupPath) {
     Write-Output "Pristine backup: $pristineBackupPath"
 }

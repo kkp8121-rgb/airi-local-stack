@@ -13,7 +13,7 @@
   → AIRI VAD 450ms
   → faster-whisper small CUDA/float16
   → 고유명사 사전 보정
-  → transcript flush 100ms
+  → transcript flush 400ms
   → Ollama proxy가 즉시 SSE 선반응
       ├─ 일반 대화: "응!" + 로컬 EXAONE 답변
       └─ 검색 요청: "응! 바로 찾아볼게." + Codex 구독 웹 검색
@@ -32,6 +32,8 @@
   - Codex CLI 구독 세션으로 live web search 실행
   - 검색 성공/실패를 같은 assistant turn에 이어 반환
   - 검색 로그에는 원문 대신 query 글자 수와 시간만 기록
+  - AIRI의 `[날짜 시간]` 표시 접두사를 검색어에서 제거
+  - 문장 첫 검색어가 잘렸지만 `웹에서 검색해줘`가 남은 경우 최근 명시적 검색어를 복구
 - `stt/openai_stt_server.py`
   - CPU INT8에서 RTX 3060 Ti CUDA/float16으로 이동
   - startup CUDA warmup
@@ -40,8 +42,8 @@
   - AIRI VAD를 통과한 비정숙 청크를 Whisper 내부 VAD가 전부 제거하면 `vad_filter=false`로 한 번 즉시 재시도
 - `patch-airi-reaction-latency.ps1`
   - VAD silence `1200 → 450ms`
-  - speech padding `360 → 120ms`
-  - transcript flush `400 또는 1200 → 100ms`
+  - 문장 첫 단어 보존용 speech pre-roll `360 → 600ms`
+  - transcript flush `1200 → 400ms`
   - 설치 `app.asar` 원본 백업 후 동일 길이 바이너리 패치
 - `gpt-sovits/openai_compatible_proxy.py`
   - `응!`, `바로 찾아볼게.`를 startup에 합성해 메모리에 보관
@@ -52,6 +54,7 @@
   - 대시보드의 큰 숫자를 VAD 450ms 포함 `발화 종료 → 실제 재생 시작`으로 표시
   - 최근 실제 마이크 5회의 최신값·P50·P95와 `5/5 모두 2초 이내` 판정을 자동 표시
   - 각 turn에 고유명사 보정 횟수와 클라우드 검색 실행 여부를 표시
+  - 문장 시작 누락 때문에 직전 검색어를 복구했는지도 표시
   - 원문·음성·대사는 보내지 않고 intent 식별자와 시각만 메모리에 기록
 
 ## 실측
@@ -71,6 +74,11 @@
 | 설치 AIRI 검색: LLM 시작 → 실제 재생 | 123ms |
 | 설치 AIRI 검색: 첫 ACK TTS | 1.4ms, cache hit |
 | `음유잉여` Codex 검색 최종 답변 | 11.6~21.3초 |
+
+실제 마이크 검색 선반응은 적용 중간 검증에서 `1.460s`, `1.620s`, `1.850s`,
+`1.552s`, `1.500s`로 모두 2초 이하였다. 다만 마지막 두 번 중 첫 턴에서 문장
+첫 고유명사가 한 번 누락되어 speech pre-roll과 최근 검색어 복구를 추가했으며,
+수정 후 실제 마이크 표본은 다시 수집한다.
 
 최종 검색 검증에서는 `음유잉여`를 이터널 리턴의 이바 장인 선수·스트리머 닉네임이며 선수명은 `UmU`라고 찾아냈고, 이터널 리턴 공식 사이트·닥지지·이스포츠 위키를 교차 확인했다고 반환했다.
 

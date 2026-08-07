@@ -99,6 +99,11 @@ SEARCH_ALIAS_MAX_WORD_DISTANCE = 2
 # prompt only lists vocabulary instead of forming a sentence Whisper can copy.
 DEFAULT_INITIAL_PROMPT = "한국어 일상 대화. 아이리, AIRI."
 BEAM_SIZE = 1
+RECOVERY_BEAM_SIZE = 3
+RECOVERY_MAX_NEW_TOKENS = 32
+RETRYABLE_TRANSCRIPTION_REASONS = frozenset(
+    {"short_audio_text_overflow", "implausible_text_rate", "low_log_probability"}
+)
 VAD_PARAMETERS = {
     "min_silence_duration_ms": 300,
     "speech_pad_ms": 200,
@@ -392,16 +397,18 @@ def transcribe_file(
     language: str | None,
     prompt: str | None,
     audio_metrics: dict[str, float],
+    recovery_decode: bool = False,
 ) -> tuple[str, str, float, list[dict[str, object]], bool]:
     if whisper is None:
         raise RuntimeError("Whisper model is not ready")
 
     normalized_language = language.split("-")[0].lower() if language else "ko"
+    beam_size = RECOVERY_BEAM_SIZE if recovery_decode else BEAM_SIZE
     transcription_options = {
         "language": normalized_language,
         "task": "transcribe",
-        "beam_size": BEAM_SIZE,
-        "best_of": BEAM_SIZE,
+        "beam_size": beam_size,
+        "best_of": beam_size,
         "temperature": 0,
         "condition_on_previous_text": False,
         "initial_prompt": prompt or DEFAULT_INITIAL_PROMPT,
@@ -410,18 +417,19 @@ def transcribe_file(
         "log_prob_threshold": -1.0,
         "repetition_penalty": 1.1,
         "no_repeat_ngram_size": 3,
-        "max_new_tokens": 64,
+        "max_new_tokens": RECOVERY_MAX_NEW_TOKENS if recovery_decode else 64,
     }
     segments, info = whisper.transcribe(
         path,
         **transcription_options,
-        vad_filter=True,
+        vad_filter=not recovery_decode,
         vad_parameters=VAD_PARAMETERS,
     )
 
     completed = list(segments)
-    vad_fallback_used = should_retry_without_vad(audio_metrics, completed)
-    if vad_fallback_used:
+    vad_fallback_used = recovery_decode
+    if not recovery_decode and should_retry_without_vad(audio_metrics, completed):
+        vad_fallback_used = True
         fallback_segments, info = whisper.transcribe(
             path,
             **transcription_options,
@@ -446,6 +454,43 @@ def transcribe_file(
     ]
     duration = completed[-1].end if completed else 0.0
     return text, info.language, duration, verbose_segments, vad_fallback_used
+
+
+def should_retry_rejected_transcription(
+    rejected_reason: str | None, audio_metrics: dict[str, float]
+) -> bool:
+    """Retry only speech-like chunks rejected for a potentially bad decode.
+
+    Quiet tails and empty chunks remain rejected. The retry uses a wider beam
+    without Whisper's internal VAD, and therefore only runs on an otherwise
+    lost user turn instead of adding latency to normal speech.
+    """
+    return (
+        rejected_reason in RETRYABLE_TRANSCRIPTION_REASONS
+        and not is_quiet_audio(audio_metrics)
+        and audio_metrics.get("duration_seconds", 0.0) >= VAD_FALLBACK_MIN_DURATION_SECONDS
+    )
+
+
+def validate_decoded_transcription(
+    raw_text: str,
+    segments: list[dict[str, object]],
+    audio_metrics: dict[str, float],
+) -> tuple[str, str | None, int, int]:
+    """Normalize and validate one Whisper decode without losing its metrics."""
+    corrected_text, proper_noun_corrections = normalize_proper_nouns(raw_text)
+    text, rejected_reason = filter_implausible_transcription(corrected_text, audio_metrics)
+    low_confidence_segments = 0
+    if rejected_reason is None:
+        text, rejected_reason, low_confidence_segments = filter_low_confidence_transcription(
+            text,
+            segments,
+        )
+        if low_confidence_segments and text:
+            text, proper_noun_corrections = normalize_proper_nouns(text)
+    if rejected_reason is None and not text.strip():
+        rejected_reason = "empty_transcription"
+    return text, rejected_reason, proper_noun_corrections, low_confidence_segments
 
 
 def filter_implausible_transcription(
@@ -565,6 +610,47 @@ async def create_transcription(
             audio_metrics,
         )
         inference_ms = elapsed_ms(inference_started)
+
+        text, rejected_reason, proper_noun_corrections, low_confidence_segments = (
+            validate_decoded_transcription(raw_text, segments, audio_metrics)
+        )
+        decode_retry_used = False
+        first_rejected_reason = rejected_reason
+        if should_retry_rejected_transcription(rejected_reason, audio_metrics):
+            retry_started = time.perf_counter()
+            (
+                retry_raw_text,
+                retry_language,
+                retry_duration,
+                retry_segments,
+                retry_vad_fallback_used,
+            ) = await asyncio.to_thread(
+                transcribe_file,
+                temp_path,
+                language,
+                prompt,
+                audio_metrics,
+                True,
+            )
+            inference_ms += elapsed_ms(retry_started)
+            retry_result = validate_decoded_transcription(
+                retry_raw_text,
+                retry_segments,
+                audio_metrics,
+            )
+            decode_retry_used = True
+            if retry_result[1] is None:
+                raw_text = retry_raw_text
+                detected_language = retry_language
+                duration = retry_duration
+                segments = retry_segments
+                vad_fallback_used = retry_vad_fallback_used
+                (
+                    text,
+                    rejected_reason,
+                    proper_noun_corrections,
+                    low_confidence_segments,
+                ) = retry_result
     except Exception:
         emit_latency_event(
             "stt",
@@ -576,23 +662,6 @@ async def create_transcription(
     finally:
         if temp_path:
             Path(temp_path).unlink(missing_ok=True)
-
-    corrected_text, proper_noun_corrections = normalize_proper_nouns(raw_text)
-    text, rejected_reason = filter_implausible_transcription(corrected_text, audio_metrics)
-    low_confidence_segments = 0
-    if rejected_reason is None:
-        text, rejected_reason, low_confidence_segments = filter_low_confidence_transcription(
-            text,
-            segments,
-        )
-        if low_confidence_segments and text:
-            # The surviving text was rebuilt from raw Whisper segments, so it has to go
-            # through proper noun normalization again.
-            text, proper_noun_corrections = normalize_proper_nouns(text)
-    if rejected_reason is None and not text.strip():
-        # An empty transcription is a dropped utterance, not an accepted one. Counting it as
-        # accepted hid silent losses from the acceptance metric.
-        rejected_reason = "empty_transcription"
 
     # Keep the segment statistics for threshold tuning even when the transcription is
     # rejected; only the response body drops the segments.
@@ -624,6 +693,7 @@ async def create_transcription(
             "proper_noun_corrections": proper_noun_corrections,
             "low_confidence_segments": low_confidence_segments,
             "vad_fallback_used": vad_fallback_used,
+            "decode_retry_used": decode_retry_used,
         },
     )
 
@@ -645,9 +715,11 @@ async def create_transcription(
                 "max_no_speech_prob": max_no_speech_prob,
                 "accepted": rejected_reason is None,
                 "rejected_reason": rejected_reason,
+                "first_rejected_reason": first_rejected_reason,
                 "proper_noun_corrections": proper_noun_corrections,
                 "low_confidence_segments": low_confidence_segments,
                 "vad_fallback_used": vad_fallback_used,
+                "decode_retry_used": decode_retry_used,
             },
             ensure_ascii=False,
         ),

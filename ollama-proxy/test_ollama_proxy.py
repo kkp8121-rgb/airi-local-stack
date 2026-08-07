@@ -90,6 +90,28 @@ class SearchRoutingTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertEqual(ollama_proxy.extract_search_query(text), "")
 
+    def test_timestamp_prefix_is_not_treated_as_a_search_query(self) -> None:
+        text = "[2026-08-07 09:10] 웹에서 검색해줘"
+
+        self.assertEqual(ollama_proxy.extract_search_query(text), "")
+
+    def test_recovers_clipped_subject_from_previous_search_turn(self) -> None:
+        query, recovered = ollama_proxy.resolve_search_query(
+            "[2026-08-07 09:11] 웹에서 검색해줘",
+            ["[2026-08-07 09:10] 음유잉여를 웹에서 검색해줘"],
+        )
+
+        self.assertEqual(query, "음유잉여")
+        self.assertTrue(recovered)
+
+    def test_first_bare_search_has_no_recoverable_subject(self) -> None:
+        query, recovered = ollama_proxy.resolve_search_query(
+            "[2026-08-07 09:10] 웹에서 검색해줘", []
+        )
+
+        self.assertEqual(query, "")
+        self.assertFalse(recovered)
+
     def test_bare_search_command_stays_on_the_local_branch(self) -> None:
         attempted: list[str] = []
 

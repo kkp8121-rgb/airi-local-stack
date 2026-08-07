@@ -171,6 +171,11 @@ LEADING_REACTION_RE = re.compile(
     r"^\s*(?:응응|응|그래|그렇구나|아하|알겠어)(?:[!,.?~…\s]+|$)",
     re.IGNORECASE,
 )
+# AIRI prefixes saved user turns with a display timestamp. It is conversation
+# metadata, not part of a web-search query.
+AIRI_TIMESTAMP_PREFIX_RE = re.compile(
+    r"^\s*\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\]\s*"
+)
 
 
 def infer_emotion(user_text: str, response_text: str) -> str:
@@ -251,8 +256,12 @@ def sanitize_assistant_content(content: str, user_text: str) -> str:
     return f'<|ACT {{"emotion":"{emotion}"}}|> {dialogue}'
 
 
+def strip_airi_timestamp_prefix(text: str) -> str:
+    return AIRI_TIMESTAMP_PREFIX_RE.sub("", text, count=1)
+
+
 def is_search_request(user_text: str) -> bool:
-    return bool(SEARCH_INTENT_RE.search(user_text))
+    return bool(SEARCH_INTENT_RE.search(strip_airi_timestamp_prefix(user_text)))
 
 
 def extract_search_query(user_text: str) -> str:
@@ -261,6 +270,7 @@ def extract_search_query(user_text: str) -> str:
     An empty result means the user only said the command itself ("검색해줘"),
     so the caller must not send the bare command to the cloud search.
     """
+    user_text = strip_airi_timestamp_prefix(user_text)
     quoted = QUOTED_QUERY_RE.search(user_text)
     if quoted and quoted.group(1).strip():
         return quoted.group(1).strip()[:100]
@@ -270,6 +280,33 @@ def extract_search_query(user_text: str) -> str:
     query = re.sub(r"\s+", " ", query).strip(" \t\r\n.,!?")
     query = re.sub(r"(?:을|를|은|는|이|가)$", "", query).strip()
     return query[:100]
+
+
+def resolve_search_query(
+    user_text: str, previous_user_texts: list[str]
+) -> tuple[str, bool]:
+    """Resolve a search subject, recovering a clipped one from recent context.
+
+    A physical microphone turn can occasionally lose its first word while
+    preserving the command (for example, "웹에서 검색해줘"). In that case the
+    most recent explicit search subject in AIRI's conversation history is the
+    safest deterministic recovery. A first-ever bare command still stays local.
+    """
+    if not is_search_request(user_text):
+        return "", False
+
+    current_query = extract_search_query(user_text)
+    if current_query:
+        return current_query, False
+
+    for previous_text in reversed(previous_user_texts):
+        if not is_search_request(previous_text):
+            continue
+        previous_query = extract_search_query(previous_text)
+        if previous_query:
+            return previous_query, True
+
+    return "", False
 
 
 def normalize_cloud_result(text: str) -> str:
@@ -552,14 +589,16 @@ async def health() -> dict[str, object]:
     }
 
 
-def transform_body(path: str, body: bytes) -> tuple[bytes, bool, bool, str]:
+def transform_body(
+    path: str, body: bytes
+) -> tuple[bytes, bool, bool, str, str, bool]:
     if not body or not (path.endswith("chat/completions") or path.endswith("api/chat")):
-        return body, False, False, ""
+        return body, False, False, "", "", False
 
     try:
         payload = json.loads(body)
     except json.JSONDecodeError:
-        return body, False, False, ""
+        return body, False, False, "", "", False
 
     stripped = False
     for key in ("tools", "tool_choice", "parallel_tool_calls"):
@@ -577,22 +616,28 @@ def transform_body(path: str, body: bytes) -> tuple[bytes, bool, bool, str]:
     messages = payload.get("messages", [])
     requested_stream = bool(payload.get("stream"))
     last_user_text = ""
+    user_texts: list[str] = []
     if isinstance(messages, list):
         conversation_messages = [
             message
             for message in messages
             if isinstance(message, dict) and message.get("role") != "system"
         ]
-        for message in reversed(conversation_messages):
-            if message.get("role") == "user" and isinstance(message.get("content"), str):
-                last_user_text = message["content"]
-                break
+        user_texts = [
+            message["content"]
+            for message in conversation_messages
+            if message.get("role") == "user" and isinstance(message.get("content"), str)
+        ]
+        if user_texts:
+            last_user_text = user_texts[-1]
         payload["messages"] = [
             {"role": "system", "content": AIRI_SYSTEM_PROMPT},
             *conversation_messages[-MAX_HISTORY_MESSAGES:],
         ]
     if path.endswith("chat/completions"):
         payload["stream"] = False
+
+    search_query, query_recovered = resolve_search_query(last_user_text, user_texts[:-1])
 
     print(
         json.dumps(
@@ -610,7 +655,14 @@ def transform_body(path: str, body: bytes) -> tuple[bytes, bool, bool, str]:
         flush=True,
     )
 
-    return json.dumps(payload, ensure_ascii=False).encode("utf-8"), stripped, requested_stream, last_user_text
+    return (
+        json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        stripped,
+        requested_stream,
+        last_user_text,
+        search_query,
+        query_recovered,
+    )
 
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
@@ -631,7 +683,14 @@ async def proxy(path: str, request: Request):
             meta={"openai_chat_endpoint": int(path.endswith("chat/completions"))},
         )
 
-    body, stripped, requested_stream, last_user_text = transform_body(path, await request.body())
+    (
+        body,
+        stripped,
+        requested_stream,
+        last_user_text,
+        search_query,
+        query_recovered,
+    ) = transform_body(path, await request.body())
     request_headers = {
         key: value
         for key, value in request.headers.items()
@@ -651,11 +710,8 @@ async def proxy(path: str, request: Request):
             "X-AIRI-Immediate-Ack": "true",
         }
 
-        # An empty query means the user only uttered the command itself, so the
-        # request stays on the local branch instead of searching for "검색해줘".
-        search_query = (
-            extract_search_query(last_user_text) if is_search_request(last_user_text) else ""
-        )
+        # A bare command reuses the most recent explicit search subject when
+        # available. Without prior context it stays local.
         if search_query:
 
             async def stream_cloud_search() -> AsyncIterator[bytes]:
@@ -666,7 +722,11 @@ async def proxy(path: str, request: Request):
                         "first",
                         trace_id,
                         duration_ms=elapsed_ms(request_started),
-                        meta={"immediate_ack": 1, "cloud_search": 1},
+                        meta={
+                            "immediate_ack": 1,
+                            "cloud_search": 1,
+                            "query_recovered": int(query_recovered),
+                        },
                     )
                     yield openai_sse_delta(
                         completion_id,
@@ -700,6 +760,7 @@ async def proxy(path: str, request: Request):
                             "cloud_search": 1,
                             "cloud_duration_ms": cloud_duration_ms,
                             "query_chars": len(search_query),
+                            "query_recovered": int(query_recovered),
                         },
                     )
                     print(
@@ -710,6 +771,7 @@ async def proxy(path: str, request: Request):
                                 "provider": "codex-subscription",
                                 "duration_ms": cloud_duration_ms,
                                 "query_chars": len(search_query),
+                                "query_recovered": query_recovered,
                             },
                             ensure_ascii=False,
                         ),

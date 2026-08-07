@@ -8,6 +8,7 @@ from openai_stt_server import (
     is_allowed_origin,
     normalize_proper_nouns,
     preserve_debug_audio,
+    should_retry_rejected_transcription,
     should_retry_without_vad,
 )
 
@@ -161,6 +162,32 @@ class VadFallbackDeadBandTests(unittest.TestCase):
         text, reason = filter_implausible_transcription("응 들려", borderline)
         self.assertEqual(text, "응 들려")
         self.assertIsNone(reason)
+
+
+class RejectedDecodeRecoveryTests(unittest.TestCase):
+    def test_retries_nonquiet_implausible_decode(self) -> None:
+        metrics = {"duration_seconds": 1.319, "rms": 0.0181, "peak": 0.1335}
+
+        self.assertTrue(
+            should_retry_rejected_transcription("implausible_text_rate", metrics)
+        )
+        self.assertTrue(
+            should_retry_rejected_transcription("short_audio_text_overflow", metrics)
+        )
+        self.assertTrue(
+            should_retry_rejected_transcription("low_log_probability", metrics)
+        )
+
+    def test_does_not_retry_quiet_or_empty_transcription(self) -> None:
+        quiet = {"duration_seconds": 1.319, "rms": 0.0052, "peak": 0.0451}
+        speech = {"duration_seconds": 1.319, "rms": 0.0181, "peak": 0.1335}
+
+        self.assertFalse(
+            should_retry_rejected_transcription("implausible_text_rate", quiet)
+        )
+        self.assertFalse(
+            should_retry_rejected_transcription("empty_transcription", speech)
+        )
 
 
 class SegmentConfidenceTests(unittest.TestCase):

@@ -179,6 +179,7 @@
           <span>TTS 세그먼트 ${view.tts.segments || 0}</span>
           <span>고유명사 보정 ${sm.proper_noun_corrections || 0}회</span>
           <span>클라우드 검색 ${lm.cloud_search ? '예' : '아니오'}</span>
+          <span>직전 검색어 복구 ${lm.query_recovered ? '예' : '아니오'}</span>
         </div>
       </article>`;
     }).join('');
