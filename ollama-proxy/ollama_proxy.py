@@ -27,22 +27,91 @@ from latency_trace import elapsed_ms, emit_latency_event, request_id
 
 
 app = FastAPI(title="AIRI Ollama compatibility proxy")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 UPSTREAM = "http://127.0.0.1:11434"
 NUM_CTX = 2048
 NUM_GPU = 12
 MAX_HISTORY_MESSAGES = 10
-CODEX_SEARCH_TIMEOUT_SECONDS = 75.0
+# Measured cloud searches land in 11.6~21.3s, so 30s is a generous ceiling that
+# still leaves room for the local fallback before the client gives up.
+CODEX_SEARCH_TIMEOUT_SECONDS = 30.0
 CODEX_SEARCH_MODEL = os.environ.get("AIRI_CODEX_SEARCH_MODEL", "gpt-5.6-sol")
 CODEX_SEARCH_REASONING = os.environ.get("AIRI_CODEX_SEARCH_REASONING", "medium")
+# SSE comment sent while a slow cloud search runs, so proxies and clients do not
+# treat the idle stream as dead.
+SSE_HEARTBEAT = b": ping\n\n"
+HEARTBEAT_INTERVAL_SECONDS = 5.0
+# Read is generous because a cold local model load can take well over a minute,
+# but no phase may block forever.
+UPSTREAM_TIMEOUT = httpx.Timeout(connect=5.0, read=120.0, write=30.0, pool=5.0)
 client: httpx.AsyncClient | None = None
+
+# Browser-reachable origins. The proxy speaks for the local model, so only the
+# AIRI desktop shell and loopback pages may drive it from a browser context.
+DEFAULT_ALLOWED_ORIGINS = "app://.,file://,http://localhost,http://127.0.0.1"
+ALLOWED_ORIGIN_PREFIXES = tuple(
+    origin.strip()
+    for origin in os.environ.get("AIRI_PROXY_ALLOW_ORIGINS", DEFAULT_ALLOWED_ORIGINS).split(",")
+    if origin.strip()
+)
+ALLOWED_ORIGIN_REGEX = (
+    "|".join(f"{re.escape(prefix)}.*" for prefix in ALLOWED_ORIGIN_PREFIXES) or r"(?!)"
+)
+
+# Only the endpoints AIRI actually calls are proxied. Everything else on the
+# Ollama API surface mutates server state (/api/delete, /api/pull, /api/push,
+# /api/create, /api/copy) and must not be reachable through an unauthenticated
+# catch-all route.
+ALLOWED_PATHS = frozenset(
+    {
+        "/api/chat",
+        "/api/generate",
+        "/api/tags",
+        "/api/show",
+        "/api/version",
+        "/api/ps",
+        "/api/embed",
+        "/api/embeddings",
+        "/health",
+    }
+)
+ALLOWED_PATH_PREFIXES = ("/v1/",)
+
+
+def is_allowed_origin(origin: str) -> bool:
+    return any(origin.startswith(prefix) for prefix in ALLOWED_ORIGIN_PREFIXES)
+
+
+def is_allowed_path(path: str) -> bool:
+    normalized = path if path.startswith("/") else f"/{path}"
+    if ".." in normalized.split("/"):
+        return False
+    if normalized.rstrip("/") in ALLOWED_PATHS:
+        return True
+    return normalized.startswith(ALLOWED_PATH_PREFIXES)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.middleware("http")
+async def enforce_local_scope(request: Request, call_next):
+    # Registered after CORSMiddleware, so it runs outermost: a rejected origin
+    # never reaches the proxy body. Requests without an Origin header (curl,
+    # native clients) are not browser-driven and stay allowed.
+    origin = request.headers.get("origin")
+    if origin and not is_allowed_origin(origin):
+        return JSONResponse({"error": "origin is not allowed"}, status_code=403)
+    if not is_allowed_path(request.url.path):
+        return JSONResponse({"error": "path is not allowed"}, status_code=403)
+    return await call_next(request)
+
 
 AIRI_SYSTEM_PROMPT = """너는 '아이리'라는 이름의 한국어 버추얼 캐릭터야. 사용자의 Windows 데스크톱에서 함께 대화하는 밝고 호기심 많은 친구로 연기해.
 
@@ -66,13 +135,40 @@ SEARCH_IMMEDIATE_ACK = (
     '<|ACT {"emotion":"curious"}|> 응! 바로 찾아볼게. '
     '<|ACT {"emotion":"curious"}|>'
 )
+SEARCH_FALLBACK_PREFIX = "검색이 안 돼서 아는 만큼만 말할게."
+SEARCH_UNAVAILABLE_DIALOGUE = "검색 연결이 잠시 안 돼. 다시 한 번 말해줘."
+UPSTREAM_TIMEOUT_DIALOGUE = "답이 너무 늦어서 잠깐 멈췄어. 다시 말해줘."
+LOCAL_ERROR_DIALOGUE = "답을 만들다가 문제가 생겼어. 다시 말해줘."
+
+# A search noun only signals intent when it is followed by an imperative ending
+# ("검색해줘", "웹서칭해 봐") or stands alone as its own eojeol. Substring
+# matching would misfire on 리서치 / 서치라이트 / research / 검색엔진 and leak the
+# raw utterance to the cloud search.
+SEARCH_NOUN = r"(?:검색|서칭|서치|search)"
+SEARCH_COMMAND_SUFFIX = (
+    r"(?:\s*해\s*(?:주세요|줄래|주라|줘|봐|보자|볼래)?"
+    r"|\s*부탁\s*(?:해\s*(?:주세요|줘)?|드려요?)?)"
+)
+_WEB_PREFIX = r"(?:웹(?:에서)?\s*)?"
+_NOUN_BOUNDARY = r"(?<![가-힣a-zA-Z])"
 SEARCH_INTENT_RE = re.compile(
-    r"(?:웹(?:에서)?\s*)?(?:검색|서칭|서치|찾아\s*봐|찾아\s*줘|찾아\s*주세요|알아\s*봐|search)",
+    rf"{_NOUN_BOUNDARY}{_WEB_PREFIX}{SEARCH_NOUN}{SEARCH_COMMAND_SUFFIX}"
+    rf"|{_NOUN_BOUNDARY}{_WEB_PREFIX}{SEARCH_NOUN}(?![가-힣a-zA-Z])"
+    r"|찾아\s*봐|찾아\s*줘|찾아\s*주세요|알아\s*봐",
     re.IGNORECASE,
 )
 QUOTED_QUERY_RE = re.compile(r"[\"'“”‘’「『](.{1,100}?)[\"'“”‘’」』]")
+# Filler words are only dropped when they form a whole eojeol; otherwise
+# "해리포터"/"좀비"/"해외 뉴스" would lose their first syllable.
+QUERY_FILLER_RE = re.compile(
+    r"(?:(?<=\s)|^)"
+    r"(?:해\s*주세요|해\s*줘|해\s*봐|해|좀|바로|관련해서|대해서|인터넷에서|웹에서|무엇인지|뭔지)"
+    r"(?=\s|$)"
+)
+# The reaction word must be closed by at least one separator (or end the string),
+# otherwise "그래도"/"응원할게"/"그래프가" get their first syllables shaved off.
 LEADING_REACTION_RE = re.compile(
-    r"^\s*(?:응|응응|그래|그렇구나|아하|알겠어)[!,.?\s]*",
+    r"^\s*(?:응응|응|그래|그렇구나|아하|알겠어)(?:[!,.?~…\s]+|$)",
     re.IGNORECASE,
 )
 
@@ -111,7 +207,12 @@ def remove_emoji(text: str) -> str:
     return "".join(character for character in text if keep(character))
 
 
-def normalize_dialogue(text: str) -> str:
+def normalize_dialogue(
+    text: str,
+    *,
+    max_sentences: int = 2,
+    fallback: str = "응, 여기 있어.",
+) -> str:
     dialogue = CONTROL_TOKEN_RE.sub("", text)
     dialogue = remove_emoji(dialogue)
     dialogue = dialogue.replace("```", "").replace("**", "").replace("__", "")
@@ -138,10 +239,10 @@ def normalize_dialogue(text: str) -> str:
         dialogue = dialogue.replace(formal, casual)
 
     sentences = re.findall(r"[^.!?]+[.!?]+|[^.!?]+$", dialogue)
-    if len(sentences) > 2:
-        dialogue = "".join(sentences[:2]).strip()
+    if len(sentences) > max_sentences:
+        dialogue = "".join(sentences[:max_sentences]).strip()
 
-    return dialogue or "응, 여기 있어."
+    return dialogue or fallback
 
 
 def sanitize_assistant_content(content: str, user_text: str) -> str:
@@ -155,32 +256,45 @@ def is_search_request(user_text: str) -> bool:
 
 
 def extract_search_query(user_text: str) -> str:
+    """Return the term to search for, or "" when the utterance carries none.
+
+    An empty result means the user only said the command itself ("검색해줘"),
+    so the caller must not send the bare command to the cloud search.
+    """
     quoted = QUOTED_QUERY_RE.search(user_text)
-    if quoted:
-        return quoted.group(1).strip()
+    if quoted and quoted.group(1).strip():
+        return quoted.group(1).strip()[:100]
 
     query = SEARCH_INTENT_RE.sub(" ", user_text)
-    query = re.sub(
-        r"(?:해주세요|해\s*줘|해\s*봐|해|좀|바로|관련해서|대해서|인터넷에서|웹에서|무엇인지|뭔지)",
-        " ",
-        query,
-    )
+    query = QUERY_FILLER_RE.sub(" ", query)
     query = re.sub(r"\s+", " ", query).strip(" \t\r\n.,!?")
     query = re.sub(r"(?:을|를|은|는|이|가)$", "", query).strip()
-    return (query or user_text).strip()[:100]
+    return query[:100]
 
 
 def normalize_cloud_result(text: str) -> str:
-    dialogue = CONTROL_TOKEN_RE.sub("", text)
-    dialogue = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", dialogue)
+    dialogue = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
     dialogue = re.sub(r"https?://\S+", "", dialogue)
-    dialogue = remove_emoji(dialogue)
-    dialogue = dialogue.replace("```", "").replace("**", "").replace("__", "")
-    dialogue = re.sub(r"\s+", " ", dialogue).strip(" \t\r\n#*-_")
-    sentences = re.findall(r"[^.!?]+[.!?]+|[^.!?]+$", dialogue)
-    if len(sentences) > 3:
-        dialogue = "".join(sentences[:3]).strip()
-    return dialogue or "검색 결과를 정리하지 못했어. 다시 한 번 말해줘."
+    # Reuse the local persona pipeline so cloud answers speak the same casual
+    # Korean. Search answers keep a 3-sentence budget because the codex prompt
+    # asks for 2~3 sentences with a source name.
+    return normalize_dialogue(
+        dialogue,
+        max_sentences=3,
+        fallback="검색 결과를 정리하지 못했어. 다시 한 번 말해줘.",
+    )
+
+
+def message_content(message: object) -> str:
+    """Return assistant text, mapping a null/non-string content to "".
+
+    Ollama can answer with `"content": null`; naive str() would make AIRI speak
+    the literal word "None".
+    """
+    if not isinstance(message, dict):
+        return ""
+    content = message.get("content")
+    return content if isinstance(content, str) else ""
 
 
 def strip_leading_reaction(text: str) -> str:
@@ -272,7 +386,9 @@ async def run_codex_search(user_text: str, query: str) -> tuple[str, float]:
             process.communicate(build_codex_search_prompt(user_text, query).encode("utf-8")),
             timeout=CODEX_SEARCH_TIMEOUT_SECONDS,
         )
-    except (asyncio.CancelledError, TimeoutError):
+    except (asyncio.CancelledError, asyncio.TimeoutError, TimeoutError):
+        # asyncio.TimeoutError is only an alias of the builtin from 3.11 on, so
+        # both names are listed to stay catchable on 3.10 and below.
         process.kill()
         await process.communicate()
         raise
@@ -322,6 +438,8 @@ def openai_sse_finish(completion_id: str, model: str) -> bytes:
 
 
 def to_openai_sse(payload: dict[str, object], content: str) -> bytes:
+    # unreached - kept for non-stream fallback reference (the streaming chat
+    # path returns earlier via stream_local_with_ack / stream_cloud_search).
     choices = payload.get("choices")
     first_choice = choices[0] if isinstance(choices, list) and choices else {}
     finish_reason = first_choice.get("finish_reason", "stop") if isinstance(first_choice, dict) else "stop"
@@ -360,13 +478,64 @@ HOP_BY_HOP_HEADERS = {
 @app.on_event("startup")
 async def startup() -> None:
     global client
-    client = httpx.AsyncClient(timeout=None)
+    client = httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT)
 
 
 @app.on_event("shutdown")
 async def shutdown() -> None:
     if client is not None:
         await client.aclose()
+
+
+def discard_upstream_task(task: asyncio.Task) -> None:
+    """Cancel an upstream request and close whatever response it still lands.
+
+    Cancelling alone leaks the connection: httpx may already have returned an
+    open streaming response that nobody will read.
+    """
+    task.cancel()
+
+    def close_if_opened(finished: asyncio.Task) -> None:
+        if finished.cancelled() or finished.exception() is not None:
+            return
+        response = finished.result()
+        try:
+            asyncio.get_running_loop().create_task(response.aclose())
+        except RuntimeError:
+            pass
+
+    task.add_done_callback(close_if_opened)
+
+
+async def fetch_local_dialogue(
+    method: str,
+    path: str,
+    params: object,
+    headers: dict[str, str],
+    body: bytes,
+) -> str:
+    """Ask the local model once and return AIRI-normalized dialogue.
+
+    Used as the offline fallback when a cloud search fails, so the user still
+    hears an answer in the same persona instead of an apology only.
+    """
+    if client is None:
+        raise RuntimeError("proxy client is not ready")
+    response = await client.send(
+        client.build_request(
+            method,
+            f"{UPSTREAM}/{path}",
+            params=params,
+            headers=headers,
+            content=body,
+        )
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"Ollama returned {response.status_code}")
+    payload = json.loads(response.content)
+    choices = payload.get("choices") or []
+    message = choices[0].get("message", {}) if choices else {}
+    return strip_leading_reaction(normalize_dialogue(message_content(message)))
 
 
 @app.get("/health")
@@ -482,8 +651,12 @@ async def proxy(path: str, request: Request):
             "X-AIRI-Immediate-Ack": "true",
         }
 
-        if is_search_request(last_user_text):
-            search_query = extract_search_query(last_user_text)
+        # An empty query means the user only uttered the command itself, so the
+        # request stays on the local branch instead of searching for "검색해줘".
+        search_query = (
+            extract_search_query(last_user_text) if is_search_request(last_user_text) else ""
+        )
+        if search_query:
 
             async def stream_cloud_search() -> AsyncIterator[bytes]:
                 search_task = asyncio.create_task(run_codex_search(last_user_text, search_query))
@@ -501,6 +674,15 @@ async def proxy(path: str, request: Request):
                         SEARCH_IMMEDIATE_ACK,
                         include_role=True,
                     )
+                    # Keep the stream warm while the search runs so an idle
+                    # timeout cannot drop the connection before the answer.
+                    while True:
+                        done, _pending = await asyncio.wait(
+                            {search_task}, timeout=HEARTBEAT_INTERVAL_SECONDS
+                        )
+                        if done:
+                            break
+                        yield SSE_HEARTBEAT
                     result, cloud_duration_ms = await search_task
                     final_emotion = infer_emotion(last_user_text, result)
                     yield openai_sse_delta(
@@ -552,20 +734,39 @@ async def proxy(path: str, request: Request):
                         duration_ms=elapsed_ms(request_started),
                         meta={"cloud_search": 1},
                     )
+                    # The web is unreachable, but the local model still knows
+                    # something - answer with what it has instead of an apology.
+                    try:
+                        fallback_dialogue = await fetch_local_dialogue(
+                            request.method,
+                            path,
+                            request.query_params,
+                            request_headers,
+                            body,
+                        )
+                    except Exception:
+                        fallback_dialogue = ""
                     print(
                         json.dumps(
                             {
                                 "event": "cloud_search",
                                 "status": "error",
                                 "error_type": type(exc).__name__,
+                                "fallback": "local" if fallback_dialogue else "none",
                             }
                         ),
                         flush=True,
                     )
+                    if fallback_dialogue:
+                        spoken = f"{SEARCH_FALLBACK_PREFIX} {fallback_dialogue}"
+                        emotion = infer_emotion(last_user_text, fallback_dialogue)
+                    else:
+                        spoken = SEARCH_UNAVAILABLE_DIALOGUE
+                        emotion = "sad"
                     yield openai_sse_delta(
                         completion_id,
                         model,
-                        '<|ACT {"emotion":"sad"}|> 검색 연결이 잠시 안 돼. 다시 한 번 말해줘.',
+                        f'<|ACT {{"emotion":"{emotion}"}}|> {spoken}',
                     )
                     yield openai_sse_finish(completion_id, model)
 
@@ -614,7 +815,7 @@ async def proxy(path: str, request: Request):
                 response_payload = json.loads(raw_body)
                 choices = response_payload.get("choices", [])
                 message = choices[0].get("message", {}) if choices else {}
-                dialogue = normalize_dialogue(str(message.get("content", "")))
+                dialogue = normalize_dialogue(message_content(message))
                 dialogue = strip_leading_reaction(dialogue)
                 emotion = infer_emotion(last_user_text, dialogue)
                 yield openai_sse_delta(
@@ -631,7 +832,8 @@ async def proxy(path: str, request: Request):
                     meta={"immediate_ack": 1, "response_bytes": len(raw_body)},
                 )
             except asyncio.CancelledError:
-                send_task.cancel()
+                if upstream_response is None:
+                    discard_upstream_task(send_task)
                 emit_latency_event(
                     "llm",
                     "error",
@@ -641,7 +843,8 @@ async def proxy(path: str, request: Request):
                 )
                 raise
             except Exception as exc:
-                send_task.cancel()
+                if upstream_response is None:
+                    discard_upstream_task(send_task)
                 emit_latency_event(
                     "llm",
                     "error",
@@ -659,10 +862,17 @@ async def proxy(path: str, request: Request):
                     ),
                     flush=True,
                 )
+                # A read/connect timeout ends the stream cleanly instead of
+                # leaving the client waiting forever.
+                spoken = (
+                    UPSTREAM_TIMEOUT_DIALOGUE
+                    if isinstance(exc, httpx.TimeoutException)
+                    else LOCAL_ERROR_DIALOGUE
+                )
                 yield openai_sse_delta(
                     completion_id,
                     model,
-                    '<|ACT {"emotion":"sad"}|> 답을 만들다가 문제가 생겼어. 다시 말해줘.',
+                    f'<|ACT {{"emotion":"sad"}}|> {spoken}',
                 )
                 yield openai_sse_finish(completion_id, model)
             finally:
@@ -727,9 +937,11 @@ async def proxy(path: str, request: Request):
             response_payload = json.loads(raw_body)
             choices = response_payload.get("choices", [])
             message = choices[0].get("message", {}) if choices else {}
-            content = message.get("content", "")
+            content = message_content(message)
             sanitized = sanitize_assistant_content(content, last_user_text)
             if requested_stream:
+                # unreached - kept for non-stream fallback reference (streaming
+                # chat/completions is answered above by stream_local_with_ack).
                 response_headers["content-type"] = "text/event-stream; charset=utf-8"
                 emit_latency_event(
                     "llm",
