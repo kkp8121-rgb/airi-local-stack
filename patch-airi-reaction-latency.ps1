@@ -1,23 +1,76 @@
+#Requires -Version 5.1
+<#
+.SYNOPSIS
+    Shortens AIRI's VAD silence window and the assistant transcript flush delay.
+
+.DESCRIPTION
+    Two equal-length, in-place edits of the installed app.asar (no repack):
+
+      1. DEFAULT_VAD_MIN_SILENCE_DURATION_MS  1200 ms -> 450 ms
+         The dominant end-of-turn delay. Silero VAD must observe this much
+         silence before it closes a segment, and every user turn pays it.
+
+      2. transcript flushDelayMs              1200 ms -> 400 ms
+         How long the assistant transcript buffer waits for more STT text
+         before flushing a sentence downstream.
+
+    WHY flushDelayMs = 400 AND NOT 100 OR 700+
+    ------------------------------------------
+    The buffer exists to merge consecutive STT fragments into one turn. On this
+    stack the next fragment cannot arrive sooner than roughly 750 ms (VAD 450 ms
+    silence + recorder stop + STT round trip), so:
+
+      * 100 ms  -> the buffer always flushes before the next fragment can land.
+                   Sentence merging is effectively disabled and a mid-sentence
+                   pause splits one utterance into two turns.
+      * 700 ms+ -> merging works, but every single turn pays the full delay.
+      * 400 ms  -> keeps the buffer meaningful for back-to-back fragments while
+                   only adding 0.4 s to a turn. Chosen balance point.
+
+    REMOVED: DEFAULT_VAD_SPEECH_PAD_MS 360 -> 120
+    -------------------------------------------
+    An earlier revision also patched the VAD speech padding. The audit found it
+    is a no-op for reaction latency: speechPadMs only pads the audio handed to
+    the VAD event path, which this stack does not consume for segmentation
+    timing, so shrinking it changed nothing measurable while still consuming a
+    patch site. It is intentionally not patched any more.
+
+.PARAMETER AsarPath
+    Path to the installed AIRI app.asar.
+
+.PARAMETER Force
+    Continue when app.asar is in an unrecognized state (no pristine backup and
+    no stock markers). No backup is created in that case.
+#>
 param(
-    [string]$AsarPath = "$env:LOCALAPPDATA\Programs\airi\resources\app.asar"
+    [string]$AsarPath = "$env:LOCALAPPDATA\Programs\airi\resources\app.asar",
+    [switch]$Force
 )
 
 $ErrorActionPreference = 'Stop'
 
+# --- 1. Resolve and validate the target archive ------------------------------
 $resolvedAsar = (Resolve-Path -LiteralPath $AsarPath).Path
-$expectedRoot = [System.IO.Path]::GetFullPath("$env:LOCALAPPDATA\Programs\airi\resources\")
-if (-not $resolvedAsar.StartsWith($expectedRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "Refusing to patch an archive outside the AIRI resources directory: $resolvedAsar"
-}
 if ([System.IO.Path]::GetFileName($resolvedAsar) -ne 'app.asar') {
     throw "Expected app.asar, got: $resolvedAsar"
 }
-
-$backupPath = "$resolvedAsar.backup-before-reaction-latency"
-if (-not (Test-Path -LiteralPath $backupPath)) {
-    Copy-Item -LiteralPath $resolvedAsar -Destination $backupPath
+$resourcesDir = Split-Path -Parent $resolvedAsar
+if ((Split-Path -Leaf $resourcesDir) -ne 'resources') {
+    throw "Refusing to patch an archive outside an AIRI 'resources' directory: $resolvedAsar"
+}
+$installDir = Split-Path -Parent $resourcesDir
+if (-not (Test-Path -LiteralPath (Join-Path $installDir 'airi.exe'))) {
+    throw "Refusing to patch: '$installDir' does not look like an AIRI installation (airi.exe not found)."
 }
 
+# --- 2. AIRI must not be running ---------------------------------------------
+$airiProcesses = @(Get-Process -Name 'airi' -ErrorAction SilentlyContinue)
+if ($airiProcesses.Count -gt 0) {
+    $airiPids = ($airiProcesses | ForEach-Object { $_.Id }) -join ', '
+    throw "AIRI is running (PID: $airiPids). Close AIRI completely and re-run; patching a loaded app.asar corrupts the install."
+}
+
+if (-not ('ReactionLatencyBinaryPatcher' -as [type])) {
 Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
@@ -68,6 +121,13 @@ public static class ReactionLatencyBinaryPatcher
         return positions;
     }
 
+    public static int CountOccurrences(string path, string text)
+    {
+        byte[] pattern = Encoding.UTF8.GetBytes(text);
+        using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            return FindAll(stream, pattern).Count;
+    }
+
     public static int PatchOneOf(string path, string[] oldTexts, string newText)
     {
         byte[] newBytes = Encoding.UTF8.GetBytes(newText);
@@ -102,26 +162,69 @@ public static class ReactionLatencyBinaryPatcher
     }
 }
 '@
+}
 
+function Get-MarkerCount([string]$Text) {
+    return [ReactionLatencyBinaryPatcher]::CountOccurrences($resolvedAsar, $Text)
+}
+
+function Test-MarkersPresent([string[]]$Markers) {
+    foreach ($marker in $Markers) {
+        if ((Get-MarkerCount $marker) -lt 1) { return $false }
+    }
+    return $true
+}
+
+# --- 3. Patch targets --------------------------------------------------------
+# Verified against the stock 0.11.3 install (app.asar, 1,130,829,614 bytes):
+#   "var DEFAULT_VAD_MIN_SILENCE_DURATION_MS = 1200;" -> 1 hit @   870,085,942
+#   "flushDelayMs: 1200,<LF><TAB><TAB><TAB>maxBufferedTextLength: 90," -> 1 hit @ 1,105,472,073
+$stockVadSilence = 'var DEFAULT_VAD_MIN_SILENCE_DURATION_MS = 1200;'
+$stockFlushDelay = "flushDelayMs: 1200,`n`t`t`tmaxBufferedTextLength: 90,"
+
+$stockMarkers = @($stockVadSilence, $stockFlushDelay)
+
+$pristineBackupPath = "$resolvedAsar.backup-pristine"
+if (Test-Path -LiteralPath $pristineBackupPath) {
+    Write-Output "Pristine backup exists - skipping the backup copy: $pristineBackupPath"
+}
+elseif (Test-MarkersPresent $stockMarkers) {
+    Copy-Item -LiteralPath $resolvedAsar -Destination $pristineBackupPath
+    Write-Output "Created pristine backup: $pristineBackupPath"
+}
+elseif ($Force) {
+    Write-Warning 'No pristine backup exists and app.asar no longer carries this patch''s stock markers. Continuing without a backup because -Force was supplied.'
+}
+else {
+    throw "No pristine backup exists and app.asar no longer carries this patch's stock markers, so a backup taken now would not be pristine. Run .\restore-airi-original.ps1 (or reinstall AIRI) and retry, or pass -Force to patch without a backup."
+}
+
+# --- 4. Patch ----------------------------------------------------------------
 $vadSilence = [ReactionLatencyBinaryPatcher]::PatchOneOf(
     $resolvedAsar,
-    @('var DEFAULT_VAD_MIN_SILENCE_DURATION_MS = 1200;'),
+    @($stockVadSilence),
     'var DEFAULT_VAD_MIN_SILENCE_DURATION_MS =  450;'
 )
-$vadPadding = [ReactionLatencyBinaryPatcher]::PatchOneOf(
-    $resolvedAsar,
-    @('var DEFAULT_VAD_SPEECH_PAD_MS = 360;'),
-    'var DEFAULT_VAD_SPEECH_PAD_MS = 120;'
-)
+
+# Accepted old states for the transcript buffer, all the same byte length:
+#   1200 = stock, 400 = current target (handled by PatchOneOf's leading
+#   idempotency check), 100 = superseded over-aggressive patch.
 $transcriptFlush = [ReactionLatencyBinaryPatcher]::PatchOneOf(
     $resolvedAsar,
     @(
-        "flushDelayMs: 1200,`n`t`t`tmaxBufferedTextLength: 90,",
-        "flushDelayMs:  400,`n`t`t`tmaxBufferedTextLength: 90,"
+        $stockFlushDelay,
+        "flushDelayMs:  400,`n`t`t`tmaxBufferedTextLength: 90,",
+        "flushDelayMs:  100,`n`t`t`tmaxBufferedTextLength: 90,"
     ),
-    "flushDelayMs:  100,`n`t`t`tmaxBufferedTextLength: 90,"
+    "flushDelayMs:  400,`n`t`t`tmaxBufferedTextLength: 90,"
 )
 
-Write-Output "AIRI reaction latency patch: VAD silence=$vadSilence padding=$vadPadding transcript flush=$transcriptFlush."
-Write-Output "Effective values: VAD silence 450 ms, speech padding 120 ms, transcript flush 100 ms."
-Write-Output "Backup: $backupPath"
+Write-Output "AIRI reaction latency patch: VAD silence=$vadSilence transcript flush=$transcriptFlush."
+Write-Output 'Effective values: VAD silence 450 ms, transcript flush 400 ms.'
+Write-Output 'Not patched: DEFAULT_VAD_SPEECH_PAD_MS (audit found it is a no-op for reaction latency).'
+if (Test-Path -LiteralPath $pristineBackupPath) {
+    Write-Output "Pristine backup: $pristineBackupPath"
+}
+else {
+    Write-Warning "No pristine backup exists for this install; .\restore-airi-original.ps1 cannot undo these edits."
+}

@@ -1,25 +1,65 @@
+#Requires -Version 5.1
+<#
+.SYNOPSIS
+    Replaces AIRI's WAV-encoding recorder with a native MediaRecorder that emits
+    Opus/WebM.
+
+.DESCRIPTION
+    Overwrites the useAudioRecorder region of the installed app.asar with the
+    minified replacement in airi-native-media-recorder.min.js, padding the rest
+    of the region with spaces so the asar is never repacked.
+
+    Idempotency: the region's start marker is consumed by the first run, so a
+    second run would fail on "found 0 starts". The script therefore checks for a
+    marker unique to the replacement (audioBitsPerSecond:128e3, absent from
+    stock) and exits 0 when the patch is already in place.
+
+    Backup: this script participates in the shared pristine backup contract -
+    a single app.asar.backup-pristine copy is taken by whichever patch runs
+    first while app.asar is still stock, instead of one 1.05 GiB copy per
+    script. Restore with .\restore-airi-original.ps1.
+
+.PARAMETER AsarPath
+    Path to the installed AIRI app.asar.
+
+.PARAMETER ReplacementPath
+    Minified recorder implementation written into the region.
+
+.PARAMETER Force
+    Continue when app.asar is in an unrecognized state (no pristine backup and
+    no stock markers). No backup is created in that case.
+#>
 param(
     [string]$AsarPath = "$env:LOCALAPPDATA\Programs\airi\resources\app.asar",
-    [string]$ReplacementPath = "$PSScriptRoot\airi-native-media-recorder.min.js"
+    [string]$ReplacementPath = "$PSScriptRoot\airi-native-media-recorder.min.js",
+    [switch]$Force
 )
 
 $ErrorActionPreference = 'Stop'
 
+# --- 1. Resolve and validate the target archive ------------------------------
 $resolvedAsar = (Resolve-Path -LiteralPath $AsarPath).Path
 $resolvedReplacement = (Resolve-Path -LiteralPath $ReplacementPath).Path
-$expectedRoot = [System.IO.Path]::GetFullPath("$env:LOCALAPPDATA\Programs\airi\resources\")
-if (-not $resolvedAsar.StartsWith($expectedRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "Refusing to patch an archive outside the AIRI resources directory: $resolvedAsar"
-}
 if ([System.IO.Path]::GetFileName($resolvedAsar) -ne 'app.asar') {
     throw "Expected app.asar, got: $resolvedAsar"
 }
-
-$backupPath = "$resolvedAsar.backup-before-native-mediarecorder"
-if (-not (Test-Path -LiteralPath $backupPath)) {
-    Copy-Item -LiteralPath $resolvedAsar -Destination $backupPath
+$resourcesDir = Split-Path -Parent $resolvedAsar
+if ((Split-Path -Leaf $resourcesDir) -ne 'resources') {
+    throw "Refusing to patch an archive outside an AIRI 'resources' directory: $resolvedAsar"
+}
+$installDir = Split-Path -Parent $resourcesDir
+if (-not (Test-Path -LiteralPath (Join-Path $installDir 'airi.exe'))) {
+    throw "Refusing to patch: '$installDir' does not look like an AIRI installation (airi.exe not found)."
 }
 
+# --- 2. AIRI must not be running ---------------------------------------------
+$airiProcesses = @(Get-Process -Name 'airi' -ErrorAction SilentlyContinue)
+if ($airiProcesses.Count -gt 0) {
+    $airiPids = ($airiProcesses | ForEach-Object { $_.Id }) -join ', '
+    throw "AIRI is running (PID: $airiPids). Close AIRI completely and re-run; patching a loaded app.asar corrupts the install."
+}
+
+if (-not ('AsarRegionPatcher' -as [type])) {
 Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
@@ -68,6 +108,13 @@ public static class AsarRegionPatcher
             bufferBase += total - carry;
         }
         return positions;
+    }
+
+    public static int CountOccurrences(string path, string text)
+    {
+        byte[] pattern = Encoding.UTF8.GetBytes(text);
+        using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            return FindAll(stream, pattern).Count;
     }
 
     public static long PatchRegion(string path, string startMarker, string endMarker, string replacement)
@@ -121,10 +168,56 @@ public static class AsarRegionPatcher
     }
 }
 '@
+}
+
+function Get-MarkerCount([string]$Text) {
+    return [AsarRegionPatcher]::CountOccurrences($resolvedAsar, $Text)
+}
+
+function Test-MarkersPresent([string[]]$Markers) {
+    foreach ($marker in $Markers) {
+        if ((Get-MarkerCount $marker) -lt 1) { return $false }
+    }
+    return $true
+}
 
 $replacement = Get-Content -LiteralPath $resolvedReplacement -Raw -Encoding UTF8
+
+# --- 3. Patch targets --------------------------------------------------------
+# Verified against the stock 0.11.3 install (app.asar, 1,130,829,614 bytes):
+#   "function useAudioRecorder(media) {"      -> 1 hit @ 868,203,257
+#   "<LF>//#endregion<LF>//#region .../vad.ts" -> 1 hit @ 868,205,384
+#   region length 2,127 bytes; replacement 2,075 bytes -> fits with padding
+#   "audioBitsPerSecond:128e3"                -> 0 hits (unique to the patch)
 $startMarker = 'function useAudioRecorder(media) {'
 $endMarker = "`n//#endregion`n//#region ../../packages/stage-ui/src/libs/audio/vad.ts"
+$patchedMarker = 'audioBitsPerSecond:128e3'
+
+# --- 4. Idempotency: the start marker is consumed by the first run ------------
+# This check must run BEFORE the backup block: an already-patched archive is not
+# pristine, so taking a backup here would capture a patched copy.
+if ((Get-MarkerCount $patchedMarker) -gt 0) {
+    Write-Output 'AIRI native MediaRecorder replacement is already applied - nothing to do.'
+    exit 0
+}
+
+# --- 5. Pristine backup contract (shared by every patch-airi-*.ps1) ----------
+$pristineBackupPath = "$resolvedAsar.backup-pristine"
+if (Test-Path -LiteralPath $pristineBackupPath) {
+    Write-Output "Pristine backup exists - skipping the backup copy: $pristineBackupPath"
+}
+elseif (Test-MarkersPresent @($startMarker, $endMarker)) {
+    Copy-Item -LiteralPath $resolvedAsar -Destination $pristineBackupPath
+    Write-Output "Created pristine backup: $pristineBackupPath"
+}
+elseif ($Force) {
+    Write-Warning 'No pristine backup exists and app.asar no longer carries this patch''s stock markers. Continuing without a backup because -Force was supplied.'
+}
+else {
+    throw "No pristine backup exists and app.asar no longer carries this patch's stock markers, so a backup taken now would not be pristine. Run .\restore-airi-original.ps1 (or reinstall AIRI) and retry, or pass -Force to patch without a backup."
+}
+
+# --- 6. Patch ----------------------------------------------------------------
 $regionLength = [AsarRegionPatcher]::PatchRegion(
     $resolvedAsar,
     $startMarker,
@@ -133,4 +226,9 @@ $regionLength = [AsarRegionPatcher]::PatchRegion(
 )
 
 Write-Output "Replaced the AIRI recorder region ($regionLength bytes) with native MediaRecorder."
-Write-Output "Backup: $backupPath"
+if (Test-Path -LiteralPath $pristineBackupPath) {
+    Write-Output "Pristine backup: $pristineBackupPath"
+}
+else {
+    Write-Warning "No pristine backup exists for this install; .\restore-airi-original.ps1 cannot undo these edits."
+}
