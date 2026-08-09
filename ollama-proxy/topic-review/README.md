@@ -26,3 +26,11 @@ The compiler preserves pending order, emits schema-v2 runtime fields plus immuta
 Runtime boards require root `approval_workflow_version: 1`. Each item binds its HTTPS source URL and canonical pending-record hash, then binds the canonical approving decision hash and all five confirmations. This is local human-governance provenance, not a cryptographic signature or independent proof of source truth.
 
 CLI status and failures are content-free: they do not expose paths, IDs, source text, notes, or reviewer identity.
+
+## Candidate collection (default OFF)
+
+`collect_topic_candidates.py` is a pending-only intake boundary. Without explicit `--enable-collection`, it exits successfully with a content-free disabled status and performs no network call or file write. It has no built-in source URL, source policy, or automatic network client.
+
+An enabled integration must inject a reviewed exact HTTPS host-and-path policy and bounded fetcher. The production fetcher is responsible for DNS resolution, TLS connection, and pinning the actual connected peer IP; the collector accepts only a global-unicast verified peer. Redirects must be disabled in the HTTP client and followed manually by returning each redirect response: every response URL and redirect target is checked against the same policy. Userinfo, fragments, IP literals, localhost, non-HTTPS URLs, non-global peers, oversized/compressed bodies, excessive redirects, and excessive entries fail closed. The source deadline covers every redirect and decode step.
+
+The standalone enabled CLI intentionally always rejects: it has no policy or network client. Only a reviewed integration that calls the collector function with an explicit policy and bounded fetcher can collect. The collector only atomically merges strict pending-v1 JSONL into an explicit absolute path under this directory, under an ownership-token sidecar lock. It never creates a decision, runtime board, compiler output, database record, service call, model call, or automatic approval.

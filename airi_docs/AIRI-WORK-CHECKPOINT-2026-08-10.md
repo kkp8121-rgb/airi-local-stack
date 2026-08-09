@@ -211,3 +211,13 @@ Push 이후 재기동 검사에서는 8880·8890·8892·9880·11434·11435가 lo
 - 현재 성공 의미는 HTTP terminal 소비까지이며 실제 TTS 자연 재생 완료 ACK는 아직 별도 후속 과제다.
 - lease·ABA·동시성·1/2/8 순환·hot reload·proactive 격리 집중 회귀 13개가 통과했다.
 - 이 체크포인트의 최종 `ollama-proxy` 전체 단위 회귀 458개가 통과했다.
+
+## 11. Default-OFF pending-only topic collector boundary
+
+- `collect_topic_candidates.py`를 추가했다. 명시적 enable이 없으면 네트워크와 파일 쓰기를 전혀 하지 않고 content-free disabled 상태로 끝난다.
+- 실제 소스 URL과 HTTP client는 내장하지 않았다. standalone enabled CLI도 의도적으로 거부하며, 검토된 integration이 exact HTTPS host/path policy와 bounded fetcher를 주입해야만 수집 함수가 동작한다.
+- integration 응답은 실제 TLS peer의 global-unicast IP, 매 redirect의 동일 allowlist, source 전체 deadline, strict redirect status, body/decompression/entry 한도, gzip 완결성, case-insensitive content-encoding을 모두 통과해야 한다.
+- 수집 결과는 strict pending-v1 JSONL에만 atomic merge한다. provenance/hash 중복은 결정론적으로 제거하고 같은 ID의 다른 내용은 fail-closed하며, ownership token과 file identity를 확인하는 sidecar lock으로 concurrent lost update를 막는다.
+- decision, runtime board, compiler output, DB, 서비스, 모델, 자동 승인은 생성하거나 호출하지 않았다. 실제 토픽·소스·pending queue도 추가하지 않았다.
+- collector·review workflow·runtime/startup 집중 회귀 26개와 Python compile, diff check가 통과했다.
+- 이 체크포인트의 최종 `ollama-proxy` 전체 단위 회귀 464개가 통과했다.
