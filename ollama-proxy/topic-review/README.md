@@ -88,6 +88,43 @@ three paired discovery arguments: `--source-policies`, `--raw-discoveries`,
 and `--curations`. Local source-policy registries are ignored as
 `source-policies*.json`; do not commit a real registry.
 
+### Wikimedia source-policy creation (default OFF)
+
+`create_wikimedia_source_policy.py` is the offline human gate that can create
+the fixed Korean Wikimedia policy required by the optional adapter. Without the
+exact `--create-wikimedia-policy` flag it emits a content-free disabled status
+before parsing arguments, reading a path or clock, prompting, locking, or
+writing. It never fetches a page, starts a service, or creates raw discoveries,
+pending topics, decisions, runtime boards, prompts, speech, memory, or model
+input.
+
+Use a real local reviewer identity and an absolute output under this directory:
+
+```powershell
+$reviewRoot = (Resolve-Path .\topic-review).Path
+python .\create_wikimedia_source_policy.py `
+  --create-wikimedia-policy `
+  --output (Join-Path $reviewRoot source-policies.json) `
+  --policy-id ko-wikipedia-portal `
+  --reviewer reviewer-id
+```
+
+The reviewer must then type, in order, `approve-source`, `approve-license`, and
+the exact policy ID. EOF, interruption during confirmation, or a mismatch
+cancels without writing. The resulting canonical registry fixes the Korean
+Wikipedia Action API host/path, portal attribution, and CC BY-SA 4.0 license;
+it does not store the operational User-Agent contact. The same policy and same
+reviewer are idempotent and preserve the original review timestamp and bytes.
+An ID collision, different reviewer, noncanonical registry, concurrent owner,
+or changed target fails closed. Cooperative writes use an ownership-token lock,
+revalidate the production policy contract, and replace atomically only on
+success.
+
+This is a local human-governance record and hash binding, not a signature or an
+independent verification of Wikipedia content. The registry remains ignored by
+Git. This repository intentionally contains no real reviewer identity, contact,
+created source-policy registry, raw discovery, or approval decision.
+
 ### Optional Korean Wikimedia raw adapter (default OFF)
 
 `wikimedia_topic_source.py` requires `--enable-wikimedia`, absolute local

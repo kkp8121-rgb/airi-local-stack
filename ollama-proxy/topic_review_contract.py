@@ -58,7 +58,11 @@ class OwnershipLock:
                 if time.monotonic() >= deadline:
                     raise TopicReviewError("lock unavailable")
                 time.sleep(0.01)
-            except OSError:
+            except BaseException:
+                # An interrupt may arrive after O_EXCL created the sidecar but
+                # before the owner token was fully written.  At that point this
+                # object still owns the exact inode, so clean it up before the
+                # exception escapes.  Never remove a replacement inode.
                 if self.fd is not None:
                     os.close(self.fd)
                     self.fd = None
