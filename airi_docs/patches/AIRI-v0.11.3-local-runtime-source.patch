@@ -176,10 +176,18 @@ index 963ac98ed75ce7d3e22761544c896a5d800a8fdb..96adb8d2ea44a65f6ce63dc35f3f10ce
            catch (err) {
              console.error('Failed to send chat from voice:', err)
 diff --git a/apps/stage-tamagotchi/src/main/index.ts b/apps/stage-tamagotchi/src/main/index.ts
-index 2eaa6db30d2b93e3652e23feffb8ca5cd87e2b74..7ad9f7ff56630c338cd80206a703452994dbf47b 100644
+index 2eaa6db30d2b93e3652e23feffb8ca5cd87e2b74..64f3e950520a895ede6424071d5f1d9163f0b57d 100644
 --- a/apps/stage-tamagotchi/src/main/index.ts
 +++ b/apps/stage-tamagotchi/src/main/index.ts
-@@ -64,6 +64,11 @@ setupDebugger()
+@@ -23,6 +23,7 @@ import icon from '../../resources/icon.png?asset'
+ import { openDebugger, setupDebugger } from './app/debugger'
+ import { nullFileLoggerHandle, setupFileLogger } from './app/file-logger'
+ import { installSingleInstanceGuard } from './app/single-instance'
++import { startsInBackground } from './app/startup-mode'
+ import { createArtistryConfig } from './configs/artistry'
+ import { createGlobalAppConfig } from './configs/global'
+ import { emitAppBeforeQuit, emitAppReady, emitAppWindowAllClosed } from './libs/bootkit/lifecycle'
+@@ -64,6 +65,11 @@ setupDebugger()
  
  const log = useLogg('main').useGlobalConfig()
  
@@ -191,6 +199,22 @@ index 2eaa6db30d2b93e3652e23feffb8ca5cd87e2b74..7ad9f7ff56630c338cd80206a7034529
  const appUserDataPath = env.APP_USER_DATA_PATH?.trim()
  if (appUserDataPath) {
    app.setPath('userData', appUserDataPath)
+@@ -101,6 +107,7 @@ electronApp.setAppUserModelId('ai.moeru.airi')
+ // Track the real user-facing AIRI window because the process also owns hidden utility windows.
+ // The second-instance handler should restore the main UI instead of accidentally surfacing internals.
+ let userFacingMainWindow: BrowserWindow | undefined
++const startInBackground = startsInBackground(process.argv)
+ const shouldStartMainProcess = installSingleInstanceGuard({ app, getWindow: () => userFacingMainWindow })
+ 
+ if (shouldStartMainProcess) {
+@@ -228,6 +235,7 @@ app.whenReady().then(async () => {
+       onWindowCreated: (window) => {
+         userFacingMainWindow = window
+       },
++      startInBackground,
+     }),
+   })
+ 
 diff --git a/apps/stage-tamagotchi/src/renderer/App.vue b/apps/stage-tamagotchi/src/renderer/App.vue
 index 70ccf8ae7616ad81eee7666d399b88f9ed3748fd..5f95b0aeeeb141e363577c41505434129970dc15 100644
 --- a/apps/stage-tamagotchi/src/renderer/App.vue
@@ -8203,3 +8227,122 @@ index 0000000..39907c2
 +    expect(speechReady).not.toHaveBeenCalled()
 +  })
 +})
+diff --git a/apps/stage-tamagotchi/src/main/app/single-instance.test.ts b/apps/stage-tamagotchi/src/main/app/single-instance.test.ts
+index 24097c6827d05aab1486dbb9a98b833bf5eac70a..65c6c84b8ef9ddc0463fcc0e058c40e86433593c 100644
+--- a/apps/stage-tamagotchi/src/main/app/single-instance.test.ts
++++ b/apps/stage-tamagotchi/src/main/app/single-instance.test.ts
+@@ -65,11 +65,26 @@ describe('installSingleInstanceGuard', async () => {
+     expect(installed).toBe(true)
+     expect(app.on).toHaveBeenCalledWith('second-instance', expect.any(Function))
+ 
+-    const secondInstanceHandler = app.on.mock.calls[0]?.[1] as () => void
+-    secondInstanceHandler()
++    const secondInstanceHandler = app.on.mock.calls[0]?.[1] as (_: unknown, commandLine: string[]) => void
++    secondInstanceHandler({}, ['airi.exe'])
+ 
+     expect(windowMock.toggleWindowShow).toHaveBeenCalledWith(window)
+   })
++
++  it('keeps the current window hidden when a duplicate launch requests background mode', () => {
++    const app = createMockApp(true)
++    const window = createMockWindow()
++
++    installSingleInstanceGuard({
++      app,
++      getWindow: vi.fn(() => window),
++    })
++
++    const secondInstanceHandler = app.on.mock.calls[0]?.[1] as (_: unknown, commandLine: string[]) => void
++    secondInstanceHandler({}, ['airi.exe', '--background'])
++
++    expect(windowMock.toggleWindowShow).not.toHaveBeenCalled()
++  })
+ })
+ type MockApp = App & {
+   on: ReturnType<typeof vi.fn>
+diff --git a/apps/stage-tamagotchi/src/main/app/single-instance.ts b/apps/stage-tamagotchi/src/main/app/single-instance.ts
+index b0bcd56cfa78907fbf0e6da4a3bcc73b9f674da5..45efcc59b17cc1e900d2cd8f45073179233e55bf 100644
+--- a/apps/stage-tamagotchi/src/main/app/single-instance.ts
++++ b/apps/stage-tamagotchi/src/main/app/single-instance.ts
+@@ -1,6 +1,7 @@
+ import type { App, BrowserWindow } from 'electron'
+ 
+ import { toggleWindowShow } from '../windows/shared/window'
++import { startsInBackground } from './startup-mode'
+ 
+ interface SingleInstanceGuardOptions {
+   app: App
+@@ -49,7 +50,11 @@ export function installSingleInstanceGuard(options: SingleInstanceGuardOptions)
+     return false
+   }
+ 
+-  options.app.on('second-instance', () => {
++  options.app.on('second-instance', (_, commandLine) => {
++    if (startsInBackground(commandLine)) {
++      return
++    }
++
+     focusMainWindow(options.getWindow)
+   })
+ 
+diff --git a/apps/stage-tamagotchi/src/main/app/startup-mode.test.ts b/apps/stage-tamagotchi/src/main/app/startup-mode.test.ts
+new file mode 100644
+index 0000000..5ed60c1
+--- /dev/null
++++ b/apps/stage-tamagotchi/src/main/app/startup-mode.test.ts
+@@ -0,0 +1,13 @@
++import { describe, expect, it } from 'vitest'
++
++import { startsInBackground } from './startup-mode'
++
++describe('startsInBackground', () => {
++  it('recognizes the canonical background argument', () => {
++    expect(startsInBackground(['airi.exe', '--background'])).toBe(true)
++  })
++
++  it('does not treat unrelated arguments as a background launch', () => {
++    expect(startsInBackground(['airi.exe', '--minimized'])).toBe(false)
++  })
++})
+diff --git a/apps/stage-tamagotchi/src/main/app/startup-mode.ts b/apps/stage-tamagotchi/src/main/app/startup-mode.ts
+new file mode 100644
+index 0000000..bc5b856
+--- /dev/null
++++ b/apps/stage-tamagotchi/src/main/app/startup-mode.ts
+@@ -0,0 +1,11 @@
++const backgroundArgument = '--background'
++
++/**
++ * Returns whether this AIRI launch should keep the main window hidden.
++ *
++ * The same command-line convention is used for the initial process and for
++ * launches forwarded to Electron's primary single-instance process.
++ */
++export function startsInBackground(commandLine: readonly string[]) {
++  return commandLine.includes(backgroundArgument)
++}
+diff --git a/apps/stage-tamagotchi/src/main/windows/main/index.ts b/apps/stage-tamagotchi/src/main/windows/main/index.ts
+index 0f452fc8a559ca96c133864e0d9b4c2b71c5e5b4..86d4bd286331295539a47d2bfdaee4f5391f8b6c 100644
+--- a/apps/stage-tamagotchi/src/main/windows/main/index.ts
++++ b/apps/stage-tamagotchi/src/main/windows/main/index.ts
+@@ -56,6 +56,7 @@ export async function setupMainWindow(params: {
+   noticeWindow: NoticeWindowManager
+   autoUpdater: AutoUpdater
+   onWindowCreated?: (window: BrowserWindow) => void
++  startInBackground?: boolean
+   serverChannel: ServerChannel
+   godotStageManager: GodotStageManager
+   mcpStdioManager: McpStdioManager
+@@ -170,7 +171,11 @@ export async function setupMainWindow(params: {
+     window.setWindowButtonVisibility(false)
+   }
+ 
+-  window.on('ready-to-show', () => window!.show())
++  window.on('ready-to-show', () => {
++    if (!params.startInBackground) {
++      window.show()
++    }
++  })
+   protectPrivilegedWindowNavigation(window)
+ 
+   await setupMainWindowElectronInvokes({

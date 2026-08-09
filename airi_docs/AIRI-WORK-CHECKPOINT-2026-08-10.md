@@ -93,6 +93,16 @@
 - 직전 설치본 SHA-256 `E3C73BC060DB2005014EECC9287435C47F8C32E161D1FF0F05B90C41B4129FCF`은 `.codex/artifacts`의 exact recovery backup과 일치한다.
 - AIRI 앱은 사용자의 현재 창 focus를 빼앗지 않도록 자동 실행하지 않았다. persisted card/storage는 수정하지 않았다.
 
+### 무포커스 백그라운드 실행 경계
+
+- 공식 Tamagotchi main process에 `--background` 시작 모드를 추가했다. primary renderer와 tray/local runtime은 정상 부팅하지만 main BrowserWindow의 `ready-to-show`에서 창을 표시하지 않는다.
+- 이미 실행 중인 AIRI에 `--background`가 두 번째 instance로 전달되면 기존 창을 표시하거나 focus하지 않는다. 일반 두 번째 실행은 기존 UI 복원 동작을 유지한다.
+- workspace의 `start-airi-background.ps1`은 설치된 exact `AIRI.exe`와 sibling `resources/app.asar`를 검증하고, 기존 exact-path 프로세스가 있으면 중복 실행하지 않는다. 새 실행은 `--background`, `-WindowStyle Hidden`, exact working directory를 사용한다.
+- 런처 성공 조건은 visible main window 없음과 passive local voice-status의 `stageMounted=true`다. 이 확인은 채팅, 모델, TTS, 마우스·키보드 입력을 전혀 발생시키지 않는다.
+- background/startup 및 single-instance 집중 테스트 5개, stage-tamagotchi typecheck, workspace 런처 계약 테스트 5개, PowerShell AST parse가 통과했다.
+- canonical source patch는 새 startup 경계를 포함한 82개 source path로 재생성했다. SHA-256은 `13177D2547EBDBCCC65541CEDD8F3B4DF197117DFA2212090A7C697C98C075C8`이며 pristine index 정방향과 현재 source 역방향 apply check가 모두 통과했다.
+- 이 소스 체크포인트에서는 아직 새 `app.asar`를 build/install하거나 AIRI를 실행하지 않았다. 다음 checkpoint에서 기존 설치본을 exact backup한 뒤 교체하고 전경 창 변화 없이 passive readiness를 검증한다.
+
 ## 4. 최신 집중 검증
 
 - `test_ollama_proxy -k grounding`: 9 passed.
