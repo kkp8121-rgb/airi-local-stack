@@ -124,3 +124,38 @@ follows the official [Action API revision](https://www.mediawiki.org/wiki/API:Re
 [API etiquette](https://www.mediawiki.org/wiki/API:Etiquette/en), and
 [maxlag](https://www.mediawiki.org/wiki/Manual:Maxlag_parameter) guidance;
 reuse follows the [Wikimedia Terms of Use](https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use/en).
+
+### Optional raw intake schedule (default OFF)
+
+`wikimedia_topic_scheduler.py` is a separate foreground scheduler for the raw
+adapter. Neither local-stack launcher imports or starts it. Without the exact
+`--enable-wikimedia-schedule` flag it emits only `{"status":"disabled"}` and
+does not parse paths, acquire a lock, read a clock, sleep, fetch, or write.
+
+An operator may start it only after creating the ignored reviewed policy and
+choosing a real Wikimedia-compliant contact value:
+
+```powershell
+$userAgent = Read-Host 'Wikimedia User-Agent: name/version (email-or-https-contact)'
+python .\wikimedia_topic_scheduler.py `
+  --enable-wikimedia-schedule `
+  --source-policies (Join-Path $reviewRoot source-policies.json) `
+  --raw-discoveries (Join-Path $reviewRoot raw.jsonl) `
+  --cache (Join-Path $reviewRoot .wikimedia-topic-cache.json) `
+  --policy-id ko-wiki `
+  --user-agent $userAgent
+```
+
+The default success interval is six hours; the default failure retry is 15
+minutes. Explicit intervals are bounded to 15 minutes–24 hours and retries to
+1–60 minutes. Collection is serial and completion-based, so a slow request
+cannot overlap the next cycle. One ownership sidecar is held for the scheduler
+lifetime; a second process fails closed. A crash can leave a stale ignored lock,
+which must be reviewed only after confirming no scheduler is still running.
+
+Scheduler output is limited to the content-free statuses `disabled`,
+`complete`, `rejected`, and `stopped`. A rejected cycle waits for the bounded
+retry interval; it does not loosen validation. The scheduler owns no queue or
+state file and still cannot create pending topics, decisions, runtime boards,
+prompts, speech, memory, or approvals. Stop it before inspecting or changing
+its local source-policy/cache configuration.
