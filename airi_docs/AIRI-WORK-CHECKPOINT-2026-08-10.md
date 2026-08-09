@@ -85,6 +85,14 @@
 - repository의 canonical AIRI source patch가 실제 temp source보다 15개 source path 뒤처져 있음을 발견했다. tracked 61개와 untracked source 16개, 총 77개 경로를 현재 source에서 다시 생성했고 `git apply --reverse --check`로 source와 exact match를 확인했다.
 - core-agent, pipelines-audio, stage-ui, i18n, stage-tamagotchi, server, server-runtime, plugin-protocol 8개 package typecheck가 모두 통과했다.
 
+### 최신 source build와 설치
+
+- plugin-protocol, server-runtime, core-agent, pipelines-audio, i18n을 새로 build하고 Tamagotchi Electron main/preload/renderer를 fresh build했다.
+- 기존 packaged runtime의 dependency/resources는 유지하고 새 `out`만 mirror한 뒤 28,085-entry `app.asar`를 생성했다. main과 renderer 진입점 및 card/voice-status/proactive/single-producer marker를 확인했다.
+- 설치된 `app.asar` SHA-256은 `9AA26031877AD6B899F09CC00CCD06F869573F74F8FF1619DD580C84E531BA70`이다.
+- 직전 설치본 SHA-256 `E3C73BC060DB2005014EECC9287435C47F8C32E161D1FF0F05B90C41B4129FCF`은 `.codex/artifacts`의 exact recovery backup과 일치한다.
+- AIRI 앱은 사용자의 현재 창 focus를 빼앗지 않도록 자동 실행하지 않았다. persisted card/storage는 수정하지 않았다.
+
 ## 4. 최신 집중 검증
 
 - `test_ollama_proxy -k grounding`: 9 passed.
