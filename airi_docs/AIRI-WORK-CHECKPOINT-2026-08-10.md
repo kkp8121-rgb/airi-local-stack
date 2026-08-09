@@ -77,6 +77,14 @@
 
 결론: JSON schema는 근거 추출에는 유효하지만 현재 2.4B 모델의 대사 합성 품질을 보장하지 못한다. 이 경로를 production에 통합하거나 prompt를 더 누적하지 않는다. 검증을 느슨하게 하거나 고정 fallback 대사를 넣지 않으며, 다음 품질 분기는 legacy card 오염 경계 확인과 200건 pending S1의 독립 검수다.
 
+### 카드 provenance와 source patch 동기화
+
+- 현재 persisted `default` 카드는 공식 자동 생성 shape가 아니다. 여러 authored field가 채워져 있으므로 사용자 편집 카드로 취급하며 자동 초기화하거나 삭제하지 않는다.
+- 정확한 v0.11.3 generated default만 locale별 전체 prompt fingerprint, ReLU/1.0.0, 모든 authored field empty, exact default widget 조건으로 마이그레이션한다. 기존에 기록된 재현 불가능한 길이/hash를 pinned `dbf8124` 원문에서 다시 계산한 값으로 교체했다.
+- exact legacy ko/en migration, 한 글자 수정, authored field, widget 변경, UTF-16 FNV 경계를 포함한 card test 20개와 stage-ui typecheck가 통과했다.
+- repository의 canonical AIRI source patch가 실제 temp source보다 15개 source path 뒤처져 있음을 발견했다. tracked 61개와 untracked source 16개, 총 77개 경로를 현재 source에서 다시 생성했고 `git apply --reverse --check`로 source와 exact match를 확인했다.
+- core-agent, pipelines-audio, stage-ui, i18n, stage-tamagotchi, server, server-runtime, plugin-protocol 8개 package typecheck가 모두 통과했다.
+
 ## 4. 최신 집중 검증
 
 - `test_ollama_proxy -k grounding`: 9 passed.
@@ -92,6 +100,7 @@
 - eval runner 23 passed, latency monitor 16 passed, 공용 latency trace 3 passed, local no-focus API 8 passed.
 - pending training gate 13 passed. 시드 큐는 200건 계약이며 여전히 전부 review pending/training ineligible이다.
 - 수정·신규 PowerShell 7개 파일은 AST parse를 통과했다.
+- AIRI source 8개 package typecheck와 exact legacy-card migration test 20개가 통과했다.
 
 체크포인트 전체 회귀와 staged privacy/secret scan을 완료했으며, ASAR·로그·SQLite·runtime/eval 결과와 실제 발화 원문은 커밋에서 제외했다.
 
