@@ -189,3 +189,14 @@ Push 이후 재기동 검사에서는 8880·8890·8892·9880·11434·11435가 lo
 - 예시 보드는 비어 있는 v2 형식으로 유지했다. 실제 토픽 파일, 승인 결정, 활성 `TopicBoardPath`는 만들지 않았고 외부 검색·수집도 계속 OFF다.
 - 관련 집중 회귀 19개, Python compile, PowerShell AST parse, diff check가 통과했다.
 - 최종 `ollama-proxy` 전체 단위 회귀는 446개가 통과했다. 첫 실행에서 과거 memory E2E mock의 일반 응답이 새 grounding fail-closed 경계에 거부되는 것을 발견해, 사용자 사실에 근거한 synthetic 응답으로 fixture를 고친 뒤 해당 E2E와 전체 회귀를 다시 통과시켰다.
+
+## 9. TopicBoard human-review workflow
+
+- pending 토픽은 `approved` 필드가 없는 strict JSONL이며, HTTPS 출처·발행 시각·요약·사전 작성 대사·만료 시각과 빈 pending review 상태만 가진다. 실제 pending/decision 파일은 Git에서 제외한다.
+- reviewer CLI는 전체 pending record의 canonical SHA-256에 decision을 결합한다. approve는 출처·발행 시각·요약 근거·대사·만료 확인이 모두 참이어야 하며, rewrite/reject는 notes가 필수다. 기존 decision 교체는 같은 reviewer의 명시적 replace만 허용한다.
+- compiler는 approve decision만 pending 순서로 골라 `runtime` 바로 아래의 명시 경로에 결정적으로 쓴다. temporary board를 현재 runtime loader로 재검증하고 모든 ID와 순서가 exact 일치할 때만 기존 파일을 원자적으로 교체한다. 만료·미래·변조·부분 통과는 기존 output을 건드리지 않는다.
+- runtime schema v2는 root workflow version과 per-item pending/decision hash provenance를 필수로 요구한다. loader가 두 canonical record를 다시 구성해 해시를 검증하므로 수동 `approved:true` JSON이나 수정된 제목·요약·출처·대사·승인 정보는 거부된다.
+- hash binding은 로컬 변경 탐지와 human-governance 추적용이며 reviewer 신원이나 외부 사실을 암호학적으로 인증하는 서명은 아니다.
+- 새 실제 토픽·decision·활성 runtime board는 만들지 않았다. 기존 ignored legacy board는 수정하지 않고 비활성 상태로 보존했으며 자동 마이그레이션하지 않는다.
+- workflow·runtime·startup 집중 회귀 25개와 Python compile, diff check가 통과했다.
+- 이 체크포인트의 최종 `ollama-proxy` 전체 단위 회귀 452개가 통과했다.

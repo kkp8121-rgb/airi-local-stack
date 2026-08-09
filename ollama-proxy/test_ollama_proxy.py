@@ -457,6 +457,7 @@ class TopicBoardRuntimeTests(unittest.TestCase):
         schema_version: int = 2,
         synthesize_broadcast_line: bool = True,
     ) -> str:
+        from topic_review_contract import record_sha256
         handle = tempfile.NamedTemporaryFile(
             "w", encoding="utf-8", suffix=".json", delete=False
         )
@@ -468,8 +469,26 @@ class TopicBoardRuntimeTests(unittest.TestCase):
                     "broadcast_line",
                     f"{normalized.get('title', '주제')} 소식을 확인했어.",
                 )
+            if schema_version == 2 and normalized.get("approved") is True and synthesize_broadcast_line:
+                source_url = f"https://example.test/{normalized.get('id', 'topic')}"
+                pending = {
+                    "pending_schema_version": 1, "id": normalized["id"], "title": normalized["title"],
+                    "source": normalized["source"], "source_url": source_url,
+                    "published_at": normalized["published_at"], "summary": normalized["summary"],
+                    "broadcast_line": normalized["broadcast_line"], "expires_at": normalized["expires_at"],
+                    "review": {"status": "pending", "reviewer": "", "reviewed_at": ""},
+                }
+                pending_hash = record_sha256(pending)
+                decision = {
+                    "id": normalized["id"], "record_sha256": pending_hash, "decision": "approve",
+                    "source_verified": True, "published_at_verified": True, "summary_grounded": True,
+                    "broadcast_line_verified": True, "expires_at_verified": True, "notes": "",
+                    "reviewer": "reviewer-a", "reviewed_at": "2026-08-08T00:00:00Z",
+                }
+                normalized["provenance"] = {"source_url": source_url, "pending_record_sha256": pending_hash}
+                normalized["approval"] = {key: decision[key] for key in decision if key not in {"id", "record_sha256"}} | {"decision_record_sha256": record_sha256(decision)}
             normalized_items.append(normalized)
-        json.dump({"schema_version": schema_version, "items": normalized_items}, handle, ensure_ascii=False)
+        json.dump({"schema_version": schema_version, "approval_workflow_version": 1, "items": normalized_items}, handle, ensure_ascii=False)
         handle.close()
         self.addCleanup(lambda: Path(handle.name).unlink(missing_ok=True))
         return handle.name

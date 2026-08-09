@@ -9,10 +9,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 import re
 from typing import Any, Iterable
+from urllib.parse import urlsplit
 
 
 CONTROL_RE = re.compile(r"<\|(?:ACT|DELAY|CALL)\b|\b(?:SYSTEM|PROMPT|TOOL)\b", re.IGNORECASE)
@@ -30,6 +32,11 @@ SPEAKER_LABEL_RE = re.compile(
 HONORIFIC_ENDING_RE = re.compile(
     r"(?:습니다|습니까|십시오|세요|입니다|랍니다|네요|군요|어요|아요|지요|죠|구요|까요)\s*[.!。！？]\Z"
 )
+RUNTIME_BOARD_FIELDS = {"schema_version", "approval_workflow_version", "items"}
+RUNTIME_ITEM_FIELDS = {"id", "title", "source", "published_at", "summary", "broadcast_line", "expires_at", "approved", "provenance", "approval"}
+PROVENANCE_FIELDS = {"source_url", "pending_record_sha256"}
+APPROVAL_FIELDS = {"decision", "source_verified", "published_at_verified", "summary_grounded", "broadcast_line_verified", "expires_at_verified", "notes", "reviewer", "reviewed_at", "decision_record_sha256"}
+HASH_RE = re.compile(r"[0-9a-f]{64}\Z")
 
 
 @dataclass(frozen=True)
@@ -48,6 +55,19 @@ def _parse_time(value: str) -> datetime:
     text = value.strip().replace("Z", "+00:00")
     parsed = datetime.fromisoformat(text)
     return (parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)).astimezone(timezone.utc)
+
+
+def _strict_utc_time(value: Any, field: str) -> datetime:
+    if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value):
+        raise ValueError(f"{field} must be RFC3339 UTC")
+    try:
+        return _parse_time(value)
+    except ValueError as exc:
+        raise ValueError(f"{field} must be RFC3339 UTC") from exc
+
+
+def _canonical_sha256(value: Any) -> str:
+    return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
 def _bounded_text(value: Any, limit: int, field: str) -> str:
@@ -76,8 +96,10 @@ def load_approved_topics(path: str | Path, *, now: datetime | None = None) -> tu
     payload = json.loads(resolved.read_bytes().decode("utf-8"))
     # Runtime delivery uses an explicitly pre-approved spoken line. Version 1
     # has no such field, so it must not be accepted at runtime.
-    schema_version = payload.get("schema_version") if isinstance(payload, dict) else None
-    if type(schema_version) is not int or schema_version != 2:
+    if not isinstance(payload, dict) or set(payload) != RUNTIME_BOARD_FIELDS:
+        raise ValueError("unsupported topic board schema")
+    schema_version = payload.get("schema_version")
+    if type(schema_version) is not int or schema_version != 2 or type(payload.get("approval_workflow_version")) is not int or payload["approval_workflow_version"] != 1:
         raise ValueError("unsupported topic board schema")
     raw_items = payload.get("items")
     if not isinstance(raw_items, list):
@@ -88,13 +110,13 @@ def load_approved_topics(path: str | Path, *, now: datetime | None = None) -> tu
     result: list[TopicItem] = []
     seen: set[str] = set()
     for raw in raw_items:
-        if not isinstance(raw, dict) or raw.get("approved") is not True:
-            continue
+        if not isinstance(raw, dict) or set(raw) != RUNTIME_ITEM_FIELDS or raw.get("approved") is not True:
+            raise ValueError("runtime topic item is invalid")
         topic_id = _bounded_text(raw.get("id"), 120, "id")
         if not TOPIC_ID_RE.fullmatch(topic_id):
             raise ValueError("id is unsafe")
         if topic_id in seen:
-            continue
+            raise ValueError("duplicate topic id")
         title = _bounded_text(raw.get("title"), MAX_TITLE_CHARS, "title")
         source = _bounded_text(raw.get("source"), MAX_TITLE_CHARS, "source")
         summary = _bounded_text(raw.get("summary"), MAX_SUMMARY_CHARS, "summary")
@@ -119,8 +141,42 @@ def load_approved_topics(path: str | Path, *, now: datetime | None = None) -> tu
             raise ValueError("broadcast_line is not grounded in its topic")
         published_at = _bounded_text(raw.get("published_at"), 64, "published_at")
         expires_at = _bounded_text(raw.get("expires_at"), 64, "expires_at")
-        published = _parse_time(published_at)
-        expires = _parse_time(expires_at)
+        published = _strict_utc_time(published_at, "published_at")
+        expires = _strict_utc_time(expires_at, "expires_at")
+        provenance = raw.get("provenance")
+        approval = raw.get("approval")
+        if not isinstance(provenance, dict) or set(provenance) != PROVENANCE_FIELDS or not isinstance(approval, dict) or set(approval) != APPROVAL_FIELDS:
+            raise ValueError("runtime topic provenance is invalid")
+        source_url = provenance.get("source_url")
+        if not isinstance(source_url, str) or len(source_url) > 2048 or CONTROL_RE.search(source_url) or UNSAFE_TEXT_RE.search(source_url):
+            raise ValueError("runtime topic provenance is invalid")
+        parsed_url = urlsplit(source_url)
+        if parsed_url.scheme != "https" or not parsed_url.netloc or parsed_url.username or parsed_url.password:
+            raise ValueError("runtime topic provenance is invalid")
+        pending_hash = provenance.get("pending_record_sha256")
+        if not isinstance(pending_hash, str) or not HASH_RE.fullmatch(pending_hash):
+            raise ValueError("runtime topic provenance is invalid")
+        pending_record = {"pending_schema_version": 1, "id": topic_id, "title": title, "source": source, "source_url": source_url, "published_at": published_at, "summary": summary, "broadcast_line": broadcast_line, "expires_at": expires_at, "review": {"status": "pending", "reviewer": "", "reviewed_at": ""}}
+        if _canonical_sha256(pending_record) != pending_hash:
+            raise ValueError("runtime topic provenance is invalid")
+        flags = ("source_verified", "published_at_verified", "summary_grounded", "broadcast_line_verified", "expires_at_verified")
+        if approval.get("decision") != "approve" or not all(type(approval.get(flag)) is bool and approval[flag] for flag in flags):
+            raise ValueError("runtime topic approval is invalid")
+        notes = approval.get("notes")
+        reviewer = approval.get("reviewer")
+        if not isinstance(notes, str) or len(notes) > 500 or CONTROL_RE.search(notes) or UNSAFE_TEXT_RE.search(notes):
+            raise ValueError("runtime topic approval is invalid")
+        reviewer = _bounded_text(reviewer, 500, "reviewer")
+        reviewed_at = approval.get("reviewed_at")
+        reviewed = _strict_utc_time(reviewed_at, "reviewed_at")
+        if reviewed > current:
+            raise ValueError("runtime topic approval is invalid")
+        decision_hash = approval.get("decision_record_sha256")
+        if not isinstance(decision_hash, str) or not HASH_RE.fullmatch(decision_hash):
+            raise ValueError("runtime topic approval is invalid")
+        decision_record = {"id": topic_id, "record_sha256": pending_hash, "decision": "approve", **{flag: True for flag in flags}, "notes": notes, "reviewer": reviewer, "reviewed_at": reviewed_at}
+        if _canonical_sha256(decision_record) != decision_hash:
+            raise ValueError("runtime topic approval is invalid")
         if published > current or expires <= current or published >= expires:
             continue
         result.append(TopicItem(

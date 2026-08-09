@@ -10,34 +10,23 @@
 
 ## File contract
 
-Copy `ollama-proxy/approved-topics.example.json` into `ollama-proxy/runtime`. The checked-in example is deliberately empty; do not create a runtime board unless a person has approved the contents.
+`ollama-proxy/approved-topics.example.json` documents only the empty root shape. Do not copy and fill it by hand; the reviewed compiler creates the operational file under `ollama-proxy/runtime`.
 
 ```json
 {
   "schema_version": 2,
+  "approval_workflow_version": 1,
   "items": []
 }
 ```
 
-Every live `approved: true` item needs bounded safe metadata plus a `broadcast_line`. `broadcast_line` is the exact, explicitly preapproved Korean sentence delivered for that item. The model does not generate that spoken line. Schema v1 is rejected because it lacks this delivery field.
+Every live `approved: true` item needs bounded safe metadata plus a `broadcast_line`. `broadcast_line` is the exact, explicitly preapproved Korean sentence delivered for that item. The model does not generate that spoken line. Schema v1 is rejected because it lacks this delivery field. Runtime schema-v2 boards must also have exact root `approval_workflow_version: 1` and per-item pending/approval provenance; manual `approved: true` JSON is rejected.
 
-```json
-{
-  "schema_version": 2,
-  "items": [{
-    "id": "topic-2026-08-09-01",
-    "title": "Short title",
-    "source": "Human-approved source label",
-    "published_at": "2026-08-09T00:00:00Z",
-    "summary": "One or two factual sentences.",
-    "broadcast_line": "검수한 제목 소식을 확인했어.",
-    "expires_at": "2026-08-10T00:00:00Z",
-    "approved": true
-  }]
-}
-```
+Do not hand-author runtime items. Use the pending JSONL, human decision sidecar, and deterministic compiler documented in `ollama-proxy/topic-review/README.md`; the compiler supplies the required provenance and approval objects.
 
-The loader requires an absolute local file, no more than 256 KiB, at most 64 items, valid IDs, safe bounded text, and a live expiry later than publication. Its mechanical dialogue check requires Korean text, a complete non-question sentence, no speaker label, no new numeric token, at least one three-or-more-character topic anchor, and rejects common honorific endings. That check is defense in depth rather than proof of factuality or banmal; the human reviewer remains responsible for the whole preapproved line. One invalid approved item fails the board closed.
+The deterministic offline compiler is the only supported runtime-board producer. It binds canonical pending and human-decision hashes, then the loader reconstructs and verifies both records before accepting an item. These hashes preserve local human-governance provenance; they are not signatures or independent proof of source truth. The loader requires an absolute local file, no more than 256 KiB, at most 64 items, valid IDs, safe bounded text, and a live expiry later than publication. One invalid approved item fails the board closed.
+
+Legacy or hand-authored schema-v2 boards without this binding are not migrated automatically. Keep them inactive; recreate their records as pending JSONL, review them explicitly, and compile a new board if they are still wanted.
 
 ## Delivery and persistence
 
