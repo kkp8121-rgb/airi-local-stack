@@ -106,6 +106,14 @@
 - `start-airi-background.ps1` 실기동에서 시작 전후 foreground process가 동일했고 visible AIRI window는 0개였다. local channel은 listener를 열었고 passive status는 `stageMounted=true`, voice input/provider configured, microphone permission granted, VAD active/listening, input live/enabled/unmuted를 확인했다. 캡처·transcription은 진행 중이 아니고 마지막 capture outcome도 none이었다.
 - 같은 시점에 8880·8890·8892·9880·11434·11435 listener는 loopback에서 정상이고 11436은 OFF였다. STT는 large-v3-turbo/CUDA/int8_float16, TTS는 GPT-SoVITS v2ProPlus, memory/knowledge는 ready다. extraction, external search/chat approval, evaluation collection은 OFF이며 character evaluator는 local GPU/30m keep-alive로 ready다.
 
+### 비영속 production quality probe
+
+- 기존 `local-evaluation`은 frozen 평가 재현을 위해 personal memory/state뿐 아니라 production sampling 기본값과 grounding retry도 의도적으로 끈다. 따라서 이를 실제 대화 품질 판정에 재사용하면 안 된다.
+- exact loopback 전용 `local-quality-probe` origin을 추가했다. personal memory assembly, character state/evaluator, repeat director, cloud search/chat, durable journal을 차단하지만 production local sampling, response mode, language/grounding retry는 유지한다. opaque trace만 사용하고 origin header는 upstream으로 전달하지 않는다.
+- spoof 거부·상태/기억 비변경·sampling 유지·grounding retry eligibility·header stripping 집중 테스트와 proxy 전체 단위 테스트 186개가 통과했다.
+- generated-default provenance를 사용한 합성 일상 장면 3건에서 journal scheduled/completed, character sessions, memory pending은 모두 불변이었다. 세 건 모두 최초 draft의 grounding 부족을 정확히 검출해 retry를 사용했지만 correction candidate는 0/3 통과였다.
+- 현재 선택 로직은 correction 실패 시 grounding에 실패한 최초 완결 draft를 다시 공개한다. 실제 결과는 사건을 일반화하거나, 긍정 상황의 정서를 반대로 추정하거나, 입력에 없는 속성을 추가했다. 다음 품질 분기는 이 fail-open 동작을 제거하고 한 번의 correction call에서 검증 가능한 복수 후보를 생성·선택할 수 있는지 격리 실험한다.
+
 ## 4. 최신 집중 검증
 
 - `test_ollama_proxy -k grounding`: 9 passed.

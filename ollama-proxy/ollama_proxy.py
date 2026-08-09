@@ -201,6 +201,11 @@ EVALUATION_REQUEST_MAX_BYTES = 128_000
 TOPIC_BOARD_PATH = os.environ.get("AIRI_TOPIC_BOARD_PATH", "").strip()
 TOPIC_RECENT_LIMIT = 8
 SYNTHETIC_EVALUATION_TRACE_PREFIX = f"local-evaluation-{uuid4().hex}:"
+QUALITY_PROBE_TRACE_PREFIX = f"local-quality-probe-{uuid4().hex}:"
+NONMUTATING_TRACE_PREFIXES = (
+    SYNTHETIC_EVALUATION_TRACE_PREFIX,
+    QUALITY_PROBE_TRACE_PREFIX,
+)
 
 
 class SessionHeaderTelemetry:
@@ -689,6 +694,19 @@ def is_local_synthetic_evaluation_turn(request: Request) -> bool:
     traffic. It does not enable the evaluation store or any external provider.
     """
     if request.headers.get("x-airi-turn-origin") != "local-evaluation":
+        return False
+    peer = request.client.host if request.client is not None else ""
+    return peer in {"127.0.0.1", "::1", "localhost"}
+
+
+def is_local_quality_probe_turn(request: Request) -> bool:
+    """Recognize the non-mutating local quality probe only on loopback.
+
+    Quality probes exercise the normal local response path, including its
+    request-local knowledge/style and retry safeguards, without observing or
+    persisting any personal state.
+    """
+    if request.headers.get("x-airi-turn-origin") != "local-quality-probe":
         return False
     peer = request.client.host if request.client is not None else ""
     return peer in {"127.0.0.1", "::1", "localhost"}
@@ -3102,7 +3120,7 @@ def schedule_completed_turn(
     This boundary observes what already happened.  It never chooses a line,
     tool, emotion, or action and therefore cannot turn counts into dialogue.
     """
-    if trace_id.startswith(SYNTHETIC_EVALUATION_TRACE_PREFIX):
+    if trace_id.startswith(NONMUTATING_TRACE_PREFIXES):
         return
     # AIRI adds a synthetic ``[YYYY-MM-DD HH:MM] `` prefix to provider-bound
     # user messages.  Keep that temporal hint in the model prompt, but never
@@ -3887,9 +3905,13 @@ async def proxy(path: str, request: Request):
         path.endswith("chat/completions") or path.endswith("api/chat")
     )
     synthetic_evaluation_turn = is_local_synthetic_evaluation_turn(request)
+    quality_probe_turn = is_local_quality_probe_turn(request)
+    nonmutating_turn = synthetic_evaluation_turn or quality_probe_turn
     trace_id = (
         SYNTHETIC_EVALUATION_TRACE_PREFIX + uuid4().hex
         if synthetic_evaluation_turn
+        else QUALITY_PROBE_TRACE_PREFIX + uuid4().hex
+        if quality_probe_turn
         else request_id(request.headers, uuid4().hex)
     )
     request_started = time.perf_counter()
@@ -3947,7 +3969,7 @@ async def proxy(path: str, request: Request):
         is_chat_request
         and last_user_text
         and not proactive_turn
-        and not synthetic_evaluation_turn
+        and not nonmutating_turn
     ):
         repeat_intent = (
             "explicit_repeat"
@@ -4057,7 +4079,7 @@ async def proxy(path: str, request: Request):
                 media_type="text/event-stream",
             )
 
-        if repeat_candidate:
+        if repeat_candidate and not nonmutating_turn:
 
             async def stream_directed_repeat() -> AsyncIterator[bytes]:
                 emit_latency_event(
@@ -4282,7 +4304,7 @@ async def proxy(path: str, request: Request):
 
         # A bare command reuses the most recent explicit search subject when
         # available. Without prior context it stays local.
-        if search_query and ALLOW_EXTERNAL_SEARCH:
+        if search_query and ALLOW_EXTERNAL_SEARCH and not nonmutating_turn:
 
             async def stream_cloud_search() -> AsyncIterator[bytes]:
                 search_task = asyncio.create_task(run_codex_search(last_user_text, search_query))
@@ -4435,7 +4457,7 @@ async def proxy(path: str, request: Request):
                 media_type="text/event-stream",
             )
 
-        if cloud_chat_provider.ready and not proactive_turn:
+        if cloud_chat_provider.ready and not proactive_turn and not nonmutating_turn:
 
             async def stream_cloud_chat() -> AsyncIterator[bytes]:
                 response = None
@@ -4599,7 +4621,7 @@ async def proxy(path: str, request: Request):
                         meta={"approved_proactive_dialogue": 1},
                     )
                     return
-                elif synthetic_evaluation_turn:
+                elif nonmutating_turn:
                     prepared_body = inject_response_mode(
                         await prepare_knowledge_body(body, memory_question),
                         memory_question,
@@ -5302,7 +5324,7 @@ async def proxy(path: str, request: Request):
                     "finish_reason": "stop",
                 }],
             })
-        elif synthetic_evaluation_turn:
+        elif nonmutating_turn:
             body = inject_response_mode(
                 await prepare_knowledge_body(body, memory_question),
                 memory_question,

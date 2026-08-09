@@ -176,6 +176,17 @@ class SystemPromptContractTests(unittest.TestCase):
         self.assertFalse(ollama_proxy.is_local_synthetic_evaluation_turn(request("LOCAL-EVALUATION", "127.0.0.1")))
         self.assertFalse(ollama_proxy.is_local_synthetic_evaluation_turn(request("local-evaluation", "10.0.0.8")))
 
+    def test_local_quality_probe_marker_requires_exact_value_and_loopback_peer(self) -> None:
+        def request(value: str, host: str) -> Request:
+            return Request({"type":"http","headers":[(b"x-airi-turn-origin", value.encode())], "client":(host, 9)})
+        self.assertTrue(ollama_proxy.is_local_quality_probe_turn(request("local-quality-probe", "127.0.0.1")))
+        self.assertFalse(ollama_proxy.is_local_quality_probe_turn(request("LOCAL-QUALITY-PROBE", "127.0.0.1")))
+        self.assertFalse(ollama_proxy.is_local_quality_probe_turn(request("local-quality-probe", "10.0.0.8")))
+        self.assertNotEqual(
+            ollama_proxy.SYNTHETIC_EVALUATION_TRACE_PREFIX,
+            ollama_proxy.QUALITY_PROBE_TRACE_PREFIX,
+        )
+
     def test_prompt_has_original_korean_first_narrative_contract(self) -> None:
         prompt = ollama_proxy.AIRI_SYSTEM_PROMPT
         self.assertIn("기본 언어는 한국어다", prompt)
@@ -2688,6 +2699,92 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertIn("합성 평가 답변도 자연스러운 반말이야.", response.text)
         self.assertEqual(memory.prepared, 0)
         self.assertEqual(memory.completed, [])
+
+    def test_local_quality_probe_bypasses_personal_state_and_memory_but_keeps_sampling(self) -> None:
+        def event(content: str, done: bool = True) -> bytes:
+            return (json.dumps({
+                "message": {"role": "assistant", "content": content}, "done": done,
+            }) + "\n").encode("utf-8")
+
+        class HeaderCapturingClient(_QueuedApiStreamClient):
+            def __init__(self) -> None:
+                super().__init__([[event("quality probe answer.")]])
+                self.headers: list[dict[str, str]] = []
+
+            def build_request(self, *args: object, **kwargs: object) -> bytes:
+                self.headers.append(dict(kwargs.get("headers", {})))
+                return super().build_request(*args, **kwargs)
+
+        chat = HeaderCapturingClient()
+        memory = _FakeMemoryRuntime()
+        state = mock.Mock()
+        evaluator = mock.Mock()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ), mock.patch.object(
+            ollama_proxy, "knowledge_runtime", None
+        ), mock.patch.object(
+            ollama_proxy, "character_state_runtime", state
+        ), mock.patch.object(
+            ollama_proxy, "character_state_evaluator", evaluator
+        ), mock.patch.object(
+            ollama_proxy, "is_local_quality_probe_turn", return_value=True
+        ):
+            response = TestClient(ollama_proxy.app).post(
+                "/v1/chat/completions",
+                headers={"x-airi-turn-origin": "local-quality-probe"},
+                json={"model": "exaone-airi:2.4b", "stream": True, "messages": [
+                    {"role": "user", "content": "quality probe question"},
+                ]},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(memory.prepared, 0)
+        self.assertFalse(state.observe_user.called)
+        self.assertFalse(state.observe_assistant.called)
+        self.assertFalse(evaluator.interrupt_for_chat.called)
+        self.assertFalse(evaluator.schedule_completed_turn.called)
+        self.assertEqual(memory.completed, [])
+        self.assertTrue(set(ollama_proxy.OLLAMA_SAMPLING_DEFAULTS) <= set(chat.requests[0]["options"]))
+        self.assertNotIn("x-airi-turn-origin", chat.headers[0])
+        system_contents = [
+            message.get("content", "") for message in chat.requests[0]["messages"]
+            if message.get("role") == "system"
+        ]
+        self.assertIn(ollama_proxy.REQUEST_LOCAL_STYLE_CONTRACT, system_contents)
+
+    def test_local_quality_probe_keeps_grounding_retry_eligible(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps({
+                "message": {"role": "assistant", "content": content}, "done": True,
+            }) + "\n").encode("utf-8")
+
+        chat = _QueuedApiStreamClient([
+            [event("first draft.")],
+            [event("grounded retry.")],
+        ])
+        grounding = mock.Mock(return_value=True)
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", _FakeMemoryRuntime()
+        ), mock.patch.object(
+            ollama_proxy, "knowledge_runtime", None
+        ), mock.patch.object(
+            ollama_proxy, "is_local_quality_probe_turn", return_value=True
+        ), mock.patch.object(
+            ollama_proxy, "needs_grounding_retry", grounding
+        ):
+            response = TestClient(ollama_proxy.app).post(
+                "/v1/chat/completions",
+                headers={"x-airi-turn-origin": "local-quality-probe"},
+                json={"model": "exaone-airi:2.4b", "stream": True, "messages": [
+                    {"role": "user", "content": "quality probe question"},
+                ]},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(chat.requests), 2)
+        self.assertFalse(grounding.call_args.kwargs["synthetic_evaluation"])
+        self.assertTrue(set(ollama_proxy.OLLAMA_SAMPLING_DEFAULTS) <= set(chat.requests[1]["options"]))
 
     def test_direct_cloud_stream_uses_prepared_memory_and_journals_complete_text(self) -> None:
         cloud=_FakeCloudProvider(["별을 ","기억하고 있어."])
