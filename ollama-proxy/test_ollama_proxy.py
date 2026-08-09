@@ -2262,8 +2262,12 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             [event("수건을 반듯하게 접어뒀네!")],
         ])
         memory = _FakeMemoryRuntime()
+        events: list[tuple[tuple[object, ...], dict[str, object]]] = []
         with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
             ollama_proxy, "memory_runtime", memory
+        ), mock.patch.object(
+            ollama_proxy, "emit_latency_event",
+            side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
         ):
             response = post_stream("수건을 반듯하게 접어뒀어.")
 
@@ -2272,6 +2276,13 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
         self.assertEqual(len(chat.requests), 2)
+        end_meta = next(
+            kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end")
+        )
+        self.assertEqual(
+            end_meta["grounding_selected"],
+            ollama_proxy.GROUNDING_SELECTED_RETRY_STRICT,
+        )
 
     def test_two_failed_grounding_drafts_use_fact_preserving_observation(self) -> None:
         def event(content: str) -> bytes:
@@ -2288,8 +2299,12 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             [event("정말 다행이다!")],
         ])
         memory = _FakeMemoryRuntime()
+        events: list[tuple[tuple[object, ...], dict[str, object]]] = []
         with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
             ollama_proxy, "memory_runtime", memory
+        ), mock.patch.object(
+            ollama_proxy, "emit_latency_event",
+            side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
         ):
             response = post_stream("수건을 반듯하게 접어뒀어.")
 
@@ -2298,6 +2313,13 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
         self.assertEqual(len(chat.requests), 2)
+        end_meta = next(
+            kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end")
+        )
+        self.assertEqual(
+            end_meta["grounding_selected"],
+            ollama_proxy.GROUNDING_SELECTED_DETERMINISTIC,
+        )
 
     def test_retry_with_unresolved_personal_deixis_never_reaches_wire_or_journal(self) -> None:
         def event(content: str) -> bytes:
@@ -2564,6 +2586,109 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertIn("사용자 원문에 없는 내용 명사·동사·형용사를 추가하지 마", correction_notes[0])
         self.assertIn("창문", correction_notes[0])
         self.assertIn("손잡이", correction_notes[0])
+
+    def test_grounding_rejection_flags_are_fixed_numeric_and_behavior_neutral(self) -> None:
+        user = "\uc218\uac74\uc744 \ubc18\ub4ef\ud558\uac8c \uc811\uc5b4\ub450\uc5b4."
+        accepted = "\uc218\uac74\uc744 \ubc18\ub4ef\ud558\uac8c \uc811\uc5b4\ub450\uc5b4."
+        accepted_flags = ollama_proxy.grounding_rejection_flags(user, accepted)
+        self.assertEqual(set(accepted_flags), set(ollama_proxy.GROUNDING_REJECTION_FLAG_KEYS))
+        self.assertTrue(all(type(value) is int and value in {0, 1} for value in accepted_flags.values()))
+        reason_bits = tuple(ollama_proxy.GROUNDING_REJECTION_BITS.values())
+        self.assertEqual(len(reason_bits), len(set(reason_bits)))
+        self.assertTrue(all(bit > 0 and bit & (bit - 1) == 0 for bit in reason_bits))
+        self.assertTrue(all(
+            bit < ollama_proxy.GROUNDING_REJECTION_LANGUAGE_BLOCKED
+            for bit in reason_bits
+        ))
+        self.assertTrue(ollama_proxy.grounding_candidate_is_safe_fallback(user, accepted))
+        self.assertEqual(accepted_flags["empty"], 0)
+
+        rejected_flags = ollama_proxy.grounding_rejection_flags(user, "")
+        self.assertEqual(set(rejected_flags), set(ollama_proxy.GROUNDING_REJECTION_FLAG_KEYS))
+        self.assertTrue(all(type(value) is int and value in {0, 1} for value in rejected_flags.values()))
+        self.assertEqual(rejected_flags["empty"], 1)
+        self.assertEqual(rejected_flags["overlap_shortfall"], 1)
+        rejected_mask = ollama_proxy.grounding_rejection_mask(user, "")
+        self.assertTrue(rejected_mask & ollama_proxy.GROUNDING_REJECTION_BITS["empty"])
+        self.assertTrue(
+            rejected_mask & ollama_proxy.GROUNDING_REJECTION_BITS["overlap_shortfall"]
+        )
+        self.assertFalse(ollama_proxy.grounding_candidate_is_safe_fallback(user, ""))
+
+        question_flags = ollama_proxy.grounding_rejection_flags(user, "수건을 접어뒀어?")
+        self.assertEqual(question_flags["question"], 1)
+        self.assertEqual(question_flags["terminal_shape"], 0)
+
+    def test_grounding_retry_end_meta_has_only_fixed_numeric_reasons(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        user = "\ucc3d\ubb38 \uc190\uc7a1\uc774\uac00 \ud5d0\uac70\uc6cc\uc84c\uc5b4."
+        chat = _QueuedApiStreamClient([
+            [event("\uadf8\ub0e5 \uad00\uc2ec \uc788\ub294 \uac70\uc57c.")],
+            [event(user)],
+        ])
+        events: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "emit_latency_event",
+            side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
+        ):
+            response = post_stream(user)
+
+        self.assertEqual(openai_sse_content(response.text), user)
+        end_meta = next(kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end"))
+        fixed_keys = {
+            "grounding_initial_reject_mask",
+            "grounding_retry_reject_mask",
+            "grounding_selected",
+        }
+        self.assertTrue(fixed_keys <= set(end_meta))
+        self.assertTrue(all(list(end_meta).index(key) < 24 for key in fixed_keys))
+        self.assertFalse(any("_reason_" in key for key in end_meta))
+        self.assertFalse(any(key.startswith("grounding_selected_") for key in end_meta))
+        self.assertTrue(all(type(end_meta[key]) is int for key in fixed_keys))
+        mask_limit = ollama_proxy.GROUNDING_REJECTION_MASK_LIMIT
+        self.assertTrue(0 <= end_meta["grounding_initial_reject_mask"] < mask_limit)
+        self.assertTrue(0 <= end_meta["grounding_retry_reject_mask"] < mask_limit)
+        self.assertEqual(
+            end_meta["grounding_selected"],
+            ollama_proxy.GROUNDING_SELECTED_RETRY_STRICT,
+        )
+
+    def test_grounding_diagnostic_failure_cannot_change_selected_dialogue(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        user = "창문 손잡이가 헐거워졌어."
+        chat = _QueuedApiStreamClient([
+            [event("그냥 관심 있는 거야.")],
+            [event(user)],
+        ])
+        events: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "grounding_rejection_flags", side_effect=RuntimeError("diagnostic"),
+        ), mock.patch.object(
+            ollama_proxy, "emit_latency_event",
+            side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
+        ):
+            response = post_stream(user)
+
+        self.assertEqual(openai_sse_content(response.text), user)
+        end_meta = next(kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end"))
+        self.assertEqual(
+            end_meta["grounding_selected"],
+            ollama_proxy.GROUNDING_SELECTED_RETRY_STRICT,
+        )
+        self.assertTrue(
+            end_meta["grounding_retry_reject_mask"]
+            & ollama_proxy.GROUNDING_REJECTION_DIAGNOSTIC_ERROR
+        )
 
     def test_grounded_ordinary_draft_does_not_retry(self) -> None:
         def event(content: str) -> bytes:
@@ -3155,15 +3280,35 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         chat.responses[1] = _StallingApiStreamResponse([], 0.05)
         retry_response = chat.responses[1]
         memory = _FakeMemoryRuntime()
+        events: list[tuple[tuple[object, ...], dict[str, object]]] = []
         with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
             ollama_proxy, "memory_runtime", memory
-        ), mock.patch.object(ollama_proxy, "CORRECTIVE_RETRY_TIMEOUT_SECONDS", 0.01):
+        ), mock.patch.object(
+            ollama_proxy, "CORRECTIVE_RETRY_TIMEOUT_SECONDS", 0.01
+        ), mock.patch.object(
+            ollama_proxy, "grounding_rejection_mask", side_effect=RuntimeError("diagnostic")
+        ), mock.patch.object(
+            ollama_proxy, "emit_latency_event",
+            side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
+        ):
             response = post_stream("창문 손잡이가 헐거워져서 잘 안 돌아가.")
 
         self.assertEqual(openai_sse_content(response.text), "")
         self.assertEqual(memory.completed, [])
         self.assertEqual(len(chat.requests), 2)
         self.assertTrue(retry_response.closed)
+        end_meta = next(kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end"))
+        self.assertEqual(
+            end_meta["grounding_selected"], ollama_proxy.GROUNDING_SELECTED_CONTENT_FREE,
+        )
+        self.assertTrue(
+            end_meta["grounding_retry_reject_mask"]
+            & ollama_proxy.GROUNDING_REJECTION_TIMEOUT
+        )
+        self.assertTrue(
+            end_meta["grounding_retry_reject_mask"]
+            & ollama_proxy.GROUNDING_REJECTION_DIAGNOSTIC_ERROR
+        )
 
     def test_invalid_grounding_retry_fails_closed_without_error_dialogue(self) -> None:
         def event(content: str) -> bytes:
@@ -3174,8 +3319,12 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
 
         chat = _QueuedApiStreamClient([[event("창문이 이상해.")], [b"not-json\n"]])
         memory = _FakeMemoryRuntime()
+        events: list[tuple[tuple[object, ...], dict[str, object]]] = []
         with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
             ollama_proxy, "memory_runtime", memory
+        ), mock.patch.object(
+            ollama_proxy, "emit_latency_event",
+            side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
         ):
             response = post_stream("창문 손잡이가 헐거워져서 잘 안 돌아가.")
 
@@ -3184,6 +3333,14 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertEqual(memory.completed, [])
         self.assertEqual(len(chat.requests), 2)
         self.assertIn("data: [DONE]", response.text)
+        end_meta = next(kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end"))
+        self.assertEqual(
+            end_meta["grounding_selected"], ollama_proxy.GROUNDING_SELECTED_CONTENT_FREE,
+        )
+        self.assertTrue(
+            end_meta["grounding_retry_reject_mask"]
+            & ollama_proxy.GROUNDING_REJECTION_INVALID_TRANSPORT
+        )
 
     def test_first_raw_watchdog_bounds_a_stream_that_never_starts(self) -> None:
         chat = _StallingApiStreamClient([], stall_seconds=0.05)

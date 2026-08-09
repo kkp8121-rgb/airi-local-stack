@@ -2416,6 +2416,77 @@ def has_unambiguous_declarative_terminal(text: str) -> bool:
     return bool(re.search(r"[.!。！]+$", clean))
 
 
+GROUNDING_REJECTION_FLAG_KEYS = (
+    "empty", "user_sentence_shape", "candidate_sentence_shape",
+    "user_terminal_shape", "foreign", "missing_hangul", "question", "simile",
+    "generic_echo", "unsolicited_advice", "bare_interjection", "personal_deixis",
+    "full_surface_mismatch", "semantic_marker_mismatch", "unsupported_emotion",
+    "terminal_shape", "overlap_shortfall", "action_mismatch",
+)
+GROUNDING_REJECTION_BITS = {
+    key: 1 << index for index, key in enumerate(GROUNDING_REJECTION_FLAG_KEYS)
+}
+GROUNDING_REJECTION_LANGUAGE_BLOCKED = 1 << 18
+GROUNDING_REJECTION_INVALID_TRANSPORT = 1 << 19
+GROUNDING_REJECTION_TIMEOUT = 1 << 20
+GROUNDING_REJECTION_TOOL_TRUTH = 1 << 21
+GROUNDING_REJECTION_DIAGNOSTIC_ERROR = 1 << 22
+GROUNDING_REJECTION_MASK_LIMIT = 1 << 23
+GROUNDING_SELECTED_RETRY_STRICT = 1
+GROUNDING_SELECTED_RETRY_SAFE = 2
+GROUNDING_SELECTED_INITIAL_SAFE = 3
+GROUNDING_SELECTED_DETERMINISTIC = 4
+GROUNDING_SELECTED_CONTENT_FREE = 5
+
+
+def grounding_rejection_flags(user_text: str, candidate: str) -> dict[str, int]:
+    """Return fixed, content-free reasons a draft cannot pass grounding gates.
+
+    Values are integer booleans and keys are fixed. This diagnostic retains and
+    emits no source text; the existing acceptance predicates remain authoritative.
+    """
+    clean = candidate.strip()
+    actions = grounding_action_sequence(user_text)
+    candidate_actions = grounding_action_sequence(clean)
+    return {
+        "empty": int(not clean),
+        "user_sentence_shape": int(not has_exactly_one_complete_sentence(user_text)),
+        "candidate_sentence_shape": int(not has_exactly_one_complete_sentence(clean)),
+        "user_terminal_shape": int(not has_unambiguous_declarative_terminal(user_text)),
+        "foreign": int(is_unrequested_foreign_dialogue(clean, user_text)),
+        "missing_hangul": int(not contains_hangul(clean)),
+        "question": int("?" in clean),
+        "simile": int(bool(_GROUNDING_SIMILE_RE.search(clean))),
+        "generic_echo": int(grounding_is_generic_echo(user_text, clean)),
+        "unsolicited_advice": int(bool(_GROUNDING_UNSOLICITED_ADVICE_RE.search(clean))),
+        "bare_interjection": int(bool(_GROUNDING_BARE_INTERJECTION_RE.search(clean))),
+        "personal_deixis": int(contains_personal_deixis(clean)),
+        "full_surface_mismatch": int(not grounding_candidate_matches_full_surface(user_text, clean)),
+        "semantic_marker_mismatch": int(
+            grounding_semantic_marker_sequence(clean) != grounding_semantic_marker_sequence(user_text)
+        ),
+        "unsupported_emotion": int(bool(
+            _GROUNDING_EMOTION_RE.search(clean) and not _GROUNDING_EMOTION_RE.search(user_text)
+        )),
+        "terminal_shape": int(
+            not re.search(r"[.!?。！？]$", clean)
+            and not _COMPLETE_UNPUNCTUATED_KOREAN_RE.search(clean)
+        ),
+        "overlap_shortfall": int(
+            grounding_overlap(user_text, clean) < grounding_required_overlap(user_text)
+        ),
+        "action_mismatch": int(bool(
+            actions and not any(action in candidate_actions for action in actions)
+        )),
+    }
+
+
+def grounding_rejection_mask(user_text: str, candidate: str) -> int:
+    """Pack the fixed rejection flags into a bounded, content-free bitmask."""
+    flags = grounding_rejection_flags(user_text, candidate)
+    return sum(GROUNDING_REJECTION_BITS[key] for key, value in flags.items() if value)
+
+
 def ambiguous_unpunctuated_grounding_echo(user_text: str, candidate: str) -> bool:
     """Detect a retry that turns an ambiguous casual question into an assertion."""
     user = unicodedata.normalize("NFKC", user_text).strip()
@@ -5291,6 +5362,9 @@ async def proxy(path: str, request: Request):
                 grounding_safe_fallback_used = False
                 grounding_safe_fallback_from_retry = False
                 grounded_observation_fallback_used = False
+                grounding_initial_reject_mask = 0
+                grounding_retry_reject_mask = 0
+                grounding_selected = 0
                 empty_dialogue_retry_used = False
                 empty_dialogue_retry_passed = False
                 # This watchdog is intentionally armed only after actual
@@ -5599,6 +5673,7 @@ async def proxy(path: str, request: Request):
                         grounding_content_free = not grounding_retry_passed
                         if grounding_retry_passed:
                             boundary = retry_boundary
+                            grounding_selected = GROUNDING_SELECTED_RETRY_STRICT
                         elif (
                             grounding_candidate_is_safe_fallback(
                                 last_user_text, retry_candidate
@@ -5610,6 +5685,7 @@ async def proxy(path: str, request: Request):
                             grounding_safe_fallback_used = True
                             grounding_safe_fallback_from_retry = True
                             grounding_content_free = False
+                            grounding_selected = GROUNDING_SELECTED_RETRY_SAFE
                         elif (
                             grounding_candidate_is_safe_fallback(
                                 last_user_text, initial_boundary.output
@@ -5624,6 +5700,7 @@ async def proxy(path: str, request: Request):
                             terminal_event = initial_terminal_event
                             grounding_safe_fallback_used = True
                             grounding_content_free = False
+                            grounding_selected = GROUNDING_SELECTED_INITIAL_SAFE
                         else:
                             # The first draft already failed the production
                             # grounding gate.  A failed correction therefore
@@ -5635,6 +5712,7 @@ async def proxy(path: str, request: Request):
                             # spoken fallback and does not select dialogue by
                             # a scenario/count rule.
                             grounding_quality_rejected = True
+                            grounding_selected = GROUNDING_SELECTED_CONTENT_FREE
                             boundary = IncrementalAiriOutputBoundary(
                                 require_korean=user_prefers_korean,
                                 max_sentences=response_sentence_limit(last_user_text),
@@ -5657,10 +5735,12 @@ async def proxy(path: str, request: Request):
                         grounding_retry_passed = False
                         grounding_content_free = False
                         grounding_safe_fallback_used = True
+                        grounding_selected = GROUNDING_SELECTED_INITIAL_SAFE
                     elif grounding_retry_used:
                         grounding_retry_passed = False
                         grounding_content_free = True
                         grounding_quality_rejected = True
+                        grounding_selected = GROUNDING_SELECTED_CONTENT_FREE
                         boundary = IncrementalAiriOutputBoundary(
                             require_korean=user_prefers_korean,
                             max_sentences=response_sentence_limit(last_user_text),
@@ -5706,6 +5786,7 @@ async def proxy(path: str, request: Request):
                     ):
                         dialogue = grounded_fallback
                         grounded_observation_fallback_used = True
+                        grounding_selected = GROUNDING_SELECTED_DETERMINISTIC
                 if raw_progress_timeout and not emitted_substantive:
                     # No model text has crossed the public boundary yet, so a
                     # single canonical interruption cannot conflict with a
@@ -5745,6 +5826,7 @@ async def proxy(path: str, request: Request):
                     "raw_chars_16_ms": raw_chars_16_ms,
                     "raw_chars_24_ms": raw_chars_24_ms,
                 }
+                response_duration_ms = elapsed_ms(request_started)
                 if raw_progress_timeout:
                     end_meta.update({
                         "upstream_raw_progress_timeout": 1,
@@ -5753,6 +5835,31 @@ async def proxy(path: str, request: Request):
                     if raw_progress_timeout_before_content:
                         end_meta["upstream_first_raw_timeout"] = 1
                 if grounding_retry_used:
+                    if grounding_retry_language_blocked:
+                        grounding_retry_reject_mask |= GROUNDING_REJECTION_LANGUAGE_BLOCKED
+                    if grounding_retry_invalid:
+                        grounding_retry_reject_mask |= GROUNDING_REJECTION_INVALID_TRANSPORT
+                    if retry_timed_out:
+                        grounding_retry_reject_mask |= GROUNDING_REJECTION_TIMEOUT
+                    try:
+                        initial_candidate = initial_boundary.output.strip()
+                        retry_candidate = retry_boundary.output.strip()
+                        grounding_initial_reject_mask = grounding_rejection_mask(
+                            last_user_text, initial_candidate,
+                        )
+                        grounding_retry_reject_mask |= grounding_rejection_mask(
+                            last_user_text, retry_candidate,
+                        )
+                        if not retry_timed_out and not grounding_retry_invalid:
+                            if (
+                                enforce_tool_truth(original_messages, retry_candidate)
+                                != retry_candidate
+                            ):
+                                grounding_retry_reject_mask |= GROUNDING_REJECTION_TOOL_TRUTH
+                    except Exception:
+                        # Diagnostics run only after the public terminal frame;
+                        # they must never alter dialogue selection or delivery.
+                        grounding_retry_reject_mask |= GROUNDING_REJECTION_DIAGNOSTIC_ERROR
                     end_meta.update({
                         "grounding_retry_used": 1,
                         "grounding_retry_passed": int(grounding_retry_passed),
@@ -5769,6 +5876,9 @@ async def proxy(path: str, request: Request):
                         "grounding_safe_fallback_from_retry": int(
                             grounding_safe_fallback_from_retry
                         ),
+                        "grounding_selected": grounding_selected,
+                        "grounding_initial_reject_mask": grounding_initial_reject_mask,
+                        "grounding_retry_reject_mask": grounding_retry_reject_mask,
                     })
                 if empty_dialogue_retry_used:
                     end_meta.update({
@@ -5795,7 +5905,7 @@ async def proxy(path: str, request: Request):
                     "llm",
                     "end",
                     trace_id,
-                    duration_ms=elapsed_ms(request_started),
+                    duration_ms=response_duration_ms,
                     meta=end_meta,
                 )
             except asyncio.CancelledError:
