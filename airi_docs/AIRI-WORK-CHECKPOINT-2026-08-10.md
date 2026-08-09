@@ -101,7 +101,10 @@
 - 런처 성공 조건은 visible main window 없음과 passive local voice-status의 `stageMounted=true`다. 이 확인은 채팅, 모델, TTS, 마우스·키보드 입력을 전혀 발생시키지 않는다.
 - background/startup 및 single-instance 집중 테스트 5개, stage-tamagotchi typecheck, workspace 런처 계약 테스트 5개, PowerShell AST parse가 통과했다.
 - canonical source patch는 새 startup 경계를 포함한 82개 source path로 재생성했다. SHA-256은 `13177D2547EBDBCCC65541CEDD8F3B4DF197117DFA2212090A7C697C98C075C8`이며 pristine index 정방향과 현재 source 역방향 apply check가 모두 통과했다.
-- 이 소스 체크포인트에서는 아직 새 `app.asar`를 build/install하거나 AIRI를 실행하지 않았다. 다음 checkpoint에서 기존 설치본을 exact backup한 뒤 교체하고 전경 창 변화 없이 passive readiness를 검증한다.
+- source checkpoint push 뒤 Tamagotchi Electron main/preload/renderer build가 통과했다. 기존 packaged dependencies/resources에 fresh `out`을 mirror해 28,085-entry `app.asar`를 만들었고 main/renderer entry와 background, voice-status, proactive proof, per-event context lock, exact card fingerprint marker를 확인했다.
+- 새 artifact 및 설치본 SHA-256은 `D3A623CEEDCEE3C3CFCCF508D6BD18C1C0EDD6F7FCC3CCC428109E60CF20074B`, 크기는 1,359,495,376 bytes다. 직전 설치본 `9AA26031877AD6B899F09CC00CCD06F869573F74F8FF1619DD580C84E531BA70`은 exact recovery backup으로 보존했다.
+- `start-airi-background.ps1` 실기동에서 시작 전후 foreground process가 동일했고 visible AIRI window는 0개였다. local channel은 listener를 열었고 passive status는 `stageMounted=true`, voice input/provider configured, microphone permission granted, VAD active/listening, input live/enabled/unmuted를 확인했다. 캡처·transcription은 진행 중이 아니고 마지막 capture outcome도 none이었다.
+- 같은 시점에 8880·8890·8892·9880·11434·11435 listener는 loopback에서 정상이고 11436은 OFF였다. STT는 large-v3-turbo/CUDA/int8_float16, TTS는 GPT-SoVITS v2ProPlus, memory/knowledge는 ready다. extraction, external search/chat approval, evaluation collection은 OFF이며 character evaluator는 local GPU/30m keep-alive로 ready다.
 
 ## 4. 최신 집중 검증
 
