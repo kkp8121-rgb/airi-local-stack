@@ -1,0 +1,6 @@
+# Local human-governance inputs and generated promotion bundles.
+local-*.json
+local-*.jsonl
+reviewed-bundles/
+.*.stage-*
+*.promotion.lock

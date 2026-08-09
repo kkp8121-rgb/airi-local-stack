@@ -31,3 +31,45 @@ It emits only a content-free count/category summary—never `VerificationResult`
 Human identity, source custody, and any signature/key service are external governance duties; schema validation cannot authenticate a forged review. The hash binding detects changed pending content but is not a reviewer signature.
 
 Before human review, the pending gate also requires at least 200 rows, all category and split minimums, and at least 90% normalized answer uniqueness. It rejects normalized duplicate IDs, groups, and prompts; answers repeated three times; answer overlap between splits; a sentence repeated five times; English alphabet characters, Korean honorific endings, emoji, Markdown, control/format characters, and bidirectional controls in answers. These quality limits are pre-review screening only and do not grant approval, training eligibility, or authorization to train or deploy.
+
+## Reviewed dataset promotion
+
+Promotion is a separate, default-off mechanical step. It does not approve records,
+create reviewer identities, generate fixtures, run a model, train an adapter, or
+write the immutable production gate report. Without the exact
+`--promote-reviewed-style` flag, the compiler performs no file or validation work.
+
+All 200 pending records must have one hash-bound `approve` decision with the
+required voice, counselor-tone, and safety/truth confirmations. A rewrite or
+rejection cannot be promoted. Amend the pending corpus and collect a new complete
+decision sidecar instead. The externally supplied governance envelope binds the
+exact pending, sidecar, C0, and S1 bytes plus the complete reviewer set. These
+hashes provide consistency and tamper evidence; they are not signatures or proof
+of reviewer identity.
+
+Example using deliberately local, ignored governance inputs:
+
+```powershell
+python .\compile_airi_style_reviewed.py --promote-reviewed-style `
+  --pending .\seed\airi_style_seed_pending.jsonl `
+  --decisions .\local-review-decisions.jsonl `
+  --governance-envelope .\local-promotion-approval.json `
+  --c0-fixture .\local-c0-fixture.jsonl `
+  --s1-fixture .\local-s1-fixture.jsonl `
+  --output-dir .\reviewed-bundles\reviewed-v1
+```
+
+The compiler snapshots local regular inputs once, validates exact governance and
+review bindings, derives deterministic non-pending IDs, stages a five-file bundle,
+runs the production verifier, and publishes only to a fresh output directory.
+Cooperative writers are serialized by an ownership-checked sidecar lock. The
+output parent is an operator-controlled local directory; this is not a hostile
+multi-user filesystem security boundary.
+
+The current production verifier requires nonempty canonical C0 and S1 fixtures
+but does not impose a minimum fixture count. The one-case synthetic fixtures in
+unit tests prove mechanics only and are not adequate evaluation coverage. After a
+real promotion, run `verify_airi_style_dataset.py` separately to create the closed
+immutable gate report. Training remains independently license-acknowledged and
+hash-gated. Do not commit local decisions, governance envelopes, fixtures, bundles,
+or gate reports.

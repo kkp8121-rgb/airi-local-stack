@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "The Python promotion compiler and production verifier are authoritative for privacy, placeholder identities, UTC/future timestamps, and case-folded reviewer uniqueness.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "promotion_contract_version",
+    "policy_version",
+    "pending_dataset_sha256",
+    "decision_sidecar_sha256",
+    "approved_decisions_sha256",
+    "c0_fixture_sha256",
+    "s1_fixture_sha256",
+    "pending_record_count",
+    "human_approved",
+    "approved_by",
+    "approved_at",
+    "reviewer_provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "promotion_contract_version": { "const": "airi-reviewed-promotion/v1" },
+    "policy_version": { "const": "airi-style-qlora/v3" },
+    "pending_dataset_sha256": { "$ref": "#/$defs/sha256" },
+    "decision_sidecar_sha256": { "$ref": "#/$defs/sha256" },
+    "approved_decisions_sha256": { "$ref": "#/$defs/sha256" },
+    "c0_fixture_sha256": { "$ref": "#/$defs/sha256" },
+    "s1_fixture_sha256": { "$ref": "#/$defs/sha256" },
+    "pending_record_count": { "const": 200 },
+    "human_approved": { "const": true },
+    "approved_by": { "$ref": "#/$defs/identity" },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,6})?(?:Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "reviewer_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["review_program", "dataset_author", "fixture_owner", "independent_review", "reviewers"],
+      "properties": {
+        "review_program": { "$ref": "#/$defs/identity" },
+        "dataset_author": { "$ref": "#/$defs/identity" },
+        "fixture_owner": { "$ref": "#/$defs/identity" },
+        "independent_review": { "const": true },
+        "reviewers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "role", "affiliation"],
+            "properties": {
+              "id": { "$ref": "#/$defs/identity" },
+              "role": { "$ref": "#/$defs/identity" },
+              "affiliation": { "$ref": "#/$defs/identity" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "identity": {
+      "type": "string",
+      "minLength": 3
+    }
+  }
+}
