@@ -1,4 +1,3 @@
-import gzip
 import io
 import json
 import tempfile
@@ -9,156 +8,203 @@ from pathlib import Path
 from unittest import mock
 
 import collect_topic_candidates as collector
+import topic_discovery_contract as discovery
 import topic_review_contract as contract
 
 
-POLICY = collector.SourcePolicy("source.test", "/feed.json")
+def policy() -> dict:
+    return {
+        "policy_id": "synthetic-policy",
+        "source_kind": "feed",
+        "source": "synthetic source",
+        "feed_url": "https://feed.test/list",
+        "article_host": "source.test",
+        "article_path_prefix": "/item/",
+        "license": {
+            "spdx": "CC-BY-4.0",
+            "license_url": "https://license.test/cc",
+            "attribution": "synthetic attribution",
+            "attribution_url": "https://source.test/about",
+        },
+        "approved": True,
+        "reviewer": "policy-reviewer",
+        "reviewed_at": "2026-01-01T00:00:00Z",
+    }
 
 
-def row(**changes):
-    value = {"pending_schema_version": 1, "id": "candidate-001", "title": "후보토픽", "source": "synthetic source", "source_url": "https://source.test/feed.json", "published_at": "2026-01-01T00:00:00Z", "summary": "8월 12일 후보토픽 행사가 열린다.", "broadcast_line": "8월 12일 후보토픽 소식을 봤어.", "expires_at": "2099-01-01T00:00:00Z", "review": {"status": "pending", "reviewer": "", "reviewed_at": ""}}
-    value.update(changes); return value
+def raw_record(number: int = 1, **changes) -> dict:
+    source_policy = policy()
+    published = f"2026-01-{number:02d}T00:00:00Z"
+    value = {
+        "discovery_schema_version": 1,
+        "discovery_id": "",
+        "source_policy_id": source_policy["policy_id"],
+        "source_kind": source_policy["source_kind"],
+        "source": source_policy["source"],
+        "feed_url": source_policy["feed_url"],
+        "source_url": f"https://source.test/item/{number}",
+        "published_at": published,
+        "discovered_at": f"2026-01-{number:02d}T01:00:00Z",
+        "source_title": f"합성 원문 제목 {number}",
+        "source_snippet": f"합성 원문 요약 {number}",
+        "license": source_policy["license"],
+        "source_body_sha256": f"{number:x}" * 64,
+        "source_policy_sha256": discovery.policy_sha256(source_policy),
+    }
+    value.update(changes)
+    value["discovery_id"] = discovery.discovery_id(
+        value["source_policy_id"],
+        value["source_url"],
+        value["published_at"],
+    )
+    return value
 
 
 class CandidateCollectorTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name) / "topic-review"; self.root.mkdir()
-        self.patch = mock.patch.object(contract, "TOPIC_REVIEW_ROOT", self.root); self.patch.start(); self.addCleanup(self.patch.stop)
-        self.pending = self.root / "pending.jsonl"
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name) / "topic-review"
+        self.root.mkdir()
+        self.root_patch = mock.patch.object(contract, "TOPIC_REVIEW_ROOT", self.root)
+        self.root_patch.start()
+        self.addCleanup(self.root_patch.stop)
+        self.policies = self.root / "source-policies.json"
+        self.raw = self.root / "raw.jsonl"
+        self.policies.write_text(
+            json.dumps({"schema_version": 1, "policies": [policy()]}),
+            encoding="utf-8",
+        )
 
-    def fetcher(self, rows, *, redirect=None, body=None, headers=None, peer_ip="8.8.8.8", status=200):
-        calls = []
-        payload = body if body is not None else json.dumps(rows, ensure_ascii=False).encode()
-        def fetch(url, connect, read, total):
-            calls.append((url, connect, read, total))
-            return collector.FetchResponse(url=url, status=status, headers=headers or {}, body=payload, peer_ip=peer_ip, redirect_to=redirect)
-        return fetch, calls
-
-    def test_disabled_cli_never_calls_or_writes(self):
+    def test_disabled_and_standalone_enabled_cli_never_write(self):
         output = io.StringIO()
         with redirect_stdout(output):
             self.assertEqual(collector.main([]), 0)
-        self.assertEqual(json.loads(output.getvalue()), {"status": "disabled", "added_count": 0, "pending_count": 0})
-        self.assertFalse(self.pending.exists())
-
-    def test_allowlist_redirect_caps_and_decompression(self):
-        fetch, _ = self.fetcher([row()], redirect="https://source.test/feed.json")
-        with self.assertRaises(collector.CollectionError):
-            collector.collect_candidates(self.pending, (POLICY,), fetch)
-        bad_fetch, _ = self.fetcher([row()], redirect="https://localhost/feed.json")
-        with self.assertRaises(collector.CollectionError):
-            collector.collect_candidates(self.pending, (POLICY,), bad_fetch)
-        huge = gzip.compress(b"[" + b" " * (collector.MAX_DECOMPRESSED_BYTES + 2) + b"]")
-        capped, _ = self.fetcher([], body=huge, headers={"content-encoding": "gzip"})
-        with self.assertRaises(collector.CollectionError):
-            collector.collect_candidates(self.pending, (POLICY,), capped)
-        oversized, _ = self.fetcher([], body=b"x" * (collector.MAX_BODY_BYTES + 1))
-        with self.assertRaises(collector.CollectionError):
-            collector.collect_candidates(self.pending, (POLICY,), oversized)
-        for literal, literal_policy in (
-            ("https://127.0.0.1/feed.json", collector.SourcePolicy("127.0.0.1", "/feed.json")),
-            ("https://[::1]/feed.json", collector.SourcePolicy("::1", "/feed.json")),
-            ("https://8.8.8.8/feed.json", collector.SourcePolicy("8.8.8.8", "/feed.json")),
-        ):
-            with self.assertRaises(collector.CollectionError):
-                collector._allowed_url(literal, literal_policy)
-        private_peer, _ = self.fetcher([row()], peer_ip="127.0.0.1")
-        with self.assertRaises(collector.CollectionError):
-            collector.collect_candidates(self.pending, (POLICY,), private_peer)
-        non_redirect, _ = self.fetcher([row()], redirect="https://source.test/feed.json", status=200)
-        with self.assertRaises(collector.CollectionError):
-            collector.collect_candidates(self.pending, (POLICY,), non_redirect)
-        unknown_encoding, _ = self.fetcher([row()], headers={"content-encoding": "br"})
-        with self.assertRaises(collector.CollectionError):
-            collector.collect_candidates(self.pending, (POLICY,), unknown_encoding)
-        for headers in (
-            {"Content-Encoding": "br"},
-            {"cOnTeNt-EnCoDiNg": "br"},
-            {"Content-Encoding": "gzip", "content-encoding": "br"},
-        ):
-            encoded, _ = self.fetcher([row()], headers=headers)
-            with self.assertRaises(collector.CollectionError):
-                collector.collect_candidates(self.pending, (POLICY,), encoded)
-        self.assertFalse(self.pending.exists())
-
-    def test_dedupe_determinism_existing_preservation_and_id_collision(self):
-        first, duplicate = row(), row()
-        second = row(id="candidate-002", published_at="2026-01-02T00:00:00Z")
-        fetch, calls = self.fetcher([first, duplicate, second])
-        result = collector.collect_candidates(self.pending, (POLICY,), fetch)
-        self.assertEqual(result, {"existing_count": 0, "added_count": 2, "pending_count": 2})
-        original = self.pending.read_bytes()
-        again, _ = self.fetcher([second, first])
-        self.assertEqual(collector.collect_candidates(self.pending, (POLICY,), again)["added_count"], 0)
-        self.assertEqual(self.pending.read_bytes(), original)
-        self.assertEqual(calls[0][1:3], (3.0, 5.0)); self.assertGreater(calls[0][3], 0); self.assertLessEqual(calls[0][3], collector.SOURCE_TOTAL_TIMEOUT)
-        collision, _ = self.fetcher([row(title="다른후보")])
-        with self.assertRaises(collector.CollectionError):
-            collector.collect_candidates(self.pending, (POLICY,), collision)
-        self.assertEqual(self.pending.read_bytes(), original)
-
-    def test_invalid_existing_and_pending_only_concurrent_merge(self):
-        self.pending.write_text('{"bad":true}\n', encoding="utf-8")
-        fetch, _ = self.fetcher([row()])
-        with self.assertRaises(contract.TopicReviewError):
-            collector.collect_candidates(self.pending, (POLICY,), fetch)
-        self.pending.unlink()
-        fetch, _ = self.fetcher([row()])
-        results, failures, barrier = [], [], threading.Barrier(3)
-        def merge(candidate):
-            try:
-                barrier.wait(); results.append(collector.collect_candidates(self.pending, (POLICY,), candidate))
-            except Exception as exc:
-                failures.append(exc)
-        second_row = row(id="candidate-002", published_at="2026-01-02T00:00:00Z")
-        second_fetch, _ = self.fetcher([second_row])
-        threads = [threading.Thread(target=merge, args=(fetch,)), threading.Thread(target=merge, args=(second_fetch,))]
-        [thread.start() for thread in threads]; barrier.wait(); [thread.join() for thread in threads]
-        self.assertEqual(failures, [])
-        self.assertEqual(len(results), 2)
-        self.assertEqual(len(contract.load_pending(self.pending)), 2)
-        self.assertEqual({record["id"] for record in contract.load_pending(self.pending)}, {"candidate-001", "candidate-002"})
-        self.assertFalse((self.root / ".pending.jsonl.collect.lock").exists())
-        self.assertFalse((self.root / "approved-topics.json").exists())
-
-    def test_content_free_errors_and_no_default_collection_policy(self):
+        self.assertEqual(
+            json.loads(output.getvalue()),
+            {"status": "disabled", "added_count": 0, "raw_count": 0},
+        )
         output = io.StringIO()
         with redirect_stdout(output):
-            self.assertEqual(collector.main(["--enable-collection", "--pending", str(self.pending)]), 2)
-        rendered = output.getvalue(); self.assertNotIn(str(self.pending), rendered); self.assertEqual(json.loads(rendered)["status"], "rejected")
-        for candidate in ("http://source.test/feed.json", "https://127.0.0.1/feed.json", "https://source.test/other", "https://user@source.test/feed.json", "https://source.test/feed.json#x"):
-            with self.assertRaises(collector.CollectionError):
-                collector._allowed_url(candidate, POLICY)
+            self.assertEqual(
+                collector.main(
+                    [
+                        "--enable-collection",
+                        "--raw-discoveries",
+                        str(self.raw),
+                        "--source-policies",
+                        str(self.policies),
+                    ]
+                ),
+                2,
+            )
+        self.assertEqual(json.loads(output.getvalue())["status"], "rejected")
+        self.assertFalse(self.raw.exists())
 
-    def test_deadline_and_lock_ownership_fail_closed_without_write(self):
-        clock = [0.0]
-        def now(): return clock[0]
-        def slow(url, connect, read, remaining):
-            clock[0] += 9.0
-            return collector.FetchResponse(url=url, status=200, headers={}, body=json.dumps([row()]).encode(), peer_ip="8.8.8.8")
-        with mock.patch.object(collector, "MONOTONIC", now):
-            with self.assertRaises(collector.CollectionError):
-                collector.collect_candidates(self.pending, (POLICY,), slow)
-        self.assertFalse(self.pending.exists())
-        lock = self.root / ".pending.jsonl.collect.lock"; lock.write_text("stale-owner", encoding="ascii")
-        with mock.patch.object(collector, "LOCK_WAIT_SECONDS", 0.0):
-            with self.assertRaises(collector.CollectionError):
-                collector.collect_candidates(self.pending, (POLICY,), self.fetcher([row()])[0])
-        self.assertTrue(lock.exists())
-        lock.unlink()
-        owner = collector._SidecarLock(self.pending); owner.__enter__()
-        lock.write_text("other-owner", encoding="ascii")
+    def test_removed_pending_collector_always_fails_closed(self):
+        pending = self.root / "pending.jsonl"
         with self.assertRaises(collector.CollectionError):
-            owner.__exit__()
-        self.assertTrue(lock.exists())
+            collector.collect_candidates(pending, (), object())
+        self.assertFalse(pending.exists())
 
-        with mock.patch.object(collector.os, "write", return_value=0):
-            failed_owner = collector._SidecarLock(self.pending)
-            lock.unlink()
+    def test_raw_merge_deduplicates_and_preserves_on_collision(self):
+        first = raw_record(1)
+        second = raw_record(2)
+        result = collector.collect_raw_discoveries(
+            self.raw,
+            self.policies,
+            [first, first, second],
+        )
+        self.assertEqual(result, {"raw_count": 2, "added_count": 2})
+        original = self.raw.read_bytes()
+        self.assertEqual(
+            collector.collect_raw_discoveries(
+                self.raw,
+                self.policies,
+                [second, first],
+            ),
+            {"raw_count": 2, "added_count": 0},
+        )
+        self.assertEqual(self.raw.read_bytes(), original)
+        changed = raw_record(1, source_title="변조된 제목")
+        with self.assertRaises(collector.CollectionError):
+            collector.collect_raw_discoveries(self.raw, self.policies, [changed])
+        self.assertEqual(self.raw.read_bytes(), original)
+
+    def test_policy_revision_and_invalid_existing_fail_without_overwrite(self):
+        collector.collect_raw_discoveries(
+            self.raw,
+            self.policies,
+            [raw_record(1)],
+        )
+        original = self.raw.read_bytes()
+        changed_policy = policy()
+        changed_policy["reviewed_at"] = "2026-01-02T00:00:00Z"
+        self.policies.write_text(
+            json.dumps({"schema_version": 1, "policies": [changed_policy]}),
+            encoding="utf-8",
+        )
+        with self.assertRaises(contract.TopicReviewError):
+            collector.collect_raw_discoveries(self.raw, self.policies, [])
+        self.assertEqual(self.raw.read_bytes(), original)
+
+    def test_concurrent_distinct_raw_merges_are_serialized(self):
+        results: list[dict[str, int]] = []
+        failures: list[Exception] = []
+        barrier = threading.Barrier(3)
+
+        def merge(record: dict) -> None:
+            try:
+                barrier.wait()
+                results.append(
+                    collector.collect_raw_discoveries(
+                        self.raw,
+                        self.policies,
+                        [record],
+                    )
+                )
+            except Exception as exc:  # pragma: no cover - asserted below
+                failures.append(exc)
+
+        threads = [
+            threading.Thread(target=merge, args=(raw_record(1),)),
+            threading.Thread(target=merge, args=(raw_record(2),)),
+        ]
+        for thread in threads:
+            thread.start()
+        barrier.wait()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(failures, [])
+        self.assertEqual(len(results), 2)
+        self.assertEqual(len(discovery.load_raw(self.raw, self.policies)), 2)
+        self.assertFalse((self.root / ".raw.jsonl.lock").exists())
+
+    def test_lock_stale_partial_and_replaced_owner_fail_closed(self):
+        lock_path = self.root / ".raw.jsonl.lock"
+        lock_path.write_text("stale-owner", encoding="ascii")
+        with self.assertRaises(contract.TopicReviewError):
+            with contract.OwnershipLock(self.raw, wait_seconds=0):
+                pass
+        self.assertEqual(lock_path.read_text(encoding="ascii"), "stale-owner")
+        lock_path.unlink()
+
+        with mock.patch.object(contract.os, "write", return_value=0):
+            owner = contract.OwnershipLock(self.raw)
             with self.assertRaises(OSError):
-                failed_owner.__enter__()
-            self.assertFalse(lock.exists())
+                owner.__enter__()
+        self.assertFalse(lock_path.exists())
+
+        owner = contract.OwnershipLock(self.raw)
+        owner.__enter__()
+        lock_path.write_text("replacement-owner", encoding="ascii")
+        with self.assertRaises(contract.TopicReviewError):
+            owner.__exit__()
+        self.assertEqual(
+            lock_path.read_text(encoding="ascii"),
+            "replacement-owner",
+        )
 
 
-if __name__ == "__main__": unittest.main()
+if __name__ == "__main__":
+    unittest.main()

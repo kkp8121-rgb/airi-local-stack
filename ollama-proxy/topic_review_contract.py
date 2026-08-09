@@ -6,6 +6,8 @@ import json
 import os
 import re
 import tempfile
+import secrets
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -24,14 +26,72 @@ DECISION_FIELDS = {"id", "record_sha256", "decision", "source_verified", "publis
 DECISIONS = {"approve", "rewrite", "reject"}
 MAX_SOURCE_URL_CHARS = 2048
 MAX_REVIEW_TEXT_CHARS = 500
+LOCK_WAIT_SECONDS = 5.0
 
 
 class TopicReviewError(ValueError):
     """A deliberately content-free local review gate failure."""
 
 
+class OwnershipLock:
+    """Fail-closed sidecar lock with a random owner token."""
+
+    def __init__(self, target: Path, *, wait_seconds: float = LOCK_WAIT_SECONDS) -> None:
+        self.path = target.with_name(f".{target.name}.lock")
+        self.token = secrets.token_hex(16)
+        self.wait_seconds = wait_seconds
+        self.fd: int | None = None
+        self.identity: tuple[int, int] | None = None
+
+    def __enter__(self) -> "OwnershipLock":
+        deadline = time.monotonic() + self.wait_seconds
+        while True:
+            try:
+                self.fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                stat = os.fstat(self.fd)
+                self.identity = (stat.st_dev, stat.st_ino)
+                encoded = self.token.encode("ascii")
+                if os.write(self.fd, encoded) != len(encoded):
+                    raise OSError("incomplete lock write")
+                return self
+            except FileExistsError:
+                if time.monotonic() >= deadline:
+                    raise TopicReviewError("lock unavailable")
+                time.sleep(0.01)
+            except OSError:
+                if self.fd is not None:
+                    os.close(self.fd)
+                    self.fd = None
+                try:
+                    stat = self.path.stat()
+                    if self.identity == (stat.st_dev, stat.st_ino):
+                        self.path.unlink()
+                except (FileNotFoundError, OSError):
+                    pass
+                raise
+
+    def __exit__(self, *_: object) -> None:
+        if self.fd is not None:
+            os.close(self.fd)
+            self.fd = None
+        try:
+            stat = self.path.stat()
+            if (
+                self.identity != (stat.st_dev, stat.st_ino)
+                or self.path.read_text(encoding="ascii") != self.token
+            ):
+                raise TopicReviewError("lock ownership")
+            self.path.unlink()
+        except FileNotFoundError:
+            raise TopicReviewError("lock ownership")
+
+
 def canonical_json(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def canonical_jsonl_bytes(rows: Sequence[Mapping[str, Any]]) -> bytes:
+    return b"".join(canonical_json(row) + b"\n" for row in rows)
 
 
 def record_sha256(record: Mapping[str, Any]) -> str:
@@ -221,8 +281,7 @@ def atomic_write_jsonl(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
     try:
         with tempfile.NamedTemporaryFile("wb", dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False) as handle:
             temp = Path(handle.name)
-            for row in rows:
-                handle.write(canonical_json(row) + b"\n")
+            handle.write(canonical_jsonl_bytes(rows))
             handle.flush(); os.fsync(handle.fileno())
         if review_output_path(path) != path:
             raise TopicReviewError("invalid local path")

@@ -1,3 +1,4 @@
 *.jsonl
+source-policies*.json
 .*.tmp
 *.tmp

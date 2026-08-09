@@ -9,11 +9,20 @@ import tempfile
 from pathlib import Path
 
 from topic_board import load_approved_topics
-from topic_review_contract import TopicReviewError, canonical_json, load_decisions, load_pending, record_sha256, runtime_output_path
+from topic_review_contract import TopicReviewError, canonical_json, load_decisions, record_sha256, runtime_output_path
+from topic_discovery_contract import load_curated_pending
 
 
-def compile_board(pending_path: str, decisions_path: str, output_path: str) -> tuple[int, str]:
-    pending = load_pending(pending_path)
+def compile_board(pending_path: str, decisions_path: str, output_path: str, *, source_policies: str | None = None, raw_discoveries: str | None = None, curations: str | None = None) -> tuple[int, str]:
+    discovery_values = (source_policies, raw_discoveries, curations)
+    if not all(discovery_values):
+        raise TopicReviewError("invalid request")
+    pending = load_curated_pending(
+        raw_discoveries,
+        source_policies,
+        curations,
+        pending_path,
+    )
     decisions = load_decisions(decisions_path, pending)
     approved_decisions = {row["id"]: row for row in decisions if row["decision"] == "approve"}
     items = []
@@ -51,12 +60,13 @@ def compile_board(pending_path: str, decisions_path: str, output_path: str) -> t
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--pending"); parser.add_argument("--decisions"); parser.add_argument("--output")
+    parser.add_argument("--pending"); parser.add_argument("--decisions"); parser.add_argument("--output"); parser.add_argument("--source-policies"); parser.add_argument("--raw-discoveries"); parser.add_argument("--curations")
     try:
         args, unknown = parser.parse_known_args(argv)
-        if unknown or not args.pending or not args.decisions or not args.output:
+        discovery_values = (args.source_policies, args.raw_discoveries, args.curations)
+        if unknown or not args.pending or not args.decisions or not args.output or not all(discovery_values):
             raise TopicReviewError("invalid request")
-        count, digest = compile_board(args.pending, args.decisions, args.output)
+        count, digest = compile_board(args.pending, args.decisions, args.output, source_policies=args.source_policies, raw_discoveries=args.raw_discoveries, curations=args.curations)
     except (OSError, RuntimeError, UnicodeDecodeError, ValueError, TopicReviewError, json.JSONDecodeError):
         print('{"status":"rejected"}')
         return 2

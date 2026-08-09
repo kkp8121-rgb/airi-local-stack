@@ -9,9 +9,10 @@ from datetime import datetime, timezone
 from typing import Callable, TextIO
 
 from topic_review_contract import (
-    DECISIONS, TopicReviewError, atomic_write_jsonl, load_decisions, load_pending,
+    DECISIONS, TopicReviewError, atomic_write_jsonl, load_decisions,
     record_sha256, review_output_path, validate_decision,
 )
+from topic_discovery_contract import load_curated_pending
 
 Input = Callable[[str], str]
 
@@ -51,11 +52,24 @@ def run_cli(argv: list[str] | None = None, *, input_fn: Input = input, output: T
     parser.add_argument("--pending"); parser.add_argument("--decisions")
     parser.add_argument("--reviewer"); parser.add_argument("--replace-decision", action="store_true")
     parser.add_argument("--status", action="store_true"); parser.add_argument("--limit", type=int)
+    parser.add_argument("--source-policies"); parser.add_argument("--raw-discoveries"); parser.add_argument("--curations")
     try:
         args, unknown = parser.parse_known_args(argv)
-        if unknown or not args.pending or not args.decisions or (args.limit is not None and args.limit < 0):
+        discovery_values = (args.source_policies, args.raw_discoveries, args.curations)
+        if (
+            unknown
+            or not args.pending
+            or not args.decisions
+            or not all(discovery_values)
+            or (args.limit is not None and args.limit < 0)
+        ):
             raise TopicReviewError("invalid request")
-        pending = load_pending(args.pending)
+        pending = load_curated_pending(
+            args.raw_discoveries,
+            args.source_policies,
+            args.curations,
+            args.pending,
+        )
         decisions_path = review_output_path(args.decisions)
         decisions = load_decisions(args.decisions, pending, allow_missing=True)
         if args.status:
