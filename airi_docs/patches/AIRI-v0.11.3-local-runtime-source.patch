@@ -3305,7 +3305,7 @@ index 7949f7f4f02bb49732301cd0040c8e5fd0dd109e..91caabc6795e0d1a53fc1acead282d8f
    'output:gen-ai:chat:tool-call': OutputGenAiChatToolCallEvent
    'output:gen-ai:chat:message': OutputGenAiChatMessageEvent
 diff --git a/packages/stage-ui/src/components/scenes/Stage.vue b/packages/stage-ui/src/components/scenes/Stage.vue
-index 966f39b3b849eec527661978c654aa2f0161f208..f7dc68896bfcc9090b0857cd94e414355a0124e7 100644
+index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9d30d89a6 100644
 --- a/packages/stage-ui/src/components/scenes/Stage.vue
 +++ b/packages/stage-ui/src/components/scenes/Stage.vue
 @@ -34,8 +34,13 @@ import { useSpeechPipelineAnalytics } from '../../composables/use-speech-pipelin
@@ -3724,7 +3724,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..f7dc68896bfcc9090b0857cd94e41435
      streaming: buildStreamingSnapshot,
      audioContext,
      playbackManager,
-@@ -765,15 +1032,16 @@ watch(latestStopRequest, (request) => {
+@@ -765,15 +1032,17 @@ watch(latestStopRequest, (request) => {
    stopSpeechOutput(request.reason)
  })
  
@@ -3735,6 +3735,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..f7dc68896bfcc9090b0857cd94e41435
 +  // Stop the previous round before any await lets it produce more audio.
 +  stopSpeechOutput('new-message')
 +  activeSpeechRoundId = context.roundId
++  voiceTurnLatencyTrace.armPlaybackRound(context.roundId)
  
    setupAnalyser()
    await setupLipSync()
@@ -3744,7 +3745,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..f7dc68896bfcc9090b0857cd94e41435
    currentSession = openTtsSession()
  }))
  
-@@ -781,7 +1049,8 @@ chatHookCleanups.push(onBeforeSend(async () => {
+@@ -781,7 +1050,8 @@ chatHookCleanups.push(onBeforeSend(async () => {
    currentMotion.value = { group: EmotionThinkMotionName }
  }))
  
@@ -3754,7 +3755,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..f7dc68896bfcc9090b0857cd94e41435
    currentSession?.appendText(literal)
  }))
  
-@@ -960,6 +1229,8 @@ defineExpose({
+@@ -960,6 +1230,8 @@ defineExpose({
    canvasElement,
    captureFrame,
    readRenderTargetRegionAtClientPoint,
@@ -7306,16 +7307,16 @@ index 0000000..94b7abd
 +}
 diff --git a/packages/stage-ui/src/libs/latency/voice-turn-latency.test.ts b/packages/stage-ui/src/libs/latency/voice-turn-latency.test.ts
 new file mode 100644
-index 0000000..fa84eff
+index 0000000..48cc125
 --- /dev/null
 +++ b/packages/stage-ui/src/libs/latency/voice-turn-latency.test.ts
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,49 @@
 +import { describe, expect, it, vi } from 'vitest'
 +
 +import { createVoiceTurnLatencyTrace } from './voice-turn-latency'
 +
 +describe('voice turn latency trace', () => {
-+  it('preserves server STT timing and emits only the first substantive delta and playback start', () => {
++  it('preserves server STT timing and emits only the first substantive LLM delta and playback start for a voice round', () => {
 +    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => undefined)
 +    const trace = createVoiceTurnLatencyTrace(fetch, () => 1234)
 +
@@ -7333,22 +7334,38 @@ index 0000000..fa84eff
 +    ])
 +  })
 +
-+  it('does not emit events for a non-voice turn', () => {
++  it('emits exactly one playback start for an armed non-voice round', () => {
++    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => undefined)
++    const trace = createVoiceTurnLatencyTrace(fetch)
++
++    trace.armPlaybackRound('typed-round')
++    trace.firstSubstantiveLlmDelta('typed-round', 'answer')
++    trace.firstPlaybackStart('typed-round')
++    trace.firstPlaybackStart('typed-round')
++
++    expect(fetch).toHaveBeenCalledTimes(1)
++    expect(JSON.parse((fetch.mock.calls[0][1] as RequestInit).body as string)).toMatchObject({
++      source: 'playback',
++      phase: 'start',
++      request_id: 'typed-round',
++    })
++  })
++
++  it('does not emit playback for an unarmed round', () => {
 +    const fetch = vi.fn(async () => undefined)
 +    const trace = createVoiceTurnLatencyTrace(fetch)
 +
-+    trace.firstSubstantiveLlmDelta('typed-round', 'answer')
-+    trace.firstPlaybackStart('typed-round')
++    trace.firstPlaybackStart('unarmed-round')
 +
 +    expect(fetch).not.toHaveBeenCalled()
 +  })
 +})
 diff --git a/packages/stage-ui/src/libs/latency/voice-turn-latency.ts b/packages/stage-ui/src/libs/latency/voice-turn-latency.ts
 new file mode 100644
-index 0000000..581d02f
+index 0000000..4dba92c
 --- /dev/null
 +++ b/packages/stage-ui/src/libs/latency/voice-turn-latency.ts
-@@ -0,0 +1,64 @@
+@@ -0,0 +1,76 @@
 +const endpoint = 'http://127.0.0.1:8892/api/event'
 +const maxTrackedTurns = 64
 +
@@ -7363,6 +7380,7 @@ index 0000000..581d02f
 + */
 +export function createVoiceTurnLatencyTrace(fetchImpl: LatencyFetch = globalThis.fetch, now = () => Date.now()) {
 +  const acceptedTurns = new Set<string>()
++  const armedPlaybackTurns = new Set<string>()
 +  const firstLlmDeltaTurns = new Set<string>()
 +
 +  function post(source: LatencySource, phase: LatencyPhase, roundId: string) {
@@ -7381,6 +7399,10 @@ index 0000000..581d02f
 +      turns.delete(turns.values().next().value!)
 +  }
 +
++  function armPlaybackRound(roundId: string) {
++    retain(armedPlaybackTurns, roundId)
++  }
++
 +  return {
 +    /**
 +     * Marks an accepted voice turn for later LLM/playback correlation.
@@ -7394,6 +7416,13 @@ index 0000000..581d02f
 +      if (!roundId)
 +        return
 +      retain(acceptedTurns, roundId)
++      armPlaybackRound(roundId)
++    },
++    /** Arms an authoritative chat round to report its first actual playback start. */
++    armPlaybackRound(roundId?: string) {
++      if (!roundId)
++        return
++      armPlaybackRound(roundId)
 +    },
 +    /** Records only the first non-whitespace LLM delta for an accepted turn. */
 +    firstSubstantiveLlmDelta(roundId: string | undefined, delta: string) {
@@ -7404,7 +7433,7 @@ index 0000000..581d02f
 +    },
 +    /** Records only the first actual Web Audio playback start for that turn. */
 +    firstPlaybackStart(roundId?: string) {
-+      if (!roundId || !acceptedTurns.delete(roundId))
++      if (!roundId || !armedPlaybackTurns.delete(roundId))
 +        return
 +      firstLlmDeltaTurns.delete(roundId)
 +      post('playback', 'start', roundId)
