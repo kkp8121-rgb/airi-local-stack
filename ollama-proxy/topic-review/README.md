@@ -125,6 +125,43 @@ independent verification of Wikipedia content. The registry remains ignored by
 Git. This repository intentionally contains no real reviewer identity, contact,
 created source-policy registry, raw discovery, or approval decision.
 
+### Read-only workflow status (default OFF)
+
+`topic_workflow_status.py` reports the first incomplete validated boundary
+without exposing any path, policy ID, topic ID, source text, reviewer, hash, or
+timestamp. Without the exact `--inspect-topic-workflow` flag it emits a fixed
+disabled object before parsing or touching any path, file, clock, lock, or
+network dependency.
+
+```powershell
+$reviewRoot = (Resolve-Path .\topic-review).Path
+$runtimeRoot = (Resolve-Path .\runtime).Path
+python .\topic_workflow_status.py `
+  --inspect-topic-workflow `
+  --source-policies (Join-Path $reviewRoot source-policies.json) `
+  --raw-discoveries (Join-Path $reviewRoot raw.jsonl) `
+  --curations (Join-Path $reviewRoot curations.jsonl) `
+  --pending (Join-Path $reviewRoot pending.jsonl) `
+  --decisions (Join-Path $reviewRoot decisions.jsonl) `
+  --runtime-board (Join-Path $runtimeRoot approved-topics.json) `
+  --policy-id ko-wikipedia-portal
+```
+
+The fixed stage enum is `policy_required`, `raw_required`,
+`curation_required`, `review_required`, `compile_required`, `ready`, or
+`rejected`. Counts cover only policies, raw rows, curations, pending rows,
+decisions, approvals, and live runtime items. A runtime board is `ready` only
+when it is live and its bytes exactly equal the deterministic board derived
+from the currently bound pending and decision records. Expired or future
+approvals are never reported as compilable.
+
+The inspector is strictly read-only: it creates no missing file, takes no lock,
+and never starts collection, compilation, a service, model, prompt, speech, or
+memory operation. Because it intentionally does not block cooperative writers,
+run it while the scheduler, curator, reviewer, and compiler are stopped. A
+concurrent artifact change may produce a fail-closed `rejected` snapshot; rerun
+after the writer exits.
+
 ### Optional Korean Wikimedia raw adapter (default OFF)
 
 `wikimedia_topic_source.py` requires `--enable-wikimedia`, absolute local

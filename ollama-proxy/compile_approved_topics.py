@@ -6,11 +6,58 @@ import hashlib
 import json
 import os
 import tempfile
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 from topic_board import load_approved_topics
 from topic_review_contract import TopicReviewError, canonical_json, load_decisions, record_sha256, runtime_output_path
 from topic_discovery_contract import load_curated_pending
+
+
+_UTC_Z_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")
+
+
+def runtime_items_are_live(items: list[dict], *, now: datetime | None = None) -> bool:
+    """Match the runtime loader's all-items-live precondition without I/O."""
+    if not items:
+        return False
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    try:
+        for item in items:
+            published_text = item["published_at"]
+            expires_text = item["expires_at"]
+            if (
+                not isinstance(published_text, str)
+                or not isinstance(expires_text, str)
+                or not _UTC_Z_RE.fullmatch(published_text)
+                or not _UTC_Z_RE.fullmatch(expires_text)
+            ):
+                return False
+            published = datetime.fromisoformat(published_text[:-1] + "+00:00")
+            expires = datetime.fromisoformat(expires_text[:-1] + "+00:00")
+            if published > current or expires <= current or published >= expires:
+                return False
+    except (KeyError, TypeError, ValueError):
+        return False
+    return True
+
+
+def build_runtime_board(pending, decisions) -> tuple[list[dict], bytes]:
+    """Build the exact canonical runtime bytes without touching the filesystem."""
+    approved_decisions = {row["id"]: row for row in decisions if row["decision"] == "approve"}
+    items = []
+    for row in pending:
+        decision = approved_decisions.get(row["id"])
+        if not decision:
+            continue
+        pending_hash = record_sha256(row)
+        items.append({key: row[key] for key in ("id", "title", "source", "published_at", "summary", "broadcast_line", "expires_at")} | {
+            "approved": True,
+            "provenance": {"source_url": row["source_url"], "pending_record_sha256": pending_hash},
+            "approval": {key: decision[key] for key in ("decision", "source_verified", "published_at_verified", "summary_grounded", "broadcast_line_verified", "expires_at_verified", "notes", "reviewer", "reviewed_at")} | {"decision_record_sha256": record_sha256(decision)},
+        })
+    return items, canonical_json({"schema_version": 2, "approval_workflow_version": 1, "items": items}) + b"\n"
 
 
 def compile_board(pending_path: str, decisions_path: str, output_path: str, *, source_policies: str | None = None, raw_discoveries: str | None = None, curations: str | None = None) -> tuple[int, str]:
@@ -24,22 +71,10 @@ def compile_board(pending_path: str, decisions_path: str, output_path: str, *, s
         pending_path,
     )
     decisions = load_decisions(decisions_path, pending)
-    approved_decisions = {row["id"]: row for row in decisions if row["decision"] == "approve"}
-    items = []
-    for row in pending:
-        decision = approved_decisions.get(row["id"])
-        if not decision:
-            continue
-        pending_hash = record_sha256(row)
-        items.append({key: row[key] for key in ("id", "title", "source", "published_at", "summary", "broadcast_line", "expires_at")} | {
-            "approved": True,
-            "provenance": {"source_url": row["source_url"], "pending_record_sha256": pending_hash},
-            "approval": {key: decision[key] for key in ("decision", "source_verified", "published_at_verified", "summary_grounded", "broadcast_line_verified", "expires_at_verified", "notes", "reviewer", "reviewed_at")} | {"decision_record_sha256": record_sha256(decision)},
-        })
-    if not items:
+    items, data = build_runtime_board(pending, decisions)
+    if not runtime_items_are_live(items):
         raise TopicReviewError("no live topics")
     output = runtime_output_path(output_path)
-    data = canonical_json({"schema_version": 2, "approval_workflow_version": 1, "items": items}) + b"\n"
     temp: Path | None = None
     try:
         with tempfile.NamedTemporaryFile("wb", dir=output.parent, prefix=f".{output.name}.", suffix=".tmp", delete=False) as handle:
