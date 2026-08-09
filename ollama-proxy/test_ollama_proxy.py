@@ -2528,7 +2528,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
 
         chat = _QueuedApiStreamClient([
             [event("그냥 괜찮을 거야.")],
-            [event("창문 손잡이는 헐거워졌어.")],
+            [event("창문 손잡이가 헐거워졌네.")],
         ])
         memory = _FakeMemoryRuntime()
         with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
@@ -2536,7 +2536,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream("창문 손잡이가 헐거워졌어.")
 
-        expected = "창문 손잡이는 헐거워졌어."
+        expected = "창문 손잡이가 헐거워졌네."
         self.assertEqual(openai_sse_content(response.text), expected)
         self.assertEqual(len(chat.requests), 2)
         self.assertEqual(memory.completed[0]["assistant"], expected)
@@ -2728,6 +2728,166 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             with self.subTest(rejected=rejected):
                 self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(user, initial, rejected))
 
+    def test_grounding_gates_reject_unseen_tokens_and_multiple_sentences(self) -> None:
+        user = "배달 온 컵이 하나도 깨지지 않고 멀쩡했어."
+        initial = "컵이 무사히 도착했네."
+        unsupported_adjective = "컵이 깨지지 않고 튼튼했네."
+        valid_morphological_candidate = "배달 온 컵이 하나도 깨지지 않고 멀쩡했네."
+
+        self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(
+            user, initial, unsupported_adjective,
+        ))
+        self.assertFalse(ollama_proxy.grounding_candidate_is_safe_fallback(
+            user, unsupported_adjective,
+        ))
+        self.assertTrue(ollama_proxy.grounding_candidate_is_safe_fallback(
+            user, valid_morphological_candidate,
+        ))
+
+        multiple_sentences = "컵이 도착했어. 하나도 안 깨졌어."
+        self.assertEqual(ollama_proxy.grounded_observation_fallback(multiple_sentences), "")
+        self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(
+            multiple_sentences, initial, valid_morphological_candidate,
+        ))
+        self.assertFalse(ollama_proxy.grounding_candidate_is_safe_fallback(
+            user, multiple_sentences,
+        ))
+
+        homograph_user = "신사고가 필요했어."
+        homograph_candidate = "신사가 필요했네."
+        self.assertTrue(ollama_proxy.grounding_candidate_introduces_unseen_token(
+            homograph_user, homograph_candidate,
+        ))
+        self.assertFalse(ollama_proxy.grounding_candidate_is_safe_fallback(
+            homograph_user, homograph_candidate,
+        ))
+        self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(
+            homograph_user, "신사고가 필요하네.", homograph_candidate,
+        ))
+
+        polarity_user = "배달 온 컵이 하나도 깨지지 않고 멀쩡했어."
+        introduced_absence = "컵이 없어도 하나도 깨지지 않고 멀쩡했네."
+        dropped_negation = "컵이 깨지고 멀쩡했네."
+        self.assertNotEqual(
+            ollama_proxy.grounding_semantic_marker_sequence(polarity_user),
+            ollama_proxy.grounding_semantic_marker_sequence(introduced_absence),
+        )
+        self.assertFalse(ollama_proxy.grounding_candidate_is_safe_fallback(
+            polarity_user, introduced_absence,
+        ))
+        self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(
+            polarity_user, "컵이 멀쩡하네.", introduced_absence,
+        ))
+        negative_user = "컵이 안 깨지고 멀쩡했어."
+        self.assertFalse(ollama_proxy.grounding_candidate_is_safe_fallback(
+            negative_user, dropped_negation,
+        ))
+
+        self.assertFalse(ollama_proxy.has_exactly_one_complete_sentence(
+            "일이 끝났어...",
+        ))
+        self.assertEqual(ollama_proxy.grounded_observation_fallback(
+            "일이 끝났어...",
+        ), "")
+        self.assertTrue(ollama_proxy.has_exactly_one_complete_sentence(
+            '철수는 "영희가 왔어."라고 말했어.',
+        ))
+        self.assertFalse(ollama_proxy.has_exactly_one_complete_sentence(
+            '철수는 "영희가 왔어.라고 말했어.',
+        ))
+
+        for user_text, candidate in (
+            ("준비가 됐어.", "준비가 됐네."),
+            ("준비를 했어.", "준비를 했구나!"),
+            (
+                "배달 온 컵이 하나도 깨지지 않고 멀쩡했어.",
+                "배달 온 컵이 하나도 깨지지 않고 멀쩡했구나!",
+            ),
+        ):
+            with self.subTest(user_text=user_text, candidate=candidate):
+                self.assertFalse(
+                    ollama_proxy.grounding_candidate_introduces_unseen_token(
+                        user_text, candidate,
+                    )
+                )
+                self.assertTrue(ollama_proxy.grounding_candidate_is_safe_fallback(
+                    user_text, candidate,
+                ))
+                self.assertTrue(ollama_proxy.grounded_observation_fallback(user_text))
+
+        for short_user, short_candidate in (
+            ("비가 왔어.", "비가 왔구나!"),
+            ("물이 샜어.", "물이 샜구나!"),
+            ("철수는 학생이야.", "철수는 학생이구나!"),
+        ):
+            with self.subTest(short_user=short_user, short_candidate=short_candidate):
+                self.assertTrue(ollama_proxy.grounding_candidate_matches_full_surface(
+                    short_user, short_candidate,
+                ))
+                self.assertTrue(ollama_proxy.grounding_candidate_is_safe_fallback(
+                    short_user, short_candidate,
+                ))
+                self.assertEqual(
+                    ollama_proxy.grounded_observation_fallback(short_user),
+                    short_candidate,
+                )
+
+        for user_text, role_reversed in (
+            ("철수가 영희를 밀었어.", "영희가 철수를 밀었네."),
+            ("컵이 상자를 눌렀어.", "상자가 컵을 눌렀네."),
+            ("철수가 영희를 밀었어.", "철수를 영희가 밀었네."),
+            ("못이 바닥에 떨어졌어.", "바닥에 못 떨어졌네."),
+            (
+                "철수가 영희를 밀었고 민수가 철수를 잡았어.",
+                "철수가 철수를 잡았네.",
+            ),
+            (
+                "컵이 상자를 눌렀고 병이 컵을 밀었어.",
+                "컵이 컵을 밀었네.",
+            ),
+            ("철수는 영희가 밀었어.", "철수가 영희는 밀었네."),
+            ("종이 떨어졌어.", "종은 떨어졌네."),
+            ("컵이 멀쩡했어.", "컵이 또 멀쩡했네."),
+            ("컵이 멀쩡했어.", "컵이 오늘도 멀쩡했네."),
+            ("꿈에서 컵이 깨졌어.", "컵이 깨졌네."),
+            ("아마 컵이 깨졌어.", "컵이 깨졌네."),
+            (
+                "철수가 컵을 깨뜨렸다고 영희가 거짓말했어.",
+                "철수가 컵을 깨뜨렸다고!",
+            ),
+            ("컵이 깨졌다고 철수가 말했어.", "컵이 깨졌다고!"),
+            (
+                '철수는 "영희가 왔어"라고 말했어.',
+                '"철수는 영희가 왔어"라고 말했네.',
+            ),
+            (
+                '민수는 "철수가 영희를 밀었어"라고 말했어.',
+                '"민수는 철수가 영희를 밀었어"라고 말했네.',
+            ),
+            (
+                '메모에는 "컵이 깨졌어"라고 적혔어.',
+                '"메모에는 컵이 깨졌어"라고 적혔네.',
+            ),
+            ("사과했어.", "사과였다니!"),
+            ("코드는 AbC였어.", "코드는 ABC였네."),
+            ("코드는 ABC였어.", "코드는 AbC였네."),
+            ("코드는 iPhone였어.", "코드는 IPhone였네."),
+        ):
+            with self.subTest(user_text=user_text, role_reversed=role_reversed):
+                self.assertFalse(
+                    ollama_proxy.grounding_candidate_matches_full_surface(
+                        user_text, role_reversed,
+                    )
+                )
+                self.assertFalse(ollama_proxy.grounding_candidate_is_safe_fallback(
+                    user_text, role_reversed,
+                ))
+                self.assertFalse(
+                    ollama_proxy.grounding_retry_is_factual_improvement(
+                        user_text, "아, 그렇구나!", role_reversed,
+                    )
+                )
+
     def test_grounding_normalizes_observational_banmal_and_equal_anchor_retries(self) -> None:
         user = (
             "\ucc45\uc0c1 \ubc11\uc5d0\uc11c \uc783\uc5b4\ubc84\ub9b0 \uc904 \uc54c\uc558\ub358 "
@@ -2864,18 +3024,21 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertIn("굴러가", ollama_proxy.grounding_action_sequence(user))
         self.assertIn("굴러가", ollama_proxy.grounding_action_sequence(echo))
 
-    def test_bare_surprise_echo_retries_but_direct_observation_can_replace_it(self) -> None:
+    def test_bare_surprise_echo_retries_but_new_status_assertion_is_rejected(self) -> None:
         user = "서랍을 닫았는데 안쪽에서 펜 하나가 굴러가는 소리가 났어."
         echo = "아, 펜이 굴러가다니!"
         direct = "펜이 서랍 안쪽을 굴러가고 있네."
         self.assertTrue(ollama_proxy.grounding_is_generic_echo(user, echo))
         self.assertTrue(ollama_proxy.needs_grounding_retry(user, echo))
         self.assertFalse(ollama_proxy.grounding_is_generic_echo(user, direct))
-        self.assertTrue(ollama_proxy.grounding_retry_is_factual_improvement(
+        self.assertTrue(ollama_proxy.grounding_candidate_introduces_unseen_token(
+            user, direct,
+        ))
+        self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(
             user, echo, direct,
         ))
 
-    def test_correction_ledger_prefers_recent_observation_and_rejects_unsolicited_advice(self) -> None:
+    def test_correction_ledger_rejects_advice_and_unverified_rewording(self) -> None:
         user = "싱크대 옆에 세워 둔 접시가 살짝 미끄러져서 수건에 기대 멈췄어."
         self.assertEqual(
             ollama_proxy.grounding_correction_anchor_sequence(user),
@@ -2884,14 +3047,14 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         advice = "아, 접시 조심해야겠네!"
         corrected = "접시가 미끄러지다 수건에 기대 멈췄네."
         self.assertTrue(ollama_proxy.needs_grounding_retry(user, advice))
-        self.assertTrue(ollama_proxy.grounding_retry_is_factual_improvement(
+        self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(
             user, advice, corrected,
         ))
         fridge_user = "냉장고 속 병들이 덜컹거리다가 조용해졌어."
         fridge_summary = "아, 냉장고 안이 좀 더 차분해졌네!"
         fridge_direct = "냉장고 속 병들이 덜컹이다가 조용해졌네."
         self.assertTrue(ollama_proxy.needs_grounding_retry(fridge_user, fridge_summary))
-        self.assertTrue(ollama_proxy.grounding_retry_is_factual_improvement(
+        self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(
             fridge_user, fridge_summary, fridge_direct,
         ))
 
@@ -2961,7 +3124,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             "\ub0a8\uc558\ub2e4\ub2c8!"
         )
         self.assertTrue(ollama_proxy.needs_grounding_retry(user, grounded_echo))
-        self.assertTrue(
+        self.assertFalse(
             ollama_proxy.grounding_candidate_is_safe_fallback(user, grounded_echo)
         )
         chat = _QueuedApiStreamClient([
@@ -2974,8 +3137,10 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), grounded_echo)
-        self.assertEqual(memory.completed[0]["assistant"], grounded_echo)
+        expected = ollama_proxy.grounded_observation_fallback(user)
+        self.assertTrue(expected)
+        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(memory.completed[0]["assistant"], expected)
         self.assertEqual(len(chat.requests), 2)
 
     def test_stalled_grounding_retry_fails_closed_without_journal(self) -> None:

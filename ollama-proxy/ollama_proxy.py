@@ -1796,6 +1796,9 @@ REQUEST_LOCAL_SYSTEM_MESSAGE_NAME = "airi_request_local"
 # These are deliberately grammatical rather than topic-specific.  Grounding is
 # a lexical safety check, not a collection of preferred subjects or brands.
 _GROUNDING_TOKEN_RE = re.compile(r"[가-힣]+|[A-Za-z0-9]+")
+_GROUNDING_SURFACE_TOKEN_RE = re.compile(
+    r"[가-힣]+|[A-Za-z0-9]+|[^\s가-힣A-Za-z0-9]"
+)
 _GROUNDING_PARTICLES = (
     "으로", "에서", "에게", "한테", "부터", "까지", "처럼", "보다",
     "은", "는", "이", "가", "을", "를", "의", "에", "와", "과", "도", "만", "로",
@@ -1803,17 +1806,40 @@ _GROUNDING_PARTICLES = (
 _GROUNDING_COPULAR_SUFFIXES = (
     "이라고", "이라는", "이라니",
 )
+_GROUNDING_EXACT_VERBAL_FORMS = {
+    "했어": "하",
+    "했네": "하",
+    "했구나": "하",
+    "됐어": "되",
+    "됐네": "되",
+    "됐구나": "되",
+}
+_GROUNDING_SURFACE_EXACT_VERBAL_FORMS = {
+    "했어": "<HA>", "했네": "<HA>", "했구나": "<HA>",
+    "됐어": "<DOE>", "됐네": "<DOE>", "됐구나": "<DOE>",
+}
 # Conservative Korean surface endings used only for request-local grounding.
 # This is morphological normalization, not a subject/keyword exception: it
 # lets e.g. ``굴러가는`` and ``굴러가다니`` share the same observable action.
 _GROUNDING_VERBAL_SUFFIXES = (
-    "구나", "구먼", "네",
+    "하였구나", "했구나", "었구나", "았구나", "였구나", "됐구나", "졌구나",
+    "구나", "구먼",
     "하였다니", "했다니", "었다니", "았다니", "였다니", "됐다니",
     "하였는데", "했는데", "었는데", "았는데", "였는데", "됐는데",
     "하였어", "했어", "었어", "았어", "였어", "됐어", "졌어",
     "다니", "라니", "는데", "은데", "거든", "니까", "아서", "어서", "여서", "해서",
     "겠어", "했네", "었네", "았네", "였네", "됐네", "졌네",
     "어", "아", "네", "지", "니",
+)
+_GROUNDING_SURFACE_FINAL_SUFFIX_GROUPS = (
+    ("<HA>", (
+        "하였다니", "했다니", "하였구나", "했구나", "하였어", "했어", "하였네", "했네",
+    )),
+    ("<EO>", ("었다니", "었구나", "었어", "었네")),
+    ("<A>", ("았다니", "았구나", "았어", "았네")),
+    ("<COP>", ("였다니", "였구나", "였어", "였네")),
+    ("<DOE>", ("됐다니", "됐구나", "됐어", "됐네")),
+    ("<JYEO>", ("졌다니", "졌구나", "졌어", "졌네")),
 )
 _GROUNDING_FUNCTION_WORDS = frozenset({
     "그", "이", "저", "것", "수", "좀", "더", "잘", "정말", "너무", "그냥", "아",
@@ -1829,6 +1855,9 @@ _GROUNDING_COMMAND_RE = re.compile(r"(?:해줘|해주세요|해라|해봐|해 �
 def _normalized_grounding_token(raw: str) -> str:
     token = raw
     if re.fullmatch(r"[가-힣]+", token):
+        exact = _GROUNDING_EXACT_VERBAL_FORMS.get(token)
+        if exact is not None:
+            return exact
         for suffix in _GROUNDING_COPULAR_SUFFIXES:
             if len(token) > len(suffix) + 1 and token.endswith(suffix):
                 token = token[:-len(suffix)]
@@ -1886,6 +1915,145 @@ def grounding_anchor_sequence(text: str) -> list[str]:
 def grounding_tokens(text: str) -> set[str]:
     """Return the set view used by the deterministic output verifier."""
     return set(grounding_token_sequence(text))
+
+
+def grounding_surface_sequence(text: str) -> list[str]:
+    """Preserve words and punctuation; normalize only the final verbal ending."""
+    normalized = unicodedata.normalize("NFKC", text)
+    sequence = _GROUNDING_SURFACE_TOKEN_RE.findall(normalized)
+    if not sequence:
+        return sequence
+    final_word_index = next(
+        (
+            index for index in range(len(sequence) - 1, -1, -1)
+            if re.fullmatch(r"[가-힣]+|[A-Za-z0-9]+", sequence[index])
+        ),
+        None,
+    )
+    if final_word_index is None or not re.fullmatch(
+        r"[가-힣]+", sequence[final_word_index]
+    ):
+        return sequence
+    final = sequence[final_word_index]
+    exact = _GROUNDING_SURFACE_EXACT_VERBAL_FORMS.get(final)
+    if exact is not None:
+        sequence[final_word_index] = exact
+    elif final.endswith("이구나") and len(final) > 3:
+        sequence[final_word_index] = final[:-3] + "<COP>"
+    elif final.endswith("이야") and len(final) > 2:
+        sequence[final_word_index] = final[:-2] + "<COP>"
+    else:
+        for marker, suffixes in _GROUNDING_SURFACE_FINAL_SUFFIX_GROUPS:
+            matched = next(
+                (
+                    suffix for suffix in suffixes
+                    if len(final) > len(suffix) and final.endswith(suffix)
+                ),
+                None,
+            )
+            if matched is not None:
+                sequence[final_word_index] = final[:-len(matched)] + marker
+                break
+        else:
+            for suffix in ("구나", "어", "네"):
+                if final.endswith(suffix):
+                    stem = final[:-len(suffix)]
+                    if stem and _hangul_has_final_ss(stem[-1]):
+                        sequence[final_word_index] = stem + "<SS>"
+                        break
+    for index in range(len(sequence) - 1, final_word_index, -1):
+        if sequence[index] in {".", "!", "。", "！"}:
+            sequence[index] = "<END>"
+            break
+    return sequence
+
+
+def grounding_candidate_matches_full_surface(
+    user_text: str, candidate: str,
+) -> bool:
+    """Preserve every surface token; only the verified final ending may differ."""
+    candidate_sequence = grounding_surface_sequence(candidate)
+    return bool(
+        candidate_sequence
+        and grounding_surface_sequence(user_text) == candidate_sequence
+    )
+
+
+_GROUNDING_QUOTE_PAIRS = {
+    '"': '"',
+    "“": "”",
+    "‘": "’",
+    "「": "」",
+    "『": "』",
+}
+
+
+def _outside_balanced_grounding_quotes(text: str) -> str | None:
+    """Mask balanced quoted content so its punctuation is not a new sentence."""
+    expected_closers: list[str] = []
+    rendered: list[str] = []
+    closers = set(_GROUNDING_QUOTE_PAIRS.values())
+    for character in text:
+        if expected_closers and character == expected_closers[-1]:
+            expected_closers.pop()
+            rendered.append(" ")
+            continue
+        if character in _GROUNDING_QUOTE_PAIRS:
+            expected_closers.append(_GROUNDING_QUOTE_PAIRS[character])
+            rendered.append(" ")
+            continue
+        if character in closers:
+            return None
+        rendered.append(" " if expected_closers else character)
+    return None if expected_closers else "".join(rendered)
+
+
+def has_exactly_one_complete_sentence(text: str) -> bool:
+    """Return whether ``text`` is one punctuated sentence with no trailing text."""
+    clean = unicodedata.normalize("NFKC", text).strip()
+    if _INCOMPLETE_PUNCTUATION_END_RE.search(clean):
+        return False
+    outside_quotes = _outside_balanced_grounding_quotes(clean)
+    if outside_quotes is None:
+        return False
+    matches = list(_SENTENCE_END_RE.finditer(outside_quotes))
+    return bool(
+        len(matches) == 1
+        and matches[0].end() == len(outside_quotes)
+        and outside_quotes[:matches[0].start()].strip()
+    )
+
+
+def grounding_candidate_introduces_unseen_token(
+    user_text: str, candidate: str,
+) -> bool:
+    """Reject any informative normalized token not supplied in this turn."""
+    return bool(grounding_tokens(candidate) - grounding_tokens(user_text))
+
+
+def grounding_semantic_marker_sequence(text: str) -> tuple[str, ...]:
+    """Preserve explicit Korean negation and existence markers exactly.
+
+    Some of these forms are intentionally absent from the informative-token
+    set because they are common grammatical words. They still change factual
+    polarity, so a candidate may neither introduce nor drop them.
+    """
+    markers: list[str] = []
+    folded = unicodedata.normalize("NFKC", text).casefold()
+    for raw in _GROUNDING_TOKEN_RE.findall(folded):
+        if not re.fullmatch(r"[가-힣]+", raw):
+            continue
+        if raw == "안" or raw.startswith("못"):
+            markers.append(raw[:1])
+        elif raw.startswith("않"):
+            markers.append("않")
+        elif raw.startswith("없"):
+            markers.append("없")
+        elif raw.startswith("있"):
+            markers.append("있")
+        elif raw.startswith("아니"):
+            markers.append("아니")
+    return tuple(markers)
 
 
 def grounding_overlap(user_text: str, candidate: str) -> int:
@@ -2071,6 +2239,8 @@ def grounding_retry_is_factual_improvement(
     candidate = retry_draft.strip()
     if (
         not candidate
+        or not has_exactly_one_complete_sentence(user_text)
+        or not has_exactly_one_complete_sentence(candidate)
         or not has_unambiguous_declarative_terminal(user_text)
         or is_unrequested_foreign_dialogue(candidate, user_text)
         or not contains_hangul(candidate)
@@ -2080,6 +2250,9 @@ def grounding_retry_is_factual_improvement(
         or _GROUNDING_UNSOLICITED_ADVICE_RE.search(candidate)
         or _GROUNDING_BARE_INTERJECTION_RE.search(candidate)
         or contains_personal_deixis(candidate)
+        or not grounding_candidate_matches_full_surface(user_text, candidate)
+        or grounding_semantic_marker_sequence(candidate)
+        != grounding_semantic_marker_sequence(user_text)
     ):
         return False
     # An emotion term is safe only when it was explicitly supplied by the user.
@@ -2127,6 +2300,8 @@ def grounding_candidate_is_safe_fallback(user_text: str, candidate: str) -> bool
     clean = candidate.strip()
     if (
         not clean
+        or not has_exactly_one_complete_sentence(user_text)
+        or not has_exactly_one_complete_sentence(clean)
         or not has_unambiguous_declarative_terminal(user_text)
         or is_unrequested_foreign_dialogue(clean, user_text)
         or not contains_hangul(clean)
@@ -2138,6 +2313,9 @@ def grounding_candidate_is_safe_fallback(user_text: str, candidate: str) -> bool
             and not _GROUNDING_EMOTION_RE.search(user_text)
         )
         or contains_personal_deixis(clean)
+        or not grounding_candidate_matches_full_surface(user_text, clean)
+        or grounding_semantic_marker_sequence(clean)
+        != grounding_semantic_marker_sequence(user_text)
         or grounding_overlap(user_text, clean) < grounding_required_overlap(user_text)
     ):
         return False
@@ -2295,6 +2473,7 @@ def grounded_observation_fallback(user_text: str) -> str:
     ).strip()
     if (
         not ordinary_korean_grounding_turn(clean)
+        or not has_exactly_one_complete_sentence(clean)
         or not 4 <= len(clean) <= 60
         or "\n" in clean
         or CONTROL_TOKEN_RE.search(clean)
@@ -2322,7 +2501,12 @@ def grounded_observation_fallback(user_text: str) -> str:
         candidate = stem + "!"
     else:
         return ""
-    return candidate if grounding_candidate_is_safe_fallback(clean, candidate) else ""
+    return (
+        candidate
+        if has_exactly_one_complete_sentence(candidate)
+        and grounding_candidate_is_safe_fallback(clean, candidate)
+        else ""
+    )
 
 
 def ordinary_korean_grounding_turn(
