@@ -4,27 +4,31 @@ This directory is the only permitted location for local source-policy registries
 raw discoveries, curations, pending topics, and human decisions. These local
 artifacts are deliberately ignored by Git; do not commit them or a runtime board.
 
-The workflow is offline only: it makes no network, RSS, model, or automatic-approval call.
+Human curation, review, and compilation are offline only: they make no network,
+model, or automatic-approval call. Optional source adapters are separate,
+explicitly enabled intake steps and may write only untrusted raw evidence.
 
 1. Use a locally reviewed `source-policies*.json` registry and a policy-bound raw
    discovery JSONL under this directory.
 2. Curate raw evidence into an immutable curation ledger and pending JSONL:
 
 ```powershell
-python .\curate_raw_topics.py --source-policies C:\...\topic-review\source-policies.json --raw-discoveries C:\...\topic-review\raw.jsonl --curations C:\...\topic-review\curations.jsonl --pending C:\...\topic-review\pending.jsonl --curator curator-id
+$reviewRoot = (Resolve-Path .\topic-review).Path
+python .\curate_raw_topics.py --source-policies (Join-Path $reviewRoot source-policies.json) --raw-discoveries (Join-Path $reviewRoot raw.jsonl) --curations (Join-Path $reviewRoot curations.jsonl) --pending (Join-Path $reviewRoot pending.jsonl) --curator curator-id
 ```
 
 3. Review curated pending rows into an absolute decision JSONL:
 
 ```powershell
-python .\review_pending_topics.py --source-policies C:\...\topic-review\source-policies.json --raw-discoveries C:\...\topic-review\raw.jsonl --curations C:\...\topic-review\curations.jsonl --pending C:\...\topic-review\pending.jsonl --decisions C:\...\topic-review\decisions.jsonl --reviewer reviewer-id
+python .\review_pending_topics.py --source-policies (Join-Path $reviewRoot source-policies.json) --raw-discoveries (Join-Path $reviewRoot raw.jsonl) --curations (Join-Path $reviewRoot curations.jsonl) --pending (Join-Path $reviewRoot pending.jsonl) --decisions (Join-Path $reviewRoot decisions.jsonl) --reviewer reviewer-id
 ```
 
 4. Compile only explicit approvals into an explicit path directly inside
    `ollama-proxy/runtime`:
 
 ```powershell
-python .\compile_approved_topics.py --source-policies C:\...\topic-review\source-policies.json --raw-discoveries C:\...\topic-review\raw.jsonl --curations C:\...\topic-review\curations.jsonl --pending C:\...\topic-review\pending.jsonl --decisions C:\...\topic-review\decisions.jsonl --output C:\...\ollama-proxy\runtime\approved-topics.json
+$runtimeRoot = (Resolve-Path .\runtime).Path
+python .\compile_approved_topics.py --source-policies (Join-Path $reviewRoot source-policies.json) --raw-discoveries (Join-Path $reviewRoot raw.jsonl) --curations (Join-Path $reviewRoot curations.jsonl) --pending (Join-Path $reviewRoot pending.jsonl) --decisions (Join-Path $reviewRoot decisions.jsonl) --output (Join-Path $runtimeRoot approved-topics.json)
 ```
 
 Pending records use `pending_schema_version: 1` and exactly these fields: `id`, `title`, `source`, HTTPS `source_url`, `published_at`, `summary`, `broadcast_line`, `expires_at`, and `review`. The review object must remain exactly `{ "status": "pending", "reviewer": "", "reviewed_at": "" }`; it has no `approved` field. `broadcast_line` must satisfy the current runtime loader's bounded, grounded, non-honorific Korean-line contract.
@@ -45,9 +49,9 @@ disabled status and performs no network call or file write. It has no built-in
 source URL, source policy, HTTP client, or adapter. It never writes pending
 records directly.
 
-The standalone enabled CLI intentionally always rejects because no reviewed
-source adapter is installed. A future adapter must independently enforce its
-network, redirect, decompression, size, timeout, DNS/TLS, and peer-IP policy,
+The standalone enabled CLI intentionally always rejects because source-specific
+network policy belongs to a reviewed adapter. An adapter must independently
+enforce its redirect, encoding, size, deadline, DNS/TLS, and peer-IP policy,
 then call `collect_raw_discoveries` with strict raw-v1 records. The merge helper
 accepts only records bound to the exact reviewed source-policy hash and writes
 under an ownership-token sidecar lock. It never creates pending dialogue,
@@ -83,3 +87,40 @@ Unbound pending input is no longer accepted. Review and compilation require all
 three paired discovery arguments: `--source-policies`, `--raw-discoveries`,
 and `--curations`. Local source-policy registries are ignored as
 `source-policies*.json`; do not commit a real registry.
+
+### Optional Korean Wikimedia raw adapter (default OFF)
+
+`wikimedia_topic_source.py` requires `--enable-wikimedia`, absolute local
+policy/raw/cache paths, a policy ID, and a Wikimedia-style
+`name/version (email-or-https-contact)` User-Agent. There is no bundled real
+policy, contact, schedule, or enable flag. It fetches only the fixed
+`포털:요즘 화제` page through at most two serial Action API requests: current
+revision metadata, then rendered HTML for that exact `oldid` unless a strictly
+bound 304 cache is reusable. It does not widen
+to another page or section when the expected structure is absent.
+
+Before connecting, every DNS answer must be a public global address. The HTTPS
+socket connects to one of those pinned addresses, validates TLS for
+`ko.wikipedia.org`, and then verifies the actual peer against the approved set.
+Redirects, compressed responses, unexpected URLs/statuses, oversized bodies,
+deadline overruns, malformed JSON/HTML, unsafe links, and mismatched revisions
+fail closed. Only direct items from top-level portal lists are considered;
+nested/reference/navigation content is discarded, bounded, and still treated
+as untrusted evidence for a human curator.
+
+An optional ETag is reused only while the canonical raw snapshot, policy hash,
+portal revision timestamp, and rendered-body hash still match the cache. The
+cache and all real review artifacts are ignored by Git. The adapter writes raw
+discovery rows only—never pending topics, decisions, prompts, speech, memory,
+runtime boards, database records, or approvals. The raw `published_at` is the
+portal revision timestamp that exposed the item, not a claim about the linked
+article's original publication date.
+
+The reviewed policy must bind `Wikipedia contributors`, the fixed portal URL,
+and the CC BY-SA 4.0 license URL. Human-curated downstream use must preserve
+that attribution and identify transformed excerpts. Operational behavior
+follows the official [Action API revision](https://www.mediawiki.org/wiki/API:Revisions),
+[parse](https://www.mediawiki.org/wiki/API:Parsing_wikitext),
+[API etiquette](https://www.mediawiki.org/wiki/API:Etiquette/en), and
+[maxlag](https://www.mediawiki.org/wiki/Manual:Maxlag_parameter) guidance;
+reuse follows the [Wikimedia Terms of Use](https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use/en).

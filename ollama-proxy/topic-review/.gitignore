@@ -2,3 +2,5 @@
 source-policies*.json
 .*.tmp
 *.tmp
+*.lock
+.wikimedia-topic-cache*.json
