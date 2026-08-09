@@ -36,12 +36,23 @@ moss-tts-nano/
 
 # Runtime output
 *.log
+*.log.*
 *.pid
 *.tmp
 *.temp
+*.asar
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
 **/outputs/
 **/output/
 **/generated/
+ollama-proxy/runtime/
+ollama-proxy/x
+ollama-proxy/bench-results/
+ollama-proxy/eval/results/
+.codex/
+*.patch.bak-*
 
 # Local credentials and machine-specific configuration
 .env

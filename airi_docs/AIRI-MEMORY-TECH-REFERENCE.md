@@ -15,7 +15,7 @@
 - 원본은 gpt-5.4-mini 사용 — **"분해는 결정론적이라 nano급 충분" 가정은 품질 미달로 실패**했음. 로컬 EXAONE 적용 시 M0 게이트 실측 필수.
 - 원본은 structured output 미사용(코드펜스 스트립+JSON 파싱, fail-soft). 소형 모델은 준수력이 낮으므로 **JSON schema/GBNF 강제 권장**.
 - 캐릭터 base(페르소나 시트) 추출은 Stage B 생략 fast-path (후보가 없으므로).
-- 트리거: 응답 완료 후 fire-and-forget, 미추출 메시지 ≥3 + 세션 종료 시 강제 flush. 실패 5회 시 skip(dead-letter), 세션 재시작 시 리셋.
+- 트리거: 응답 완료 후 fire-and-forget, 미추출 메시지 ≥3 + 세션 종료 시 강제 flush. JSON/coverage 같은 품질 실패 5회 시 skip(dead-letter), 세션 재시작 시 리셋. worker/model/transport 일시 장애는 품질 실패에 포함하지 않고 pending을 보존해 bounded backoff한다.
 
 ### Stage A 시스템 프롬프트 (원문)
 
@@ -136,7 +136,8 @@ Given:
 - extracted[]: Stage A output (entity/fact/relation items, with subjectNames/sourceName/targetName).
 - candidates[]: existing memory rows mapped to short aliases (e.g., e0, f1, r2) plus their content.
 
-For each extracted item, produce one MemoryOperation:
+For each extracted item, produce one MemoryOperation. Copy its zero-based
+`sourceItemIndex` exactly; every extracted index must appear once:
 - ADD_ENTITY / ADD_FACT / ADD_RELATION   — new item not in candidates
 - UPDATE_ENTITY / UPDATE_FACT / UPDATE_RELATION — refines an existing candidate (reuse its alias)
 - SUPERSEDE_ENTITY / SUPERSEDE_FACT / SUPERSEDE_RELATION — replaces an outdated candidate
@@ -149,32 +150,38 @@ Rules:
    Keep "{{user}}" placeholder literal — do NOT substitute with a real user name.
 4. ADD_RELATION / UPDATE_RELATION MUST include `sourceAlias` and `targetAlias`.
 5. ADD_FACT / UPDATE_FACT MUST include `subjectAliases` mapped from extracted subjectNames.
-6. SUPERSEDE_* requires a non-empty `reason` field.
-7. Keep content terse: facts ≤ 200 chars.
-8. Preserve original language.
+6. SUPERSEDE_* creates a replacement row, marks the old row superseded, links
+   `old.superseded_by`, and requires replacement fields plus non-empty `reason`.
+7. Copy subtype/content verbatim from the indexed Stage-A item; also copy entity
+   name and fact turnRange. Subject and directed endpoint aliases must map to the
+   same Stage-A names.
+8. Keep content terse: facts ≤ 200 chars.
+9. Preserve original language.
 
 Respond with JSON only. Field set per op type shown below — include ALL listed fields:
 {
   "operations": [
-    { "op": "ADD_ENTITY", "sourceTurnNumber": 1,
+    { "op": "ADD_ENTITY", "sourceItemIndex": 0, "sourceTurnNumber": 1,
       "alias": "e10", "subtype": "person",
       "name": "{{user}}", "content": "...",
       "turnRange": null, "reason": null },
-    { "op": "ADD_FACT", "sourceTurnNumber": 1,
+    { "op": "ADD_FACT", "sourceItemIndex": 1, "sourceTurnNumber": 1,
       "alias": "f10", "subtype": "trait", "content": "...",
       "subjectAliases": ["e10"], "turnRange": [1,1],
       "reason": null },
-    { "op": "ADD_RELATION", "sourceTurnNumber": 1,
+    { "op": "ADD_RELATION", "sourceItemIndex": 2, "sourceTurnNumber": 1,
       "alias": "r10", "subtype": "소지",
       "sourceAlias": "e10", "targetAlias": "e0",
       "content": "...", "reason": null },
-    { "op": "UPDATE_ENTITY", "sourceTurnNumber": 1,
+    { "op": "UPDATE_ENTITY", "sourceItemIndex": 3, "sourceTurnNumber": 1,
       "alias": "e0", "subtype": "person",
       "name": "...", "content": "...",
       "reason": null },
-    { "op": "SUPERSEDE_ENTITY", "sourceTurnNumber": 1,
-      "alias": "e0", "reason": "페르소나 변경" },
-    { "op": "NOOP", "sourceTurnNumber": 1, "alias": "f3" }
+    { "op": "SUPERSEDE_ENTITY", "sourceItemIndex": 4, "sourceTurnNumber": 1,
+      "alias": "e0", "subtype": "person", "name": "...",
+      "content": "replacement", "turnRange": null,
+      "reason": "페르소나 변경" },
+    { "op": "NOOP", "sourceItemIndex": 5, "sourceTurnNumber": 1, "alias": "f3" }
   ]
 }
 ```
@@ -255,6 +262,20 @@ CREATE TABLE extraction_job (
   pending_msgs INTEGER DEFAULT 0,
   fail_count INTEGER DEFAULT 0, last_error TEXT
 );
+
+-- 헤더가 없는 과도기 클라이언트의 bounded continuity index
+CREATE TABLE session_activity (
+  session_id TEXT PRIMARY KEY,
+  latest_message_id INTEGER NOT NULL,
+  latest_turn INTEGER NOT NULL
+);
+CREATE TABLE session_turn_tail (
+  session_id TEXT NOT NULL,
+  turn_no INTEGER NOT NULL,
+  user_hash TEXT NOT NULL,
+  assistant_hash TEXT NOT NULL,
+  PRIMARY KEY(session_id, turn_no)
+); -- session별 completed turn 최신 60개만 유지
 ```
 
 **canon-snapshot**: 방송 세션 시작 시 `session_id IS NULL`인 canon 행을 세션 id로 복제(**vector BLOB까지 복사 — 재임베딩 0원**). id 리맵은 entity → fact(+fact_subject) → relation 3단 순서. 스냅샷 없는 세션은 `(session_id = ? OR session_id IS NULL)` 폴백 — 백필 불필요.
@@ -266,6 +287,16 @@ if len(recent) > 60: recent = recent[-60:]             # 추출 지연 시 grace
 context = [인트로(장면설정, 항상 보존)] + [메모리 블록] + recent
 # 요약 LLM 호출 0회 — "요약" = 추출된 fact 그 자체
 ```
+
+**추출기 장기 미가용 fail-soft**: `recent`가 60 messages를 넘고 질문이 retrieval
+gate를 통과하면, 현재 resolved session의 `extracted=0` journal에서 raw tail에 포함되지
+않은 complete user/assistant pair만 bounded lexical recall한다. 최신 4,096 messages만
+NFC/casefold Hangul·영숫자 token overlap으로 검사하고 최대 4 turns/1,200 chars만
+`[Untrusted Journal Recall]` 뒤에 원래 role로 삽입한다. 이 블록은 증거이지 지시가
+아니며, 다른 session·불완전 pair·이미 raw tail에 있는 turn은 제외한다. 이 경로는
+LLM/API/embedding을 호출하지 않고 `watermark`, `extracted`, `pending_msgs`,
+`DATA_VERSION`을 절대 변경하지 않는다. 추출기가 복구되면 정상 structured memory가
+계속 우선하고 journal recall은 오래된 미추출 공백을 메우는 제한된 안전망으로만 남는다.
 
 ---
 
@@ -296,12 +327,15 @@ def needs_retrieval(question, known_names, attendees=None):
 
 ```python
 class NameScanner:
-    """한국어는 띄어쓰기 경계가 없어 set 룩업 부족 → 길이 내림차순 부분문자열 스캔.
-    (인물 수십 명 규모면 충분. 폭증 시 Aho-Corasick 교체)"""
-    def scan(self, question, names):       # names: 길이 내림차순 정렬된 인물명
-        hits = [n for n in names if n and n in question]
-        # 긴 이름에 포함된 짧은 이름 제거
-        return [n for n in hits if not any(n != m and n in m for m in hits)]
+    """NFC+casefold 후 실제 출현 span을 찾고, 겹치는 span에서만 긴 이름 우선."""
+    def scan(self, question, names):
+        text = unicodedata.normalize("NFC", question).casefold()
+        occurrences = find_all_occurrence_spans(text, names, normalize="NFC+casefold")
+        selected = []
+        for hit in sorted(occurrences, key=lambda h: (-h.length, h.start)):
+            if not overlaps_any(hit, selected):
+                selected.append(hit)
+        return unique_names_in_text_order(selected)
 ```
 
 ### 다층 캐시 (rag_rnd 실측 11.9s → 2.0s)
@@ -315,6 +349,17 @@ class NameScanner:
 | **컨텍스트 캐시** | **(top-1 주제/커뮤니티 ID, filter_sig, DATA_VERSION)** | 600s | **표현이 달라도 같은 주제면 히트. 답변은 캐싱 안 함**(false hit 방지) |
 
 공통: 전역 `RAG_CACHE=off` 스위치(코드 무변경 A/B 실측용) + `DATA_VERSION` 정수 무효화. 캐시 격리 — filter_sig에 (세션 id, 자리 인물)을 넣어 세션 간 오염 방지.
+
+현재 AIRI 구현은 false hit보다 재계산을 우선한다. exact result/query-vector cache와
+별도로 semantic/context cache에는 **답변이 아니라 memory block과 count만** 저장한다.
+semantic cache는 `source=base`, `turn_range=NULL`인 정적 canon scope에서만
+`cosine >= 0.97`을 허용하고, conversation memory가 하나라도 섞이면 우회한다.
+context cache는 embedder가 없는 fail-soft 경로에서 정적 scope와 명시 이름으로 top-1이
+결정된 경우에만 사용한다. 임베딩 질의의 top-1만 같다는 이유로 전체 graph 결과를
+재사용하지 않는다. 미추출 journal recall은 두 캐시의 hit 여부와 무관하게 질문별로 다시
+계산한다. 네 cache layer는 각각 최대 512 entries, TTL 600초이며 `RAG_CACHE=off` 또는
+runtime cache disable 시 retrieval gate보다 먼저 전부 비운다. `filter_sig`는 session id,
+정렬된 attendees, 명시 entity names를 포함하고 `DATA_VERSION`이 달라지면 hit하지 않는다.
 
 ### 체감 지연 보강
 
@@ -358,7 +403,7 @@ naive `.Replace`는 모음 이름에 "세리은"처럼 조사를 깨뜨린다. �
 
 ## §6. 운영 원칙 (두 레포 공통 실측 교훈)
 
-1. **fail-soft 3원칙 — 기억이 발화를 절대 막지 않는다**: ① 임베딩 실패 행만 vector=NULL로 저장(검색에서 자동 제외) ② 검색 실패 시 빈 블록 반환하고 채팅 지속 ③ 추출 파싱 실패 시 워터마크 미갱신 → 다음 트리거에 자연 재시도(별도 재시도 큐 불필요).
+1. **fail-soft 3원칙 — 기억이 발화를 절대 막지 않는다**: ① 임베딩 실패 행만 vector=NULL로 저장(검색에서 자동 제외) ② 검색 실패 시 빈 블록 반환하고 채팅 지속 ③ 추출 품질 실패 시 워터마크 미갱신, availability 실패 시 fail_count도 미갱신한다.
 2. **임베딩은 로컬만** — API 임베딩 200~400ms 실측(talkain ADR-001)은 150ms 예산 초과. KURE-v1(한국어 특화) 또는 BGE-M3, SentenceTransformer, 배치 16, `normalize_embeddings=True`(cosine=dot).
 3. **그래프 DB 도입 금지** — talkain Neo4j 폐기 근거: "모든 쿼리가 1-hop, 2-hop+ 0건". 관계형 테이블(§3)로 충분.
 4. **벡터 검색은 브루트포스로 시작** — 후보 ~100행에서 <1ms 실측. 1만 행 초과 시 sqlite-vec 전환.
@@ -366,3 +411,160 @@ naive `.Replace`는 모음 이름에 "세리은"처럼 조사를 깨뜨린다. �
 6. **사용량 로깅**: 호출별 토큰·duration만 적재, 비용은 조회 시점 단가로 계산(단가 변경이 과거 집계에 자동 반영).
 7. **스트리밍 fallback 불가** — 토큰 전송 시작 후엔 모델 교체 불가. fallback 판정(429/5xx만)은 첫 토큰 전. SSE로 토큰을 보낼 땐 JSON 인코딩(멀티라인 델타 프레임 깨짐 방지).
 8. **소형 모델 추출은 미검증 가정** — talkain: nano 품질 미달로 mini 상향. rag_rnd: 처음부터 Opus. EXAONE 추출은 M0 게이트 실측 후 결정, 미달 시 추출만 클라우드 mini급(비실시간·배치).
+9. **로컬 추출 자원 격리** — 방송 응답용 Ollama(11434)와 CPU batch 추출용
+   Ollama(기본 11436)를 별도 상주 프로세스/connection pool로 분리한다. 추출
+   endpoint는 HTTP loopback만 허용하고 `num_gpu=0`, parallel=1,
+   max-loaded-models=1로 운용한다. `AIRI_MEMORY_EXTRACTION_UPSTREAM`이 전용
+   endpoint를 지정하며, 추출 실패·지연은 채팅 upstream을 점유하지 않는다.
+10. **M0 Stage-B gate** — schema pass만으로 합격시키지 않는다. Stage-A
+    hallucination은 memory item 단위로 1회만 계산하고, Stage-B는
+    `sourceItemIndex` exact-once, journal turn/kind/subtype/content, fact subject,
+    relation 방향 coverage가 모두 100%여야 한다. 허용된 Stage-A 선택에 필요한
+    Stage-B 연산을 hallucination으로 중복 벌점 처리하지 않는다.
+11. **추출 availability와 품질 실패 분리** — local Ollama는 모델 inventory를
+    preflight하고, worker/model/transport·외부 429/5xx는 한 global queue에서
+    1~60초 exponential backoff한다. 영구 4xx와 JSON/schema/coverage 실패만
+    fail_count 5회 cap을 사용한다. 재기동 시 기존 pending session도 자동 drain하며,
+    shutdown 뒤 retry task가 shared client를 사용해서는 안 된다.
+
+---
+
+## §7. 현재 구현 계약 보충 (2026-08-08)
+
+### Curated canon
+
+`ollama-proxy/airi-canon.json`은 `schema_version=1`의 self-contained bundle이다.
+entity는 stable `key/name/subtype/content`, fact는 `key/subtype/content/subjects`,
+relation은 `key/subtype/content/source/target`만 허용한다. 참조는 같은 bundle의
+entity key만 가리킨다. import는 누락 항목을 삭제하지 않는 additive sync이며,
+같은 key의 변경은 replacement row를 만들고 과거 행을 superseded 상태로 보존한다.
+runtime은 bundle을 session snapshot보다 먼저 적재한다.
+
+### 외부 provider 안전 게이트
+
+- Memory extraction: `AIRI_MEMORY_EXTRACTION_PROVIDER`,
+  `AIRI_MEMORY_ALLOW_EXTERNAL_EXTRACTION`, `AIRI_MEMORY_EXTRACTION_MODEL`, provider key.
+- Main chat: `AIRI_CHAT_PROVIDER`, `AIRI_ALLOW_EXTERNAL_CHAT`, `AIRI_CHAT_MODEL`, provider key.
+- 두 경로 모두 기본 외부 전송은 off다. official HTTPS host 또는 명시 allowlist만
+  허용하며 health/log에 key와 raw prompt를 넣지 않는다.
+- OpenAI/Anthropic 구조화 추출은 정상 완료 stop을 확인한 뒤에만 watermark를
+  갱신한다. Main chat stream도 정상 stop과 terminal marker가 모두 있어야 완전한
+  응답으로 journal한다.
+
+### 외부 검색·사용량 계측
+
+- 레거시 Codex 검색 사이드카도 `AIRI_ALLOW_EXTERNAL_SEARCH`가 명시적으로 true일
+  때만 사용자 발화를 외부로 보낸다. 기본값은 false이며, 비승인 검색형 문장은
+  검색 전용 고정 응답이 아니라 기존 로컬 대화 경로로 처리한다.
+- `provider_usage.py`의 로컬 SQLite 원장은 cloud chat과 cloud Stage A/B 추출의
+  provider/model/timestamp/duration/status/token/cache token만 저장한다. prompt,
+  response, header, API key는 저장하지 않는다.
+- 비용은 DB에 고정하지 않고 조회 시점의 모델별 100만 token 단가로 계산한다.
+  OpenAI의 cached token은 `prompt_tokens`에 포함되므로 uncached input과 분리해
+  중복 과금하지 않는다.
+
+### No-header session continuity fail-soft
+
+- 명시적인 `x-airi-session-id`는 항상 최우선이며 implicit 상태를 읽거나 바꾸지 않는다.
+- canonical user/assistant hash-pair exact suffix를 먼저 비교한다. 현재 AIRI wire history가
+  ACK/ACT wrapper를 포함해 journal의 canonical assistant text와 달라질 수 있으므로,
+  pair가 실패할 때만 exact raw user SHA-256 suffix를 보조 신호로 사용한다.
+- 같은 process의 claimed session은 user turns 3개 이상·서로 다른 hash 2개 이상,
+  cold recovery는 user turns 4개 이상·서로 다른 hash 3개 이상을 요구한다. 후보가
+  하나뿐이고 후보군 안에서 session-unique anchor hash가 있을 때만 복구한다.
+- 후보 탐색은 `session_activity`의 최근 256 sessions와 `session_turn_tail`의 session별
+  최신 60 completed turns만 읽는다. 조회 비용은 전체 journal 길이에 비례하지 않는다.
+- 복구하지 못한 history는 최신 completed 60 turns만 한 `BEGIN IMMEDIATE`
+  transaction으로 빈 UUID child scope에 bootstrap한다. 기존 scope의 watermark를
+  새 대화에 적용하지 않으며, 원문 fuzzy/semantic normalization은 사용하지 않는다.
+- `session_activity`와 `session_turn_tail`은 append/bootstrap transaction 안에서 함께
+  갱신한다. 구조 backfill은 memory `DATA_VERSION`을 증가시키지 않는다. 이 기능은
+  stable client header가 적용되기 전까지의 fail-soft이며 최종 isolation 계약을
+  대체하지 않는다.
+
+---
+
+## §8. Stage-B 결정 계약과 M0 gate 상태 (2026-08-08)
+
+Stage B의 structured output은 최종 memory operation이 아니라 `decision-v2`의 정확히 N개
+결정이다. 루트는 `{"decisions":[...]}` 하나이고 배열은 `minItems=maxItems=N`이다. 각 결정은
+`sourceItemIndex`, `action`, `candidateAlias`, `reason`만 가진다. action은
+`add|update|noop|supersede`; add는 alias/reason 모두 null, update/noop는 기존 alias와 null
+reason, supersede는 기존 alias와 non-empty reason이다. compiler가 Stage-A item을 복사하여
+operation을 만들고 index exact-once, candidate 존재/kind, entity reference와 graph coverage를
+결정론적으로 검증한다.
+
+`decision-v2.1`은 source item kind별 `oneOf` 분기다. index는 같은 kind의 branch에만 들어가며
+기존 alias enum도 entity/fact/relation 후보군별로 제한된다. `N=60`, `C=185`에서 schema는 약
+7,359 B다. 이 계약은 모델에 원문 재기록을 요구하지 않는 compact generic prompt와 함께 쓰며,
+fixture 특례나 hardcoding을 허용하지 않는다.
+
+candidate builder는 현재 scope의 fact id만 대상으로 `fact_subject`를 chunk 조회한다. 무관한
+300k fact_subject 행 재현에서 build는 1.70–3.34 ms였으며, 이전 전역 scan 235.1 ms를
+피한다. fact/relation의 endpoint/subject entity dependency closure는 primary candidate budget과
+분리해 최소한으로 추가한다.
+
+동일 runtime options(`seed=42`, `max_tokens=2048`) smoke의 해석은 엄격히 비교 가능한 이웃
+버전에 한정한다. V2는 Stage-B schema 2/2 및 null/count 고정 후에도 `candidate_kind` 2건으로
+coverage 0/2였다. V2.1은 kind grouping으로 그 오류를 없앴지만
+`entity_reference_missing` 2건으로 coverage 0/2였다. V2b conversation Stage-A는 Stage-B
+schema/coverage 2/2와 `update_alias` 회복을 보였지만, `moment_signal` Stage-A recall 0,
+unexpected 3 및 aggregate recall 0.5, unexpected 4로 overall gate false다. V1은 옵션이 달라
+직접 인과 비교 대상이 아니다.
+
+실패한 gated smoke 뒤 full 7-fixture run은 하지 않았고 자동 extractor는 의도적으로 OFF다.
+수정된 frozen full-fixture gate를 통과하기 전 운영 활성화는 금지한다. 현재 memory-focused
+141개, `ollama-proxy` 전체 248개, latency monitor 8개, STT 36개 통과는 구현 회귀 확인일 뿐
+extraction 품질 통과를 뜻하지 않는다. 따라서 다음 단계는 prompt micro-tuning이 아니라 더 나은
+extraction candidate 또는 향후 eval-data/LoRA 연구다.
+
+운영 launcher는 extraction model이 비어 있지 않을 때 `verify_extraction_gate.py`를 먼저 실행한다.
+검증기는 실제 frozen fixture 파일의 SHA-256, 64-hex model digest, model/contract 일치,
+prompt/schema와 current Stage-B factory probe hash, 11434 local tag의 live digest binding 및 11436 extractor tag 재검증; gate-only preflight 뒤 extractor 검증/기동 후 proxy를 기동하며, extraction-enabled 기존 proxy는 재사용하지 않고, 실패 cleanup은 이번 실행이 소유한 verified PID에만 적용,
+런처 고정 options (`temperature=0`, `num_ctx=8192`, `num_gpu=0`, `seed=42`, `max_tokens=2048`, `think=false`),
+`allow_cloud=false`, 전체 fixture별 정확한 run 수와 `gate_pass is true`를 read-only로 확인한다.
+실패 시 안정 reason code만 출력하고 proxy/extractor를 시작하지 않는다. root launcher는 extraction
+활성화 요청에 기존 11435 listener가 있으면 재기동을 요구한다. 새 기동은 gate-only 검증 → 실제
+11436 model/digest 검증 → 11435 순서를 지키며, 실패 cleanup도 이번 실행이 소유한 exact PID에만
+적용한다. 따라서 실패 report나 다른 구성의 기존 proxy/extractor를 잘못 사용하거나 종료하지 않는다.
+
+---
+
+## §9. Local extraction 후보의 bounded smoke (2026-08-08)
+
+기본 대화 모델은 `exaone-airi:2.4b`로 고정하고 extraction 전용 후보 `qwen3:4b`
+(Q4_K_M, digest `359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7`)
+하나만 CPU 격리 서버에서 시험했다. 첫 요청은 Ollama의 default thinking 때문에
+`moment_signal` Stage A가 180초 timeout/HTTP 500으로 끝났다. 공식 API의 `think=false`를
+benchmark/production local extraction/gate의 고정 boolean 계약으로 추가한 뒤 같은 조건을
+재실행하자 Stage A 16.836초, Stage B 7.281초, total 24.118초로 완료됐다. 그러나 schema와
+coverage 통과에도 critical recall 0, unexpected 1, alias accuracy 0으로 품질 gate는 false였다.
+두 번째 fixture와 full gate는 수행하지 않았으며 자동 extraction은 OFF로 유지한다. 이 경로의
+실패는 prompt·fixture 특례가 아니라 후보 모델 품질 증거로 취급한다.
+
+벤치의 `--fail-fast`는 smoke 전용 opt-in이다. 첫 실패 row 이후 나머지 fixture/run을 중단하고
+attempted 범위만 집계하지만, 운영 verifier의 전체 fixture/run 요구는 완화하지 않는다. 따라서
+partial 또는 aborted report는 `gate_pass`와 무관하게 activation 자료로 사용할 수 없다.
+관련 benchmark/provider/verifier 집중 테스트는 56개 통과했다.
+
+---
+
+## §10. Extractor-OFF journal recall 계약 (2026-08-08)
+
+Active graph/vector retrieval과 unextracted journal recall은 서로 다른 gate다. Active gate가
+false인 짧은 지시형 질문도 same-session pending complete turn과 유의미 lexical token이 있으면
+journal path만 사용할 수 있다. 선택은 일반 NFC/casefold token overlap이며 특정 사실명,
+검색 의도, 반복 count를 하드코딩하지 않는다. 인사·stopword-only·다른 session은 empty다.
+
+Client raw history에서 실제로 forward하는 최대 60 messages의 turn id는 길이와 무관하게
+항상 recall 제외 목록에 넣는다. 따라서 stable session header와 current user turn만 있는 요청은
+오래된 pending DB evidence를 찾을 수 있고, complete short history는 중복되지 않는다.
+회수 범위는 최신 4,096 messages, 최대 4 complete turns/1,200 chars다. 새 row는 append 시
+bounded `recall_chars`를 기록하고, covering metadata index로 window와 완결 turn/문자 상한을
+먼저 판별한 뒤 적격 pair만 원문을 읽는다. legacy row의 NULL metadata는 startup 원문 scan이나
+backfill 없이 fail-closed로 제외한다. 이 window 밖의 회상은 보장하지 않으며 추출 복구 또는
+curated memory가 필요하다.
+
+Privacy-safe health는 선택 session `pending` 외에 전체 `pending_total`, pending이 양수인
+`pending_sessions`, `journal_recall_window_messages`를 보고한다. 원문과 session id는 health에
+포함하지 않는다. 이 경로는 read-only이며 watermark/pending/data version을 갱신하지 않는다.

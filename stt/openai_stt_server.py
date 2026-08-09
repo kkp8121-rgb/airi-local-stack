@@ -87,22 +87,45 @@ whisper: WhisperModel | None = None
 
 QUIET_RMS_THRESHOLD = 0.01
 QUIET_PEAK_THRESHOLD = 0.08
+NORMALIZE_BELOW_RMS = 0.03
+NORMALIZE_TARGET_RMS = 0.04
+MAX_INPUT_GAIN = 4.0
+MAX_NORMALIZED_PEAK = 0.95
 SHORT_AUDIO_MAX_COMPACT_CHARS = 18
 MAX_COMPACT_CHARS_PER_SECOND = 14.0
 MIN_ACCEPTED_AVG_LOGPROB = -1.0
 # Short confirmations such as "응" or "아니" run 0.4-0.6 s, so the fallback has to reach below
 # the old 0.6 s floor to rescue them.
 VAD_FALLBACK_MIN_DURATION_SECONDS = 0.3
+QUIET_RECOVERY_MIN_DURATION_SECONDS = 0.5
+FRAME_ENERGY_MS = 25
+QUIET_RECOVERY_MIN_ACTIVE_FRAMES = 3
+QUIET_RECOVERY_MIN_ACTIVE_FRACTION = 0.08
+QUIET_RECOVERY_MAX_ACTIVE_FRACTION = 0.85
+QUIET_RECOVERY_MIN_RELATIVE_ENERGY = 1.5
+QUIET_RECOVERY_MAX_NO_SPEECH_PROB = 0.6
+# This is deliberately a small rescue band, not a lower global confidence threshold.
+QUIET_RECOVERY_MIN_AVG_LOGPROB = -1.25
+SEGMENT_TIMESTAMP_TOLERANCE_SECONDS = 0.25
 SEARCH_INTENT_TERMS = ("검색", "서칭", "서치", "찾아", "알아봐")
 SEARCH_ALIAS_MAX_WORD_DISTANCE = 2
 # A complete prompt sentence is echoed back verbatim when the audio is ambiguous, so the
 # prompt only lists vocabulary instead of forming a sentence Whisper can copy.
 DEFAULT_INITIAL_PROMPT = "한국어 일상 대화. 아이리, AIRI."
-BEAM_SIZE = 1
+BEAM_SIZE = 3
 RECOVERY_BEAM_SIZE = 3
 RECOVERY_MAX_NEW_TOKENS = 32
 RETRYABLE_TRANSCRIPTION_REASONS = frozenset(
     {"short_audio_text_overflow", "implausible_text_rate", "low_log_probability"}
+)
+# Whisper sometimes fills ambiguous Korean audio with stock broadcast subtitle copy. Keep
+# this list exact after punctuation/spacing normalization so ordinary discussion about
+# captions or advertising is not suppressed.
+KNOWN_WHISPER_HALLUCINATION_PHRASES = frozenset(
+    {
+        "자막제공및광고를포함하고있습니다",
+        "자막제공및광고를포함합니다",
+    }
 )
 VAD_PARAMETERS = {
     "min_silence_duration_ms": 300,
@@ -322,13 +345,34 @@ async def list_models() -> dict[str, object]:
     }
 
 
-def analyze_audio(path: str) -> dict[str, float]:
-    sample_count = 0
-    clipped_sample_count = 0
-    square_sum = 0.0
-    peak = 0.0
-    resampler = av.AudioResampler(format="s16", layout="mono", rate=16000)
+def frame_energy_stats(samples: np.ndarray, sample_rate: int = 16000) -> dict[str, float]:
+    """Return scalar 25 ms energy features without retaining audio or text."""
+    frame_size = max(1, round(sample_rate * FRAME_ENERGY_MS / 1000))
+    frame_count = samples.size // frame_size
+    if not frame_count:
+        return {"frame_rms_p50": 0.0, "frame_rms_p90": 0.0, "frame_rms_p95": 0.0,
+                "active_frame_count": 0.0, "active_frame_fraction": 0.0,
+                "longest_active_run": 0.0, "relative_energy": 0.0}
+    frames = samples[: frame_count * frame_size].reshape(frame_count, frame_size)
+    rms = np.sqrt(np.mean(np.square(frames, dtype=np.float64), axis=1))
+    p20, p50, p90, p95 = (float(np.percentile(rms, value)) for value in (20, 50, 90, 95))
+    active = rms >= max(0.002, p20 * QUIET_RECOVERY_MIN_RELATIVE_ENERGY)
+    longest_run = run = 0
+    for is_active in active:
+        run = run + 1 if is_active else 0
+        longest_run = max(longest_run, run)
+    return {"frame_rms_p50": p50, "frame_rms_p90": p90, "frame_rms_p95": p95,
+            "active_frame_count": float(np.count_nonzero(active)),
+            "active_frame_fraction": float(np.mean(active)),
+            "longest_active_run": float(longest_run),
+            "relative_energy": p90 / max(p20, 1e-6)}
 
+
+def analyze_audio(path: str) -> dict[str, float]:
+    sample_count = clipped_sample_count = 0
+    square_sum = peak = 0.0
+    chunks: list[np.ndarray] = []
+    resampler = av.AudioResampler(format="s16", layout="mono", rate=16000)
     with av.open(path) as container:
         for frame in container.decode(audio=0):
             for mono in resampler.resample(frame):
@@ -339,13 +383,27 @@ def analyze_audio(path: str) -> dict[str, float]:
                 clipped_sample_count += int((np.abs(samples) >= 0.99).sum())
                 square_sum += float(np.square(samples).sum())
                 peak = max(peak, float(np.abs(samples).max()))
+                chunks.append(samples)
+    decoded = np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)
+    return {"duration_seconds": sample_count / 16000.0,
+            "rms": (square_sum / sample_count) ** 0.5 if sample_count else 0.0,
+            "peak": peak, "clipped_ratio": clipped_sample_count / sample_count if sample_count else 0.0,
+            **frame_energy_stats(decoded)}
 
-    return {
-        "duration_seconds": sample_count / 16000.0,
-        "rms": (square_sum / sample_count) ** 0.5 if sample_count else 0.0,
-        "peak": peak,
-        "clipped_ratio": clipped_sample_count / sample_count if sample_count else 0.0,
-    }
+
+def load_audio_samples(path: str) -> np.ndarray:
+    """Decode a local upload to the float32 mono/16 kHz array Whisper accepts."""
+    chunks: list[np.ndarray] = []
+    resampler = av.AudioResampler(format="s16", layout="mono", rate=16000)
+    with av.open(path) as container:
+        for frame in container.decode(audio=0):
+            for mono in resampler.resample(frame):
+                samples = mono.to_ndarray().astype(np.float32).reshape(-1) / 32768.0
+                if samples.size:
+                    chunks.append(samples)
+    if not chunks:
+        return np.zeros(0, dtype=np.float32)
+    return np.ascontiguousarray(np.concatenate(chunks), dtype=np.float32)
 
 
 def preserve_debug_audio(contents: bytes, suffix: str) -> str | None:
@@ -380,6 +438,39 @@ def is_quiet_audio(audio_metrics: dict[str, float]) -> bool:
     )
 
 
+def calculate_input_gain(audio_metrics: dict[str, float]) -> float:
+    """Return conservative gain for speech-like but unusually soft uploads.
+
+    AIRI already gates microphone chunks with its own VAD. Either RMS or peak
+    may establish that a quiet chunk contains speech; requiring both discarded
+    the user's soft 2.9-second utterance even though its peak crossed the speech
+    floor. Normal, fully quiet, or clipped input remains untouched.
+    """
+    rms = audio_metrics.get("rms", 0.0)
+    peak = audio_metrics.get("peak", 0.0)
+    if (
+        is_quiet_audio(audio_metrics)
+        or rms >= NORMALIZE_BELOW_RMS
+        or peak >= MAX_NORMALIZED_PEAK
+    ):
+        return 1.0
+    return max(
+        1.0,
+        min(MAX_INPUT_GAIN, NORMALIZE_TARGET_RMS / rms, MAX_NORMALIZED_PEAK / peak),
+    )
+
+
+def prepare_audio_for_whisper(
+    path: str, audio_metrics: dict[str, float]
+) -> np.ndarray:
+    samples = load_audio_samples(path)
+    gain = calculate_input_gain(audio_metrics)
+    audio_metrics["input_gain"] = round(gain, 3)
+    if gain > 1.0 and samples.size:
+        samples = np.clip(samples * gain, -1.0, 1.0).astype(np.float32, copy=False)
+    return np.ascontiguousarray(samples, dtype=np.float32)
+
+
 def should_retry_without_vad(
     audio_metrics: dict[str, float],
     segments: list[object],
@@ -388,12 +479,72 @@ def should_retry_without_vad(
     if segments:
         return False
     if is_quiet_audio(audio_metrics):
-        return False
+        return is_quiet_speech_candidate(audio_metrics)
     return audio_metrics.get("duration_seconds", 0.0) >= VAD_FALLBACK_MIN_DURATION_SECONDS
 
 
+def is_quiet_speech_candidate(audio_metrics: dict[str, float]) -> bool:
+    """Conservatively distinguish sustained quiet speech from flat noise or a click."""
+    active_fraction = audio_metrics.get("active_frame_fraction", 0.0)
+    return (
+        is_quiet_audio(audio_metrics)
+        and audio_metrics.get("duration_seconds", 0.0) >= QUIET_RECOVERY_MIN_DURATION_SECONDS
+        and audio_metrics.get("relative_energy", 0.0) >= QUIET_RECOVERY_MIN_RELATIVE_ENERGY
+        and audio_metrics.get("active_frame_count", 0.0) >= QUIET_RECOVERY_MIN_ACTIVE_FRAMES
+        and QUIET_RECOVERY_MIN_ACTIVE_FRACTION <= active_fraction <= QUIET_RECOVERY_MAX_ACTIVE_FRACTION
+        and audio_metrics.get("longest_active_run", 0.0) >= QUIET_RECOVERY_MIN_ACTIVE_FRAMES
+    )
+
+
+def prepare_quiet_recovery_audio(audio: np.ndarray, audio_metrics: dict[str, float]) -> np.ndarray:
+    """Apply one bounded gain only after the numeric quiet-speech gate passes."""
+    peak, rms = audio_metrics.get("peak", 0.0), audio_metrics.get("rms", 0.0)
+    if not audio.size or peak <= 0.0 or rms <= 0.0:
+        return audio
+    gain = max(1.0, min(MAX_INPUT_GAIN, NORMALIZE_TARGET_RMS / rms, MAX_NORMALIZED_PEAK / peak))
+    audio_metrics["quiet_recovery_gain"] = round(gain, 3)
+    return np.clip(audio * gain, -1.0, 1.0).astype(np.float32, copy=False)
+
+
+def segment_timing_is_valid(segment: dict[str, object], audio_duration: float) -> bool:
+    """Accept only finite segment bounds that can belong to this upload.
+
+    Unit-level callers that provide confidence-only segment dictionaries predate
+    timestamp telemetry; those remain valid. Whisper-produced segments always
+    include both bounds and are checked strictly with a small decoder tolerance.
+    """
+    if "start" not in segment and "end" not in segment:
+        return True
+    try:
+        start = float(segment["start"])
+        end = float(segment["end"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    return (
+        np.isfinite(start)
+        and np.isfinite(end)
+        and start >= -SEGMENT_TIMESTAMP_TOLERANCE_SECONDS
+        and end >= start
+        and end <= audio_duration + SEGMENT_TIMESTAMP_TOLERANCE_SECONDS
+    )
+
+
+def filter_invalid_timing_segments(
+    segments: list[dict[str, object]], audio_metrics: dict[str, float]
+) -> list[dict[str, object]]:
+    audio_duration = max(0.0, float(audio_metrics.get("duration_seconds", 0.0)))
+    valid = [segment for segment in segments if segment_timing_is_valid(segment, audio_duration)]
+    invalid_count = max(
+        int(audio_metrics.get("timing_invalid_segment_count", 0)),
+        len(segments) - len(valid),
+    )
+    audio_metrics["timing_invalid_segment_count"] = invalid_count
+    audio_metrics["timing_invalid"] = bool(invalid_count)
+    return valid
+
+
 def transcribe_file(
-    path: str,
+    path: str | np.ndarray,
     language: str | None,
     prompt: str | None,
     audio_metrics: dict[str, float],
@@ -401,6 +552,10 @@ def transcribe_file(
 ) -> tuple[str, str, float, list[dict[str, object]], bool]:
     if whisper is None:
         raise RuntimeError("Whisper model is not ready")
+    # This invocation is the authoritative decoder attempt. A later clean retry
+    # must not inherit an invalid-timing flag from a discarded first attempt.
+    audio_metrics["timing_invalid_segment_count"] = 0
+    audio_metrics["timing_invalid"] = False
 
     normalized_language = language.split("-")[0].lower() if language else "ko"
     beam_size = RECOVERY_BEAM_SIZE if recovery_decode else BEAM_SIZE
@@ -430,13 +585,17 @@ def transcribe_file(
     vad_fallback_used = recovery_decode
     if not recovery_decode and should_retry_without_vad(audio_metrics, completed):
         vad_fallback_used = True
+        recovery_input = (
+            prepare_quiet_recovery_audio(path, audio_metrics)
+            if isinstance(path, np.ndarray) and is_quiet_speech_candidate(audio_metrics)
+            else path
+        )
         fallback_segments, info = whisper.transcribe(
-            path,
+            recovery_input,
             **transcription_options,
             vad_filter=False,
         )
         completed = list(fallback_segments)
-    text = " ".join(segment.text.strip() for segment in completed if segment.text.strip()).strip()
     verbose_segments = [
         {
             "id": index,
@@ -452,7 +611,24 @@ def transcribe_file(
         }
         for index, segment in enumerate(completed)
     ]
-    duration = completed[-1].end if completed else 0.0
+    # Preserve content-free decoder diagnostics before rejecting impossible timing.
+    audio_metrics["decoded_segment_count"] = len(verbose_segments)
+    decoded_avg = [float(segment["avg_logprob"]) for segment in verbose_segments]
+    decoded_no_speech = [float(segment["no_speech_prob"]) for segment in verbose_segments]
+    audio_metrics["decoded_min_avg_logprob"] = min(decoded_avg, default=None)
+    audio_metrics["decoded_max_no_speech_prob"] = max(decoded_no_speech, default=None)
+    verbose_segments = filter_invalid_timing_segments(verbose_segments, audio_metrics)
+    text = " ".join(
+        str(segment.get("text", "")).strip()
+        for segment in verbose_segments
+        if str(segment.get("text", "")).strip()
+    ).strip()
+    # Never publish a decoder timestamp beyond the actual upload duration.
+    duration = max(
+        (min(float(segment["end"]), audio_metrics.get("duration_seconds", 0.0))
+         for segment in verbose_segments if "end" in segment),
+        default=0.0,
+    )
     return text, info.language, duration, verbose_segments, vad_fallback_used
 
 
@@ -476,12 +652,18 @@ def validate_decoded_transcription(
     raw_text: str,
     segments: list[dict[str, object]],
     audio_metrics: dict[str, float],
+    strict_quiet_recovery: bool = False,
 ) -> tuple[str, str | None, int, int]:
     """Normalize and validate one Whisper decode without losing its metrics."""
+    segments = filter_invalid_timing_segments(segments, audio_metrics)
+    if audio_metrics.get("timing_invalid_segment_count", 0) and not segments:
+        return "", "timing_invalid", 0, 0
     corrected_text, proper_noun_corrections = normalize_proper_nouns(raw_text)
-    text, rejected_reason = filter_implausible_transcription(corrected_text, audio_metrics)
+    text, rejected_reason = filter_implausible_transcription(
+        corrected_text, audio_metrics, allow_quiet_speech=strict_quiet_recovery
+    )
     low_confidence_segments = 0
-    if rejected_reason is None:
+    if rejected_reason is None and not strict_quiet_recovery:
         text, rejected_reason, low_confidence_segments = filter_low_confidence_transcription(
             text,
             segments,
@@ -490,21 +672,43 @@ def validate_decoded_transcription(
             text, proper_noun_corrections = normalize_proper_nouns(text)
     if rejected_reason is None and not text.strip():
         rejected_reason = "empty_transcription"
+    if rejected_reason is None and strict_quiet_recovery:
+        if not is_quiet_speech_candidate(audio_metrics):
+            rejected_reason = "quiet_recovery_frame_gate"
+        elif not segments:
+            rejected_reason = "quiet_recovery_empty_segments"
+        elif any(
+            not np.isfinite(float(segment.get("avg_logprob", float("nan"))))
+            or float(segment["avg_logprob"]) < QUIET_RECOVERY_MIN_AVG_LOGPROB
+            for segment in segments
+        ):
+            rejected_reason = "quiet_recovery_low_log_probability"
+        elif any(
+            not np.isfinite(float(segment.get("no_speech_prob", float("nan"))))
+            or float(segment.get("no_speech_prob", 1.0)) > QUIET_RECOVERY_MAX_NO_SPEECH_PROB
+            for segment in segments
+        ):
+            rejected_reason = "quiet_recovery_no_speech"
     return text, rejected_reason, proper_noun_corrections, low_confidence_segments
 
 
 def filter_implausible_transcription(
     text: str,
     audio_metrics: dict[str, float],
+    allow_quiet_speech: bool = False,
 ) -> tuple[str, str | None]:
     """Suppress common Whisper hallucinations from short or quiet AIRI chunks."""
     if not text:
         return text, None
 
+    compact_phrase = re.sub(r"[^0-9A-Za-z가-힣]+", "", text).lower()
+    if compact_phrase in KNOWN_WHISPER_HALLUCINATION_PHRASES:
+        return "", "known_whisper_hallucination"
+
     duration = audio_metrics.get("duration_seconds", 0.0)
     compact_chars = len("".join(text.split()))
 
-    if is_quiet_audio(audio_metrics):
+    if is_quiet_audio(audio_metrics) and not allow_quiet_speech:
         return "", "quiet_audio"
 
     # One continuous character budget instead of two step functions. The old 1.5 s split let a
@@ -551,6 +755,32 @@ def filter_low_confidence_transcription(
     if not kept_text:
         return "", "low_log_probability", dropped
     return kept_text, None, dropped
+
+
+def finite_audit_number(value: object, *, lower: float = 0.0, upper: float = 1_000_000.0) -> float:
+    """Keep latency telemetry numeric, bounded, and safe for downstream JSON consumers."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return lower
+    if not np.isfinite(number):
+        return lower
+    return round(min(upper, max(lower, number)), 4)
+
+
+def rejection_reason_flags(reason: str | None) -> dict[str, bool]:
+    """Content-free audit flags; the latency event never exposes decoder text or a reason string."""
+    return {
+        "timing_invalid": reason == "timing_invalid",
+        "quiet_audio": reason == "quiet_audio",
+        "quiet_recovery_low_confidence": reason == "quiet_recovery_low_log_probability",
+        "quiet_recovery_no_speech": reason == "quiet_recovery_no_speech",
+        "quiet_recovery_frame_gate": reason == "quiet_recovery_frame_gate",
+        "low_confidence": reason == "low_log_probability",
+        "text_rate": reason in {"short_audio_text_overflow", "implausible_text_rate"},
+        "known_hallucination": reason == "known_whisper_hallucination",
+        "empty": reason in {"empty_transcription", "quiet_recovery_empty_segments"},
+    }
 
 
 @app.post("/v1/audio/transcriptions")
@@ -600,11 +830,16 @@ async def create_transcription(
             temp_path = temp_file.name
         analysis_started = time.perf_counter()
         audio_metrics = await asyncio.to_thread(analyze_audio, temp_path)
+        audio_input = await asyncio.to_thread(
+            prepare_audio_for_whisper,
+            temp_path,
+            audio_metrics,
+        )
         analysis_ms = elapsed_ms(analysis_started)
         inference_started = time.perf_counter()
         raw_text, detected_language, duration, segments, vad_fallback_used = await asyncio.to_thread(
             transcribe_file,
-            temp_path,
+            audio_input,
             language,
             prompt,
             audio_metrics,
@@ -612,7 +847,13 @@ async def create_transcription(
         inference_ms = elapsed_ms(inference_started)
 
         text, rejected_reason, proper_noun_corrections, low_confidence_segments = (
-            validate_decoded_transcription(raw_text, segments, audio_metrics)
+            validate_decoded_transcription(
+                raw_text,
+                segments,
+                audio_metrics,
+                strict_quiet_recovery=vad_fallback_used
+                and is_quiet_speech_candidate(audio_metrics),
+            )
         )
         decode_retry_used = False
         first_rejected_reason = rejected_reason
@@ -626,7 +867,7 @@ async def create_transcription(
                 retry_vad_fallback_used,
             ) = await asyncio.to_thread(
                 transcribe_file,
-                temp_path,
+                audio_input,
                 language,
                 prompt,
                 audio_metrics,
@@ -665,15 +906,19 @@ async def create_transcription(
 
     # Keep the segment statistics for threshold tuning even when the transcription is
     # rejected; only the response body drops the segments.
-    segment_count = len(segments)
-    min_avg_logprob = min(
-        (float(segment["avg_logprob"]) for segment in segments),
-        default=None,
-    )
-    max_no_speech_prob = max(
-        (float(segment["no_speech_prob"]) for segment in segments),
-        default=None,
-    )
+    segment_count = int(audio_metrics.get("decoded_segment_count", len(segments)))
+    avg_logprobs = [
+        float(segment["avg_logprob"])
+        for segment in segments
+        if np.isfinite(float(segment.get("avg_logprob", float("nan"))))
+    ]
+    no_speech_probs = [
+        float(segment["no_speech_prob"])
+        for segment in segments
+        if np.isfinite(float(segment.get("no_speech_prob", float("nan"))))
+    ]
+    min_avg_logprob = audio_metrics.get("decoded_min_avg_logprob", min(avg_logprobs, default=None))
+    max_no_speech_prob = audio_metrics.get("decoded_max_no_speech_prob", max(no_speech_probs, default=None))
     if rejected_reason:
         segments = []
 
@@ -683,15 +928,21 @@ async def create_transcription(
         trace_id,
         duration_ms=elapsed_ms(request_started),
         meta={
-            "audio_duration_ms": round(audio_metrics.get("duration_seconds", 0.0) * 1000, 1),
-            "speech_duration_ms": round(duration * 1000, 1),
-            "analysis_ms": analysis_ms,
-            "inference_ms": inference_ms,
-            "text_chars": len(text),
+            "audio_duration_ms": finite_audit_number(audio_metrics.get("duration_seconds", 0.0) * 1000),
+            "speech_duration_ms": finite_audit_number(duration * 1000),
+            "analysis_ms": finite_audit_number(analysis_ms),
+            "inference_ms": finite_audit_number(inference_ms),
+            "rms": finite_audit_number(audio_metrics.get("rms", 0.0), upper=1.0),
+            "peak": finite_audit_number(audio_metrics.get("peak", 0.0), upper=1.0),
+            "quiet_speech_candidate": is_quiet_speech_candidate(audio_metrics),
+            "quiet_recovery_gain": finite_audit_number(audio_metrics.get("quiet_recovery_gain", 1.0), upper=MAX_INPUT_GAIN),
+            "segment_count": min(256, max(0, segment_count)),
+            "min_avg_logprob": finite_audit_number(min_avg_logprob, lower=-20.0, upper=0.0) if min_avg_logprob is not None else None,
+            "max_no_speech_prob": finite_audit_number(max_no_speech_prob, upper=1.0) if max_no_speech_prob is not None else None,
+            "timing_invalid_segment_count": min(256, max(0, int(audio_metrics.get("timing_invalid_segment_count", 0)))),
+            "timing_invalid": bool(audio_metrics.get("timing_invalid", False)),
             "accepted": rejected_reason is None,
-            "rejected_reason": rejected_reason,
-            "proper_noun_corrections": proper_noun_corrections,
-            "low_confidence_segments": low_confidence_segments,
+            **rejection_reason_flags(rejected_reason),
             "vad_fallback_used": vad_fallback_used,
             "decode_retry_used": decode_retry_used,
         },

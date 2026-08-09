@@ -1,16 +1,54 @@
 import unittest
+import numpy as np
 
 from openai_stt_server import (
     DEBUG_AUDIO_DIR,
     VERBOSE_TRANSCRIPTION_LOG,
+    build_hotwords,
+    calculate_input_gain,
     filter_implausible_transcription,
     filter_low_confidence_transcription,
+    frame_energy_stats,
+    is_quiet_speech_candidate,
     is_allowed_origin,
     normalize_proper_nouns,
     preserve_debug_audio,
     should_retry_rejected_transcription,
     should_retry_without_vad,
+    validate_decoded_transcription,
 )
+
+
+class AdaptiveInputGainTests(unittest.TestCase):
+    def test_boosts_observed_soft_speech_without_clipping(self) -> None:
+        gain = calculate_input_gain(
+            {"duration_seconds": 0.959, "rms": 0.010608, "peak": 0.120361}
+        )
+
+        self.assertGreater(gain, 3.7)
+        self.assertLess(gain * 0.120361, 0.95)
+
+    def test_leaves_normal_quiet_and_clipped_input_unchanged(self) -> None:
+        cases = (
+            {"rms": 0.0394, "peak": 0.4732},
+            {"rms": 0.0052, "peak": 0.0451},
+            {"rms": 0.0351, "peak": 1.0},
+        )
+
+        for metrics in cases:
+            with self.subTest(metrics=metrics):
+                self.assertEqual(calculate_input_gain(metrics), 1.0)
+
+    def test_moderately_soft_speech_gets_bounded_gain(self) -> None:
+        gain = calculate_input_gain({"rms": 0.025, "peak": 0.204})
+
+        self.assertAlmostEqual(gain, 1.6)
+        self.assertLessEqual(gain, 4.0)
+
+    def test_boosts_low_rms_chunk_when_peak_still_indicates_speech(self) -> None:
+        gain = calculate_input_gain({"rms": 0.006672, "peak": 0.08786})
+
+        self.assertEqual(gain, 4.0)
 
 
 class TranscriptionFilterTests(unittest.TestCase):
@@ -32,6 +70,85 @@ class TranscriptionFilterTests(unittest.TestCase):
 
         self.assertFalse(should_retry_without_vad(quiet, []))
         self.assertFalse(should_retry_without_vad(speech, [object()]))
+
+
+class QuietSpeechRecoveryTests(unittest.TestCase):
+    def test_frame_stats_have_only_numeric_shape_and_identify_sustained_soft_speech(self) -> None:
+        # 0.5 s silence, then 0.5 s of quiet voiced energy: no lexical/audio content is kept.
+        samples = np.concatenate((np.zeros(8000, dtype=np.float32), np.full(8000, 0.006, dtype=np.float32)))
+        stats = frame_energy_stats(samples)
+        self.assertEqual(set(stats), {"frame_rms_p50", "frame_rms_p90", "frame_rms_p95", "active_frame_count", "active_frame_fraction", "longest_active_run", "relative_energy"})
+        self.assertTrue(all(isinstance(value, float) for value in stats.values()))
+        metrics = {"duration_seconds": 1.0, "rms": 0.0042, "peak": 0.006, **stats}
+        self.assertTrue(is_quiet_speech_candidate(metrics))
+        self.assertTrue(should_retry_without_vad(metrics, []))
+
+    def test_rejects_flat_noise_click_and_too_short_quiet_audio(self) -> None:
+        cases = (
+            np.full(16000, 0.004, dtype=np.float32),
+            np.pad(np.full(400, 0.02, dtype=np.float32), (0, 15600)),
+        )
+        for samples in cases:
+            with self.subTest(samples=samples.size):
+                stats = frame_energy_stats(samples)
+                metrics = {"duration_seconds": 1.0, "rms": 0.004, "peak": 0.04, **stats}
+                self.assertFalse(is_quiet_speech_candidate(metrics))
+        stats = frame_energy_stats(np.concatenate((np.zeros(1600), np.full(1600, 0.006))).astype(np.float32))
+        self.assertFalse(is_quiet_speech_candidate({"duration_seconds": 0.2, "rms": 0.004, "peak": 0.006, **stats}))
+
+    def test_strict_quiet_recovery_accepts_only_plausible_confident_non_speech_decode(self) -> None:
+        stats = frame_energy_stats(
+            np.concatenate((np.zeros(8000, dtype=np.float32), np.full(8000, 0.006, dtype=np.float32)))
+        )
+        metrics = {"duration_seconds": 1.0, "rms": 0.004, "peak": 0.04, **stats}
+        text, reason, _, _ = validate_decoded_transcription("hello", [{"avg_logprob": -0.4, "no_speech_prob": 0.2}], metrics, True)
+        self.assertEqual(text, "hello")
+        self.assertIsNone(reason)
+        # A single bounded band rescues the observed quiet -1.20 decode, without lowering
+        # the normal -1.0 threshold used by non-quiet audio.
+        text, reason, _, _ = validate_decoded_transcription("hello", [{"avg_logprob": -1.20, "no_speech_prob": 0.2}], metrics, True)
+        self.assertEqual(text, "hello")
+        self.assertIsNone(reason)
+        for segments, expected in (([{"avg_logprob": -1.30, "no_speech_prob": 0.2}], "quiet_recovery_low_log_probability"), ([{"avg_logprob": -0.4, "no_speech_prob": 0.7}], "quiet_recovery_no_speech")):
+            with self.subTest(expected=expected):
+                _, reason, _, _ = validate_decoded_transcription("hello", segments, metrics, True)
+                self.assertEqual(reason, expected)
+        _, reason, _, _ = validate_decoded_transcription("x" * 50, [{"avg_logprob": -0.4, "no_speech_prob": 0.2}], metrics, True)
+        self.assertEqual(reason, "short_audio_text_overflow")
+
+    def test_rejects_impossible_decoder_timing_without_inflating_evidence(self) -> None:
+        metrics = {"duration_seconds": 2.939, "rms": 0.004, "peak": 0.04}
+        text, reason, _, dropped = validate_decoded_transcription(
+            "hello",
+            [{"start": 0.0, "end": 29.98, "text": "hello", "avg_logprob": -1.2, "no_speech_prob": 0.2}],
+            metrics,
+            True,
+        )
+
+        self.assertEqual(text, "")
+        self.assertEqual(reason, "timing_invalid")
+        self.assertEqual(dropped, 0)
+        self.assertEqual(metrics["timing_invalid_segment_count"], 1)
+        self.assertTrue(metrics["timing_invalid"])
+
+    def test_quiet_recovery_rejects_low_confidence_no_speech_and_flat_noise(self) -> None:
+        sustained = frame_energy_stats(
+            np.concatenate((np.zeros(8000, dtype=np.float32), np.full(8000, 0.006, dtype=np.float32)))
+        )
+        quiet_speech = {"duration_seconds": 1.0, "rms": 0.004, "peak": 0.04, **sustained}
+        for segment, expected in (
+            ({"avg_logprob": -1.26, "no_speech_prob": 0.2}, "quiet_recovery_low_log_probability"),
+            ({"avg_logprob": -1.2, "no_speech_prob": 0.61}, "quiet_recovery_no_speech"),
+        ):
+            with self.subTest(expected=expected):
+                _, reason, _, _ = validate_decoded_transcription("hello", [segment], quiet_speech.copy(), True)
+                self.assertEqual(reason, expected)
+        flat = frame_energy_stats(np.full(16000, 0.004, dtype=np.float32))
+        _, reason, _, _ = validate_decoded_transcription(
+            "hello", [{"avg_logprob": -1.2, "no_speech_prob": 0.2}],
+            {"duration_seconds": 1.0, "rms": 0.004, "peak": 0.04, **flat}, True,
+        )
+        self.assertEqual(reason, "quiet_recovery_frame_gate")
 
     def test_privacy_defaults_do_not_persist_audio_or_text_logging(self) -> None:
         self.assertIsNone(DEBUG_AUDIO_DIR)
@@ -65,6 +182,31 @@ class TranscriptionFilterTests(unittest.TestCase):
 
         self.assertEqual(text, "")
         self.assertEqual(reason, "quiet_audio")
+
+    def test_rejects_observed_broadcast_subtitle_hallucination(self) -> None:
+        for raw in (
+            "자막 제공 및 광고를 포함하고 있습니다.",
+            "  자막  제공 및 광고를 포함하고 있습니다!  ",
+            "자막 제공 및 광고를 포함합니다",
+        ):
+            with self.subTest(raw=raw):
+                text, reason = filter_implausible_transcription(
+                    raw,
+                    {"duration_seconds": 2.879, "rms": 0.0121, "peak": 0.0699},
+                )
+
+                self.assertEqual(text, "")
+                self.assertEqual(reason, "known_whisper_hallucination")
+
+    def test_keeps_a_real_sentence_that_only_mentions_the_blocked_phrase(self) -> None:
+        raw = "영상에 자막 제공 및 광고를 포함하고 있습니다라고 적혀 있어"
+        text, reason = filter_implausible_transcription(
+            raw,
+            {"duration_seconds": 5.0, "rms": 0.04, "peak": 0.35},
+        )
+
+        self.assertEqual(text, raw)
+        self.assertIsNone(reason)
 
     def test_keeps_observed_normal_middle_chunk(self) -> None:
         text, reason = filter_implausible_transcription(
@@ -108,7 +250,12 @@ class TranscriptionFilterTests(unittest.TestCase):
         self.assertEqual(dropped, 0)
 
     def test_corrects_observed_proper_noun_failures(self) -> None:
-        for raw in ("음류인경 웹서팅해줘", "윤류린 여 검색해줘", "음료인 찾아봐"):
+        for raw in (
+            "음류인경 웹서팅해줘",
+            "윤류린 여 검색해줘",
+            "음료인 찾아봐",
+            "유행렬 웹에서 검색해",
+        ):
             with self.subTest(raw=raw):
                 text, corrections = normalize_proper_nouns(raw)
                 self.assertIn("음유잉여", text)
@@ -119,6 +266,17 @@ class TranscriptionFilterTests(unittest.TestCase):
         text, corrections = normalize_proper_nouns("이건 음료인 것 같아")
 
         self.assertEqual(text, "이건 음료인 것 같아")
+        self.assertEqual(corrections, 0)
+
+    def test_maplestory_vocabulary_bias_does_not_rewrite_apple_store(self) -> None:
+        hotwords = build_hotwords()
+
+        for expected in ("메이플스토리", "메이플 스토리", "넥슨", "게임"):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, hotwords)
+
+        text, corrections = normalize_proper_nouns("애플 스토리에 들렀어")
+        self.assertEqual(text, "애플 스토리에 들렀어")
         self.assertEqual(corrections, 0)
 
 
@@ -187,6 +345,11 @@ class RejectedDecodeRecoveryTests(unittest.TestCase):
         )
         self.assertFalse(
             should_retry_rejected_transcription("empty_transcription", speech)
+        )
+        self.assertFalse(
+            should_retry_rejected_transcription(
+                "known_whisper_hallucination", speech
+            )
         )
 
 

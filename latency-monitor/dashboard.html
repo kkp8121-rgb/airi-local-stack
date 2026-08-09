@@ -9,7 +9,7 @@
       color-scheme: light dark;
       --bg: #f3f5f8; --panel: #ffffff; --ink: #172033; --muted: #687386;
       --line: #dce2eb; --stt: #5275e8; --gap: #9aa5b5; --llm: #914cc9;
-      --tts: #0f9871; --play: #e08a17; --good: #087d5e; --bad: #c43d4d;
+      --tts: #0f9871; --play: #e08a17; --memory: #2686a8; --good: #087d5e; --bad: #c43d4d;
     }
     @media (prefers-color-scheme: dark) {
       :root { --bg: #10151e; --panel: #19212d; --ink: #eef3fb; --muted: #a8b2c0; --line: #303b4b; }
@@ -58,6 +58,7 @@
     <span class="key" style="--color:var(--stt)">STT</span>
     <span class="key" style="--color:var(--gap)">앱 전달</span>
     <span class="key" style="--color:var(--llm)">LLM</span>
+    <span class="key" style="--color:var(--memory)">Memory</span>
     <span class="key" style="--color:var(--tts)">TTS</span>
     <span class="key" style="--color:var(--play)">실제 재생(프런트 계측 시)</span>
   </div>
@@ -79,7 +80,7 @@
   }
 
   function stages(turn) {
-    const stt = turn.stt || {}, llm = turn.llm || {}, tts = turn.tts || {}, playback = turn.playback || {};
+    const stt = turn.stt || {}, memory = turn.memory || {}, llm = turn.llm || {}, tts = turn.tts || {}, playback = turn.playback || {}, kpi = turn.kpi || {};
     const base = stt.start || llm.start || tts.start || playback.start;
     const items = [];
     const add = (name, color, start, end) => {
@@ -88,16 +89,21 @@
     add('STT 요청 처리', 'var(--stt)', stt.start, stt.end || stt.first);
     add('앱 전달', 'var(--gap)', stt.end, llm.start);
     add('LLM 생성', 'var(--llm)', llm.start, llm.first || llm.end);
+    add('LLM 실질 응답 준비', 'var(--llm)', llm.content, llm.content != null ? llm.content + 1 : null);
+    add('Memory retrieve', 'var(--memory)', memory.retrieve_start, memory.retrieve_end || memory.error);
+    add('Memory extract', 'var(--memory)', memory.extract_start, memory.extract_end || memory.error);
     add('TTS 요청 준비', 'var(--gap)', llm.end || llm.first, tts.start);
     add('TTS 첫 바이트', 'var(--tts)', tts.start, tts.first || tts.end);
     add('TTS 남은 WAV', 'var(--tts)', tts.first || tts.start, tts.end);
     add('실제 재생 시작', 'var(--play)', playback.start, playback.start != null ? playback.start + 1 : null);
     return {
-      stt, llm, tts, playback, base, items,
+      stt, memory, llm, tts, playback, kpi, base, items,
       requestToAudio: delta(tts.first, stt.start),
       requestToComplete: delta(tts.end, stt.start),
       requestToPlayback: delta(playback.start, stt.start),
       afterStt: delta(tts.first, stt.end),
+      substantiveToAudio: delta(kpi.substantive_tts_first, llm.content),
+      substantiveToPlayback: delta(kpi.substantive_playback_start, llm.content),
     };
   }
 
@@ -150,7 +156,7 @@
       const bars = all.map(item =>
         `<i class="bar" title="${item.name}: ${ms(item.end - item.start)}" style="background:${item.color};left:${(item.start-low)/range*100}%;width:${Math.max((item.end-item.start)/range*100,.6)}%"></i>`
       ).join('');
-      const sm = view.stt.meta || {}, lm = view.llm.meta || {}, tm = view.tts.meta || {};
+      const sm = view.stt.meta || {}, mm = view.memory.meta || {}, lm = view.llm.meta || {}, tm = view.tts.meta || {};
       const llmName = lm.buffered ? 'LLM 전체 생성' : 'LLM 첫 응답';
       const ttsState = view.tts.end
         ? (view.playback.start ? '실제 재생 이벤트 수신' : 'WAV 완료 · 스피커 시작 미계측')
@@ -170,6 +176,13 @@
           <span>오디오 분석 ${ms(sm.analysis_ms)}</span>
           <span>Whisper ${ms(sm.inference_ms)}</span>
           <span>${llmName} ${ms(delta(view.llm.first || view.llm.end, view.llm.start))}</span>
+          <span>실질 응답 준비 ${ms(delta(view.llm.content, view.llm.start))}</span>
+          <span>실질 응답→첫 오디오 ${ms(view.substantiveToAudio)}</span>
+          <span>실질 응답→실제 재생 ${ms(view.substantiveToPlayback)}</span>
+          <span>상관관계 ${Object.values(turn.correlation || {}).every(v => v === 'explicit') ? '명시적' : '휴리스틱 포함 · 실질 KPI 보류'}</span>
+          <span>Memory retrieve ${ms(delta(view.memory.retrieve_end || view.memory.error, view.memory.retrieve_start) ?? view.memory.duration_ms)}</span>
+          <span>Memory extract ${ms(delta(view.memory.extract_end || view.memory.error, view.memory.extract_start) ?? view.memory.duration_ms)}</span>
+          <span>Memory cache ${mm.cache_hit ? 'hit' : '—'}</span>
           <span>STT 접수→첫 오디오 바이트 ${ms(view.requestToAudio)}</span>
           <span>STT 접수→실제 재생 ${ms(view.requestToPlayback)}</span>
           <span>STT 접수→WAV 완료 ${ms(view.requestToComplete)}</span>

@@ -1,0 +1,15 @@
+diff --git a/packages/stage-ui/src/stores/chat.ts b/packages/stage-ui/src/stores/chat.ts
+--- a/packages/stage-ui/src/stores/chat.ts
++++ b/packages/stage-ui/src/stores/chat.ts
+@@ -97,8 +97,10 @@ async function streamWithStageAdapters(
+   ) {
+     let llmTextLength = 0
+     const headers = { ...options?.headers }
+-    if (providerMode(activeProvider.value) === 'official' && options?.requestCorrelation) {
++    if (options?.requestCorrelation) {
+       headers[AIRI_CHAT_SESSION_ID_HEADER] = options.requestCorrelation.conversationId
++    }
++    if (providerMode(activeProvider.value) === 'official' && options?.requestCorrelation) {
+       headers[AIRI_CHAT_ROUND_ID_HEADER] = options.requestCorrelation.roundId
+       headers[AIRI_CHAT_APP_SURFACE_HEADER] = getConversationAnalyticsSurface()
+     }

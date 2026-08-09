@@ -30,8 +30,16 @@ def elapsed_ms(started: float) -> float:
 
 
 def request_id(headers: Mapping[str, str], fallback: str) -> str:
+    """Resolve one turn-scoped correlation id across LLM, STT, and TTS.
+
+    AIRI's ``x-airi-round-id`` is the authoritative per-round identifier.  The
+    older request headers remain supported for callers which have not yet been
+    upgraded, while the random fallback preserves the existing fail-soft
+    telemetry behavior.
+    """
     return (
-        headers.get("x-airi-request-id")
+        headers.get("x-airi-round-id")
+        or headers.get("x-airi-request-id")
         or headers.get("x-request-id")
         or fallback
     )[:128]

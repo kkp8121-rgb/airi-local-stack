@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AIRI reviewed style JSONL record (policy v3)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "split", "category", "prompt", "answer", "partition", "review", "provenance", "training_eligible"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{2,79}$"},
+    "split": {"enum": ["train", "dev", "test"]},
+    "category": {"enum": ["banter", "commentary", "directness", "seriousness", "truthfulness", "warmth"]},
+    "prompt": {"type": "string", "minLength": 1, "maxLength": 280},
+    "answer": {"type": "string", "minLength": 1, "maxLength": 160},
+    "partition": {"type": "object", "additionalProperties": false, "required": ["tier", "group"], "properties": {"tier": {"const": "S1"}, "group": {"type": "string"}}},
+    "review": {"type": "object", "additionalProperties": false, "required": ["status", "reviewer", "approved_at"], "properties": {"status": {"const": "approved"}, "reviewer": {"type": "string"}, "approved_at": {"type": "string", "format": "date-time"}}},
+    "provenance": {"type": "object", "additionalProperties": false, "required": ["synthetic", "source"], "properties": {"synthetic": {"const": true}, "source": {"type": "string"}}},
+    "training_eligible": {"const": true}
+  }
+}

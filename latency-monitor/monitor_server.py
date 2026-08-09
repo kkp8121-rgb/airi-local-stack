@@ -12,8 +12,41 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST, PORT = "127.0.0.1", 8892
 MAX_BODY = 16384
-SOURCES = {"stt", "llm", "tts", "playback"}
-PHASES = {"start", "first", "end", "error"}
+SOURCES = {"stt", "memory", "llm", "tts", "playback"}
+LOCAL_BROADCAST_SOURCE = "local-proactive-broadcast"
+LOCAL_BROADCAST_PHASE = "playback-completed"
+LOCAL_BROADCAST_FAILURE_CODES = {
+    "invalid-proactive-speech",
+    "audio-context-unavailable",
+    "speech-provider-unavailable",
+    "local-rest-speech-required",
+    "speech-model-or-voice-unavailable",
+    "speech-provider-initialization-failed",
+    "local-speech-endpoint-required",
+    "audio-context-resume-failed",
+    "speech-stage-unavailable",
+    "candidate-rejected",
+    "candidate-too-long",
+    "candidate-content-rejected",
+    "candidate-empty-or-cancelled",
+    "playback-rejected",
+    "playback-interrupted",
+    "intent-cancelled",
+    "proactive-speech-timeout",
+    "pipeline-incomplete",
+}
+PHASES = {
+    "start",
+    "first",
+    "raw_content",
+    "content",
+    "end",
+    "error",
+    "retrieve_start",
+    "retrieve_end",
+    "extract_start",
+    "extract_end",
+}
 
 
 def now_ms():
@@ -25,6 +58,7 @@ class Correlator:
     def __init__(self, limit=20):
         self.turns = deque(maxlen=limit)
         self.by_request = {}
+        self.request_correlation = {}
         self.lock = threading.Lock()
 
     @staticmethod
@@ -41,10 +75,13 @@ class Correlator:
             for request_id, mapped in list(self.by_request.items()):
                 if mapped is expired:
                     del self.by_request[request_id]
+                    self.request_correlation.pop(request_id, None)
         turn = {"turn_id": event["request_id"], "created_ms": event["timestamp_ms"],
-                "stt": {}, "llm": {}, "tts": {"segments": 0}, "playback": {}, "meta": {}}
+                "stt": {}, "memory": {}, "llm": {}, "tts": {"segments": 0},
+                "playback": {}, "kpi": {}, "correlation": {}}
         self.turns.append(turn)
         self.by_request[event["request_id"]] = turn
+        self.request_correlation[event["request_id"]] = "explicit"
         return turn
 
     def _latest(self, key, unassigned=False):
@@ -57,19 +94,35 @@ class Correlator:
         with self.lock:
             source, request_id = event["source"], event["request_id"]
             turn = self.by_request.get(request_id)
+            correlation = self.request_correlation.get(request_id, "unmatched") if turn else "unmatched"
             if source == "stt" and event["phase"] == "start":
                 turn = self._new_turn(event)
+                correlation = "explicit"
             elif not turn:
-                if source == "llm":
-                    turn = self._latest("llm", True) or self._latest("stt")
+                if source == "memory":
+                    turn = self._latest("memory", True) or self._latest("llm") or self._latest("stt")
+                elif source == "llm":
+                    # Join only a turn that has not received any LLM event.
+                    # Falling back to an arbitrary latest STT stage merges a
+                    # new text-only request into the previous completed turn.
+                    turn = self._latest("llm", True)
                 elif source == "tts":
                     turn = self._latest("tts", True) or self._latest("llm")
                 elif source == "playback":
                     turn = self._latest("playback", True) or self._latest("tts")
                 else:
                     turn = self._latest("stt")
+                if not turn and source == "llm" and event["phase"] == "start":
+                    # Text/API turns have no STT start event. The proxy's
+                    # loopback request ID is still an explicit correlation
+                    # boundary, so retain the same content-free waterfall.
+                    turn = self._new_turn(event)
+                    correlation = "explicit"
                 if turn:
                     self.by_request[request_id] = turn
+                    if request_id not in self.request_correlation:
+                        self.request_correlation[request_id] = "heuristic"
+                        correlation = "heuristic"
             if not turn:
                 return False
             stage = turn[source]
@@ -83,6 +136,15 @@ class Correlator:
                 stage.setdefault("first", stamp)
             elif source == "playback" and phase == "start":
                 stage.setdefault("start", stamp)
+            elif source == "llm" and phase == "content":
+                # `content` is the first boundary-visible substantive delta.
+                # Preserve it as TTFS-like evidence and retain the latest
+                # content event separately if an older producer emits more
+                # than once.
+                stage.setdefault("content", stamp)
+                stage["content_last"] = stamp
+            elif source == "llm" and phase == "raw_content":
+                stage.setdefault("raw_content", stamp)
             else:
                 stage[phase] = stamp
             if event.get("duration_ms") is not None:
@@ -90,12 +152,80 @@ class Correlator:
             clean = self._clean_meta(event.get("meta", {}))
             if clean:
                 stage.setdefault("meta", {}).update(clean)
+            # Keep a small numeric-only event trail so a real test can still
+            # be reconstructed on one clock when renderer/TTS request IDs do
+            # not match the LLM ID.  Such entries remain explicitly marked as
+            # heuristic and never become acceptance KPIs.
+            if source in {"tts", "playback"} and phase in {"start", "first", "end", "error"}:
+                timeline = stage.setdefault("timeline", [])
+                timeline.append({
+                    "phase": phase,
+                    "timestamp_ms": stamp,
+                    "correlation": correlation,
+                })
+                if len(timeline) > 64:
+                    del timeline[:-64]
+            # A different request ID can only be joined by the legacy
+            # half-duplex heuristic.  Preserve it for the waterfall, but do
+            # not let it create substantive-content KPIs: overlapping turns
+            # would otherwise be silently attributed to the wrong response.
+            turn["correlation"][source] = correlation
+            content_at = turn["llm"].get("content")
+            if correlation == "explicit":
+                if source == "tts" and phase == "first":
+                    if content_at is not None and stamp >= content_at:
+                        turn["kpi"].setdefault("substantive_tts_first", stamp)
+                    else:
+                        turn["kpi"].setdefault("ack_tts_first", stamp)
+                elif source == "playback" and phase == "start":
+                    if content_at is not None and stamp >= content_at:
+                        turn["kpi"].setdefault("substantive_playback_start", stamp)
+                    else:
+                        turn["kpi"].setdefault("ack_playback_start", stamp)
             return True
 
     def snapshot(self):
         with self.lock:
             # JSON roundtrip is a compact deep-copy; no user raw content exists in this structure.
             return json.loads(json.dumps(list(reversed(self.turns))))
+
+
+class LocalBroadcastProofs:
+    """Content-free, process-local proof that renderer WebAudio drained naturally."""
+
+    def __init__(self, limit=64):
+        self.events = deque(maxlen=limit)
+        self.incomplete = deque(maxlen=limit)
+        self.lock = threading.Lock()
+
+    def add(self, proof):
+        with self.lock:
+            if proof["phase"] == "playback-incomplete":
+                self.incomplete.append({
+                    "received_ms": now_ms(),
+                    "attempt_count": proof["attempt_count"],
+                    "failure_code": proof["failure_code"],
+                    "tts_requests": proof["tts_requests"],
+                    "successful_tts_results": proof["successful_tts_results"],
+                    "natural_playback_ends": proof["natural_playback_ends"],
+                })
+                return
+            self.events.append({
+                "received_ms": now_ms(),
+                "completion_count": proof["completion_count"],
+            })
+
+    def snapshot(self):
+        with self.lock:
+            events = list(self.events)
+            incomplete = list(self.incomplete)
+            return {
+                "accepted_events": len(events),
+                "latest_completion_count": events[-1]["completion_count"] if events else 0,
+                "events": list(reversed(events)),
+                "incomplete_events": len(incomplete),
+                "latest_incomplete": incomplete[-1] if incomplete else None,
+            }
 
 
 class Resources:
@@ -152,13 +282,40 @@ class Resources:
         return {"cpu_percent": cpu, "ram": ram, "gpus": self.gpu_snapshot()}
 
 
-CORRELATOR, RESOURCES = Correlator(), Resources()
+CORRELATOR, RESOURCES, LOCAL_BROADCAST_PROOFS = Correlator(), Resources(), LocalBroadcastProofs()
+
+
+def validate_local_broadcast_proof(payload):
+    if not isinstance(payload, dict):
+        return None
+    completed = {"schema_version", "source", "phase", "completion_count"}
+    incomplete = {
+        "schema_version", "source", "phase", "attempt_count", "tts_requests",
+        "successful_tts_results", "natural_playback_ends", "failure_code",
+    }
+    required = completed if payload.get("phase") == LOCAL_BROADCAST_PHASE else incomplete
+    if set(payload) != required:
+        return None
+    if payload["schema_version"] != 1 or isinstance(payload["schema_version"], bool):
+        return None
+    if payload["source"] != LOCAL_BROADCAST_SOURCE or payload["phase"] not in {LOCAL_BROADCAST_PHASE, "playback-incomplete"}:
+        return None
+    if payload.get("phase") == "playback-incomplete" and payload.get("failure_code") not in LOCAL_BROADCAST_FAILURE_CODES:
+        return None
+    numeric_keys = required - {"schema_version", "source", "phase", "failure_code"}
+    for key in numeric_keys:
+        value = payload[key]
+        minimum = 1 if key in {"completion_count", "attempt_count"} else 0
+        if not isinstance(value, int) or isinstance(value, bool) or value < minimum or value > 1_000_000_000:
+            return None
+    return {key: payload[key] for key in sorted(required)}
 
 
 def validate(payload):
     if not isinstance(payload, dict) or set(("source", "phase", "request_id")) - payload.keys(): return None
     if set(payload) - {"source", "phase", "request_id", "timestamp_ms", "duration_ms", "meta"}: return None
     if payload["source"] not in SOURCES or payload["phase"] not in PHASES or not isinstance(payload["request_id"], str) or not payload["request_id"] or len(payload["request_id"]) > 128: return None
+    if payload["phase"] == "content" and payload["source"] != "llm": return None
     if "timestamp_ms" in payload and (not isinstance(payload["timestamp_ms"], (int, float)) or isinstance(payload["timestamp_ms"], bool)): return None
     if "duration_ms" in payload and (not isinstance(payload["duration_ms"], (int, float)) or isinstance(payload["duration_ms"], bool)): return None
     if "meta" in payload and not isinstance(payload["meta"], dict): return None
@@ -179,8 +336,8 @@ class Handler(BaseHTTPRequestHandler):
         body = json.dumps(value, ensure_ascii=False).encode("utf-8")
         self.send_response(status); self.send_header("Content-Type", "application/json; charset=utf-8"); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
     def do_GET(self):
-        if self.path == "/health": return self.send_json(200, {"status": "ok"})
-        if self.path == "/api/snapshot": return self.send_json(200, {"now_ms": now_ms(), "turns": CORRELATOR.snapshot(), "resources": RESOURCES.snapshot()})
+        if self.path == "/health": return self.send_json(200, {"status": "ok", "local_broadcast": LOCAL_BROADCAST_PROOFS.snapshot()})
+        if self.path == "/api/snapshot": return self.send_json(200, {"now_ms": now_ms(), "turns": CORRELATOR.snapshot(), "resources": RESOURCES.snapshot(), "local_broadcast": LOCAL_BROADCAST_PROOFS.snapshot()})
         if self.path in ("/", "/dashboard.html"):
             try:
                 with open(os.path.join(os.path.dirname(__file__), "dashboard.html"), "rb") as f: body = f.read()
@@ -196,6 +353,10 @@ class Handler(BaseHTTPRequestHandler):
             size = int(self.headers.get("Content-Length", "0"))
             if size <= 0 or size > MAX_BODY: raise ValueError()
             payload = json.loads(self.rfile.read(size).decode("utf-8"))
+            proof = validate_local_broadcast_proof(payload)
+            if proof:
+                LOCAL_BROADCAST_PROOFS.add(proof)
+                return self.send_json(202, {"accepted": True})
             event = validate(payload)
             if not event: raise ValueError()
         except (ValueError, UnicodeDecodeError, json.JSONDecodeError): return self.send_json(400, {"error": "유효하지 않은 계측 이벤트"})

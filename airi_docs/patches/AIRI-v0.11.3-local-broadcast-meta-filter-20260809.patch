@@ -1,0 +1,21 @@
+diff --git a/packages/stage-ui/src/stores/broadcast-director.ts b/packages/stage-ui/src/stores/broadcast-director.ts
+--- a/packages/stage-ui/src/stores/broadcast-director.ts
++++ b/packages/stage-ui/src/stores/broadcast-director.ts
+@@
+-  if (/(?:새로운\s*사용자\s*입력|사용자\s*입력(?:이|은)?\s*없|입력(?:을|이)\s*기다|대화(?:가|이)\s*없|시스템|프롬프트|모델\s*(?:이|은)?\s*대기|new\s+user\s+input|no\s+user\s+input|waiting\s+for\s+(?:user\s+)?input|system\s+prompt)/iu.test(clean)) return false
++  if (/(?:사용자\s*:|아이리\s*:|대화\s*(?:예시|시작)|답변\s*예시|질문\s*예시|사용자\s*입력(?:\s*예시)?|새로운\s*(?:상황|대화|사용자\s*입력)|시나리오\s*시작|시작\s*대화|현재\s*대화\s*상황|최종\s*(?:질문|답변)\s*예시|요청\s*예시|주어진\s*상황|당신의\s*요청을\s*이해했습니다|사용자\s*입력(?:이|은)?\s*없|입력(?:을|이)\s*기다|대화(?:가|이)\s*없|시스템|프롬프트|모델\s*(?:이|은)?\s*대기|stage\s+execution\s+plan|new\s+user\s+interaction\s+start|new\s+user\s+input|no\s+user\s+input|waiting\s+for\s+(?:user\s+)?input|system\s+prompt)/iu.test(clean)) return false
+diff --git a/packages/stage-ui/src/stores/broadcast-director.test.ts b/packages/stage-ui/src/stores/broadcast-director.test.ts
+--- a/packages/stage-ui/src/stores/broadcast-director.test.ts
++++ b/packages/stage-ui/src/stores/broadcast-director.test.ts
+@@
++  it('rejects transcript and prompt-example labels before speech', () => {
++    for (const candidate of [
++      '사용자: 나 지금 선물 준비했어!',
++      '당신이 요청하신 것에 대한 대화 예시입니다:',
++      '새로운 상황 설정',
++      'Stage Execution Plan',
++      '최종 질문 예시:',
++    ]) {
++      expect(isBroadcastCandidate(candidate, []), candidate).toBe(false)
++    }
++  })

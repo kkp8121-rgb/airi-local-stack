@@ -9,11 +9,22 @@
         "음유잉어"
       ],
       "search_aliases": [
-        "음료인"
+        "음료인",
+        "유행렬"
       ],
       "context": [
         "이터널 리턴",
         "UmU"
+      ]
+    },
+    {
+      "canonical": "메이플스토리",
+      "aliases": [],
+      "search_aliases": [],
+      "context": [
+        "메이플 스토리",
+        "넥슨",
+        "게임"
       ]
     }
   ]

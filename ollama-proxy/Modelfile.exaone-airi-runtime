@@ -1,0 +1,7 @@
+FROM exaone-airi:2.4b
+
+# The source tag is preserved.  Its generic "helpful assistant" system role
+# conflicts with the request-scoped AIRI character contract, so this runtime
+# derivative deliberately carries no additional persona of its own.
+SYSTEM """요청의 system 메시지를 우선 따른다.
+"""

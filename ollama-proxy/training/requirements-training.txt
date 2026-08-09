@@ -1,0 +1,9 @@
+# Reproducible local environment; do not install/resolve from a training run.
+torch==2.5.1
+transformers==4.46.3
+peft==0.13.2
+bitsandbytes==0.44.1
+datasets==3.1.0
+accelerate==1.0.1
+safetensors==0.4.5
+packaging==24.2

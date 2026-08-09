@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AIRI reviewed-style manifest (policy v3)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "policy_version", "dataset_sha256", "human_approved", "approved_by", "approved_at", "reviewed_record_count", "categories", "reviewer_provenance"],
+  "properties": {
+    "schema_version": {"const": 3},
+    "policy_version": {"const": "airi-style-qlora/v3"},
+    "dataset_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "human_approved": {"const": true},
+    "approved_by": {"type": "string", "minLength": 3},
+    "approved_at": {"type": "string", "format": "date-time"},
+    "reviewed_record_count": {"type": "integer", "minimum": 200},
+    "categories": {"const": ["banter", "commentary", "directness", "seriousness", "truthfulness", "warmth"]},
+    "reviewer_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["review_program", "dataset_author", "fixture_owner", "independent_review", "reviewers"],
+      "properties": {
+        "review_program": {"type": "string", "minLength": 3},
+        "dataset_author": {"type": "string", "minLength": 3},
+        "fixture_owner": {"type": "string", "minLength": 3},
+        "independent_review": {"const": true},
+        "reviewers": {"type": "array", "minItems": 1}
+      }
+    }
+  }
+}

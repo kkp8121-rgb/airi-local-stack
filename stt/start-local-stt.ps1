@@ -5,7 +5,8 @@ param(
     [string]$ComputeType = 'float16',
     [ValidateRange(1, 32)]
     [int]$CpuThreads = 8,
-    [switch]$EnableDebugAudio
+    [switch]$EnableDebugAudio,
+    [switch]$VerboseTranscriptionLog
 )
 
 $ErrorActionPreference = 'Stop'
@@ -107,6 +108,10 @@ if ($EnableDebugAudio) {
     $debugAudioRoot = Join-Path $repo 'debug-recordings'
     $serverArguments += @('--debug-audio-dir', $debugAudioRoot)
     Write-Warning 'Debug audio persistence is enabled. Uploaded microphone audio will be saved locally.'
+}
+if ($VerboseTranscriptionLog) {
+    $serverArguments += '--verbose-transcription-log'
+    Write-Warning 'Verbose transcription logging is enabled. Recognized text will be written to the STT log.'
 }
 
 $process = Start-Process `

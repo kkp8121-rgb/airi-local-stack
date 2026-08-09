@@ -1,0 +1,2038 @@
+diff --git a/apps/server/src/routes/openai/v1/index.ts b/apps/server/src/routes/openai/v1/index.ts
+index e9bd2a4..9abea5c 100644
+--- a/apps/server/src/routes/openai/v1/index.ts
++++ b/apps/server/src/routes/openai/v1/index.ts
+@@ -75,6 +75,7 @@ export function createV1Routes(input: CreateV1RoutesDeps) {
+           userId: user.id,
+           body,
+           sessionId: c.req.header(AIRI_CHAT_SESSION_ID_HEADER),
++          roundId: c.req.header(AIRI_CHAT_ROUND_ID_HEADER),
+           abortSignal: c.req.raw.signal,
+         }
+       },
+diff --git a/apps/server/src/routes/openai/v1/operations/speech-generation/index.ts b/apps/server/src/routes/openai/v1/operations/speech-generation/index.ts
+index dddf244..816a329 100644
+--- a/apps/server/src/routes/openai/v1/operations/speech-generation/index.ts
++++ b/apps/server/src/routes/openai/v1/operations/speech-generation/index.ts
+@@ -7,6 +7,7 @@ export interface SpeechGenerationOperationRequest {
+   userId: string
+   body: Record<string, unknown>
+   sessionId?: string
++  roundId?: string
+   abortSignal?: AbortSignal
+ }
+ 
+diff --git a/apps/server/src/routes/openai/v1/route.test.ts b/apps/server/src/routes/openai/v1/route.test.ts
+index 337a8e5..856cb27 100644
+--- a/apps/server/src/routes/openai/v1/route.test.ts
++++ b/apps/server/src/routes/openai/v1/route.test.ts
+@@ -1208,6 +1208,40 @@ describe('v1CompletionsRoutes', () => {
+   })
+ 
+   describe('pOST /api/v1/audio/speech', () => {
++    it('preserves the chat round header in TTS tracing', async () => {
++      globalThis.fetch = vi.fn(async () => new Response(new Uint8Array([1]), {
++        status: 200,
++        headers: { 'Content-Type': 'audio/mpeg' },
++      }))
++      const tracing = createMockLlmTracing()
++      const app = createTestApp(
++        createMockFluxService(),
++        createMockConfigKV({ DEFAULT_TTS_MODEL: 'tts-1' }),
++        undefined,
++        undefined,
++        undefined,
++        undefined,
++        tracing,
++      )
++
++      const response = await app.fetch(
++        new Request('http://localhost/api/v1/audio/speech', {
++          method: 'POST',
++          headers: {
++            'Content-Type': 'application/json',
++            [AIRI_CHAT_ROUND_ID_HEADER]: 'round-tts-1',
++          },
++          body: JSON.stringify({ model: 'auto', input: 'test', voice: 'alloy' }),
++        }),
++        { user: testUser } as any,
++      )
++
++      expect(response.status).toBe(200)
++      expect(tracing.startTtsGeneration).toHaveBeenCalledWith(expect.objectContaining({
++        roundId: 'round-tts-1',
++      }))
++    })
++
+     it('should proxy TTS request to upstream with resolved model', async () => {
+       globalThis.fetch = vi.fn(async () => new Response(new Uint8Array([1]), {
+         status: 200,
+diff --git a/apps/server/src/services/domain/llm-tracing/index.test.ts b/apps/server/src/services/domain/llm-tracing/index.test.ts
+index 8668b11..709fd29 100644
+--- a/apps/server/src/services/domain/llm-tracing/index.test.ts
++++ b/apps/server/src/services/domain/llm-tracing/index.test.ts
+@@ -165,6 +165,7 @@ describe('startChatGeneration', () => {
+         requestId: 'tts-1',
+         userId: 'user-1',
+         sessionId: 'sess-1',
++        roundId: 'round-113',
+       })
+       trace.succeed({
+         inputChars: 5,
+@@ -179,6 +180,7 @@ describe('startChatGeneration', () => {
+           model: 'tts-1',
+           metadata: {
+             requestId: 'tts-1',
++            roundId: 'round-113',
+             inputChars: 5,
+             voice: 'alloy',
+             speed: undefined,
+@@ -192,6 +194,7 @@ describe('startChatGeneration', () => {
+         usageDetails: { input: 5 },
+         metadata: {
+           requestId: 'tts-1',
++          roundId: 'round-113',
+           inputChars: 5,
+           voice: 'alloy',
+           speed: undefined,
+diff --git a/apps/server/src/services/domain/llm-tracing/index.ts b/apps/server/src/services/domain/llm-tracing/index.ts
+index f67dbf8..12392a8 100644
+--- a/apps/server/src/services/domain/llm-tracing/index.ts
++++ b/apps/server/src/services/domain/llm-tracing/index.ts
+@@ -75,6 +75,8 @@ interface GenerationInput {
+   userId: string
+   /** Client-supplied conversation id (`x-airi-session-id`). Absent → user-only attribution. */
+   sessionId?: string
++  /** Client-supplied chat round id (`x-airi-round-id`) for correlation. */
++  roundId?: string
+ }
+ 
+ /** Parameters identifying the chat request a generation traces. */
+@@ -184,7 +186,7 @@ function startGeneration(input: GenerationInput): {
+   if (!tracingActive())
+     return null
+ 
+-  const baseMetadata = { requestId: input.requestId, ...input.metadata }
++  const baseMetadata = { requestId: input.requestId, ...(input.roundId ? { roundId: input.roundId } : {}), ...input.metadata }
+   const generation = startObservation(input.name, {
+     input: input.input,
+     model: input.model,
+@@ -244,6 +246,7 @@ export function startChatGeneration(input: ChatGenerationInput): ChatGenerationT
+     metadata: { stream: input.stream },
+     userId: input.userId,
+     sessionId: input.sessionId,
++    roundId: input.roundId,
+   })
+   if (!generation)
+     return NOOP_CHAT_TRACE
+@@ -311,6 +314,7 @@ export function startTtsGeneration(input: TtsGenerationInput): TtsGenerationTrac
+     },
+     userId: input.userId,
+     sessionId: input.sessionId,
++    roundId: input.roundId,
+   })
+   if (!generation)
+     return NOOP_TTS_TRACE
+diff --git a/apps/server/src/services/domain/openai-speech/index.ts b/apps/server/src/services/domain/openai-speech/index.ts
+index 2c38600..bca1d6a 100644
+--- a/apps/server/src/services/domain/openai-speech/index.ts
++++ b/apps/server/src/services/domain/openai-speech/index.ts
+@@ -62,6 +62,7 @@ export interface OpenAiSpeechRequest {
+   userId: string
+   body: Record<string, unknown>
+   sessionId?: string
++  roundId?: string
+   abortSignal?: AbortSignal
+ }
+ 
+@@ -195,6 +196,7 @@ export function createOpenAiSpeechService(deps: OpenAiSpeechServiceDeps) {
+       requestId,
+       userId: input.userId,
+       sessionId: input.sessionId,
++      roundId: input.roundId,
+     })
+ 
+     const span = tracer.startSpan('llm.gateway.tts', {
+diff --git a/apps/stage-pocket/src/pages/index.vue b/apps/stage-pocket/src/pages/index.vue
+index 963ac98..96adb8d 100644
+--- a/apps/stage-pocket/src/pages/index.vue
++++ b/apps/stage-pocket/src/pages/index.vue
+@@ -87,7 +87,7 @@ async function startAudioInteraction() {
+         if (!provider || !activeChatModel.value)
+           return
+ 
+-        await chatStore.ingest(text, { model: activeChatModel.value, chatProvider: provider as ChatProvider })
++        await chatStore.ingest(text, { model: activeChatModel.value, chatProvider: provider as ChatProvider, supersedeActive: true })
+       }
+       catch (err) {
+         console.error('Failed to send chat from voice:', err)
+@@ -116,7 +116,7 @@ async function handleSpeechStart() {
+             if (!provider || !activeChatModel.value)
+               return
+ 
+-            await chatStore.ingest(finalText, { model: activeChatModel.value, chatProvider: provider as ChatProvider })
++            await chatStore.ingest(finalText, { model: activeChatModel.value, chatProvider: provider as ChatProvider, supersedeActive: true })
+           }
+           catch (err) {
+             console.error('Failed to send chat from voice:', err)
+diff --git a/apps/stage-tamagotchi/src/renderer/pages/index.vue b/apps/stage-tamagotchi/src/renderer/pages/index.vue
+index aadea79..b4f0f09 100644
+--- a/apps/stage-tamagotchi/src/renderer/pages/index.vue
++++ b/apps/stage-tamagotchi/src/renderer/pages/index.vue
+@@ -1,5 +1,6 @@
+ <script setup lang="ts">
+ import type { ModelSettingsRuntimeSnapshot } from '@proj-airi/stage-ui/components/scenarios/settings/model-settings/runtime'
++import type { TranscriptFragmentReservation } from '@proj-airi/pipelines-audio'
+ 
+ import type { ModelSettingsRuntimeChannelEvent } from '../../shared/model-settings-runtime'
+ 
+@@ -260,11 +261,17 @@ const { error: transcriptionError, supportsStreamInput } = storeToRefs(hearingPi
+ const chatSyncStore = useChatSyncStore()
+ const streamingTranscriptionUnavailable = ref(false)
+ const shouldUseStreamInput = computed(() => supportsStreamInput.value && !!stream.value && !streamingTranscriptionUnavailable.value)
+-const voiceTranscriptBuffer = createTranscriptBuffer({
++interface VoiceTranscriptContext {
++  roundId: string
++}
++type VoiceTranscriptReservation = TranscriptFragmentReservation<VoiceTranscriptContext>
++
++const voiceTranscriptBuffer = createTranscriptBuffer<VoiceTranscriptContext>({
+   flushDelayMs: 1200,
+   maxBufferedTextLength: 90,
+-  async flush(text) {
+-    await sendVoiceInputTextToChat(text)
++  createContext: () => ({ roundId: globalThis.crypto.randomUUID() }),
++  async flush(text, context) {
++    await sendVoiceInputTextToChat(text, context.roundId)
+   },
+ })
+ 
+@@ -435,9 +442,9 @@ function postSpeakerCaption(text: string) {
+ /**
+  * Sends buffered voice input text to the active chat session.
+  */
+-async function sendVoiceInputTextToChat(text: string) {
++async function sendVoiceInputTextToChat(text: string, roundId?: string) {
+   try {
+-    await chatSyncStore.requestIngest({ text })
++    await chatSyncStore.requestIngest({ text, roundId })
+   }
+   catch (err) {
+     reportVoiceInputFailure('send to chat', err)
+@@ -470,18 +477,47 @@ function getVoiceInputGeneration(metadata?: Record<string, unknown>) {
+   return typeof metadata?.generation === 'number' ? metadata.generation : undefined
+ }
+ 
++/** Reads the opaque local correlation reservation attached before ASR starts. */
++function getVoiceTranscriptReservation(metadata?: Record<string, unknown>) {
++  const reservation = metadata?.transcriptReservation
++  if (!reservation || typeof reservation !== 'object' || !('context' in reservation))
++    return undefined
++
++  return reservation as VoiceTranscriptReservation
++}
++
++function releaseVoiceTranscriptReservation(metadata?: Record<string, unknown>) {
++  const reservation = getVoiceTranscriptReservation(metadata)
++  if (reservation)
++    voiceTranscriptBuffer.release(reservation)
++}
++
+ const voiceInputSession = useVoiceInputSession(stream, {
+   shouldUseStreamInput,
+   canStartSegment: () => enabled.value && !isVoiceInputSuppressed(),
+   inspectBeforeTranscription: ({ metadata }) => inspectVoiceInputProviderRequestGate(getVoiceInputGeneration(metadata)),
+   inspectAfterTranscription: ({ metadata }) => inspectVoiceInputProviderRequestGate(getVoiceInputGeneration(metadata)),
+-  onRecordingReady: () => ({ generation: voiceInputGeneration }),
+-  onTranscriptionResult: ({ text }) => {
++  onRecordingReady: () => {
++    const transcriptReservation = voiceTranscriptBuffer.reserve()
++    return {
++      generation: voiceInputGeneration,
++      roundId: transcriptReservation.context.roundId,
++      transcriptReservation,
++    }
++  },
++  resolveTranscriptionOptions: ({ metadata }) => ({
++    roundId: typeof metadata?.roundId === 'string' ? metadata.roundId : undefined,
++  }),
++  onRecordingSkipped: ({ metadata }) => {
++    releaseVoiceTranscriptReservation(metadata)
++  },
++  onTranscriptionResult: ({ text, metadata }) => {
+     postSpeakerCaption(text)
+     toast(`Voice input transcribed: ${text}`)
+-    voiceTranscriptBuffer.push(text)
++    voiceTranscriptBuffer.push(text, getVoiceTranscriptReservation(metadata))
+   },
+-  onTranscriptionEmpty: () => {
++  onTranscriptionEmpty: ({ metadata }) => {
++    releaseVoiceTranscriptReservation(metadata)
+     if (transcriptionError.value) {
+       reportVoiceInputFailure('transcribe speech', transcriptionError.value)
+       return
+@@ -489,7 +525,8 @@ const voiceInputSession = useVoiceInputSession(stream, {
+ 
+     toast('Voice input transcribed no text.')
+   },
+-  onTranscriptionError: ({ error }) => {
++  onTranscriptionError: ({ error, metadata }) => {
++    releaseVoiceTranscriptReservation(metadata)
+     reportVoiceInputFailure('transcribe speech', error)
+   },
+ })
+diff --git a/apps/stage-tamagotchi/src/renderer/stores/chat-sync.test.ts b/apps/stage-tamagotchi/src/renderer/stores/chat-sync.test.ts
+index a50e16d..26bdf5a 100644
+--- a/apps/stage-tamagotchi/src/renderer/stores/chat-sync.test.ts
++++ b/apps/stage-tamagotchi/src/renderer/stores/chat-sync.test.ts
+@@ -282,6 +282,28 @@ describe('useChatSyncStore', async () => {
+     store.dispose()
+   })
+ 
++  it('preserves a voice round and marks user input as an active-round supersede', async () => {
++    mockState.ingest.mockResolvedValueOnce(undefined)
++    const store = useChatSyncStore()
++    store.initialize('authority')
++
++    await store.requestIngest({
++      text: 'correlated voice input',
++      sessionId: 'session-1',
++      roundId: 'voice-round-1',
++    })
++
++    expect(mockState.ingest).toHaveBeenCalledWith(
++      'correlated voice input',
++      expect.objectContaining({
++        roundId: 'voice-round-1',
++        supersedeActive: true,
++      }),
++      'session-1',
++    )
++    store.dispose()
++  })
++
+   it('rejects follower command timeouts after thirty seconds', async () => {
+     vi.useFakeTimers()
+     vi.spyOn(console, 'error').mockImplementation(() => {})
+diff --git a/apps/stage-tamagotchi/src/renderer/stores/chat-sync.ts b/apps/stage-tamagotchi/src/renderer/stores/chat-sync.ts
+index dade972..8fa0336 100644
+--- a/apps/stage-tamagotchi/src/renderer/stores/chat-sync.ts
++++ b/apps/stage-tamagotchi/src/renderer/stores/chat-sync.ts
+@@ -48,6 +48,8 @@ interface IngestCommandPayload {
+   input?: WebSocketEventInputs
+   sessionId?: string
+   toolset?: ToolsetId
++  /** Preserves a valid caller/voice round key across the renderer authority hop. */
++  roundId?: string
+ }
+ 
+ interface SpotlightIngestPayload {
+@@ -342,6 +344,8 @@ export const useChatSyncStore = defineStore('stage-tamagotchi:chat-sync', () =>
+       attachments: payload.attachments,
+       input: payload.input,
+       tools: resolveTools(payload.toolset),
++      roundId: payload.roundId,
++      supersedeActive: true,
+     }, payload.sessionId)
+   }
+ 
+diff --git a/apps/stage-web/src/pages/index.vue b/apps/stage-web/src/pages/index.vue
+index 920de19..e06da6a 100644
+--- a/apps/stage-web/src/pages/index.vue
++++ b/apps/stage-web/src/pages/index.vue
+@@ -84,7 +84,7 @@ async function startAudioInteraction() {
+         if (!provider || !activeChatModel.value)
+           return
+ 
+-        await chatStore.ingest(text, { model: activeChatModel.value, chatProvider: provider as ChatProvider })
++        await chatStore.ingest(text, { model: activeChatModel.value, chatProvider: provider as ChatProvider, supersedeActive: true })
+       }
+       catch (err) {
+         console.error('Failed to send chat from voice:', err)
+diff --git a/packages/core-agent/src/runtime/chat-orchestrator-runtime.test.ts b/packages/core-agent/src/runtime/chat-orchestrator-runtime.test.ts
+index 30f483c..52854e3 100644
+--- a/packages/core-agent/src/runtime/chat-orchestrator-runtime.test.ts
++++ b/packages/core-agent/src/runtime/chat-orchestrator-runtime.test.ts
+@@ -50,7 +50,7 @@ function createHarness() {
+     await options?.onStreamEvent?.({ type: 'text-delta', text: 'assistant reply' })
+     await options?.onStreamEvent?.({ type: 'finish', finishReason: 'stop' })
+   })
+-  const ids = ['stream-context', 'assistant-id', 'user-id', 'fallback-id']
++  const ids = ['user-id', 'stream-context', 'assistant-id', 'fallback-id']
+   let systemPromptSupplement: string | undefined
+   let nowValue = new Date(2026, 3, 25, 18, 47).getTime()
+   let monotonicNowValues = [1000]
+@@ -520,6 +520,109 @@ describe('createChatOrchestratorRuntime', () => {
+     await firstSend
+   })
+ 
++  /**
++   * @example
++   * runtime.cancelActiveRound('session-1', 'external-round')
++   */
++  it('treats an aborted active round as normal cancellation without completion telemetry', async () => {
++    const harness = createHarness()
++    const completedTurns = vi.fn(async () => {})
++    harness.runtime.hooks.onChatTurnComplete(completedTurns)
++    harness.stream.mockImplementationOnce(async (_model, _chatProvider, _messages, options) => {
++      await new Promise<void>((_resolve, reject) => {
++        options?.abortSignal?.addEventListener('abort', () => reject(new Error('Aborted')), { once: true })
++      })
++    })
++
++    const sending = harness.runtime.ingest('cancel this generation', {
++      model: 'gpt-test',
++      chatProvider: provider,
++      roundId: 'external-round',
++    })
++
++    await vi.waitFor(() => expect(harness.stream).toHaveBeenCalledTimes(1))
++    expect(harness.stream.mock.calls[0]?.[3]?.abortSignal).toBeInstanceOf(AbortSignal)
++    expect(harness.runtime.cancelActiveRound('session-1', 'wrong-round')).toBe(false)
++    expect(harness.runtime.cancelActiveRound('session-1', 'external-round')).toBe(true)
++
++    await expect(sending).resolves.toBeUndefined()
++    expect(harness.sessionMessages['session-1']).toEqual(expect.arrayContaining([
++      expect.objectContaining({ role: 'user', id: 'external-round' }),
++    ]))
++    expect(harness.sessionMessages['session-1']?.some(message => message.role === 'assistant')).toBe(false)
++    expect(harness.telemetry.messageRound).toEqual([])
++    expect(harness.telemetry.messageRoundFailed).toEqual([])
++    expect(harness.telemetry.chatActivationSucceeded).toEqual([])
++    expect(harness.telemetry.chatActivationFailed).toEqual([])
++    expect(completedTurns).not.toHaveBeenCalled()
++    expect(harness.foregroundResets).toHaveLength(1)
++  })
++
++  it('supersedes only the active generation for the same session on a new ingest', async () => {
++    const harness = createHarness()
++    let firstSignal: AbortSignal | undefined
++    harness.stream.mockImplementationOnce(async (_model, _chatProvider, _messages, options) => {
++      firstSignal = options?.abortSignal
++      await new Promise<void>((_resolve, reject) => {
++        options?.abortSignal?.addEventListener('abort', () => reject(new Error('Aborted')), { once: true })
++      })
++    })
++
++    const first = harness.runtime.ingest('first generation', { model: 'gpt-test', chatProvider: provider })
++    await vi.waitFor(() => expect(harness.stream).toHaveBeenCalledTimes(1))
++    const second = harness.runtime.ingest('superseding generation', {
++      model: 'gpt-test',
++      chatProvider: provider,
++      supersedeActive: true,
++    })
++
++    await expect(first).resolves.toBeUndefined()
++    await expect(second).resolves.toBeUndefined()
++    expect(firstSignal?.aborted).toBe(true)
++    expect(harness.stream).toHaveBeenCalledTimes(2)
++  })
++
++  it('uses only bounded valid preassigned round IDs in hooks and request correlation', async () => {
++    const harness = createHarness()
++    let seenRoundId: string | undefined
++    let requestRoundId: string | undefined
++    harness.runtime.hooks.onBeforeMessageComposed(async (_message, context) => {
++      seenRoundId = context.roundId
++    })
++    harness.stream.mockImplementationOnce(async (_model, _chatProvider, _messages, options) => {
++      requestRoundId = options?.requestCorrelation?.roundId
++      await options?.onStreamEvent?.({ type: 'text-delta', text: 'reply' })
++      await options?.onStreamEvent?.({ type: 'finish', finishReason: 'stop' })
++    })
++
++    await harness.runtime.ingest('correlated', {
++      model: 'gpt-test',
++      chatProvider: provider,
++      roundId: 'voice:round-1',
++    })
++
++    expect(seenRoundId).toBe('voice:round-1')
++    expect(requestRoundId).toBe('voice:round-1')
++    expect(harness.sessionMessages['session-1']?.find(message => message.role === 'user')).toMatchObject({ id: 'voice:round-1' })
++  })
++
++  it('replaces invalid preassigned round IDs with a runtime-created ID', async () => {
++    const harness = createHarness()
++    let seenRoundId: string | undefined
++    harness.runtime.hooks.onBeforeMessageComposed(async (_message, context) => {
++      seenRoundId = context.roundId
++    })
++
++    await harness.runtime.ingest('invalid correlation', {
++      model: 'gpt-test',
++      chatProvider: provider,
++      roundId: `invalid\n${'x'.repeat(128)}`,
++    })
++
++    expect(seenRoundId).toBe('user-id')
++    expect(harness.sessionMessages['session-1']?.find(message => message.role === 'user')).toMatchObject({ id: 'user-id' })
++  })
++
+   /**
+    * @example
+    * A queued send rejects if its captured session generation becomes stale.
+diff --git a/packages/core-agent/src/runtime/chat-orchestrator-runtime.ts b/packages/core-agent/src/runtime/chat-orchestrator-runtime.ts
+index 55ae4f3..1fbfeb5 100644
+--- a/packages/core-agent/src/runtime/chat-orchestrator-runtime.ts
++++ b/packages/core-agent/src/runtime/chat-orchestrator-runtime.ts
+@@ -60,6 +60,13 @@ export interface ChatOrchestratorSendOptions {
+   tools?: StreamOptions['tools']
+   /** Original transport input metadata used by bridge/devtools observers. */
+   input?: ChatStreamEventContext['input']
++  /**
++   * Optional caller-provided correlation key (for example, a voice bridge or
++   * another renderer). Invalid values are deliberately replaced by a runtime ID.
++   */
++  roundId?: string
++  /** User-originated input may explicitly replace an active round in this session. */
++  supersedeActive?: boolean
+ }
+ 
+ interface QueuedSend {
+@@ -74,6 +81,11 @@ interface QueuedSend {
+   }
+ }
+ 
++interface ActiveRound {
++  controller: AbortController
++  roundId: string
++}
++
+ /**
+  * Serializable view of a queued send waiting to be processed.
+  */
+@@ -310,6 +322,8 @@ export interface ChatOrchestratorRuntime {
+   ingest: (sendingMessage: string, options: ChatOrchestratorSendOptions, targetSessionId?: string) => Promise<void>
+   /** Rejects queued sends that have not started yet. */
+   cancelPendingSends: (sessionId?: string) => void
++  /** Cancels the active generation for one session, optionally matching a round. */
++  cancelActiveRound: (conversationId: string, roundId?: string) => boolean
+   /** Returns serializable snapshots of currently queued sends. */
+   getPendingQueuedSendSnapshot: () => QueuedSendSnapshot[]
+   /** Returns the current queued send count. */
+@@ -326,6 +340,16 @@ function defaultCreateId() {
+   return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+ }
+ 
++const ROUND_ID_MAX_LENGTH = 128
++const ROUND_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/
++
++function isValidRoundId(roundId: unknown): roundId is string {
++  return typeof roundId === 'string'
++    && roundId.length > 0
++    && roundId.length <= ROUND_ID_MAX_LENGTH
++    && ROUND_ID_PATTERN.test(roundId)
++}
++
+ /**
+  * Creates the core chat orchestrator runtime used behind UI facades.
+  *
+@@ -349,6 +373,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+ 
+   let sending = false
+   let pendingQueuedSends: QueuedSend[] = []
++  const activeRounds = new Map<string, ActiveRound>()
+ 
+   function emitStateChange() {
+     deps.onStateChange?.({
+@@ -433,8 +458,13 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+ 
+     const sendingCreatedAt = now()
+ 
++    // The runtime owns the final correlation ID even when a bridge preassigns it.
++    // Narrow validation prevents transport payloads from becoming unbounded headers.
++    const roundId = isValidRoundId(options.roundId) ? options.roundId : createId()
++
+     // TODO: Expire or prune stale runtime contexts from disconnected services before composing.
+     const streamingMessageContext: ChatStreamEventContext = {
++      roundId,
+       message: { role: 'user', content: sendingMessage, createdAt: sendingCreatedAt, id: createId() },
+       contexts: deps.context.snapshot(),
+       composedMessage: [],
+@@ -451,10 +481,13 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+     })
+ 
+     const isStaleGeneration = () => deps.session.getSessionGeneration(sessionId) !== generation
+-    const shouldAbort = () => isStaleGeneration()
+-    if (shouldAbort())
++    if (isStaleGeneration())
+       return
+ 
++    const activeRound: ActiveRound = { controller: new AbortController(), roundId }
++    activeRounds.set(sessionId, activeRound)
++    const shouldAbort = () => isStaleGeneration() || activeRound.controller.signal.aborted
++
+     setSending(true)
+ 
+     const buildingMessage: StreamingAssistantMessage = {
+@@ -470,7 +503,6 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+     const activeProvider = deps.getActiveProvider?.() ?? ''
+     // The user message is the durable start of a round, so its ID also serves
+     // as the correlation key for every telemetry milestone emitted by it.
+-    const roundId = createId()
+     const correlation: ChatRoundCorrelation = {
+       conversationId: sessionId,
+       roundId,
+@@ -701,6 +733,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+       })
+ 
+       await deps.llm.stream(options.model, options.chatProvider, newMessages as Message[], {
++        abortSignal: activeRound.controller.signal,
+         headers,
+         requestCorrelation: {
+           conversationId: correlation.conversationId,
+@@ -710,6 +743,8 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+         waitForTools: true,
+         captureToolErrors: true,
+         onUsage: (usage) => {
++          if (shouldAbort())
++            return
+           generationUsage = usage
+           deps.onLlmGeneration?.({
+             ...correlation,
+@@ -722,6 +757,8 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+           })
+         },
+         onStreamEvent: async (event: StreamEvent) => {
++          if (shouldAbort())
++            return
+           switch (event.type) {
+             case 'tool-call':
+               toolCallQueue.enqueue({
+@@ -784,14 +821,19 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+         },
+       })
+ 
++      if (shouldAbort())
++        return
++
+       await parser.end()
++      if (shouldAbort())
++        return
+       deps.onAssistantResponseRendered?.({
+         ...correlation,
+         model: options.model,
+         latencyMs: Math.round(monotonicNow() - llmRequestStartedAt),
+       })
+ 
+-      if (!isStaleGeneration() && buildingMessage.slices.length > 0) {
++      if (!shouldAbort() && buildingMessage.slices.length > 0) {
+         const finalAssistant = buildingMessage
+         deps.session.appendSessionMessage(sessionId, finalAssistant)
+         deps.onAssistantMessageAppended?.({
+@@ -802,15 +844,25 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+       }
+ 
+       await hooks.emitStreamEndHooks(streamingMessageContext)
++      if (shouldAbort())
++        return
+       await hooks.emitAssistantResponseEndHooks(fullText, streamingMessageContext)
++      if (shouldAbort())
++        return
+ 
+       await hooks.emitAfterSendHooks(sendingMessage, streamingMessageContext)
++      if (shouldAbort())
++        return
+       await hooks.emitAssistantMessageHooks({ ...buildingMessage }, fullText, streamingMessageContext)
++      if (shouldAbort())
++        return
+       await hooks.emitChatTurnCompleteHooks({
+         output: { ...buildingMessage },
+         outputText: fullText,
+         toolCalls: sessionMessagesForSend.filter(msg => msg.role === 'tool') as ToolMessage[],
+       }, streamingMessageContext)
++      if (shouldAbort())
++        return
+ 
+       deps.onAssistantTurnReady?.({
+         messageText: fullText,
+@@ -840,6 +892,9 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+       }
+     }
+     catch (error) {
++      // Abort is an expected supersede/cancel path, not a failed assistant turn.
++      if (shouldAbort())
++        return
+       console.error('Error sending message:', error)
+       deps.onMessageRoundFailed?.({
+         ...correlation,
+@@ -862,6 +917,11 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+       throw error
+     }
+     finally {
++      if (shouldAbort())
++        resetForegroundStream(sessionId)
++      // A newer send may already own this session; never remove its controller.
++      if (activeRounds.get(sessionId) === activeRound)
++        activeRounds.delete(sessionId)
+       setSending(false)
+       deps.onSendSettled?.({ sessionId })
+     }
+@@ -909,6 +969,11 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+     const sessionId = targetSessionId || deps.getActiveSessionId()
+     const generation = deps.session.getSessionGeneration(sessionId)
+ 
++    // Background/context producers retain FIFO behavior. User-facing input may
++    // explicitly supersede only the active generation in its own session.
++    if (options.supersedeActive)
++      cancelActiveRound(sessionId)
++
+     return new Promise<void>((resolve, reject) => {
+       sendQueue.enqueue({
+         sendingMessage,
+@@ -935,6 +1000,15 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+     emitStateChange()
+   }
+ 
++  function cancelActiveRound(conversationId: string, roundId?: string) {
++    const activeRound = activeRounds.get(conversationId)
++    if (!activeRound || (roundId && activeRound.roundId !== roundId))
++      return false
++
++    activeRound.controller.abort()
++    return true
++  }
++
+   function getPendingQueuedSendSnapshot() {
+     return pendingQueuedSends.map(queued => ({
+       sessionId: queued.sessionId,
+@@ -949,6 +1023,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+   return {
+     ingest,
+     cancelPendingSends,
++    cancelActiveRound,
+     getPendingQueuedSendSnapshot,
+     getPendingQueuedSendCount: () => pendingQueuedSends.length,
+     getSending: () => sending,
+diff --git a/packages/core-agent/src/types/chat.ts b/packages/core-agent/src/types/chat.ts
+index 7db4e24..22d2425 100644
+--- a/packages/core-agent/src/types/chat.ts
++++ b/packages/core-agent/src/types/chat.ts
+@@ -50,6 +50,8 @@ export interface ContextMessage extends ContextUpdate<Record<string, unknown>, u
+ export type ChatHistoryItem = (ChatMessage | ErrorMessage) & { context?: ContextMessage } & { createdAt?: number, id?: string }
+ 
+ export interface ChatStreamEventContext {
++  /** Runtime-selected correlation key for this user-to-assistant round. */
++  roundId: string
+   message: ChatHistoryItem
+   contexts: Record<string, ContextMessage[]>
+   composedMessage: Array<Message>
+diff --git a/packages/pipelines-audio/src/processors/tts-chunker.ts b/packages/pipelines-audio/src/processors/tts-chunker.ts
+index 3f82cef..a198284 100644
+--- a/packages/pipelines-audio/src/processors/tts-chunker.ts
++++ b/packages/pipelines-audio/src/processors/tts-chunker.ts
+@@ -386,7 +386,7 @@ export function processNarrative(text: string, options?: TtsInputChunkOptions):
+ 
+ export function createTtsSegmentStream(
+   tokens: ReadableStream<TextToken>,
+-  meta: { streamId: string, intentId: string, turnId?: string },
++  meta: { streamId: string, intentId: string, turnId?: string, roundId?: string },
+   options?: TtsInputChunkOptions,
+ ) {
+   const { stream, write, close, error } = createPushStream<TextSegment>()
+@@ -486,6 +486,7 @@ export function createTtsSegmentStream(
+       await chunkEmitter(reader, pendingSpecials, options, async (chunk) => {
+         write({
+           turnId: meta.turnId,
++          roundId: meta.roundId,
+           streamId: meta.streamId,
+           intentId: meta.intentId,
+           segmentId: `${meta.streamId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+diff --git a/packages/pipelines-audio/src/speech-pipeline.test.ts b/packages/pipelines-audio/src/speech-pipeline.test.ts
+index a6af1e3..5b64888 100644
+--- a/packages/pipelines-audio/src/speech-pipeline.test.ts
++++ b/packages/pipelines-audio/src/speech-pipeline.test.ts
+@@ -25,7 +25,7 @@ function deferred<T>() {
+ }
+ 
+ function createSegmenter(texts: string[]) {
+-  return (_tokens: ReadableStream<TextToken>, meta: { streamId: string, intentId: string }) => {
++  return (_tokens: ReadableStream<TextToken>, meta: { streamId: string, intentId: string, roundId?: string }) => {
+     let index = 0
+ 
+     return new ReadableStream<TextSegment>({
+@@ -37,6 +37,7 @@ function createSegmenter(texts: string[]) {
+         }
+ 
+         controller.enqueue({
++          roundId: meta.roundId,
+           streamId: meta.streamId,
+           intentId: meta.intentId,
+           segmentId: `${meta.streamId}:${index}`,
+@@ -82,6 +83,31 @@ function createPlaybackSpy(options?: { autoEnd?: boolean }) {
+ }
+ 
+ describe('createSpeechPipeline', () => {
++  it('preserves roundId from intent through request, result, and playback', async () => {
++    const { scheduled, playback } = createPlaybackSpy()
++    const requests: TtsRequest[] = []
++    const results: Array<{ roundId?: string }> = []
++    const pipeline = createSpeechPipeline<string>({
++      segmenter: createSegmenter(['round scoped']),
++      playback,
++      async tts(request) {
++        requests.push(request)
++        return request.text
++      },
++    })
++    const finished = new Promise<void>(resolve => pipeline.on('onIntentEnd', () => resolve()))
++    pipeline.on('onTtsResult', result => results.push(result))
++
++    const intent = pipeline.openIntent({ roundId: 'round-113' })
++    intent.end()
++    await finished
++
++    expect(intent.roundId).toBe('round-113')
++    expect(requests.map(request => request.roundId)).toEqual(['round-113'])
++    expect(results.map(result => result.roundId)).toEqual(['round-113'])
++    expect(scheduled.map(item => item.roundId)).toEqual(['round-113'])
++  })
++
+   it('preserves playback order when TTS completes out of order', async () => {
+     const { scheduled, playback } = createPlaybackSpy()
+ 
+diff --git a/packages/pipelines-audio/src/speech-pipeline.ts b/packages/pipelines-audio/src/speech-pipeline.ts
+index f8f11ee..4e0fc8a 100644
+--- a/packages/pipelines-audio/src/speech-pipeline.ts
++++ b/packages/pipelines-audio/src/speech-pipeline.ts
+@@ -41,11 +41,12 @@ export interface SpeechPipelineOptions<TAudio> {
+   }
+   logger?: LoggerLike
+   priority?: ReturnType<typeof createPriorityResolver>
+-  segmenter?: (tokens: ReadableStream<TextToken>, meta: { streamId: string, intentId: string, turnId?: string }) => ReadableStream<TextSegment>
++  segmenter?: (tokens: ReadableStream<TextToken>, meta: { streamId: string, intentId: string, turnId?: string, roundId?: string }) => ReadableStream<TextSegment>
+ }
+ 
+ interface IntentState {
+   turnId?: string
++  roundId?: string
+   intentId: string
+   streamId: string
+   priority: number
+@@ -130,7 +131,7 @@ export function createSpeechPipeline<TAudio>(options: SpeechPipelineOptions<TAud
+       context.emit(speechPipelineEventMap.onTurnStart, intent.turnId)
+ 
+     const tokenStream = intent.stream
+-    const segmentStream = segmenter(tokenStream, { streamId: intent.streamId, intentId: intent.intentId, turnId: intent.turnId })
++    const segmentStream = segmenter(tokenStream, { streamId: intent.streamId, intentId: intent.intentId, turnId: intent.turnId, roundId: intent.roundId })
+     const completedRequests = new Map<number, TtsResult<TAudio> | null>()
+     const inFlightTasks = new Set<Promise<void>>()
+     let nextRequestSequence = 0
+@@ -165,6 +166,7 @@ export function createSpeechPipeline<TAudio>(options: SpeechPipelineOptions<TAud
+           if (item.special) {
+             context.emit(speechPipelineEventMap.onSpecial, {
+               turnId: item.turnId,
++              roundId: item.roundId,
+               streamId: item.streamId,
+               intentId: item.intentId,
+               segmentId: item.segmentId,
+@@ -187,6 +189,7 @@ export function createSpeechPipeline<TAudio>(options: SpeechPipelineOptions<TAud
+           enqueuePlayback({
+             id: createId('playback'),
+             turnId: completedRequest.turnId,
++            roundId: completedRequest.roundId,
+             streamId: completedRequest.streamId,
+             intentId: completedRequest.intentId,
+             segmentId: completedRequest.segmentId,
+@@ -211,9 +214,9 @@ export function createSpeechPipeline<TAudio>(options: SpeechPipelineOptions<TAud
+           audio = await options.tts(request, intent.controller.signal)
+         }
+         catch (err) {
+-          logger.warn('TTS generation failed:', err)
+           if (intent.controller.signal.aborted)
+             return
++          logger.warn('TTS generation failed:', err)
+         }
+ 
+         if (intent.controller.signal.aborted) {
+@@ -230,6 +233,7 @@ export function createSpeechPipeline<TAudio>(options: SpeechPipelineOptions<TAud
+ 
+         const ttsResult: TtsResult<TAudio> = {
+           turnId: request.turnId,
++          roundId: request.roundId,
+           streamId: request.streamId,
+           intentId: request.intentId,
+           segmentId: request.segmentId,
+@@ -279,6 +283,7 @@ export function createSpeechPipeline<TAudio>(options: SpeechPipelineOptions<TAud
+ 
+         const request: TtsRequest = {
+           turnId: value.turnId,
++          roundId: value.roundId,
+           streamId: value.streamId,
+           intentId: value.intentId,
+           segmentId: value.segmentId,
+@@ -328,6 +333,7 @@ export function createSpeechPipeline<TAudio>(options: SpeechPipelineOptions<TAud
+   function openIntent(optionsInput?: IntentOptions): IntentHandle {
+     const intentId = optionsInput?.intentId ?? createId('intent')
+     const turnId = optionsInput?.turnId
++    const roundId = optionsInput?.roundId
+     const streamId = optionsInput?.streamId ?? createId('stream')
+     const priority = priorityResolver.resolve(optionsInput?.priority)
+     const behavior = optionsInput?.behavior ?? 'queue'
+@@ -339,6 +345,7 @@ export function createSpeechPipeline<TAudio>(options: SpeechPipelineOptions<TAud
+ 
+     const intent: IntentState = {
+       turnId,
++      roundId,
+       intentId,
+       streamId,
+       priority,
+@@ -355,6 +362,7 @@ export function createSpeechPipeline<TAudio>(options: SpeechPipelineOptions<TAud
+ 
+     const handle: IntentHandle = {
+       turnId,
++      roundId,
+       intentId,
+       streamId,
+       priority,
+@@ -367,6 +375,7 @@ export function createSpeechPipeline<TAudio>(options: SpeechPipelineOptions<TAud
+           type: 'literal',
+           value: text,
+           turnId,
++          roundId,
+           streamId,
+           intentId,
+           sequence: sequence++,
+@@ -380,6 +389,7 @@ export function createSpeechPipeline<TAudio>(options: SpeechPipelineOptions<TAud
+           type: 'special',
+           value: special,
+           turnId,
++          roundId,
+           streamId,
+           intentId,
+           sequence: sequence++,
+@@ -392,6 +402,7 @@ export function createSpeechPipeline<TAudio>(options: SpeechPipelineOptions<TAud
+         write({
+           type: 'flush',
+           turnId,
++          roundId,
+           streamId,
+           intentId,
+           sequence: sequence++,
+diff --git a/packages/pipelines-audio/src/transcript-buffer.test.ts b/packages/pipelines-audio/src/transcript-buffer.test.ts
+index 6182ae1..ef0293e 100644
+--- a/packages/pipelines-audio/src/transcript-buffer.test.ts
++++ b/packages/pipelines-audio/src/transcript-buffer.test.ts
+@@ -166,4 +166,88 @@ describe('createTranscriptBuffer', () => {
+     /** @example The recovered chain delivers the next buffered transcript. */
+     expect(flush).toHaveBeenNthCalledWith(2, 'second transcript')
+   })
++
++  it('keeps one correlation context across ASR fragments in the same buffered turn', async () => {
++    const flush = vi.fn()
++    const createContext = vi.fn()
++      .mockReturnValueOnce({ roundId: 'round-1' })
++      .mockReturnValueOnce({ roundId: 'round-2' })
++    const buffer = createTranscriptBuffer({
++      flushDelayMs: 1200,
++      createContext,
++      flush,
++    })
++
++    const first = buffer.reserve()
++    buffer.push('hello', first)
++    vi.advanceTimersByTime(800)
++
++    const second = buffer.reserve()
++    expect(second.context).toBe(first.context)
++    await vi.advanceTimersByTimeAsync(1200)
++    expect(flush).not.toHaveBeenCalled()
++
++    buffer.push('world', second)
++    await vi.advanceTimersByTimeAsync(1200)
++
++    expect(flush).toHaveBeenCalledWith('hello world', { roundId: 'round-1' })
++    expect(createContext).toHaveBeenCalledOnce()
++
++    const next = buffer.reserve()
++    expect(next.context).toEqual({ roundId: 'round-2' })
++  })
++
++  it('releases an empty ASR reservation without reusing its round', () => {
++    const createContext = vi.fn()
++      .mockReturnValueOnce({ roundId: 'empty-round' })
++      .mockReturnValueOnce({ roundId: 'next-round' })
++    const buffer = createTranscriptBuffer({
++      flushDelayMs: 1200,
++      createContext,
++      flush: vi.fn(),
++    })
++
++    const empty = buffer.reserve()
++    buffer.release(empty)
++    const next = buffer.reserve()
++
++    expect(next.context).toEqual({ roundId: 'next-round' })
++  })
++
++  it('invalidates late ASR reservations when pending voice input is cleared', () => {
++    const flush = vi.fn()
++    const buffer = createTranscriptBuffer({
++      flushDelayMs: 1200,
++      createContext: () => ({ roundId: 'stale-round' }),
++      flush,
++    })
++
++    const stale = buffer.reserve()
++    buffer.clear()
++    buffer.push('must not be delivered', stale)
++
++    expect(flush).not.toHaveBeenCalled()
++  })
++
++  it('waits for an in-flight ASR reservation before disposal completes', async () => {
++    const flush = vi.fn()
++    const buffer = createTranscriptBuffer({
++      flushDelayMs: 1200,
++      createContext: () => ({ roundId: 'round-dispose' }),
++      flush,
++    })
++    const reservation = buffer.reserve()
++    let disposed = false
++    const disposal = buffer.dispose().then(() => {
++      disposed = true
++    })
++
++    await Promise.resolve()
++    expect(disposed).toBe(false)
++    buffer.push('final fragment', reservation)
++    await disposal
++
++    expect(flush).toHaveBeenCalledWith('final fragment', { roundId: 'round-dispose' })
++    expect(disposed).toBe(true)
++  })
+ })
+diff --git a/packages/pipelines-audio/src/transcript-buffer.ts b/packages/pipelines-audio/src/transcript-buffer.ts
+index 2db2dc5..cd2dc3d 100644
+--- a/packages/pipelines-audio/src/transcript-buffer.ts
++++ b/packages/pipelines-audio/src/transcript-buffer.ts
+@@ -1,5 +1,10 @@
+ /** Options for grouping nearby ASR fragments into one transcript. */
+-export interface TranscriptBufferOptions {
++export interface TranscriptFragmentReservation<TContext> {
++  /** Correlation context shared by every ASR fragment in one buffered turn. */
++  readonly context: TContext
++}
++
++export interface TranscriptBufferOptions<TContext = undefined> {
+   /** Delay after the latest fragment before the buffer flushes. */
+   flushDelayMs: number
+   /**
+@@ -8,8 +13,10 @@ export interface TranscriptBufferOptions {
+    * @default 80
+    */
+   maxBufferedTextLength?: number
+-  /** Receives serialized, normalized transcript text. */
+-  flush: (text: string) => Promise<void> | void
++  /** Creates correlation context when the first fragment of a spoken turn starts. */
++  createContext?: () => TContext
++  /** Receives serialized, normalized transcript text and its stable turn context. */
++  flush: (text: string, context: TContext) => Promise<void> | void
+ }
+ 
+ const DEFAULT_MAX_BUFFERED_TEXT_LENGTH = 80
+@@ -51,12 +58,24 @@ function joinTranscriptFragments(previous: string, next: string) {
+  * Returns:
+  * - Actions to push fragments, flush or discard pending text, and dispose the buffer.
+  */
+-export function createTranscriptBuffer(options: TranscriptBufferOptions) {
++export function createTranscriptBuffer<TContext = undefined>(options: TranscriptBufferOptions<TContext>) {
+   let pendingText = ''
++  let pendingContext: TContext | undefined
+   let flushTimer: ReturnType<typeof setTimeout> | undefined
+   let flushChain = Promise.resolve()
++  let activeReservations = 0
++  let flushRequested = false
++  let flushWaiter: Promise<void> | undefined
++  let reservationsIdle = Promise.resolve()
++  let resolveReservationsIdle: (() => void) | undefined
++  let reservationGeneration = 0
+   const maxBufferedTextLength = options.maxBufferedTextLength ?? DEFAULT_MAX_BUFFERED_TEXT_LENGTH
+ 
++  type InternalReservation = TranscriptFragmentReservation<TContext> & {
++    generation: number
++    settled: boolean
++  }
++
+   /** Clears the pending delayed flush timer. */
+   function clearFlushTimer() {
+     if (!flushTimer)
+@@ -70,12 +89,28 @@ export function createTranscriptBuffer(options: TranscriptBufferOptions) {
+   function flushNow() {
+     clearFlushTimer()
+ 
++    if (activeReservations > 0) {
++      flushRequested = true
++      if (!flushWaiter) {
++        flushWaiter = reservationsIdle.then(async () => {
++          flushWaiter = undefined
++          await flushNow()
++        })
++      }
++      return flushWaiter
++    }
++
+     const text = pendingText.trim()
++    const context = pendingContext as TContext
+     pendingText = ''
++    pendingContext = undefined
++    flushRequested = false
+     if (!text)
+       return flushChain
+ 
+-    const delivery = flushChain.then(() => options.flush(text))
++    const delivery = flushChain.then(() => options.createContext
++      ? options.flush(text, context)
++      : (options.flush as (text: string) => Promise<void> | void)(text))
+ 
+     // Keep the failed delivery observable to its caller without poisoning later queued flushes.
+     flushChain = delivery.catch(() => {})
+@@ -90,13 +125,79 @@ export function createTranscriptBuffer(options: TranscriptBufferOptions) {
+     }, options.flushDelayMs)
+   }
+ 
++  /**
++   * Reserves the current spoken turn before an asynchronous ASR request starts.
++   * While a reservation is active the pause timer cannot split that request from
++   * the buffered text which preceded it.
++   */
++  function reserve(): TranscriptFragmentReservation<TContext> {
++    clearFlushTimer()
++    if (pendingContext === undefined)
++      pendingContext = options.createContext?.() as TContext
++
++    if (activeReservations === 0) {
++      reservationsIdle = new Promise<void>((resolve) => {
++        resolveReservationsIdle = resolve
++      })
++    }
++    activeReservations += 1
++    return {
++      context: pendingContext,
++      generation: reservationGeneration,
++      settled: false,
++    } as InternalReservation
++  }
++
++  /** Completes an ASR reservation which produced no usable transcript. */
++  function release(reservation: TranscriptFragmentReservation<TContext>) {
++    const internal = reservation as InternalReservation
++    if (internal.settled || internal.generation !== reservationGeneration)
++      return
++
++    internal.settled = true
++    activeReservations = Math.max(0, activeReservations - 1)
++    if (activeReservations > 0)
++      return
++
++    resolveReservationsIdle?.()
++    resolveReservationsIdle = undefined
++
++    if (!pendingText) {
++      pendingContext = undefined
++      flushRequested = false
++      return
++    }
++
++    if ((flushRequested || pendingText.length >= maxBufferedTextLength) && !flushWaiter)
++      void flushNow()
++    else
++      scheduleFlush()
++  }
++
+   /** Adds one normalized ASR fragment to the pending spoken turn. */
+-  function push(text: string) {
++  function push(text: string, reservation?: TranscriptFragmentReservation<TContext>) {
+     const trimmed = text.trim()
+-    if (!trimmed)
++    if (!trimmed) {
++      if (reservation)
++        release(reservation)
+       return
++    }
++
++    const internal = reservation as InternalReservation | undefined
++    if (internal && (internal.settled || internal.generation !== reservationGeneration))
++      return
++
++    if (pendingContext === undefined)
++      pendingContext = internal?.context ?? options.createContext?.() as TContext
+ 
+     pendingText = joinTranscriptFragments(pendingText, trimmed)
++    if (reservation) {
++      if (pendingText.length >= maxBufferedTextLength)
++        flushRequested = true
++      release(reservation)
++      return
++    }
++
+     if (pendingText.length >= maxBufferedTextLength) {
+       void flushNow()
+       return
+@@ -109,6 +210,12 @@ export function createTranscriptBuffer(options: TranscriptBufferOptions) {
+   function clear() {
+     clearFlushTimer()
+     pendingText = ''
++    pendingContext = undefined
++    activeReservations = 0
++    flushRequested = false
++    reservationGeneration += 1
++    resolveReservationsIdle?.()
++    resolveReservationsIdle = undefined
+   }
+ 
+   /** Flushes pending text and prevents its delayed timer from firing later. */
+@@ -117,6 +224,8 @@ export function createTranscriptBuffer(options: TranscriptBufferOptions) {
+   }
+ 
+   return {
++    reserve,
++    release,
+     push,
+     flushNow,
+     clear,
+diff --git a/packages/pipelines-audio/src/types.ts b/packages/pipelines-audio/src/types.ts
+index 77e947e..130f09b 100644
+--- a/packages/pipelines-audio/src/types.ts
++++ b/packages/pipelines-audio/src/types.ts
+@@ -8,6 +8,8 @@ export interface TextToken {
+   type: 'literal' | 'special' | 'flush'
+   value?: string
+   turnId?: string
++  /** Chat round that produced this token. Kept distinct from stream/intent/turn ids. */
++  roundId?: string
+   streamId: string
+   intentId: string
+   sequence: number
+@@ -16,6 +18,7 @@ export interface TextToken {
+ 
+ export interface TextSegment {
+   turnId?: string
++  roundId?: string
+   streamId: string
+   intentId: string
+   segmentId: string
+@@ -27,6 +30,7 @@ export interface TextSegment {
+ 
+ export interface TtsRequest {
+   turnId?: string
++  roundId?: string
+   streamId: string
+   intentId: string
+   segmentId: string
+@@ -39,6 +43,7 @@ export interface TtsRequest {
+ 
+ export interface TtsResult<TAudio> {
+   turnId?: string
++  roundId?: string
+   streamId: string
+   intentId: string
+   segmentId: string
+@@ -52,6 +57,7 @@ export interface TtsResult<TAudio> {
+ export interface PlaybackItem<TAudio> {
+   id: string
+   turnId?: string
++  roundId?: string
+   streamId: string
+   intentId: string
+   segmentId: string
+@@ -90,6 +96,7 @@ export type IntentBehavior = 'queue' | 'interrupt' | 'replace'
+ 
+ export interface IntentOptions {
+   turnId?: string
++  roundId?: string
+   intentId?: string
+   streamId?: string
+   priority?: PriorityLevel | number
+@@ -99,6 +106,7 @@ export interface IntentOptions {
+ 
+ export interface IntentHandle {
+   turnId?: string
++  roundId?: string
+   intentId: string
+   streamId: string
+   priority: number
+diff --git a/packages/stage-ui/src/components/scenes/Stage.vue b/packages/stage-ui/src/components/scenes/Stage.vue
+index 966f39b..7d70e15 100644
+--- a/packages/stage-ui/src/components/scenes/Stage.vue
++++ b/packages/stage-ui/src/components/scenes/Stage.vue
+@@ -36,6 +36,7 @@ import { getDefaultStreamingModel, getDefinedProvider } from '../../libs/provide
+ import { OFFICIAL_SPEECH_PROVIDER_ID, OFFICIAL_SPEECH_STREAMING_PROVIDER_ID } from '../../libs/providers/providers/official'
+ import { bindSpeakingStateToPlaybackManager } from '../../libs/speech/playback-speaking-state'
+ import { createStageTtsSession } from '../../libs/speech/tts-session'
++import { AIRI_CHAT_ROUND_ID_HEADER } from '../../libs/analytics-headers'
+ import { useAudioContext, useSpeakingStore } from '../../stores/audio'
+ import { useBackgroundStore } from '../../stores/background'
+ import { useChatOrchestratorStore } from '../../stores/chat'
+@@ -91,6 +92,19 @@ const { mouthOpenSize, nowSpeaking } = storeToRefs(useSpeakingStore())
+ const { audioContext } = useAudioContext()
+ const currentAudioSource = ref<AudioBufferSourceNode>()
+ const { latestStopRequest } = storeToRefs(useSpeechOutputControlStore())
++// Set synchronously when a new chat round begins. It is intentionally
++// separate from the pipeline's stream, intent, and turn identifiers.
++let activeSpeechRoundId: string | undefined
++
++function isLoopbackEndpoint(baseURL: unknown) {
++  try {
++    const { hostname } = baseURL instanceof URL ? baseURL : new URL(String(baseURL))
++    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1'
++  }
++  catch {
++    return false
++  }
++}
+ 
+ const { onBeforeMessageComposed, onBeforeSend, onTokenLiteral, onTokenSpecial, onStreamEnd, onAssistantResponseEnd } = useChatOrchestratorStore()
+ const chatHookCleanups: Array<() => void> = []
+@@ -253,6 +267,9 @@ async function playSpecialToken(
+ const lipSyncNode = ref<AudioNode>()
+ 
+ async function playFunction(item: Parameters<Parameters<typeof createPlaybackManager<AudioBuffer>>[0]['play']>[0], signal: AbortSignal): Promise<void> {
++  if (item.roundId && item.roundId !== activeSpeechRoundId)
++    return
++
+   if (!audioContext || !item.audio)
+     return
+ 
+@@ -271,6 +288,8 @@ async function playFunction(item: Parameters<Parameters<typeof createPlaybackMan
+     // the wLipSync graph here before connecting the AudioBufferSourceNode.
+     setupAnalyser()
+     await setupLipSync()
++    if (item.roundId && item.roundId !== activeSpeechRoundId)
++      return
+   }
+ 
+   const source = audioContext.createBufferSource()
+@@ -363,7 +382,7 @@ function trackOfficialAutoTtsForTurn(modelId: string) {
+ 
+ const speechPipeline = createSpeechPipeline<AudioBuffer>({
+   tts: async (request, signal) => {
+-    if (signal.aborted)
++    if (signal.aborted || (request.roundId && request.roundId !== activeSpeechRoundId))
+       return null
+ 
+     if (activeSpeechProvider.value === 'speech-noop')
+@@ -473,16 +492,27 @@ const speechPipeline = createSpeechPipeline<AudioBuffer>({
+             },
+           }
+         : speechRequest.providerConfig
++      const providerRequest = provider.speech(model, providerConfigWithAnalytics)
++      const mayAttachRoundId = activeSpeechProvider.value === OFFICIAL_SPEECH_PROVIDER_ID
++        || isLoopbackEndpoint(providerRequest.baseURL)
++      const headers = new Headers(providerRequest.headers)
++      if (mayAttachRoundId && request.roundId)
++        headers.set(AIRI_CHAT_ROUND_ID_HEADER, request.roundId)
++
+       const res = await generateSpeech({
+-        ...provider.speech(model, providerConfigWithAnalytics),
++        ...providerRequest,
++        headers,
+         input: speechRequest.input,
+         voice: voice.id,
++        abortSignal: signal,
+       })
+ 
+-      if (signal.aborted || !res || res.byteLength === 0)
++      if (signal.aborted || (request.roundId && request.roundId !== activeSpeechRoundId) || !res || res.byteLength === 0)
+         return null
+ 
+       const audioBuffer = await audioContext.decodeAudioData(res)
++      if (signal.aborted || (request.roundId && request.roundId !== activeSpeechRoundId))
++        return null
+       trackOfficialAutoTtsForTurn(model)
+       return audioBuffer
+     }
+@@ -542,6 +572,9 @@ bindSpeakingStateToPlaybackManager(playbackManager, {
+       nowSpeaking.value = true
+   },
+   onStart: ({ item }) => {
++    if (item.roundId && item.roundId !== activeSpeechRoundId)
++      return
++
+     // NOTICE: postCaption and postPresent may throw errors if the BroadcastChannel is closed
+     // (e.g., when navigating away from the page). We wrap these in try-catch to prevent
+     // breaking playback when the channel is unavailable.
+@@ -728,6 +761,7 @@ function openTtsSession(): StageTtsSession {
+   }
+   session = createStageTtsSession<AudioBuffer>({
+     transport: resolveSpeechTransport(activeSpeechProvider.value),
++    roundId: activeSpeechRoundId,
+     streaming: buildStreamingSnapshot,
+     audioContext,
+     playbackManager,
+@@ -765,15 +799,16 @@ watch(latestStopRequest, (request) => {
+   stopSpeechOutput(request.reason)
+ })
+ 
+-chatHookCleanups.push(onBeforeMessageComposed(async () => {
++chatHookCleanups.push(onBeforeMessageComposed(async (_message, context) => {
+   officialAutoTtsTrackedForTurn = false
+-  playbackManager.stopAll('new-message')
++  // Stop the previous round before any await lets it produce more audio.
++  stopSpeechOutput('new-message')
++  activeSpeechRoundId = context.roundId
+ 
+   setupAnalyser()
+   await setupLipSync()
+   resetAssistantSpeechSurface('new-message')
+ 
+-  currentSession?.cancel('new-message')
+   currentSession = openTtsSession()
+ }))
+ 
+diff --git a/packages/stage-ui/src/composables/audio/voice-input-session.test.ts b/packages/stage-ui/src/composables/audio/voice-input-session.test.ts
+index a79c59b..efa7d8e 100644
+--- a/packages/stage-ui/src/composables/audio/voice-input-session.test.ts
++++ b/packages/stage-ui/src/composables/audio/voice-input-session.test.ts
+@@ -3,10 +3,15 @@ import { ref, shallowRef } from 'vue'
+ 
+ const audioRecorderMock = vi.hoisted(() => ({
+   isRecording: undefined as unknown as { value: boolean },
++  onStopRecordCallback: undefined as undefined | ((recording: Blob) => Promise<void>),
+   startRecord: vi.fn(),
+   stopRecord: vi.fn(),
+ }))
+ 
++const hearingPipelineMock = vi.hoisted(() => ({
++  transcribeForRecording: vi.fn(async () => ''),
++}))
++
+ vi.mock('../../workers/vad/process.worklet?worker&url', () => ({
+   default: 'vad-worklet-url',
+ }))
+@@ -30,7 +35,7 @@ vi.mock('../../stores/ai/models/vad', async () => {
+ 
+ vi.mock('../../stores/modules/hearing', () => ({
+   useHearingSpeechInputPipeline: () => ({
+-    transcribeForRecording: vi.fn(async () => ''),
++    transcribeForRecording: hearingPipelineMock.transcribeForRecording,
+   }),
+ }))
+ 
+@@ -43,7 +48,9 @@ vi.mock('./audio-recorder', async () => {
+       isRecording: audioRecorderMock.isRecording,
+       startRecord: audioRecorderMock.startRecord,
+       stopRecord: audioRecorderMock.stopRecord,
+-      onStopRecord: vi.fn(),
++      onStopRecord: vi.fn((callback: (recording: Blob) => Promise<void>) => {
++        audioRecorderMock.onStopRecordCallback = callback
++      }),
+     }),
+   }
+ })
+@@ -60,6 +67,8 @@ describe('useVoiceInputSession', () => {
+     vi.useRealTimers()
+     vi.unstubAllGlobals()
+     vi.clearAllMocks()
++    audioRecorderMock.onStopRecordCallback = undefined
++    hearingPipelineMock.transcribeForRecording.mockResolvedValue('')
+   })
+ 
+   it('clears the active recorder segment when discarding fails during stop', async () => {
+@@ -289,4 +298,30 @@ describe('useVoiceInputSession', () => {
+     expect(stopRecord).toHaveBeenCalledOnce()
+     expect(session.activeRecordingTrigger.value).toBeUndefined()
+   })
++
++  it('passes correlation options from recording metadata into the ASR request and result', async () => {
++    const { useVoiceInputSession } = await import('./voice-input-session')
++    const onTranscriptionResult = vi.fn()
++    hearingPipelineMock.transcribeForRecording.mockResolvedValueOnce('hello')
++
++    useVoiceInputSession(shallowRef(createMediaStream()), {
++      volumeFallback: { enabled: false },
++      onRecordingReady: () => ({ roundId: 'round-voice-1' }),
++      resolveTranscriptionOptions: ({ metadata }) => ({
++        roundId: typeof metadata?.roundId === 'string' ? metadata.roundId : undefined,
++      }),
++      onTranscriptionResult,
++    })
++
++    const recording = new Blob(['voice'], { type: 'audio/wav' })
++    await audioRecorderMock.onStopRecordCallback?.(recording)
++
++    expect(hearingPipelineMock.transcribeForRecording).toHaveBeenCalledWith(recording, {
++      roundId: 'round-voice-1',
++    })
++    expect(onTranscriptionResult).toHaveBeenCalledWith(expect.objectContaining({
++      text: 'hello',
++      metadata: { roundId: 'round-voice-1' },
++    }))
++  })
+ })
+diff --git a/packages/stage-ui/src/composables/audio/voice-input-session.ts b/packages/stage-ui/src/composables/audio/voice-input-session.ts
+index db8ea2e..63e2290 100644
+--- a/packages/stage-ui/src/composables/audio/voice-input-session.ts
++++ b/packages/stage-ui/src/composables/audio/voice-input-session.ts
+@@ -1,5 +1,6 @@
+ import type { MaybeRefOrGetter } from 'vue'
+ 
++import type { HearingRecordingTranscriptionOptions } from '../../stores/modules/hearing'
+ import type { VoiceInputRecordingSegment, VoiceInputSessionTrigger } from './voice-input-segment'
+ import type { VoiceInputTranscriptionTicket } from './voice-input-transcription-chain'
+ 
+@@ -65,6 +66,7 @@ export interface VoiceInputSessionOptions {
+   onSegmentStop?: (event: VoiceInputSessionEvent) => void | Promise<void>
+   onSegmentStopped?: (event: VoiceInputSessionEvent) => void | Promise<void>
+   onRecordingReady?: (event: VoiceInputSessionEvent) => Record<string, unknown> | void | Promise<Record<string, unknown> | void>
++  resolveTranscriptionOptions?: (event: VoiceInputSessionEvent) => HearingRecordingTranscriptionOptions | undefined | Promise<HearingRecordingTranscriptionOptions | undefined>
+   onRecordingSkipped?: (event: VoiceInputSessionEvent) => void | Promise<void>
+   onTranscriptionStart?: (event: VoiceInputSessionEvent) => void | Promise<void>
+   onTranscriptionResult?: (event: VoiceInputSessionEvent & { text: string }) => void | Promise<void>
+@@ -315,11 +317,23 @@ export function useVoiceInputSession(
+ 
+     const metadata = await options.onRecordingReady?.(event) ?? undefined
+     const readyEvent = { ...event, metadata }
+-    if (isStaleTranscriptionTicket(ticket, trigger, 'recording-ready'))
++
++    async function dropReadyEventIfStale(phase: string, currentEvent: VoiceInputSessionEvent = readyEvent) {
++      if (!isStaleTranscriptionTicket(ticket, trigger, phase))
++        return false
++
++      await options.onRecordingSkipped?.({
++        ...currentEvent,
++        gate: { skip: true, reason: 'stale-transcription-ticket', details: { phase } },
++      })
++      return true
++    }
++
++    if (await dropReadyEventIfStale('recording-ready'))
+       return
+ 
+     const beforeGate = await options.inspectBeforeTranscription?.(readyEvent)
+-    if (isStaleTranscriptionTicket(ticket, trigger, 'before-transcription-gate'))
++    if (await dropReadyEventIfStale('before-transcription-gate'))
+       return
+ 
+     if (beforeGate?.skip) {
+@@ -336,13 +350,17 @@ export function useVoiceInputSession(
+     let text = ''
+     try {
+       await options.onTranscriptionStart?.(readyEvent)
+-      if (isStaleTranscriptionTicket(ticket, trigger, 'transcription-started'))
++      if (await dropReadyEventIfStale('transcription-started'))
++        return
++
++      const transcriptionOptions = await options.resolveTranscriptionOptions?.(readyEvent)
++      if (await dropReadyEventIfStale('transcription-options-resolved'))
+         return
+ 
+-      text = await transcribeForRecording(recording) ?? ''
++      text = await transcribeForRecording(recording, transcriptionOptions) ?? ''
+     }
+     catch (error) {
+-      if (isStaleTranscriptionTicket(ticket, trigger, 'transcription-error'))
++      if (await dropReadyEventIfStale('transcription-error'))
+         return
+ 
+       lastError.value = error
+@@ -354,12 +372,12 @@ export function useVoiceInputSession(
+       markTranscriptionFinished()
+     }
+ 
+-    if (isStaleTranscriptionTicket(ticket, trigger, 'transcription-result'))
++    if (await dropReadyEventIfStale('transcription-result'))
+       return
+ 
+     const resultEvent = { ...readyEvent, text }
+     const afterGate = await options.inspectAfterTranscription?.(resultEvent)
+-    if (isStaleTranscriptionTicket(ticket, trigger, 'after-transcription-gate'))
++    if (await dropReadyEventIfStale('after-transcription-gate', resultEvent))
+       return
+ 
+     if (afterGate?.skip) {
+diff --git a/packages/stage-ui/src/libs/speech/tts-session.test.ts b/packages/stage-ui/src/libs/speech/tts-session.test.ts
+index 4fadf05..b930fb7 100644
+--- a/packages/stage-ui/src/libs/speech/tts-session.test.ts
++++ b/packages/stage-ui/src/libs/speech/tts-session.test.ts
+@@ -186,6 +186,7 @@ describe('createStreamingTtsSession (adapter)', () => {
+ 
+     createStreamingTtsSession({
+       intentId: 'stream-abc',
++      roundId: 'round-113',
+       snapshot: snap,
+       audioContext: dummyAudioContext,
+       playbackManager: playback,
+@@ -203,6 +204,7 @@ describe('createStreamingTtsSession (adapter)', () => {
+     expect(playback.scheduled).toHaveLength(2)
+     expect(playback.scheduled[0]).toMatchObject({
+       id: 'stream-abc-0',
++      roundId: 'round-113',
+       streamId: 'stream-abc',
+       intentId: 'stream-abc',
+       segmentId: 'stream-abc-0',
+diff --git a/packages/stage-ui/src/libs/speech/tts-session.ts b/packages/stage-ui/src/libs/speech/tts-session.ts
+index e4007ac..7ffd8a1 100644
+--- a/packages/stage-ui/src/libs/speech/tts-session.ts
++++ b/packages/stage-ui/src/libs/speech/tts-session.ts
+@@ -21,6 +21,8 @@ import { createStreamingTtsPipeline } from './streaming-pipeline'
+ export interface StageTtsSession {
+   /** Stable id for this session. Used by playback to scope cancellation. */
+   readonly intentId: string
++  /** Chat round that owns this session, when it was opened from chat. */
++  readonly roundId?: string
+   /** Forward an LLM token. Adapter decides whether it's segmented or raw. */
+   appendText: (text: string) => void
+   /**
+@@ -44,7 +46,7 @@ export interface StageTtsSession {
+  * etc.) that are not part of the session protocol; this typed subset keeps
+  * the adapter honest about what it actually depends on.
+  */
+-type IntentHandleSubset = Pick<IntentHandle, 'intentId' | 'writeLiteral' | 'writeSpecial' | 'writeFlush' | 'end' | 'cancel'>
++type IntentHandleSubset = Pick<IntentHandle, 'intentId' | 'roundId' | 'writeLiteral' | 'writeSpecial' | 'writeFlush' | 'end' | 'cancel'>
+ 
+ /**
+  * Direct adapter from a `pipelines-audio` `IntentHandle` to
+@@ -54,6 +56,7 @@ type IntentHandleSubset = Pick<IntentHandle, 'intentId' | 'writeLiteral' | 'writ
+ function fromIntent(intent: IntentHandleSubset): StageTtsSession {
+   return {
+     intentId: intent.intentId,
++    roundId: intent.roundId,
+     appendText: intent.writeLiteral,
+     appendSpecial: intent.writeSpecial,
+     finishInput: intent.writeFlush,
+@@ -116,6 +119,7 @@ export interface StreamingSessionHooks {
+ 
+ export interface CreateStreamingSessionOptions<TAudio = AudioBuffer> {
+   intentId: string
++  roundId?: string
+   snapshot: StreamingSessionSnapshot
+   audioContext: BaseAudioContext
+   playbackManager: PlaybackManagerSubset<TAudio>
+@@ -150,7 +154,7 @@ export interface CreateStreamingSessionOptions<TAudio = AudioBuffer> {
+ export function createStreamingTtsSession<TAudio = AudioBuffer>(
+   options: CreateStreamingSessionOptions<TAudio>,
+ ): StageTtsSession {
+-  const { intentId, snapshot, audioContext, playbackManager, hooks } = options
++  const { intentId, roundId, snapshot, audioContext, playbackManager, hooks } = options
+   const pipelineFactory = options.pipelineFactory ?? createStreamingTtsPipeline
+ 
+   let sequence = 0
+@@ -168,6 +172,7 @@ export function createStreamingTtsSession<TAudio = AudioBuffer>(
+         return
+       playbackManager.schedule({
+         id: `${intentId}-${index}`,
++        roundId,
+         streamId: intentId,
+         intentId,
+         segmentId: `${intentId}-${index}`,
+@@ -203,6 +208,7 @@ export function createStreamingTtsSession<TAudio = AudioBuffer>(
+ 
+   return {
+     intentId,
++    roundId,
+     appendText: handle.appendText,
+     // Streaming has no in-band queue to align audio with; fire the host's
+     // immediate-special callback so emotion / delay tokens still reach the
+@@ -240,6 +246,8 @@ export interface StageTtsSessionContext<TAudio = AudioBuffer> {
+    * routes through the streaming WebSocket adapter.
+    */
+   transport: SpeechTransport | undefined
++  /** Chat round to preserve across both segmenter and streaming transports. */
++  roundId?: string
+   /**
+    * Snapshot of the streaming provider's settings. Used only when
+    * `transport === 'bidirectional-ws'` and the snapshot is non-null with
+@@ -302,12 +310,13 @@ export function createStageTtsSession<TAudio = AudioBuffer>(
+ 
+   if (!canStream) {
+     // Segmenter path: open the existing IntentHandle and adapt 1:1.
+-    return fromIntent(ctx.openIntent(ctx.intentOptions()))
++    return fromIntent(ctx.openIntent({ ...ctx.intentOptions(), roundId: ctx.roundId }))
+   }
+ 
+   const intentId = createStreamingIntentId()
+   return createStreamingTtsSession<TAudio>({
+     intentId,
++    roundId: ctx.roundId,
+     snapshot: snapshot!,
+     audioContext: ctx.audioContext!,
+     playbackManager: ctx.playbackManager,
+diff --git a/packages/stage-ui/src/services/speech/bus.ts b/packages/stage-ui/src/services/speech/bus.ts
+index 769d7b0..947cb59 100644
+--- a/packages/stage-ui/src/services/speech/bus.ts
++++ b/packages/stage-ui/src/services/speech/bus.ts
+@@ -4,6 +4,7 @@ import { createContext as createBroadcastChannelContext } from '@moeru/eventa/ad
+ export interface SpeechIntentStartPayload {
+   originId: string
+   turnId?: string
++  roundId?: string
+   intentId: string
+   streamId: string
+   ownerId?: string
+@@ -14,6 +15,7 @@ export interface SpeechIntentStartPayload {
+ export interface SpeechIntentTokenPayload {
+   originId: string
+   turnId?: string
++  roundId?: string
+   intentId: string
+   streamId: string
+   sequence: number
+@@ -23,6 +25,7 @@ export interface SpeechIntentTokenPayload {
+ export interface SpeechIntentEndPayload {
+   originId: string
+   turnId?: string
++  roundId?: string
+   intentId: string
+   streamId: string
+ }
+@@ -30,6 +33,7 @@ export interface SpeechIntentEndPayload {
+ export interface SpeechIntentCancelPayload {
+   originId: string
+   turnId?: string
++  roundId?: string
+   intentId: string
+   streamId: string
+   reason?: string
+diff --git a/packages/stage-ui/src/services/speech/pipeline-runtime.ts b/packages/stage-ui/src/services/speech/pipeline-runtime.ts
+index 5efff3c..e2d258b 100644
+--- a/packages/stage-ui/src/services/speech/pipeline-runtime.ts
++++ b/packages/stage-ui/src/services/speech/pipeline-runtime.ts
+@@ -56,6 +56,7 @@ export function createSpeechPipelineRuntime(): SpeechPipelineRuntime {
+ 
+       const intent = hostPipeline.openIntent({
+         turnId: payload.turnId,
++        roundId: payload.roundId,
+         intentId: payload.intentId,
+         streamId: payload.streamId,
+         ownerId: payload.ownerId,
+@@ -73,7 +74,7 @@ export function createSpeechPipelineRuntime(): SpeechPipelineRuntime {
+       if (!intent) {
+         if (!hostPipeline)
+           return
+-        const fallback = hostPipeline.openIntent({ turnId: payload.turnId, intentId: payload.intentId, streamId: payload.streamId })
++        const fallback = hostPipeline.openIntent({ turnId: payload.turnId, roundId: payload.roundId, intentId: payload.intentId, streamId: payload.streamId })
+         remoteIntentMap.set(payload.intentId, fallback)
+         writer(fallback, payload.value)
+         return
+@@ -139,6 +140,7 @@ export function createSpeechPipelineRuntime(): SpeechPipelineRuntime {
+   function createRemoteIntent(options?: IntentOptions): IntentHandle {
+     const intentId = options?.intentId ?? createId('intent')
+     const turnId = options?.turnId
++    const roundId = options?.roundId
+     const streamId = options?.streamId ?? createId('stream')
+     const priority = typeof options?.priority === 'number' ? options?.priority : undefined
+     const behavior = options?.behavior
+@@ -151,6 +153,7 @@ export function createSpeechPipelineRuntime(): SpeechPipelineRuntime {
+     context.emit(speechIntentStartEvent, {
+       originId,
+       turnId,
++      roundId,
+       intentId,
+       streamId,
+       ownerId,
+@@ -161,6 +164,7 @@ export function createSpeechPipelineRuntime(): SpeechPipelineRuntime {
+     const handle: IntentHandle = {
+       intentId,
+       turnId,
++      roundId,
+       streamId,
+       ownerId,
+       priority: priority ?? 0,
+@@ -168,10 +172,11 @@ export function createSpeechPipelineRuntime(): SpeechPipelineRuntime {
+       writeLiteral(value: string) {
+         if (closed)
+           return
+-        write({ type: 'literal', value, turnId, streamId, intentId, sequence, createdAt: Date.now() })
++        write({ type: 'literal', value, turnId, roundId, streamId, intentId, sequence, createdAt: Date.now() })
+         context.emit(speechIntentLiteralEvent, {
+           originId,
+           turnId,
++          roundId,
+           intentId,
+           streamId,
+           sequence: sequence++,
+@@ -181,10 +186,11 @@ export function createSpeechPipelineRuntime(): SpeechPipelineRuntime {
+       writeSpecial(value: string) {
+         if (closed)
+           return
+-        write({ type: 'special', value, turnId, streamId, intentId, sequence, createdAt: Date.now() })
++        write({ type: 'special', value, turnId, roundId, streamId, intentId, sequence, createdAt: Date.now() })
+         context.emit(speechIntentSpecialEvent, {
+           originId,
+           turnId,
++          roundId,
+           intentId,
+           streamId,
+           sequence: sequence++,
+@@ -194,10 +200,11 @@ export function createSpeechPipelineRuntime(): SpeechPipelineRuntime {
+       writeFlush() {
+         if (closed)
+           return
+-        write({ type: 'flush', turnId, streamId, intentId, sequence, createdAt: Date.now() })
++        write({ type: 'flush', turnId, roundId, streamId, intentId, sequence, createdAt: Date.now() })
+         context.emit(speechIntentFlushEvent, {
+           originId,
+           turnId,
++          roundId,
+           intentId,
+           streamId,
+           sequence: sequence++,
+@@ -211,6 +218,7 @@ export function createSpeechPipelineRuntime(): SpeechPipelineRuntime {
+         context.emit(speechIntentEndEvent, {
+           originId,
+           turnId,
++          roundId,
+           intentId,
+           streamId,
+         })
+@@ -223,6 +231,7 @@ export function createSpeechPipelineRuntime(): SpeechPipelineRuntime {
+         context.emit(speechIntentCancelEvent, {
+           originId,
+           turnId,
++          roundId,
+           intentId,
+           streamId,
+           reason,
+diff --git a/packages/stage-ui/src/stores/chat.contract.test.ts b/packages/stage-ui/src/stores/chat.contract.test.ts
+index fe4c24a..435809c 100644
+--- a/packages/stage-ui/src/stores/chat.contract.test.ts
++++ b/packages/stage-ui/src/stores/chat.contract.test.ts
+@@ -308,6 +308,26 @@ describe('chat orchestrator contract', () => {
+     })
+   })
+ 
++  it('adds correlation headers to loopback custom chat only', async () => {
++    llmStreamMock.mockImplementation(async (_model: string, _chatProvider: ChatProvider, _messages: Message[], options: any) => {
++      await options.onStreamEvent({ type: 'text-delta', text: 'ok' })
++      await options.onStreamEvent({ type: 'finish', finishReason: 'stop' })
++    })
++    const loopbackProvider = {
++      chat: () => ({ baseURL: 'http://127.0.0.1:11435/v1/' }),
++    } as unknown as ChatProvider
++    const store = useChatOrchestratorStore()
++
++    await store.ingest('remote custom', { model: 'gpt-test', chatProvider: provider })
++    expect(llmStreamMock.mock.calls[0]?.[3]?.headers).toEqual({})
++
++    await store.ingest('local custom', { model: 'gpt-test', chatProvider: loopbackProvider })
++    expect(llmStreamMock.mock.calls[1]?.[3]?.headers).toEqual({
++      [AIRI_CHAT_SESSION_ID_HEADER]: 'session-1',
++      [AIRI_CHAT_ROUND_ID_HEADER]: expect.any(String),
++    })
++  })
++
+   it('emits second turn analytics from chat sends', async () => {
+     activeProviderRef.value = 'official-provider'
+     llmStreamMock.mockImplementation(async (_model: string, _chatProvider: ChatProvider, _messages: Message[], options: any) => {
+diff --git a/packages/stage-ui/src/stores/chat.ts b/packages/stage-ui/src/stores/chat.ts
+index d4ec894..6caa45b 100644
+--- a/packages/stage-ui/src/stores/chat.ts
++++ b/packages/stage-ui/src/stores/chat.ts
+@@ -47,6 +47,16 @@ function isTextDelta(event: StreamEvent): event is Extract<StreamEvent, { type:
+   return event.type === 'text-delta'
+ }
+ 
++function isLoopbackChatEndpoint(chatProvider: ChatProvider, model: string): boolean {
++  try {
++    const { hostname } = new URL(String(chatProvider.chat(model).baseURL))
++    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1'
++  }
++  catch {
++    return false
++  }
++}
++
+ export type { QueuedSendSnapshot, ChatOrchestratorSendOptions as SendOptions } from '@proj-airi/core-agent'
+ 
+ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
+@@ -97,10 +107,14 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
+   ) {
+     let llmTextLength = 0
+     const headers = { ...options?.headers }
+-    if (providerMode(activeProvider.value) === 'official' && options?.requestCorrelation) {
++    const isOfficialProvider = providerMode(activeProvider.value) === 'official'
++    // Keep correlation headers on AIRI's official gateway and explicit loopback
++    // endpoints only; never disclose them to arbitrary remote custom providers.
++    if ((isOfficialProvider || isLoopbackChatEndpoint(chatProvider, model)) && options?.requestCorrelation) {
+       headers[AIRI_CHAT_SESSION_ID_HEADER] = options.requestCorrelation.conversationId
+       headers[AIRI_CHAT_ROUND_ID_HEADER] = options.requestCorrelation.roundId
+-      headers[AIRI_CHAT_APP_SURFACE_HEADER] = getConversationAnalyticsSurface()
++      if (isOfficialProvider)
++        headers[AIRI_CHAT_APP_SURFACE_HEADER] = getConversationAnalyticsSurface()
+     }
+ 
+     const hadExistingTurn = !!activeTurnSpan.value
+@@ -406,6 +420,10 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
+     runtime.cancelPendingSends(sessionId)
+   }
+ 
++  function cancelActiveRound(conversationId: string, roundId?: string) {
++    return runtime.cancelActiveRound(conversationId, roundId)
++  }
++
+   function getPendingQueuedSendSnapshot() {
+     return runtime.getPendingQueuedSendSnapshot()
+   }
+@@ -417,6 +435,7 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
+     ingest,
+     ingestOnFork,
+     cancelPendingSends,
++    cancelActiveRound,
+     getPendingQueuedSendSnapshot,
+ 
+     clearHooks: runtime.hooks.clearHooks,
+diff --git a/packages/stage-ui/src/stores/chat/maintenance.ts b/packages/stage-ui/src/stores/chat/maintenance.ts
+index dd55f6a..1b92d98 100644
+--- a/packages/stage-ui/src/stores/chat/maintenance.ts
++++ b/packages/stage-ui/src/stores/chat/maintenance.ts
+@@ -12,6 +12,7 @@ export const useChatMaintenanceStore = defineStore('chat-maintenance', () => {
+   const chatOrchestrator = useChatOrchestratorStore()
+ 
+   function cleanupMessages(sessionId = chatSession.activeSessionId) {
++    chatOrchestrator.cancelActiveRound(sessionId)
+     chatSession.cleanupMessages(sessionId)
+     chatContext.resetContexts()
+     chatOrchestrator.cancelPendingSends(sessionId)
+diff --git a/packages/stage-ui/src/stores/modules/hearing.analytics.test.ts b/packages/stage-ui/src/stores/modules/hearing.analytics.test.ts
+index 77eddaa..7657262 100644
+--- a/packages/stage-ui/src/stores/modules/hearing.analytics.test.ts
++++ b/packages/stage-ui/src/stores/modules/hearing.analytics.test.ts
+@@ -13,7 +13,7 @@ const analyticsMock = vi.hoisted(() => ({
+ }))
+ 
+ const transcriptionMock = vi.hoisted(() => ({
+-  generateTranscription: vi.fn(async () => ({ text: 'hello' })),
++  generateTranscription: vi.fn<(options: Record<string, unknown>) => Promise<{ text: string }>>(async () => ({ text: 'hello' })),
+ }))
+ 
+ vi.mock('../../composables/use-analytics', () => ({
+@@ -119,4 +119,36 @@ describe('useHearingStore analytics lifecycle', () => {
+     })
+     expect(analyticsMock.trackAudioDeviceUnavailable).not.toHaveBeenCalled()
+   }, 10000)
++
++  it('adds a round correlation header only to loopback transcription requests', async () => {
++    const { AIRI_CHAT_ROUND_ID_HEADER } = await import('../../libs/analytics-headers')
++    const { useHearingStore } = await import('./hearing')
++    const hearingStore = useHearingStore()
++    const file = new File(['hello'], 'recording.wav', { type: 'audio/wav' })
++
++    await hearingStore.transcription(
++      'openai-compatible-audio-transcription',
++      { transcription: () => ({ baseURL: 'http://127.0.0.1:8880/v1/', headers: { existing: 'kept' } }) } as any,
++      'whisper',
++      file,
++      undefined,
++      { roundId: 'round-local-1' },
++    )
++
++    const localOptions = transcriptionMock.generateTranscription.mock.calls[0]?.[0] as { headers: Headers }
++    expect(localOptions.headers.get('existing')).toBe('kept')
++    expect(localOptions.headers.get(AIRI_CHAT_ROUND_ID_HEADER)).toBe('round-local-1')
++
++    await hearingStore.transcription(
++      'openai-compatible-audio-transcription',
++      { transcription: () => ({ baseURL: 'https://stt.example/v1/', headers: { existing: 'kept' } }) } as any,
++      'whisper',
++      file,
++      undefined,
++      { roundId: 'must-not-leave-device' },
++    )
++
++    const remoteOptions = transcriptionMock.generateTranscription.mock.calls[1]?.[0] as { headers: Record<string, string> }
++    expect(remoteOptions.headers).toEqual({ existing: 'kept' })
++  })
+ })
+diff --git a/packages/stage-ui/src/stores/modules/hearing.ts b/packages/stage-ui/src/stores/modules/hearing.ts
+index ef42774..3020573 100644
+--- a/packages/stage-ui/src/stores/modules/hearing.ts
++++ b/packages/stage-ui/src/stores/modules/hearing.ts
+@@ -15,6 +15,7 @@ import vadWorkletUrl from '../../workers/vad/process.worklet?worker&url'
+ 
+ import { useAnalytics } from '../../composables/use-analytics'
+ import { activeTurnSpan, startSpan } from '../../composables/use-io-tracer'
++import { AIRI_CHAT_ROUND_ID_HEADER } from '../../libs/analytics-headers'
+ import { OFFICIAL_TRANSCRIPTION_PROVIDER_ID } from '../../libs/providers'
+ import { useProvidersStore } from '../providers'
+ import { streamAliyunTranscription } from '../providers/aliyun/stream-transcription'
+@@ -107,6 +108,41 @@ type HearingTranscriptionInput = File | {
+ 
+ interface HearingTranscriptionInvokeOptions {
+   providerOptions?: Record<string, unknown>
++  roundId?: string
++}
++
++export interface HearingRecordingTranscriptionOptions {
++  roundId?: string
++}
++
++const MAX_CORRELATION_ID_LENGTH = 128
++const CORRELATION_ID_RE = /^[A-Za-z0-9._:-]+$/
++
++/** Correlation headers are only attached to loopback STT endpoints. */
++function withLocalTranscriptionRoundId<T extends { baseURL?: unknown, headers?: HeadersInit }>(request: T, roundId?: string): T {
++  const normalizedRoundId = roundId?.trim()
++  if (!normalizedRoundId
++    || normalizedRoundId.length > MAX_CORRELATION_ID_LENGTH
++    || !CORRELATION_ID_RE.test(normalizedRoundId))
++    return request
++
++  let target: URL
++  try {
++    target = request.baseURL instanceof URL
++      ? request.baseURL
++      : new URL(String(request.baseURL))
++  }
++  catch {
++    return request
++  }
++
++  const hostname = target.hostname.toLowerCase()
++  if (hostname !== 'localhost' && hostname !== '127.0.0.1' && hostname !== '[::1]' && hostname !== '::1')
++    return request
++
++  const headers = new Headers(request.headers)
++  headers.set(AIRI_CHAT_ROUND_ID_HEADER, normalizedRoundId)
++  return { ...request, headers }
+ }
+ 
+ export const CONFIDENCE_THRESHOLD_DISABLED = -3
+@@ -443,7 +479,10 @@ export const useHearingStore = defineStore('hearing-store', () => {
+     try {
+       if (features.supportsStreamOutput && streamExecutor) {
+         // TODO: integrate VAD-driven silence detection to stop and restart realtime sessions based on silence thresholds.
+-        const request = provider.transcription(model, options?.providerOptions)
++        const request = withLocalTranscriptionRoundId(
++          provider.transcription(model, options?.providerOptions),
++          options?.roundId,
++        )
+ 
+         // Stream branches: emit succeeded with char_count=0 once the
+         // executor returns successfully — char count is only known by
+@@ -495,8 +534,12 @@ export const useHearingStore = defineStore('hearing-store', () => {
+       }
+ 
+       const useVerboseJson = !format && confidenceThreshold.value > CONFIDENCE_THRESHOLD_DISABLED
++      const request = withLocalTranscriptionRoundId(
++        provider.transcription(model, options?.providerOptions),
++        options?.roundId,
++      )
+       const response = await generateTranscription({
+-        ...provider.transcription(model, options?.providerOptions),
++        ...request,
+         file: normalizedInput.file,
+         fileName: resolveTranscriptionFileName(normalizedInput.file, normalizedInput.fileName),
+         responseFormat: useVerboseJson ? 'verbose_json' : format,
+@@ -1113,7 +1156,10 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
+     }
+   }
+ 
+-  async function transcribeForRecording(recording: Blob | null | undefined) {
++  async function transcribeForRecording(
++    recording: Blob | null | undefined,
++    options?: HearingRecordingTranscriptionOptions,
++  ) {
+     error.value = undefined
+ 
+     if (!recording) {
+@@ -1161,7 +1207,7 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
+         model,
+         new File([recording], 'recording.wav', { type: recording.type || 'audio/wav' }),
+         undefined,
+-        { providerOptions },
++        { providerOptions, roundId: options?.roundId },
+       )
+       const text = result.mode === 'stream' ? await result.text : result.text
+       if (!text || !text.trim()) {

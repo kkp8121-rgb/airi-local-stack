@@ -20,6 +20,7 @@
            patch-airi-voice-input-segmentation.ps1
            patch-airi-reaction-latency.ps1
            patch-airi-playback-latency.ps1
+           patch-airi-session-header.ps1
          patch-airi-transcript-latency.ps1 is DEPRECATED (folded into
          patch-airi-reaction-latency.ps1) and is intentionally not run.
       5. Re-scans and prints a pass/fail table. Exits 1 if any site is wrong.
@@ -160,6 +161,7 @@ $stockMarkers = @(
     @{ Patch = 'reaction-latency';         Text = 'var DEFAULT_VAD_MIN_SILENCE_DURATION_MS = 1200;';                                 Expected = 1 }
     @{ Patch = 'reaction-latency';         Text = "flushDelayMs: 1200,`n`t`t`tmaxBufferedTextLength: 90,";                           Expected = 1 }
     @{ Patch = 'playback-latency';         Text = "source.start(0);`n`t`t`t`t`tif (item.intentId.startsWith(`"stream-`")) {";        Expected = 1 }
+    @{ Patch = 'session-header';           Text = "`t`tif (providerMode(activeProvider.value) === `"official`" && options?.requestCorrelation) {`n`t`t`theaders[AIRI_CHAT_SESSION_ID_HEADER] = options.requestCorrelation.conversationId;`n`t`t`theaders[AIRI_CHAT_ROUND_ID_HEADER] = options.requestCorrelation.roundId;`n`t`t`theaders[AIRI_CHAT_APP_SURFACE_HEADER] = getConversationAnalyticsSurface();`n`t`t}"; Expected = 1 }
 )
 
 $patchedMarkers = @(
@@ -170,6 +172,7 @@ $patchedMarkers = @(
     @{ Patch = 'reaction-latency';         Site = 'VAD silence 450';       Text = 'var DEFAULT_VAD_MIN_SILENCE_DURATION_MS =  450;';                   Expected = 1 }
     @{ Patch = 'reaction-latency';         Site = 'transcript flush 400';  Text = "flushDelayMs:  400,`n`t`t`tmaxBufferedTextLength: 90,";             Expected = 1 }
     @{ Patch = 'playback-latency';         Site = 'playback start event';  Text = 'request_id:String(item.intentId)';                                  Expected = 1 }
+    @{ Patch = 'session-header';           Site = 'custom conversation id'; Text = 'if(options?.requestCorrelation)headers[AIRI_CHAT_SESSION_ID_HEADER]=options.requestCorrelation.conversationId;'; Expected = 1 }
 )
 
 # Superseded patch that deleted the volume-fallback safety net for VAD segments.
@@ -229,6 +232,7 @@ $patchScripts = @(
     'patch-airi-voice-input-segmentation.ps1'
     'patch-airi-reaction-latency.ps1'
     'patch-airi-playback-latency.ps1'
+    'patch-airi-session-header.ps1'
 )
 
 $failures = New-Object System.Collections.ArrayList
@@ -296,7 +300,8 @@ if ($failedChecks.Count -gt 0 -or $failures.Count -gt 0) {
 
 Write-Output 'All AIRI patches applied and verified.'
 Write-Output 'Effective values: raw mic capture, native MediaRecorder (Opus/WebM), VAD silence 450 ms,'
-Write-Output 'volume-fallback safety net 2700 ms, transcript flush 400 ms, playback start reported to 127.0.0.1:8892.'
+Write-Output 'volume-fallback safety net 2700 ms, transcript flush 400 ms, playback start reported to 127.0.0.1:8892,'
+Write-Output 'and stable x-airi-session-id on custom OpenAI-compatible chat requests.'
 if (Test-Path -LiteralPath $pristineBackupPath) {
     Write-Output "Pristine backup: $pristineBackupPath"
 }
