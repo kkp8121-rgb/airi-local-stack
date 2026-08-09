@@ -66,6 +66,17 @@
 
 다음 품질 실험은 같은 모델이 JSON schema로 `관찰 근거 2개 + 관계 + speech`를 생성하게 하고, 검증된 speech만 기존 plain dialogue boundary로 보내는 방식이다. 고정 대사/횟수 if문은 사용하지 않으며 memory/card/character loop를 그대로 통과시킨다. 이 실험 시작 직전에 로컬 스택 전체 listener가 사라져 모델 호출은 완료하지 못했다.
 
+### Push 이후 structured grounding 실험
+
+로컬 스택을 안전 기본값으로 다시 기동한 뒤 원본 `exaone-airi:2.4b`에 합성 일상 장면 3건을 직접 보냈다. 이 경로는 proxy, DB, UI, TTS, journal을 사용하지 않았다.
+
+- JSON schema의 `anchors` 두 개는 3/3 grounded했다.
+- 생성 시간은 0.393~0.783초로 충분히 짧았다.
+- 최종 `speech`는 1/3만 grounded했다. 나머지 두 건은 관찰되지 않은 안도감·불편함을 추가하거나 두 번째 근거를 누락했다.
+- 실패한 두 건에 anchor ledger, 탈락 원인, rejected draft를 제공해 correction-only 재생성을 한 번씩 실행했지만 0/2였다. 모델은 다시 감정·가치 판단을 추가했고 한 근거를 누락했다.
+
+결론: JSON schema는 근거 추출에는 유효하지만 현재 2.4B 모델의 대사 합성 품질을 보장하지 못한다. 이 경로를 production에 통합하거나 prompt를 더 누적하지 않는다. 검증을 느슨하게 하거나 고정 fallback 대사를 넣지 않으며, 다음 품질 분기는 legacy card 오염 경계 확인과 200건 pending S1의 독립 검수다.
+
 ## 4. 최신 집중 검증
 
 - `test_ollama_proxy -k grounding`: 9 passed.
@@ -94,14 +105,15 @@
 - 11436: listener 없음이 정상.
 - memory/knowledge ready, extraction/search/cloud/evaluation OFF.
 
+Push 이후 재기동 검사에서는 8880·8890·8892·9880·11434·11435가 loopback에서 정상이고 11436은 계속 OFF였다. STT는 `large-v3-turbo`/CUDA/`int8_float16`, memory·knowledge는 ready, Ollama는 `num_gpu=999`/`keep_alive=30m`, character evaluator는 같은 GPU/keep-alive 설정이다. extraction, external search/chat, evaluation collection은 OFF다.
+
 ## 6. 다음 작업 순서
 
-1. 스택을 안전 기본값으로 기동하고 health/listener를 확인한다.
-2. JSON-schema ordinary-dialogue probe를 DB/UI/TTS 없는 direct local call로 3개 독립 합성 장면에 실행한다.
-3. schema가 짧고 grounded한 speech를 안정적으로 만들 때만 proxy의 ordinary declarative path에 통합한다. 실패하면 원본 prompt-only 경로를 유지하고 training 데이터 검수로 이동한다.
-4. 관련 unit test 후 무포커스 API로 최소 3개 서로 다른 일상 장면을 확인한다. 합격 기준은 첫 content 8초 이내, 한국어 한 문장, 상담/조언/복창/상태 요약/근거 없는 비유 없음, wire와 journal exact match다.
-5. 사용자의 다음 자연 음성에서 quiet recovery와 first-word STT를 측정한다. 전용 발화를 반복 요구하지 않는다.
-6. 논리 체크포인트 마지막에 전체 회귀를 한 번 수행하고 다음 commit/push를 만든다.
+1. 현재 default card와 request header 경로를 감사해 과거 ACT·선물 예시가 정확한 프로젝트 생성 템플릿일 때만 안전하게 마이그레이션한다. 사용자 작성 필드는 추측으로 지우지 않는다.
+2. 200건 pending S1을 독립 검수하고, 승인 sidecar·reviewer provenance가 갖춰지기 전에는 production dataset이나 QLoRA 입력으로 승격하지 않는다.
+3. 관련 unit test 후 무포커스 API로 최소 3개 서로 다른 일상 장면을 확인한다. 합격 기준은 첫 content 8초 이내, 한국어 한 문장, 상담/조언/복창/상태 요약/근거 없는 비유 없음, wire와 journal exact match다.
+4. 사용자의 다음 자연 음성에서 quiet recovery와 first-word STT를 측정한다. 전용 발화를 반복 요구하지 않는다.
+5. 논리 체크포인트 마지막에 전체 회귀를 한 번 수행하고 다음 commit/push를 만든다.
 
 ## 7. 커밋 경계와 개인정보
 
