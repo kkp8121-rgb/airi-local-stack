@@ -12,7 +12,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, TextIO
 
-DECISION_FIELDS = {"id", "decision", "vtuber_voice", "counselor_tone", "safety_truth", "notes", "reviewer", "reviewed_at"}
+from validate_airi_style_pending import GateError, record_sha256, validate_decisions, validate_pending_dataset
+
+DECISION_FIELDS = {"id", "record_sha256", "decision", "vtuber_voice", "counselor_tone", "safety_truth", "notes", "reviewer", "reviewed_at"}
 DECISIONS = {"approve", "rewrite", "reject"}
 Input = Callable[[str], str]
 
@@ -50,11 +52,17 @@ def _load_pending(path: Path) -> list[dict[str, Any]]:
         seen.add(row["id"])
     return rows
 
-def _load_decisions(path: Path, pending_ids: set[str]) -> list[dict[str, Any]]:
+def _load_decisions(path: Path, pending: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not path.exists(): return []
+    pending_by_id = {row["id"]: row for row in pending}
+    try:
+        validate_decisions(path, pending_by_id)
+    except GateError as exc:
+        raise ReviewError(str(exc)) from exc
     rows, seen = _read_jsonl(path, "decision sidecar"), set()
     for row in rows:
-        if set(row) != DECISION_FIELDS or row.get("id") not in pending_ids or row["id"] in seen: raise ReviewError("decision sidecar has invalid or duplicate decisions")
+        if set(row) != DECISION_FIELDS or row.get("id") not in pending_by_id or row["id"] in seen: raise ReviewError("decision sidecar has invalid or duplicate decisions")
+        if not isinstance(row.get("record_sha256"), str) or row["record_sha256"] != record_sha256(pending_by_id[row["id"]]): raise ReviewError("decision sidecar record hash does not match pending record")
         if row.get("decision") not in DECISIONS or not all(type(row.get(key)) is bool for key in ("vtuber_voice", "counselor_tone", "safety_truth")): raise ReviewError("decision sidecar has invalid decision fields")
         if not isinstance(row.get("notes"), str) or not isinstance(row.get("reviewer"), str) or not row["reviewer"].strip() or not _rfc3339_utc(row.get("reviewed_at")): raise ReviewError("decision sidecar has invalid reviewer fields")
         if row["decision"] in {"rewrite", "reject"} and not row["notes"].strip(): raise ReviewError("decision sidecar has missing decision notes")
@@ -110,7 +118,11 @@ def run_cli(argv: list[str] | None = None, *, input_fn: Input = input, output: T
     try:
         if args.limit is not None and args.limit < 0: raise ReviewError("limit must be zero or greater")
         pending_path = _regular_input(args.pending); decisions_path = _output_path(args.decisions, pending_path)
-        pending = _load_pending(pending_path); decisions = _load_decisions(decisions_path, {row["id"] for row in pending})
+        try:
+            validate_pending_dataset(pending_path)
+        except GateError as exc:
+            raise ReviewError(f"pending input failed strict validation: {exc}") from exc
+        pending = _load_pending(pending_path); decisions = _load_decisions(decisions_path, pending)
         if args.status: _status(pending, decisions, output); return 0
         reviewer = args.reviewer if args.reviewer is not None else _ask("Reviewer identity (required): ", input_fn)
         if reviewer is None: print("Review ended; no decision recorded.", file=output); return 0
@@ -139,7 +151,7 @@ def run_cli(argv: list[str] | None = None, *, input_fn: Input = input, output: T
                 notes = value.strip()
                 if not notes: print("Decision not recorded: notes are required.", file=output); seen_count += 1; continue
             if choice == "approve" and not (voice is True and tone is False and safety is True): print("Decision not recorded: approval confirmations were not satisfied.", file=output); seen_count += 1; continue
-            decision = {"id": row["id"], "decision": choice, "vtuber_voice": voice, "counselor_tone": tone, "safety_truth": safety, "notes": notes, "reviewer": reviewer, "reviewed_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")}
+            decision = {"id": row["id"], "record_sha256": record_sha256(row), "decision": choice, "vtuber_voice": voice, "counselor_tone": tone, "safety_truth": safety, "notes": notes, "reviewer": reviewer, "reviewed_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")}
             if prior is None: decisions.append(decision)
             else: decisions[decisions.index(prior)] = decision
             existing[row["id"]] = decision; _atomic_write(decisions_path, decisions); changed = True; seen_count += 1

@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from validate_airi_style_pending import GateError, validate_pending_dataset
+from validate_airi_style_pending import GateError, record_sha256, validate_decisions, validate_pending_dataset
 from verify_airi_style_dataset import CATEGORY_TAXONOMY
 
 
@@ -101,6 +101,17 @@ class PendingQualityGateTests(unittest.TestCase):
         rows[0]["training_eligible"] = True
         with self.assertRaisesRegex(GateError, "training_eligible"):
             self.validate(rows)
+
+    def test_decisions_bind_to_the_exact_canonical_pending_record(self) -> None:
+        with TemporaryDirectory() as directory:
+            rows = clean_rows()
+            sidecar = Path(directory) / "decisions.jsonl"
+            decision = {"id": rows[0]["id"], "record_sha256": record_sha256(rows[0]), "decision": "approve", "vtuber_voice": True, "counselor_tone": False, "safety_truth": True, "notes": "", "reviewer": "reviewer-a", "reviewed_at": "2026-08-09T00:00:00Z"}
+            sidecar.write_text(json.dumps(decision, ensure_ascii=False) + "\n", encoding="utf-8")
+            validate_decisions(sidecar, {row["id"]: row for row in rows})
+            rows[0]["answer"] += "!"
+            with self.assertRaisesRegex(GateError, "record hash does not match"):
+                validate_decisions(sidecar, {row["id"]: row for row in rows})
 
 
 if __name__ == "__main__":

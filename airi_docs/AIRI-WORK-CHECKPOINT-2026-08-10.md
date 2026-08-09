@@ -123,10 +123,21 @@
 - focused grounding 회귀 11개와 `test_ollama_proxy.py` 전체 187개가 통과했다. 최신 proxy를 재기동한 뒤 비영속 production probe 3건은 모두 correction 실패를 content-free로 종료했고, telemetry의 `grounding_quality_rejected=1`을 확인했다. journal scheduled/completed=0, character sessions=0, memory pending=986은 불변이며 evaluation/extraction/external search/chat은 계속 OFF다.
 - 이 체크포인트는 잘못된 말을 TTS·로그·기억에 남기는 문제를 막지만, 3건 모두 무응답이므로 대화 품질의 최종 해결은 아니다. 다음 분기는 고정 fallback이나 추가 prompt 누적이 아니라, 검수된 S1 데이터와 더 신뢰할 수 있는 생성/검증 경계를 준비하는 것이다.
 
+### S1 pending review 무결성
+
+- 현재 pending S1은 정확히 200건, split 160/20/20, category 34/34/33/33/33/33이며 strict offline gate를 통과한다. 모든 레코드는 `pending`, reviewer/timestamp empty, `training_eligible=false`이고 실제 decision sidecar는 없다.
+- 기존 reviewer CLI는 화면에 필요한 최소 필드만 읽어 strict pending gate를 운영자가 별도로 실행해야 했다. 이제 status·display·write 전에 동일한 `validate_pending_dataset`을 강제하며, 실패하면 sidecar를 열거나 쓰지 않는다.
+- 기존 decision은 레코드 ID에만 묶여 있었다. `record_sha256` 필드를 추가해 prompt, answer, category, split, partition, review, provenance, eligibility를 포함한 전체 canonical pending record에 결정을 결합했다. 같은 ID의 내용이 한 글자라도 바뀌면 status, validation, replacement가 모두 fail-closed한다.
+- reviewer identity는 추측하지 않고 입력받으며 pending 원본은 immutable, decision sidecar는 atomic write를 유지한다. 이 변경은 레코드를 승인하거나 production dataset으로 컴파일하지 않는다.
+- reviewer/validator unittest 11개와 production verifier pytest 5개, py_compile, diff check가 통과했다. 실제 큐 status는 decision 0, remaining 200이고 status 확인으로 sidecar가 생성되지 않았다.
+- production QLoRA gate에 필요한 canonical C0/S1 JSONL fixture, reviewed dataset compiler, independent reviewer provenance manifest, immutable gate report와 외부 custody/signature는 아직 없다. eval JSON을 production fixture라고 추측해 변환하거나 학습을 시작하지 않는다.
+
 ## 4. 최신 집중 검증
 
 - `test_ollama_proxy -k grounding`: 11 passed.
 - 최신 `test_ollama_proxy.py` 전체: 187 passed.
+- S1 pending reviewer/validator unittest: 11 passed.
+- production dataset verifier pytest: 5 passed.
 - prompt/system contract: 25 passed.
 - 추가 live-failure ledger/advice regression: 1 passed.
 - STT quiet/timestamp validation: 42 passed.

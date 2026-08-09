@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from verify_airi_style_dataset import CATEGORY_TAXONOMY, GateError, canonical_sha256, prompt_sha256, sha256_file, verify_reviewed_dataset
-from validate_airi_style_pending import validate_decisions, validate_pending_dataset
+from validate_airi_style_pending import record_sha256, validate_decisions, validate_pending_dataset
 from train_airi_style_qlora import TrainingRefused, _assert_train_rows
 def row(i,split,category): return {"id":f"style-{i:03d}","split":split,"category":category,"prompt":f"주제 {i}을 말해줘","answer":"좋아 핵심만 말할게","partition":{"tier":"S1","group":f"reviewed-{i:03d}"},"review":{"status":"approved","reviewer":"reviewer-alex","approved_at":"2026-08-08T00:00:00Z"},"provenance":{"synthetic":True,"source":"curated-synthetic"},"training_eligible":True}
 def fixture(tier):
@@ -40,7 +40,7 @@ def test_pending_rejects_approved_eligible_duplicate_private_and_questions(tmp_p
 
 def test_decision_approval_requires_voice_no_counselor_tone_and_safety(tmp_path):
  p=Path(__file__).resolve().parents[1]/"seed"/"airi_style_seed_pending.jsonl";rows=[json.loads(x) for x in p.read_text(encoding="utf8").splitlines()]
- decision={"id":rows[0]["id"],"decision":"approve","vtuber_voice":True,"counselor_tone":False,"safety_truth":True,"notes":"independent review","reviewer":"reviewer-alex","reviewed_at":"2026-08-09T00:00:00Z"}
- sidecar=tmp_path/"decisions.jsonl";sidecar.write_text(json.dumps(decision,ensure_ascii=False)+"\n",encoding="utf8");validate_decisions(sidecar,{rows[0]["id"]})
+ decision={"id":rows[0]["id"],"record_sha256":record_sha256(rows[0]),"decision":"approve","vtuber_voice":True,"counselor_tone":False,"safety_truth":True,"notes":"independent review","reviewer":"reviewer-alex","reviewed_at":"2026-08-09T00:00:00Z"}
+ sidecar=tmp_path/"decisions.jsonl";sidecar.write_text(json.dumps(decision,ensure_ascii=False)+"\n",encoding="utf8");validate_decisions(sidecar,{rows[0]["id"]:rows[0]})
  decision["counselor_tone"]=True;sidecar.write_text(json.dumps(decision,ensure_ascii=False)+"\n",encoding="utf8")
- with pytest.raises(GateError,match="approval requires"):validate_decisions(sidecar,{rows[0]["id"]})
+ with pytest.raises(GateError,match="approval requires"):validate_decisions(sidecar,{rows[0]["id"]:rows[0]})

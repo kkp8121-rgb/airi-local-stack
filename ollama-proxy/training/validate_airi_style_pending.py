@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
 import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from verify_airi_style_dataset import (
     CATEGORY_TAXONOMY,
@@ -27,7 +28,7 @@ from verify_airi_style_dataset import (
 )
 
 
-DECISION_FIELDS = {"id", "decision", "vtuber_voice", "counselor_tone", "safety_truth", "notes", "reviewer", "reviewed_at"}
+DECISION_FIELDS = {"id", "record_sha256", "decision", "vtuber_voice", "counselor_tone", "safety_truth", "notes", "reviewer", "reviewed_at"}
 MIN_CATEGORY_COUNT = 20
 MIN_NORMALIZED_ANSWER_UNIQUENESS = 0.90
 MAX_ANSWER_OCCURRENCES = 2
@@ -50,6 +51,12 @@ def normalized_key(value: str) -> str:
     """Compare text independent of Unicode form, case, whitespace, and punctuation."""
     value = unicodedata.normalize("NFKC", value).casefold()
     return " ".join("".join(c if not (c.isspace() or unicodedata.category(c).startswith("P")) else " " for c in value).split())
+
+
+def record_sha256(record: Mapping[str, Any]) -> str:
+    """Bind a decision to the complete, canonical pending record."""
+    canonical = json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _answer_gate(answer: str, record_id: str, prompt: str) -> None:
@@ -156,15 +163,21 @@ def validate_pending_dataset(path: Path) -> dict[str, Any]:
     return {"status": "pending-review", "record_count": len(rows), "categories": {key: cats[key] for key in CATEGORY_TAXONOMY}}
 
 
-def validate_decisions(path: Path, pending_ids: set[str]) -> None:
+def validate_decisions(path: Path, pending_records: Mapping[str, Mapping[str, Any]]) -> None:
     seen = set()
     for index, row in enumerate(load_jsonl(local_path(path, "decision sidecar"), "decision sidecar"), 1):
         r = _strict(row, DECISION_FIELDS, f"decision {index}")
         _privacy(r, f"decision {index}")
-        if r["id"] not in pending_ids or r["id"] in seen or r["decision"] not in ("approve", "rewrite", "reject"):
+        if r["id"] not in pending_records or r["id"] in seen or r["decision"] not in ("approve", "rewrite", "reject"):
             raise GateError(f"decision {index}: unknown, duplicate, or invalid decision")
+        if not isinstance(r["record_sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", r["record_sha256"]):
+            raise GateError(f"decision {index}: invalid record hash")
+        if r["record_sha256"] != record_sha256(pending_records[r["id"]]):
+            raise GateError(f"decision {index}: record hash does not match pending record")
         if not all(isinstance(r[key], bool) for key in ("vtuber_voice", "counselor_tone", "safety_truth")) or not isinstance(r["notes"], str) or not isinstance(r["reviewer"], str) or not r["reviewer"].strip():
             raise GateError(f"decision {index}: invalid review fields")
+        if r["decision"] in ("rewrite", "reject") and not r["notes"].strip():
+            raise GateError(f"decision {index}: rewrite/reject requires notes")
         if r["decision"] == "approve" and not (r["vtuber_voice"] and not r["counselor_tone"] and r["safety_truth"]):
             raise GateError(f"decision {index}: approval requires VTuber voice, no counselor tone, and safety truth")
         _rfc(r["reviewed_at"], f"decision {index}.reviewed_at")
@@ -180,7 +193,7 @@ def main() -> int:
         summary = validate_pending_dataset(args.dataset)
         if args.decisions:
             rows = load_jsonl(local_path(args.dataset, "pending dataset"), "pending dataset")
-            validate_decisions(args.decisions, {row["id"] for row in rows})
+            validate_decisions(args.decisions, {row["id"]: row for row in rows})
             summary["decision_count"] = len(load_jsonl(local_path(args.decisions, "decision sidecar"), "decision sidecar"))
         print(json.dumps(summary, ensure_ascii=False, sort_keys=True))
     except GateError as error:

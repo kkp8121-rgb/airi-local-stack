@@ -18,7 +18,7 @@ Use the local human-review CLI with an explicit decision-sidecar output; it neve
 python .\review_airi_style_pending.py --pending .\seed\airi_style_seed_pending.jsonl --decisions .\local-review-decisions.jsonl --reviewer "your-explicit-reviewer-id"
 ```
 
-It displays one pending prompt/answer at a time. `approve` requires explicit `yes`, `no`, `yes` confirmation for VTuber voice, counselor tone, and safety/truth. `rewrite` and `reject` require notes; `skip` writes nothing. Existing decisions are skipped unless `--replace-decision` is supplied, and only the same reviewer may replace one. `--status` prints content-free counts, `--limit N` bounds a session, and sidecar writes are atomic.
+It first runs the strict pending-dataset quality gate, before any record is displayed, status is emitted, or sidecar is read/written; a failure rejects the session. `approve` requires explicit `yes`, `no`, `yes` confirmation for VTuber voice, counselor tone, and safety/truth. `rewrite` and `reject` require notes; `skip` writes nothing. Every decision includes `record_sha256`: SHA-256 of the complete pending record encoded as UTF-8 canonical JSON (sorted keys, compact separators, `ensure_ascii=False`). Existing decisions must match the current record hash; a mismatch rejects rather than replacing a decision. Existing decisions are skipped unless `--replace-decision` is supplied, and only the same reviewer may replace one. `--status` prints content-free counts, `--limit N` bounds a session, and sidecar writes are atomic.
 
 `seed/airi_style_seed_pending.jsonl` is a separate S1-only synthetic pending queue, described by `seed/airi_style_pending_record.schema.json`. Run:
 
@@ -28,6 +28,6 @@ python .\validate_airi_style_pending.py --dataset .\seed\airi_style_seed_pending
 
 It emits only a content-free count/category summary—never `VerificationResult`, an approved report, or a training authorization. Pending rows must remain `pending`, reviewer/approval time empty, and `training_eligible: false`; the production verifier and trainer reject them. Review decisions use `seed/airi_style_pending_decision.schema.json` (`approve`, `rewrite`, or `reject` plus voice/tone/safety fields). A decision cannot change eligibility.
 
-Human identity, source custody, and any signature/key service are external governance duties; schema validation cannot authenticate a forged review.
+Human identity, source custody, and any signature/key service are external governance duties; schema validation cannot authenticate a forged review. The hash binding detects changed pending content but is not a reviewer signature.
 
 Before human review, the pending gate also requires at least 200 rows, all category and split minimums, and at least 90% normalized answer uniqueness. It rejects normalized duplicate IDs, groups, and prompts; answers repeated three times; answer overlap between splits; a sentence repeated five times; English alphabet characters, Korean honorific endings, emoji, Markdown, control/format characters, and bidirectional controls in answers. These quality limits are pre-review screening only and do not grant approval, training eligibility, or authorization to train or deploy.
