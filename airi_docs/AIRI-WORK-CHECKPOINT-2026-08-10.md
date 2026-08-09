@@ -114,9 +114,19 @@
 - generated-default provenance를 사용한 합성 일상 장면 3건에서 journal scheduled/completed, character sessions, memory pending은 모두 불변이었다. 세 건 모두 최초 draft의 grounding 부족을 정확히 검출해 retry를 사용했지만 correction candidate는 0/3 통과였다.
 - 현재 선택 로직은 correction 실패 시 grounding에 실패한 최초 완결 draft를 다시 공개한다. 실제 결과는 사건을 일반화하거나, 긍정 상황의 정서를 반대로 추정하거나, 입력에 없는 속성을 추가했다. 다음 품질 분기는 이 fail-open 동작을 제거하고 한 번의 correction call에서 검증 가능한 복수 후보를 생성·선택할 수 있는지 격리 실험한다.
 
+### Grounding fail-closed 체크포인트
+
+- 원본 `exaone-airi:2.4b`에 같은 세 합성 장면을 사용해 correction 1회당 JSON 후보 3개를 생성하는 격리 실험을 했다. schema parse는 3/3 성공했지만 9개 후보 중 기존 production verifier를 통과할 가능성이 있는 것은 2개뿐이었고, 그 후보에도 원문에 없는 동작이 섞였다. 더 엄격하게 원문 내용어 추가를 금지한 3회도 새 동사·속성·불완전 문장을 안정적으로 제거하지 못했다.
+- 따라서 multi-candidate 생성을 production에 넣지 않았다. 모델 후보 수를 늘려 품질을 확률적으로 고르거나 verifier를 느슨하게 하는 방식은 채택하지 않는다.
+- 실제 결함인 fail-open은 제거했다. 최초 draft가 grounding gate를 실패한 뒤 correction도 언어·내용 검증, timeout, UTF-8/NDJSON 구조 중 하나라도 실패하면 최초 draft를 복구하지 않는다. substantive SSE를 비운 채 정상 terminal만 보내며 journal, character state, evaluator에 아무 대사도 저장하지 않는다.
+- correction 전용 문체 계약은 일반 잡담 계약과 분리했다. 서로 다른 사실 둘과 행동·결과 하나를 보존하고, 조사·어미 외에 사용자 원문에 없는 내용 명사·동사·형용사 및 새 감정·원인·속성·비유·조언·예측·질문을 추가하지 못하도록 제한했다.
+- focused grounding 회귀 11개와 `test_ollama_proxy.py` 전체 187개가 통과했다. 최신 proxy를 재기동한 뒤 비영속 production probe 3건은 모두 correction 실패를 content-free로 종료했고, telemetry의 `grounding_quality_rejected=1`을 확인했다. journal scheduled/completed=0, character sessions=0, memory pending=986은 불변이며 evaluation/extraction/external search/chat은 계속 OFF다.
+- 이 체크포인트는 잘못된 말을 TTS·로그·기억에 남기는 문제를 막지만, 3건 모두 무응답이므로 대화 품질의 최종 해결은 아니다. 다음 분기는 고정 fallback이나 추가 prompt 누적이 아니라, 검수된 S1 데이터와 더 신뢰할 수 있는 생성/검증 경계를 준비하는 것이다.
+
 ## 4. 최신 집중 검증
 
-- `test_ollama_proxy -k grounding`: 9 passed.
+- `test_ollama_proxy -k grounding`: 11 passed.
+- 최신 `test_ollama_proxy.py` 전체: 187 passed.
 - prompt/system contract: 25 passed.
 - 추가 live-failure ledger/advice regression: 1 passed.
 - STT quiet/timestamp validation: 42 passed.

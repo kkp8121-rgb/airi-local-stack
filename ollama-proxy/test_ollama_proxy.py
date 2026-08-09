@@ -2037,8 +2037,8 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertEqual(len(chat.requests), 2)
         self.assertEqual(memory.completed[0]["assistant"], expected)
         # Native conversion removes the private note name, but the retry must
-        # still contain exactly one correction note carrying exactly one copy
-        # of the canonical style contract, with no stale first-pass note.
+        # still contain exactly one strict correction note, with no stale
+        # first-pass style note encouraging unsupported banter.
         system_contents = [
             message.get("content", "") for message in chat.requests[1]["messages"]
             if message.get("role") == "system"
@@ -2048,11 +2048,16 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ]
         self.assertEqual(len(correction_notes), 1)
         self.assertEqual(
-            sum(content.count("이번 응답 문체:") for content in system_contents),
+            sum(content.count("수정 응답 조건:") for content in system_contents),
             1,
+        )
+        self.assertEqual(
+            sum(content.count("이번 응답 문체:") for content in system_contents),
+            0,
         )
         self.assertIn("사실", correction_notes[0])
         self.assertIn("행동·결과", correction_notes[0])
+        self.assertIn("사용자 원문에 없는 내용 명사·동사·형용사를 추가하지 마", correction_notes[0])
         self.assertIn("창문", correction_notes[0])
         self.assertIn("손잡이", correction_notes[0])
 
@@ -2233,7 +2238,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertEqual(memory.completed[0]["assistant"], accepted)
         self.assertEqual(len(chat.requests), 2)
 
-    def test_english_grounding_retry_keeps_completed_initial_draft(self) -> None:
+    def test_english_grounding_retry_fails_closed_without_journal(self) -> None:
         def event(content: str) -> bytes:
             return (json.dumps(
                 {"message": {"role": "assistant", "content": content}, "done": True},
@@ -2248,11 +2253,11 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream("창문 손잡이가 헐거워져서 잘 안 돌아가.")
 
-        self.assertEqual(openai_sse_content(response.text), initial)
-        self.assertEqual(memory.completed[0]["assistant"], initial)
+        self.assertEqual(openai_sse_content(response.text), "")
+        self.assertEqual(memory.completed, [])
         self.assertEqual(len(chat.requests), 2)
 
-    def test_stalled_grounding_retry_keeps_completed_initial_draft(self) -> None:
+    def test_stalled_grounding_retry_fails_closed_without_journal(self) -> None:
         def event(content: str) -> bytes:
             return (json.dumps(
                 {"message": {"role": "assistant", "content": content}, "done": True},
@@ -2262,15 +2267,37 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         initial = "창문이 이상해."
         chat = _QueuedApiStreamClient([[event(initial)], []])
         chat.responses[1] = _StallingApiStreamResponse([], 0.05)
+        retry_response = chat.responses[1]
         memory = _FakeMemoryRuntime()
         with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
             ollama_proxy, "memory_runtime", memory
         ), mock.patch.object(ollama_proxy, "CORRECTIVE_RETRY_TIMEOUT_SECONDS", 0.01):
             response = post_stream("창문 손잡이가 헐거워져서 잘 안 돌아가.")
 
-        self.assertEqual(openai_sse_content(response.text), initial)
-        self.assertEqual(memory.completed[0]["assistant"], initial)
+        self.assertEqual(openai_sse_content(response.text), "")
+        self.assertEqual(memory.completed, [])
         self.assertEqual(len(chat.requests), 2)
+        self.assertTrue(retry_response.closed)
+
+    def test_invalid_grounding_retry_fails_closed_without_error_dialogue(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        chat = _QueuedApiStreamClient([[event("창문이 이상해.")], [b"not-json\n"]])
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_stream("창문 손잡이가 헐거워져서 잘 안 돌아가.")
+
+        self.assertEqual(openai_sse_content(response.text), "")
+        self.assertNotIn(ollama_proxy.LOCAL_ERROR_DIALOGUE, response.text)
+        self.assertEqual(memory.completed, [])
+        self.assertEqual(len(chat.requests), 2)
+        self.assertIn("data: [DONE]", response.text)
 
     def test_first_raw_watchdog_bounds_a_stream_that_never_starts(self) -> None:
         chat = _StallingApiStreamClient([], stall_seconds=0.05)
@@ -2505,7 +2532,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
 
     def test_completed_turn_strips_only_airi_provider_timestamp_from_user_journal(self) -> None:
         memory = _FakeMemoryRuntime()
-        chat = _CapturingChatClient("응, 들었어.")
+        chat = _CapturingChatClient("포스트잇이 미끄러졌네.")
         timestamped = "[2026-08-09 16:42] 방금 포스트잇이 미끄러졌어."
         with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
             ollama_proxy, "memory_runtime", memory
@@ -2864,7 +2891,7 @@ class CharacterLoopIntegrationTests(unittest.TestCase):
         self.assertNotIn("private-topic-" * 20, system)
 
     def test_local_completion_updates_actual_session_state_and_upstream_prompt(self) -> None:
-        chat = _CapturingChatClient("응! 계속 이야기해 보자.")
+        chat = _CapturingChatClient("별 이야기를 계속하자.")
         memory = _FakeMemoryRuntime()
         runtime = ollama_proxy.CharacterStateRuntime()
         with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(

@@ -1961,7 +1961,7 @@ def build_grounding_correction_body(
         note = (
             "수정 전 초안은 신뢰하지 말고 재작성 재료로만 써: " + draft + ". "
             f"사용자 근거 장부(사실): {anchor_ledger}. 행동·결과 장부: {action_ledger}. "
-            "명시된 사실을 보존해. " + REQUEST_LOCAL_STYLE_CONTRACT
+            "명시된 사실을 보존해. " + GROUNDING_CORRECTION_STYLE_CONTRACT
         )
         insert_at = next(
             (
@@ -2084,6 +2084,14 @@ REQUEST_LOCAL_STYLE_CONTRACT = (
     "사용자 말에 없는 감정·원인·속성·비유·다음 장면은 더하지 마. "
     "사용자가 다른 언어를 요청하지 않았으면 한국어 어휘를 쓰고, "
     "사용자 원문·승인 지식에 있는 필요한 고유명사 외 알파벳 단어를 새로 만들지 마."
+)
+
+GROUNDING_CORRECTION_STYLE_CONTRACT = (
+    "수정 응답 조건: 10~45자의 자연스러운 한국어 반말 한 문장. "
+    "근거 장부의 서로 다른 사실 둘과 행동·결과 하나를 문법에 맞게 보존해. "
+    "조사와 어미 외에는 사용자 원문에 없는 내용 명사·동사·형용사를 추가하지 마. "
+    "새 감정·원인·속성·비유·조언·예측·질문을 만들지 말고, "
+    "감탄사나 상태 요약만으로 끝내지 마."
 )
 
 
@@ -4788,10 +4796,12 @@ async def proxy(path: str, request: Request):
                 grounding_retry_used = False
                 grounding_retry_passed = False
                 grounding_content_free = False
+                grounding_quality_rejected = False
                 grounding_initial_overlap = 0
                 grounding_retry_overlap = 0
                 grounding_required = 0
                 grounding_retry_language_blocked = False
+                grounding_retry_invalid = False
                 # This watchdog is intentionally armed only after actual
                 # non-whitespace upstream character progress.  It therefore
                 # preserves the generous httpx read timeout for cold loads.
@@ -4988,41 +4998,68 @@ async def proxy(path: str, request: Request):
                         except TimeoutError:
                             retry_timed_out = True
                             break
-                        retry_pending += retry_decoder.decode(retry_chunk)
+                        try:
+                            retry_pending += retry_decoder.decode(retry_chunk)
+                        except UnicodeDecodeError:
+                            if not grounding_retry:
+                                raise
+                            grounding_retry_invalid = True
+                            break
                         while "\n" in retry_pending:
                             retry_line, retry_pending = retry_pending.split("\n", 1)
                             if not retry_line.strip():
                                 continue
-                            retry_event = json.loads(retry_line)
+                            try:
+                                retry_event = json.loads(retry_line)
+                            except json.JSONDecodeError:
+                                if not grounding_retry:
+                                    raise
+                                grounding_retry_invalid = True
+                                break
                             if not isinstance(retry_event, dict):
-                                raise RuntimeError("invalid upstream NDJSON item")
+                                if not grounding_retry:
+                                    raise RuntimeError("invalid upstream NDJSON item")
+                                grounding_retry_invalid = True
+                                break
                             retry_clean = retry_boundary.feed(message_content(retry_event.get("message")))
                             if retry_event.get("done"):
                                 terminal = True
                                 terminal_event = retry_event
                                 break
-                        if terminal or retry_boundary.closed_early:
+                        if terminal or retry_boundary.closed_early or grounding_retry_invalid:
                             break
-                    if retry_timed_out:
+                    if retry_timed_out or grounding_retry_invalid:
                         await upstream_response.aclose()
                         if not grounding_retry:
-                            raise TimeoutError("language corrective retry timed out")
+                            if retry_timed_out:
+                                raise TimeoutError("language corrective retry timed out")
+                            raise RuntimeError("language corrective retry was invalid")
                     if (
                         not retry_timed_out
+                        and not grounding_retry_invalid
                         and not terminal
                         and not retry_boundary.closed_early
                         and retry_pending.strip()
                     ):
-                        retry_event = json.loads(retry_pending + retry_decoder.decode(b"", final=True))
-                        if not isinstance(retry_event, dict):
-                            raise RuntimeError("invalid upstream NDJSON item")
-                        retry_clean = retry_boundary.feed(message_content(retry_event.get("message")))
-                        terminal = bool(retry_event.get("done"))
-                        terminal_event = retry_event if terminal else None
+                        try:
+                            retry_event = json.loads(retry_pending + retry_decoder.decode(b"", final=True))
+                        except (json.JSONDecodeError, UnicodeDecodeError):
+                            if not grounding_retry:
+                                raise
+                            grounding_retry_invalid = True
+                        else:
+                            if not isinstance(retry_event, dict):
+                                if not grounding_retry:
+                                    raise RuntimeError("invalid upstream NDJSON item")
+                                grounding_retry_invalid = True
+                            else:
+                                retry_clean = retry_boundary.feed(message_content(retry_event.get("message")))
+                                terminal = bool(retry_event.get("done"))
+                                terminal_event = retry_event if terminal else None
                     if language_retry and retry_boundary.language_blocked and not emitted_substantive:
                         fallback = "한국어로 답할게."
                         retry_boundary.output = fallback
-                    if grounding_retry_used and not retry_timed_out:
+                    if grounding_retry_used and not retry_timed_out and not grounding_retry_invalid:
                         retry_overlap = grounding_overlap(
                             last_user_text, retry_boundary.output
                         )
@@ -5041,13 +5078,32 @@ async def proxy(path: str, request: Request):
                         if grounding_retry_passed:
                             boundary = retry_boundary
                         else:
-                            boundary = initial_boundary
+                            # The first draft already failed the production
+                            # grounding gate.  A failed correction therefore
+                            # has no safe dialogue to recover: exposing the
+                            # rejected draft would turn a detector into a
+                            # fail-open path and persist the same unsupported
+                            # claim in the journal.  Finish the transport with
+                            # no substantive content instead.  This is not a
+                            # spoken fallback and does not select dialogue by
+                            # a scenario/count rule.
+                            grounding_quality_rejected = True
+                            boundary = IncrementalAiriOutputBoundary(
+                                require_korean=user_prefers_korean,
+                                max_sentences=response_sentence_limit(last_user_text),
+                            )
+                            boundary.closed_early = True
                             terminal = initial_terminal
                             terminal_event = initial_terminal_event
                     elif grounding_retry_used:
                         grounding_retry_passed = False
                         grounding_content_free = True
-                        boundary = initial_boundary
+                        grounding_quality_rejected = True
+                        boundary = IncrementalAiriOutputBoundary(
+                            require_korean=user_prefers_korean,
+                            max_sentences=response_sentence_limit(last_user_text),
+                        )
+                        boundary.closed_early = True
                         terminal = initial_terminal
                         terminal_event = initial_terminal_event
                     else:
@@ -5118,6 +5174,8 @@ async def proxy(path: str, request: Request):
                         "grounding_retry_overlap": grounding_retry_overlap,
                         "grounding_required_overlap": grounding_required,
                         "grounding_retry_language_blocked": int(grounding_retry_language_blocked),
+                        "grounding_retry_invalid": int(grounding_retry_invalid),
+                        "grounding_quality_rejected": int(grounding_quality_rejected),
                     })
                 # Do not ascribe a terminal measurement to a stream we closed
                 # at our output boundary. The same applies naturally to
