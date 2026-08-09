@@ -89,6 +89,19 @@ if (-not $python) {
     throw "Python interpreter not found. Set AIRI_STACK_PYTHON, or create a virtual environment at '$(Join-Path $repo '.venv')' or '$(Join-Path $stackRoot 'chatterbox\.venv')'."
 }
 
+# A supplied board is an explicit startup opt-in. Validate it with the same
+# interpreter before any existing proxy can be reused or a new one is started.
+if (-not [string]::IsNullOrWhiteSpace($resolvedTopicBoardPath)) {
+    $topicBoardValidator = Join-Path $repo 'validate_approved_topics.py'
+    if (-not (Test-Path -LiteralPath $topicBoardValidator -PathType Leaf)) {
+        throw 'Topic board startup validator is missing.'
+    }
+    & $python $topicBoardValidator --board $resolvedTopicBoardPath
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Topic board startup validation failed.'
+    }
+}
+
 function Resolve-LocalOllamaModelDigest {
     param([Parameter(Mandatory)][string]$Model)
 

@@ -13,9 +13,11 @@ AIRI가 저스트 채팅 중 당일의 공용 화제를 참고해 짧은 의견�
 
 ## 권장 데이터 형태
 
+`broadcast_line`은 사람이 명시적으로 사전 승인한 실제 전달 문장이다. 모델이 토픽 문장을 생성하지 않으며, 이 필드가 없는 schema v1은 런타임에서 거부한다.
+
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "items": [
     {
       "id": "topic-2026-08-09-01",
@@ -23,6 +25,7 @@ AIRI가 저스트 채팅 중 당일의 공용 화제를 참고해 짧은 의견�
       "source": "사용자가 승인한 출처",
       "published_at": "2026-08-09T00:00:00Z",
       "summary": "사실 요약 1~2문장",
+      "broadcast_line": "검수한 제목 소식을 확인했어.",
       "expires_at": "2026-08-10T00:00:00Z",
       "approved": true
     }

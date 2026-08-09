@@ -179,3 +179,13 @@ Push 이후 재기동 검사에서는 8880·8890·8892·9880·11434·11435가 lo
 - raw session/request/round ID, 로컬 DB, 실제 사용자 발화 원문, local absolute path, auth token을 문서나 결과에 넣지 않는다.
 - eval fixture와 pending training record는 synthetic이며 승인 여부를 명시한다. live result 디렉터리는 기본 ignore한다.
 - GitHub push 전 staged diff와 secret scan을 다시 확인한다.
+
+## 8. TopicBoard v2 시작 게이트
+
+- 자동방송이 실제로 읽을 수 있는 보드 계약을 `schema_version: 2`로 고정했다. `broadcast_line`이 없는 v1 보드는 선택만 되고 발화되지 않던 계약 불일치가 있었으므로 이제 시작 전에 명시적으로 거부한다.
+- `validate_approved_topics.py`는 proxy 시작 또는 기존 listener 재사용 전에 실행된다. 선택된 파일이 `ollama-proxy/runtime` 안의 절대 경로 일반 파일인지, 활성 승인 항목이 하나 이상인지, 만료·개수·크기·문장·근거 조건을 만족하는지 확인한다.
+- 검증 성공은 기존 승인을 새로 부여한다는 뜻이 아니다. 결과는 content-free `status=valid`와 활성 항목 수만 내보내며, 실패하면 원문·경로·토픽 ID를 출력하지 않고 시작을 중단한다.
+- 사전 승인 대사는 12~60자의 한국어 완결문이어야 하고 질문·화자 라벨·제어 토큰·새 숫자를 허용하지 않는다. 기계 검사는 3자 이상 토픽 앵커 하나와 대표 존댓말 종결 거부까지만 담당하며, 전체 사실성·반말 여부는 인간 사전 승인이 책임진다. 모델이 승인 대사를 다시 쓰지 않으며, 성공한 방송 뒤에만 최근 사용 순환 상태를 갱신한다.
+- 예시 보드는 비어 있는 v2 형식으로 유지했다. 실제 토픽 파일, 승인 결정, 활성 `TopicBoardPath`는 만들지 않았고 외부 검색·수집도 계속 OFF다.
+- 관련 집중 회귀 19개, Python compile, PowerShell AST parse, diff check가 통과했다.
+- 최종 `ollama-proxy` 전체 단위 회귀는 446개가 통과했다. 첫 실행에서 과거 memory E2E mock의 일반 응답이 새 grounding fail-closed 경계에 거부되는 것을 발견해, 사용자 사실에 근거한 synthetic 응답으로 fixture를 고친 뒤 해당 E2E와 전체 회귀를 다시 통과시켰다.

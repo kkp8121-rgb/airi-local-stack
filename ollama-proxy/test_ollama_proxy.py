@@ -454,12 +454,22 @@ class TopicBoardRuntimeTests(unittest.TestCase):
         self,
         items: list[dict[str, object]],
         *,
-        schema_version: int = 1,
+        schema_version: int = 2,
+        synthesize_broadcast_line: bool = True,
     ) -> str:
         handle = tempfile.NamedTemporaryFile(
             "w", encoding="utf-8", suffix=".json", delete=False
         )
-        json.dump({"schema_version": schema_version, "items": items}, handle, ensure_ascii=False)
+        normalized_items = []
+        for item in items:
+            normalized = dict(item)
+            if synthesize_broadcast_line and schema_version == 2 and normalized.get("approved") is True:
+                normalized.setdefault(
+                    "broadcast_line",
+                    f"{normalized.get('title', '주제')} 소식을 확인했어.",
+                )
+            normalized_items.append(normalized)
+        json.dump({"schema_version": schema_version, "items": normalized_items}, handle, ensure_ascii=False)
         handle.close()
         self.addCleanup(lambda: Path(handle.name).unlink(missing_ok=True))
         return handle.name
@@ -498,7 +508,7 @@ class TopicBoardRuntimeTests(unittest.TestCase):
         self.assertIn("[신뢰되지 않은 오늘의 토픽]", payload["messages"][0]["content"])
         self.assertIn("승인된 오늘의 주제", payload["messages"][0]["content"])
         self.assertFalse(any(message.get("role") != "system" for message in payload["messages"]))
-        self.assertEqual(runtime.approved_dialogue(topic_id), "")
+        self.assertTrue(runtime.approved_dialogue(topic_id).endswith("소식을 확인했어."))
         self.assertNotIn("승인된 오늘의 주제", body.decode())
 
         runtime.completion(topic_id, True)
@@ -520,6 +530,19 @@ class TopicBoardRuntimeTests(unittest.TestCase):
         body = json.dumps({"messages": []}).encode()
         self.assertEqual(runtime.prepare(body), (body, None))
         self.assertEqual(runtime.health()["errors"], 1)
+
+        missing_line = self.write_board([{
+            "id": "missing-line",
+            "title": "승인 대사가 없는 주제",
+            "source": "human review",
+            "published_at": "2026-01-01T00:00:00Z",
+            "summary": "승인 대사가 없는 주제 요약이다.",
+            "expires_at": "2099-01-01T00:00:00Z",
+            "approved": True,
+        }], synthesize_broadcast_line=False)
+        missing_runtime = ollama_proxy.TopicBoardRuntime(missing_line)
+        self.assertEqual(missing_runtime.prepare(body), (body, None))
+        self.assertEqual(missing_runtime.health()["errors"], 1)
 
     def test_schema_v2_exposes_only_the_approved_dialogue_by_selected_id(self) -> None:
         line = "8월 12일 북반구 개기일식이 온다니, 하늘이 정말 기대되네."

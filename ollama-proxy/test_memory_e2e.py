@@ -80,7 +80,9 @@ class MemoryEndToEndTests(unittest.IsolatedAsyncioTestCase):
                 extraction_threshold=2,extraction_model="test",user_display_name="민석",
             ),http_client=extraction)
             await runtime.startup()
-            local=LocalClient(["응! 기억할게.","응! 말해볼게."])
+            # The foreground grounding gate now rejects generic acknowledgements;
+            # keep this memory E2E fixture anchored to the user's stated fact.
+            local=LocalClient(["민트초코 좋아하는 거 기억할게.","응! 말해볼게."])
             transport=httpx.ASGITransport(app=ollama_proxy.app)
             with mock.patch.object(ollama_proxy,"client",local), mock.patch.object(
                 ollama_proxy,"memory_runtime",runtime

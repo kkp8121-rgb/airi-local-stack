@@ -27,6 +27,9 @@ SPEAKER_LABEL_RE = re.compile(
     r"^\s*[\"'“‘]?\s*(?:사용자|너|아이리|AIRI|assistant|user)\s*:",
     re.IGNORECASE,
 )
+HONORIFIC_ENDING_RE = re.compile(
+    r"(?:습니다|습니까|십시오|세요|입니다|랍니다|네요|군요|어요|아요|지요|죠|구요|까요)\s*[.!。！？]\Z"
+)
 
 
 @dataclass(frozen=True)
@@ -71,9 +74,11 @@ def load_approved_topics(path: str | Path, *, now: datetime | None = None) -> tu
     if stat.st_size <= 0 or stat.st_size > MAX_BOARD_BYTES:
         raise ValueError("topic board is empty or oversized")
     payload = json.loads(resolved.read_bytes().decode("utf-8"))
-    if not isinstance(payload, dict) or payload.get("schema_version") not in {1, 2}:
+    # Runtime delivery uses an explicitly pre-approved spoken line. Version 1
+    # has no such field, so it must not be accepted at runtime.
+    schema_version = payload.get("schema_version") if isinstance(payload, dict) else None
+    if type(schema_version) is not int or schema_version != 2:
         raise ValueError("unsupported topic board schema")
-    schema_version = int(payload["schema_version"])
     raw_items = payload.get("items")
     if not isinstance(raw_items, list):
         raise ValueError("topic board items must be a list")
@@ -93,26 +98,25 @@ def load_approved_topics(path: str | Path, *, now: datetime | None = None) -> tu
         title = _bounded_text(raw.get("title"), MAX_TITLE_CHARS, "title")
         source = _bounded_text(raw.get("source"), MAX_TITLE_CHARS, "source")
         summary = _bounded_text(raw.get("summary"), MAX_SUMMARY_CHARS, "summary")
-        broadcast_line = ""
-        if schema_version >= 2:
-            broadcast_line = _bounded_text(
-                raw.get("broadcast_line"),
-                MAX_BROADCAST_LINE_CHARS,
-                "broadcast_line",
-            )
-            if (
-                len(broadcast_line) < 12
-                or not re.search(r"[가-힣]", broadcast_line)
-                or "?" in broadcast_line
-                or not re.search(r"[.!。！]\Z", broadcast_line)
-                or SPEAKER_LABEL_RE.search(broadcast_line)
-            ):
-                raise ValueError("broadcast_line is not plain bounded Korean dialogue")
-            reference = title + " " + summary
-            new_numbers = set(re.findall(r"\d+", broadcast_line)) - set(re.findall(r"\d+", reference))
-            anchors = set(re.findall(r"[가-힣A-Za-z]{3,}|\d+", reference))
-            if new_numbers or not any(anchor in broadcast_line for anchor in anchors):
-                raise ValueError("broadcast_line is not grounded in its topic")
+        broadcast_line = _bounded_text(
+            raw.get("broadcast_line"),
+            MAX_BROADCAST_LINE_CHARS,
+            "broadcast_line",
+        )
+        if (
+            len(broadcast_line) < 12
+            or not re.search(r"[가-힣]", broadcast_line)
+            or "?" in broadcast_line
+            or not re.search(r"[.!。！]\Z", broadcast_line)
+            or SPEAKER_LABEL_RE.search(broadcast_line)
+            or HONORIFIC_ENDING_RE.search(broadcast_line)
+        ):
+            raise ValueError("broadcast_line is not plain bounded Korean dialogue")
+        reference = title + " " + summary
+        new_numbers = set(re.findall(r"\d+", broadcast_line)) - set(re.findall(r"\d+", reference))
+        anchors = set(re.findall(r"[가-힣A-Za-z]{3,}|\d+", reference))
+        if new_numbers or not any(anchor in broadcast_line for anchor in anchors):
+            raise ValueError("broadcast_line is not grounded in its topic")
         published_at = _bounded_text(raw.get("published_at"), 64, "published_at")
         expires_at = _bounded_text(raw.get("expires_at"), 64, "expires_at")
         published = _parse_time(published_at)
