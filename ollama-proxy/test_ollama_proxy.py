@@ -523,7 +523,7 @@ class TopicBoardRuntimeTests(unittest.TestCase):
 
         prepared, topic_id = runtime.prepare(body)
         payload = json.loads(prepared)
-        self.assertEqual(topic_id, "topic-one")
+        self.assertIsNotNone(topic_id)
         self.assertIn("[신뢰되지 않은 오늘의 토픽]", payload["messages"][0]["content"])
         self.assertIn("승인된 오늘의 주제", payload["messages"][0]["content"])
         self.assertFalse(any(message.get("role") != "system" for message in payload["messages"]))
@@ -532,11 +532,11 @@ class TopicBoardRuntimeTests(unittest.TestCase):
 
         runtime.completion(topic_id, True)
         second, next_id = runtime.prepare(body)
-        self.assertEqual(next_id, "topic-two")
+        self.assertIsNotNone(next_id)
         self.assertIn("승인된 다음 주제", second.decode("utf-8"))
         runtime.completion(next_id, True)
         cycled, cycled_id = runtime.prepare(body)
-        self.assertEqual(cycled_id, "topic-one")
+        self.assertIsNotNone(cycled_id)
         self.assertIn("승인된 오늘의 주제", cycled.decode("utf-8"))
         health = runtime.health()
         self.assertEqual(health["completions"], 2)
@@ -581,6 +581,119 @@ class TopicBoardRuntimeTests(unittest.TestCase):
         self.assertEqual(runtime.approved_dialogue("different-id"), "")
         runtime.completion(topic_id, True)
         self.assertEqual(runtime.approved_dialogue(topic_id), "")
+
+    def test_in_process_lease_blocks_duplicates_and_false_completion_releases(self) -> None:
+        path = self.write_board([{
+            "id": "single", "title": "단일토픽", "source": "human review",
+            "published_at": "2026-01-01T00:00:00Z", "summary": "단일토픽의 사실 요약이다.",
+            "expires_at": "2099-01-01T00:00:00Z", "approved": True,
+        }])
+        runtime = ollama_proxy.TopicBoardRuntime(path)
+        body = json.dumps({"messages": []}).encode()
+        _, topic_id = runtime.prepare(body)
+        self.assertIsNotNone(topic_id)
+        self.assertEqual(runtime.prepare(body), (body, None))
+        self.assertEqual(runtime.health()["in_flight"], 1)
+        runtime.completion(topic_id, False)
+        self.assertEqual(runtime.health()["in_flight"], 0)
+        self.assertEqual(runtime.health()["completions"], 0)
+        self.assertEqual(runtime.approved_dialogue(topic_id), "")
+        _, retry = runtime.prepare(body)
+        self.assertIsNotNone(retry)
+        self.assertNotEqual(retry, topic_id)
+        runtime.completion(retry, True)
+        runtime.completion(retry, True)
+        self.assertEqual(runtime.health()["completions"], 1)
+
+    def test_concurrent_leases_are_distinct_and_small_board_cycles(self) -> None:
+        import threading
+        path = self.write_board([
+            {"id": "one", "title": "첫번째토픽", "source": "human review", "published_at": "2026-01-01T00:00:00Z", "summary": "첫번째토픽의 사실 요약이다.", "expires_at": "2099-01-01T00:00:00Z", "approved": True},
+            {"id": "two", "title": "두번째토픽", "source": "human review", "published_at": "2026-01-01T00:00:00Z", "summary": "두번째토픽의 사실 요약이다.", "expires_at": "2099-01-01T00:00:00Z", "approved": True},
+        ])
+        runtime = ollama_proxy.TopicBoardRuntime(path)
+        body = json.dumps({"messages": []}).encode(); barrier = threading.Barrier(3); selected = []
+        def reserve():
+            barrier.wait(); selected.append(runtime.prepare(body)[1])
+        threads = [threading.Thread(target=reserve), threading.Thread(target=reserve)]
+        [thread.start() for thread in threads]; barrier.wait(); [thread.join() for thread in threads]
+        self.assertEqual(len(set(selected)), 2)
+        self.assertFalse(any(token is None for token in selected))
+        self.assertEqual({runtime.approved_dialogue(token) for token in selected}, {"첫번째토픽 소식을 확인했어.", "두번째토픽 소식을 확인했어."})
+        for topic_id in selected: runtime.completion(topic_id, True)
+        cycle = []
+        for _ in range(8):
+            _, topic_id = runtime.prepare(body); self.assertIsNotNone(topic_id); cycle.append(runtime.approved_dialogue(topic_id)); runtime.completion(topic_id, True)
+        self.assertEqual(set(cycle), {"첫번째토픽 소식을 확인했어.", "두번째토픽 소식을 확인했어."})
+        self.assertLessEqual(runtime.health()["recent_count"], 8)
+
+    def test_eight_topic_cycle_reuses_the_oldest_delivered_item(self) -> None:
+        path = self.write_board([
+            {
+                "id": f"cycle-{index}", "title": f"순환토픽{index}", "source": "human review",
+                "published_at": "2026-01-01T00:00:00Z",
+                "summary": f"순환토픽{index}의 사실 요약이다.",
+                "expires_at": "2099-01-01T00:00:00Z", "approved": True,
+            }
+            for index in range(8)
+        ])
+        runtime = ollama_proxy.TopicBoardRuntime(path)
+        body = json.dumps({"messages": []}).encode()
+        first_cycle = []
+        for _ in range(8):
+            _, token = runtime.prepare(body)
+            self.assertIsNotNone(token)
+            first_cycle.append(runtime.approved_dialogue(token))
+            runtime.completion(token, True)
+        self.assertEqual(len(set(first_cycle)), 8)
+        _, ninth = runtime.prepare(body)
+        self.assertIsNotNone(ninth)
+        self.assertEqual(runtime.approved_dialogue(ninth), first_cycle[0])
+        runtime.completion(ninth, False)
+
+    def test_hot_reload_stale_lease_is_suppressed_without_leak(self) -> None:
+        item = {"id": "hot", "title": "갱신토픽", "source": "human review", "published_at": "2026-01-01T00:00:00Z", "summary": "갱신토픽의 사실 요약이다.", "expires_at": "2099-01-01T00:00:00Z", "approved": True}
+        path = self.write_board([item]); runtime = ollama_proxy.TopicBoardRuntime(path); body = json.dumps({"messages": []}).encode()
+        _, topic_id = runtime.prepare(body); self.assertIsNotNone(topic_id)
+        replacement = self.write_board([])
+        Path(path).write_bytes(Path(replacement).read_bytes())
+        self.assertEqual(runtime.approved_dialogue(topic_id), "")
+        self.assertEqual(runtime.health()["in_flight"], 0)
+        self.assertEqual(runtime.health()["completions"], 0)
+        # Expired and invalid reloads also revoke existing leases fail-soft.
+        Path(path).write_bytes(Path(self.write_board([item])).read_bytes())
+        _, topic_id = runtime.prepare(body); self.assertIsNotNone(topic_id)
+        expired = {**item, "published_at": "2024-01-01T00:00:00Z", "expires_at": "2025-01-01T00:00:00Z"}
+        Path(path).write_bytes(Path(self.write_board([expired])).read_bytes())
+        self.assertEqual(runtime.approved_dialogue(topic_id), "")
+        Path(path).write_bytes(Path(self.write_board([item])).read_bytes())
+        _, topic_id = runtime.prepare(body); self.assertIsNotNone(topic_id)
+        Path(path).write_text("{not-json", encoding="utf-8")
+        self.assertEqual(runtime.approved_dialogue(topic_id), "")
+        self.assertEqual(runtime.health()["in_flight"], 0)
+
+    def test_health_is_content_free_with_active_lease(self) -> None:
+        line = "8월 12일 북반구 개기일식 소식을 봤어."
+        path = self.write_board([{"id": "secret-id", "title": "북반구 개기일식", "source": "human review", "published_at": "2026-01-01T00:00:00Z", "summary": "8월 12일 북반구 일부에서 개기일식이 보인다.", "broadcast_line": line, "expires_at": "2099-01-01T00:00:00Z", "approved": True}])
+        runtime = ollama_proxy.TopicBoardRuntime(path); _, topic_id = runtime.prepare(json.dumps({"messages": []}).encode())
+        health = json.dumps(runtime.health(), ensure_ascii=False)
+        self.assertEqual(runtime.health()["in_flight"], 1)
+        self.assertNotIn("secret-id", health); self.assertNotIn(line, health); self.assertNotIn(path, health)
+        runtime.completion(topic_id, False)
+
+    def test_old_completion_token_cannot_release_new_same_topic_lease(self) -> None:
+        path = self.write_board([{"id": "aba-topic", "title": "에이비에이토픽", "source": "human review", "published_at": "2026-01-01T00:00:00Z", "summary": "에이비에이토픽의 사실 요약이다.", "expires_at": "2099-01-01T00:00:00Z", "approved": True}])
+        runtime = ollama_proxy.TopicBoardRuntime(path); body = json.dumps({"messages": []}).encode()
+        _, old_token = runtime.prepare(body); self.assertIsNotNone(old_token)
+        runtime.completion(old_token, False)
+        _, new_token = runtime.prepare(body); self.assertIsNotNone(new_token); self.assertNotEqual(old_token, new_token)
+        line = runtime.approved_dialogue(new_token)
+        runtime.completion(old_token, False); runtime.completion(old_token, True)
+        self.assertEqual(runtime.health()["in_flight"], 1)
+        self.assertEqual(runtime.health()["completions"], 0)
+        self.assertEqual(runtime.approved_dialogue(new_token), line)
+        runtime.completion(new_token, True)
+        self.assertEqual(runtime.health()["completions"], 1)
 
     def test_allowed_root_rejects_outside_path_without_exposing_it(self) -> None:
         path = self.write_board([])

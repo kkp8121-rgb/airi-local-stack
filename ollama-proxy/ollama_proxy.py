@@ -8,6 +8,7 @@ import json
 import math
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -45,7 +46,7 @@ from evaluation_store import (
     EvaluationValidationError,
     NullEvaluationStore,
 )
-from topic_board import choose_topic, load_approved_topics, render_topic_context
+from topic_board import load_approved_topics, render_topic_context
 from knowledge_store import KnowledgeStore
 
 
@@ -474,7 +475,12 @@ class TopicBoardRuntime:
                 self._path_allowed = False
         self._lock = threading.Lock()
         self._recent: deque[str] = deque(maxlen=TOPIC_RECENT_LIMIT)
-        self._approved_dialogues: dict[str, str] = {}
+        # Opaque token -> (topic id, exact reviewed line). A separate topic-id
+        # set makes completion ABA-safe: an old token cannot release a newer
+        # lease for the same topic.
+        self._leases: dict[str, tuple[str, str]] = {}
+        self._in_flight_topic_ids: set[str] = set()
+        self._lease_serial = 0
         self._loads = 0
         self._selections = 0
         self._completions = 0
@@ -497,28 +503,42 @@ class TopicBoardRuntime:
             return body, None
         try:
             items = load_approved_topics(self._path)
-            with self._lock:
-                self._loads += 1
-                self._approved_count = len(items)
-                recent = tuple(self._recent)
-            topic = choose_topic(items, recently_used=recent)
-            if topic is None:
-                # A small board must not become permanently silent after a
-                # single pass. Reuse the least-recently delivered live item;
-                # the renderer's multi-minute cooldown still controls time.
-                by_id = {item.id: item for item in items}
-                topic = next(
-                    (by_id[topic_id] for topic_id in recent if topic_id in by_id),
-                    None,
-                )
-            if topic is None:
-                with self._lock:
-                    self._last_status = "empty"
-                return body, None
             payload = json.loads(body)
             messages = payload.get("messages") if isinstance(payload, dict) else None
             if not isinstance(messages, list):
                 raise ValueError("chat messages are unavailable")
+            # Board I/O happens before this critical section. Selection and
+            # reservation happen together, so no two concurrent requests can
+            # obtain the same reviewed line.
+            with self._lock:
+                self._loads += 1
+                self._approved_count = len(items)
+                by_id = {item.id: item for item in items}
+                available = [item for item in items if item.id not in self._in_flight_topic_ids]
+                topic = next((item for item in available if item.id not in self._recent), None)
+                if topic is None:
+                    # After one complete cycle, use the oldest delivered live
+                    # topic that is not currently leased.
+                    topic = next(
+                        (by_id[topic_id] for topic_id in self._recent
+                         if topic_id in by_id and topic_id not in self._in_flight_topic_ids),
+                        None,
+                    )
+                if topic is None:
+                    self._last_status = "empty"
+                    return body, None
+                # The serial makes tokens unique for this runtime even if a
+                # random source collision is forced in a test or occurs in
+                # the astronomically unlikely case of a token_hex collision.
+                self._lease_serial += 1
+                token = f"{secrets.token_hex(16)}-{self._lease_serial:x}"
+                while token in self._leases:
+                    self._lease_serial += 1
+                    token = f"{secrets.token_hex(16)}-{self._lease_serial:x}"
+                self._leases[token] = (topic.id, topic.broadcast_line)
+                self._in_flight_topic_ids.add(topic.id)
+                self._selections += 1
+                self._last_status = "selected"
             # Proactive generation must never inherit a foreground user or
             # assistant transcript, even if a direct loopback caller sends
             # one. Keep only system configuration before adding the ephemeral
@@ -535,29 +555,52 @@ class TopicBoardRuntime:
                     break
             else:
                 messages.insert(0, {"role": "system", "content": context})
-            with self._lock:
-                self._selections += 1
-                if topic.broadcast_line:
-                    self._approved_dialogues[topic.id] = topic.broadcast_line
-                self._last_status = "selected"
-            return json.dumps(payload, ensure_ascii=False).encode("utf-8"), topic.id
-        except (OSError, ValueError, UnicodeDecodeError, json.JSONDecodeError):
+            return json.dumps(payload, ensure_ascii=False).encode("utf-8"), token
+        except (OSError, RuntimeError, ValueError, UnicodeDecodeError, json.JSONDecodeError):
+            # A reservation is never allowed to survive a failed body mapping.
+            if "token" in locals():
+                self.completion(token, False)
             with self._lock:
                 self._errors += 1
                 self._last_status = "error"
             return body, None
 
-    def approved_dialogue(self, topic_id: str | None) -> str:
-        if not topic_id:
+    def approved_dialogue(self, token: str | None) -> str:
+        if not token:
             return ""
         with self._lock:
-            return self._approved_dialogues.get(topic_id, "")
+            lease = self._leases.get(token)
+        if lease is None:
+            return ""
+        topic_id, line = lease
+        # Hot reload is fail-soft: do one local board read outside the lease
+        # lock, then confirm the same lease still exists before returning it.
+        try:
+            current = next(
+                (item for item in load_approved_topics(self._path)
+                 if item.id == topic_id and item.broadcast_line == line),
+                None,
+            )
+        except (OSError, RuntimeError, ValueError, UnicodeDecodeError, json.JSONDecodeError):
+            current = None
+        if current is None:
+            self.completion(token, False)
+            return ""
+        with self._lock:
+            return line if self._leases.get(token) == lease else ""
 
-    def completion(self, topic_id: str | None, delivered: bool) -> None:
-        if not topic_id or not delivered:
+    def completion(self, token: str | None, delivered: bool) -> None:
+        if not token:
             return
         with self._lock:
-            self._approved_dialogues.pop(topic_id, None)
+            lease = self._leases.pop(token, None)
+            if lease is None:
+                return
+            topic_id, _ = lease
+            self._in_flight_topic_ids.discard(topic_id)
+            if not delivered:
+                self._last_status = "released"
+                return
             if topic_id in self._recent:
                 self._recent.remove(topic_id)
             self._recent.append(topic_id)
@@ -574,6 +617,7 @@ class TopicBoardRuntime:
                 "completions": self._completions,
                 "errors": self._errors,
                 "recent_count": len(self._recent),
+                "in_flight": len(self._leases),
                 "last_status": self._last_status,
             }
 

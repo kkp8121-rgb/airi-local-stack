@@ -200,3 +200,14 @@ Push 이후 재기동 검사에서는 8880·8890·8892·9880·11434·11435가 lo
 - 새 실제 토픽·decision·활성 runtime board는 만들지 않았다. 기존 ignored legacy board는 수정하지 않고 비활성 상태로 보존했으며 자동 마이그레이션하지 않는다.
 - workflow·runtime·startup 집중 회귀 25개와 Python compile, diff check가 통과했다.
 - 이 체크포인트의 최종 `ollama-proxy` 전체 단위 회귀 452개가 통과했다.
+
+## 10. TopicBoard in-flight lease
+
+- 토픽 선택과 reservation을 같은 lock 안에서 수행하고, 요청마다 새 opaque lease token을 발급한다. 내부에서만 token을 topic ID와 사전 승인 대사에 연결하므로 동시 요청은 같은 토픽을 중복 선택할 수 없다.
+- completion은 exact token만 정리한다. 과거 요청의 늦은 completion은 같은 topic ID로 다시 잡힌 새 lease를 해제하거나 완료 처리할 수 없다.
+- 성공·실패 모두 lease와 대사 mapping을 제거한다. 성공한 HTTP terminal 소비만 recent 순환과 completion count를 갱신하며, 실패·취소·stale hot reload는 최근 상태를 바꾸지 않는다.
+- 승인 보드가 선택 뒤 삭제·만료·변경되거나 invalid가 되면 대사를 전달하기 전에 한 번 재검증해 stale lease를 fail-soft로 폐기한다.
+- health는 content-free `in_flight` 수만 추가하며 token, topic ID, 제목, 대사를 노출하지 않는다.
+- 현재 성공 의미는 HTTP terminal 소비까지이며 실제 TTS 자연 재생 완료 ACK는 아직 별도 후속 과제다.
+- lease·ABA·동시성·1/2/8 순환·hot reload·proactive 격리 집중 회귀 13개가 통과했다.
+- 이 체크포인트의 최종 `ollama-proxy` 전체 단위 회귀 458개가 통과했다.
