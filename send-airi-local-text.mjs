@@ -14,14 +14,55 @@ export const CLIENT_POSSIBLE_EVENTS = [
 
 export function assistantText(message) {
   const content = message?.content
-  if (typeof content === 'string')
-    return content
-  if (!Array.isArray(content))
-    return ''
-  return content
-    .filter(part => part && typeof part === 'object' && part.type === 'text' && typeof part.text === 'string')
-    .map(part => part.text)
-    .join('')
+  const contentText = typeof content === 'string'
+    ? content
+    : Array.isArray(content)
+      ? content
+          .filter(part => part && typeof part === 'object' && part.type === 'text' && typeof part.text === 'string')
+          .map(part => part.text)
+          .join('')
+      : ''
+  if (contentText.trim())
+    return contentText
+
+  // AIRI runtime messages also carry UI-native slices. Some packaged bridge
+  // versions serialize an empty content field but retain completed speech here.
+  const sliceText = Array.isArray(message?.slices)
+    ? message.slices
+        .filter(slice => slice && typeof slice === 'object' && slice.type === 'text' && typeof slice.text === 'string')
+        .map(slice => slice.text)
+        .join('')
+    : ''
+  if (sliceText.trim())
+    return sliceText
+  const categorizedText = message?.categorization?.speech
+  return typeof categorizedText === 'string' && categorizedText.trim()
+    ? categorizedText
+    : ''
+}
+
+export function assistantMessageShape(message) {
+  const content = message?.content
+  const slices = message?.slices
+  return {
+    message_object: Boolean(message && typeof message === 'object' && !Array.isArray(message)),
+    content_kind: Array.isArray(content) ? 'array' : typeof content,
+    content_parts: Array.isArray(content) ? content.length : 0,
+    slices_kind: Array.isArray(slices) ? 'array' : typeof slices,
+    slices_parts: Array.isArray(slices) ? slices.length : 0,
+    categorization_object: Boolean(message?.categorization && typeof message.categorization === 'object'),
+    categorization_speech_kind: typeof message?.categorization?.speech,
+  }
+}
+
+export function resolveAssistantText(completionMessage, matchingMessageText = '') {
+  return assistantText(completionMessage) || (typeof matchingMessageText === 'string' ? matchingMessageText : '')
+}
+
+export function resolveAssistantShape(completionMessage, matchingMessageShape, matchingMessageSeen = false) {
+  return assistantText(completionMessage) || !matchingMessageSeen
+    ? assistantMessageShape(completionMessage)
+    : matchingMessageShape
 }
 
 export function decodeTextArgument(args) {
@@ -72,8 +113,9 @@ async function loadServerConfig(configPath) {
 async function main() {
   const args = process.argv.slice(2)
   const text = decodeTextArgument(args)
-  const waitComplete = args.includes('--wait-complete') || args.includes('--print-assistant')
   const printAssistant = args.includes('--print-assistant')
+  const printAssistantShape = args.includes('--print-assistant-shape')
+  const waitComplete = args.includes('--wait-complete') || printAssistant || printAssistantShape
   const appData = process.env.APPDATA
   if (!appData)
     throw new Error('APPDATA is unavailable.')
@@ -94,6 +136,9 @@ async function main() {
     matchingCompletions: 0,
     errors: 0,
   }
+  let matchingAssistantText = ''
+  let matchingAssistantShape = assistantMessageShape(undefined)
+  let matchingAssistantSeen = false
   const client = new Client({
     name: 'local-codex-chat-ingress',
     url: `ws://${hostname}:6121/ws`,
@@ -105,8 +150,14 @@ async function main() {
     onAnyMessage: (event) => {
       if (event?.type === 'output:gen-ai:chat:message') {
         eventStats.assistantMessages++
-        if (event?.data?.text === text)
+        if (event?.data?.text === text) {
           eventStats.matchingAssistantMessages++
+          matchingAssistantSeen = true
+          matchingAssistantShape = assistantMessageShape(event?.data?.message)
+          const candidate = assistantText(event?.data?.message)
+          if (candidate)
+            matchingAssistantText = candidate
+        }
       }
       else if (event?.type === 'output:gen-ai:chat:complete') {
         eventStats.completions++
@@ -132,9 +183,14 @@ async function main() {
     ? client.onEvent('output:gen-ai:chat:complete', (event) => {
         if (event?.data?.text !== text)
           return
+        const completionText = assistantText(event?.data?.message)
         completeResolve({
           elapsedMs: Math.round(performance.now() - startedAt),
-          assistant: assistantText(event?.data?.message),
+          assistant: resolveAssistantText(event?.data?.message, matchingAssistantText),
+          assistantSource: completionText ? 'completion' : matchingAssistantText ? 'message-event' : 'none',
+          assistantShape: resolveAssistantShape(
+            event?.data?.message, matchingAssistantShape, matchingAssistantSeen,
+          ),
         })
       })
     : undefined
@@ -168,6 +224,9 @@ async function main() {
           completed_ms: completed.elapsedMs,
           assistant_chars: Array.from(completed.assistant).length,
           ...(printAssistant ? { assistant: completed.assistant } : {}),
+          ...(printAssistantShape
+            ? { assistant_source: completed.assistantSource, assistant_shape: completed.assistantShape }
+            : {}),
         }
       : {}),
   }

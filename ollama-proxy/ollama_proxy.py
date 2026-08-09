@@ -816,6 +816,10 @@ _CARD_CONTROL_TOKEN_RE = re.compile(
     r"<\s*(?:\||\{\s*['\"]\|['\"]\s*\})\s*(?:ACT|CALL|DELAY)\b",
     re.IGNORECASE,
 )
+_CARD_GENERIC_CONTROL_TEMPLATE_RE = re.compile(
+    r"<\|\s*[A-Za-z][A-Za-z0-9_.-]{0,63}"
+    r"(?:\s+[^|\r\n]{1,256})?\s*\|>"
+)
 _CARD_CONTROL_NAME_RE = re.compile(r"\b(?:ACT|CALL|DELAY)\b", re.IGNORECASE)
 _CARD_CONTROL_CUE_RE = re.compile(
     r"(?:token|control|json|format|stream|reply|response|output|every|must|include|"
@@ -843,6 +847,14 @@ def sanitize_character_card_content(content: str) -> str:
         if not compact:
             continue
         if _CARD_CONTROL_TOKEN_RE.search(compact):
+            continue
+        generic_template = _CARD_GENERIC_CONTROL_TEMPLATE_RE.search(compact)
+        if generic_template and (
+            _CARD_CONTROL_CUE_RE.search(compact)
+            or _CARD_GENERIC_CONTROL_TEMPLATE_RE.fullmatch(
+                compact.strip().rstrip(".。")
+            )
+        ):
             continue
         if _CARD_CONTROL_NAME_RE.search(compact) and _CARD_CONTROL_CUE_RE.search(compact):
             continue
@@ -1795,6 +1807,7 @@ _GROUNDING_COPULAR_SUFFIXES = (
 # This is morphological normalization, not a subject/keyword exception: it
 # lets e.g. ``굴러가는`` and ``굴러가다니`` share the same observable action.
 _GROUNDING_VERBAL_SUFFIXES = (
+    "구나", "구먼", "네",
     "하였다니", "했다니", "었다니", "았다니", "였다니", "됐다니",
     "하였는데", "했는데", "었는데", "았는데", "였는데", "됐는데",
     "하였어", "했어", "었어", "았어", "였어", "됐어", "졌어",
@@ -1913,7 +1926,9 @@ GROUNDING_CORRECTION_DRAFT_MAX_CHARS = 240
 _GROUNDING_ACTION_ENDING_RE = re.compile(
     r"(?:았|었|였|했|하|되|하였)?(?:다|요|어|아|네|지|고|며|면|니|까|ㄴ|은|는|던|ㄹ|을|겠다|겠어)$"
 )
-_GROUNDING_SIMILE_RE = re.compile(r"(?:처럼|같(?:아|은|은데|다)|마치|듯(?:이|한)?|닮(?:았|아|은|는다))")
+_GROUNDING_SIMILE_RE = re.compile(
+    r"(?:처럼|같(?:아|은|은데|다)|마치|듯(?:이|한)?(?=[\s.!?,。！？]|$)|닮(?:았|아|은|는다))"
+)
 _GROUNDING_EMOTION_RE = re.compile(
     r"(?:슬프|속상|기쁘|행복|우울|불안|걱정|무섭|두렵|화났|짜증|외롭|놀랐|당황|신났)"
 )
@@ -1929,6 +1944,7 @@ _GROUNDING_GENERIC_ECHO_RE = re.compile(
 # general token normalization: a noun made shorter by a particle is not an
 # action.
 _GROUNDING_ACTION_SUFFIXES = (
+    "구나", "구먼", "네",
     "다니", "라니", "는데", "은데", "거든", "니까", "아서", "어서", "여서", "해서",
     "겠어", "어", "아", "네", "지", "니", "는", "ㄴ", "던", "고", "며", "면",
 )
@@ -1980,9 +1996,12 @@ def build_grounding_correction_body(
 ) -> bytes:
     """Create a retry-only OpenAI-shaped body without mutating the first send.
 
-    Only request-local system messages are replaced.  The base prompt, card,
-    state, memory, journal and projected foreground messages retain both their
-    content and ordering.
+    A rejected spoken draft keeps the base/card/memory context and replaces
+    only the request-local note. If sanitization left no spoken draft at all,
+    the small model has usually followed card/control scaffolding instead of
+    the user. That recovery gets a deliberately compact, request-local prompt
+    and the current user turn only; retaining the failed scaffolding would
+    reproduce the same empty result.
     """
     try:
         payload = json.loads(prepared_body)
@@ -1999,9 +2018,28 @@ def build_grounding_correction_body(
         ]
         anchors = grounding_correction_anchor_sequence(user_text)
         actions = grounding_action_sequence(user_text)
-        draft = json.dumps(normalized_grounding_draft(initial_draft), ensure_ascii=False)
+        normalized_draft = normalized_grounding_draft(initial_draft)
+        draft = json.dumps(normalized_draft, ensure_ascii=False)
         anchor_ledger = ", ".join(anchors) or "사용자 원문의 관찰 사실"
         action_ledger = ", ".join(actions) or "사용자 원문의 행동·결과"
+        if not normalized_draft:
+            payload["messages"] = [
+                {
+                    "role": "system",
+                    "name": REQUEST_LOCAL_SYSTEM_MESSAGE_NAME,
+                    "content": (
+                        "너는 아이리야. 사용자의 현재 말에 바로 이어지는 10~45자의 "
+                        "자연스러운 한국어 반말 한 문장만 써. "
+                        f"근거 장부(대상·사실): {anchor_ledger}. "
+                        f"행동·결과 장부: {action_ledger}. "
+                        "장부의 대상과 행동·결과를 직접 받아 말하고, 새 사실·감정·원인·"
+                        "취향·비유·조언·질문을 만들지 마. 설명, 제어 데이터, 발화자 표식, "
+                        "영문자, 존댓말, 이모지 없이 대사만 써."
+                    ),
+                },
+                {"role": "user", "content": user_text.strip()},
+            ]
+            return json.dumps(payload, ensure_ascii=False).encode("utf-8")
         note = (
             "수정 전 초안은 신뢰하지 말고 재작성 재료로만 써: " + draft + ". "
             f"사용자 근거 장부(사실): {anchor_ledger}. 행동·결과 장부: {action_ledger}. "
@@ -2033,6 +2071,7 @@ def grounding_retry_is_factual_improvement(
     candidate = retry_draft.strip()
     if (
         not candidate
+        or not has_unambiguous_declarative_terminal(user_text)
         or is_unrequested_foreign_dialogue(candidate, user_text)
         or not contains_hangul(candidate)
         or "?" in candidate
@@ -2040,6 +2079,7 @@ def grounding_retry_is_factual_improvement(
         or grounding_is_generic_echo(user_text, candidate)
         or _GROUNDING_UNSOLICITED_ADVICE_RE.search(candidate)
         or _GROUNDING_BARE_INTERJECTION_RE.search(candidate)
+        or contains_personal_deixis(candidate)
     ):
         return False
     # An emotion term is safe only when it was explicitly supplied by the user.
@@ -2076,6 +2116,215 @@ def grounding_retry_is_factual_improvement(
     return initial_has_other_violation
 
 
+def grounding_candidate_is_safe_fallback(user_text: str, candidate: str) -> bool:
+    """Allow a grounded, non-fabricating draft when strict correction fails.
+
+    The correction pass still gets first choice. This fallback deliberately
+    permits a plain observation/restatement, but never an unsupported emotion,
+    simile, advice, foreign-language switch, question, or missing action anchor.
+    It avoids converting a recoverable quality miss into silent chat.
+    """
+    clean = candidate.strip()
+    if (
+        not clean
+        or not has_unambiguous_declarative_terminal(user_text)
+        or is_unrequested_foreign_dialogue(clean, user_text)
+        or not contains_hangul(clean)
+        or "?" in clean
+        or _GROUNDING_SIMILE_RE.search(clean)
+        or _GROUNDING_UNSOLICITED_ADVICE_RE.search(clean)
+        or (
+            _GROUNDING_EMOTION_RE.search(clean)
+            and not _GROUNDING_EMOTION_RE.search(user_text)
+        )
+        or contains_personal_deixis(clean)
+        or grounding_overlap(user_text, clean) < grounding_required_overlap(user_text)
+    ):
+        return False
+    if not re.search(r"[.!?。！？]$", clean) and not _COMPLETE_UNPUNCTUATED_KOREAN_RE.search(clean):
+        return False
+    actions = grounding_action_sequence(user_text)
+    if actions and not any(action in grounding_action_sequence(clean) for action in actions):
+        return False
+    return True
+
+
+_GROUNDING_FIRST_PERSON_ROOTS = ("우리", "저희", "나", "내", "저", "제")
+_GROUNDING_SECOND_PERSON_ROOTS = ("너희", "너네", "니네", "당신", "너", "네", "니")
+_GROUNDING_PERSONAL_PARTICLE_RE = re.compile(
+    r"(?:(?:에게서|한테서|한텐|한테|에겐|에게|께선|으로|부터|까지|하고|더러|보고|"
+    r"야말로|밖엔|밖에|보단|보다|처럼|이라도|라도|라면|라서|마저|조차|끼리|마다|"
+    r"만큼|만치|겐|께|랑|와|과|"
+    r"로|에|의|가|는|은|를|을|도|만|뿐|게|들)){0,3}$"
+)
+_GROUNDING_PERSONAL_CONTRACTION_RE = re.compile(
+    r"(?:난|넌|날|널|전|절|우린|우릴|내겐|네겐|제겐|저흰|저흴|너흰)$"
+)
+_GROUNDING_FIRST_PERSON_CONTRACTIONS = frozenset(
+    {"난", "날", "전", "절", "우린", "우릴", "내겐", "제겐", "저흰", "저흴"}
+)
+_GROUNDING_SECOND_PERSON_CONTRACTIONS = frozenset(
+    {"넌", "널", "네겐", "너흰"}
+)
+
+
+def personal_deixis_roles(text: str) -> frozenset[str]:
+    """Return explicit Korean first/second-person roles after homograph guards."""
+    roles: set[str] = set()
+    tokens = re.findall(r"[가-힣]+", unicodedata.normalize("NFKC", text))
+    for index, token in enumerate(tokens):
+        previous = tokens[index - 1] if index else ""
+        following = tokens[index + 1] if index + 1 < len(tokens) else ""
+        following_is_case_marked_noun = following.endswith(("이", "가", "을", "를"))
+        following_is_subject_marked_noun = following.endswith(("이", "가"))
+        # ``나는`` is also the adnominal form of 날다, and bare ``나`` can be
+        # the predicate in ``티가 나``. ``저`` before a noun is a demonstrative.
+        # These structural cases do not identify the current speaker.
+        if (
+            token == "나는"
+            and previous.endswith(("을", "를"))
+            and following_is_case_marked_noun
+        ):
+            continue
+        if token == "나" and previous.endswith(("이", "가")):
+            continue
+        if token.startswith("저들") or token.startswith("저마다"):
+            continue
+        if token == "저" and following_is_case_marked_noun:
+            continue
+        # Contracted first-person ``전`` is homographic with the determiner in
+        # ``전 직원이``. An immediately following subject-marked noun is the
+        # determiner construction; object-marked forms such as ``전 수건을``
+        # remain personal and fail closed.
+        if token == "전" and following_is_subject_marked_noun:
+            continue
+        if _GROUNDING_PERSONAL_CONTRACTION_RE.fullmatch(token):
+            if token in _GROUNDING_FIRST_PERSON_CONTRACTIONS:
+                roles.add("first")
+            elif token in _GROUNDING_SECOND_PERSON_CONTRACTIONS:
+                roles.add("second")
+            continue
+        for root in _GROUNDING_FIRST_PERSON_ROOTS:
+            if (
+                token.startswith(root)
+                and _GROUNDING_PERSONAL_PARTICLE_RE.fullmatch(token[len(root):])
+            ):
+                roles.add("first")
+                break
+        else:
+            for root in _GROUNDING_SECOND_PERSON_ROOTS:
+                if (
+                    token.startswith(root)
+                    and _GROUNDING_PERSONAL_PARTICLE_RE.fullmatch(token[len(root):])
+                ):
+                    roles.add("second")
+                    break
+    return frozenset(roles)
+
+
+def contains_personal_deixis(text: str) -> bool:
+    """Detect unresolved Korean speaker deixis without common homograph traps."""
+    return bool(personal_deixis_roles(text))
+
+
+def _hangul_has_final_ss(char: str) -> bool:
+    codepoint = ord(char) - 0xAC00 if len(char) == 1 else -1
+    return 0 <= codepoint < 11172 and codepoint % 28 == 20
+
+
+def has_unambiguous_declarative_terminal(text: str) -> bool:
+    """Require punctuation that distinguishes a statement from a yes/no question."""
+    clean = unicodedata.normalize("NFKC", text).strip()
+    return bool(re.search(r"[.!。！]+$", clean))
+
+
+def ambiguous_unpunctuated_grounding_echo(user_text: str, candidate: str) -> bool:
+    """Detect a retry that turns an ambiguous casual question into an assertion."""
+    user = unicodedata.normalize("NFKC", user_text).strip()
+    draft = unicodedata.normalize("NFKC", candidate).strip()
+    if has_unambiguous_declarative_terminal(user) or not draft or "?" in draft:
+        return False
+    user_roles = personal_deixis_roles(user)
+    draft_roles = personal_deixis_roles(draft)
+    def has_negative_orientation(text: str) -> bool:
+        tokens = re.findall(r"[가-힣]+", text)
+        return bool(
+            any("않" in token for token in tokens)
+            or any(
+                token == "아직" and index + 1 < len(tokens) and tokens[index + 1] == "안"
+                for index, token in enumerate(tokens)
+            )
+        )
+
+    # An explicit AIRI-first-person answer resolves the direction only when
+    # it also changes polarity. Korean routinely omits a first-person subject,
+    # so merely introducing ``난`` cannot prove that a copied action is AIRI's
+    # answer rather than appropriation of the user's statement.
+    overlap_is_grounded = (
+        grounding_overlap(user, draft) >= grounding_required_overlap(user)
+    )
+    actions = grounding_action_sequence(user)
+    action_is_grounded = bool(
+        actions
+        and any(action in grounding_action_sequence(draft) for action in actions)
+    )
+    if (
+        draft_roles == {"first"}
+        and user_roles in (frozenset(), {"second"})
+        and has_negative_orientation(user) != has_negative_orientation(draft)
+        and overlap_is_grounded
+        and action_is_grounded
+    ):
+        return False
+    if draft_roles:
+        return True
+    return bool(overlap_is_grounded and action_is_grounded)
+
+
+def grounded_observation_fallback(user_text: str) -> str:
+    """Return a fact-preserving Korean observation after two model failures.
+
+    This is deliberately narrower than normal generation. It changes only a
+    conservative declarative ending, never chooses a topic or invents a
+    reaction. First/second-person forms are rejected because echoing them could
+    reverse the speaker. Questions, commands, knowledge, safety, foreign and
+    proactive turns are already excluded by ``ordinary_korean_grounding_turn``.
+    """
+    clean = unicodedata.normalize(
+        "NFKC", strip_airi_timestamp_prefix(user_text)
+    ).strip()
+    if (
+        not ordinary_korean_grounding_turn(clean)
+        or not 4 <= len(clean) <= 60
+        or "\n" in clean
+        or CONTROL_TOKEN_RE.search(clean)
+        or BARE_LEADING_CONTROL_ENVELOPE_RE.search(clean)
+        or _SPEAKER_LABEL_RE.match(clean)
+        or _SPOKEN_LIST_MARKER_RE.search(clean)
+    ):
+        return ""
+    tokens = set(re.findall(r"[가-힣]+", clean))
+    if contains_personal_deixis(clean):
+        return ""
+    # A period/exclamation mark is required. Without it, a Korean past-form
+    # question such as ``점심 먹었어`` is indistinguishable from a statement.
+    if not has_unambiguous_declarative_terminal(clean):
+        return ""
+    stem = re.sub(r"[.!。！]+\s*$", "", clean).strip()
+    if stem.endswith("이야"):
+        candidate = stem[:-2] + "이구나!"
+    elif stem.endswith("어") and (
+        (len(stem) >= 2 and _hangul_has_final_ss(stem[-2]))
+        or stem.endswith("없어")
+    ):
+        candidate = stem[:-1] + "구나!"
+    elif stem.endswith("네"):
+        candidate = stem + "!"
+    else:
+        return ""
+    return candidate if grounding_candidate_is_safe_fallback(clean, candidate) else ""
+
+
 def ordinary_korean_grounding_turn(
     user_text: str, *, proactive: bool = False, synthetic_evaluation: bool = False
 ) -> bool:
@@ -2087,6 +2336,7 @@ def ordinary_korean_grounding_turn(
         and not proactive
         and not synthetic_evaluation
         and not requests_non_korean_dialogue(text)
+        and has_unambiguous_declarative_terminal(text)
         and not _GROUNDING_QUESTION_RE.search(text)
         and not _GROUNDING_COMMAND_RE.search(text)
         and not should_retrieve_knowledge(text)
@@ -2099,10 +2349,16 @@ def needs_grounding_retry(
     synthetic_evaluation: bool = False,
 ) -> bool:
     """Select zero-grounded and structurally generic one-token drafts."""
-    if not candidate.strip() or not ordinary_korean_grounding_turn(
+    if not ordinary_korean_grounding_turn(
         user_text, proactive=proactive, synthetic_evaluation=synthetic_evaluation
     ):
         return False
+    # A nonempty native response can consist only of ACT/CALL decoration. The
+    # boundary correctly removes that control material, but an ordinary user
+    # statement still deserves one grounded correction attempt instead of an
+    # apparently successful empty completion.
+    if not candidate.strip():
+        return True
     if grounding_overlap(user_text, candidate) < grounding_required_overlap(user_text):
         return True
     if _GROUNDING_SIMILE_RE.search(candidate):
@@ -2112,6 +2368,8 @@ def needs_grounding_retry(
     if _GROUNDING_UNSOLICITED_ADVICE_RE.search(candidate):
         return True
     if _GROUNDING_BARE_INTERJECTION_RE.search(candidate):
+        return True
+    if contains_personal_deixis(candidate):
         return True
     if _GROUNDING_EMOTION_RE.search(candidate) and not _GROUNDING_EMOTION_RE.search(user_text):
         return True
@@ -4846,6 +5104,11 @@ async def proxy(path: str, request: Request):
                 grounding_required = 0
                 grounding_retry_language_blocked = False
                 grounding_retry_invalid = False
+                grounding_safe_fallback_used = False
+                grounding_safe_fallback_from_retry = False
+                grounded_observation_fallback_used = False
+                empty_dialogue_retry_used = False
+                empty_dialogue_retry_passed = False
                 # This watchdog is intentionally armed only after actual
                 # non-whitespace upstream character progress.  It therefore
                 # preserves the generous httpx read timeout for cold loads.
@@ -4973,6 +5236,12 @@ async def proxy(path: str, request: Request):
                     terminal = bool(event.get("done"))
                     if terminal:
                         terminal_event = event
+                # A native terminal can carry the entire short answer in one
+                # unpunctuated delta. Finalize before deciding whether a
+                # corrective retry is needed; otherwise the valid answer is
+                # still pending when the retry gate inspects boundary.output.
+                if terminal and not raw_progress_timeout and not boundary.closed_early:
+                    boundary.finish()
                 # Do not expose a canned "I'll say that in Korean" line.
                 # Before the first public sentence, a language rejection is
                 # still reversible: repeat the same native request once with
@@ -4982,10 +5251,20 @@ async def proxy(path: str, request: Request):
                     last_user_text, boundary.output, proactive=proactive_turn,
                     synthetic_evaluation=synthetic_evaluation_turn,
                 )
+                empty_dialogue_retry = bool(
+                    not proactive_turn
+                    and not language_retry
+                    and not grounding_retry
+                    and emitted_raw_content
+                    and terminal
+                    and not boundary.output.strip()
+                    and not boundary.truncation_failed
+                    and not boundary.register_normalization_failed
+                )
                 if (
                     not raw_progress_timeout
                     and not proactive_turn
-                    and (language_retry or grounding_retry)
+                    and (language_retry or grounding_retry or empty_dialogue_retry)
                 ):
                     initial_boundary = boundary
                     initial_terminal = terminal
@@ -4995,13 +5274,18 @@ async def proxy(path: str, request: Request):
                     grounding_required = grounding_required_overlap(last_user_text)
                     await upstream_response.aclose()
                     grounding_retry_used = grounding_retry
+                    empty_dialogue_retry_used = empty_dialogue_retry
                     retry_prepared_body = (
                         build_grounding_correction_body(
                             prepared_openai_body, boundary.output, last_user_text,
                         ) if grounding_retry else inject_request_local_system_note(
                             prepared_openai_body,
-                            "직전 응답은 한국어 문장 안에 일반 알파벳 단어가 있어 보낼 수 없었다. "
-                            "사용자 원문이나 승인 지식의 고유명사 외 알파벳 단어 없이 자연스러운 한국어 반말 한 문장으로 다시 답해.",
+                            (
+                                "직전 응답은 한국어 문장 안에 일반 알파벳 단어가 있어 보낼 수 없었다. "
+                                "이번에는 필요한 고유명사도 한글로 풀어 쓰고, 영문자를 한 글자도 쓰지 말고 자연스러운 한국어 반말 한 문장으로 다시 답해."
+                                if language_retry else
+                                "직전 응답에는 실제로 말할 대사가 없었다. 제어 표현이나 설명을 쓰지 말고, 사용자의 현재 말에 직접 이어지는 자연스러운 한국어 반말 한 문장만 답해."
+                            ),
                             replace=True,
                         )
                     )
@@ -5101,8 +5385,18 @@ async def proxy(path: str, request: Request):
                                 terminal = bool(retry_event.get("done"))
                                 terminal_event = retry_event if terminal else None
                     if language_retry and retry_boundary.language_blocked and not emitted_substantive:
-                        fallback = "한국어로 답할게."
-                        retry_boundary.output = fallback
+                        # A meta apology is not the requested answer. Keep the
+                        # failed retry silent instead of speaking "I'll answer
+                        # in Korean" as if it were useful dialogue.
+                        retry_boundary = IncrementalAiriOutputBoundary(
+                            require_korean=user_prefers_korean,
+                            max_sentences=response_sentence_limit(last_user_text),
+                        )
+                        retry_boundary.closed_early = True
+                        terminal = initial_terminal
+                        terminal_event = initial_terminal_event
+                    if terminal and not retry_boundary.closed_early:
+                        retry_boundary.finish()
                     if grounding_retry_used and not retry_timed_out and not grounding_retry_invalid:
                         retry_overlap = grounding_overlap(
                             last_user_text, retry_boundary.output
@@ -5121,6 +5415,31 @@ async def proxy(path: str, request: Request):
                         grounding_content_free = not grounding_retry_passed
                         if grounding_retry_passed:
                             boundary = retry_boundary
+                        elif (
+                            grounding_candidate_is_safe_fallback(
+                                last_user_text, retry_candidate
+                            )
+                            and enforce_tool_truth(original_messages, retry_candidate)
+                            == retry_candidate
+                        ):
+                            boundary = retry_boundary
+                            grounding_safe_fallback_used = True
+                            grounding_safe_fallback_from_retry = True
+                            grounding_content_free = False
+                        elif (
+                            grounding_candidate_is_safe_fallback(
+                                last_user_text, initial_boundary.output
+                            )
+                            and enforce_tool_truth(
+                                original_messages, initial_boundary.output.strip()
+                            )
+                            == initial_boundary.output.strip()
+                        ):
+                            boundary = initial_boundary
+                            terminal = initial_terminal
+                            terminal_event = initial_terminal_event
+                            grounding_safe_fallback_used = True
+                            grounding_content_free = False
                         else:
                             # The first draft already failed the production
                             # grounding gate.  A failed correction therefore
@@ -5139,6 +5458,21 @@ async def proxy(path: str, request: Request):
                             boundary.closed_early = True
                             terminal = initial_terminal
                             terminal_event = initial_terminal_event
+                    elif grounding_retry_used and (
+                        grounding_candidate_is_safe_fallback(
+                            last_user_text, initial_boundary.output
+                        )
+                        and enforce_tool_truth(
+                            original_messages, initial_boundary.output.strip()
+                        )
+                        == initial_boundary.output.strip()
+                    ):
+                        boundary = initial_boundary
+                        terminal = initial_terminal
+                        terminal_event = initial_terminal_event
+                        grounding_retry_passed = False
+                        grounding_content_free = False
+                        grounding_safe_fallback_used = True
                     elif grounding_retry_used:
                         grounding_retry_passed = False
                         grounding_content_free = True
@@ -5152,6 +5486,22 @@ async def proxy(path: str, request: Request):
                         terminal_event = initial_terminal_event
                     else:
                         boundary = retry_boundary
+                        if empty_dialogue_retry_used:
+                            empty_dialogue_retry_passed = bool(
+                                boundary.output.strip()
+                                and not boundary.language_blocked
+                                and not ambiguous_unpunctuated_grounding_echo(
+                                    last_user_text, boundary.output,
+                                )
+                            )
+                            if not empty_dialogue_retry_passed:
+                                boundary = IncrementalAiriOutputBoundary(
+                                    require_korean=user_prefers_korean,
+                                    max_sentences=response_sentence_limit(last_user_text),
+                                )
+                                boundary.closed_early = True
+                                terminal = initial_terminal
+                                terminal_event = initial_terminal_event
                 # A normal terminal is required for journaling, except where
                 # our deterministic output budget intentionally closed the
                 # upstream after a safe boundary. A dropped stream is never
@@ -5163,6 +5513,15 @@ async def proxy(path: str, request: Request):
                 # truth rule has accepted its public form.  The exact same
                 # canonical string is then used for wire and journal.
                 dialogue = enforce_tool_truth(original_messages, boundary.output.strip())
+                if not dialogue and grounding_quality_rejected:
+                    grounded_fallback = grounded_observation_fallback(last_user_text)
+                    if (
+                        grounded_fallback
+                        and enforce_tool_truth(original_messages, grounded_fallback)
+                        == grounded_fallback
+                    ):
+                        dialogue = grounded_fallback
+                        grounded_observation_fallback_used = True
                 if raw_progress_timeout and not emitted_substantive:
                     # No model text has crossed the public boundary yet, so a
                     # single canonical interruption cannot conflict with a
@@ -5220,6 +5579,28 @@ async def proxy(path: str, request: Request):
                         "grounding_retry_language_blocked": int(grounding_retry_language_blocked),
                         "grounding_retry_invalid": int(grounding_retry_invalid),
                         "grounding_quality_rejected": int(grounding_quality_rejected),
+                        "grounding_safe_fallback_used": int(
+                            grounding_safe_fallback_used
+                        ),
+                        "grounding_safe_fallback_from_retry": int(
+                            grounding_safe_fallback_from_retry
+                        ),
+                    })
+                if empty_dialogue_retry_used:
+                    end_meta.update({
+                        "empty_dialogue_retry_used": 1,
+                        "empty_dialogue_retry_passed": int(empty_dialogue_retry_passed),
+                    })
+                if grounded_observation_fallback_used:
+                    end_meta["grounded_observation_fallback_used"] = 1
+                if raw_content_chars and not dialogue:
+                    end_meta.update({
+                        "boundary_empty": 1,
+                        "boundary_language_blocked": int(boundary.language_blocked),
+                        "boundary_truncation_failed": int(boundary.truncation_failed),
+                        "boundary_register_normalization_failed": int(
+                            boundary.register_normalization_failed
+                        ),
                     })
                 # Do not ascribe a terminal measurement to a stream we closed
                 # at our output boundary. The same applies naturally to
@@ -5519,7 +5900,7 @@ async def proxy(path: str, request: Request):
                 retry_body = inject_request_local_system_note(
                     body,
                     "직전 응답은 한국어 문장 안에 일반 알파벳 단어가 있어 보낼 수 없었다. "
-                    "사용자 원문이나 승인 지식의 고유명사 외 알파벳 단어 없이 자연스러운 한국어 반말 한 문장으로 다시 답해.",
+                    "이번에는 필요한 고유명사도 한글로 풀어 쓰고, 영문자를 한 글자도 쓰지 말고 자연스러운 한국어 반말 한 문장으로 다시 답해.",
                 )
                 retry_response = await client.send(
                     client.build_request(request.method, f"{UPSTREAM}/{path}",
@@ -5544,7 +5925,7 @@ async def proxy(path: str, request: Request):
                         boundary.feed(message_content(message), final=True),
                     )
                 if boundary.language_blocked and not sanitized:
-                    sanitized = "한국어로 답할게."
+                    sanitized = ""
             if requested_stream:
                 # unreached - kept for non-stream fallback reference (streaming
                 # chat/completions is answered above by stream_local_with_ack).
@@ -5671,7 +6052,7 @@ async def proxy(path: str, request: Request):
                     retry_body = inject_request_local_system_note(
                         body,
                         "직전 응답은 한국어 문장 안에 일반 알파벳 단어가 있어 보낼 수 없었다. "
-                        "사용자 원문이나 승인 지식의 고유명사 외 알파벳 단어 없이 자연스러운 한국어 반말 한 문장으로 다시 답해.",
+                        "이번에는 필요한 고유명사도 한글로 풀어 쓰고, 영문자를 한 글자도 쓰지 말고 자연스러운 한국어 반말 한 문장으로 다시 답해.",
                     )
                     retry_response = await client.send(
                         client.build_request(request.method, f"{UPSTREAM}/{path}",
@@ -5710,7 +6091,7 @@ async def proxy(path: str, request: Request):
                         if retry_item.get("done"):
                             terminal_item = retry_item
                     if boundary.language_blocked and not emitted_content:
-                        boundary.output = "한국어로 답할게."
+                        boundary.output = ""
                 if terminal_item is None and not boundary.closed_early and pending.strip():
                     try:
                         item = json.loads(pending + decoder.decode(b"", final=True))
@@ -5785,7 +6166,7 @@ async def proxy(path: str, request: Request):
                 retry_body = inject_request_local_system_note(
                     body,
                     "직전 응답은 한국어 문장 안에 일반 알파벳 단어가 있어 보낼 수 없었다. "
-                    "사용자 원문이나 승인 지식의 고유명사 외 알파벳 단어 없이 자연스러운 한국어 반말 한 문장으로 다시 답해.",
+                    "이번에는 필요한 고유명사도 한글로 풀어 쓰고, 영문자를 한 글자도 쓰지 말고 자연스러운 한국어 반말 한 문장으로 다시 답해.",
                 )
                 retry_response = await client.send(
                     client.build_request(request.method, f"{UPSTREAM}/{path}",
@@ -5807,7 +6188,7 @@ async def proxy(path: str, request: Request):
                         boundary.feed(message_content(native_payload.get("message")), final=True),
                     )
                 if boundary.language_blocked and not plain:
-                    plain = "한국어로 답할게."
+                    plain = ""
             message = native_payload.get("message")
             if not isinstance(message, dict):
                 message = {"role": "assistant"}
@@ -5866,7 +6247,7 @@ async def proxy(path: str, request: Request):
                     retry_body = inject_request_local_system_note(
                         body,
                         "직전 응답은 한국어 문장 안에 일반 알파벳 단어가 있어 보낼 수 없었다. "
-                        "사용자 원문이나 승인 지식의 고유명사 외 알파벳 단어 없이 자연스러운 한국어 반말 한 문장으로 다시 답해.",
+                        "이번에는 필요한 고유명사도 한글로 풀어 쓰고, 영문자를 한 글자도 쓰지 말고 자연스러운 한국어 반말 한 문장으로 다시 답해.",
                     )
                     retry_response = await client.send(
                         client.build_request(request.method, f"{UPSTREAM}/{path}",
@@ -5888,7 +6269,7 @@ async def proxy(path: str, request: Request):
                         )
                         plain = boundary.feed(message_content(message), final=True)
                     if boundary.language_blocked and not plain:
-                        plain = "한국어로 답할게."
+                        plain = ""
                 message["content"] = plain
                 if proactive_turn:
                     proactive_output_telemetry.completion(plain.strip())
