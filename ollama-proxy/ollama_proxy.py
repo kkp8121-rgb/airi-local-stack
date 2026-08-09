@@ -1848,8 +1848,13 @@ _GROUNDING_FUNCTION_WORDS = frozenset({
     "나", "내", "내가", "나는", "저", "제", "제가", "저는", "우리", "우리가", "우리는",
     "너", "네가", "너가", "너는", "당신",
 })
-_GROUNDING_QUESTION_RE = re.compile(r"[?？]|(?:뭐|무엇|왜|어디|언제|누가|어떻게|어떤|몇)")
-_GROUNDING_COMMAND_RE = re.compile(r"(?:해줘|해주세요|해라|해봐|해 봐|말해줘|알려줘|찾아줘|보여줘|실행해|켜줘|꺼줘|열어줘|닫아줘)")
+_GROUNDING_QUESTION_RE = re.compile(
+    r"[?？]|(?:뭐|무엇|왜|어디|언제|누가|어떻게|어떤|몇)"
+    r"|(?:까|니|냐|지|나)[.!。！]+$"
+)
+_GROUNDING_COMMAND_RE = re.compile(
+    r"(?:해줘|해주세요|해라|해봐|해 봐|말해줘|알려줘|찾아줘|보여줘|실행해|켜줘|꺼줘|열어줘|닫아줘)"
+)
 
 
 def _normalized_grounding_token(raw: str) -> str:
@@ -2570,6 +2575,12 @@ def grounded_observation_fallback(user_text: str) -> str:
         candidate = stem[:-1] + "구나!"
     elif stem.endswith("네"):
         candidate = stem + "!"
+    # Preserve an otherwise eligible surface exactly when its ending is not
+    # among the deliberately audited conversational rewrites.  This is only
+    # an outer ASCII-period swap; all eligibility and full-surface safety
+    # checks below still apply.
+    elif clean.endswith(".") and grounding_has_explicit_nominative_subject(clean):
+        candidate = clean[:-1] + "!"
     else:
         return ""
     return (
@@ -2577,6 +2588,26 @@ def grounded_observation_fallback(user_text: str) -> str:
         if has_exactly_one_complete_sentence(candidate)
         and grounding_candidate_is_safe_fallback(clean, candidate)
         else ""
+    )
+
+
+def grounding_has_explicit_nominative_subject(text: str) -> bool:
+    """Require an overt ``이/가`` subject for punctuation-only recovery.
+
+    Korean questions and imperatives are often written with a period, so the
+    punctuation-only path must not infer declarative force from punctuation
+    alone.  An overt nominative outside balanced quotations is a conservative,
+    topic-independent structural signal; ambiguous subjectless turns stay
+    content-free instead of being voiced back with a changed speaker.
+    """
+    outside_quotes = _outside_balanced_grounding_quotes(
+        unicodedata.normalize("NFKC", text).strip()
+    )
+    if outside_quotes is None:
+        return False
+    return any(
+        len(token) > 1 and token.endswith(("이", "가"))
+        for token in re.findall(r"[가-힣]+", outside_quotes)
     )
 
 
@@ -5359,6 +5390,7 @@ async def proxy(path: str, request: Request):
                 grounding_required = 0
                 grounding_retry_language_blocked = False
                 grounding_retry_invalid = False
+                grounding_retry_terminal = False
                 grounding_safe_fallback_used = False
                 grounding_safe_fallback_from_retry = False
                 grounded_observation_fallback_used = False
@@ -5612,7 +5644,11 @@ async def proxy(path: str, request: Request):
                                 terminal = True
                                 terminal_event = retry_event
                                 break
-                        if terminal or retry_boundary.closed_early or grounding_retry_invalid:
+                        if (
+                            terminal
+                            or grounding_retry_invalid
+                            or (retry_boundary.closed_early and not grounding_retry)
+                        ):
                             break
                     if retry_timed_out or grounding_retry_invalid:
                         await upstream_response.aclose()
@@ -5642,6 +5678,7 @@ async def proxy(path: str, request: Request):
                                 retry_clean = retry_boundary.feed(message_content(retry_event.get("message")))
                                 terminal = bool(retry_event.get("done"))
                                 terminal_event = retry_event if terminal else None
+                    grounding_retry_terminal = bool(terminal)
                     if language_retry and retry_boundary.language_blocked and not emitted_substantive:
                         # A meta apology is not the requested answer. Keep the
                         # failed retry silent instead of speaking "I'll answer
@@ -5777,7 +5814,15 @@ async def proxy(path: str, request: Request):
                 # truth rule has accepted its public form.  The exact same
                 # canonical string is then used for wire and journal.
                 dialogue = enforce_tool_truth(original_messages, boundary.output.strip())
-                if not dialogue and grounding_quality_rejected:
+                if (
+                    not dialogue
+                    and grounding_quality_rejected
+                    and grounding_retry_used
+                    and grounding_retry_terminal
+                    and not retry_timed_out
+                    and not grounding_retry_invalid
+                    and not grounding_retry_language_blocked
+                ):
                     grounded_fallback = grounded_observation_fallback(last_user_text)
                     if (
                         grounded_fallback

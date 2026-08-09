@@ -2321,6 +2321,80 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             ollama_proxy.GROUNDING_SELECTED_DETERMINISTIC,
         )
 
+    def test_two_failed_grounding_drafts_use_exact_surface_punctuation_fallback(self) -> None:
+        def event(content: str, *, done: bool = False) -> bytes:
+            return (
+                json.dumps(
+                    {"message": {"role": "assistant", "content": content}, "done": done},
+                    ensure_ascii=False,
+                )
+                + "\n"
+            ).encode("utf-8")
+
+        user = "창문 손잡이가 헐거워져."
+        expected = "창문 손잡이가 헐거워져!"
+        chat = _QueuedApiStreamClient([
+            [event('<|ACT {"emotion":"neutral","intensity":"medium"}|>', done=True)],
+            [event("정말 다행이다!"), event("", done=True)],
+        ])
+        memory = _FakeMemoryRuntime()
+        events: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ), mock.patch.object(
+            ollama_proxy, "emit_latency_event",
+            side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
+        ):
+            response = post_stream(user)
+
+        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(response.text.count(expected), 1)
+        self.assertEqual(len(memory.completed), 1)
+        self.assertEqual(memory.completed[0]["assistant"], expected)
+        self.assertEqual(len(chat.requests), 2)
+        end_meta = next(
+            kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end")
+        )
+        self.assertEqual(
+            end_meta["grounding_selected"],
+            ollama_proxy.GROUNDING_SELECTED_DETERMINISTIC,
+        )
+
+    def test_incomplete_grounding_retry_cannot_use_exact_surface_fallback(self) -> None:
+        def event(content: str, *, done: bool) -> bytes:
+            return (
+                json.dumps(
+                    {"message": {"role": "assistant", "content": content}, "done": done},
+                    ensure_ascii=False,
+                )
+                + "\n"
+            ).encode("utf-8")
+
+        chat = _QueuedApiStreamClient([
+            [event('<|ACT {"emotion":"neutral","intensity":"medium"}|>', done=True)],
+            [event("정말 다행이다!", done=False)],
+        ])
+        memory = _FakeMemoryRuntime()
+        events: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ), mock.patch.object(
+            ollama_proxy, "emit_latency_event",
+            side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
+        ):
+            response = post_stream("창문 손잡이가 헐거워져.")
+
+        self.assertEqual(openai_sse_content(response.text), "")
+        self.assertEqual(memory.completed, [])
+        self.assertEqual(len(chat.requests), 2)
+        end_meta = next(
+            kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end")
+        )
+        self.assertEqual(
+            end_meta["grounding_selected"],
+            ollama_proxy.GROUNDING_SELECTED_CONTENT_FREE,
+        )
+
     def test_retry_with_unresolved_personal_deixis_never_reaches_wire_or_journal(self) -> None:
         def event(content: str) -> bytes:
             return (
@@ -3040,8 +3114,37 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertEqual(
             ollama_proxy.grounded_observation_fallback("수건을 접어뒀어?"), "",
         )
+        for user_text in (
+            "싱크대가 반짝여.",
+            "창문 손잡이가 헐거워져.",
+            '철수가 "문을 닫아."라고 했구여.',
+        ):
+            with self.subTest(user_text=user_text):
+                expected = user_text[:-1] + "!"
+                self.assertEqual(
+                    ollama_proxy.grounded_observation_fallback(user_text), expected,
+                )
+                self.assertTrue(ollama_proxy.has_exactly_one_complete_sentence(expected))
+                self.assertTrue(ollama_proxy.grounding_candidate_matches_full_surface(
+                    user_text, expected,
+                ))
+                self.assertTrue(ollama_proxy.grounding_candidate_is_safe_fallback(
+                    user_text, expected,
+                ))
+        self.assertFalse(ollama_proxy.grounding_candidate_is_safe_fallback(
+            "오늘 메뉴는 연어.", "오늘 메뉴는 연구나!",
+        ))
         for rejected in (
             "오늘 메뉴는 연어.",
+            "영화 볼까.",
+            "철수가 왔니.",
+            "누나가 오냐.",
+            "비가 오지.",
+            "철수가 왔나.",
+            "문이 닫혔나.",
+            "창문을 밀어.",
+            "잠깐 기다려.",
+            "여기 앉아.",
             "점심 먹었어",
             "문을 닫아.",
             "철수가 나한테 두꺼운 책을 건네줬어.",
