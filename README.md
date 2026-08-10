@@ -43,3 +43,4 @@ AIRI 애플리케이션 자체는 Windows에 별도로 설치되어 있으며 �
 ## 제3자 소스
 
 이 저장소에는 작업 당시 사용한 세 프로젝트의 소스 스냅샷과 로컬 수정이 포함된다. 원본 저장소와 기준 커밋은 `THIRD-PARTY-SOURCES.md`에 기록했다. 각 프로젝트의 라이선스 파일을 유지한다.
+> Current handoff: use `airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md` and `airi_docs/AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md`. The older 2026-08-07 handoff documents are historical snapshots.
