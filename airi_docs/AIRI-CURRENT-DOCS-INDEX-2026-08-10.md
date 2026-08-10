@@ -23,6 +23,11 @@ runtime observations.
 
 ## Historical
 
+Unless a document is listed under **Current** above, treat it as historical
+working material rather than a current branch contract. The filenames below
+call out the most likely sources of confusion, but the rule applies to every
+other older handoff, experiment, audit, and patch snapshot in this directory.
+
 `AIRI-HANDOFF-2026-08-07.md` and `AIRI-TRACK-M-CHECKPOINT-2026-08-08.md`
 preserve earlier test totals, listener observations, archive hashes, and
 installation procedures. Those values are not current branch status. Do not
