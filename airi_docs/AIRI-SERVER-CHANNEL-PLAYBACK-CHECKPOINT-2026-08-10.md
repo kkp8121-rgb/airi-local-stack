@@ -61,6 +61,15 @@ The default completion mode remains suitable for existing callers. No
 production topic board, pending review data, raw discovery, or personal
 dialogue was created by this checkpoint.
 
+No `--wait-playback-end` flag is shipped yet. The available audio end hooks
+are emitted per playback item, while one chat response may produce multiple
+items and an item may end by interruption or rejection rather than natural
+completion. Treating the first item end as whole-turn completion would create
+a false success signal. A future end proof needs a dedicated, round-correlated
+event emitted only after the final naturally completed item, with explicit
+interruption semantics and bounded state; until then playback-start is the
+strongest safe bounded proof.
+
 ## Handoff request for the next Claude session
 
 Please review commit history from the latest checkpoint and audit only the
