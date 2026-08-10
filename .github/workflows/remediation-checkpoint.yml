@@ -27,6 +27,10 @@ jobs:
         with:
           node-version: 22
 
+      - name: Check patch whitespace
+        shell: pwsh
+        run: git diff --check
+
       - name: Run offline checkpoint contracts
         shell: pwsh
         run: .\test-current-checkpoint.ps1
