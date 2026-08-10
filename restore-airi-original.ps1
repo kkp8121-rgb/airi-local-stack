@@ -74,7 +74,15 @@ $resolvedInstallDir = (Resolve-Path -LiteralPath $InstallDir).Path
 if (-not (Test-Path -LiteralPath (Join-Path $resolvedInstallDir 'airi.exe'))) {
     throw "'$resolvedInstallDir' does not look like an AIRI installation (airi.exe not found)."
 }
-$asarPath = Join-Path $resolvedInstallDir 'resources\app.asar'
+$resourcesPath = Join-Path $resolvedInstallDir 'resources'
+if (-not (Test-Path -LiteralPath $resourcesPath)) {
+    throw "AIRI resources directory not found: $resourcesPath"
+}
+$resourcesItem = Get-Item -LiteralPath $resourcesPath -Force
+if (-not $resourcesItem.PSIsContainer -or (($resourcesItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+    throw "AIRI resources path is not a regular non-reparse directory: $resourcesPath"
+}
+$asarPath = Join-Path $resourcesPath 'app.asar'
 if (-not (Test-Path -LiteralPath $asarPath)) {
     throw "app.asar not found: $asarPath"
 }

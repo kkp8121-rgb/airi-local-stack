@@ -53,6 +53,9 @@ playback completion from playback-start evidence.
   the installation.
 - The apply orchestrator applies the same non-reparse checks to the install
   directory and archive before scanning or creating a pristine backup.
+- The intermediate `resources` directory is also required to be a regular
+  non-reparse directory, closing junction redirection between install root and
+  `app.asar`.
 - The apply orchestrator serializes its complete run with a named local mutex;
   concurrent invocations fail fast before touching the installation.
 - Restore uses the same mutex, so apply and restore cannot modify the archive
