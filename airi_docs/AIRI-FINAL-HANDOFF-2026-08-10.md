@@ -89,9 +89,10 @@ cleanly in the dedicated pristine verification checkout; the current branch
 does not require that checkout to be present. The GitHub job intentionally
 does not clone or apply a v0.11.3 fixture: patch applicability is a separately
 recorded pristine-checkout result, while CI stays offline and artifact-free.
-The workflow's committed-whitespace check uses `git diff-tree --check` and excludes
-the byte-addressed patch files; those files are checked by exact manifest
-hashes instead.
+The workflow's committed-whitespace check inspects the full push/PR range with
+`git diff --check` (falling back to `git diff-tree --check` for other event
+types) and excludes the byte-addressed patch files; those files are checked by
+exact manifest hashes instead.
 
 Patch applicability can be rechecked explicitly against a local checkout of
 the pinned commit (the command creates and removes only a temporary detached

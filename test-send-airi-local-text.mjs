@@ -196,6 +196,27 @@ test('playback-first empty completion does not adopt a later message shell', () 
   assert.equal(tracker.waitTerminal(complete, 8), undefined)
 })
 
+test('playback wait keeps the first correlated completion across duplicate replays', () => {
+  const tracker = createAssistantEventTracker('input-a')
+  const playback = correlatedEvent('output:gen-ai:chat:playback-start', 'input-a', {})
+  const first = correlatedEvent('output:gen-ai:chat:complete', 'input-a', {
+    message: { content: 'first answer' },
+  })
+  const replay = correlatedEvent('output:gen-ai:chat:complete', 'input-a', {
+    message: { content: 'replayed answer' },
+  })
+
+  tracker.observe(first)
+  assert.equal(tracker.waitTerminal(first, 7), undefined)
+  tracker.observe(replay)
+  assert.equal(tracker.waitTerminal(replay, 8), undefined)
+  tracker.observe(playback)
+  const outcome = tracker.waitPlaybackStart(playback, 9)
+  const terminal = outcome.terminal
+  assert.equal(terminal.assistant, 'first answer')
+  assert.equal(terminal.elapsedMs, 7)
+})
+
 test('default completion terminal does not require playback start', () => {
   const tracker = createAssistantEventTracker('input-a')
   const complete = correlatedEvent('output:gen-ai:chat:complete', 'input-a', { message: { content: 'answer' } })

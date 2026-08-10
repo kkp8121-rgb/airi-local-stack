@@ -178,7 +178,11 @@ export function createAssistantEventTracker(inputEventId) {
       if (event?.type !== 'output:gen-ai:chat:complete')
         return undefined
       if (!playbackStarted) {
-        pendingCompletion = { event, elapsedMs }
+        // The first correlated completion is the terminal payload for this
+        // request. Replays must not replace it while playback is still
+        // pending (otherwise a duplicate can change the assistant payload).
+        if (!pendingCompletion)
+          pendingCompletion = { event, elapsedMs }
         return undefined
       }
       terminalClaimed = true
