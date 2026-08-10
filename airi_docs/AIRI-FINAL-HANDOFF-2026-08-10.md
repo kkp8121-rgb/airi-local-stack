@@ -81,7 +81,7 @@ For the next Claude session, paste the request in the final section below
 verbatim. It intentionally asks for an audit before any mutation and forbids
 network/model/service or real-microphone actions.
 
-The sender contract currently passes 22 Node tests. The combined checkpoint
+The sender contract currently passes 23 Node tests. The combined checkpoint
 also verifies all three documented patch artifact sizes and hashes and the
 orchestrator-only child-script contract, and invokes the applicability verifier
 in its inert/default-off mode. The pinned v0.11.3 patch applies

@@ -88,6 +88,13 @@ export function isEmptyPlaybackPayload(value) {
     && Object.keys(value).length === 0
 }
 
+function isValidCompletionEvent(event) {
+  return event?.type === 'output:gen-ai:chat:complete'
+    && event?.data !== null
+    && typeof event?.data === 'object'
+    && !Array.isArray(event.data)
+}
+
 export function createAssistantEventTracker(inputEventId) {
   const eventStats = {
     assistantMessages: 0,
@@ -160,6 +167,8 @@ export function createAssistantEventTracker(inputEventId) {
         return undefined
       if (event?.type === 'output:gen-ai:chat:cancelled' && event?.data?.reason !== 'superseded')
         return undefined
+      if (event?.type === 'output:gen-ai:chat:complete' && !isValidCompletionEvent(event))
+        return undefined
 
       terminalClaimed = true
       return event.type === 'output:gen-ai:chat:cancelled'
@@ -175,7 +184,7 @@ export function createAssistantEventTracker(inputEventId) {
         terminalClaimed = true
         return { cancelled: true, elapsedMs }
       }
-      if (event?.type !== 'output:gen-ai:chat:complete')
+      if (!isValidCompletionEvent(event))
         return undefined
       if (!playbackStarted) {
         // The first correlated completion is the terminal payload for this
