@@ -53,7 +53,7 @@ playback completion from playback-start evidence.
 
 ## Latest audit evidence
 
-- `node --test test-send-airi-local-text.mjs`: 21/21 passed.
+- `node --test test-send-airi-local-text.mjs`: 22/22 passed.
 - The canonical patch and the separate generic-context sanitizer both apply
   cleanly in the pinned v0.11.3 verification checkout.
 - The focused browser contract suite with the sanitizer applied passed 25/25
