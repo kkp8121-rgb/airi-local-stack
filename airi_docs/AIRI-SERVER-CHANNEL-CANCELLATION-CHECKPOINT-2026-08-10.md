@@ -24,8 +24,12 @@ The canonical patch was regenerated from the pinned AIRI v0.11.3 base (`dbf8124`
 - Canonical source patch apply check: passed.
 - Stage browser contract test was attempted but could not launch because the local Playwright Chromium executable is not installed. No browser or service installation was performed in this checkpoint.
 
-## Deferred next step
+## Installed-runtime proof
 
-The installed Electron runtime was not rebuilt or replaced for this cancellation checkpoint. The next operator should build the official source, package the renderer, install it only after preserving the current archive, and run a privacy-safe synthetic same-text race. Expected result: the superseded first sender exits with `cancelled: true` promptly, the newer sender alone completes, and only the newer turn reaches TTS/playback. A future playback-wait mode remains separate work; it must use an explicit parent-correlated renderer event and must not poll the latency monitor.
+The official source was rebuilt and packaged into an archive of 1,359,499,075 bytes with SHA-256 `E59A3E456ECC1615B7A57AFA61BA0947C39977717C74C86A799179C21988AA6D`. The prior installed archive was preserved before replacement. The installed background runtime reported `stageMounted=true`, voice enabled/configured, and microphone permission `granted` through the passive status probe.
+
+A privacy-safe same-text race was then run with two separate sender processes, 250ms apart. The first sender returned `sent=true`, `cancelled=true`, fixed reason `superseded` in 318ms; the second returned `sent=true`, `completed=true` in 1,936ms with 14 assistant characters. Both stderr streams were empty. The monitor retained 19 completed LLM turns at inspection time; the newest eligible turn had one TTS segment and a playback record. No raw text, session identifier, or round identifier was recorded here.
+
+A future playback-wait mode remains separate work; it must use an explicit parent-correlated renderer event and must not poll the latency monitor.
 
 No real microphone transcript, assistant response, session identifier, or round identifier is recorded in this document.
