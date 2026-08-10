@@ -27,7 +27,7 @@ event carries no text, audio, round ID, session ID, or model output.
 
 ## Verification
 
-- Root sender tests: 21/21 passed; Node syntax checks passed, including the
+- Root sender tests: 23/23 passed; Node syntax checks passed, including the
   completion-first/playback-later metadata path.
 - Stage UI typecheck passed.
 - Playback latency tests: 4/4 passed.
