@@ -36,6 +36,8 @@ event carries no text, audio, round ID, session ID, or model output.
   contract suite.
 - Runtime source patch applies cleanly to the pinned v0.11.3 base with
   `git apply --check --whitespace=nowarn`.
+- `test-patch-manifest.ps1` verifies all three documented patch artifact
+  sizes and SHA-256 values offline; it passed on the current branch.
 - Browser contract suite: 24/24 passed after installing the local Playwright
   Chromium executable. It covers exact parent correlation, content-free
   playback output, remote-mirror rejection, completion-before-playback, and
