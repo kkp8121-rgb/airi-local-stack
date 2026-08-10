@@ -53,3 +53,34 @@ The focused browser contract test could not execute because the local Playwright
 Chromium binary is absent. No browser package was installed. The contract remains
 covered statically by the Stage UI typecheck and by the updated source test, while
 the workspace sender's pure interleaving tests execute without a browser.
+
+## Installed runtime and live proof
+
+The patched source was built with Electron Vite, repacked from the currently
+installed archive, and installed without changing the existing unpacked runtime
+tree.
+
+- Installed ASAR size: `1,359,496,413` bytes.
+- Installed ASAR SHA-256:
+  `6979697C367ED99B55A8D015888083F68D2CF5546820F5F0FF65E01B8FB76523`.
+- The previous playback-trace archive remains available as
+  `app.asar.pre-server-correlation-20260810`.
+- AIRI restarted with the background contract; Stage readiness passed and no
+  visible window was opened.
+
+One synthetic focus-free turn completed through the correlated sender without
+printing assistant content:
+
+- input characters: 22
+- matching completion: 5,628 ms
+- assistant characters: 23
+- TTS segments: 1
+- playback-start observed: yes
+
+A same-text latest-wins race was then exercised with two senders started 150 ms
+apart. The newer sender completed in 1,165 ms with one TTS segment and a playback
+start. At that moment the superseded sender was still waiting with zero stdout and
+zero stderr bytes, proving that it had not accepted the newer turn's completion.
+The superseded helper process was then stopped instead of waiting for its 90-second
+timeout. Content-free monitor state independently showed one non-terminal LLM turn
+and one completed LLM/TTS/playback turn.
