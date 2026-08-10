@@ -58,3 +58,5 @@ playback completion from playback-start evidence.
 - New pristine backups are hash-gated before and after staging, then published
   with no-clobber atomic move; concurrent runs may only reuse an independently
   verified backup.
+- Existing backup reuse also rejects container or reparse-point backup paths
+  before hashing.

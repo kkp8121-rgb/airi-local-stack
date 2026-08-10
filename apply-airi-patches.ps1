@@ -251,6 +251,10 @@ Write-Output ''
 # --- 4. Pristine backup -------------------------------------------------------
 $pristineBackupPath = "$resolvedAsar.backup-pristine"
 if (Test-Path -LiteralPath $pristineBackupPath) {
+    $pristineBackupItem = Get-Item -LiteralPath $pristineBackupPath -Force
+    if ($pristineBackupItem.PSIsContainer -or (($pristineBackupItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+        throw "Pristine backup is not a regular non-reparse file: $pristineBackupPath"
+    }
     $pristineBackupHash = Get-Sha256 $pristineBackupPath
     if ($pristineBackupHash -ne $knownPristineAsarSha256) {
         throw "Pristine backup SHA-256 mismatch: got $pristineBackupHash, expected $knownPristineAsarSha256. Refusing to continue."
