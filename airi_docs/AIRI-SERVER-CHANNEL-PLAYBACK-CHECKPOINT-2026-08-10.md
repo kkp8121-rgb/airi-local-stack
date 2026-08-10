@@ -18,6 +18,8 @@ event carries no text, audio, round ID, session ID, or model output.
   sends one exact parent-correlated event, and clears the mapping on playback,
   cancellation, stale replacement, and disposal. Completion intentionally
   does not clear it because chat completion can precede audio start.
+- Rebinding a valid round ID first invalidates any old mapping, preventing a
+  later local or uncorrelated reuse from inheriting a stale parent.
 - `send-airi-local-text.mjs` adds opt-in `--wait-playback-start`. It waits for
   the exact correlated completion and playback-start events in either order;
   a matching supersession cancellation settles immediately. Default
@@ -30,6 +32,8 @@ event carries no text, audio, round ID, session ID, or model output.
 - Stage UI typecheck passed.
 - Playback latency tests: 4/4 passed.
 - Protocol typecheck passed.
+- Stale round-parent reuse regression coverage was added to the browser
+  contract suite.
 - Runtime source patch applies cleanly to the pinned v0.11.3 base with
   `git apply --check --whitespace=nowarn`.
 - Browser contract tests were not runnable because the local Playwright
