@@ -70,6 +70,8 @@ playback completion from playback-start evidence.
 - If an internal patch step throws, the orchestrator stops the remaining patch
   sequence before final verification; restore from the verified pristine backup
   before investigating or retrying.
+- `test-patch-entrypoints.ps1` is an offline regression check for the internal
+  child-script guard and does not inspect or modify an AIRI installation.
 - Restore uses the same mutex, so apply and restore cannot modify the archive
   concurrently.
 - The six `patch-airi-*.ps1` files are implementation steps for the
