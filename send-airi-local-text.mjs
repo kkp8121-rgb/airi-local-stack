@@ -98,6 +98,7 @@ export function createAssistantEventTracker(inputEventId) {
   let matchingAssistantSeen = false
   let terminalClaimed = false
   let playbackStarted = false
+  let playbackStartedMs
   let pendingCompletion
 
   function observe(event) {
@@ -178,7 +179,7 @@ export function createAssistantEventTracker(inputEventId) {
         cancelled: false,
         ...this.completion(event, elapsedMs),
         ...(playbackStarted
-          ? { playbackStarted: true, playbackStartedMs: elapsedMs }
+          ? { playbackStarted: true, playbackStartedMs }
           : {}),
       }
     },
@@ -188,6 +189,7 @@ export function createAssistantEventTracker(inputEventId) {
         || playbackStarted)
         return undefined
       playbackStarted = true
+      playbackStartedMs = elapsedMs
       const playback = { playbackStarted: true, playbackStartedMs: elapsedMs }
       if (!pendingCompletion || terminalClaimed)
         return { playback }

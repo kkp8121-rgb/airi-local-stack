@@ -103,7 +103,15 @@ test('waits for completion when playback start arrives first', () => {
     playback: { playbackStarted: true, playbackStartedMs: 4 },
   })
   tracker.observe(complete)
-  assert.equal(tracker.waitTerminal(complete, 18).cancelled, false)
+  assert.deepEqual(tracker.waitTerminal(complete, 18), {
+    cancelled: false,
+    elapsedMs: 18,
+    assistant: 'answer',
+    assistantSource: 'completion',
+    assistantShape: assistantMessageShape({ content: 'answer' }),
+    playbackStarted: true,
+    playbackStartedMs: 4,
+  })
 })
 
 test('ignores wrong-parent and duplicate playback-start events', () => {
