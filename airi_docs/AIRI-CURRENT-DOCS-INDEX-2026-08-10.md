@@ -60,6 +60,10 @@ playback completion from playback-start evidence.
   concurrent invocations fail fast before touching the installation.
 - Restore uses the same mutex, so apply and restore cannot modify the archive
   concurrently.
+- The six `patch-airi-*.ps1` files are implementation steps for the
+  orchestrator, not concurrent standalone entry points; use
+  `apply-airi-patches.ps1` or `restore-airi-original.ps1` for supported
+  operations.
 - New pristine backups are hash-gated before and after staging, then published
   with no-clobber atomic move; concurrent runs may only reuse an independently
   verified backup.
