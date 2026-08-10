@@ -32,10 +32,14 @@
 param(
     [string]$AsarPath = "$env:LOCALAPPDATA\Programs\airi\resources\app.asar",
     [string]$ReplacementPath = "$PSScriptRoot\airi-native-media-recorder.min.js",
-    [switch]$Force
+    [switch]$Force,
+    [switch]$InternalOrchestrator
 )
 
 $ErrorActionPreference = 'Stop'
+if (-not $InternalOrchestrator) {
+    throw 'This patch step is internal; run .\apply-airi-patches.ps1.'
+}
 
 # --- 1. Resolve and validate the target archive ------------------------------
 $resolvedAsar = (Resolve-Path -LiteralPath $AsarPath).Path

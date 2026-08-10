@@ -19,10 +19,14 @@
 param(
     [string]$AsarPath = "$env:LOCALAPPDATA\Programs\airi\resources\app.asar",
     [switch]$Force,
-    [switch]$VerifyOnly
+    [switch]$VerifyOnly,
+    [switch]$InternalOrchestrator
 )
 
 $ErrorActionPreference = 'Stop'
+if (-not $InternalOrchestrator) {
+    throw 'This patch step is internal; run .\apply-airi-patches.ps1.'
+}
 $resolvedAsar = (Resolve-Path -LiteralPath $AsarPath).Path
 if ([IO.Path]::GetFileName($resolvedAsar) -ne 'app.asar') {
     throw "Expected app.asar, got: $resolvedAsar"

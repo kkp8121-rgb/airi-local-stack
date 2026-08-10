@@ -71,7 +71,9 @@ playback completion from playback-start evidence.
 - The six `patch-airi-*.ps1` files are implementation steps for the
   orchestrator, not concurrent standalone entry points; use
   `apply-airi-patches.ps1` or `restore-airi-original.ps1` for supported
-  operations.
+  operations. Each step now requires the orchestrator-only
+  `-InternalOrchestrator` switch and refuses direct invocation before touching
+  the archive.
 - New pristine backups are hash-gated before and after staging, then published
   with no-clobber atomic move; concurrent runs may only reuse an independently
   verified backup.

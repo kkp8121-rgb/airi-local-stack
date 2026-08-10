@@ -331,10 +331,10 @@ foreach ($scriptName in $patchScripts) {
     Write-Output "--- $scriptName ---"
     try {
         if ($Force) {
-            & $scriptPath -AsarPath $resolvedAsar -Force
+            & $scriptPath -AsarPath $resolvedAsar -Force -InternalOrchestrator
         }
         else {
-            & $scriptPath -AsarPath $resolvedAsar
+            & $scriptPath -AsarPath $resolvedAsar -InternalOrchestrator
         }
     }
     catch {
