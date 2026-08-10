@@ -21,6 +21,10 @@ runtime observations.
 preserve earlier test totals, listener observations, archive hashes, and
 installation procedures. Those values are not current branch status. Do not
 use their old patch hashes or test counts to validate the current checkout.
+The same historical rule applies to command examples in other documents dated
+2026-08-07 or 2026-08-08: in particular, do not invoke individual
+`patch-airi-*.ps1` steps from those pages. Use the current orchestrator contract
+below instead.
 
 The installed-artifact section in
 `patches/AIRI-v0.11.3-round-cancel-source-replacement.md` is likewise a
