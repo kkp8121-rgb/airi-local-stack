@@ -36,8 +36,10 @@ event carries no text, audio, round ID, session ID, or model output.
   contract suite.
 - Runtime source patch applies cleanly to the pinned v0.11.3 base with
   `git apply --check --whitespace=nowarn`.
-- Browser contract tests were not runnable because the local Playwright
-  Chromium executable is absent; no browser binary was installed.
+- Browser contract suite: 24/24 passed after installing the local Playwright
+  Chromium executable. It covers exact parent correlation, content-free
+  playback output, remote-mirror rejection, completion-before-playback, and
+  stale round-parent reuse.
 
 ## Live synthetic proof
 
