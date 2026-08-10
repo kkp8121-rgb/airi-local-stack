@@ -1,0 +1,24 @@
+name: Remediation checkpoint
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-contracts:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run offline checkpoint contracts
+        shell: pwsh
+        run: .\test-current-checkpoint.ps1
