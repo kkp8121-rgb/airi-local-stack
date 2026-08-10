@@ -158,6 +158,7 @@ $stockMarkers = @(
     @{ Patch = 'audio-constraints';        Text = "autoGainControl: true,`n`t`techoCancellation: true,`n`t`tnoiseSuppression: true"; Expected = 2 }
     @{ Patch = 'native-media-recorder';    Text = 'function useAudioRecorder(media) {';                                              Expected = 1 }
     @{ Patch = 'voice-input-segmentation'; Text = 'var DEFAULT_VOLUME_FALLBACK_STOP_DELAY_MS = 900;';                                Expected = 1 }
+    @{ Patch = 'voice-input-segmentation'; Text = 'error.value = `No transcription result returned from provider (${result.mode === "generate" ? describeEmptyTranscriptionResponse(result) : "stream result returned empty text"})`;' ; Expected = 1 }
     @{ Patch = 'reaction-latency';         Text = 'var DEFAULT_VAD_MIN_SILENCE_DURATION_MS = 1200;';                                 Expected = 1 }
     @{ Patch = 'reaction-latency';         Text = 'var DEFAULT_VAD_SPEECH_PAD_MS = 360;';                                             Expected = 1 }
     @{ Patch = 'reaction-latency';         Text = "flushDelayMs: 1200,`n`t`t`tmaxBufferedTextLength: 90,";                           Expected = 1 }
@@ -171,7 +172,7 @@ $patchedMarkers = @(
     @{ Patch = 'voice-input-segmentation'; Site = 'volume fallback 2700';  Text = 'var DEFAULT_VOLUME_FALLBACK_STOP_DELAY_MS =2700;';                  Expected = 1 }
     @{ Patch = 'voice-input-segmentation'; Site = 'empty transcript toast'; Text = 'error.value = void 0; /* Valid empty transcription is silence. */'; Expected = 1 }
     @{ Patch = 'reaction-latency';         Site = 'VAD silence 450';       Text = 'var DEFAULT_VAD_MIN_SILENCE_DURATION_MS =  450;';                   Expected = 1 }
-    @{ Patch = 'reaction-latency';         Site = 'speech pre-roll 600';   Text = 'var DEFAULT_VAD_SPEECH_PAD_MS =  600;';                      Expected = 1 }
+    @{ Patch = 'reaction-latency';         Site = 'speech pre-roll 600';   Text = 'var DEFAULT_VAD_SPEECH_PAD_MS = 600;';                       Expected = 1 }
     @{ Patch = 'reaction-latency';         Site = 'transcript flush 400';  Text = "flushDelayMs:  400,`n`t`t`tmaxBufferedTextLength: 90,";             Expected = 1 }
     @{ Patch = 'playback-latency';         Site = 'playback start event';  Text = 'request_id:String(item.intentId)';                                  Expected = 1 }
     @{ Patch = 'session-header';           Site = 'custom conversation id'; Text = 'if(options?.requestCorrelation)headers[AIRI_CHAT_SESSION_ID_HEADER]=options.requestCorrelation.conversationId;'; Expected = 1 }
