@@ -14,6 +14,9 @@ the currently running AIRI installation.
 - Combined patch SHA-256: `2077D440481D64BD08B9A890C318D3CDFABADFE0E1398C28CAF3A3AB8B76CD86`
 - Combined patch size: 414,208 bytes
 - Combined scope: 84 files, 5,799 insertions, 510 deletions
+- Follow-up generic context sanitizer: `AIRI-v0.11.3-context-correlation-sanitizer.patch`
+- Follow-up sanitizer SHA-256: `BA38C5F13670DECEEDAB3F0BFE9473AE7FB3BE1DE1A652A26E80E046F572B59E`
+- Follow-up sanitizer size: 2,541 bytes (2 files, 27 insertions, 1 deletion)
 
 The patch was generated from the exact diff of a clean v0.11.3 checkout and
 `git apply --check --reverse` succeeds against the fully patched checkout.
