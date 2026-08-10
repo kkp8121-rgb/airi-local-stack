@@ -75,6 +75,9 @@ playback completion from playback-start evidence.
   before investigating or retrying.
 - `test-patch-entrypoints.ps1` is an offline regression check for the internal
   child-script guard and does not inspect or modify an AIRI installation.
+- `test-patch-manifest.ps1` is an offline regression check for the three
+  documented patch artifact sizes and SHA-256 values; it does not inspect or
+  modify an AIRI installation.
 - Restore uses the same mutex, so apply and restore cannot modify the archive
   concurrently.
 - The six active `patch-airi-*.ps1` child files are implementation steps for
