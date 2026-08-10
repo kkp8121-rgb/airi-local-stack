@@ -45,3 +45,6 @@ playback completion from playback-start evidence.
   PowerShell process.
 - Existing `app.asar.backup-pristine` files are now SHA-256 checked against the
   pinned pristine 0.11.3 archive before patching continues.
+- `restore-airi-original.ps1` uses the same pristine hash contract, stages the
+  backup in the target directory, verifies the staged bytes, and publishes via
+  an atomic file replacement instead of truncating `app.asar` in place.
