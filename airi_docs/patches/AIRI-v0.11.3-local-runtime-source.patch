@@ -7493,7 +7493,7 @@ index 2bafa8c5f5cad7fb2338a50eb487190c12141725..f487655ceeb7c37e1b7becee6cd3091e
    })
  
 diff --git a/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts b/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts
-index 566c38875bc979b6407d905a36fe757ba928be85..b005ca4f737d5673400c43632ecc937a029722c7 100644
+index 566c38875bc979b6407d905a36fe757ba928be85..472711bd7fb4733f7ad1a0e36f40352388ad6725 100644
 --- a/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts
 +++ b/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts
 @@ -37,6 +37,7 @@ const streamEndHooks: HookCallback[] = []
@@ -7612,7 +7612,7 @@ index 566c38875bc979b6407d905a36fe757ba928be85..b005ca4f737d5673400c43632ecc937a
    /**
     * @example
     * Server context updates record store-ingested before broadcast-posted.
-@@ -608,6 +679,471 @@ describe('context bridge contract', () => {
+@@ -608,6 +679,501 @@ describe('context bridge contract', () => {
      await store.dispose()
    })
  
@@ -8081,11 +8081,41 @@ index 566c38875bc979b6407d905a36fe757ba928be85..b005ca4f737d5673400c43632ecc937a
 +    await store.dispose()
 +  })
 +
++  it('does not reuse a stale playback parent when a later local round reuses its round id', async () => {
++    activeProviderRef.value = 'mock-provider'
++    activeModelRef.value = 'mock-model'
++    getProviderInstanceMock.mockResolvedValueOnce({})
++    const store = useContextBridgeStore()
++    await store.initialize()
++
++    await emitServerEvent('input:text', {
++      type: 'input:text',
++      source: 'extension-module-host',
++      metadata: { ...createMetadata('weather', 'station-1'), event: { id: 'stale-playback-parent-42' } },
++      data: { text: 'correlated input' },
++    })
++    const input = chatOrchestratorMock.ingest.mock.calls[0]?.[1]?.input
++    await emitHooks(beforeComposeHooks, 'message', {
++      roundId: 'reused-playback-round', input, message: { role: 'user', content: 'private' }, contexts: {}, composedMessage: [],
++    })
++    await emitHooks(beforeComposeHooks, 'message', {
++      roundId: 'reused-playback-round', input: {}, message: { role: 'user', content: 'local' }, contexts: {}, composedMessage: [],
++    })
++
++    serverSendMock.mockClear()
++    globalThis.dispatchEvent(new CustomEvent('airi:chat-playback-start', { detail: { roundId: 'reused-playback-round' } }))
++    expect(serverSendMock).not.toHaveBeenCalledWith(expect.objectContaining({
++      type: 'output:gen-ai:chat:playback-start',
++    }))
++
++    await store.dispose()
++  })
++
    it('ignores remote literal and end events when generation guard is stale', async () => {
      const store = useContextBridgeStore()
      await store.initialize()
 diff --git a/packages/stage-ui/src/stores/mods/api/context-bridge.ts b/packages/stage-ui/src/stores/mods/api/context-bridge.ts
-index 47321590d65bbb57e41f9f18bd410a70d5b102de..a02817e7b1d9fc233f0eba2f2647b151cd890779 100644
+index 47321590d65bbb57e41f9f18bd410a70d5b102de..713ab916f53a3263bd7ed342f71cfa8821760ca5 100644
 --- a/packages/stage-ui/src/stores/mods/api/context-bridge.ts
 +++ b/packages/stage-ui/src/stores/mods/api/context-bridge.ts
 @@ -15,6 +15,7 @@ import { defineStore, storeToRefs } from 'pinia'
@@ -8118,7 +8148,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..a02817e7b1d9fc233f0eba2f2647b151
  
    function recordContextIngestRejected(options: {
      channel: 'server' | 'broadcast' | 'input'
-@@ -374,14 +388,82 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -374,14 +388,88 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
      return await callback()
    }
  
@@ -8153,8 +8183,14 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..a02817e7b1d9fc233f0eba2f2647b151
 +  }
 +
 +  function bindPlaybackStartParent(roundId: unknown, input: unknown) {
++    if (typeof roundId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(roundId))
++      return
++
++    // Round identifiers are normally unique, but never let a later local or
++    // uncorrelated reuse inherit an unconsumed parent from an older round.
++    playbackStartParentsByRoundId.delete(roundId)
 +    const parentId = input && typeof input === 'object' ? inputTextEventParentIds.get(input) : undefined
-+    if (typeof roundId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(roundId) || !parentId)
++    if (!parentId)
 +      return
 +
 +    playbackStartParentsByRoundId.set(roundId, parentId)
@@ -8202,7 +8238,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..a02817e7b1d9fc233f0eba2f2647b151
          for (const consumerEvent of consumerRegistrationEvents) {
            serverChannelStore.send({
              type: 'module:consumer:register',
-@@ -396,10 +478,14 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -396,10 +484,14 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
  
        await serverChannelStore.ensureConnected()
  
@@ -8219,7 +8255,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..a02817e7b1d9fc233f0eba2f2647b151
  
        const { stop } = watch(incomingContext, (event) => {
          if (!event)
-@@ -557,143 +643,164 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -557,143 +649,164 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
        }))
  
        disposeHookFns.value.push(serverChannelStore.onEvent('input:text', async (event) => {
@@ -8497,7 +8533,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..a02817e7b1d9fc233f0eba2f2647b151
        }))
  
        disposeHookFns.value.push(
-@@ -701,6 +808,8 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -701,6 +814,8 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
            if (isProcessingRemoteStream)
              return
  
@@ -8506,7 +8542,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..a02817e7b1d9fc233f0eba2f2647b151
            broadcastStreamEvent({ type: 'before-compose', message, sessionId: chatSession.activeSessionId, context: structuredClone(normalizeContextSnapshot(context)) })
          }),
          chatOrchestrator.onAfterMessageComposed(async (message, context) => {
-@@ -747,8 +856,13 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -747,8 +862,13 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
          }),
  
          chatOrchestrator.onAssistantMessage(async (message, _messageText, context) => {
@@ -8520,7 +8556,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..a02817e7b1d9fc233f0eba2f2647b151
              data: {
                ...context.input?.data,
                message,
-@@ -765,8 +879,15 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -765,8 +885,15 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
          }),
  
          chatOrchestrator.onChatTurnComplete(async (chat, context) => {
@@ -8536,7 +8572,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..a02817e7b1d9fc233f0eba2f2647b151
              data: {
                ...context.input?.data,
                'message': chat.output,
-@@ -789,6 +910,23 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -789,6 +916,23 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
                },
              },
            })
@@ -8560,7 +8596,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..a02817e7b1d9fc233f0eba2f2647b151
          }),
        )
  
-@@ -883,15 +1021,17 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -883,15 +1027,17 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
        if (!initialized)
          return
  
@@ -8587,7 +8623,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..a02817e7b1d9fc233f0eba2f2647b151
        }
  
        for (const fn of disposeHookFns.value) {
-@@ -900,6 +1040,8 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -900,6 +1046,8 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
  
        initialized = false
        remoteStreamGuard = null
