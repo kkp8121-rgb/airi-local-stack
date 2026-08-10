@@ -77,7 +77,7 @@ recorded pristine-checkout result, while CI stays offline and artifact-free.
 
 Patch applicability can be rechecked explicitly against a local checkout of
 the pinned commit (the command creates and removes only a temporary detached
-worktree):
+worktree through Git):
 
 ```powershell
 .\test-patch-applicability.ps1 -BaseCheckout 'D:\src\airi-v0.11.3'
@@ -85,7 +85,9 @@ worktree):
 
 The verifier is inert and exits successfully when `-BaseCheckout` is omitted;
 CI remains inert with respect to patch applicability and never clones a base
-checkout, touches the AIRI installation, or starts services.
+checkout, touches the AIRI installation, or starts services. If Git refuses to
+remove its temporary worktree, the verifier leaves it untouched and reports a
+warning rather than performing a path-based recursive delete.
 
 ## Latest installer-script audit
 

@@ -78,25 +78,13 @@ try {
     Write-Output 'Patch applicability: PASS (canonical and sanitizer apply/reverse-check cleanly; AIRI untouched).'
 }
 finally {
-    if ($worktreeAdded) { Invoke-Git $resolvedBase @('worktree', 'remove', '--force', $worktree) -AllowFailure | Out-Null }
-    if (Test-Path -LiteralPath $worktree) {
-        # Never recursively remove a path that changed type or became a
-        # reparse point while git was working. Leaving an unexpected path is
-        # safer than following an attacker-controlled replacement.
-        try {
-            $remaining = Get-Item -LiteralPath $worktree -Force
-            $resolvedRemaining = (Resolve-Path -LiteralPath $worktree).Path
-            if ($remaining.PSIsContainer -and
-                (($remaining.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) -and
-                ($resolvedRemaining -eq $worktree)) {
-                Remove-Item -LiteralPath $worktree -Recurse -Force -ErrorAction SilentlyContinue
-            }
-            else {
-                Write-Warning 'Temporary worktree path changed type; leaving it untouched.'
-            }
-        }
-        catch {
-            Write-Warning 'Could not safely remove the temporary worktree path; leaving it untouched.'
+    if ($worktreeAdded) {
+        # Let Git remove its own worktree through its registered metadata. Do
+        # not fall back to a path-based recursive delete: a same-user race
+        # could replace the path between validation and Remove-Item.
+        $removeResult = Invoke-Git $resolvedBase @('worktree', 'remove', '--force', $worktree) -AllowFailure
+        if ($removeResult.ExitCode -ne 0) {
+            Write-Warning 'Git could not remove the temporary worktree; leaving it untouched for manual cleanup.'
         }
     }
 }
