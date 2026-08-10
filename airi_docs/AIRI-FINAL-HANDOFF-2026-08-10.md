@@ -153,7 +153,7 @@ Audit only the current source patch and sender/bridge protocol. Verify:
 4) default --wait-complete remains behavior-compatible; and
 5) the patch applies cleanly to the pinned v0.11.3 base.
 
-Run offline checks first: git status/log, git diff --check,
+Run offline checks first: git status/log, git diff-tree --check --no-commit-id -r HEAD,
 .\test-current-checkpoint.ps1, and node --test test-send-airi-local-text.mjs.
 Do not create a governed topic board, send real microphone text, call models or
 services, or expose raw IDs, paths, or dialogue. Report only findings, test

@@ -115,7 +115,7 @@ Review only the current source patch and sender/bridge protocol for:
 4) unchanged default --wait-complete behavior; and
 5) clean application of the patch to the pinned v0.11.3 base.
 
-Run offline checks first: git status/log, git diff --check,
+Run offline checks first: git status/log, git diff-tree --check --no-commit-id -r HEAD,
 node --test test-send-airi-local-text.mjs, and the available PowerShell
 entrypoint contract test. Do not create a governed topic board, send real
 microphone text, call models/services, or expose raw IDs, paths, or dialogue.
@@ -133,7 +133,7 @@ airi_docs/AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md를 읽어라.
 현재 작업은 server-channel 입력의 parent correlation, superseded cancellation,
 playback-start proof, sender의 --wait-playback-start를 검토하는 것이다.
 
-먼저 오프라인 검사만 실행하라: git status/log, git diff --check,
+먼저 오프라인 검사만 실행하라: git status/log, git diff-tree --check --no-commit-id -r HEAD,
 node --test test-send-airi-local-text.mjs, 그리고 가능한 범위의 타입체크/패치
 적용 검증. 확인할 것은 (1) source.start(0) 이후에만 playback-start가 나가는지,
 (2) parentId가 정확히 일치해야 하는지, (3) stale/duplicate/remote/superseded
