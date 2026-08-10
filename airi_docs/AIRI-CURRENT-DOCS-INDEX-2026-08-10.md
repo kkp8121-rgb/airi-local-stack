@@ -5,6 +5,9 @@ runtime observations.
 
 ## Current
 
+- `AIRI-FINAL-HANDOFF-2026-08-10.md` is the concise end-of-session handoff for
+  the next reviewer. It records the current contracts, verification boundary,
+  and copy/paste review request.
 - `AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md` is the authoritative
   handoff for cancellation, parent correlation, playback-start proof, sender
   behavior, and current verification.

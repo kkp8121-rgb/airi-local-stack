@@ -1,0 +1,113 @@
+# AIRI Remediation Final Handoff - 2026-08-10
+
+## Scope and branch
+
+This handoff records the source/patch remediation state at the end of the
+current work session.
+
+- Branch: `fix/code-audit-remediation-2026-08-07`
+- The branch is source and patch work only. It does not contain a production
+  topic board, review decisions, raw discovery data, model output, or personal
+  microphone content.
+- The supported patch entry point is `apply-airi-patches.ps1`; restoration is
+  through `restore-airi-original.ps1`. The individual `patch-airi-*.ps1`
+  files are orchestrator-only implementation steps.
+
+## Delivered contracts
+
+The current patch set covers:
+
+1. Opaque parent correlation for local server-channel chat events. Correlation
+   is envelope metadata only and is not copied into chat text, context
+   snapshots, journal records, or persisted messages.
+2. A content-free supersession cancellation event. A sender waiting on an
+   exact parent correlation can settle as cancelled without accepting another
+   same-text request's completion.
+3. A content-free playback-start event emitted only after the audio source
+   successfully executes `source.start(0)`. It is correlated by the same
+   parent metadata and is one-shot/fail-closed for stale, duplicate, or remote
+   mirrored events.
+4. Sender options that preserve the existing default `--wait-complete`
+   behavior and add opt-in `--wait-playback-start`. Playback-start is a bounded
+   start proof, not proof of natural playback end.
+5. Byte-addressed patch artifacts with a checked manifest. Patch files are
+   explicitly non-text in `.gitattributes` so checkout normalization cannot
+   change their documented size or SHA-256.
+6. Offline PowerShell contracts for patch manifest integrity, orchestrator-only
+   child entry points, and the combined checkpoint command. The GitHub
+   workflow runs those checks on Windows with immutable Node 24 action pins.
+
+## Authoritative files
+
+- `airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md` — current-vs-historical
+  document map and safety boundary.
+- `airi_docs/AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md` — detailed
+  correlation, cancellation, playback-start, and sender contract.
+- `airi_docs/patches/AIRI-v0.11.3-round-cancel-source-replacement.md` — pinned
+  base, combined patch manifest, sizes, hashes, and scope.
+- `airi_docs/patches/AIRI-v0.11.3-context-correlation-sanitizer.patch` — the
+  separate generic `context:update` sanitizer patch applied after the combined
+  patch.
+- `test-current-checkpoint.ps1` — one offline entry point for the manifest,
+  entrypoint, and sender checks.
+- `.github/workflows/remediation-checkpoint.yml` — offline Windows CI gate.
+
+Do not use older handoff/checkpoint pages as current branch status. They may
+contain historical archive hashes, runtime observations, or old test totals.
+
+## Verification at handoff
+
+The following checks are the minimum reproducible checkpoint and must remain
+offline/model-free:
+
+```powershell
+git status --short
+git diff --check
+.\test-current-checkpoint.ps1
+```
+
+The sender contract currently passes 21 Node tests. The combined checkpoint
+also verifies all three documented patch artifact sizes and hashes and the
+orchestrator-only child-script contract. The pinned v0.11.3 patch applies
+cleanly in the dedicated pristine verification checkout; the current branch
+does not require that checkout to be present. The GitHub job intentionally
+does not clone or apply a v0.11.3 fixture: patch applicability is a separately
+recorded pristine-checkout result, while CI stays offline and artifact-free.
+
+## Deliberate boundaries
+
+- Do not create or enable a governed topic board from this handoff.
+- Do not send real microphone text, call a model/service, or expose raw IDs,
+  paths, session identifiers, or dialogue in an audit report.
+- Do not claim that playback-start proves natural playback completion.
+- Do not add a `--wait-playback-end` mode without a dedicated final-round
+  playback protocol and interruption semantics.
+- If a future reviewer finds a defect, make the smallest scoped change, rerun
+  the offline checkpoint, update this handoff, commit, and push before moving
+  to the next branch of work.
+
+## Copy/paste request for the next Claude session
+
+```text
+You are reviewing the AIRI remediation branch after its latest handoff.
+
+Read README.md, airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md,
+airi_docs/AIRI-FINAL-HANDOFF-2026-08-10.md, and
+airi_docs/AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md first.
+
+Audit only the current source patch and sender/bridge protocol. Verify:
+1) playback-start is emitted only after successful source.start(0);
+2) parent correlation is exact and does not leak into text, context snapshots,
+   journal, or persisted messages;
+3) completion-first/playback-first ordering, duplicates, stale rounds, remote
+   mirrors, and supersession cancellation fail closed;
+4) default --wait-complete remains behavior-compatible; and
+5) the patch applies cleanly to the pinned v0.11.3 base.
+
+Run offline checks first: git status/log, git diff --check,
+.\test-current-checkpoint.ps1, and node --test test-send-airi-local-text.mjs.
+Do not create a governed topic board, send real microphone text, call models or
+services, or expose raw IDs, paths, or dialogue. Report only findings, test
+counts, and repository-relative file/line references. If a fix is needed,
+describe the smallest scoped change before editing.
+```
