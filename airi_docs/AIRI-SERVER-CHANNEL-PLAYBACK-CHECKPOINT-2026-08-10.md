@@ -45,7 +45,10 @@ event carries no text, audio, round ID, session ID, or model output.
   registry ingest and renderer broadcast. Its focused browser contract suite
   passes 25/25. Apply
   `airi_docs/patches/AIRI-v0.11.3-context-correlation-sanitizer.patch` after
-  the canonical runtime patch when using a clean v0.11.3 checkout.
+  the canonical runtime patch when using a clean v0.11.3 checkout. This is a
+  separate generic `context:update` occurrence; the canonical patch's
+  source-only sanitizer covers the input `contextUpdates` occurrence and does
+  not replace this follow-up hunk.
 
 ## Live synthetic proof
 
