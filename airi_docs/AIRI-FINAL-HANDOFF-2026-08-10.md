@@ -64,7 +64,7 @@ offline/model-free:
 
 ```powershell
 git status --short
-git diff --check
+git diff-tree --check --no-commit-id -r HEAD -- . ':(exclude)airi_docs/patches/*.patch'
 .\test-current-checkpoint.ps1
 ```
 

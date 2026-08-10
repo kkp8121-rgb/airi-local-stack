@@ -89,8 +89,10 @@ playback completion from playback-start evidence.
 - `test-patch-manifest.ps1` is an offline regression check for the three
   documented patch artifact sizes and SHA-256 values; it does not inspect or
   modify an AIRI installation. The workflow separately checks committed
-  source whitespace with `git diff-tree --check` while excluding byte-addressed
-  patch artifacts, whose whitespace is covered by the manifest hashes.
+  source whitespace over push/PR ranges with `git diff --check` (and uses a
+  `git diff-tree --check` fallback for other events) while excluding
+  byte-addressed patch artifacts, whose whitespace is covered by the manifest
+  hashes.
 - `test-current-checkpoint.ps1` runs the manifest, entrypoint, and sender
   contract checks together as one offline checkpoint command; it also invokes
   `test-patch-applicability.ps1` in its inert/default-off mode.
