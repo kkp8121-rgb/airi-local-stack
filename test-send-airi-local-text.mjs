@@ -124,6 +124,7 @@ test('ignores wrong-parent and duplicate playback-start events', () => {
   assert.equal(tracker.waitPlaybackStart(wrong, 2), undefined)
   tracker.observe(complete)
   assert.equal(tracker.waitTerminal(complete, 3), undefined)
+  assert.equal(tracker.waitPlaybackStart(correlatedEvent('output:gen-ai:chat:playback-start', 'input-a', { leaked: true }), 3), undefined)
   tracker.observe(playback)
   assert.ok(tracker.waitPlaybackStart(playback, 4).terminal)
   tracker.observe(playback)

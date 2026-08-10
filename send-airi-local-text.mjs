@@ -81,6 +81,13 @@ export function isCorrelatedOutputEvent(event, inputEventId) {
   return event?.metadata?.event?.parentId === inputEventId
 }
 
+export function isEmptyPlaybackPayload(value) {
+  return value !== null
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && Object.keys(value).length === 0
+}
+
 export function createAssistantEventTracker(inputEventId) {
   const eventStats = {
     assistantMessages: 0,
@@ -186,6 +193,7 @@ export function createAssistantEventTracker(inputEventId) {
     waitPlaybackStart(event, elapsedMs) {
       if (event?.type !== 'output:gen-ai:chat:playback-start'
         || !isCorrelatedOutputEvent(event, inputEventId)
+        || !isEmptyPlaybackPayload(event?.data)
         || playbackStarted)
         return undefined
       playbackStarted = true
