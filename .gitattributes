@@ -1,0 +1,3 @@
+# Patch artifacts are byte-addressed by the manifest contract.
+*.patch -text
+*.asar binary
