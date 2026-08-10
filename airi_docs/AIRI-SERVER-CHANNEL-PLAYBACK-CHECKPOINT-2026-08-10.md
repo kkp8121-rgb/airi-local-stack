@@ -40,12 +40,10 @@ event carries no text, audio, round ID, session ID, or model output.
   Chromium executable. It covers exact parent correlation, content-free
   playback output, remote-mirror rejection, completion-before-playback, and
   stale round-parent reuse.
-- The follow-up context-correlation sanitizer patch adds a generic
-  `context:update` regression: transport `metadata.event` is stripped before
-  registry ingest and renderer broadcast. Its focused browser contract suite
-  passes 25/25. Apply
-  `airi_docs/patches/AIRI-v0.11.3-context-correlation-sanitizer.patch` after
-  the canonical runtime patch when using a clean v0.11.3 checkout.
+- The canonical runtime patch also sanitizes generic `context:update`
+  correlation metadata before registry ingest and renderer broadcast. The
+  focused browser contract suite covers this boundary; no second patch is
+  required after applying the canonical runtime patch.
 
 ## Live synthetic proof
 
