@@ -68,11 +68,24 @@ git diff --check
 
 The sender contract currently passes 21 Node tests. The combined checkpoint
 also verifies all three documented patch artifact sizes and hashes and the
-orchestrator-only child-script contract. The pinned v0.11.3 patch applies
+orchestrator-only child-script contract, and invokes the applicability verifier
+in its inert/default-off mode. The pinned v0.11.3 patch applies
 cleanly in the dedicated pristine verification checkout; the current branch
 does not require that checkout to be present. The GitHub job intentionally
 does not clone or apply a v0.11.3 fixture: patch applicability is a separately
 recorded pristine-checkout result, while CI stays offline and artifact-free.
+
+Patch applicability can be rechecked explicitly against a local checkout of
+the pinned commit (the command creates and removes only a temporary detached
+worktree):
+
+```powershell
+.\test-patch-applicability.ps1 -BaseCheckout 'D:\src\airi-v0.11.3'
+```
+
+The verifier is inert and exits successfully when `-BaseCheckout` is omitted;
+CI remains inert with respect to patch applicability and never clones a base
+checkout, touches the AIRI installation, or starts services.
 
 ## Latest installer-script audit
 

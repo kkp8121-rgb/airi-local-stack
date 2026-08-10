@@ -82,7 +82,11 @@ playback completion from playback-start evidence.
   documented patch artifact sizes and SHA-256 values; it does not inspect or
   modify an AIRI installation.
 - `test-current-checkpoint.ps1` runs the manifest, entrypoint, and sender
-  contract checks together as one offline checkpoint command.
+  contract checks together as one offline checkpoint command; it also invokes
+  `test-patch-applicability.ps1` in its inert/default-off mode.
+- `test-patch-applicability.ps1` can optionally validate canonical and secondary
+  patch application against an explicitly supplied local pinned-base checkout;
+  it never accesses the installed AIRI archive.
 - `.github/workflows/remediation-checkpoint.yml` runs that same checkpoint on
   Windows for every push, pull request, or manual dispatch; it does not install
   or start AIRI.
