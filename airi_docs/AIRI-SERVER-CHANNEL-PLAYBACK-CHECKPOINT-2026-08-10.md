@@ -35,6 +35,18 @@ event carries no text, audio, round ID, session ID, or model output.
 - Browser contract tests were not runnable because the local Playwright
   Chromium executable is absent; no browser binary was installed.
 
+## Live synthetic proof
+
+The rebuilt official source was packaged and installed locally, then AIRI was
+started in background mode with the stage readiness gate satisfied. The
+installed archive SHA-256 was
+`46EBB95E36880B87526582B00837552ED38817D4393CD416F1D7521DFB72C412`. A
+synthetic, non-personal sender request using `--wait-playback-start
+--print-assistant-shape` returned only content-free status fields indicating
+`sent=true`, `completed=true`, and `playback_started=true`; completion latency
+was 744 ms and playback-start latency was 2897 ms. No response text or
+runtime identifiers are committed here.
+
 ## Operational boundary
 
 The optional sender flag proves playback-start, not natural playback end.
