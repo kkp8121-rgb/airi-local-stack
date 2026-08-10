@@ -27,3 +27,13 @@ use their old patch hashes or test counts to validate the current checkout.
 The current branch is source/patch work only. Do not create governed topic
 boards, send real microphone text, expose raw IDs or dialogue, or infer natural
 playback completion from playback-start evidence.
+
+## Latest audit evidence
+
+- `node --test test-send-airi-local-text.mjs`: 21/21 passed.
+- The canonical patch and the separate generic-context sanitizer both apply
+  cleanly in the pinned v0.11.3 verification checkout.
+- The focused browser contract suite with the sanitizer applied passed 25/25
+  in the dependency-equipped source checkout.
+- The latest privacy/correlation audit found no HIGH or MED issue in the
+  current patch boundary.
