@@ -340,6 +340,11 @@ foreach ($scriptName in $patchScripts) {
     catch {
         Write-Warning "$scriptName FAILED: $($_.Exception.Message)"
         [void]$failures.Add($scriptName)
+        # Do not compound a partial archive with later patch attempts. The
+        # final verification below still reports the complete state, and the
+        # caller can use restore-airi-original.ps1 to return to the verified
+        # pristine backup before investigating the failed step.
+        break
     }
     Write-Output ''
 }

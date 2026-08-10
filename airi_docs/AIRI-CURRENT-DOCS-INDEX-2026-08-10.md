@@ -63,6 +63,9 @@ playback completion from playback-start evidence.
   `app.asar`.
 - The apply orchestrator serializes its complete run with a named local mutex;
   concurrent invocations fail fast before touching the installation.
+- If an internal patch step throws, the orchestrator stops the remaining patch
+  sequence before final verification; restore from the verified pristine backup
+  before investigating or retrying.
 - Restore uses the same mutex, so apply and restore cannot modify the archive
   concurrently.
 - The six `patch-airi-*.ps1` files are implementation steps for the
