@@ -18,7 +18,9 @@
     AIRI installation directory. Default: %LOCALAPPDATA%\Programs\airi
 
 .PARAMETER BackupPath
-    Override the backup file. Default: <InstallDir>\resources\app.asar.backup-pristine
+    Override the location of the pinned pristine backup file. The supplied
+    file must still match the pinned AIRI 0.11.3 SHA-256. Default:
+    <InstallDir>\resources\app.asar.backup-pristine
 
 .EXAMPLE
     .\restore-airi-original.ps1
