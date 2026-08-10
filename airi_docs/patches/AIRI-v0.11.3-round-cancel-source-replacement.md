@@ -9,15 +9,18 @@ Status: **implemented, verified, source-built, and installed as the live AIRI v0
 - Patch size: 84,743 bytes
 - Scope: 32 files, 817 insertions, 60 deletions
 - Combined local-runtime patch: `AIRI-v0.11.3-local-runtime-source.patch`
-- Combined patch SHA-256: `483cfc6e6cbfdd9df33402e3d02d95572fd7ec0dd1fc9772f7ccaca781ca6fa1`
-- Combined patch size: 105,778 bytes
-- Combined scope: 38 files, 1,009 insertions, 196 deletions
+- Combined patch SHA-256: `B3497A1F3AD2521B27B5D29D440C0794D949BB282B731CFFF2C278AF04F311AC`
+- Combined patch size: 414,211 bytes
+- Combined scope: 84 files, 5,799 insertions, 510 deletions
 
 The patch was generated from the exact diff of a clean v0.11.3 checkout and
 `git apply --check --reverse` succeeds against the fully patched checkout.
 The original 32-file patch is retained as the round/cancel-only artifact. The
-combined 38-file patch additionally preserves the installed local audio and
-latency behavior as source changes. Both patches pass
+combined 84-file patch additionally preserves the installed local audio,
+latency, playback-correlation, and current runtime behavior as source changes.
+The generic `context:update` metadata sanitizer regression is supplied by the
+separate `AIRI-v0.11.3-context-correlation-sanitizer.patch`, which is applied
+after the combined patch. Both patches pass
 `git apply --check --reverse` against their corresponding patched checkout.
 
 ## Implemented contract
