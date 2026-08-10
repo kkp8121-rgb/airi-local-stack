@@ -48,8 +48,8 @@ if (-not (Test-Path -LiteralPath $workflowPath -PathType Leaf)) {
     throw 'Missing checkpoint workflow.'
 }
 $workflow = Get-Content -LiteralPath $workflowPath -Raw
-if ($workflow -notmatch 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' -or
-    $workflow -notmatch 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' -or
+if ($workflow -notmatch 'actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09' -or
+    $workflow -notmatch 'actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444' -or
     $workflow -match 'actions/(checkout|setup-node)@v[0-9]') {
     throw 'Checkpoint workflow action pin contract failed.'
 }
