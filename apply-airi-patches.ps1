@@ -46,6 +46,26 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Serialize the complete orchestrator, including validation and pristine
+# backup creation. A non-blocking wait preserves the existing fail-fast flow.
+$applyMutex = $null
+$applyMutexHeld = $false
+try {
+    try {
+        $applyMutex = [System.Threading.Mutex]::new($false, 'Local\AiriApplyPatches')
+        $applyMutexHeld = $applyMutex.WaitOne(0)
+    }
+    catch [System.Threading.AbandonedMutexException] {
+        # The previous owner exited without releasing it; ownership is ours now.
+        $applyMutexHeld = $true
+    }
+    catch {
+        throw 'Could not acquire AIRI patch mutex.'
+    }
+    if (-not $applyMutexHeld) {
+        throw 'Could not acquire AIRI patch mutex.'
+    }
+
 # --- 1. Resolve and validate the installation --------------------------------
 if (-not (Test-Path -LiteralPath $InstallDir)) {
     throw "AIRI installation directory not found: $InstallDir"
@@ -377,3 +397,12 @@ else {
     Write-Warning "No pristine backup exists for this install; .\restore-airi-original.ps1 cannot undo these edits."
 }
 exit 0
+}
+finally {
+    if ($null -ne $applyMutex) {
+        if ($applyMutexHeld) {
+            $applyMutex.ReleaseMutex()
+        }
+        $applyMutex.Dispose()
+    }
+}

@@ -53,6 +53,8 @@ playback completion from playback-start evidence.
   the installation.
 - The apply orchestrator applies the same non-reparse checks to the install
   directory and archive before scanning or creating a pristine backup.
+- The apply orchestrator serializes its complete run with a named local mutex;
+  concurrent invocations fail fast before touching the installation.
 - New pristine backups are hash-gated before and after staging, then published
   with no-clobber atomic move; concurrent runs may only reuse an independently
   verified backup.
