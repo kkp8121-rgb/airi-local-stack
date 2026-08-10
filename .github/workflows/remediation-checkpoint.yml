@@ -69,3 +69,34 @@ jobs:
       - name: Run offline checkpoint contracts
         shell: pwsh
         run: .\test-current-checkpoint.ps1
+
+  python-core-tests:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install lean test dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check `
+            pytest==9.1.1 `
+            fastapi==0.141.1 `
+            httpx==0.28.1 `
+            uvicorn==0.52.1 `
+            numpy==2.5.2 `
+            av==18.0.0 `
+            faster-whisper==1.2.1 `
+            python-multipart==0.0.32
+
+      - name: Run core Python tests
+        shell: pwsh
+        run: python -m pytest -q ollama-proxy test_latency_trace.py test_start_airi_background.py latency-monitor stt

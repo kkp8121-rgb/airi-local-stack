@@ -191,7 +191,7 @@ class KnowledgeStoreTests(unittest.TestCase):
             self.assertIn("reviewed_at", columns)
 
     def test_approved_manifest_uses_review_date_not_claimed_source_publication(self):
-        manifest = Path(__file__).parent / "runtime" / "approved-knowledge-2026-08-09.json"
+        manifest = Path(__file__).parent / "testdata" / "approved-knowledge-2026-08-09.json"
         records = json.loads(manifest.read_text(encoding="utf-8"))["records"]
         self.assertEqual(len(records), 9)
         for raw in records:

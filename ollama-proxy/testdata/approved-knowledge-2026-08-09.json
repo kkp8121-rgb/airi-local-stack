@@ -1,0 +1,117 @@
+{
+  "records": [
+    {
+      "approved": true,
+      "source": "https://www.minecraft.net/en-us/article/what-minecraft",
+      "title": "Minecraft 공식 개요",
+      "aliases": ["마인크래프트"],
+      "answer_summary": "마인크래프트는 블록을 모아 건축·탐험·생존을 자유롭게 즐기는 샌드박스 게임이야.",
+      "version": "approved-summary-2026-08-09",
+      "reviewed_at": "2026-08-09T00:00:00Z",
+      "expires_at": "2027-08-09T00:00:00Z",
+      "provenance": "Minecraft 공식 소개 페이지를 2026-08-09에 검토해 작성한 한국어 요약",
+      "content": "Minecraft는 블록, 생물, 커뮤니티를 중심으로 하는 샌드박스 게임이다. 정해진 하나의 목표가 아니라, 블록을 부수고 수집·제작·배치하여 세계를 바꾸거나 탐험과 전투를 선택할 수 있다. 대표 모드는 크리에이티브와 서바이벌이다. 크리에이티브에서는 자원 제한 없이 건축에 집중할 수 있고 비행도 가능하다. 서바이벌에서는 자원 수집, 제작, 허기와 체력 관리, 적대적 몹 대응이 중요하다. 멀티플레이 및 커뮤니티 제작 콘텐츠의 이용 가능 여부와 방식은 에디션·플랫폼·서비스에 따라 다를 수 있으므로 플레이 전 공식 안내를 확인한다.",
+      "content_sha256": "64f153d0f426e16aac937ce8d3ecc5c2b2fd4ff22a56613e5e3dd49da0a50fea"
+    },
+    {
+      "approved": true,
+      "source": "https://playeternalreturn.com/main?hl=en-US",
+      "title": "Eternal Return 공식 개요",
+      "aliases": ["이터널 리턴"],
+      "answer_summary": "이터널 리턴은 재료로 장비를 만들고 팀과 협력해 최후까지 생존하는 온라인 아레나 게임이야.",
+      "version": "approved-summary-2026-08-09",
+      "reviewed_at": "2026-08-09T00:00:00Z",
+      "expires_at": "2027-08-09T00:00:00Z",
+      "provenance": "Eternal Return 공식 웹사이트를 2026-08-09에 검토해 작성한 한국어 요약",
+      "content": "Eternal Return은 루미아 섬을 배경으로 한 멀티플레이 온라인 생존 아레나 게임이다. 공식 소개는 참가자가 생존에 필요한 무기와 방어구를 제작하고, 팀원과 협력해 다른 팀과 경쟁하여 최후의 팀이 되는 흐름을 제시한다. 승패와 전술은 캐릭터 선택, 재료 확보, 제작, 이동 경로, 교전 판단, 팀 협력에 영향을 받는다. 시즌·패치에 따라 캐릭터, 아이템, 규칙, 이용 가능한 플랫폼이 달라질 수 있으므로 구체적인 수치나 현재 메타는 공식 패치 노트를 우선한다.",
+      "content_sha256": "b3fe73a1d83e78ac92c9d087b466aa022fee3c85e7953ff59bdc47aff4ab0d0d"
+    },
+    {
+      "approved": true,
+      "source": "https://mangaplus.shueisha.co.jp/faq/eng/",
+      "title": "MANGA Plus by SHUEISHA 공식 서비스 개요",
+      "aliases": ["망가 플러스", "공식 만화 서비스"],
+      "answer_summary": "MANGA Plus는 집영사가 운영하며 지역에 따라 작품과 언어가 달라지는 공식 만화 서비스야.",
+      "version": "approved-summary-2026-08-09",
+      "reviewed_at": "2026-08-09T00:00:00Z",
+      "expires_at": "2027-08-09T00:00:00Z",
+      "provenance": "SHUEISHA의 MANGA Plus 공식 FAQ를 2026-08-09에 검토해 작성한 한국어 요약",
+      "content": "MANGA Plus by SHUEISHA는 집영사가 운영하는 공식 만화 콘텐츠 서비스다. 공식 FAQ에 따르면 서비스에서 제공하는 작품은 집영사 발행 작품을 중심으로 하며, 일부 작품은 일본 공개 시점과 함께 제공될 수 있다. 제공 언어, 표시되는 작품, 열람 가능한 화수는 지역·라이선스·웹 또는 앱 환경에 따라 달라질 수 있다. 특정 작품의 전체 화수나 무료·유료 이용 조건을 일반화하지 말고, 해당 작품의 현재 상세 페이지와 이용약관을 확인한다. 공식 서비스 이용은 권리자와 창작자 지원에 연결될 수 있다.",
+      "content_sha256": "ef4aa9d63fc13242c81598ab0626183ae737d477177f43061d7325da63b342e2"
+    },
+    {
+      "approved": true,
+      "source": "https://maplestory.nexon.com/Home/Main",
+      "title": "MapleStory 공식 게임 개요",
+      "aliases": ["메이플스토리"],
+      "answer_summary": "메이플스토리는 캐릭터를 키우며 사냥·퀘스트·보스·협동을 즐기는 온라인 액션 RPG야.",
+      "version": "approved-summary-2026-08-09",
+      "reviewed_at": "2026-08-09T00:00:00Z",
+      "expires_at": "2027-08-09T00:00:00Z",
+      "provenance": "Nexon Korea의 MapleStory 공식 홈페이지를 2026-08-09에 검토해 작성한 한국어 요약",
+      "content": "MapleStory는 넥슨이 제공하는 온라인 액션 RPG다. 플레이어는 캐릭터를 성장시키며 지역을 탐험하고, 퀘스트·사냥·보스 콘텐츠·다른 이용자와의 협동 등 여러 활동을 경험한다. 게임의 세부 시스템, 콘텐츠 접근 조건, 보상, 이벤트 및 운영 정책은 업데이트와 월드·지역 서비스에 따라 달라질 수 있다. 시작 전에는 공식 홈페이지의 공지, 게임 가이드, 이용약관을 기준으로 현재 적용 내용을 확인하는 것이 안전하다.",
+      "content_sha256": "3d5f18370e3400b3545f4f6917baf70906a4122f71c142a2a3922c95f91c9818"
+    },
+    {
+      "approved": true,
+      "source": "https://maplestory.nexon.com/Guide/Job",
+      "title": "MapleStory 공식 직업 안내",
+      "aliases": ["메이플스토리 직업"],
+      "answer_summary": "메이플스토리 직업은 무기·전투 거리·조작 방식·파티 역할이 서로 달라.",
+      "version": "approved-summary-2026-08-09",
+      "reviewed_at": "2026-08-09T00:00:00Z",
+      "expires_at": "2027-08-09T00:00:00Z",
+      "provenance": "Nexon Korea의 MapleStory 공식 직업 안내를 2026-08-09에 검토해 작성한 한국어 요약",
+      "content": "MapleStory의 직업은 사용하는 무기, 주 능력치, 공격 방식, 이동·방어·지원 능력, 조작 난이도와 성장 경험이 서로 다르다. 직업 선택에서는 선호하는 전투 거리와 조작 방식, 파티 기여 방식, 육성 목표를 함께 고려할 수 있다. 어떤 직업이 절대적으로 가장 강하다고 단정하기보다, 현재 패치의 직업 밸런스와 자신의 플레이 환경을 함께 보는 편이 적절하다. 신규·복귀 이용자는 공식 직업 안내와 인게임 설명을 우선 참고하고, 패치 이후에는 스킬과 수치가 바뀔 수 있음을 유의한다.",
+      "content_sha256": "66f301cd2fc605eabe4dd2e5b23e968deab13742ffc8edc0e275b02444ee5a4c"
+    },
+    {
+      "approved": true,
+      "source": "https://science.nasa.gov/solar-system/solar-system-facts/",
+      "title": "태양계의 구성과 형성: NASA 과학 개요",
+      "answer_summary": "태양계는 태양과 여덟 행성, 왜행성, 위성, 소행성, 혜성으로 이루어져 있어.",
+      "version": "approved-summary-2026-08-09",
+      "reviewed_at": "2026-08-09T00:00:00Z",
+      "expires_at": "2027-08-09T00:00:00Z",
+      "provenance": "NASA Science의 Solar System Facts를 2026-08-09에 검토해 작성한 한국어 요약",
+      "content": "태양계에는 태양, 여덟 행성, 왜행성, 수많은 위성, 소행성과 혜성 등이 포함된다. NASA의 설명에 따르면 태양계는 약 46억 년 전 성간 가스와 먼지의 조밀한 구름에서 형성되었다. 중심부에서는 중력에 의해 물질이 모여 태양이 형성되었고, 원반의 나머지 물질은 충돌과 응집을 거쳐 행성·왜행성·위성 및 작은 천체가 되었다. 태양에 가까운 내행성은 암석질이고, 바깥쪽에는 거대 행성이 있다. 천체 수나 명칭은 관측과 공식 지정에 따라 갱신될 수 있다.",
+      "content_sha256": "817c12d338ae8a6c3ab5a4540ced206cdf80fd09861435ce1b8add3bc2e018a4"
+    },
+    {
+      "approved": true,
+      "source": "https://science.nasa.gov/universe/galaxies/",
+      "title": "은하와 우리은하: NASA 과학 개요",
+      "answer_summary": "은하는 별뿐 아니라 행성, 가스와 먼지가 중력으로 묶인 거대한 집합이야.",
+      "version": "approved-summary-2026-08-09",
+      "reviewed_at": "2026-08-09T00:00:00Z",
+      "expires_at": "2027-08-09T00:00:00Z",
+      "provenance": "NASA Science의 Galaxies 페이지를 2026-08-09에 검토해 작성한 한국어 요약",
+      "content": "은하는 중력으로 묶인 별, 행성, 가스와 먼지의 거대한 집합이다. 은하의 크기와 형태는 다양하며, 대표적인 형태로 나선은하·타원은하·불규칙은하가 언급된다. 우리 태양계가 속한 우리은하는 나선은하이고, 태양계는 은하의 중심을 공전한다. 은하들은 소규모 그룹이나 더 큰 은하단을 이룰 수 있으며, 이러한 구조는 우주의 대규모 분포를 이해하는 데 쓰인다. 거리·나이·별 수 같은 수치는 관측 방법과 연구 결과에 따라 정밀화되므로 최신 과학 자료를 확인한다.",
+      "content_sha256": "9b65b74d21d42b7d47aa15a202051c813ed4be3fa1fe2e6792bf5af2d1f9f07d"
+    },
+    {
+      "approved": true,
+      "source": "https://www.fao.org/markets-and-trade/en/",
+      "title": "글로벌 농식품 시장과 무역: FAO 개요",
+      "answer_summary": "농식품 시장 정보는 가격·공급 변화를 파악하고 식량 위기에 일찍 대응하는 데 필요해.",
+      "version": "approved-summary-2026-08-09",
+      "reviewed_at": "2026-08-09T00:00:00Z",
+      "expires_at": "2027-08-09T00:00:00Z",
+      "provenance": "FAO Markets and Trade 공식 페이지를 2026-08-09에 검토해 작성한 한국어 요약",
+      "content": "국제 농식품 시장은 기본 식량, 열대 상품, 원자재 등 주요 농산물을 연결한다. FAO의 시장·무역 부문은 세계 농산물 시장 정보, 식량 생산과 수요·공급에 관한 조기경보, 무역 정책과 가치사슬 관련 분석을 제공한다. 글로벌 시장은 극한 기상, 분쟁, 감염병, 거시경제 및 금융 충격의 영향을 받을 수 있다. 따라서 특정 품목의 가격·공급 전망은 고정된 사실로 취급하지 말고, 시점·지역·품목을 명시한 최신 공식 통계와 보고서를 확인한다.",
+      "content_sha256": "c9ab2b2b16edca0350e6e356659ef9467beb6996fb54c5113528f208e87bfbb3"
+    },
+    {
+      "approved": true,
+      "source": "https://www.fao.org/markets-and-trade/areas-of-work/trade-policy-and-partnerships/trade-food-security-and-sustainable-development/3/",
+      "title": "식량안보와 농식품 무역: FAO 정책 관점",
+      "answer_summary": "농식품 무역은 부족한 식량을 보완하고 가격 안정에 도움을 주지만 국내 생산과 균형이 필요해.",
+      "version": "approved-summary-2026-08-09",
+      "reviewed_at": "2026-08-09T00:00:00Z",
+      "expires_at": "2027-08-09T00:00:00Z",
+      "provenance": "FAO의 Trade, Food Security and Sustainable Development 페이지를 2026-08-09에 검토해 작성한 한국어 요약",
+      "content": "농식품 무역은 국가 간 식량의 부족과 잉여를 조정하고, 다양한 식품의 이용 가능성과 가격 안정에 기여할 수 있다. 그러나 무역만으로 식량안보와 영양을 좌우하는 모든 사회경제적·정치적 문제를 해결할 수는 없다. FAO는 안정적인 식량 이용 가능성과 접근성을 위해 무역 의존과 국내 생산을 균형 있게 고려하는 정책이 중요하다고 설명한다. 정책 효과는 소규모 생산자, 소비자, 물류, 기후 위험, 분쟁 등 조건에 따라 달라질 수 있으므로 한 국가의 경험을 다른 곳에 그대로 일반화하지 않는다.",
+      "content_sha256": "e01ba23a73d74d572a2a580de3f0cf412011ca9569946d8b10ed1bcd74abf8ad"
+    }
+  ]
+}

@@ -3446,11 +3446,14 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         )
 
     def test_first_raw_watchdog_bounds_a_stream_that_never_starts(self) -> None:
-        chat = _StallingApiStreamClient([], stall_seconds=0.05)
+        # Keep the body stall well beyond the watchdog deadline.  A 10 ms
+        # deadline is below the Windows monotonic clock resolution and tests
+        # the response-header branch instead of the intended raw-body branch.
+        chat = _StallingApiStreamClient([], stall_seconds=0.2)
         memory = _FakeMemoryRuntime()
         with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
             ollama_proxy, "memory_runtime", memory
-        ), mock.patch.object(ollama_proxy, "UPSTREAM_FIRST_RAW_TIMEOUT_SECONDS", 0.01):
+        ), mock.patch.object(ollama_proxy, "UPSTREAM_FIRST_RAW_TIMEOUT_SECONDS", 0.05):
             response = post_stream("창문 손잡이가 헐거워졌어.")
 
         expected = ollama_proxy.UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
