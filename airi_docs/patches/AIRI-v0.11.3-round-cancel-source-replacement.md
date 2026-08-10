@@ -1,6 +1,8 @@
 # AIRI v0.11.3 round correlation / cancellation source patch
 
-Status: **implemented, verified, source-built, and installed as the live AIRI v0.11.3 `app.asar`.**
+Status: **implemented and verified as a source patch manifest.** The installed
+artifact details below are historical checkpoints; they are not a claim about
+the currently running AIRI installation.
 
 - Upstream tag: `v0.11.3`
 - Peeled commit: `dbf812488829a61cc2e95909e021b215704d066c`
@@ -128,7 +130,11 @@ and chunker suites pass 30/30.
 `git diff --check` exits 0. Windows Git reports only the checkout's configured
 LF-to-CRLF conversion warnings.
 
-## Installed artifact checkpoint
+## Historical installed artifact checkpoint
+
+The following artifact was validated during the earlier round/cancellation
+checkpoint. The later server-channel playback checkpoint records a newer
+synthetic installation and is authoritative for current runtime observations.
 
 - Installed product version: `0.11.3.0`
 - Installed `app.asar` size: 1,119,409,243 bytes

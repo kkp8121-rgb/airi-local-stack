@@ -22,6 +22,11 @@ preserve earlier test totals, listener observations, archive hashes, and
 installation procedures. Those values are not current branch status. Do not
 use their old patch hashes or test counts to validate the current checkout.
 
+The installed-artifact section in
+`patches/AIRI-v0.11.3-round-cancel-source-replacement.md` is likewise a
+historical checkpoint. For the current server-channel runtime observation,
+use the 2026-08-10 server-channel checkpoint instead.
+
 ## Verification boundary
 
 The current branch is source/patch work only. Do not create governed topic
