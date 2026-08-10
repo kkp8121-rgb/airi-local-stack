@@ -239,8 +239,37 @@ if (Test-Path -LiteralPath $pristineBackupPath) {
 }
 elseif ($isFullyStock) {
     Write-Output "Creating pristine backup (this copies ~1.05 GiB): $pristineBackupPath"
-    Copy-Item -LiteralPath $resolvedAsar -Destination $pristineBackupPath
-    Write-Output 'Pristine backup created.'
+    $sourceHashBeforeBackup = Get-Sha256 $resolvedAsar
+    if ($sourceHashBeforeBackup -ne $knownPristineAsarSha256) {
+        throw "Stock scan/hash race detected: app.asar SHA-256 is $sourceHashBeforeBackup, expected $knownPristineAsarSha256. Refusing to create a backup."
+    }
+    $temporaryBackupPath = Join-Path (Split-Path -Parent $pristineBackupPath) ('.app.asar.backup-{0}.tmp' -f ([guid]::NewGuid().ToString('N')))
+    try {
+        Copy-Item -LiteralPath $resolvedAsar -Destination $temporaryBackupPath -Force
+        $temporaryBackupHash = Get-Sha256 $temporaryBackupPath
+        if ($temporaryBackupHash -ne $knownPristineAsarSha256) {
+            throw "Pristine backup staging SHA-256 mismatch: got $temporaryBackupHash, expected $knownPristineAsarSha256."
+        }
+        try {
+            [System.IO.File]::Move($temporaryBackupPath, $pristineBackupPath)
+        }
+        catch [System.IO.IOException] {
+            if (-not (Test-Path -LiteralPath $pristineBackupPath)) {
+                throw
+            }
+            $racingBackupHash = Get-Sha256 $pristineBackupPath
+            if ($racingBackupHash -ne $knownPristineAsarSha256) {
+                throw "Concurrent pristine backup has an unexpected SHA-256: got $racingBackupHash, expected $knownPristineAsarSha256."
+            }
+            Write-Warning 'A concurrent run created the verified pristine backup; reusing it.'
+        }
+        Write-Output 'Pristine backup created or safely reused.'
+    }
+    finally {
+        if (Test-Path -LiteralPath $temporaryBackupPath) {
+            Remove-Item -LiteralPath $temporaryBackupPath -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 elseif ($Force) {
     Write-Warning 'No pristine backup exists and app.asar is not stock. Continuing without a backup because -Force was supplied.'
