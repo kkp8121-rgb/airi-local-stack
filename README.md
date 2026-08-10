@@ -30,10 +30,10 @@ AIRI 애플리케이션 자체는 Windows에 별도로 설치되어 있으며 �
 
 ## 다음 세션이 먼저 읽을 문서
 
-1. `airi_docs/AIRI-FIX-HANDOFF-2026-08-07.md` — **감사 반영 수정 인수인계 (최신 진입점)**
-2. `airi_docs/AIRI-LOCAL-STACK-REVIEW-2026-08-07.md` — 코드 감사 보고서 (결함 근거·실측치)
-3. `airi_docs/AIRI-CLOUD-SEARCH-REACTION-2026-08-07.md`
-4. `airi_docs/AIRI-HANDOFF-2026-08-07.md`
+1. `airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md` — **현재 문서 색인 및 최신 진입점**
+2. `airi_docs/AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md` — 현재 source/patch 인수인계
+3. `airi_docs/AIRI-LOCAL-STACK-REVIEW-2026-08-07.md` — 코드 감사 보고서 (결함 근거·실측치)
+4. `airi_docs/AIRI-CLOUD-SEARCH-REACTION-2026-08-07.md`
 5. `NEXT-SESSION.md`
 
 ## Git에 포함하지 않는 항목
