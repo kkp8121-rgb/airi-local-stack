@@ -55,6 +55,8 @@ playback completion from playback-start evidence.
   directory and archive before scanning or creating a pristine backup.
 - The apply orchestrator serializes its complete run with a named local mutex;
   concurrent invocations fail fast before touching the installation.
+- Restore uses the same mutex, so apply and restore cannot modify the archive
+  concurrently.
 - New pristine backups are hash-gated before and after staging, then published
   with no-clobber atomic move; concurrent runs may only reuse an independently
   verified backup.

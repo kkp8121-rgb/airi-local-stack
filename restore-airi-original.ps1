@@ -33,6 +33,23 @@ param(
 $ErrorActionPreference = 'Stop'
 $knownPristineAsarSha256 = 'B3433A29D2E8357A84068DFFCAD80A2A23A4D4C0F5F803764C66839C84B788AF'
 
+$patchMutex = $null
+$patchMutexHeld = $false
+try {
+    try {
+        $patchMutex = [System.Threading.Mutex]::new($false, 'Local\AiriApplyPatches')
+        $patchMutexHeld = $patchMutex.WaitOne(0)
+    }
+    catch [System.Threading.AbandonedMutexException] {
+        $patchMutexHeld = $true
+    }
+    catch {
+        throw 'Could not acquire AIRI patch mutex.'
+    }
+    if (-not $patchMutexHeld) {
+        throw 'Could not acquire AIRI patch mutex.'
+    }
+
 function Get-Sha256([string]$Path) {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToUpperInvariant()
 }
@@ -48,6 +65,10 @@ function Assert-AiriNotRunning {
 # --- 1. Resolve and validate the installation --------------------------------
 if (-not (Test-Path -LiteralPath $InstallDir)) {
     throw "AIRI installation directory not found: $InstallDir"
+}
+$installItemBeforeResolve = Get-Item -LiteralPath $InstallDir -Force
+if (-not $installItemBeforeResolve.PSIsContainer -or (($installItemBeforeResolve.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+    throw "AIRI installation path is not a regular non-reparse directory: $InstallDir"
 }
 $resolvedInstallDir = (Resolve-Path -LiteralPath $InstallDir).Path
 if (-not (Test-Path -LiteralPath (Join-Path $resolvedInstallDir 'airi.exe'))) {
@@ -137,3 +158,12 @@ if ($restoredHash -ne $backupHash) {
 Write-Output "Restored app.asar from the pristine backup (SHA-256 $restoredHash)."
 Write-Output 'Re-apply the patch set with .\apply-airi-patches.ps1 when needed.'
 exit 0
+}
+finally {
+    if ($null -ne $patchMutex) {
+        if ($patchMutexHeld) {
+            $patchMutex.ReleaseMutex()
+        }
+        $patchMutex.Dispose()
+    }
+}
