@@ -68,6 +68,19 @@ git diff --check
 .\test-current-checkpoint.ps1
 ```
 
+## Handoff finalization
+
+This document is the boundary for the next review session. The working tree
+must be clean and the branch must be pushed before a reviewer begins. The
+next reviewer should treat the current commit, not an uncommitted local
+checkout or an installed AIRI archive, as the source of truth. Review findings
+should be reported first; edits should be limited to the smallest justified
+scope, followed by the offline checkpoint and a new pushed commit.
+
+For the next Claude session, paste the request in the final section below
+verbatim. It intentionally asks for an audit before any mutation and forbids
+network/model/service or real-microphone actions.
+
 The sender contract currently passes 21 Node tests. The combined checkpoint
 also verifies all three documented patch artifact sizes and hashes and the
 orchestrator-only child-script contract, and invokes the applicability verifier
