@@ -3,7 +3,7 @@ import json, sys
 from pathlib import Path
 import pytest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from verify_airi_style_dataset import CATEGORY_TAXONOMY, GateError, canonical_sha256, prompt_sha256, sha256_file, verify_reviewed_dataset
+from verify_airi_style_dataset import CATEGORY_TAXONOMY, GateError, canonical_sha256, load_jsonl, load_jsonl_bytes, prompt_sha256, sha256_file, validate_fixture, validate_fixture_rows, verify_reviewed_dataset
 from validate_airi_style_pending import record_sha256, validate_decisions, validate_pending_dataset
 from train_airi_style_qlora import TrainingRefused, _assert_train_rows
 def row(i,split,category): return {"id":f"style-{i:03d}","split":split,"category":category,"prompt":f"주제 {i}을 말해줘","answer":"좋아 핵심만 말할게","partition":{"tier":"S1","group":f"reviewed-{i:03d}"},"review":{"status":"approved","reviewer":"reviewer-alex","approved_at":"2026-08-08T00:00:00Z"},"provenance":{"synthetic":True,"source":"curated-synthetic"},"training_eligible":True}
@@ -12,6 +12,11 @@ def fixture(tier):
 def bundle(t):
  rows=[row(i,"train" if i<160 else "dev" if i<180 else "test",CATEGORY_TAXONOMY[i%6]) for i in range(200)];d=t/"reviewed.jsonl";d.write_text("\n".join(json.dumps(x,ensure_ascii=False) for x in rows)+"\n",encoding="utf8")
  m=t/"manifest.json";m.write_text(json.dumps({"schema_version":3,"policy_version":"airi-style-qlora/v3","dataset_sha256":sha256_file(d),"human_approved":True,"approved_by":"reviewer-alex","approved_at":"2026-08-08T00:00:00Z","reviewed_record_count":200,"categories":list(CATEGORY_TAXONOMY),"reviewer_provenance":{"review_program":"independent-review","dataset_author":"author-kim","fixture_owner":"fixture-lee","independent_review":True,"reviewers":[{"id":"reviewer-alex","role":"senior-reviewer","affiliation":"quality-team"}]}},ensure_ascii=False),encoding="utf8");c=t/"c0.jsonl";s=t/"s1.jsonl";c.write_text(json.dumps(fixture("C0"))+"\n");s.write_text(json.dumps(fixture("S1"))+"\n");return rows,d,m,c,s
+def test_fixture_byte_helpers_match_path_helpers(tmp_path):
+ p=tmp_path/"c0.jsonl";p.write_text(json.dumps(fixture("C0"))+"\n",encoding="utf8")
+ rows=load_jsonl(p,"C0 fixture")
+ assert rows==load_jsonl_bytes(p.read_bytes(),"C0 fixture")
+ assert validate_fixture(p,"C0")==validate_fixture_rows(rows,"C0")
 def test_production_v3_shape_balance_split_and_s1_only(tmp_path):
  _,d,m,c,s=bundle(tmp_path);r=verify_reviewed_dataset(d,m,c,s);assert r.report_payload["splits"]=={"dev":20,"test":20,"train":160}
 def test_production_rejects_pending_and_c0(tmp_path):

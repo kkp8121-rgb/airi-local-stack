@@ -73,10 +73,8 @@ def _read_json(p:Path,where:str)->dict[str,Any]:
  except (OSError,json.JSONDecodeError) as e: raise GateError(f"{where}: invalid JSON") from e
  if not isinstance(v,dict): raise GateError(f"{where}: must contain an object")
  return v
-def load_jsonl(p:Path,where:str)->list[dict[str,Any]]:
- if not p.is_file() or p.is_symlink(): raise GateError(f"{where}: must be a regular local JSONL file")
- try: lines=p.read_text(encoding="utf-8").splitlines()
- except OSError as e: raise GateError(f"{where}: cannot read") from e
+def load_jsonl_bytes(data:bytes,where:str)->list[dict[str,Any]]:
+ lines=data.decode("utf-8").splitlines()
  if not lines: raise GateError(f"{where}: must not be empty")
  out=[]
  for n,line in enumerate(lines,1):
@@ -86,6 +84,11 @@ def load_jsonl(p:Path,where:str)->list[dict[str,Any]]:
   if not isinstance(row,dict): raise GateError(f"{where}:{n}: each line must be an object")
   out.append(row)
  return out
+def load_jsonl(p:Path,where:str)->list[dict[str,Any]]:
+ if not p.is_file() or p.is_symlink(): raise GateError(f"{where}: must be a regular local JSONL file")
+ try: data=p.read_bytes()
+ except OSError as e: raise GateError(f"{where}: cannot read") from e
+ return load_jsonl_bytes(data,where)
 def _reviewers(v:Any)->tuple[set[str],str]:
  p=_strict(v,{"review_program","dataset_author","fixture_owner","independent_review","reviewers"},"reviewer_provenance")
  if p["independent_review"] is not True: raise GateError("reviewer_provenance: independent review is required")
@@ -123,8 +126,8 @@ def validate_record(row:Any,index:int,reviewers:set[str])->dict[str,Any]:
  if provenance["synthetic"] is not True or not isinstance(provenance["source"],str) or not provenance["source"].strip() or any(x in provenance["source"].casefold() for x in ("seed","pending","reserved")): raise GateError(f"record {index}: approved synthetic non-pending provenance required")
  if r["training_eligible"] is not True: raise GateError(f"record {index}: training_eligible must be true")
  return r
-def validate_fixture(path:Path,tier:str):
- rows=load_jsonl(path,f"{tier} fixture"); ids=set(); groups=set(); prompts=set()
+def validate_fixture_rows(rows:list[dict[str,Any]],tier:str):
+ ids=set(); groups=set(); prompts=set()
  for i,row in enumerate(rows,1):
   r=_strict(row,FIXTURE_FIELDS,f"{tier} fixture {i}"); _privacy(r,f"{tier} fixture {i}")
   if r["schema_version"]!=1 or r["suite_id"]!=FIXTURE_SUITE_ID or r["suite_version"]!=FIXTURE_SUITE_VERSION or r["tier"]!=tier: raise GateError(f"{tier} fixture {i}: suite/tier is not canonical")
@@ -134,6 +137,8 @@ def validate_fixture(path:Path,tier:str):
   if r["case_id"] in ids or r["group"] in groups or r["prompt_sha256"] in prompts: raise GateError(f"{tier} fixture {i}: duplicate case/group/prompt")
   ids.add(r["case_id"]);groups.add(r["group"]);prompts.add(r["prompt_sha256"])
  return rows,ids,groups,prompts
+def validate_fixture(path:Path,tier:str):
+ return validate_fixture_rows(load_jsonl(path,f"{tier} fixture"),tier)
 def verify_reviewed_dataset(dataset:Path,review_manifest:Path,c0_fixture:Path,s1_fixture:Path)->VerificationResult:
  dataset,review_manifest,c0_fixture,s1_fixture=(local_path(p,n) for p,n in ((dataset,"dataset"),(review_manifest,"review manifest"),(c0_fixture,"C0 fixture"),(s1_fixture,"S1 fixture")))
  if len({dataset,review_manifest,c0_fixture,s1_fixture})!=4: raise GateError("inputs must be distinct files")

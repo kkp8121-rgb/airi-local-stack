@@ -73,3 +73,11 @@ real promotion, run `verify_airi_style_dataset.py` separately to create the clos
 immutable gate report. Training remains independently license-acknowledged and
 hash-gated. Do not commit local decisions, governance envelopes, fixtures, bundles,
 or gate reports.
+
+## Fixture readiness audit
+
+`audit_airi_style_fixture_readiness.py` is default-off and read-only. With its
+explicit enable flag it can only report whether supplied C0/S1 bytes are a
+mechanically valid **candidate** fixture pair; it never creates fixtures, grants
+canonical status, records human approval, or authorizes training. Human custody,
+evaluation authority, and any acceptance decision remain external to this CLI.
