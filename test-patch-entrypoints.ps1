@@ -56,10 +56,12 @@ if ($orchestrator -notmatch [regex]::Escape('& $scriptPath -AsarPath $resolvedAs
     $orchestrator -notmatch '-InternalOrchestrator') {
     throw 'Orchestrator does not forward the internal-call switch.'
 }
-foreach ($name in $children) {
-    if ($orchestrator -notmatch [regex]::Escape("'$name'")) {
-        throw "Orchestrator patch sequence is missing: $name"
-    }
+$sequenceMatch = [regex]::Match($orchestrator, '(?s)\$patchScripts\s*=\s*@\((.*?)\)')
+if (-not $sequenceMatch.Success) { throw 'Orchestrator patch sequence array not found.' }
+$sequence = @([regex]::Matches($sequenceMatch.Groups[1].Value, "'([^']+\.ps1)'") |
+    ForEach-Object { $_.Groups[1].Value })
+if (($sequence -join '|') -ne ($children -join '|')) {
+    throw "Patch sequence mismatch: expected $($children -join ', '), found $($sequence -join ', ')."
 }
 
 Write-Output 'Patch entrypoint contract: PASS (offline, no archive access).'
