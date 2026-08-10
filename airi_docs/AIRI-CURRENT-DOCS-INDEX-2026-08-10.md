@@ -1,4 +1,4 @@
-# Current documentation index — 2026-08-10
+# AIRI Current Documentation Index - 2026-08-10
 
 Use this file to distinguish current source-based handoff material from older
 runtime observations.

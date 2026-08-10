@@ -1,4 +1,4 @@
-# AIRI server-channel playback checkpoint — 2026-08-10
+# AIRI Server-Channel Playback Checkpoint - 2026-08-10
 
 ## Scope
 
