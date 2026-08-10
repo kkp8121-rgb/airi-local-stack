@@ -16,7 +16,8 @@ event carries no text, audio, round ID, session ID, or model output.
 - The context bridge keeps a bounded renderer-local round-to-parent map. It
   records only locally originating correlated rounds, ignores remote mirrors,
   sends one exact parent-correlated event, and clears the mapping on playback,
-  completion, cancellation, stale replacement, and disposal.
+  cancellation, stale replacement, and disposal. Completion intentionally
+  does not clear it because chat completion can precede audio start.
 - `send-airi-local-text.mjs` adds opt-in `--wait-playback-start`. It waits for
   the exact correlated completion and playback-start events in either order;
   a matching supersession cancellation settles immediately. Default
@@ -24,7 +25,8 @@ event carries no text, audio, round ID, session ID, or model output.
 
 ## Verification
 
-- Root sender tests: 18/18 passed; Node syntax checks passed.
+- Root sender tests: 18/18 passed; Node syntax checks passed, including the
+  completion-first/playback-later metadata path.
 - Stage UI typecheck passed.
 - Playback latency tests: 4/4 passed.
 - Protocol typecheck passed.
