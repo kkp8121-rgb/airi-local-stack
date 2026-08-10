@@ -81,7 +81,8 @@ playback completion from playback-start evidence.
 - `test-current-checkpoint.ps1` runs the manifest, entrypoint, and sender
   contract checks together as one offline checkpoint command.
 - `.github/workflows/remediation-checkpoint.yml` runs that same checkpoint on
-  Windows for every push and pull request; it does not install or start AIRI.
+  Windows for every push, pull request, or manual dispatch; it does not install
+  or start AIRI.
 - Restore uses the same mutex, so apply and restore cannot modify the archive
   concurrently.
 - The six active `patch-airi-*.ps1` child files are implementation steps for
