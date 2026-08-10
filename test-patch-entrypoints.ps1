@@ -56,5 +56,10 @@ if ($orchestrator -notmatch [regex]::Escape('& $scriptPath -AsarPath $resolvedAs
     $orchestrator -notmatch '-InternalOrchestrator') {
     throw 'Orchestrator does not forward the internal-call switch.'
 }
+foreach ($name in $children) {
+    if ($orchestrator -notmatch [regex]::Escape("'$name'")) {
+        throw "Orchestrator patch sequence is missing: $name"
+    }
+}
 
 Write-Output 'Patch entrypoint contract: PASS (offline, no archive access).'
