@@ -1,0 +1,50 @@
+diff --git a/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts b/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts
+index 472711b..8def595 100644
+--- a/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts
++++ b/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts
+@@ -456,6 +456,30 @@ describe('context bridge contract', () => {
+     await store.dispose()
+   })
+ 
++  it('strips transport correlation metadata from server context updates', async () => {
++    const postedContexts = collectChannelMessages<Record<string, unknown>>(CONTEXT_CHANNEL_NAME)
++    const store = useContextBridgeStore()
++    await store.initialize()
++
++    await emitContextUpdate(createContextUpdateEvent({
++      id: 'correlated-server-context',
++      metadata: {
++        ...createMetadata('weather', 'station-1'),
++        event: { id: 'transport-context-id', parentId: 'transport-parent-id' },
++      },
++    }))
++    await waitForBroadcastDelivery()
++
++    const ingestedContext = chatContextIngestMock.mock.calls[0]?.[0]
++    expect(ingestedContext.metadata).toEqual({ source: createMetadata('weather', 'station-1').source })
++    expect(ingestedContext.metadata).not.toHaveProperty('event')
++    expect(postedContexts).toHaveLength(1)
++    expect(postedContexts[0]?.metadata).toEqual({ source: createMetadata('weather', 'station-1').source })
++    expect(postedContexts[0]?.metadata).not.toHaveProperty('event')
++
++    await store.dispose()
++  })
++
+   /**
+    * @example
+    * Input context updates record store-ingested and stay in chat input payload.
+diff --git a/packages/stage-ui/src/stores/mods/api/context-bridge.ts b/packages/stage-ui/src/stores/mods/api/context-bridge.ts
+index 713ab91..630c847 100644
+--- a/packages/stage-ui/src/stores/mods/api/context-bridge.ts
++++ b/packages/stage-ui/src/stores/mods/api/context-bridge.ts
+@@ -603,7 +603,9 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+         })
+         const contextMessage: ContextMessage = {
+           ...event.data,
+-          metadata: event.metadata,
++          // Transport event correlation is ephemeral and must not enter the
++          // context registry or renderer-to-renderer broadcasts.
++          metadata: event.metadata?.source ? { source: event.metadata.source } : undefined,
+           createdAt: Date.now(),
+         }
+         const ingestAttempt = ingestContextMessageSafely({
