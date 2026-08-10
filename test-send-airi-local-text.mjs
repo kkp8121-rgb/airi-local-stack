@@ -219,14 +219,20 @@ test('playback wait keeps the first correlated completion across duplicate repla
 
 test('rejects malformed completion envelopes but accepts a valid empty shell', () => {
   const tracker = createAssistantEventTracker('input-a')
-  const malformed = correlatedEvent('output:gen-ai:chat:complete', 'input-a', null)
-  assert.equal(tracker.terminal(malformed, 1), undefined)
-  assert.equal(tracker.waitTerminal(malformed, 2), undefined)
+  for (const [elapsedTerminal, elapsedWait, data] of [
+    [1, 2, null],
+    [3, 4, 'malformed'],
+    [5, 6, []],
+  ]) {
+    const malformed = correlatedEvent('output:gen-ai:chat:complete', 'input-a', data)
+    assert.equal(tracker.terminal(malformed, elapsedTerminal), undefined)
+    assert.equal(tracker.waitTerminal(malformed, elapsedWait), undefined)
+  }
 
   const validEmpty = correlatedEvent('output:gen-ai:chat:complete', 'input-a', {
     message: { content: '' },
   })
-  const terminal = tracker.terminal(validEmpty, 3)
+  const terminal = tracker.terminal(validEmpty, 7)
   assert.equal(terminal.cancelled, false)
   assert.equal(terminal.assistant, '')
 })
