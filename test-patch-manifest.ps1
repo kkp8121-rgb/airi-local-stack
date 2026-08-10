@@ -53,7 +53,7 @@ if ($workflow -notmatch 'actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c
     $workflow -match 'actions/(checkout|setup-node)@v[0-9]' -or
     $workflow -notmatch 'git diff-tree --check --no-commit-id -r HEAD' -or
     $workflow -notmatch [regex]::Escape(':(exclude)airi_docs/patches/*.patch')) {
-    throw 'Checkpoint workflow action pin contract failed.'
+    throw 'Checkpoint workflow contract failed.'
 }
 
 Write-Output 'Patch manifest contract: PASS (offline, no archive access).'
