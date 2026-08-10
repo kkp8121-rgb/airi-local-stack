@@ -175,6 +175,100 @@ index 963ac98ed75ce7d3e22761544c896a5d800a8fdb..96adb8d2ea44a65f6ce63dc35f3f10ce
            }
            catch (err) {
              console.error('Failed to send chat from voice:', err)
+diff --git a/apps/stage-tamagotchi/src/main/app/single-instance.test.ts b/apps/stage-tamagotchi/src/main/app/single-instance.test.ts
+index 24097c6827d05aab1486dbb9a98b833bf5eac70a..65c6c84b8ef9ddc0463fcc0e058c40e86433593c 100644
+--- a/apps/stage-tamagotchi/src/main/app/single-instance.test.ts
++++ b/apps/stage-tamagotchi/src/main/app/single-instance.test.ts
+@@ -65,11 +65,26 @@ describe('installSingleInstanceGuard', async () => {
+     expect(installed).toBe(true)
+     expect(app.on).toHaveBeenCalledWith('second-instance', expect.any(Function))
+ 
+-    const secondInstanceHandler = app.on.mock.calls[0]?.[1] as () => void
+-    secondInstanceHandler()
++    const secondInstanceHandler = app.on.mock.calls[0]?.[1] as (_: unknown, commandLine: string[]) => void
++    secondInstanceHandler({}, ['airi.exe'])
+ 
+     expect(windowMock.toggleWindowShow).toHaveBeenCalledWith(window)
+   })
++
++  it('keeps the current window hidden when a duplicate launch requests background mode', () => {
++    const app = createMockApp(true)
++    const window = createMockWindow()
++
++    installSingleInstanceGuard({
++      app,
++      getWindow: vi.fn(() => window),
++    })
++
++    const secondInstanceHandler = app.on.mock.calls[0]?.[1] as (_: unknown, commandLine: string[]) => void
++    secondInstanceHandler({}, ['airi.exe', '--background'])
++
++    expect(windowMock.toggleWindowShow).not.toHaveBeenCalled()
++  })
+ })
+ type MockApp = App & {
+   on: ReturnType<typeof vi.fn>
+diff --git a/apps/stage-tamagotchi/src/main/app/single-instance.ts b/apps/stage-tamagotchi/src/main/app/single-instance.ts
+index b0bcd56cfa78907fbf0e6da4a3bcc73b9f674da5..45efcc59b17cc1e900d2cd8f45073179233e55bf 100644
+--- a/apps/stage-tamagotchi/src/main/app/single-instance.ts
++++ b/apps/stage-tamagotchi/src/main/app/single-instance.ts
+@@ -1,6 +1,7 @@
+ import type { App, BrowserWindow } from 'electron'
+ 
+ import { toggleWindowShow } from '../windows/shared/window'
++import { startsInBackground } from './startup-mode'
+ 
+ interface SingleInstanceGuardOptions {
+   app: App
+@@ -49,7 +50,11 @@ export function installSingleInstanceGuard(options: SingleInstanceGuardOptions)
+     return false
+   }
+ 
+-  options.app.on('second-instance', () => {
++  options.app.on('second-instance', (_, commandLine) => {
++    if (startsInBackground(commandLine)) {
++      return
++    }
++
+     focusMainWindow(options.getWindow)
+   })
+ 
+diff --git a/apps/stage-tamagotchi/src/main/app/startup-mode.test.ts b/apps/stage-tamagotchi/src/main/app/startup-mode.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..5ed60c1fe760874bb33af5dab2cbaf421114b68e
+--- /dev/null
++++ b/apps/stage-tamagotchi/src/main/app/startup-mode.test.ts
+@@ -0,0 +1,13 @@
++import { describe, expect, it } from 'vitest'
++
++import { startsInBackground } from './startup-mode'
++
++describe('startsInBackground', () => {
++  it('recognizes the canonical background argument', () => {
++    expect(startsInBackground(['airi.exe', '--background'])).toBe(true)
++  })
++
++  it('does not treat unrelated arguments as a background launch', () => {
++    expect(startsInBackground(['airi.exe', '--minimized'])).toBe(false)
++  })
++})
+diff --git a/apps/stage-tamagotchi/src/main/app/startup-mode.ts b/apps/stage-tamagotchi/src/main/app/startup-mode.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..bc5b85620fa0d84af719a053457385b0f2db8375
+--- /dev/null
++++ b/apps/stage-tamagotchi/src/main/app/startup-mode.ts
+@@ -0,0 +1,11 @@
++const backgroundArgument = '--background'
++
++/**
++ * Returns whether this AIRI launch should keep the main window hidden.
++ *
++ * The same command-line convention is used for the initial process and for
++ * launches forwarded to Electron's primary single-instance process.
++ */
++export function startsInBackground(commandLine: readonly string[]) {
++  return commandLine.includes(backgroundArgument)
++}
 diff --git a/apps/stage-tamagotchi/src/main/index.ts b/apps/stage-tamagotchi/src/main/index.ts
 index 2eaa6db30d2b93e3652e23feffb8ca5cd87e2b74..64f3e950520a895ede6424071d5f1d9163f0b57d 100644
 --- a/apps/stage-tamagotchi/src/main/index.ts
@@ -215,6 +309,31 @@ index 2eaa6db30d2b93e3652e23feffb8ca5cd87e2b74..64f3e950520a895ede6424071d5f1d91
      }),
    })
  
+diff --git a/apps/stage-tamagotchi/src/main/windows/main/index.ts b/apps/stage-tamagotchi/src/main/windows/main/index.ts
+index 0f452fc8a559ca96c133864e0d9b4c2b71c5e5b4..86d4bd286331295539a47d2bfdaee4f5391f8b6c 100644
+--- a/apps/stage-tamagotchi/src/main/windows/main/index.ts
++++ b/apps/stage-tamagotchi/src/main/windows/main/index.ts
+@@ -56,6 +56,7 @@ export async function setupMainWindow(params: {
+   noticeWindow: NoticeWindowManager
+   autoUpdater: AutoUpdater
+   onWindowCreated?: (window: BrowserWindow) => void
++  startInBackground?: boolean
+   serverChannel: ServerChannel
+   godotStageManager: GodotStageManager
+   mcpStdioManager: McpStdioManager
+@@ -170,7 +171,11 @@ export async function setupMainWindow(params: {
+     window.setWindowButtonVisibility(false)
+   }
+ 
+-  window.on('ready-to-show', () => window!.show())
++  window.on('ready-to-show', () => {
++    if (!params.startInBackground) {
++      window.show()
++    }
++  })
+   protectPrivilegedWindowNavigation(window)
+ 
+   await setupMainWindowElectronInvokes({
 diff --git a/apps/stage-tamagotchi/src/renderer/App.vue b/apps/stage-tamagotchi/src/renderer/App.vue
 index 70ccf8ae7616ad81eee7666d399b88f9ed3748fd..5f95b0aeeeb141e363577c41505434129970dc15 100644
 --- a/apps/stage-tamagotchi/src/renderer/App.vue
@@ -673,6 +792,89 @@ index 1a37d6257837c74bcc5b8e120614cdc3ac1f02a3..62c8ba801f7aeb5db49078752ed45f5a
    {
      title: t('settings.pages.system.developer.title'),
      description: t('settings.pages.system.developer.description'),
+diff --git a/apps/stage-tamagotchi/src/renderer/pages/settings/system/local-broadcast.vue b/apps/stage-tamagotchi/src/renderer/pages/settings/system/local-broadcast.vue
+new file mode 100644
+index 0000000000000000000000000000000000000000..e168eb4db3fef7a144bb914dd21cd7f63bf2e8f3
+--- /dev/null
++++ b/apps/stage-tamagotchi/src/renderer/pages/settings/system/local-broadcast.vue
+@@ -0,0 +1,77 @@
++<script setup lang="ts">
++import type { BroadcastSettingsChannelEvent } from '@proj-airi/stage-ui/stores/broadcast-director'
++
++import {
++  BROADCAST_SETTINGS_CHANNEL_NAME,
++  loadBroadcastSettings,
++  normalizeBroadcastSettings,
++  saveBroadcastSettings,
++} from '@proj-airi/stage-ui/stores/broadcast-director'
++import { useBroadcastChannel } from '@vueuse/core'
++import { computed, onMounted, onUnmounted, ref } from 'vue'
++import { useI18n } from 'vue-i18n'
++
++const { t } = useI18n()
++const tt = (key: string, named?: Record<string, number>) => named
++  ? t(`tamagotchi.settings.pages.system.local-broadcast.${key}`, named)
++  : t(`tamagotchi.settings.pages.system.local-broadcast.${key}`)
++const settings = ref(loadBroadcastSettings())
++const status = computed(() => settings.value.enabled ? tt('status.armed') : tt('status.disabled'))
++const { post } = useBroadcastChannel<BroadcastSettingsChannelEvent, BroadcastSettingsChannelEvent>({ name: BROADCAST_SETTINGS_CHANNEL_NAME })
++const postActivity = () => post({ type: 'user-activity' })
++
++function apply() {
++  // Preserve a 90–180 second first-idle range when the UI changes the lower
++  // bound, rather than accidentally combining it with an old short jitter.
++  settings.value.minDelayMs = 0
++  settings.value.maxDelayMs = Math.max(0, 180_000 - settings.value.idleMs)
++  settings.value.cooldownMaxMs = Math.max(settings.value.cooldownMs, 480_000)
++  settings.value = normalizeBroadcastSettings(settings.value)
++  saveBroadcastSettings(settings.value)
++  post({ type: 'settings-changed', settings: settings.value })
++}
++
++onMounted(() => {
++  globalThis.addEventListener('pointerdown', postActivity, { capture: true })
++  globalThis.addEventListener('keydown', postActivity, { capture: true })
++  globalThis.addEventListener('focus', postActivity, { capture: true })
++})
++onUnmounted(() => {
++  globalThis.removeEventListener('pointerdown', postActivity, { capture: true })
++  globalThis.removeEventListener('keydown', postActivity, { capture: true })
++  globalThis.removeEventListener('focus', postActivity, { capture: true })
++})
++</script>
++
++<template>
++  <section class="flex flex-col gap-5 rounded-lg bg-neutral-50 p-5 dark:bg-neutral-800">
++    <div class="flex items-start justify-between gap-4">
++      <div>
++        <h2 class="text-sm text-neutral-900 font-medium dark:text-neutral-50">{{ tt('title') }}</h2>
++        <p class="mt-1 text-xs text-neutral-500 leading-relaxed dark:text-neutral-400">{{ tt('description') }}</p>
++      </div>
++      <span class="rounded-full bg-neutral-200 px-2 py-1 text-xs dark:bg-neutral-700">{{ status }}</span>
++    </div>
++    <label class="flex items-center justify-between gap-3 text-sm">
++      <span>{{ tt('enabled') }}</span>
++      <input v-model="settings.enabled" type="checkbox" @change="apply">
++    </label>
++    <label class="flex flex-col gap-2 text-sm">
++      <span>{{ tt('idle', { seconds: Math.round(settings.idleMs / 1000) }) }}</span>
++      <input v-model.number="settings.idleMs" type="range" min="90000" max="180000" step="1000" @change="apply">
++    </label>
++    <label class="flex flex-col gap-2 text-sm">
++      <span>{{ tt('cooldown', { seconds: Math.round(settings.cooldownMs / 1000) }) }}</span>
++      <input v-model.number="settings.cooldownMs" type="range" min="180000" max="480000" step="1000" @change="apply">
++    </label>
++  </section>
++</template>
++
++<route lang="yaml">
++meta:
++  layout: settings
++  titleKey: tamagotchi.settings.pages.system.local-broadcast.title
++  subtitleKey: settings.title
++  stageTransition:
++    name: slide
++</route>
 diff --git a/apps/stage-tamagotchi/src/renderer/stores/chat-sync.test.ts b/apps/stage-tamagotchi/src/renderer/stores/chat-sync.test.ts
 index a50e16dae17128687d7eb73c7abb564406bb9932..41c088d9a8ca1a3ea2262b4f3850d4f36cd2c56d 100644
 --- a/apps/stage-tamagotchi/src/renderer/stores/chat-sync.test.ts
@@ -1092,6 +1294,181 @@ index dade97294a7b51778877de0e8c49cb0a64a6a628..d37c4f4901f46d8fd09a0cc98ab14e25
      requestRetry,
      requestToolCallRerun,
      requestCleanup,
+diff --git a/apps/stage-tamagotchi/src/shared/voice-input-runtime.test.ts b/apps/stage-tamagotchi/src/shared/voice-input-runtime.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..51294d6e7239d850755c9145fe5d1ae144d725c2
+--- /dev/null
++++ b/apps/stage-tamagotchi/src/shared/voice-input-runtime.test.ts
+@@ -0,0 +1,59 @@
++import { describe, expect, it } from 'vitest'
++import { createInitialLastCapture, createVoiceInputRuntimeSnapshot, isExactLoopbackServerUrl, markLastCapture, readMicrophonePermissionPassive } from './voice-input-runtime'
++
++describe('local voice status privacy helpers', () => {
++  it('only permits exact plaintext loopback URLs', () => {
++    expect(isExactLoopbackServerUrl('ws://127.0.0.1:6121/ws')).toBe(true)
++    expect(isExactLoopbackServerUrl('ws://localhost:6121/ws')).toBe(true)
++    expect(isExactLoopbackServerUrl('wss://127.0.0.1:6121/ws')).toBe(false)
++    expect(isExactLoopbackServerUrl('ws://192.168.0.2:6121/ws')).toBe(false)
++  })
++  it('fails permission reads closed without asking for permission', async () => {
++    expect(await readMicrophonePermissionPassive(undefined)).toBe('unavailable')
++    expect(await readMicrophonePermissionPassive({ query: async () => ({ state: 'granted' }) } as any)).toBe('granted')
++  })
++  it('maps non-content capture outcomes', () => {
++    expect(createInitialLastCapture()).toEqual({ outcome: 'none', atMs: null })
++    expect(markLastCapture('transcription-empty', 4)).toEqual({ outcome: 'transcription-empty', atMs: 4 })
++  })
++  it('copies only the exact public snapshot keys', () => {
++    const snapshot = createVoiceInputRuntimeSnapshot({
++      stageMounted: true,
++      voiceInputEnabled: true,
++      providerConfigured: true,
++      recording: false,
++      transcribing: false,
++      vad: {
++        active: true,
++        listening: true,
++        inputLive: true,
++        inputEnabled: true,
++        inputMuted: false,
++        isSpeech: true,
++        score: Infinity,
++        threshold: -1,
++        recentMax: 1,
++        recentSamples: [-1, 0.5, 2, Number.NaN, 'drop'],
++        text: 'drop',
++      } as any,
++      microphonePermission: 'granted',
++      lastCapture: { outcome: 'capture-started', atMs: 4, deviceLabel: 'drop' } as any,
++      transcript: 'drop',
++    } as any)
++    expect(Object.keys(snapshot).sort()).toEqual([
++      'lastCapture', 'microphonePermission', 'providerConfigured', 'recording',
++      'stageMounted', 'transcribing', 'vad', 'voiceInputEnabled',
++    ])
++    expect(Object.keys(snapshot.vad).sort()).toEqual([
++      'active', 'inputEnabled', 'inputLive', 'inputMuted', 'isSpeech', 'listening',
++      'recentMax', 'recentSamples', 'score', 'threshold',
++    ])
++    expect(Object.keys(snapshot.lastCapture).sort()).toEqual(['atMs', 'outcome'])
++    expect(JSON.stringify(snapshot)).not.toContain('drop')
++    expect(snapshot.vad.score).toBe(0)
++    expect(snapshot.vad.threshold).toBe(0)
++    expect(snapshot.vad.recentSamples).toEqual([0, 0.5, 1, 0, 0])
++    expect(snapshot.vad.recentSamples.every(value => Number.isFinite(value) && value >= 0 && value <= 1)).toBe(true)
++    expect(snapshot.vad.recentMax).toBe(1)
++  })
++})
+diff --git a/apps/stage-tamagotchi/src/shared/voice-input-runtime.ts b/apps/stage-tamagotchi/src/shared/voice-input-runtime.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..ebd17810e2ac9c3ee4c067c76cea8aac6555940d
+--- /dev/null
++++ b/apps/stage-tamagotchi/src/shared/voice-input-runtime.ts
+@@ -0,0 +1,104 @@
++/** Content-free, passive voice-input status contract. */
++export type MicrophonePermission = 'granted' | 'denied' | 'prompt' | 'unavailable'
++export type VoiceCaptureOutcome = 'none' | 'capture-started' | 'capture-skipped' | 'transcription-started' | 'transcription-accepted' | 'transcription-empty' | 'transcription-error' | 'permission-denied' | 'stream-unavailable'
++
++export interface LocalVoiceStatusSnapshot {
++  stageMounted: boolean
++  voiceInputEnabled: boolean
++  providerConfigured: boolean
++  recording: boolean
++  transcribing: boolean
++  vad: {
++    active: boolean
++    listening: boolean
++    inputLive: boolean
++    inputEnabled: boolean
++    inputMuted: boolean
++    isSpeech: boolean
++    score: number
++    threshold: number
++    recentMax: number
++    recentSamples: number[]
++  }
++  microphonePermission: MicrophonePermission
++  lastCapture: { outcome: VoiceCaptureOutcome, atMs: number | null }
++}
++
++export const LOCAL_VOICE_STATUS_REQUEST = 'input:local:voice-status:request'
++export const LOCAL_VOICE_STATUS_RESPONSE = 'output:local:voice-status:response'
++
++export function createInitialLastCapture() {
++  return { outcome: 'none' as VoiceCaptureOutcome, atMs: null as number | null }
++}
++
++export function markLastCapture(outcome: VoiceCaptureOutcome, atMs = Date.now()) {
++  return { outcome, atMs }
++}
++
++const MAX_VAD_RECENT_SAMPLES = 50
++
++/** Limits diagnostic VAD values to finite probabilities, never raw audio data. */
++function normalizeVadProbability(value: unknown) {
++  return typeof value === 'number' && Number.isFinite(value)
++    ? Math.min(1, Math.max(0, value))
++    : 0
++}
++
++function normalizeVadRecentSamples(value: unknown) {
++  if (!Array.isArray(value))
++    return []
++  return value.slice(-MAX_VAD_RECENT_SAMPLES).map(normalizeVadProbability)
++}
++
++/** Copy only the public diagnostic contract, dropping any renderer-owned data. */
++export function createVoiceInputRuntimeSnapshot(value: LocalVoiceStatusSnapshot): LocalVoiceStatusSnapshot {
++  return {
++    stageMounted: value.stageMounted,
++    voiceInputEnabled: value.voiceInputEnabled,
++    providerConfigured: value.providerConfigured,
++    recording: value.recording,
++    transcribing: value.transcribing,
++    vad: (() => {
++      const recentSamples = normalizeVadRecentSamples(value.vad.recentSamples)
++      return {
++        active: Boolean(value.vad.active),
++        listening: Boolean(value.vad.listening),
++        inputLive: Boolean(value.vad.inputLive),
++        inputEnabled: Boolean(value.vad.inputEnabled),
++        inputMuted: Boolean(value.vad.inputMuted),
++        isSpeech: Boolean(value.vad.isSpeech),
++        score: normalizeVadProbability(value.vad.score),
++        threshold: normalizeVadProbability(value.vad.threshold),
++        recentMax: recentSamples.reduce((max, sample) => Math.max(max, sample), 0),
++        recentSamples,
++      }
++    })(),
++    microphonePermission: value.microphonePermission,
++    lastCapture: { outcome: value.lastCapture.outcome, atMs: value.lastCapture.atMs },
++  }
++}
++
++/** Exact loopback only: no TLS, aliases, ports-by-proxy, or LAN addresses. */
++export function isExactLoopbackServerUrl(value: string | undefined) {
++  if (!value)
++    return false
++  try {
++    const url = new URL(value)
++    return url.protocol === 'ws:' && (url.hostname === '127.0.0.1' || url.hostname === 'localhost' || url.hostname === '[::1]' || url.hostname === '::1')
++  }
++  catch {
++    return false
++  }
++}
++
++export async function readMicrophonePermissionPassive(permissions: Pick<Permissions, 'query'> | undefined): Promise<MicrophonePermission> {
++  if (!permissions)
++    return 'unavailable'
++  try {
++    const result = await permissions.query({ name: 'microphone' as PermissionName })
++    return result.state === 'granted' || result.state === 'denied' || result.state === 'prompt' ? result.state : 'unavailable'
++  }
++  catch {
++    return 'unavailable'
++  }
++}
 diff --git a/apps/stage-web/src/pages/index.vue b/apps/stage-web/src/pages/index.vue
 index 920de1934e22c42c59b1fa9fc1b18fde079875ca..e06da6a384d4e40b6ff0bc97051386de4e5f77ff 100644
 --- a/apps/stage-web/src/pages/index.vue
@@ -1105,6 +1482,52 @@ index 920de1934e22c42c59b1fa9fc1b18fde079875ca..e06da6a384d4e40b6ff0bc97051386de
        }
        catch (err) {
          console.error('Failed to send chat from voice:', err)
+diff --git a/packages/core-agent/src/contracts/hook-types.ts b/packages/core-agent/src/contracts/hook-types.ts
+index 07ac59b96fba784883c41f186221dedb3068b289..bd4e6ee6bcd80baa9597ec01b1003a05bd004aad 100644
+--- a/packages/core-agent/src/contracts/hook-types.ts
++++ b/packages/core-agent/src/contracts/hook-types.ts
+@@ -2,6 +2,8 @@ import type { ToolMessage } from '@xsai/shared-chat'
+ 
+ import type { ChatStreamEventContext, StreamingAssistantMessage } from '../types/chat'
+ 
++export type ChatCancellationReason = 'superseded'
++
+ export interface ChatHookRegistry {
+   onBeforeMessageComposed: (cb: (message: string, context: Omit<ChatStreamEventContext, 'composedMessage'>) => Promise<void>) => () => void
+   onAfterMessageComposed: (cb: (message: string, context: ChatStreamEventContext) => Promise<void>) => () => void
+@@ -13,6 +15,8 @@ export interface ChatHookRegistry {
+   onAssistantResponseEnd: (cb: (message: string, context: ChatStreamEventContext) => Promise<void>) => () => void
+   onAssistantMessage: (cb: (message: StreamingAssistantMessage, messageText: string, context: ChatStreamEventContext) => Promise<void>) => () => void
+   onChatTurnComplete: (cb: (chat: { output: StreamingAssistantMessage, outputText: string, toolCalls: ToolMessage[] }, context: ChatStreamEventContext) => Promise<void>) => () => void
++  /** Synchronous, best-effort notification emitted before a superseding abort. */
++  onChatRoundCancelled: (cb: (context: ChatStreamEventContext, reason: ChatCancellationReason) => void) => () => void
+   emitBeforeMessageComposedHooks: (message: string, context: Omit<ChatStreamEventContext, 'composedMessage'>) => Promise<void>
+   emitAfterMessageComposedHooks: (message: string, context: ChatStreamEventContext) => Promise<void>
+   emitBeforeSendHooks: (message: string, context: ChatStreamEventContext) => Promise<void>
+@@ -23,6 +27,8 @@ export interface ChatHookRegistry {
+   emitAssistantResponseEndHooks: (message: string, context: ChatStreamEventContext) => Promise<void>
+   emitAssistantMessageHooks: (message: StreamingAssistantMessage, messageText: string, context: ChatStreamEventContext) => Promise<void>
+   emitChatTurnCompleteHooks: (chat: { output: StreamingAssistantMessage, outputText: string, toolCalls: ToolMessage[] }, context: ChatStreamEventContext) => Promise<void>
++  /** Synchronous and error-isolated so cancellation cannot be delayed by observers. */
++  emitChatRoundCancelledHooks: (context: ChatStreamEventContext, reason: ChatCancellationReason) => void
+   clearHooks: () => void
+ }
+ export interface HookUnsubscribe {
+@@ -40,6 +46,7 @@ export interface AgentHookRegistry<TContext, TAssistantMessage, TToolCall> {
+   onAssistantResponseEnd: (cb: (message: string, context: TContext) => Promise<void>) => HookUnsubscribe
+   onAssistantMessage: (cb: (message: TAssistantMessage, messageText: string, context: TContext) => Promise<void>) => HookUnsubscribe
+   onChatTurnComplete: (cb: (chat: { output: TAssistantMessage, outputText: string, toolCalls: TToolCall[] }, context: TContext) => Promise<void>) => HookUnsubscribe
++  onChatRoundCancelled: (cb: (context: TContext, reason: ChatCancellationReason) => void) => HookUnsubscribe
+ 
+   emitBeforeMessageComposedHooks: (message: string, context: Omit<TContext, 'composedMessage'>) => Promise<void>
+   emitAfterMessageComposedHooks: (message: string, context: TContext) => Promise<void>
+@@ -51,5 +58,6 @@ export interface AgentHookRegistry<TContext, TAssistantMessage, TToolCall> {
+   emitAssistantResponseEndHooks: (message: string, context: TContext) => Promise<void>
+   emitAssistantMessageHooks: (message: TAssistantMessage, messageText: string, context: TContext) => Promise<void>
+   emitChatTurnCompleteHooks: (chat: { output: TAssistantMessage, outputText: string, toolCalls: TToolCall[] }, context: TContext) => Promise<void>
++  emitChatRoundCancelledHooks: (context: TContext, reason: ChatCancellationReason) => void
+   clearHooks: () => void
+ }
 diff --git a/packages/core-agent/src/index.ts b/packages/core-agent/src/index.ts
 index bc07bde96868d773c5af5da5e87f7aa8efa16e4f..70b3b38d0f3b2968c708ada2a8a56d95a7b82b76 100644
 --- a/packages/core-agent/src/index.ts
@@ -1117,8 +1540,127 @@ index bc07bde96868d773c5af5da5e87f7aa8efa16e4f..70b3b38d0f3b2968c708ada2a8a56d95
    ChatOrchestratorRuntime,
    ChatOrchestratorRuntimeDeps,
    ChatOrchestratorRuntimeState,
+diff --git a/packages/core-agent/src/runtime/agent-hooks.ts b/packages/core-agent/src/runtime/agent-hooks.ts
+index 4264e2d2930a23817f72e25406354eced5188dbe..5787f470753a724dab1fa6f44ebb3021cbfe1d77 100644
+--- a/packages/core-agent/src/runtime/agent-hooks.ts
++++ b/packages/core-agent/src/runtime/agent-hooks.ts
+@@ -1,6 +1,6 @@
+ import type { ToolMessage } from '@xsai/shared-chat'
+ 
+-import type { AgentHookRegistry, ChatHookRegistry } from '../contracts/hook-types'
++import type { AgentHookRegistry, ChatCancellationReason, ChatHookRegistry } from '../contracts/hook-types'
+ import type { ChatStreamEventContext, StreamingAssistantMessage } from '../types/chat'
+ 
+ export function createChatHooks(): ChatHookRegistry {
+@@ -14,6 +14,7 @@ export function createChatHooks(): ChatHookRegistry {
+   const onAssistantResponseEndHooks: Array<(message: string, context: ChatStreamEventContext) => Promise<void>> = []
+   const onAssistantMessageHooks: Array<(message: StreamingAssistantMessage, messageText: string, context: ChatStreamEventContext) => Promise<void>> = []
+   const onChatTurnCompleteHooks: Array<(chat: { output: StreamingAssistantMessage, outputText: string, toolCalls: ToolMessage[] }, context: ChatStreamEventContext) => Promise<void>> = []
++  const onChatRoundCancelledHooks: Array<(context: ChatStreamEventContext, reason: ChatCancellationReason) => void> = []
+ 
+   function onBeforeMessageComposed(cb: (message: string, context: Omit<ChatStreamEventContext, 'composedMessage'>) => Promise<void>) {
+     onBeforeMessageComposedHooks.push(cb)
+@@ -105,6 +106,15 @@ export function createChatHooks(): ChatHookRegistry {
+     }
+   }
+ 
++  function onChatRoundCancelled(cb: (context: ChatStreamEventContext, reason: ChatCancellationReason) => void) {
++    onChatRoundCancelledHooks.push(cb)
++    return () => {
++      const index = onChatRoundCancelledHooks.indexOf(cb)
++      if (index >= 0)
++        onChatRoundCancelledHooks.splice(index, 1)
++    }
++  }
++
+   function clearHooks() {
+     onBeforeMessageComposedHooks.length = 0
+     onAfterMessageComposedHooks.length = 0
+@@ -116,6 +126,7 @@ export function createChatHooks(): ChatHookRegistry {
+     onAssistantResponseEndHooks.length = 0
+     onAssistantMessageHooks.length = 0
+     onChatTurnCompleteHooks.length = 0
++    onChatRoundCancelledHooks.length = 0
+   }
+ 
+   async function emitBeforeMessageComposedHooks(message: string, context: Omit<ChatStreamEventContext, 'composedMessage'>) {
+@@ -168,6 +179,17 @@ export function createChatHooks(): ChatHookRegistry {
+       await hook(chat, context)
+   }
+ 
++  function emitChatRoundCancelledHooks(context: ChatStreamEventContext, reason: ChatCancellationReason) {
++    for (const hook of onChatRoundCancelledHooks) {
++      try {
++        hook(context, reason)
++      }
++      catch (error) {
++        console.error('Error in chat cancellation hook:', error)
++      }
++    }
++  }
++
+   return {
+     onBeforeMessageComposed,
+     onAfterMessageComposed,
+@@ -179,6 +201,7 @@ export function createChatHooks(): ChatHookRegistry {
+     onAssistantResponseEnd,
+     onAssistantMessage,
+     onChatTurnComplete,
++    onChatRoundCancelled,
+     emitBeforeMessageComposedHooks,
+     emitAfterMessageComposedHooks,
+     emitBeforeSendHooks,
+@@ -189,6 +212,7 @@ export function createChatHooks(): ChatHookRegistry {
+     emitAssistantResponseEndHooks,
+     emitAssistantMessageHooks,
+     emitChatTurnCompleteHooks,
++    emitChatRoundCancelledHooks,
+     clearHooks,
+   }
+ }
+@@ -204,6 +228,7 @@ export function createAgentHooks<TContext, TAssistantMessage, TToolCall>(): Agen
+   const onAssistantResponseEndHooks: Array<(message: string, context: TContext) => Promise<void>> = []
+   const onAssistantMessageHooks: Array<(message: TAssistantMessage, messageText: string, context: TContext) => Promise<void>> = []
+   const onChatTurnCompleteHooks: Array<(chat: { output: TAssistantMessage, outputText: string, toolCalls: TToolCall[] }, context: TContext) => Promise<void>> = []
++  const onChatRoundCancelledHooks: Array<(context: TContext, reason: ChatCancellationReason) => void> = []
+ 
+   function createSubscribe<T>(bucket: T[], cb: T) {
+     bucket.push(cb)
+@@ -225,6 +250,7 @@ export function createAgentHooks<TContext, TAssistantMessage, TToolCall>(): Agen
+     onAssistantResponseEndHooks.length = 0
+     onAssistantMessageHooks.length = 0
+     onChatTurnCompleteHooks.length = 0
++    onChatRoundCancelledHooks.length = 0
+   }
+ 
+   async function emitHooks<T extends any[]>(hooks: Array<(...args: T) => Promise<void>>, ...args: T) {
+@@ -243,6 +269,7 @@ export function createAgentHooks<TContext, TAssistantMessage, TToolCall>(): Agen
+     onAssistantResponseEnd: cb => createSubscribe(onAssistantResponseEndHooks, cb),
+     onAssistantMessage: cb => createSubscribe(onAssistantMessageHooks, cb),
+     onChatTurnComplete: cb => createSubscribe(onChatTurnCompleteHooks, cb),
++    onChatRoundCancelled: cb => createSubscribe(onChatRoundCancelledHooks, cb),
+ 
+     emitBeforeMessageComposedHooks: (message, context) => emitHooks(onBeforeMessageComposedHooks, message, context),
+     emitAfterMessageComposedHooks: (message, context) => emitHooks(onAfterMessageComposedHooks, message, context),
+@@ -254,6 +281,16 @@ export function createAgentHooks<TContext, TAssistantMessage, TToolCall>(): Agen
+     emitAssistantResponseEndHooks: (message, context) => emitHooks(onAssistantResponseEndHooks, message, context),
+     emitAssistantMessageHooks: (message, messageText, context) => emitHooks(onAssistantMessageHooks, message, messageText, context),
+     emitChatTurnCompleteHooks: (chat, context) => emitHooks(onChatTurnCompleteHooks, chat, context),
++    emitChatRoundCancelledHooks: (context, reason) => {
++      for (const hook of onChatRoundCancelledHooks) {
++        try {
++          hook(context, reason)
++        }
++        catch (error) {
++          console.error('Error in chat cancellation hook:', error)
++        }
++      }
++    },
+     clearHooks,
+   }
+ }
 diff --git a/packages/core-agent/src/runtime/chat-orchestrator-runtime.test.ts b/packages/core-agent/src/runtime/chat-orchestrator-runtime.test.ts
-index 30f483c47a320f0ddaeb127927bb55cfea95705f..1c7556966b2ff17bb5287e0b7ebeffd5e56e2ae7 100644
+index 30f483c47a320f0ddaeb127927bb55cfea95705f..7f61795bda2b110e99ddf08e6171c256dcf3f1f8 100644
 --- a/packages/core-agent/src/runtime/chat-orchestrator-runtime.test.ts
 +++ b/packages/core-agent/src/runtime/chat-orchestrator-runtime.test.ts
 @@ -50,7 +50,7 @@ function createHarness() {
@@ -1344,7 +1886,7 @@ index 30f483c47a320f0ddaeb127927bb55cfea95705f..1c7556966b2ff17bb5287e0b7ebeffd5
    /**
     * @example
     * Hook order and prompt composition stay compatible with the stage-ui facade.
-@@ -520,6 +727,109 @@ describe('createChatOrchestratorRuntime', () => {
+@@ -520,6 +727,183 @@ describe('createChatOrchestratorRuntime', () => {
      await firstSend
    })
  
@@ -1410,6 +1952,80 @@ index 30f483c47a320f0ddaeb127927bb55cfea95705f..1c7556966b2ff17bb5287e0b7ebeffd5
 +    expect(harness.stream).toHaveBeenCalledTimes(2)
 +  })
 +
++  it('notifies a superseded round exactly once with its original context before aborting', async () => {
++    const harness = createHarness()
++    let firstSignal: AbortSignal | undefined
++    const notifications: Array<{ reason: string, context: unknown, signalWasAborted: boolean }> = []
++    const hookError = vi.spyOn(console, 'error').mockImplementation(() => {})
++    harness.runtime.hooks.onChatRoundCancelled((context, reason) => {
++      notifications.push({ reason, context, signalWasAborted: firstSignal?.aborted ?? true })
++    })
++    harness.runtime.hooks.onChatRoundCancelled(() => {
++      throw new Error('observer failure')
++    })
++    harness.stream.mockImplementationOnce(async (_model, _chatProvider, _messages, options) => {
++      firstSignal = options?.abortSignal
++      await new Promise<void>((_resolve, reject) => {
++        options?.abortSignal?.addEventListener('abort', () => reject(new Error('Aborted')), { once: true })
++      })
++    })
++
++    const first = harness.runtime.ingest('first generation', {
++      model: 'gpt-test',
++      chatProvider: provider,
++      roundId: 'superseded-round',
++      input: { type: 'input:text', data: { text: 'first generation' } },
++    })
++    await vi.waitFor(() => expect(harness.stream).toHaveBeenCalledTimes(1))
++
++    const second = harness.runtime.ingest('replacement', {
++      model: 'gpt-test', chatProvider: provider, supersedeActive: true,
++    })
++    // Repeated cancellation requests do not notify the same active round twice.
++    expect(harness.runtime.cancelActiveRound('session-1', 'superseded-round', 'superseded')).toBe(true)
++
++    await expect(first).resolves.toBeUndefined()
++    await expect(second).resolves.toBeUndefined()
++    expect(notifications).toEqual([
++      expect.objectContaining({
++        reason: 'superseded',
++        signalWasAborted: false,
++        context: expect.objectContaining({
++          roundId: 'superseded-round',
++          input: { type: 'input:text', data: { text: 'first generation' } },
++        }),
++      }),
++    ])
++    expect(hookError).toHaveBeenCalledTimes(1)
++    hookError.mockRestore()
++  })
++
++  it('does not notify cancellation hooks for wrong rounds, manual cancellation, no active round, or normal completion', async () => {
++    const harness = createHarness()
++    const cancelled = vi.fn()
++    harness.runtime.hooks.onChatRoundCancelled(cancelled)
++    let release: (() => void) | undefined
++    harness.stream.mockImplementationOnce(async () => {
++      await new Promise<void>((resolve) => {
++        release = resolve
++      })
++    })
++
++    const sending = harness.runtime.ingest('manual cancellation', {
++      model: 'gpt-test', chatProvider: provider, roundId: 'manual-round',
++    })
++    await vi.waitFor(() => expect(harness.stream).toHaveBeenCalledTimes(1))
++    expect(harness.runtime.cancelActiveRound('session-1', 'wrong-round', 'superseded')).toBe(false)
++    expect(harness.runtime.cancelActiveRound('session-1', 'manual-round')).toBe(true)
++    release?.()
++    await sending
++    expect(harness.runtime.cancelActiveRound('session-1', undefined, 'superseded')).toBe(false)
++    expect(cancelled).not.toHaveBeenCalled()
++
++    await harness.runtime.ingest('normal completion', { model: 'gpt-test', chatProvider: provider })
++    expect(cancelled).not.toHaveBeenCalled()
++  })
++
 +  it('uses only bounded valid preassigned round IDs in hooks and request correlation', async () => {
 +    const harness = createHarness()
 +    let seenRoundId: string | undefined
@@ -1455,17 +2071,20 @@ index 30f483c47a320f0ddaeb127927bb55cfea95705f..1c7556966b2ff17bb5287e0b7ebeffd5
     * @example
     * A queued send rejects if its captured session generation becomes stale.
 diff --git a/packages/core-agent/src/runtime/chat-orchestrator-runtime.ts b/packages/core-agent/src/runtime/chat-orchestrator-runtime.ts
-index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c16e9e5c1c 100644
+index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..4253a307fd1d21d46ab567eff81ec3dfcd08aec4 100644
 --- a/packages/core-agent/src/runtime/chat-orchestrator-runtime.ts
 +++ b/packages/core-agent/src/runtime/chat-orchestrator-runtime.ts
-@@ -1,5 +1,5 @@
+@@ -1,7 +1,8 @@
  import type { ChatProvider } from '@xsai-ext/providers/utils'
 -import type { CommonContentPart, Message, ToolMessage } from '@xsai/shared-chat'
 +import type { AssistantMessage, CommonContentPart, Message, SystemMessage, ToolMessage, UserMessage } from '@xsai/shared-chat'
  
  import type { AgentContextPort } from '../contracts/context-port'
++import type { ChatCancellationReason } from '../contracts/hook-types'
  import type { AgentForegroundStreamPort } from '../contracts/stream-port'
-@@ -14,7 +14,14 @@ import { createChatHooks } from './agent-hooks'
+ import type { ChatAssistantMessage, ChatHistoryItem, ChatSlices, ChatStreamEventContext, ContextMessage, StreamingAssistantMessage } from '../types/chat'
+ import type { LlmUsage, StreamEvent, StreamOptions } from '../types/llm'
+@@ -14,7 +15,14 @@ import { createChatHooks } from './agent-hooks'
  import { useLlmmarkerParser } from './llm-marker-parser'
  import { categorizeResponse, createStreamingCategorizer } from './response-categoriser'
  
@@ -1481,7 +2100,7 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
  
  function prependTextToContent<T extends { content?: unknown }>(msg: T, text: string): T {
    const content = msg.content
-@@ -60,6 +67,28 @@ export interface ChatOrchestratorSendOptions {
+@@ -60,6 +68,28 @@ export interface ChatOrchestratorSendOptions {
    tools?: StreamOptions['tools']
    /** Original transport input metadata used by bridge/devtools observers. */
    input?: ChatStreamEventContext['input']
@@ -1510,19 +2129,21 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
  }
  
  interface QueuedSend {
-@@ -74,6 +103,11 @@ interface QueuedSend {
+@@ -74,6 +104,13 @@ interface QueuedSend {
    }
  }
  
 +interface ActiveRound {
 +  controller: AbortController
 +  roundId: string
++  context: ChatStreamEventContext
++  cancelNotified: boolean
 +}
 +
  /**
   * Serializable view of a queued send waiting to be processed.
   */
-@@ -308,8 +342,12 @@ export interface ChatOrchestratorRuntimeDeps {
+@@ -308,8 +345,12 @@ export interface ChatOrchestratorRuntimeDeps {
  export interface ChatOrchestratorRuntime {
    /** Enqueues a user send for the target session, preserving FIFO order. */
    ingest: (sendingMessage: string, options: ChatOrchestratorSendOptions, targetSessionId?: string) => Promise<void>
@@ -1531,11 +2152,11 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
    /** Rejects queued sends that have not started yet. */
    cancelPendingSends: (sessionId?: string) => void
 +  /** Cancels the active generation for one session, optionally matching a round. */
-+  cancelActiveRound: (conversationId: string, roundId?: string) => boolean
++  cancelActiveRound: (conversationId: string, roundId?: string, reason?: ChatCancellationReason) => boolean
    /** Returns serializable snapshots of currently queued sends. */
    getPendingQueuedSendSnapshot: () => QueuedSendSnapshot[]
    /** Returns the current queued send count. */
-@@ -326,6 +364,16 @@ function defaultCreateId() {
+@@ -326,6 +367,16 @@ function defaultCreateId() {
    return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
  }
  
@@ -1552,7 +2173,7 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
  /**
   * Creates the core chat orchestrator runtime used behind UI facades.
   *
-@@ -349,6 +397,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+@@ -349,6 +400,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
  
    let sending = false
    let pendingQueuedSends: QueuedSend[] = []
@@ -1560,7 +2181,7 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
  
    function emitStateChange() {
      deps.onStateChange?.({
-@@ -386,23 +435,62 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+@@ -386,23 +438,62 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
      }
    }
  
@@ -1630,7 +2251,7 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
      })
    }
  
-@@ -433,8 +521,13 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+@@ -433,8 +524,13 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
  
      const sendingCreatedAt = now()
  
@@ -1644,7 +2265,7 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
        message: { role: 'user', content: sendingMessage, createdAt: sendingCreatedAt, id: createId() },
        contexts: deps.context.snapshot(),
        composedMessage: [],
-@@ -451,10 +544,13 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+@@ -451,10 +547,13 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
      })
  
      const isStaleGeneration = () => deps.session.getSessionGeneration(sessionId) !== generation
@@ -1653,14 +2274,14 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
 +    if (isStaleGeneration())
        return
  
-+    const activeRound: ActiveRound = { controller: new AbortController(), roundId }
++    const activeRound: ActiveRound = { controller: new AbortController(), roundId, context: streamingMessageContext, cancelNotified: false }
 +    activeRounds.set(sessionId, activeRound)
 +    const shouldAbort = () => isStaleGeneration() || activeRound.controller.signal.aborted
 +
      setSending(true)
  
      const buildingMessage: StreamingAssistantMessage = {
-@@ -470,7 +566,6 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+@@ -470,7 +569,6 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
      const activeProvider = deps.getActiveProvider?.() ?? ''
      // The user message is the durable start of a round, so its ID also serves
      // as the correlation key for every telemetry milestone emitted by it.
@@ -1668,7 +2289,7 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
      const correlation: ChatRoundCorrelation = {
        conversationId: sessionId,
        roundId,
-@@ -701,6 +796,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+@@ -701,6 +799,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
        })
  
        await deps.llm.stream(options.model, options.chatProvider, newMessages as Message[], {
@@ -1676,7 +2297,7 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
          headers,
          requestCorrelation: {
            conversationId: correlation.conversationId,
-@@ -710,6 +806,8 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+@@ -710,6 +809,8 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
          waitForTools: true,
          captureToolErrors: true,
          onUsage: (usage) => {
@@ -1685,7 +2306,7 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
            generationUsage = usage
            deps.onLlmGeneration?.({
              ...correlation,
-@@ -722,6 +820,8 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+@@ -722,6 +823,8 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
            })
          },
          onStreamEvent: async (event: StreamEvent) => {
@@ -1694,7 +2315,7 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
            switch (event.type) {
              case 'tool-call':
                toolCallQueue.enqueue({
-@@ -784,14 +884,19 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+@@ -784,14 +887,19 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
          },
        })
  
@@ -1715,7 +2336,7 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
          const finalAssistant = buildingMessage
          deps.session.appendSessionMessage(sessionId, finalAssistant)
          deps.onAssistantMessageAppended?.({
-@@ -802,15 +907,25 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+@@ -802,15 +910,25 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
        }
  
        await hooks.emitStreamEndHooks(streamingMessageContext)
@@ -1741,7 +2362,7 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
  
        deps.onAssistantTurnReady?.({
          messageText: fullText,
-@@ -840,6 +955,9 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+@@ -840,6 +958,9 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
        }
      }
      catch (error) {
@@ -1751,7 +2372,7 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
        console.error('Error sending message:', error)
        deps.onMessageRoundFailed?.({
          ...correlation,
-@@ -862,6 +980,99 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+@@ -862,6 +983,99 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
        throw error
      }
      finally {
@@ -1775,10 +2396,6 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
 +    deps.session.ensureSession(sessionId)
 +    const generation = deps.session.getSessionGeneration(sessionId)
 +    const roundId = isValidRoundId(options.roundId) ? options.roundId : createId()
-+    const activeRound: ActiveRound = { controller: new AbortController(), roundId }
-+    activeRounds.set(sessionId, activeRound)
-+    const shouldAbort = () => deps.session.getSessionGeneration(sessionId) !== generation || activeRound.controller.signal.aborted
-+    setSending(true)
 +    const createdAt = now()
 +    const message: StreamingAssistantMessage = {
 +      role: 'assistant', content: '', slices: [], tool_results: [], createdAt, id: createId(), origin: 'local-proactive', localOnly: true,
@@ -1789,6 +2406,10 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
 +      message: { role: 'system', content: options.intent, createdAt, id: createId() },
 +      contexts: includeRuntimeContext ? deps.context.snapshot() : {}, composedMessage: [],
 +    }
++    const activeRound: ActiveRound = { controller: new AbortController(), roundId, context, cancelNotified: false }
++    activeRounds.set(sessionId, activeRound)
++    const shouldAbort = () => deps.session.getSessionGeneration(sessionId) !== generation || activeRound.controller.signal.aborted
++    setSending(true)
 +    try {
 +      if (includeRuntimeContext)
 +        ingestRuntimeContexts()
@@ -1851,19 +2472,19 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
        setSending(false)
        deps.onSendSettled?.({ sessionId })
      }
-@@ -909,6 +1120,11 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+@@ -909,6 +1123,11 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
      const sessionId = targetSessionId || deps.getActiveSessionId()
      const generation = deps.session.getSessionGeneration(sessionId)
  
 +    // Background/context producers retain FIFO behavior. User-facing input may
 +    // explicitly supersede only the active generation in its own session.
 +    if (options.supersedeActive)
-+      cancelActiveRound(sessionId)
++      cancelActiveRound(sessionId, undefined, 'superseded')
 +
      return new Promise<void>((resolve, reject) => {
        sendQueue.enqueue({
          sendingMessage,
-@@ -935,6 +1151,19 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+@@ -935,6 +1154,23 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
      emitStateChange()
    }
  
@@ -1871,11 +2492,15 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
 +    return performProactive(options, targetSessionId || deps.getActiveSessionId())
 +  }
 +
-+  function cancelActiveRound(conversationId: string, roundId?: string) {
++  function cancelActiveRound(conversationId: string, roundId?: string, reason?: ChatCancellationReason) {
 +    const activeRound = activeRounds.get(conversationId)
 +    if (!activeRound || (roundId && activeRound.roundId !== roundId))
 +      return false
 +
++    if (reason && !activeRound.cancelNotified) {
++      activeRound.cancelNotified = true
++      hooks.emitChatRoundCancelledHooks(activeRound.context, reason)
++    }
 +    activeRound.controller.abort()
 +    return true
 +  }
@@ -1883,7 +2508,7 @@ index 55ae4f3dd4eceb518f7a63a9864c2e402e361bb9..d26a4676a1446dc0c6c3b7c3cd4d40c1
    function getPendingQueuedSendSnapshot() {
      return pendingQueuedSends.map(queued => ({
        sessionId: queued.sessionId,
-@@ -948,7 +1177,9 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+@@ -948,7 +1184,9 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
  
    return {
      ingest,
@@ -2160,6 +2785,56 @@ index 88e91519c2834b9385aac00272eda0bc9d4e2859..4fa902e2ee2a048b8278cf70dd2ef144
      sections:
        section:
          window-shortcuts:
+diff --git a/packages/i18n/src/locales/prompt-contract.test.ts b/packages/i18n/src/locales/prompt-contract.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..7f8d465172e8bb893ac65dea1e39e8a77a4cd0aa
+--- /dev/null
++++ b/packages/i18n/src/locales/prompt-contract.test.ts
+@@ -0,0 +1,29 @@
++import { describe, expect, it } from 'vitest'
++import englishBase from './en/base.yaml'
++import koreanBase from './ko/base.yaml'
++
++const englishPrefix = (englishBase as { prompt: { prefix: string } }).prompt.prefix
++const koreanPrefix = (koreanBase as { prompt: { prefix: string } }).prompt.prefix
++
++describe('locale prompt contract', () => {
++  it('keeps the Korean prompt focused on the current verified conversation', () => {
++    expect(koreanPrefix).toContain('한국어로 답하고')
++    expect(koreanPrefix).toContain('현재 발화')
++    expect(koreanPrefix).toContain('검증된 검색·도구 결과')
++    expect(koreanPrefix).toContain('보통 1~2문장')
++    expect(koreanPrefix).toContain('사실·실행·기억은 구분해')
++    expect(koreanPrefix).not.toContain('메이플스토리')
++    expect(koreanPrefix).not.toContain('이터널 리턴')
++  })
++
++  it('keeps both locale prompts free of conversational control-token examples', () => {
++    const [korean, english] = [koreanPrefix, englishPrefix]
++
++    for (const prefix of [korean, english]) {
++      expect(prefix).toMatch(/ACT, DELAY,( and)? CALL/)
++      expect(prefix).toContain("<{'|'}NAME payload{'|'}>")
++      expect(prefix).not.toMatch(/<\{'\|'}ACT\s+\{/)
++      expect(prefix).not.toContain('prepared a gift')
++    }
++  })
++})
+diff --git a/packages/i18n/vitest.config.ts b/packages/i18n/vitest.config.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..8ed03c371a62ff9aa6fe67810ca4cd42618e6b04
+--- /dev/null
++++ b/packages/i18n/vitest.config.ts
+@@ -0,0 +1,9 @@
++import Yaml from 'unplugin-yaml/vite'
++import { defineConfig } from 'vitest/config'
++
++export default defineConfig({
++  plugins: [Yaml()],
++  test: {
++    include: ['src/**/*.test.ts'],
++  },
++})
 diff --git a/packages/pipelines-audio/src/managers/playback-manager.test.ts b/packages/pipelines-audio/src/managers/playback-manager.test.ts
 index 230bbc01612966df5a704ef244a394851bbe2e0e..e8e8f16421e978177e4b819b6862a837ba280a75 100644
 --- a/packages/pipelines-audio/src/managers/playback-manager.test.ts
@@ -3269,10 +3944,25 @@ index 77e947e3ec4ace755f074c980c5a2991c77a89aa..6ac4a0b339248746c865285aac72722c
    streamId: string
    priority: number
 diff --git a/packages/plugin-protocol/src/types/events.ts b/packages/plugin-protocol/src/types/events.ts
-index 7949f7f4f02bb49732301cd0040c8e5fd0dd109e..91caabc6795e0d1a53fc1acead282d8fa43a631d 100644
+index 7949f7f4f02bb49732301cd0040c8e5fd0dd109e..dca4501cf92d6bc640c5607b9d57a5c0c58fc108 100644
 --- a/packages/plugin-protocol/src/types/events.ts
 +++ b/packages/plugin-protocol/src/types/events.ts
-@@ -1267,6 +1267,22 @@ export const inputVoice = defineProtocolEventa<WebSocketEventInputVoice>('input:
+@@ -1071,6 +1071,14 @@ type OutputGenAiChatMessageEvent = {
+   message: AssistantMessage
+ } & Partial<WithInputSource<'stage-web' | 'stage-tamagotchi' | 'discord'>> & Partial<WithOutputSource<'gen-ai:chat'>>
+ 
++/**
++ * A generation was replaced by a newer user send. This intentionally carries
++ * no message content or correlation identifiers.
++ */
++export interface OutputGenAiChatCancelledEvent {
++  reason: 'superseded'
++}
++
+ interface OutputGenAiChatUsage {
+   promptTokens: number
+   completionTokens: number
+@@ -1267,9 +1275,26 @@ export const inputVoice = defineProtocolEventa<WebSocketEventInputVoice>('input:
    },
  })
  
@@ -3295,7 +3985,11 @@ index 7949f7f4f02bb49732301cd0040c8e5fd0dd109e..91caabc6795e0d1a53fc1acead282d8f
  export const outputGenAiChatToolCall = defineProtocolEventa<OutputGenAiChatToolCallEvent>('output:gen-ai:chat:tool-call')
  export const outputGenAiChatMessage = defineProtocolEventa<OutputGenAiChatMessageEvent>('output:gen-ai:chat:message')
  export const outputGenAiChatComplete = defineProtocolEventa<OutputGenAiChatCompleteEvent>('output:gen-ai:chat:complete')
-@@ -1453,6 +1469,8 @@ export interface ProtocolEvents<C = undefined> {
++export const outputGenAiChatCancelled = defineProtocolEventa<OutputGenAiChatCancelledEvent>('output:gen-ai:chat:cancelled')
+ 
+ export const sparkNotify = defineProtocolEventa<SparkNotifyEvent>('spark:notify')
+ export const sparkEmit = defineProtocolEventa<SparkEmitEvent>('spark:emit')
+@@ -1453,10 +1478,13 @@ export interface ProtocolEvents<C = undefined> {
    'input:text': WebSocketEventInputText
    'input:text:voice': WebSocketEventInputTextVoice
    'input:voice': WebSocketEventInputVoice
@@ -3304,6 +3998,11 @@ index 7949f7f4f02bb49732301cd0040c8e5fd0dd109e..91caabc6795e0d1a53fc1acead282d8f
  
    'output:gen-ai:chat:tool-call': OutputGenAiChatToolCallEvent
    'output:gen-ai:chat:message': OutputGenAiChatMessageEvent
+   'output:gen-ai:chat:complete': OutputGenAiChatCompleteEvent
++  'output:gen-ai:chat:cancelled': OutputGenAiChatCancelledEvent
+ 
+   /**
+    * Spark used for allowing agents in a network to raise an event toward the other destinations (e.g. character).
 diff --git a/packages/stage-ui/src/components/scenes/Stage.vue b/packages/stage-ui/src/components/scenes/Stage.vue
 index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9d30d89a6 100644
 --- a/packages/stage-ui/src/components/scenes/Stage.vue
@@ -4229,6 +4928,88 @@ index 0f0406869b985d8f6d99a4f42dc6236471c598c5..512ec455c42e55caad622416821b67b8
  
      recording.value = audioBlob
  
+diff --git a/packages/stage-ui/src/composables/audio/pcm-wav.test.ts b/packages/stage-ui/src/composables/audio/pcm-wav.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..e3baf551e91985f2651d39deee7303b13199ad7c
+--- /dev/null
++++ b/packages/stage-ui/src/composables/audio/pcm-wav.test.ts
+@@ -0,0 +1,35 @@
++import { describe, expect, it } from 'vitest'
++
++import { pcmFloat32ToWavBlob } from './pcm-wav'
++
++describe('pcmFloat32ToWavBlob', () => {
++  it('writes a mono PCM16 WAV header and clamps Float32 samples', async () => {
++    const wav = pcmFloat32ToWavBlob(new Float32Array([-2, 0, 2]), 16000)
++    const bytes = new Uint8Array(await wav.arrayBuffer())
++    const view = new DataView(bytes.buffer)
++    const ascii = (start: number, length: number) => String.fromCharCode(...bytes.slice(start, start + length))
++
++    expect(wav.type).toBe('audio/wav')
++    expect(wav.size).toBe(50)
++    expect(ascii(0, 4)).toBe('RIFF')
++    expect(view.getUint32(4, true)).toBe(42)
++    expect(ascii(8, 4)).toBe('WAVE')
++    expect(ascii(12, 4)).toBe('fmt ')
++    expect(view.getUint32(16, true)).toBe(16)
++    expect(view.getUint16(20, true)).toBe(1)
++    expect(view.getUint32(24, true)).toBe(16000)
++    expect(view.getUint16(22, true)).toBe(1)
++    expect(view.getUint32(28, true)).toBe(32000)
++    expect(view.getUint16(32, true)).toBe(2)
++    expect(view.getUint16(34, true)).toBe(16)
++    expect(ascii(36, 4)).toBe('data')
++    expect(view.getUint32(40, true)).toBe(6)
++    expect(view.getInt16(44, true)).toBe(-32768)
++    expect(view.getInt16(46, true)).toBe(0)
++    expect(view.getInt16(48, true)).toBe(32767)
++  })
++
++  it('rejects an invalid sample rate', () => {
++    expect(() => pcmFloat32ToWavBlob(new Float32Array([0]), 0)).toThrow(/positive PCM sample rate/)
++  })
++})
+diff --git a/packages/stage-ui/src/composables/audio/pcm-wav.ts b/packages/stage-ui/src/composables/audio/pcm-wav.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..94b7abd929a0695ac48b6a80a093e854c516b7eb
+--- /dev/null
++++ b/packages/stage-ui/src/composables/audio/pcm-wav.ts
+@@ -0,0 +1,35 @@
++/** Converts mono Float32 PCM samples into a browser-playable PCM16 WAV blob. */
++export function pcmFloat32ToWavBlob(buffer: Float32Array, sampleRate: number): Blob {
++  if (!Number.isFinite(sampleRate) || sampleRate <= 0)
++    throw new Error('A positive PCM sample rate is required to create WAV audio.')
++
++  const bytesPerSample = 2
++  const dataSize = buffer.length * bytesPerSample
++  const wav = new ArrayBuffer(44 + dataSize)
++  const view = new DataView(wav)
++  const writeString = (offset: number, value: string) => {
++    for (let index = 0; index < value.length; index++)
++      view.setUint8(offset + index, value.charCodeAt(index))
++  }
++
++  writeString(0, 'RIFF')
++  view.setUint32(4, 36 + dataSize, true)
++  writeString(8, 'WAVE')
++  writeString(12, 'fmt ')
++  view.setUint32(16, 16, true)
++  view.setUint16(20, 1, true)
++  view.setUint16(22, 1, true)
++  view.setUint32(24, sampleRate, true)
++  view.setUint32(28, sampleRate * bytesPerSample, true)
++  view.setUint16(32, bytesPerSample, true)
++  view.setUint16(34, 16, true)
++  writeString(36, 'data')
++  view.setUint32(40, dataSize, true)
++
++  for (let index = 0; index < buffer.length; index++) {
++    const sample = Math.max(-1, Math.min(1, buffer[index]))
++    view.setInt16(44 + index * bytesPerSample, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true)
++  }
++
++  return new Blob([wav], { type: 'audio/wav' })
++}
 diff --git a/packages/stage-ui/src/composables/audio/voice-input-session.test.ts b/packages/stage-ui/src/composables/audio/voice-input-session.test.ts
 index a79c59babb9d0d2ce066d7b01aa39f514b0cad0a..7e6480e1fa618162e9797b6d40045f911d326c38 100644
 --- a/packages/stage-ui/src/composables/audio/voice-input-session.test.ts
@@ -4740,6 +5521,508 @@ index fb0dd702788db08e38a98544549dd24582785f4f..19a6fdac626aaabc994e2f53d7efb167
    if (message.role === 'tool')
      return false
    if (message.role === 'system')
+diff --git a/packages/stage-ui/src/libs/latency/voice-turn-latency.test.ts b/packages/stage-ui/src/libs/latency/voice-turn-latency.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..48cc12525ab3671b6080baf37690d29ab876a3de
+--- /dev/null
++++ b/packages/stage-ui/src/libs/latency/voice-turn-latency.test.ts
+@@ -0,0 +1,49 @@
++import { describe, expect, it, vi } from 'vitest'
++
++import { createVoiceTurnLatencyTrace } from './voice-turn-latency'
++
++describe('voice turn latency trace', () => {
++  it('preserves server STT timing and emits only the first substantive LLM delta and playback start for a voice round', () => {
++    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => undefined)
++    const trace = createVoiceTurnLatencyTrace(fetch, () => 1234)
++
++    trace.sttAccepted('voice-round')
++    trace.firstSubstantiveLlmDelta('voice-round', '   ')
++    trace.firstSubstantiveLlmDelta('voice-round', 'answer')
++    trace.firstSubstantiveLlmDelta('voice-round', 'more')
++    trace.firstPlaybackStart('voice-round')
++    trace.firstPlaybackStart('voice-round')
++
++    expect(fetch).toHaveBeenCalledTimes(2)
++    expect(fetch.mock.calls.map(([, init]) => JSON.parse((init as RequestInit).body as string))).toEqual([
++      { source: 'llm', phase: 'content', request_id: 'voice-round', timestamp_ms: 1234 },
++      { source: 'playback', phase: 'start', request_id: 'voice-round', timestamp_ms: 1234 },
++    ])
++  })
++
++  it('emits exactly one playback start for an armed non-voice round', () => {
++    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => undefined)
++    const trace = createVoiceTurnLatencyTrace(fetch)
++
++    trace.armPlaybackRound('typed-round')
++    trace.firstSubstantiveLlmDelta('typed-round', 'answer')
++    trace.firstPlaybackStart('typed-round')
++    trace.firstPlaybackStart('typed-round')
++
++    expect(fetch).toHaveBeenCalledTimes(1)
++    expect(JSON.parse((fetch.mock.calls[0][1] as RequestInit).body as string)).toMatchObject({
++      source: 'playback',
++      phase: 'start',
++      request_id: 'typed-round',
++    })
++  })
++
++  it('does not emit playback for an unarmed round', () => {
++    const fetch = vi.fn(async () => undefined)
++    const trace = createVoiceTurnLatencyTrace(fetch)
++
++    trace.firstPlaybackStart('unarmed-round')
++
++    expect(fetch).not.toHaveBeenCalled()
++  })
++})
+diff --git a/packages/stage-ui/src/libs/latency/voice-turn-latency.ts b/packages/stage-ui/src/libs/latency/voice-turn-latency.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..4dba92c136f53331a18d8b7984439355e4f5e964
+--- /dev/null
++++ b/packages/stage-ui/src/libs/latency/voice-turn-latency.ts
+@@ -0,0 +1,76 @@
++const endpoint = 'http://127.0.0.1:8892/api/event'
++const maxTrackedTurns = 64
++
++type LatencyFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<unknown>
++type LatencySource = 'stt' | 'llm' | 'playback'
++type LatencyPhase = 'start' | 'end' | 'content'
++
++/**
++ * Emits only numeric timestamps and an opaque, per-turn correlation id to the
++ * local latency monitor. Transcript/LLM text and chat-session ids never leave
++ * this module.
++ */
++export function createVoiceTurnLatencyTrace(fetchImpl: LatencyFetch = globalThis.fetch, now = () => Date.now()) {
++  const acceptedTurns = new Set<string>()
++  const armedPlaybackTurns = new Set<string>()
++  const firstLlmDeltaTurns = new Set<string>()
++
++  function post(source: LatencySource, phase: LatencyPhase, roundId: string) {
++    try {
++      void fetchImpl(endpoint, {
++        method: 'POST',
++        body: JSON.stringify({ source, phase, request_id: roundId, timestamp_ms: now() }),
++      }).catch(() => {})
++    }
++    catch {}
++  }
++
++  function retain(turns: Set<string>, roundId: string) {
++    turns.add(roundId)
++    while (turns.size > maxTrackedTurns)
++      turns.delete(turns.values().next().value!)
++  }
++
++  function armPlaybackRound(roundId: string) {
++    retain(armedPlaybackTurns, roundId)
++  }
++
++  return {
++    /**
++     * Marks an accepted voice turn for later LLM/playback correlation.
++     *
++     * The loopback STT service owns the real request start/end timestamps.
++     * Re-emitting both phases here, after the transcript has already arrived,
++     * would replace that measured duration with an artificial 0-1 ms turn in
++     * the monitor's request-id map.
++     */
++    sttAccepted(roundId?: string) {
++      if (!roundId)
++        return
++      retain(acceptedTurns, roundId)
++      armPlaybackRound(roundId)
++    },
++    /** Arms an authoritative chat round to report its first actual playback start. */
++    armPlaybackRound(roundId?: string) {
++      if (!roundId)
++        return
++      armPlaybackRound(roundId)
++    },
++    /** Records only the first non-whitespace LLM delta for an accepted turn. */
++    firstSubstantiveLlmDelta(roundId: string | undefined, delta: string) {
++      if (!roundId || !acceptedTurns.has(roundId) || firstLlmDeltaTurns.has(roundId) || !delta.trim())
++        return
++      retain(firstLlmDeltaTurns, roundId)
++      post('llm', 'content', roundId)
++    },
++    /** Records only the first actual Web Audio playback start for that turn. */
++    firstPlaybackStart(roundId?: string) {
++      if (!roundId || !armedPlaybackTurns.delete(roundId))
++        return
++      firstLlmDeltaTurns.delete(roundId)
++      post('playback', 'start', roundId)
++    },
++  }
++}
++
++export const voiceTurnLatencyTrace = createVoiceTurnLatencyTrace()
+diff --git a/packages/stage-ui/src/libs/speech/attempt-timeout.test.ts b/packages/stage-ui/src/libs/speech/attempt-timeout.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..aecae35309f3a6cb9c604ba5d34cef1010cda29d
+--- /dev/null
++++ b/packages/stage-ui/src/libs/speech/attempt-timeout.test.ts
+@@ -0,0 +1,42 @@
++import { describe, expect, it, vi } from 'vitest'
++
++import { createAttemptTimeoutSignal } from './attempt-timeout'
++
++describe('createAttemptTimeoutSignal', () => {
++  it('aborts only the attempt when its timeout elapses', () => {
++    vi.useFakeTimers()
++    const parent = new AbortController()
++    const attempt = createAttemptTimeoutSignal(parent.signal, 10_000)
++
++    vi.advanceTimersByTime(10_000)
++
++    expect(attempt.signal.aborted).toBe(true)
++    expect(parent.signal.aborted).toBe(false)
++    attempt.cleanup()
++    vi.useRealTimers()
++  })
++
++  it('forwards parent cancellation to the attempt', () => {
++    const parent = new AbortController()
++    const attempt = createAttemptTimeoutSignal(parent.signal, 10_000)
++
++    parent.abort('intent-cancelled')
++
++    expect(attempt.signal.aborted).toBe(true)
++    expect(attempt.signal.reason).toBe('intent-cancelled')
++    attempt.cleanup()
++  })
++
++  it('cleans up its timer and parent listener after a completed attempt', () => {
++    vi.useFakeTimers()
++    const parent = new AbortController()
++    const attempt = createAttemptTimeoutSignal(parent.signal, 10_000)
++
++    attempt.cleanup()
++    parent.abort('after-cleanup')
++    vi.advanceTimersByTime(10_000)
++
++    expect(attempt.signal.aborted).toBe(false)
++    vi.useRealTimers()
++  })
++})
+diff --git a/packages/stage-ui/src/libs/speech/attempt-timeout.ts b/packages/stage-ui/src/libs/speech/attempt-timeout.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..640d30eba01466e71a6780ee096752bfbc040314
+--- /dev/null
++++ b/packages/stage-ui/src/libs/speech/attempt-timeout.ts
+@@ -0,0 +1,35 @@
++export interface AttemptTimeoutSignal {
++  signal: AbortSignal
++  cleanup: () => void
++}
++
++/**
++ * Creates an abort signal for one physical request attempt without changing
++ * the caller-owned parent signal. The caller must run `cleanup()` when that
++ * attempt settles so neither the timer nor the parent listener leaks into a
++ * later retry.
++ */
++export function createAttemptTimeoutSignal(parent: AbortSignal, timeoutMs: number): AttemptTimeoutSignal {
++  const controller = new AbortController()
++  let timeout: ReturnType<typeof setTimeout> | undefined
++
++  const abortFromParent = () => controller.abort(parent.reason)
++  if (parent.aborted) {
++    abortFromParent()
++  }
++  else {
++    parent.addEventListener('abort', abortFromParent, { once: true })
++    timeout = setTimeout(() => {
++      controller.abort('tts-attempt-timeout')
++    }, Math.max(0, timeoutMs))
++  }
++
++  return {
++    signal: controller.signal,
++    cleanup: () => {
++      if (timeout)
++        clearTimeout(timeout)
++      parent.removeEventListener('abort', abortFromParent)
++    },
++  }
++}
+diff --git a/packages/stage-ui/src/libs/speech/local-broadcast-playback-proof.test.ts b/packages/stage-ui/src/libs/speech/local-broadcast-playback-proof.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..72d15cf88425d6d0cd309971634c09527abd5a4e
+--- /dev/null
++++ b/packages/stage-ui/src/libs/speech/local-broadcast-playback-proof.test.ts
+@@ -0,0 +1,168 @@
++import { describe, expect, it, vi } from 'vitest'
++
++import { createLocalBroadcastPlaybackProof } from './local-broadcast-playback-proof'
++
++describe('createLocalBroadcastPlaybackProof', () => {
++  it('reports repeated verified completions with only an in-memory count', () => {
++    const requests: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
++    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
++      requests.push({ input, init })
++    })
++    const proof = createLocalBroadcastPlaybackProof(fetchImpl)
++
++    expect(proof.recordCompletion({
++      ttsRequests: 1,
++      successfulTtsResults: 1,
++      naturalPlaybackEnds: 1,
++    })).toBe(true)
++    expect(proof.recordCompletion({
++      ttsRequests: 2,
++      successfulTtsResults: 2,
++      naturalPlaybackEnds: 2,
++    })).toBe(true)
++
++    expect(fetchImpl).toHaveBeenCalledTimes(2)
++    expect(requests[0]?.input).toBe('http://127.0.0.1:8892/api/event')
++    expect(requests[0]?.init?.method).toBe('POST')
++
++    const firstPayload = JSON.parse(String(requests[0]?.init?.body))
++    const secondPayload = JSON.parse(String(requests[1]?.init?.body))
++    expect(firstPayload).toEqual({
++      schema_version: 1,
++      source: 'local-proactive-broadcast',
++      phase: 'playback-completed',
++      completion_count: 1,
++    })
++    expect(secondPayload).toEqual({
++      schema_version: 1,
++      source: 'local-proactive-broadcast',
++      phase: 'playback-completed',
++      completion_count: 2,
++    })
++    expect(Object.keys(firstPayload)).toEqual([
++      'schema_version',
++      'source',
++      'phase',
++      'completion_count',
++    ])
++  })
++
++  it('reports content-free lifecycle counts for incomplete attempts', () => {
++    const requests: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
++    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
++      requests.push({ input, init })
++    })
++    const proof = createLocalBroadcastPlaybackProof(fetchImpl)
++
++    expect(proof.recordCompletion({
++      ttsRequests: 0,
++      successfulTtsResults: 0,
++      naturalPlaybackEnds: 0,
++    })).toBe(false)
++    expect(proof.recordCompletion({
++      ttsRequests: 2,
++      successfulTtsResults: 1,
++      naturalPlaybackEnds: 1,
++    })).toBe(false)
++    expect(proof.recordCompletion({
++      ttsRequests: 2,
++      successfulTtsResults: 2,
++      naturalPlaybackEnds: 1,
++    })).toBe(false)
++    expect(proof.recordCompletion({
++      ttsRequests: 1,
++      successfulTtsResults: 2,
++      naturalPlaybackEnds: 2,
++    })).toBe(false)
++    expect(fetchImpl).toHaveBeenCalledTimes(4)
++    const payload = JSON.parse(String(requests[2]?.init?.body))
++    expect(payload).toEqual({
++      schema_version: 1,
++      source: 'local-proactive-broadcast',
++      phase: 'playback-incomplete',
++      attempt_count: 3,
++      failure_code: 'pipeline-incomplete',
++      tts_requests: 2,
++      successful_tts_results: 2,
++      natural_playback_ends: 1,
++    })
++    expect(payload).not.toHaveProperty('text')
++    expect(payload).not.toHaveProperty('request_id')
++    expect(payload).not.toHaveProperty('intent_id')
++  })
++
++  it('reports fixed preflight failure codes without content or correlation data', () => {
++    const requests: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
++    const proof = createLocalBroadcastPlaybackProof(async (input, init) => { requests.push({ input, init }) })
++
++    expect(proof.recordIncomplete({
++      ttsRequests: 0,
++      successfulTtsResults: 0,
++      naturalPlaybackEnds: 0,
++    }, 'speech-provider-unavailable')).toBe(false)
++
++    expect(JSON.parse(String(requests[0]?.init?.body))).toEqual({
++      schema_version: 1,
++      source: 'local-proactive-broadcast',
++      phase: 'playback-incomplete',
++      attempt_count: 1,
++      failure_code: 'speech-provider-unavailable',
++      tts_requests: 0,
++      successful_tts_results: 0,
++      natural_playback_ends: 0,
++    })
++  })
++
++  it('keeps the payload free of content and correlation fields', () => {
++    const requests: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
++    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
++      requests.push({ input, init })
++    })
++    const proof = createLocalBroadcastPlaybackProof(fetchImpl)
++
++    proof.recordCompletion({
++      ttsRequests: 1,
++      successfulTtsResults: 1,
++      naturalPlaybackEnds: 1,
++    })
++
++    const payload = JSON.parse(String(requests[0]?.init?.body))
++    expect(Object.keys(payload).sort()).toEqual([
++      'completion_count',
++      'phase',
++      'schema_version',
++      'source',
++    ])
++    expect(payload).not.toHaveProperty('text')
++    expect(payload).not.toHaveProperty('request_id')
++    expect(payload).not.toHaveProperty('intent_id')
++    expect(payload).not.toHaveProperty('round_id')
++    expect(payload).not.toHaveProperty('timestamp')
++    expect(payload).not.toHaveProperty('provider')
++    expect(payload).not.toHaveProperty('model')
++  })
++
++  it('fails soft when the loopback POST rejects or throws synchronously', async () => {
++    const rejectedFetch = vi.fn(async () => {
++      throw new Error('offline')
++    })
++    const rejectedProof = createLocalBroadcastPlaybackProof(rejectedFetch)
++
++    expect(rejectedProof.recordCompletion({
++      ttsRequests: 1,
++      successfulTtsResults: 1,
++      naturalPlaybackEnds: 1,
++    })).toBe(true)
++    await Promise.resolve()
++
++    const throwingFetch = vi.fn(() => {
++      throw new Error('unavailable')
++    })
++    const throwingProof = createLocalBroadcastPlaybackProof(throwingFetch)
++    expect(throwingProof.recordCompletion({
++      ttsRequests: 1,
++      successfulTtsResults: 1,
++      naturalPlaybackEnds: 1,
++    })).toBe(true)
++  })
++})
+diff --git a/packages/stage-ui/src/libs/speech/local-broadcast-playback-proof.ts b/packages/stage-ui/src/libs/speech/local-broadcast-playback-proof.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..093cc5eed98fc524d2f4a763c408ebdc840f8d47
+--- /dev/null
++++ b/packages/stage-ui/src/libs/speech/local-broadcast-playback-proof.ts
+@@ -0,0 +1,96 @@
++const proofEndpoint = 'http://127.0.0.1:8892/api/event'
++
++type ProofFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<unknown>
++
++/** Counts from one local proactive speech intent at its terminal boundary. */
++export interface LocalBroadcastPlaybackEvidence {
++  /** TTS requests emitted for the matching intent. */
++  ttsRequests: number
++  /** Matching requests that returned audio. */
++  successfulTtsResults: number
++  /** Matching audio sources that reached their natural Web Audio end event. */
++  naturalPlaybackEnds: number
++}
++
++/** Fixed, content-free failure labels accepted by the loopback observer. */
++export type LocalBroadcastPlaybackFailureCode
++  = | 'invalid-proactive-speech'
++    | 'audio-context-unavailable'
++    | 'speech-provider-unavailable'
++    | 'local-rest-speech-required'
++    | 'speech-model-or-voice-unavailable'
++    | 'speech-provider-initialization-failed'
++    | 'local-speech-endpoint-required'
++    | 'audio-context-resume-failed'
++    | 'speech-stage-unavailable'
++    | 'candidate-rejected'
++    | 'candidate-too-long'
++    | 'candidate-content-rejected'
++    | 'candidate-empty-or-cancelled'
++    | 'playback-rejected'
++    | 'playback-interrupted'
++    | 'intent-cancelled'
++    | 'proactive-speech-timeout'
++    | 'pipeline-incomplete'
++
++/**
++ * Creates a session-local proof reporter. It emits only aggregate completion
++ * counts and deliberately keeps no message, intent, provider, or user data.
++ */
++export function createLocalBroadcastPlaybackProof(fetchImpl: ProofFetch = globalThis.fetch) {
++  let completionCount = 0
++  let attemptCount = 0
++
++  const post = (payload: object) => {
++    try {
++      void fetchImpl(proofEndpoint, {
++        method: 'POST',
++        body: JSON.stringify(payload),
++      }).catch(() => {})
++    }
++    catch {}
++  }
++
++  return {
++    recordIncomplete(evidence: LocalBroadcastPlaybackEvidence, failureCode: LocalBroadcastPlaybackFailureCode): false {
++      attemptCount += 1
++      post({
++        schema_version: 1,
++        source: 'local-proactive-broadcast',
++        phase: 'playback-incomplete',
++        attempt_count: attemptCount,
++        failure_code: failureCode,
++        tts_requests: evidence.ttsRequests,
++        successful_tts_results: evidence.successfulTtsResults,
++        natural_playback_ends: evidence.naturalPlaybackEnds,
++      })
++      return false
++    },
++    recordCompletion(evidence: LocalBroadcastPlaybackEvidence): boolean {
++      const verified = evidence.ttsRequests > 0
++        && evidence.successfulTtsResults === evidence.ttsRequests
++        && evidence.naturalPlaybackEnds === evidence.successfulTtsResults
++
++      if (!verified)
++        return this.recordIncomplete(evidence, 'pipeline-incomplete')
++
++      attemptCount += 1
++      completionCount += 1
++      const payload = {
++        schema_version: 1,
++        source: 'local-proactive-broadcast',
++        phase: 'playback-completed',
++        completion_count: completionCount,
++      } as const
++
++      // This loopback observation must never change the speech result. Avoiding
++      // custom headers also keeps the browser request free of a CORS preflight.
++      post(payload)
++
++      return true
++    },
++  }
++}
++
++/** One renderer-session reporter shared by the director and Stage boundary. */
++export const localBroadcastPlaybackProof = createLocalBroadcastPlaybackProof()
 diff --git a/packages/stage-ui/src/libs/speech/tts-session.test.ts b/packages/stage-ui/src/libs/speech/tts-session.test.ts
 index 4fadf051a28176e2c85d9db1687be3ca0be6d978..b930fb7228ad4f15037a03baec614972c48374cc 100644
 --- a/packages/stage-ui/src/libs/speech/tts-session.test.ts
@@ -5018,6 +6301,389 @@ index 73d944243da64a8d846a3d14cff3d35069fc6327..35372ee30bbb16f7dc8cf4b0f704612e
  const DEFAULT_VAD_MIN_SPEECH_DURATION_MS = 300
  
  export function resolveVADConfig(
+diff --git a/packages/stage-ui/src/stores/broadcast-director.test.ts b/packages/stage-ui/src/stores/broadcast-director.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..bd49ece4a143047ecb0062eb14f8ea8a2786cc3e
+--- /dev/null
++++ b/packages/stage-ui/src/stores/broadcast-director.test.ts
+@@ -0,0 +1,159 @@
++import { afterEach, describe, expect, it, vi } from 'vitest'
++
++import { DEFAULT_BROADCAST_SETTINGS, isBroadcastCandidate, loadBroadcastSettings, LocalBroadcastDirector, normalizeBroadcastSettings } from './broadcast-director'
++
++describe('local broadcast director policy', () => {
++  afterEach(() => vi.useRealTimers())
++
++  it('keeps broadcasts opt-in and clamps UI-safe settings', () => {
++    expect(DEFAULT_BROADCAST_SETTINGS).toMatchObject({ schemaVersion: 2, enabled: false, idleMs: 90_000, minDelayMs: 0, maxDelayMs: 90_000, cooldownMs: 180_000, cooldownMaxMs: 480_000 })
++    expect(normalizeBroadcastSettings({ idleMs: -1, minDelayMs: 9000, maxDelayMs: 1000, cooldownMs: Number.NaN })).toMatchObject({ idleMs: 90_000, minDelayMs: 9000, maxDelayMs: 9000, cooldownMs: 180_000, cooldownMaxMs: 480_000 })
++  })
++  it('fails safe when a v2 payload tries to restore a zero-second cadence', () => {
++    expect(normalizeBroadcastSettings({ schemaVersion: 2, enabled: true, idleMs: 0, minDelayMs: 0, maxDelayMs: 0, cooldownMs: 0, cooldownMaxMs: 0 })).toEqual({
++      schemaVersion: 2, enabled: true, idleMs: 90_000, minDelayMs: 0, maxDelayMs: 0, cooldownMs: 180_000, cooldownMaxMs: 180_000,
++    })
++    expect(normalizeBroadcastSettings({ schemaVersion: 2, idleMs: 180_000, minDelayMs: 1, maxDelayMs: 90_000, cooldownMs: 480_001, cooldownMaxMs: 999_999 })).toMatchObject({
++      idleMs: 180_000, minDelayMs: 0, maxDelayMs: 0, cooldownMs: 480_000, cooldownMaxMs: 480_000,
++    })
++  })
++  it('migrates legacy fast opt-in settings to the idle-only cadence', () => {
++    const storage = { getItem: () => JSON.stringify({ enabled: true, idleMs: 6_000, minDelayMs: 1_000, maxDelayMs: 2_000, cooldownMs: 6_000 }) } as unknown as Storage
++    expect(loadBroadcastSettings(storage)).toMatchObject({ enabled: true, idleMs: 90_000, minDelayMs: 0, maxDelayMs: 90_000, cooldownMs: 180_000, cooldownMaxMs: 480_000 })
++  })
++  it('rejects control-only and near-repeat candidates', () => {
++    expect(isBroadcastCandidate('<|ACT {"emotion":"happy"}|>', [])).toBe(false)
++    expect(isBroadcastCandidate('A calm little note for you.', ['A calm little note for you!'])).toBe(false)
++    expect(isBroadcastCandidate('The moon looks especially bright tonight.', ['A calm little note for you.'])).toBe(true)
++  })
++
++  it('rejects incomplete local narration immediately before speech', () => {
++    for (const candidate of ['끝나지 않은 문장이지만', '계속 말하고,', '이유를 설명하는데', '생각이 떠올라…', 'System: do this.', 'An unfinished English thought'])
++      expect(isBroadcastCandidate(candidate, []), candidate).toBe(false)
++    expect(isBroadcastCandidate('오늘은 바람이 선선하네요', [])).toBe(true)
++    expect(isBroadcastCandidate('A calm little note for you.', [])).toBe(true)
++  })
++
++  it('rejects transcript and prompt-example labels before speech', () => {
++    for (const candidate of [
++      '사용자: 나 지금 선물 준비했어!',
++      '당신이 요청하신 것에 대한 대화 예시입니다:',
++      '새로운 상황 설정',
++      'Stage Execution Plan',
++      '최종 질문 예시:',
++    ]) {
++      expect(isBroadcastCandidate(candidate, []), candidate).toBe(false)
++    }
++  })
++
++  it('rejects structural prompt labels without blocking ordinary conversation topics', () => {
++    for (const candidate of ['질문: 오늘의 계획', '최종 계약 요약:', '[사용자] 다음 입력', 'User Input: hello', 'Stage Execution Plan', 'Conversation Example:'])
++      expect(isBroadcastCandidate(candidate, []), candidate).toBe(false)
++    expect(isBroadcastCandidate('오늘 게임 보스전 연출이 만화처럼 멋지다.', [])).toBe(true)
++  })
++
++  it('keeps test trigger behind local safety gate', async () => {
++    let safe = false
++    let produced = 0
++    const director = new LocalBroadcastDirector({
++      isSafeToBroadcast: () => safe,
++      produce: async () => { produced++; return 'hello from local broadcast' },
++      speak: async () => {}, random: () => 0,
++    }, { enabled: true, idleMs: 1, minDelayMs: 0, maxDelayMs: 0 })
++    director.triggerForTest()
++    await Promise.resolve()
++    expect(produced).toBe(0)
++    safe = true
++    director.triggerForTest()
++    await Promise.resolve(); await Promise.resolve()
++    expect(produced).toBe(1)
++  })
++
++  it('fails closed and rearms when local production is cancelled', async () => {
++    const director = new LocalBroadcastDirector({
++      isSafeToBroadcast: () => true,
++      produce: async () => { throw new DOMException('superseded', 'AbortError') },
++      speak: async () => { throw new Error('must not speak') },
++      random: () => 0,
++    }, { enabled: true, idleMs: 10, minDelayMs: 0, maxDelayMs: 0 })
++
++    await expect(director.triggerForTest()).resolves.toBeUndefined()
++    expect(director.state).toBe('waiting')
++  })
++
++  it('crosses idle and positive jitter exactly once before producing', async () => {
++    vi.useFakeTimers()
++    let produced = 0
++    let spoken = 0
++    const director = new LocalBroadcastDirector({
++      isSafeToBroadcast: () => true,
++      produce: async () => { produced++; return '첫 번째 방송이야.' },
++      speak: async () => { spoken++; return true },
++      random: () => 0,
++    }, { enabled: true, idleMs: 100, minDelayMs: 50, maxDelayMs: 50, cooldownMs: 100 })
++
++    director.enable(true)
++    await vi.advanceTimersByTimeAsync(89_999)
++    expect(produced).toBe(0)
++    await vi.advanceTimersByTimeAsync(1)
++    expect(produced).toBe(0)
++    await vi.advanceTimersByTimeAsync(50)
++    expect(produced).toBe(1)
++    expect(spoken).toBe(1)
++    expect(director.state).toBe('cooldown')
++  })
++
++  it('uses the full idle window after a failed delivery instead of a rapid retry', async () => {
++    vi.useFakeTimers()
++    let produced = 0
++    const director = new LocalBroadcastDirector({
++      isSafeToBroadcast: () => true,
++      produce: async () => { produced++; return 'quiet retry policy' },
++      speak: async () => false,
++      random: () => 0,
++    }, { enabled: true, idleMs: 100, minDelayMs: 0, maxDelayMs: 0 })
++
++    await director.triggerForTest()
++    expect(produced).toBe(1)
++    await vi.advanceTimersByTimeAsync(89_999)
++    expect(produced).toBe(1)
++    await vi.advanceTimersByTimeAsync(1)
++    expect(produced).toBe(2)
++  })
++
++  it('randomizes successful-broadcast cooldown within its configured bounds', async () => {
++    vi.useFakeTimers()
++    let produced = 0
++    const director = new LocalBroadcastDirector({
++      isSafeToBroadcast: () => true,
++      produce: async () => { produced++; return 'One quiet beat.' },
++      speak: async () => true,
++      random: () => 0,
++    }, { enabled: true, idleMs: 100, minDelayMs: 0, maxDelayMs: 0, cooldownMs: 180, cooldownMaxMs: 480 })
++
++    await director.triggerForTest()
++    await vi.advanceTimersByTimeAsync(179_999)
++    expect(produced).toBe(1)
++    await vi.advanceTimersByTimeAsync(1)
++    expect(produced).toBe(2)
++  })
++
++  it('invalidates a stale generation when user activity arrives', async () => {
++    let resolveCandidate!: (value: string) => void
++    const candidate = new Promise<string>(resolve => { resolveCandidate = resolve })
++    let spoken = 0
++    const director = new LocalBroadcastDirector({
++      isSafeToBroadcast: () => true,
++      produce: async () => candidate,
++      speak: async () => { spoken++; return true },
++      random: () => 0,
++    }, { enabled: true, idleMs: 10, minDelayMs: 0, maxDelayMs: 0 })
++
++    const pending = director.triggerForTest()
++    director.activity()
++    resolveCandidate('이미 취소된 방송 멘트')
++    await pending
++    expect(spoken).toBe(0)
++    expect(director.state).toBe('waiting')
++  })
++})
+diff --git a/packages/stage-ui/src/stores/broadcast-director.ts b/packages/stage-ui/src/stores/broadcast-director.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..96e9269f424b832b7949ca7c0aada23936f07ff5
+--- /dev/null
++++ b/packages/stage-ui/src/stores/broadcast-director.ts
+@@ -0,0 +1,212 @@
++/** Local, opt-in idle broadcast scheduler. It owns no network or persistence. */
++export type BroadcastDirectorState = 'disabled' | 'waiting' | 'armed' | 'producing' | 'validating' | 'speaking' | 'cooldown'
++
++export interface BroadcastSettings {
++  schemaVersion: 2
++  enabled: boolean
++  idleMs: number
++  minDelayMs: number
++  maxDelayMs: number
++  cooldownMs: number
++  cooldownMaxMs: number
++}
++
++export const DEFAULT_BROADCAST_SETTINGS: BroadcastSettings = {
++  // First beat: 90–180 seconds. Later beats: 180–480 seconds.
++  schemaVersion: 2, enabled: false, idleMs: 90_000, minDelayMs: 0, maxDelayMs: 90_000, cooldownMs: 180_000, cooldownMaxMs: 480_000,
++}
++
++export interface BroadcastDirectorDeps {
++  isSafeToBroadcast: () => boolean
++  produce: () => Promise<string | null>
++  /** Returns false when the candidate was not actually delivered as audio. */
++  speak: (text: string) => Promise<boolean | void>
++  now?: () => number
++  random?: () => number
++  cancel?: (reason: string) => void
++  onState?: (state: BroadcastDirectorState) => void
++  /** Content-free diagnostic hook; the rejected candidate itself is never exposed. */
++  onCandidateRejected?: () => void
++}
++
++const STORAGE_KEY = 'airi.local-proactive-broadcast.v1'
++export const BROADCAST_SETTINGS_CHANNEL_NAME = 'airi:local-proactive-broadcast:settings'
++export type BroadcastSettingsChannelEvent
++  = | { type: 'settings-changed', settings: BroadcastSettings }
++    | { type: 'user-activity' }
++const MAX_DELAY_MS = 24 * 60 * 60 * 1000
++const MIN_IDLE_MS = 90_000
++const MAX_FIRST_IDLE_MS = 180_000
++const MIN_COOLDOWN_MS = 180_000
++const MAX_COOLDOWN_MS = 480_000
++export const MAX_BROADCAST_CANDIDATE_CODE_POINTS = 60
++
++// Background narration must be independently speakable. A streamed/model
++// fragment is worse than silence, so this intentionally fails closed.
++const INCOMPLETE_BROADCAST_ENDING = /(?:\.{3}|…|[,;:：]|다니|지만|는데|으며|면서|도록|거나|니까|기에|다고(?:요)?|ㄴ데|은데|고|며|면|니)$/u
++const SAFE_KOREAN_BROADCAST_ENDING = /(?:다|요|죠|네|군|지|야|해|돼|줘|봐|있어|없어|같아|맞아|아냐)$/u
++const BROADCAST_TERMINAL_PUNCTUATION = /[.!?。！？]+$/u
++const BROADCAST_META = /(?:^|\n)\s*(?:\[\s*(?:user|assistant|system)\s*\]|(?:user|assistant|system)\s*:|user\s+input|stage\s+execution\s+plan|system\s+prompt|instructions?|conversation\s+example|example\s+(?:dialogue|conversation)|final\s+(?:contract\s+)?summary)\b/iu
++
++/** Whether text is a bounded, complete local proactive utterance. */
++export function isCompleteBroadcastCandidate(text: string): boolean {
++  const clean = text.trim()
++  if (!clean || [...clean].length > MAX_BROADCAST_CANDIDATE_CODE_POINTS || /[\r\n\u2028\u2029]/u.test(clean)) return false
++  if (BROADCAST_META.test(clean) || /<\|[\s\S]*?\|>|<[^>]+>/u.test(clean)) return false
++  if (INCOMPLETE_BROADCAST_ENDING.test(clean)) return false
++  return BROADCAST_TERMINAL_PUNCTUATION.test(clean) || SAFE_KOREAN_BROADCAST_ENDING.test(clean)
++}
++function validMs(value: unknown, fallback: number) {
++  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(MAX_DELAY_MS, Math.floor(value))) : fallback
++}
++function clamp(value: number, minimum: number, maximum: number) {
++  return Math.max(minimum, Math.min(maximum, value))
++}
++export function normalizeBroadcastSettings(value: Partial<BroadcastSettings> | unknown): BroadcastSettings {
++  const input = value && typeof value === 'object' ? value as Partial<BroadcastSettings> : {}
++  const idleMs = clamp(validMs(input.idleMs, DEFAULT_BROADCAST_SETTINGS.idleMs), MIN_IDLE_MS, MAX_FIRST_IDLE_MS)
++  const maxJitterMs = MAX_FIRST_IDLE_MS - idleMs
++  const minDelayMs = clamp(validMs(input.minDelayMs, DEFAULT_BROADCAST_SETTINGS.minDelayMs), 0, maxJitterMs)
++  const maxDelayMs = Math.max(minDelayMs, clamp(validMs(input.maxDelayMs, DEFAULT_BROADCAST_SETTINGS.maxDelayMs), 0, maxJitterMs))
++  const cooldownMs = clamp(validMs(input.cooldownMs, DEFAULT_BROADCAST_SETTINGS.cooldownMs), MIN_COOLDOWN_MS, MAX_COOLDOWN_MS)
++  const cooldownMaxMs = Math.max(cooldownMs, clamp(validMs(input.cooldownMaxMs, DEFAULT_BROADCAST_SETTINGS.cooldownMaxMs), MIN_COOLDOWN_MS, MAX_COOLDOWN_MS))
++  return { schemaVersion: 2, enabled: input.enabled === true, idleMs, minDelayMs, maxDelayMs, cooldownMs, cooldownMaxMs }
++}
++function cryptoRandom() {
++  const values = new Uint32Array(1)
++  globalThis.crypto?.getRandomValues?.(values)
++  return values[0] / 0x1_0000_0000
++}
++function trigrams(text: string) {
++  const clean = text.toLocaleLowerCase().replace(/\s+/g, ' ').trim()
++  const out = new Set<string>()
++  for (let i = 0; i + 3 <= clean.length; i++) out.add(clean.slice(i, i + 3))
++  return out
++}
++
++/** Rejects blank/control-only/prompt meta and recently repeated candidate speech. */
++export function isBroadcastCandidate(text: string, recent: readonly string[]): boolean {
++  const clean = text.replace(/<\|[\s\S]*?\|>|<[^>]+>/g, '').trim()
++  if (!clean || clean.length < 2 || /^[\p{P}\p{S}\s]+$/u.test(clean) || !isCompleteBroadcastCandidate(clean)) return false
++  // Labels and examples are model-facing prompt structure, not spontaneous
++  // narration. Keep this structural so normal game/comic/chat vocabulary is
++  // never blocked just for containing a topic word.
++  if (/(?:^|\n)\s*(?:\[\s*(?:user|assistant|system|사용자|어시스턴트|시스템)\s*\]|(?:user|assistant|system|user\s+input|stage\s+execution\s+plan|question|final\s+(?:contract\s+)?summary|scenario|conversation\s+example|example\s+(?:dialogue|conversation)|instructions?)\s*:|(?:사용자|어시스턴트|시스템|질문|최종\s*계약?\s*요약|시나리오|대화\s*예시)\s*[:：])/iu.test(clean)) return false
++  if (/^\s*(?:\[\s*(?:user|assistant|system|사용자|어시스턴트|시스템)\s*\]|(?:user\s+input|stage\s+execution\s+plan|question|final\s+(?:contract\s+)?summary|scenario|conversation\s+example|example\s+(?:dialogue|conversation)|system\s+prompt|instructions?|질문|최종\s*계약?\s*요약|대화\s*예시|시나리오))(?:$|\s|[:：])/iu.test(clean)) return false
++  // Never surface renderer/protocol state as if it were a VTuber's
++  // spontaneous chat.  The model may see an empty-history prompt and echo a
++  // status label such as "새로운 사용자 입력"; reject it before TTS/UI.
++  if (/(?:사용자\s*:|아이리\s*:|대화\s*(?:예시|시작)|답변\s*예시|질문\s*예시|사용자\s*입력(?:\s*예시)?|새로운\s*(?:상황|대화|사용자\s*입력)|시나리오\s*시작|시작\s*대화|현재\s*대화\s*상황|최종\s*(?:질문|답변)\s*예시|요청\s*예시|주어진\s*상황|당신의\s*요청을\s*이해했습니다|사용자\s*입력(?:이|은)?\s*없|입력(?:을|이)\s*기다|대화(?:가|이)\s*없|시스템|프롬프트|모델\s*(?:이|은)?\s*대기|stage\s+execution\s+plan|new\s+user\s+interaction\s+start|new\s+user\s+input|no\s+user\s+input|waiting\s+for\s+(?:user\s+)?input|system\s+prompt)/iu.test(clean)) return false
++  // A proactive narrator must not announce work it could not have executed.
++  if (/\b(?:i\s+(?:ran|used|called|executed)|tool(?:\s+call)?\s+(?:completed|succeeded)|memory\s+(?:was\s+)?updated)\b|(?:도구|툴|메모리).{0,18}(?:실행|사용|완료|업데이트)|(?:실행|사용|완료|업데이트).{0,18}(?:도구|툴|메모리)/i.test(clean)) return false
++  const next = trigrams(clean)
++  return !recent.some((previous) => {
++    const prior = trigrams(previous)
++    if (!next.size || !prior.size) return clean === previous.trim()
++    let overlap = 0; next.forEach(part => { if (prior.has(part)) overlap++ })
++    return overlap / Math.min(next.size, prior.size) >= 0.65
++  })
++}
++
++export class LocalBroadcastDirector {
++  state: BroadcastDirectorState = 'disabled'
++  settings: BroadcastSettings
++  private timer: ReturnType<typeof setTimeout> | undefined
++  private recent: string[] = []
++  /** Invalidates stale timers and async generations after any user activity. */
++  private epoch = 0
++  constructor(private readonly deps: BroadcastDirectorDeps, settings?: Partial<BroadcastSettings>) {
++    this.settings = normalizeBroadcastSettings(settings)
++  }
++  private set(next: BroadcastDirectorState) { this.state = next; this.deps.onState?.(next) }
++  private clear() { if (this.timer) clearTimeout(this.timer); this.timer = undefined }
++  enable(enabled: boolean) { this.settings.enabled = enabled; if (!enabled) { this.epoch++; this.clear(); this.deps.cancel?.('broadcast-disabled'); this.set('disabled') } else this.activity() }
++  activity() {
++    const epoch = ++this.epoch
++    this.clear()
++    this.deps.cancel?.('user-activity')
++    if (!this.settings.enabled) return this.set('disabled')
++    this.set('waiting')
++    this.schedule(this.settings.idleMs, epoch, false)
++  }
++  /** Test trigger bypasses only the idle delay; safety gates remain mandatory. */
++  triggerForTest(): Promise<void> {
++    this.clear()
++    if (!this.settings.enabled) return Promise.resolve()
++    const epoch = ++this.epoch
++    return this.run(epoch, true)
++  }
++  private schedule(delay: number, epoch: number, skipRandomDelay: boolean) {
++    this.timer = setTimeout(() => { void this.run(epoch, skipRandomDelay) }, delay)
++  }
++  private async run(epoch: number, skipRandomDelay = false): Promise<void> {
++    if (epoch !== this.epoch) return
++    if (!this.settings.enabled) return this.set('disabled')
++    if (!this.deps.isSafeToBroadcast()) { this.set('waiting'); return this.schedule(this.settings.idleMs, epoch, false) }
++    this.set('armed')
++    const random = this.deps.random ?? cryptoRandom
++    const delay = this.settings.minDelayMs + Math.floor(random() * Math.max(0, this.settings.maxDelayMs - this.settings.minDelayMs))
++    // The jitter timer enters production on its next callback. Re-entering the
++    // jitter phase here would reschedule forever for every positive delay.
++    if (!skipRandomDelay && delay) { this.set('waiting'); this.schedule(delay, epoch, true); return }
++    this.set('producing')
++    let candidate: string | null
++    try {
++      candidate = await this.deps.produce()
++    }
++    catch {
++      // Cancellation, a local provider outage, or a rejected candidate is an
++      // expected fail-closed background path. Never leak an unhandled promise
++      // from an idle/test trigger.
++      if (epoch === this.epoch) this.activity()
++      return
++    }
++    if (epoch !== this.epoch) return
++    if (!this.settings.enabled || !this.deps.isSafeToBroadcast()) { this.activity(); return }
++    this.set('validating')
++    if (!candidate || !isBroadcastCandidate(candidate, this.recent)) {
++      this.deps.onCandidateRejected?.()
++      this.activity()
++      return
++    }
++    this.set('speaking')
++    let delivered = false
++    try { delivered = (await this.deps.speak(candidate)) !== false } catch { /* fail closed and re-arm below */ } finally {
++      if (delivered && epoch === this.epoch)
++        this.recent = [...this.recent.slice(-8), candidate]
++      if (epoch !== this.epoch)
++        return
++      if (!this.settings.enabled) this.set('disabled')
++      else {
++        this.set('cooldown')
++        if (!delivered) {
++          // A failed synthesis is not an invitation to retry narration every
++          // few seconds; re-enter the full idle window instead.
++          this.activity()
++          return
++        }
++        const random = this.deps.random ?? cryptoRandom
++        const cooldown = this.settings.cooldownMs + Math.floor(random() * Math.max(0, this.settings.cooldownMaxMs - this.settings.cooldownMs))
++        this.timer = setTimeout(() => {
++          if (epoch === this.epoch)
++            void this.run(epoch, true)
++        }, cooldown)
++      }
++    }
++  }
++}
++
++export function loadBroadcastSettings(storage: Storage | undefined = globalThis.localStorage): BroadcastSettings {
++  try {
++    const parsed = JSON.parse(storage?.getItem(STORAGE_KEY) || '{}') as Partial<BroadcastSettings>
++    // v1 used 5–10 second loops. Retain the user's opt-in choice, but never
++    // carry that unsafe cadence into the idle-only v2 policy.
++    if (parsed.schemaVersion !== 2)
++      return { ...DEFAULT_BROADCAST_SETTINGS, enabled: parsed.enabled === true }
++    return normalizeBroadcastSettings(parsed)
++  }
++  catch { return { ...DEFAULT_BROADCAST_SETTINGS } }
++}
++export function saveBroadcastSettings(settings: BroadcastSettings, storage: Storage | undefined = globalThis.localStorage) {
++  storage?.setItem(STORAGE_KEY, JSON.stringify(normalizeBroadcastSettings(settings)))
++}
 diff --git a/packages/stage-ui/src/stores/chat.contract.test.ts b/packages/stage-ui/src/stores/chat.contract.test.ts
 index fe4c24a29651659ae503df25e19ea8dffce501fe..7ca6a8fc717973a5ba0bf8f41fac022278ac3a11 100644
 --- a/packages/stage-ui/src/stores/chat.contract.test.ts
@@ -5106,7 +6772,7 @@ index fe4c24a29651659ae503df25e19ea8dffce501fe..7ca6a8fc717973a5ba0bf8f41fac0222
      activeProviderRef.value = 'official-provider'
      llmStreamMock.mockImplementation(async (_model: string, _chatProvider: ChatProvider, _messages: Message[], options: any) => {
 diff --git a/packages/stage-ui/src/stores/chat.ts b/packages/stage-ui/src/stores/chat.ts
-index d4ec894116f501a91836509e0c2aa51a0f4dd5bb..1a5db1dcb43b13e3fcbfa0afcf85b170eaf4401d 100644
+index d4ec894116f501a91836509e0c2aa51a0f4dd5bb..a3bb53727dad3aec251f2a537a817bd5c3d0ca50 100644
 --- a/packages/stage-ui/src/stores/chat.ts
 +++ b/packages/stage-ui/src/stores/chat.ts
 @@ -1,4 +1,4 @@
@@ -5194,8 +6860,8 @@ index d4ec894116f501a91836509e0c2aa51a0f4dd5bb..1a5db1dcb43b13e3fcbfa0afcf85b170
 +    return runtime.produceFromIntent(options, targetSessionId ?? activeSessionId.value)
 +  }
 +
-+  function cancelActiveRound(conversationId: string, roundId?: string) {
-+    return runtime.cancelActiveRound(conversationId, roundId)
++  function cancelActiveRound(conversationId: string, roundId?: string, reason?: 'superseded') {
++    return runtime.cancelActiveRound(conversationId, roundId, reason)
 +  }
 +
    function getPendingQueuedSendSnapshot() {
@@ -5211,6 +6877,14 @@ index d4ec894116f501a91836509e0c2aa51a0f4dd5bb..1a5db1dcb43b13e3fcbfa0afcf85b170
      getPendingQueuedSendSnapshot,
  
      clearHooks: runtime.hooks.clearHooks,
+@@ -431,6 +481,7 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
+     emitAssistantResponseEndHooks: runtime.hooks.emitAssistantResponseEndHooks,
+     emitAssistantMessageHooks: runtime.hooks.emitAssistantMessageHooks,
+     emitChatTurnCompleteHooks: runtime.hooks.emitChatTurnCompleteHooks,
++    onChatRoundCancelled: runtime.hooks.onChatRoundCancelled,
+ 
+     onBeforeMessageComposed: runtime.hooks.onBeforeMessageComposed,
+     onAfterMessageComposed: runtime.hooks.onAfterMessageComposed,
 diff --git a/packages/stage-ui/src/stores/chat/maintenance.ts b/packages/stage-ui/src/stores/chat/maintenance.ts
 index dd55f6abb355c3c8e1b878a8bf610a2b69ff28d0..1b92d985480d93f250f514c444f28a0d639065ec 100644
 --- a/packages/stage-ui/src/stores/chat/maintenance.ts
@@ -5488,7 +7162,7 @@ index bb95ad874c98cbb780e22f5cc3e81cbdfb5e4b97..1b5ed5afac446d5916df906a5de139bd
  
      store.websocketAuthToken = 'rotated-secret'
 diff --git a/packages/stage-ui/src/stores/mods/api/channel-server.ts b/packages/stage-ui/src/stores/mods/api/channel-server.ts
-index 2bafa8c5f5cad7fb2338a50eb487190c12141725..7d4168b612f58373ef375b2de12c7ad1ab9e3b96 100644
+index 2bafa8c5f5cad7fb2338a50eb487190c12141725..f487655ceeb7c37e1b7becee6cd3091e8af8aa18 100644
 --- a/packages/stage-ui/src/stores/mods/api/channel-server.ts
 +++ b/packages/stage-ui/src/stores/mods/api/channel-server.ts
 @@ -15,7 +15,7 @@ import { isStageTamagotchi, isStageWeb } from '@proj-airi/stage-shared'
@@ -5529,7 +7203,7 @@ index 2bafa8c5f5cad7fb2338a50eb487190c12141725..7d4168b612f58373ef375b2de12c7ad1
  export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:server', () => {
    const connected = ref(false)
    const client = ref<Client>()
-@@ -83,6 +98,8 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
+@@ -83,8 +98,11 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
      'spark:command',
      'input:text',
      'input:text:voice',
@@ -5537,8 +7211,11 @@ index 2bafa8c5f5cad7fb2338a50eb487190c12141725..7d4168b612f58373ef375b2de12c7ad1
 +    'output:local:voice-status:response',
      'output:gen-ai:chat:message',
      'output:gen-ai:chat:complete',
++    'output:gen-ai:chat:cancelled',
      'output:gen-ai:chat:tool-call',
-@@ -108,11 +125,44 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
+     'ui:configure',
+   ]
+@@ -108,11 +126,44 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
        ...(options?.possibleEvents ?? []),
      ]))
  
@@ -5585,7 +7262,7 @@ index 2bafa8c5f5cad7fb2338a50eb487190c12141725..7d4168b612f58373ef375b2de12c7ad1
          name: isStageWeb() ? WebSocketEventSource.StageWeb : isStageTamagotchi() ? WebSocketEventSource.StageTamagotchi : WebSocketEventSource.StageWeb,
          url: currentWebSocketUrl,
          token: options?.token ?? (websocketAuthToken.value || undefined),
-@@ -135,6 +185,8 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
+@@ -135,6 +186,8 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
            useWebSocketInspectorStore().add('outgoing', event)
          },
          onError: (error) => {
@@ -5594,7 +7271,7 @@ index 2bafa8c5f5cad7fb2338a50eb487190c12141725..7d4168b612f58373ef375b2de12c7ad1
            connected.value = false
            // Do not clear listeners or replay cache here.
            // onError may be recoverable while the SDK is reconnecting.
-@@ -146,28 +198,36 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
+@@ -146,28 +199,36 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
            }
          },
          onClose: () => {
@@ -5635,7 +7312,7 @@ index 2bafa8c5f5cad7fb2338a50eb487190c12141725..7d4168b612f58373ef375b2de12c7ad1
            flush()
            initializeListeners()
  
-@@ -185,26 +245,36 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
+@@ -185,26 +246,36 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
              // eslint-disable-next-line no-console
              console.debug('WebSocket server connection re-established')
            }
@@ -5682,7 +7359,7 @@ index 2bafa8c5f5cad7fb2338a50eb487190c12141725..7d4168b612f58373ef375b2de12c7ad1
    }
  
    async function ensureConnected() {
-@@ -224,7 +294,7 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
+@@ -224,7 +295,7 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
    }
  
    function initializeListeners() {
@@ -5691,7 +7368,7 @@ index 2bafa8c5f5cad7fb2338a50eb487190c12141725..7d4168b612f58373ef375b2de12c7ad1
        return
  
      for (const listener of registeredListeners) {
-@@ -241,14 +311,13 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
+@@ -241,14 +312,13 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
      type: E,
      callback: (event: WebSocketBaseEvent<E, WebSocketEvents[E]>) => void | Promise<void>,
    ) {
@@ -5708,7 +7385,7 @@ index 2bafa8c5f5cad7fb2338a50eb487190c12141725..7d4168b612f58373ef375b2de12c7ad1
      initializeListeners()
  
      const replayableEvent = replayableEvents.get(type)
-@@ -266,24 +335,26 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
+@@ -266,24 +336,26 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
    }
  
    function send<C = undefined>(data: WebSocketEventOptionalSource<C>) {
@@ -5744,7 +7421,7 @@ index 2bafa8c5f5cad7fb2338a50eb487190c12141725..7d4168b612f58373ef375b2de12c7ad1
      }
    }
  
-@@ -323,8 +394,11 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
+@@ -323,8 +395,11 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
      replayableEvents.clear()
  
      if (client.value) {
@@ -5757,7 +7434,7 @@ index 2bafa8c5f5cad7fb2338a50eb487190c12141725..7d4168b612f58373ef375b2de12c7ad1
      }
    }
  
-@@ -337,7 +411,7 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
+@@ -337,7 +412,7 @@ export const useModsServerChannelStore = defineStore('mods:channels:proj-airi:se
  
      if (client.value || initializing.value) {
        dispose()
@@ -5767,10 +7444,18 @@ index 2bafa8c5f5cad7fb2338a50eb487190c12141725..7d4168b612f58373ef375b2de12c7ad1
    })
  
 diff --git a/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts b/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts
-index 566c388..03170d1 100644
+index 566c38875bc979b6407d905a36fe757ba928be85..97ac0ca488716b717e82c925d9a7a6aeb0cffa82 100644
 --- a/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts
 +++ b/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts
-@@ -139,6 +139,53 @@ function createContextUpdateEvent(overrides: Record<string, unknown> = {}) {
+@@ -37,6 +37,7 @@ const streamEndHooks: HookCallback[] = []
+ const assistantEndHooks: HookCallback[] = []
+ const assistantMessageHooks: HookCallback[] = []
+ const turnCompleteHooks: HookCallback[] = []
++const chatRoundCancelledHooks: HookCallback[] = []
+ 
+ const activeSessionIdRef = ref('session-1')
+ let currentGeneration = 7
+@@ -139,9 +140,57 @@ function createContextUpdateEvent(overrides: Record<string, unknown> = {}) {
    }
  }
  
@@ -5824,7 +7509,35 @@ index 566c388..03170d1 100644
  const chatOrchestratorMock = {
    sending: false,
    ingest: vi.fn(),
-@@ -347,6 +394,25 @@ describe('context bridge contract', () => {
++  cancelActiveRound: vi.fn(),
+ 
+   onBeforeMessageComposed: (callback: HookCallback) => registerHook(beforeComposeHooks, callback),
+   onAfterMessageComposed: (callback: HookCallback) => registerHook(afterComposeHooks, callback),
+@@ -153,6 +202,7 @@ const chatOrchestratorMock = {
+   onAssistantResponseEnd: (callback: HookCallback) => registerHook(assistantEndHooks, callback),
+   onAssistantMessage: (callback: HookCallback) => registerHook(assistantMessageHooks, callback),
+   onChatTurnComplete: (callback: HookCallback) => registerHook(turnCompleteHooks, callback),
++  onChatRoundCancelled: (callback: HookCallback) => registerHook(chatRoundCancelledHooks, callback),
+ 
+   emitBeforeMessageComposedHooks: (...args: unknown[]) => emitHooks(beforeComposeHooks, ...args),
+   emitAfterMessageComposedHooks: (...args: unknown[]) => emitHooks(afterComposeHooks, ...args),
+@@ -286,6 +336,7 @@ describe('context bridge contract', () => {
+     getProviderInstanceMock.mockReset()
+     recordLifecycleMock.mockReset()
+     chatOrchestratorMock.ingest.mockReset()
++    chatOrchestratorMock.cancelActiveRound.mockReset()
+ 
+     activeProviderRef.value = null
+     activeModelRef.value = null
+@@ -303,6 +354,7 @@ describe('context bridge contract', () => {
+     assistantEndHooks.length = 0
+     assistantMessageHooks.length = 0
+     turnCompleteHooks.length = 0
++    chatRoundCancelledHooks.length = 0
+     contextUpdateHooks.length = 0
+     serverEventHooks.clear()
+   })
+@@ -347,6 +399,25 @@ describe('context bridge contract', () => {
      await store.dispose()
    })
  
@@ -5850,10 +7563,131 @@ index 566c388..03170d1 100644
    /**
     * @example
     * Server context updates record store-ingested before broadcast-posted.
-@@ -608,6 +674,276 @@ describe('context bridge contract', () => {
+@@ -608,6 +679,397 @@ describe('context bridge contract', () => {
      await store.dispose()
    })
  
++  it('emits a content-free superseded cancellation only for a correlated user round', async () => {
++    activeProviderRef.value = 'mock-provider'
++    activeModelRef.value = 'mock-model'
++    getProviderInstanceMock.mockResolvedValueOnce({})
++    const store = useContextBridgeStore()
++    await store.initialize()
++
++    await emitServerEvent('input:text', {
++      type: 'input:text',
++      source: 'extension-module-host',
++      metadata: {
++        ...createMetadata('weather', 'station-1'),
++        event: { id: 'cancel-parent-42' },
++      },
++      data: { text: 'cancel me' },
++    })
++
++    serverSendMock.mockClear()
++    await emitHooks(chatRoundCancelledHooks, {
++      input: chatOrchestratorMock.ingest.mock.calls[0]?.[1]?.input,
++      message: { role: 'user', content: 'must not leak' },
++      contexts: { secret: [{ text: 'must not leak' }] },
++      composedMessage: [{ role: 'system', content: 'must not leak' }],
++    }, 'superseded')
++
++    expect(serverSendMock.mock.calls.map(call => call[0])).toEqual([{
++      type: 'output:gen-ai:chat:cancelled',
++      metadata: { event: { parentId: 'cancel-parent-42' } },
++      data: { reason: 'superseded' },
++    }])
++
++    await store.dispose()
++  })
++
++  it('does not emit cancellation output for uncorrelated or local/proactive rounds', async () => {
++    const store = useContextBridgeStore()
++    await store.initialize()
++
++    await emitHooks(chatRoundCancelledHooks, {
++      message: { role: 'user', content: 'uncorrelated' }, contexts: {}, composedMessage: [],
++    }, 'superseded')
++    await emitHooks(chatRoundCancelledHooks, {
++      input: { type: 'input:text', data: { text: 'local only' } },
++      message: { role: 'system', content: 'local proactive' }, contexts: {}, composedMessage: [],
++    }, 'superseded')
++
++    expect(serverSendMock).not.toHaveBeenCalledWith(expect.objectContaining({
++      type: 'output:gen-ai:chat:cancelled',
++    }))
++
++    await store.dispose()
++  })
++
++  it('preflight-cancels the target session before acquiring the input event lock', async () => {
++    const lockMock = installExclusiveLockMock()
++    const store = useContextBridgeStore()
++    await store.initialize()
++
++    try {
++      await emitServerEvent('input:text', {
++        type: 'input:text',
++        source: 'extension-module-host',
++        metadata: {
++          ...createMetadata('weather', 'station-1'),
++          event: { id: 'preflight-cancel-1' },
++        },
++        data: {
++          text: 'new input',
++          overrides: { sessionId: 'target-session' },
++        },
++      })
++
++      expect(chatOrchestratorMock.cancelActiveRound).toHaveBeenCalledWith('target-session', undefined, 'superseded')
++      expect(chatOrchestratorMock.cancelActiveRound.mock.invocationCallOrder[0]).toBeLessThan(lockMock.request.mock.invocationCallOrder[0]!)
++    }
++    finally {
++      await store.dispose()
++      lockMock.restore()
++    }
++  })
++
++  it('does not let a replay of the active parent supersede itself before losing its lock', async () => {
++    const lockMock = installExclusiveLockMock()
++    activeProviderRef.value = 'mock-provider'
++    activeModelRef.value = 'mock-model'
++    getProviderInstanceMock.mockResolvedValue({})
++    let resolveIngest: (() => void) | undefined
++    chatOrchestratorMock.ingest.mockImplementationOnce(() => new Promise<void>((resolve) => {
++      resolveIngest = resolve
++    }))
++    const store = useContextBridgeStore()
++    await store.initialize()
++    const event = {
++      type: 'input:text',
++      source: 'extension-module-host',
++      metadata: {
++        ...createMetadata('weather', 'station-1'),
++        event: { id: 'replayed-active-parent' },
++      },
++      data: { text: 'active input' },
++    }
++
++    try {
++      const inputHandler = serverEventHooks.get('input:text')?.[0]
++      const first = inputHandler?.(event)
++      await vi.waitFor(() => expect(chatOrchestratorMock.ingest).toHaveBeenCalledTimes(1))
++      await inputHandler?.(event)
++
++      expect(chatOrchestratorMock.cancelActiveRound).toHaveBeenCalledTimes(1)
++      expect(chatOrchestratorMock.cancelActiveRound).toHaveBeenCalledWith('session-1', undefined, 'superseded')
++      expect(chatOrchestratorMock.ingest).toHaveBeenCalledTimes(1)
++
++      resolveIngest?.()
++      await first
++    }
++    finally {
++      await store.dispose()
++      lockMock.restore()
++    }
++  })
++
 +  it('keeps a valid input event ID out of core input and echoes it only on both output envelopes', async () => {
 +    activeProviderRef.value = 'mock-provider'
 +    activeModelRef.value = 'mock-model'
@@ -6128,23 +7962,29 @@ index 566c388..03170d1 100644
      const store = useContextBridgeStore()
      await store.initialize()
 diff --git a/packages/stage-ui/src/stores/mods/api/context-bridge.ts b/packages/stage-ui/src/stores/mods/api/context-bridge.ts
-index 4732159..82d1764 100644
+index 47321590d65bbb57e41f9f18bd410a70d5b102de..cacdc3de22ab615398c7bb8e2ff1087af65b2255 100644
 --- a/packages/stage-ui/src/stores/mods/api/context-bridge.ts
 +++ b/packages/stage-ui/src/stores/mods/api/context-bridge.ts
-@@ -91,8 +91,12 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -91,8 +91,18 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
    const { post: postSparkNotifyBridgeMessage, data: incomingSparkNotifyBridgeMessage } = useBroadcastChannel<SparkNotifyBridgeMessage, SparkNotifyBridgeMessage>({ name: SPARK_NOTIFY_BRIDGE_CHANNEL_NAME })
  
    const disposeHookFns = ref<Array<() => void>>([])
 +  // Keep transport-only server event correlation out of the chat runtime
 +  // object graph (which may be persisted or broadcast to other renderers).
 +  const inputTextEventParentIds = new WeakMap<object, string>()
++  const completedInputTextRounds = new WeakSet<object>()
++  // A bridge instance can receive a replay of the same input while it owns
++  // that round. Keep this local-only marker so the replay does not supersede
++  // itself before it loses the per-event lock; a distinct parent still
++  // preflights cancellation in every renderer.
++  const activeInputTextParentsBySession = new Map<string, { parentId: string, input: object }>()
    let remoteStreamGuard: { sessionId: string, generation: number } | null = null
    let initialized = false
 +  let registersChatIngestion = true
  
    function recordContextIngestRejected(options: {
      channel: 'server' | 'broadcast' | 'input'
-@@ -374,14 +378,37 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -374,14 +384,48 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
      return await callback()
    }
  
@@ -6167,6 +8007,17 @@ index 4732159..82d1764 100644
 +    return `context-bridge:event:input:text:${eventId}`
 +  }
 +
++  function getInputTextTargetSessionId(event: { data: { overrides?: { sessionId?: string } } }) {
++    return event.data.overrides?.sessionId || chatSession.activeSessionId
++  }
++
++  function clearActiveInputTextParent(input: unknown) {
++    for (const [sessionId, active] of activeInputTextParentsBySession) {
++      if (active.input === input)
++        activeInputTextParentsBySession.delete(sessionId)
++    }
++  }
++
 +  async function initialize(options: { registerChatIngestion?: boolean } = {}) {
      await mutex.acquire()
  
@@ -6183,7 +8034,7 @@ index 4732159..82d1764 100644
          for (const consumerEvent of consumerRegistrationEvents) {
            serverChannelStore.send({
              type: 'module:consumer:register',
-@@ -396,8 +423,10 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -396,8 +440,10 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
  
        await serverChannelStore.ensureConnected()
  
@@ -6196,7 +8047,7 @@ index 4732159..82d1764 100644
  
        let isProcessingRemoteStream = false
  
-@@ -557,143 +586,147 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -557,143 +603,164 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
        }))
  
        disposeHookFns.value.push(serverChannelStore.onEvent('input:text', async (event) => {
@@ -6236,6 +8087,15 @@ index 4732159..82d1764 100644
 -              },
 -            })
 -            const contextMessage: ContextMessage = {
++        // Cancel before taking the per-event lock so a renderer which owns an
++        // earlier round can observe this input even when another renderer wins
++        // ingestion for it.
++        const targetSessionId = getInputTextTargetSessionId(event)
++        const inputTextEventId = getInputTextEventId(event)
++        if (!inputTextEventId || activeInputTextParentsBySession.get(targetSessionId)?.parentId !== inputTextEventId) {
++          chatOrchestrator.cancelActiveRound(targetSessionId, undefined, 'superseded')
++        }
++
 +        const handleInputText = async () => {
 +          const {
 +            text,
@@ -6397,6 +8257,18 @@ index 4732159..82d1764 100644
 -          // - https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API
 -          await withContextBridgeLock('context-bridge:event:input:text', async () => {
              try {
+-              await chatOrchestrator.ingest(messageText, {
+-                model: activeModel.value,
+-                chatProvider,
+-                input: {
+-                  type: 'input:text',
+-                  data: {
+-                    ...event.data,
+-                    text,
+-                    textRaw,
+-                    overrides,
+-                    contextUpdates: acceptedContextUpdates,
+-                  },
 +              // The Tamagotchi authority listens for this local DOM signal to
 +              // cancel idle/proactive narration before accepting real input.
 +              globalThis.dispatchEvent?.(new Event('airi:user-chat-activity'))
@@ -6408,29 +8280,28 @@ index 4732159..82d1764 100644
 +                  textRaw,
 +                  overrides,
 +                  contextUpdates: acceptedContextUpdates,
-+                },
+                 },
+-              }, targetSessionId)
 +              }
-+              const inputTextEventId = getInputTextEventId(event)
 +              if (inputTextEventId) {
 +                inputTextEventParentIds.set(ingestInput, inputTextEventId)
++                activeInputTextParentsBySession.set(getInputTextTargetSessionId(event), {
++                  parentId: inputTextEventId,
++                  input: ingestInput,
++                })
 +              }
 +
-               await chatOrchestrator.ingest(messageText, {
-                 model: activeModel.value,
-                 chatProvider,
--                input: {
--                  type: 'input:text',
--                  data: {
--                    ...event.data,
--                    text,
--                    textRaw,
--                    overrides,
--                    contextUpdates: acceptedContextUpdates,
--                  },
--                },
-+                supersedeActive: true,
-+                input: ingestInput,
-               }, targetSessionId)
++              try {
++                await chatOrchestrator.ingest(messageText, {
++                  model: activeModel.value,
++                  chatProvider,
++                  supersedeActive: true,
++                  input: ingestInput,
++                }, targetSessionId)
++              }
++              finally {
++                clearActiveInputTextParent(ingestInput)
++              }
              }
              catch (err) {
                console.error('Error ingesting text input via context bridge:', err)
@@ -6454,7 +8325,7 @@ index 4732159..82d1764 100644
        }))
  
        disposeHookFns.value.push(
-@@ -747,8 +780,13 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -747,8 +814,13 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
          }),
  
          chatOrchestrator.onAssistantMessage(async (message, _messageText, context) => {
@@ -6468,7 +8339,7 @@ index 4732159..82d1764 100644
              data: {
                ...context.input?.data,
                message,
-@@ -765,8 +803,13 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -765,8 +837,15 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
          }),
  
          chatOrchestrator.onChatTurnComplete(async (chat, context) => {
@@ -6476,13 +8347,38 @@ index 4732159..82d1764 100644
 +            return
 +
 +          const parentId = context.input && inputTextEventParentIds.get(context.input)
++          if (context.input)
++            completedInputTextRounds.add(context.input)
            serverChannelStore.send({
              type: 'output:gen-ai:chat:complete',
 +            ...(parentId ? { metadata: { event: { parentId } } } : {}),
              data: {
                ...context.input?.data,
                'message': chat.output,
-@@ -883,15 +926,17 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -789,6 +868,22 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+               },
+             },
+           })
++          clearActiveInputTextParent(context.input)
++        }),
++        chatOrchestrator.onChatRoundCancelled((context, reason) => {
++          if (reason !== 'superseded')
++            return
++
++          const parentId = context.input && inputTextEventParentIds.get(context.input)
++          clearActiveInputTextParent(context.input)
++          if (!parentId || !context.input || completedInputTextRounds.has(context.input))
++            return
++
++          serverChannelStore.send({
++            type: 'output:gen-ai:chat:cancelled',
++            metadata: { event: { parentId } },
++            data: { reason: 'superseded' },
++          })
+         }),
+       )
+ 
+@@ -883,15 +978,17 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
        if (!initialized)
          return
  
@@ -6509,7 +8405,7 @@ index 4732159..82d1764 100644
        }
  
        for (const fn of disposeHookFns.value) {
-@@ -900,6 +945,7 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -900,6 +997,7 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
  
        initialized = false
        remoteStreamGuard = null
@@ -7082,1298 +8978,9 @@ index ef4277451e9c670010fa37856fc1fa0f71580f72..6f92418f33d6a557ecac03c0a4a16ced
          return
        }
  
-diff --git a/packages/stage-ui/src/workers/vad/vad.ts b/packages/stage-ui/src/workers/vad/vad.ts
-index a7e63ab76114b47cab26a1995c43c598bb979f44..7f0f30144c4460ea4347f62a4fd1a15ea5d9d1b7 100644
---- a/packages/stage-ui/src/workers/vad/vad.ts
-+++ b/packages/stage-ui/src/workers/vad/vad.ts
-@@ -231,7 +231,9 @@ export class VAD implements BaseVAD {
-     this.emit('speech-end', undefined)
-     this.emit('speech-ready', {
-       buffer: finalBuffer,
-+      sampleRate: this.config.sampleRate,
-       duration,
-+      preRollSamples: prevLength,
-     })
- 
-     // Reset for the next segment
-diff --git a/apps/stage-tamagotchi/src/renderer/pages/settings/system/local-broadcast.vue b/apps/stage-tamagotchi/src/renderer/pages/settings/system/local-broadcast.vue
-new file mode 100644
-index 0000000..e168eb4
---- /dev/null
-+++ b/apps/stage-tamagotchi/src/renderer/pages/settings/system/local-broadcast.vue
-@@ -0,0 +1,77 @@
-+<script setup lang="ts">
-+import type { BroadcastSettingsChannelEvent } from '@proj-airi/stage-ui/stores/broadcast-director'
-+
-+import {
-+  BROADCAST_SETTINGS_CHANNEL_NAME,
-+  loadBroadcastSettings,
-+  normalizeBroadcastSettings,
-+  saveBroadcastSettings,
-+} from '@proj-airi/stage-ui/stores/broadcast-director'
-+import { useBroadcastChannel } from '@vueuse/core'
-+import { computed, onMounted, onUnmounted, ref } from 'vue'
-+import { useI18n } from 'vue-i18n'
-+
-+const { t } = useI18n()
-+const tt = (key: string, named?: Record<string, number>) => named
-+  ? t(`tamagotchi.settings.pages.system.local-broadcast.${key}`, named)
-+  : t(`tamagotchi.settings.pages.system.local-broadcast.${key}`)
-+const settings = ref(loadBroadcastSettings())
-+const status = computed(() => settings.value.enabled ? tt('status.armed') : tt('status.disabled'))
-+const { post } = useBroadcastChannel<BroadcastSettingsChannelEvent, BroadcastSettingsChannelEvent>({ name: BROADCAST_SETTINGS_CHANNEL_NAME })
-+const postActivity = () => post({ type: 'user-activity' })
-+
-+function apply() {
-+  // Preserve a 90–180 second first-idle range when the UI changes the lower
-+  // bound, rather than accidentally combining it with an old short jitter.
-+  settings.value.minDelayMs = 0
-+  settings.value.maxDelayMs = Math.max(0, 180_000 - settings.value.idleMs)
-+  settings.value.cooldownMaxMs = Math.max(settings.value.cooldownMs, 480_000)
-+  settings.value = normalizeBroadcastSettings(settings.value)
-+  saveBroadcastSettings(settings.value)
-+  post({ type: 'settings-changed', settings: settings.value })
-+}
-+
-+onMounted(() => {
-+  globalThis.addEventListener('pointerdown', postActivity, { capture: true })
-+  globalThis.addEventListener('keydown', postActivity, { capture: true })
-+  globalThis.addEventListener('focus', postActivity, { capture: true })
-+})
-+onUnmounted(() => {
-+  globalThis.removeEventListener('pointerdown', postActivity, { capture: true })
-+  globalThis.removeEventListener('keydown', postActivity, { capture: true })
-+  globalThis.removeEventListener('focus', postActivity, { capture: true })
-+})
-+</script>
-+
-+<template>
-+  <section class="flex flex-col gap-5 rounded-lg bg-neutral-50 p-5 dark:bg-neutral-800">
-+    <div class="flex items-start justify-between gap-4">
-+      <div>
-+        <h2 class="text-sm text-neutral-900 font-medium dark:text-neutral-50">{{ tt('title') }}</h2>
-+        <p class="mt-1 text-xs text-neutral-500 leading-relaxed dark:text-neutral-400">{{ tt('description') }}</p>
-+      </div>
-+      <span class="rounded-full bg-neutral-200 px-2 py-1 text-xs dark:bg-neutral-700">{{ status }}</span>
-+    </div>
-+    <label class="flex items-center justify-between gap-3 text-sm">
-+      <span>{{ tt('enabled') }}</span>
-+      <input v-model="settings.enabled" type="checkbox" @change="apply">
-+    </label>
-+    <label class="flex flex-col gap-2 text-sm">
-+      <span>{{ tt('idle', { seconds: Math.round(settings.idleMs / 1000) }) }}</span>
-+      <input v-model.number="settings.idleMs" type="range" min="90000" max="180000" step="1000" @change="apply">
-+    </label>
-+    <label class="flex flex-col gap-2 text-sm">
-+      <span>{{ tt('cooldown', { seconds: Math.round(settings.cooldownMs / 1000) }) }}</span>
-+      <input v-model.number="settings.cooldownMs" type="range" min="180000" max="480000" step="1000" @change="apply">
-+    </label>
-+  </section>
-+</template>
-+
-+<route lang="yaml">
-+meta:
-+  layout: settings
-+  titleKey: tamagotchi.settings.pages.system.local-broadcast.title
-+  subtitleKey: settings.title
-+  stageTransition:
-+    name: slide
-+</route>
-diff --git a/apps/stage-tamagotchi/src/shared/voice-input-runtime.test.ts b/apps/stage-tamagotchi/src/shared/voice-input-runtime.test.ts
-new file mode 100644
-index 0000000..51294d6
---- /dev/null
-+++ b/apps/stage-tamagotchi/src/shared/voice-input-runtime.test.ts
-@@ -0,0 +1,59 @@
-+import { describe, expect, it } from 'vitest'
-+import { createInitialLastCapture, createVoiceInputRuntimeSnapshot, isExactLoopbackServerUrl, markLastCapture, readMicrophonePermissionPassive } from './voice-input-runtime'
-+
-+describe('local voice status privacy helpers', () => {
-+  it('only permits exact plaintext loopback URLs', () => {
-+    expect(isExactLoopbackServerUrl('ws://127.0.0.1:6121/ws')).toBe(true)
-+    expect(isExactLoopbackServerUrl('ws://localhost:6121/ws')).toBe(true)
-+    expect(isExactLoopbackServerUrl('wss://127.0.0.1:6121/ws')).toBe(false)
-+    expect(isExactLoopbackServerUrl('ws://192.168.0.2:6121/ws')).toBe(false)
-+  })
-+  it('fails permission reads closed without asking for permission', async () => {
-+    expect(await readMicrophonePermissionPassive(undefined)).toBe('unavailable')
-+    expect(await readMicrophonePermissionPassive({ query: async () => ({ state: 'granted' }) } as any)).toBe('granted')
-+  })
-+  it('maps non-content capture outcomes', () => {
-+    expect(createInitialLastCapture()).toEqual({ outcome: 'none', atMs: null })
-+    expect(markLastCapture('transcription-empty', 4)).toEqual({ outcome: 'transcription-empty', atMs: 4 })
-+  })
-+  it('copies only the exact public snapshot keys', () => {
-+    const snapshot = createVoiceInputRuntimeSnapshot({
-+      stageMounted: true,
-+      voiceInputEnabled: true,
-+      providerConfigured: true,
-+      recording: false,
-+      transcribing: false,
-+      vad: {
-+        active: true,
-+        listening: true,
-+        inputLive: true,
-+        inputEnabled: true,
-+        inputMuted: false,
-+        isSpeech: true,
-+        score: Infinity,
-+        threshold: -1,
-+        recentMax: 1,
-+        recentSamples: [-1, 0.5, 2, Number.NaN, 'drop'],
-+        text: 'drop',
-+      } as any,
-+      microphonePermission: 'granted',
-+      lastCapture: { outcome: 'capture-started', atMs: 4, deviceLabel: 'drop' } as any,
-+      transcript: 'drop',
-+    } as any)
-+    expect(Object.keys(snapshot).sort()).toEqual([
-+      'lastCapture', 'microphonePermission', 'providerConfigured', 'recording',
-+      'stageMounted', 'transcribing', 'vad', 'voiceInputEnabled',
-+    ])
-+    expect(Object.keys(snapshot.vad).sort()).toEqual([
-+      'active', 'inputEnabled', 'inputLive', 'inputMuted', 'isSpeech', 'listening',
-+      'recentMax', 'recentSamples', 'score', 'threshold',
-+    ])
-+    expect(Object.keys(snapshot.lastCapture).sort()).toEqual(['atMs', 'outcome'])
-+    expect(JSON.stringify(snapshot)).not.toContain('drop')
-+    expect(snapshot.vad.score).toBe(0)
-+    expect(snapshot.vad.threshold).toBe(0)
-+    expect(snapshot.vad.recentSamples).toEqual([0, 0.5, 1, 0, 0])
-+    expect(snapshot.vad.recentSamples.every(value => Number.isFinite(value) && value >= 0 && value <= 1)).toBe(true)
-+    expect(snapshot.vad.recentMax).toBe(1)
-+  })
-+})
-diff --git a/apps/stage-tamagotchi/src/shared/voice-input-runtime.ts b/apps/stage-tamagotchi/src/shared/voice-input-runtime.ts
-new file mode 100644
-index 0000000..ebd1781
---- /dev/null
-+++ b/apps/stage-tamagotchi/src/shared/voice-input-runtime.ts
-@@ -0,0 +1,104 @@
-+/** Content-free, passive voice-input status contract. */
-+export type MicrophonePermission = 'granted' | 'denied' | 'prompt' | 'unavailable'
-+export type VoiceCaptureOutcome = 'none' | 'capture-started' | 'capture-skipped' | 'transcription-started' | 'transcription-accepted' | 'transcription-empty' | 'transcription-error' | 'permission-denied' | 'stream-unavailable'
-+
-+export interface LocalVoiceStatusSnapshot {
-+  stageMounted: boolean
-+  voiceInputEnabled: boolean
-+  providerConfigured: boolean
-+  recording: boolean
-+  transcribing: boolean
-+  vad: {
-+    active: boolean
-+    listening: boolean
-+    inputLive: boolean
-+    inputEnabled: boolean
-+    inputMuted: boolean
-+    isSpeech: boolean
-+    score: number
-+    threshold: number
-+    recentMax: number
-+    recentSamples: number[]
-+  }
-+  microphonePermission: MicrophonePermission
-+  lastCapture: { outcome: VoiceCaptureOutcome, atMs: number | null }
-+}
-+
-+export const LOCAL_VOICE_STATUS_REQUEST = 'input:local:voice-status:request'
-+export const LOCAL_VOICE_STATUS_RESPONSE = 'output:local:voice-status:response'
-+
-+export function createInitialLastCapture() {
-+  return { outcome: 'none' as VoiceCaptureOutcome, atMs: null as number | null }
-+}
-+
-+export function markLastCapture(outcome: VoiceCaptureOutcome, atMs = Date.now()) {
-+  return { outcome, atMs }
-+}
-+
-+const MAX_VAD_RECENT_SAMPLES = 50
-+
-+/** Limits diagnostic VAD values to finite probabilities, never raw audio data. */
-+function normalizeVadProbability(value: unknown) {
-+  return typeof value === 'number' && Number.isFinite(value)
-+    ? Math.min(1, Math.max(0, value))
-+    : 0
-+}
-+
-+function normalizeVadRecentSamples(value: unknown) {
-+  if (!Array.isArray(value))
-+    return []
-+  return value.slice(-MAX_VAD_RECENT_SAMPLES).map(normalizeVadProbability)
-+}
-+
-+/** Copy only the public diagnostic contract, dropping any renderer-owned data. */
-+export function createVoiceInputRuntimeSnapshot(value: LocalVoiceStatusSnapshot): LocalVoiceStatusSnapshot {
-+  return {
-+    stageMounted: value.stageMounted,
-+    voiceInputEnabled: value.voiceInputEnabled,
-+    providerConfigured: value.providerConfigured,
-+    recording: value.recording,
-+    transcribing: value.transcribing,
-+    vad: (() => {
-+      const recentSamples = normalizeVadRecentSamples(value.vad.recentSamples)
-+      return {
-+        active: Boolean(value.vad.active),
-+        listening: Boolean(value.vad.listening),
-+        inputLive: Boolean(value.vad.inputLive),
-+        inputEnabled: Boolean(value.vad.inputEnabled),
-+        inputMuted: Boolean(value.vad.inputMuted),
-+        isSpeech: Boolean(value.vad.isSpeech),
-+        score: normalizeVadProbability(value.vad.score),
-+        threshold: normalizeVadProbability(value.vad.threshold),
-+        recentMax: recentSamples.reduce((max, sample) => Math.max(max, sample), 0),
-+        recentSamples,
-+      }
-+    })(),
-+    microphonePermission: value.microphonePermission,
-+    lastCapture: { outcome: value.lastCapture.outcome, atMs: value.lastCapture.atMs },
-+  }
-+}
-+
-+/** Exact loopback only: no TLS, aliases, ports-by-proxy, or LAN addresses. */
-+export function isExactLoopbackServerUrl(value: string | undefined) {
-+  if (!value)
-+    return false
-+  try {
-+    const url = new URL(value)
-+    return url.protocol === 'ws:' && (url.hostname === '127.0.0.1' || url.hostname === 'localhost' || url.hostname === '[::1]' || url.hostname === '::1')
-+  }
-+  catch {
-+    return false
-+  }
-+}
-+
-+export async function readMicrophonePermissionPassive(permissions: Pick<Permissions, 'query'> | undefined): Promise<MicrophonePermission> {
-+  if (!permissions)
-+    return 'unavailable'
-+  try {
-+    const result = await permissions.query({ name: 'microphone' as PermissionName })
-+    return result.state === 'granted' || result.state === 'denied' || result.state === 'prompt' ? result.state : 'unavailable'
-+  }
-+  catch {
-+    return 'unavailable'
-+  }
-+}
-diff --git a/packages/i18n/src/locales/prompt-contract.test.ts b/packages/i18n/src/locales/prompt-contract.test.ts
-new file mode 100644
-index 0000000..7f8d465
---- /dev/null
-+++ b/packages/i18n/src/locales/prompt-contract.test.ts
-@@ -0,0 +1,29 @@
-+import { describe, expect, it } from 'vitest'
-+import englishBase from './en/base.yaml'
-+import koreanBase from './ko/base.yaml'
-+
-+const englishPrefix = (englishBase as { prompt: { prefix: string } }).prompt.prefix
-+const koreanPrefix = (koreanBase as { prompt: { prefix: string } }).prompt.prefix
-+
-+describe('locale prompt contract', () => {
-+  it('keeps the Korean prompt focused on the current verified conversation', () => {
-+    expect(koreanPrefix).toContain('한국어로 답하고')
-+    expect(koreanPrefix).toContain('현재 발화')
-+    expect(koreanPrefix).toContain('검증된 검색·도구 결과')
-+    expect(koreanPrefix).toContain('보통 1~2문장')
-+    expect(koreanPrefix).toContain('사실·실행·기억은 구분해')
-+    expect(koreanPrefix).not.toContain('메이플스토리')
-+    expect(koreanPrefix).not.toContain('이터널 리턴')
-+  })
-+
-+  it('keeps both locale prompts free of conversational control-token examples', () => {
-+    const [korean, english] = [koreanPrefix, englishPrefix]
-+
-+    for (const prefix of [korean, english]) {
-+      expect(prefix).toMatch(/ACT, DELAY,( and)? CALL/)
-+      expect(prefix).toContain("<{'|'}NAME payload{'|'}>")
-+      expect(prefix).not.toMatch(/<\{'\|'}ACT\s+\{/)
-+      expect(prefix).not.toContain('prepared a gift')
-+    }
-+  })
-+})
-diff --git a/packages/i18n/vitest.config.ts b/packages/i18n/vitest.config.ts
-new file mode 100644
-index 0000000..8ed03c3
---- /dev/null
-+++ b/packages/i18n/vitest.config.ts
-@@ -0,0 +1,9 @@
-+import Yaml from 'unplugin-yaml/vite'
-+import { defineConfig } from 'vitest/config'
-+
-+export default defineConfig({
-+  plugins: [Yaml()],
-+  test: {
-+    include: ['src/**/*.test.ts'],
-+  },
-+})
-diff --git a/packages/stage-ui/src/composables/audio/pcm-wav.test.ts b/packages/stage-ui/src/composables/audio/pcm-wav.test.ts
-new file mode 100644
-index 0000000..e3baf55
---- /dev/null
-+++ b/packages/stage-ui/src/composables/audio/pcm-wav.test.ts
-@@ -0,0 +1,35 @@
-+import { describe, expect, it } from 'vitest'
-+
-+import { pcmFloat32ToWavBlob } from './pcm-wav'
-+
-+describe('pcmFloat32ToWavBlob', () => {
-+  it('writes a mono PCM16 WAV header and clamps Float32 samples', async () => {
-+    const wav = pcmFloat32ToWavBlob(new Float32Array([-2, 0, 2]), 16000)
-+    const bytes = new Uint8Array(await wav.arrayBuffer())
-+    const view = new DataView(bytes.buffer)
-+    const ascii = (start: number, length: number) => String.fromCharCode(...bytes.slice(start, start + length))
-+
-+    expect(wav.type).toBe('audio/wav')
-+    expect(wav.size).toBe(50)
-+    expect(ascii(0, 4)).toBe('RIFF')
-+    expect(view.getUint32(4, true)).toBe(42)
-+    expect(ascii(8, 4)).toBe('WAVE')
-+    expect(ascii(12, 4)).toBe('fmt ')
-+    expect(view.getUint32(16, true)).toBe(16)
-+    expect(view.getUint16(20, true)).toBe(1)
-+    expect(view.getUint32(24, true)).toBe(16000)
-+    expect(view.getUint16(22, true)).toBe(1)
-+    expect(view.getUint32(28, true)).toBe(32000)
-+    expect(view.getUint16(32, true)).toBe(2)
-+    expect(view.getUint16(34, true)).toBe(16)
-+    expect(ascii(36, 4)).toBe('data')
-+    expect(view.getUint32(40, true)).toBe(6)
-+    expect(view.getInt16(44, true)).toBe(-32768)
-+    expect(view.getInt16(46, true)).toBe(0)
-+    expect(view.getInt16(48, true)).toBe(32767)
-+  })
-+
-+  it('rejects an invalid sample rate', () => {
-+    expect(() => pcmFloat32ToWavBlob(new Float32Array([0]), 0)).toThrow(/positive PCM sample rate/)
-+  })
-+})
-diff --git a/packages/stage-ui/src/composables/audio/pcm-wav.ts b/packages/stage-ui/src/composables/audio/pcm-wav.ts
-new file mode 100644
-index 0000000..94b7abd
---- /dev/null
-+++ b/packages/stage-ui/src/composables/audio/pcm-wav.ts
-@@ -0,0 +1,35 @@
-+/** Converts mono Float32 PCM samples into a browser-playable PCM16 WAV blob. */
-+export function pcmFloat32ToWavBlob(buffer: Float32Array, sampleRate: number): Blob {
-+  if (!Number.isFinite(sampleRate) || sampleRate <= 0)
-+    throw new Error('A positive PCM sample rate is required to create WAV audio.')
-+
-+  const bytesPerSample = 2
-+  const dataSize = buffer.length * bytesPerSample
-+  const wav = new ArrayBuffer(44 + dataSize)
-+  const view = new DataView(wav)
-+  const writeString = (offset: number, value: string) => {
-+    for (let index = 0; index < value.length; index++)
-+      view.setUint8(offset + index, value.charCodeAt(index))
-+  }
-+
-+  writeString(0, 'RIFF')
-+  view.setUint32(4, 36 + dataSize, true)
-+  writeString(8, 'WAVE')
-+  writeString(12, 'fmt ')
-+  view.setUint32(16, 16, true)
-+  view.setUint16(20, 1, true)
-+  view.setUint16(22, 1, true)
-+  view.setUint32(24, sampleRate, true)
-+  view.setUint32(28, sampleRate * bytesPerSample, true)
-+  view.setUint16(32, bytesPerSample, true)
-+  view.setUint16(34, 16, true)
-+  writeString(36, 'data')
-+  view.setUint32(40, dataSize, true)
-+
-+  for (let index = 0; index < buffer.length; index++) {
-+    const sample = Math.max(-1, Math.min(1, buffer[index]))
-+    view.setInt16(44 + index * bytesPerSample, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true)
-+  }
-+
-+  return new Blob([wav], { type: 'audio/wav' })
-+}
-diff --git a/packages/stage-ui/src/libs/latency/voice-turn-latency.test.ts b/packages/stage-ui/src/libs/latency/voice-turn-latency.test.ts
-new file mode 100644
-index 0000000..48cc125
---- /dev/null
-+++ b/packages/stage-ui/src/libs/latency/voice-turn-latency.test.ts
-@@ -0,0 +1,49 @@
-+import { describe, expect, it, vi } from 'vitest'
-+
-+import { createVoiceTurnLatencyTrace } from './voice-turn-latency'
-+
-+describe('voice turn latency trace', () => {
-+  it('preserves server STT timing and emits only the first substantive LLM delta and playback start for a voice round', () => {
-+    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => undefined)
-+    const trace = createVoiceTurnLatencyTrace(fetch, () => 1234)
-+
-+    trace.sttAccepted('voice-round')
-+    trace.firstSubstantiveLlmDelta('voice-round', '   ')
-+    trace.firstSubstantiveLlmDelta('voice-round', 'answer')
-+    trace.firstSubstantiveLlmDelta('voice-round', 'more')
-+    trace.firstPlaybackStart('voice-round')
-+    trace.firstPlaybackStart('voice-round')
-+
-+    expect(fetch).toHaveBeenCalledTimes(2)
-+    expect(fetch.mock.calls.map(([, init]) => JSON.parse((init as RequestInit).body as string))).toEqual([
-+      { source: 'llm', phase: 'content', request_id: 'voice-round', timestamp_ms: 1234 },
-+      { source: 'playback', phase: 'start', request_id: 'voice-round', timestamp_ms: 1234 },
-+    ])
-+  })
-+
-+  it('emits exactly one playback start for an armed non-voice round', () => {
-+    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => undefined)
-+    const trace = createVoiceTurnLatencyTrace(fetch)
-+
-+    trace.armPlaybackRound('typed-round')
-+    trace.firstSubstantiveLlmDelta('typed-round', 'answer')
-+    trace.firstPlaybackStart('typed-round')
-+    trace.firstPlaybackStart('typed-round')
-+
-+    expect(fetch).toHaveBeenCalledTimes(1)
-+    expect(JSON.parse((fetch.mock.calls[0][1] as RequestInit).body as string)).toMatchObject({
-+      source: 'playback',
-+      phase: 'start',
-+      request_id: 'typed-round',
-+    })
-+  })
-+
-+  it('does not emit playback for an unarmed round', () => {
-+    const fetch = vi.fn(async () => undefined)
-+    const trace = createVoiceTurnLatencyTrace(fetch)
-+
-+    trace.firstPlaybackStart('unarmed-round')
-+
-+    expect(fetch).not.toHaveBeenCalled()
-+  })
-+})
-diff --git a/packages/stage-ui/src/libs/latency/voice-turn-latency.ts b/packages/stage-ui/src/libs/latency/voice-turn-latency.ts
-new file mode 100644
-index 0000000..4dba92c
---- /dev/null
-+++ b/packages/stage-ui/src/libs/latency/voice-turn-latency.ts
-@@ -0,0 +1,76 @@
-+const endpoint = 'http://127.0.0.1:8892/api/event'
-+const maxTrackedTurns = 64
-+
-+type LatencyFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<unknown>
-+type LatencySource = 'stt' | 'llm' | 'playback'
-+type LatencyPhase = 'start' | 'end' | 'content'
-+
-+/**
-+ * Emits only numeric timestamps and an opaque, per-turn correlation id to the
-+ * local latency monitor. Transcript/LLM text and chat-session ids never leave
-+ * this module.
-+ */
-+export function createVoiceTurnLatencyTrace(fetchImpl: LatencyFetch = globalThis.fetch, now = () => Date.now()) {
-+  const acceptedTurns = new Set<string>()
-+  const armedPlaybackTurns = new Set<string>()
-+  const firstLlmDeltaTurns = new Set<string>()
-+
-+  function post(source: LatencySource, phase: LatencyPhase, roundId: string) {
-+    try {
-+      void fetchImpl(endpoint, {
-+        method: 'POST',
-+        body: JSON.stringify({ source, phase, request_id: roundId, timestamp_ms: now() }),
-+      }).catch(() => {})
-+    }
-+    catch {}
-+  }
-+
-+  function retain(turns: Set<string>, roundId: string) {
-+    turns.add(roundId)
-+    while (turns.size > maxTrackedTurns)
-+      turns.delete(turns.values().next().value!)
-+  }
-+
-+  function armPlaybackRound(roundId: string) {
-+    retain(armedPlaybackTurns, roundId)
-+  }
-+
-+  return {
-+    /**
-+     * Marks an accepted voice turn for later LLM/playback correlation.
-+     *
-+     * The loopback STT service owns the real request start/end timestamps.
-+     * Re-emitting both phases here, after the transcript has already arrived,
-+     * would replace that measured duration with an artificial 0-1 ms turn in
-+     * the monitor's request-id map.
-+     */
-+    sttAccepted(roundId?: string) {
-+      if (!roundId)
-+        return
-+      retain(acceptedTurns, roundId)
-+      armPlaybackRound(roundId)
-+    },
-+    /** Arms an authoritative chat round to report its first actual playback start. */
-+    armPlaybackRound(roundId?: string) {
-+      if (!roundId)
-+        return
-+      armPlaybackRound(roundId)
-+    },
-+    /** Records only the first non-whitespace LLM delta for an accepted turn. */
-+    firstSubstantiveLlmDelta(roundId: string | undefined, delta: string) {
-+      if (!roundId || !acceptedTurns.has(roundId) || firstLlmDeltaTurns.has(roundId) || !delta.trim())
-+        return
-+      retain(firstLlmDeltaTurns, roundId)
-+      post('llm', 'content', roundId)
-+    },
-+    /** Records only the first actual Web Audio playback start for that turn. */
-+    firstPlaybackStart(roundId?: string) {
-+      if (!roundId || !armedPlaybackTurns.delete(roundId))
-+        return
-+      firstLlmDeltaTurns.delete(roundId)
-+      post('playback', 'start', roundId)
-+    },
-+  }
-+}
-+
-+export const voiceTurnLatencyTrace = createVoiceTurnLatencyTrace()
-diff --git a/packages/stage-ui/src/libs/speech/attempt-timeout.test.ts b/packages/stage-ui/src/libs/speech/attempt-timeout.test.ts
-new file mode 100644
-index 0000000..aecae35
---- /dev/null
-+++ b/packages/stage-ui/src/libs/speech/attempt-timeout.test.ts
-@@ -0,0 +1,42 @@
-+import { describe, expect, it, vi } from 'vitest'
-+
-+import { createAttemptTimeoutSignal } from './attempt-timeout'
-+
-+describe('createAttemptTimeoutSignal', () => {
-+  it('aborts only the attempt when its timeout elapses', () => {
-+    vi.useFakeTimers()
-+    const parent = new AbortController()
-+    const attempt = createAttemptTimeoutSignal(parent.signal, 10_000)
-+
-+    vi.advanceTimersByTime(10_000)
-+
-+    expect(attempt.signal.aborted).toBe(true)
-+    expect(parent.signal.aborted).toBe(false)
-+    attempt.cleanup()
-+    vi.useRealTimers()
-+  })
-+
-+  it('forwards parent cancellation to the attempt', () => {
-+    const parent = new AbortController()
-+    const attempt = createAttemptTimeoutSignal(parent.signal, 10_000)
-+
-+    parent.abort('intent-cancelled')
-+
-+    expect(attempt.signal.aborted).toBe(true)
-+    expect(attempt.signal.reason).toBe('intent-cancelled')
-+    attempt.cleanup()
-+  })
-+
-+  it('cleans up its timer and parent listener after a completed attempt', () => {
-+    vi.useFakeTimers()
-+    const parent = new AbortController()
-+    const attempt = createAttemptTimeoutSignal(parent.signal, 10_000)
-+
-+    attempt.cleanup()
-+    parent.abort('after-cleanup')
-+    vi.advanceTimersByTime(10_000)
-+
-+    expect(attempt.signal.aborted).toBe(false)
-+    vi.useRealTimers()
-+  })
-+})
-diff --git a/packages/stage-ui/src/libs/speech/attempt-timeout.ts b/packages/stage-ui/src/libs/speech/attempt-timeout.ts
-new file mode 100644
-index 0000000..640d30e
---- /dev/null
-+++ b/packages/stage-ui/src/libs/speech/attempt-timeout.ts
-@@ -0,0 +1,35 @@
-+export interface AttemptTimeoutSignal {
-+  signal: AbortSignal
-+  cleanup: () => void
-+}
-+
-+/**
-+ * Creates an abort signal for one physical request attempt without changing
-+ * the caller-owned parent signal. The caller must run `cleanup()` when that
-+ * attempt settles so neither the timer nor the parent listener leaks into a
-+ * later retry.
-+ */
-+export function createAttemptTimeoutSignal(parent: AbortSignal, timeoutMs: number): AttemptTimeoutSignal {
-+  const controller = new AbortController()
-+  let timeout: ReturnType<typeof setTimeout> | undefined
-+
-+  const abortFromParent = () => controller.abort(parent.reason)
-+  if (parent.aborted) {
-+    abortFromParent()
-+  }
-+  else {
-+    parent.addEventListener('abort', abortFromParent, { once: true })
-+    timeout = setTimeout(() => {
-+      controller.abort('tts-attempt-timeout')
-+    }, Math.max(0, timeoutMs))
-+  }
-+
-+  return {
-+    signal: controller.signal,
-+    cleanup: () => {
-+      if (timeout)
-+        clearTimeout(timeout)
-+      parent.removeEventListener('abort', abortFromParent)
-+    },
-+  }
-+}
-diff --git a/packages/stage-ui/src/libs/speech/local-broadcast-playback-proof.test.ts b/packages/stage-ui/src/libs/speech/local-broadcast-playback-proof.test.ts
-new file mode 100644
-index 0000000..72d15cf
---- /dev/null
-+++ b/packages/stage-ui/src/libs/speech/local-broadcast-playback-proof.test.ts
-@@ -0,0 +1,168 @@
-+import { describe, expect, it, vi } from 'vitest'
-+
-+import { createLocalBroadcastPlaybackProof } from './local-broadcast-playback-proof'
-+
-+describe('createLocalBroadcastPlaybackProof', () => {
-+  it('reports repeated verified completions with only an in-memory count', () => {
-+    const requests: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
-+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-+      requests.push({ input, init })
-+    })
-+    const proof = createLocalBroadcastPlaybackProof(fetchImpl)
-+
-+    expect(proof.recordCompletion({
-+      ttsRequests: 1,
-+      successfulTtsResults: 1,
-+      naturalPlaybackEnds: 1,
-+    })).toBe(true)
-+    expect(proof.recordCompletion({
-+      ttsRequests: 2,
-+      successfulTtsResults: 2,
-+      naturalPlaybackEnds: 2,
-+    })).toBe(true)
-+
-+    expect(fetchImpl).toHaveBeenCalledTimes(2)
-+    expect(requests[0]?.input).toBe('http://127.0.0.1:8892/api/event')
-+    expect(requests[0]?.init?.method).toBe('POST')
-+
-+    const firstPayload = JSON.parse(String(requests[0]?.init?.body))
-+    const secondPayload = JSON.parse(String(requests[1]?.init?.body))
-+    expect(firstPayload).toEqual({
-+      schema_version: 1,
-+      source: 'local-proactive-broadcast',
-+      phase: 'playback-completed',
-+      completion_count: 1,
-+    })
-+    expect(secondPayload).toEqual({
-+      schema_version: 1,
-+      source: 'local-proactive-broadcast',
-+      phase: 'playback-completed',
-+      completion_count: 2,
-+    })
-+    expect(Object.keys(firstPayload)).toEqual([
-+      'schema_version',
-+      'source',
-+      'phase',
-+      'completion_count',
-+    ])
-+  })
-+
-+  it('reports content-free lifecycle counts for incomplete attempts', () => {
-+    const requests: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
-+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-+      requests.push({ input, init })
-+    })
-+    const proof = createLocalBroadcastPlaybackProof(fetchImpl)
-+
-+    expect(proof.recordCompletion({
-+      ttsRequests: 0,
-+      successfulTtsResults: 0,
-+      naturalPlaybackEnds: 0,
-+    })).toBe(false)
-+    expect(proof.recordCompletion({
-+      ttsRequests: 2,
-+      successfulTtsResults: 1,
-+      naturalPlaybackEnds: 1,
-+    })).toBe(false)
-+    expect(proof.recordCompletion({
-+      ttsRequests: 2,
-+      successfulTtsResults: 2,
-+      naturalPlaybackEnds: 1,
-+    })).toBe(false)
-+    expect(proof.recordCompletion({
-+      ttsRequests: 1,
-+      successfulTtsResults: 2,
-+      naturalPlaybackEnds: 2,
-+    })).toBe(false)
-+    expect(fetchImpl).toHaveBeenCalledTimes(4)
-+    const payload = JSON.parse(String(requests[2]?.init?.body))
-+    expect(payload).toEqual({
-+      schema_version: 1,
-+      source: 'local-proactive-broadcast',
-+      phase: 'playback-incomplete',
-+      attempt_count: 3,
-+      failure_code: 'pipeline-incomplete',
-+      tts_requests: 2,
-+      successful_tts_results: 2,
-+      natural_playback_ends: 1,
-+    })
-+    expect(payload).not.toHaveProperty('text')
-+    expect(payload).not.toHaveProperty('request_id')
-+    expect(payload).not.toHaveProperty('intent_id')
-+  })
-+
-+  it('reports fixed preflight failure codes without content or correlation data', () => {
-+    const requests: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
-+    const proof = createLocalBroadcastPlaybackProof(async (input, init) => { requests.push({ input, init }) })
-+
-+    expect(proof.recordIncomplete({
-+      ttsRequests: 0,
-+      successfulTtsResults: 0,
-+      naturalPlaybackEnds: 0,
-+    }, 'speech-provider-unavailable')).toBe(false)
-+
-+    expect(JSON.parse(String(requests[0]?.init?.body))).toEqual({
-+      schema_version: 1,
-+      source: 'local-proactive-broadcast',
-+      phase: 'playback-incomplete',
-+      attempt_count: 1,
-+      failure_code: 'speech-provider-unavailable',
-+      tts_requests: 0,
-+      successful_tts_results: 0,
-+      natural_playback_ends: 0,
-+    })
-+  })
-+
-+  it('keeps the payload free of content and correlation fields', () => {
-+    const requests: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
-+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-+      requests.push({ input, init })
-+    })
-+    const proof = createLocalBroadcastPlaybackProof(fetchImpl)
-+
-+    proof.recordCompletion({
-+      ttsRequests: 1,
-+      successfulTtsResults: 1,
-+      naturalPlaybackEnds: 1,
-+    })
-+
-+    const payload = JSON.parse(String(requests[0]?.init?.body))
-+    expect(Object.keys(payload).sort()).toEqual([
-+      'completion_count',
-+      'phase',
-+      'schema_version',
-+      'source',
-+    ])
-+    expect(payload).not.toHaveProperty('text')
-+    expect(payload).not.toHaveProperty('request_id')
-+    expect(payload).not.toHaveProperty('intent_id')
-+    expect(payload).not.toHaveProperty('round_id')
-+    expect(payload).not.toHaveProperty('timestamp')
-+    expect(payload).not.toHaveProperty('provider')
-+    expect(payload).not.toHaveProperty('model')
-+  })
-+
-+  it('fails soft when the loopback POST rejects or throws synchronously', async () => {
-+    const rejectedFetch = vi.fn(async () => {
-+      throw new Error('offline')
-+    })
-+    const rejectedProof = createLocalBroadcastPlaybackProof(rejectedFetch)
-+
-+    expect(rejectedProof.recordCompletion({
-+      ttsRequests: 1,
-+      successfulTtsResults: 1,
-+      naturalPlaybackEnds: 1,
-+    })).toBe(true)
-+    await Promise.resolve()
-+
-+    const throwingFetch = vi.fn(() => {
-+      throw new Error('unavailable')
-+    })
-+    const throwingProof = createLocalBroadcastPlaybackProof(throwingFetch)
-+    expect(throwingProof.recordCompletion({
-+      ttsRequests: 1,
-+      successfulTtsResults: 1,
-+      naturalPlaybackEnds: 1,
-+    })).toBe(true)
-+  })
-+})
-diff --git a/packages/stage-ui/src/libs/speech/local-broadcast-playback-proof.ts b/packages/stage-ui/src/libs/speech/local-broadcast-playback-proof.ts
-new file mode 100644
-index 0000000..093cc5e
---- /dev/null
-+++ b/packages/stage-ui/src/libs/speech/local-broadcast-playback-proof.ts
-@@ -0,0 +1,96 @@
-+const proofEndpoint = 'http://127.0.0.1:8892/api/event'
-+
-+type ProofFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<unknown>
-+
-+/** Counts from one local proactive speech intent at its terminal boundary. */
-+export interface LocalBroadcastPlaybackEvidence {
-+  /** TTS requests emitted for the matching intent. */
-+  ttsRequests: number
-+  /** Matching requests that returned audio. */
-+  successfulTtsResults: number
-+  /** Matching audio sources that reached their natural Web Audio end event. */
-+  naturalPlaybackEnds: number
-+}
-+
-+/** Fixed, content-free failure labels accepted by the loopback observer. */
-+export type LocalBroadcastPlaybackFailureCode
-+  = | 'invalid-proactive-speech'
-+    | 'audio-context-unavailable'
-+    | 'speech-provider-unavailable'
-+    | 'local-rest-speech-required'
-+    | 'speech-model-or-voice-unavailable'
-+    | 'speech-provider-initialization-failed'
-+    | 'local-speech-endpoint-required'
-+    | 'audio-context-resume-failed'
-+    | 'speech-stage-unavailable'
-+    | 'candidate-rejected'
-+    | 'candidate-too-long'
-+    | 'candidate-content-rejected'
-+    | 'candidate-empty-or-cancelled'
-+    | 'playback-rejected'
-+    | 'playback-interrupted'
-+    | 'intent-cancelled'
-+    | 'proactive-speech-timeout'
-+    | 'pipeline-incomplete'
-+
-+/**
-+ * Creates a session-local proof reporter. It emits only aggregate completion
-+ * counts and deliberately keeps no message, intent, provider, or user data.
-+ */
-+export function createLocalBroadcastPlaybackProof(fetchImpl: ProofFetch = globalThis.fetch) {
-+  let completionCount = 0
-+  let attemptCount = 0
-+
-+  const post = (payload: object) => {
-+    try {
-+      void fetchImpl(proofEndpoint, {
-+        method: 'POST',
-+        body: JSON.stringify(payload),
-+      }).catch(() => {})
-+    }
-+    catch {}
-+  }
-+
-+  return {
-+    recordIncomplete(evidence: LocalBroadcastPlaybackEvidence, failureCode: LocalBroadcastPlaybackFailureCode): false {
-+      attemptCount += 1
-+      post({
-+        schema_version: 1,
-+        source: 'local-proactive-broadcast',
-+        phase: 'playback-incomplete',
-+        attempt_count: attemptCount,
-+        failure_code: failureCode,
-+        tts_requests: evidence.ttsRequests,
-+        successful_tts_results: evidence.successfulTtsResults,
-+        natural_playback_ends: evidence.naturalPlaybackEnds,
-+      })
-+      return false
-+    },
-+    recordCompletion(evidence: LocalBroadcastPlaybackEvidence): boolean {
-+      const verified = evidence.ttsRequests > 0
-+        && evidence.successfulTtsResults === evidence.ttsRequests
-+        && evidence.naturalPlaybackEnds === evidence.successfulTtsResults
-+
-+      if (!verified)
-+        return this.recordIncomplete(evidence, 'pipeline-incomplete')
-+
-+      attemptCount += 1
-+      completionCount += 1
-+      const payload = {
-+        schema_version: 1,
-+        source: 'local-proactive-broadcast',
-+        phase: 'playback-completed',
-+        completion_count: completionCount,
-+      } as const
-+
-+      // This loopback observation must never change the speech result. Avoiding
-+      // custom headers also keeps the browser request free of a CORS preflight.
-+      post(payload)
-+
-+      return true
-+    },
-+  }
-+}
-+
-+/** One renderer-session reporter shared by the director and Stage boundary. */
-+export const localBroadcastPlaybackProof = createLocalBroadcastPlaybackProof()
-diff --git a/packages/stage-ui/src/stores/broadcast-director.test.ts b/packages/stage-ui/src/stores/broadcast-director.test.ts
-new file mode 100644
-index 0000000..bd49ece
---- /dev/null
-+++ b/packages/stage-ui/src/stores/broadcast-director.test.ts
-@@ -0,0 +1,159 @@
-+import { afterEach, describe, expect, it, vi } from 'vitest'
-+
-+import { DEFAULT_BROADCAST_SETTINGS, isBroadcastCandidate, loadBroadcastSettings, LocalBroadcastDirector, normalizeBroadcastSettings } from './broadcast-director'
-+
-+describe('local broadcast director policy', () => {
-+  afterEach(() => vi.useRealTimers())
-+
-+  it('keeps broadcasts opt-in and clamps UI-safe settings', () => {
-+    expect(DEFAULT_BROADCAST_SETTINGS).toMatchObject({ schemaVersion: 2, enabled: false, idleMs: 90_000, minDelayMs: 0, maxDelayMs: 90_000, cooldownMs: 180_000, cooldownMaxMs: 480_000 })
-+    expect(normalizeBroadcastSettings({ idleMs: -1, minDelayMs: 9000, maxDelayMs: 1000, cooldownMs: Number.NaN })).toMatchObject({ idleMs: 90_000, minDelayMs: 9000, maxDelayMs: 9000, cooldownMs: 180_000, cooldownMaxMs: 480_000 })
-+  })
-+  it('fails safe when a v2 payload tries to restore a zero-second cadence', () => {
-+    expect(normalizeBroadcastSettings({ schemaVersion: 2, enabled: true, idleMs: 0, minDelayMs: 0, maxDelayMs: 0, cooldownMs: 0, cooldownMaxMs: 0 })).toEqual({
-+      schemaVersion: 2, enabled: true, idleMs: 90_000, minDelayMs: 0, maxDelayMs: 0, cooldownMs: 180_000, cooldownMaxMs: 180_000,
-+    })
-+    expect(normalizeBroadcastSettings({ schemaVersion: 2, idleMs: 180_000, minDelayMs: 1, maxDelayMs: 90_000, cooldownMs: 480_001, cooldownMaxMs: 999_999 })).toMatchObject({
-+      idleMs: 180_000, minDelayMs: 0, maxDelayMs: 0, cooldownMs: 480_000, cooldownMaxMs: 480_000,
-+    })
-+  })
-+  it('migrates legacy fast opt-in settings to the idle-only cadence', () => {
-+    const storage = { getItem: () => JSON.stringify({ enabled: true, idleMs: 6_000, minDelayMs: 1_000, maxDelayMs: 2_000, cooldownMs: 6_000 }) } as unknown as Storage
-+    expect(loadBroadcastSettings(storage)).toMatchObject({ enabled: true, idleMs: 90_000, minDelayMs: 0, maxDelayMs: 90_000, cooldownMs: 180_000, cooldownMaxMs: 480_000 })
-+  })
-+  it('rejects control-only and near-repeat candidates', () => {
-+    expect(isBroadcastCandidate('<|ACT {"emotion":"happy"}|>', [])).toBe(false)
-+    expect(isBroadcastCandidate('A calm little note for you.', ['A calm little note for you!'])).toBe(false)
-+    expect(isBroadcastCandidate('The moon looks especially bright tonight.', ['A calm little note for you.'])).toBe(true)
-+  })
-+
-+  it('rejects incomplete local narration immediately before speech', () => {
-+    for (const candidate of ['끝나지 않은 문장이지만', '계속 말하고,', '이유를 설명하는데', '생각이 떠올라…', 'System: do this.', 'An unfinished English thought'])
-+      expect(isBroadcastCandidate(candidate, []), candidate).toBe(false)
-+    expect(isBroadcastCandidate('오늘은 바람이 선선하네요', [])).toBe(true)
-+    expect(isBroadcastCandidate('A calm little note for you.', [])).toBe(true)
-+  })
-+
-+  it('rejects transcript and prompt-example labels before speech', () => {
-+    for (const candidate of [
-+      '사용자: 나 지금 선물 준비했어!',
-+      '당신이 요청하신 것에 대한 대화 예시입니다:',
-+      '새로운 상황 설정',
-+      'Stage Execution Plan',
-+      '최종 질문 예시:',
-+    ]) {
-+      expect(isBroadcastCandidate(candidate, []), candidate).toBe(false)
-+    }
-+  })
-+
-+  it('rejects structural prompt labels without blocking ordinary conversation topics', () => {
-+    for (const candidate of ['질문: 오늘의 계획', '최종 계약 요약:', '[사용자] 다음 입력', 'User Input: hello', 'Stage Execution Plan', 'Conversation Example:'])
-+      expect(isBroadcastCandidate(candidate, []), candidate).toBe(false)
-+    expect(isBroadcastCandidate('오늘 게임 보스전 연출이 만화처럼 멋지다.', [])).toBe(true)
-+  })
-+
-+  it('keeps test trigger behind local safety gate', async () => {
-+    let safe = false
-+    let produced = 0
-+    const director = new LocalBroadcastDirector({
-+      isSafeToBroadcast: () => safe,
-+      produce: async () => { produced++; return 'hello from local broadcast' },
-+      speak: async () => {}, random: () => 0,
-+    }, { enabled: true, idleMs: 1, minDelayMs: 0, maxDelayMs: 0 })
-+    director.triggerForTest()
-+    await Promise.resolve()
-+    expect(produced).toBe(0)
-+    safe = true
-+    director.triggerForTest()
-+    await Promise.resolve(); await Promise.resolve()
-+    expect(produced).toBe(1)
-+  })
-+
-+  it('fails closed and rearms when local production is cancelled', async () => {
-+    const director = new LocalBroadcastDirector({
-+      isSafeToBroadcast: () => true,
-+      produce: async () => { throw new DOMException('superseded', 'AbortError') },
-+      speak: async () => { throw new Error('must not speak') },
-+      random: () => 0,
-+    }, { enabled: true, idleMs: 10, minDelayMs: 0, maxDelayMs: 0 })
-+
-+    await expect(director.triggerForTest()).resolves.toBeUndefined()
-+    expect(director.state).toBe('waiting')
-+  })
-+
-+  it('crosses idle and positive jitter exactly once before producing', async () => {
-+    vi.useFakeTimers()
-+    let produced = 0
-+    let spoken = 0
-+    const director = new LocalBroadcastDirector({
-+      isSafeToBroadcast: () => true,
-+      produce: async () => { produced++; return '첫 번째 방송이야.' },
-+      speak: async () => { spoken++; return true },
-+      random: () => 0,
-+    }, { enabled: true, idleMs: 100, minDelayMs: 50, maxDelayMs: 50, cooldownMs: 100 })
-+
-+    director.enable(true)
-+    await vi.advanceTimersByTimeAsync(89_999)
-+    expect(produced).toBe(0)
-+    await vi.advanceTimersByTimeAsync(1)
-+    expect(produced).toBe(0)
-+    await vi.advanceTimersByTimeAsync(50)
-+    expect(produced).toBe(1)
-+    expect(spoken).toBe(1)
-+    expect(director.state).toBe('cooldown')
-+  })
-+
-+  it('uses the full idle window after a failed delivery instead of a rapid retry', async () => {
-+    vi.useFakeTimers()
-+    let produced = 0
-+    const director = new LocalBroadcastDirector({
-+      isSafeToBroadcast: () => true,
-+      produce: async () => { produced++; return 'quiet retry policy' },
-+      speak: async () => false,
-+      random: () => 0,
-+    }, { enabled: true, idleMs: 100, minDelayMs: 0, maxDelayMs: 0 })
-+
-+    await director.triggerForTest()
-+    expect(produced).toBe(1)
-+    await vi.advanceTimersByTimeAsync(89_999)
-+    expect(produced).toBe(1)
-+    await vi.advanceTimersByTimeAsync(1)
-+    expect(produced).toBe(2)
-+  })
-+
-+  it('randomizes successful-broadcast cooldown within its configured bounds', async () => {
-+    vi.useFakeTimers()
-+    let produced = 0
-+    const director = new LocalBroadcastDirector({
-+      isSafeToBroadcast: () => true,
-+      produce: async () => { produced++; return 'One quiet beat.' },
-+      speak: async () => true,
-+      random: () => 0,
-+    }, { enabled: true, idleMs: 100, minDelayMs: 0, maxDelayMs: 0, cooldownMs: 180, cooldownMaxMs: 480 })
-+
-+    await director.triggerForTest()
-+    await vi.advanceTimersByTimeAsync(179_999)
-+    expect(produced).toBe(1)
-+    await vi.advanceTimersByTimeAsync(1)
-+    expect(produced).toBe(2)
-+  })
-+
-+  it('invalidates a stale generation when user activity arrives', async () => {
-+    let resolveCandidate!: (value: string) => void
-+    const candidate = new Promise<string>(resolve => { resolveCandidate = resolve })
-+    let spoken = 0
-+    const director = new LocalBroadcastDirector({
-+      isSafeToBroadcast: () => true,
-+      produce: async () => candidate,
-+      speak: async () => { spoken++; return true },
-+      random: () => 0,
-+    }, { enabled: true, idleMs: 10, minDelayMs: 0, maxDelayMs: 0 })
-+
-+    const pending = director.triggerForTest()
-+    director.activity()
-+    resolveCandidate('이미 취소된 방송 멘트')
-+    await pending
-+    expect(spoken).toBe(0)
-+    expect(director.state).toBe('waiting')
-+  })
-+})
-diff --git a/packages/stage-ui/src/stores/broadcast-director.ts b/packages/stage-ui/src/stores/broadcast-director.ts
-new file mode 100644
-index 0000000..96e9269
---- /dev/null
-+++ b/packages/stage-ui/src/stores/broadcast-director.ts
-@@ -0,0 +1,212 @@
-+/** Local, opt-in idle broadcast scheduler. It owns no network or persistence. */
-+export type BroadcastDirectorState = 'disabled' | 'waiting' | 'armed' | 'producing' | 'validating' | 'speaking' | 'cooldown'
-+
-+export interface BroadcastSettings {
-+  schemaVersion: 2
-+  enabled: boolean
-+  idleMs: number
-+  minDelayMs: number
-+  maxDelayMs: number
-+  cooldownMs: number
-+  cooldownMaxMs: number
-+}
-+
-+export const DEFAULT_BROADCAST_SETTINGS: BroadcastSettings = {
-+  // First beat: 90–180 seconds. Later beats: 180–480 seconds.
-+  schemaVersion: 2, enabled: false, idleMs: 90_000, minDelayMs: 0, maxDelayMs: 90_000, cooldownMs: 180_000, cooldownMaxMs: 480_000,
-+}
-+
-+export interface BroadcastDirectorDeps {
-+  isSafeToBroadcast: () => boolean
-+  produce: () => Promise<string | null>
-+  /** Returns false when the candidate was not actually delivered as audio. */
-+  speak: (text: string) => Promise<boolean | void>
-+  now?: () => number
-+  random?: () => number
-+  cancel?: (reason: string) => void
-+  onState?: (state: BroadcastDirectorState) => void
-+  /** Content-free diagnostic hook; the rejected candidate itself is never exposed. */
-+  onCandidateRejected?: () => void
-+}
-+
-+const STORAGE_KEY = 'airi.local-proactive-broadcast.v1'
-+export const BROADCAST_SETTINGS_CHANNEL_NAME = 'airi:local-proactive-broadcast:settings'
-+export type BroadcastSettingsChannelEvent
-+  = | { type: 'settings-changed', settings: BroadcastSettings }
-+    | { type: 'user-activity' }
-+const MAX_DELAY_MS = 24 * 60 * 60 * 1000
-+const MIN_IDLE_MS = 90_000
-+const MAX_FIRST_IDLE_MS = 180_000
-+const MIN_COOLDOWN_MS = 180_000
-+const MAX_COOLDOWN_MS = 480_000
-+export const MAX_BROADCAST_CANDIDATE_CODE_POINTS = 60
-+
-+// Background narration must be independently speakable. A streamed/model
-+// fragment is worse than silence, so this intentionally fails closed.
-+const INCOMPLETE_BROADCAST_ENDING = /(?:\.{3}|…|[,;:：]|다니|지만|는데|으며|면서|도록|거나|니까|기에|다고(?:요)?|ㄴ데|은데|고|며|면|니)$/u
-+const SAFE_KOREAN_BROADCAST_ENDING = /(?:다|요|죠|네|군|지|야|해|돼|줘|봐|있어|없어|같아|맞아|아냐)$/u
-+const BROADCAST_TERMINAL_PUNCTUATION = /[.!?。！？]+$/u
-+const BROADCAST_META = /(?:^|\n)\s*(?:\[\s*(?:user|assistant|system)\s*\]|(?:user|assistant|system)\s*:|user\s+input|stage\s+execution\s+plan|system\s+prompt|instructions?|conversation\s+example|example\s+(?:dialogue|conversation)|final\s+(?:contract\s+)?summary)\b/iu
-+
-+/** Whether text is a bounded, complete local proactive utterance. */
-+export function isCompleteBroadcastCandidate(text: string): boolean {
-+  const clean = text.trim()
-+  if (!clean || [...clean].length > MAX_BROADCAST_CANDIDATE_CODE_POINTS || /[\r\n\u2028\u2029]/u.test(clean)) return false
-+  if (BROADCAST_META.test(clean) || /<\|[\s\S]*?\|>|<[^>]+>/u.test(clean)) return false
-+  if (INCOMPLETE_BROADCAST_ENDING.test(clean)) return false
-+  return BROADCAST_TERMINAL_PUNCTUATION.test(clean) || SAFE_KOREAN_BROADCAST_ENDING.test(clean)
-+}
-+function validMs(value: unknown, fallback: number) {
-+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(MAX_DELAY_MS, Math.floor(value))) : fallback
-+}
-+function clamp(value: number, minimum: number, maximum: number) {
-+  return Math.max(minimum, Math.min(maximum, value))
-+}
-+export function normalizeBroadcastSettings(value: Partial<BroadcastSettings> | unknown): BroadcastSettings {
-+  const input = value && typeof value === 'object' ? value as Partial<BroadcastSettings> : {}
-+  const idleMs = clamp(validMs(input.idleMs, DEFAULT_BROADCAST_SETTINGS.idleMs), MIN_IDLE_MS, MAX_FIRST_IDLE_MS)
-+  const maxJitterMs = MAX_FIRST_IDLE_MS - idleMs
-+  const minDelayMs = clamp(validMs(input.minDelayMs, DEFAULT_BROADCAST_SETTINGS.minDelayMs), 0, maxJitterMs)
-+  const maxDelayMs = Math.max(minDelayMs, clamp(validMs(input.maxDelayMs, DEFAULT_BROADCAST_SETTINGS.maxDelayMs), 0, maxJitterMs))
-+  const cooldownMs = clamp(validMs(input.cooldownMs, DEFAULT_BROADCAST_SETTINGS.cooldownMs), MIN_COOLDOWN_MS, MAX_COOLDOWN_MS)
-+  const cooldownMaxMs = Math.max(cooldownMs, clamp(validMs(input.cooldownMaxMs, DEFAULT_BROADCAST_SETTINGS.cooldownMaxMs), MIN_COOLDOWN_MS, MAX_COOLDOWN_MS))
-+  return { schemaVersion: 2, enabled: input.enabled === true, idleMs, minDelayMs, maxDelayMs, cooldownMs, cooldownMaxMs }
-+}
-+function cryptoRandom() {
-+  const values = new Uint32Array(1)
-+  globalThis.crypto?.getRandomValues?.(values)
-+  return values[0] / 0x1_0000_0000
-+}
-+function trigrams(text: string) {
-+  const clean = text.toLocaleLowerCase().replace(/\s+/g, ' ').trim()
-+  const out = new Set<string>()
-+  for (let i = 0; i + 3 <= clean.length; i++) out.add(clean.slice(i, i + 3))
-+  return out
-+}
-+
-+/** Rejects blank/control-only/prompt meta and recently repeated candidate speech. */
-+export function isBroadcastCandidate(text: string, recent: readonly string[]): boolean {
-+  const clean = text.replace(/<\|[\s\S]*?\|>|<[^>]+>/g, '').trim()
-+  if (!clean || clean.length < 2 || /^[\p{P}\p{S}\s]+$/u.test(clean) || !isCompleteBroadcastCandidate(clean)) return false
-+  // Labels and examples are model-facing prompt structure, not spontaneous
-+  // narration. Keep this structural so normal game/comic/chat vocabulary is
-+  // never blocked just for containing a topic word.
-+  if (/(?:^|\n)\s*(?:\[\s*(?:user|assistant|system|사용자|어시스턴트|시스템)\s*\]|(?:user|assistant|system|user\s+input|stage\s+execution\s+plan|question|final\s+(?:contract\s+)?summary|scenario|conversation\s+example|example\s+(?:dialogue|conversation)|instructions?)\s*:|(?:사용자|어시스턴트|시스템|질문|최종\s*계약?\s*요약|시나리오|대화\s*예시)\s*[:：])/iu.test(clean)) return false
-+  if (/^\s*(?:\[\s*(?:user|assistant|system|사용자|어시스턴트|시스템)\s*\]|(?:user\s+input|stage\s+execution\s+plan|question|final\s+(?:contract\s+)?summary|scenario|conversation\s+example|example\s+(?:dialogue|conversation)|system\s+prompt|instructions?|질문|최종\s*계약?\s*요약|대화\s*예시|시나리오))(?:$|\s|[:：])/iu.test(clean)) return false
-+  // Never surface renderer/protocol state as if it were a VTuber's
-+  // spontaneous chat.  The model may see an empty-history prompt and echo a
-+  // status label such as "새로운 사용자 입력"; reject it before TTS/UI.
-+  if (/(?:사용자\s*:|아이리\s*:|대화\s*(?:예시|시작)|답변\s*예시|질문\s*예시|사용자\s*입력(?:\s*예시)?|새로운\s*(?:상황|대화|사용자\s*입력)|시나리오\s*시작|시작\s*대화|현재\s*대화\s*상황|최종\s*(?:질문|답변)\s*예시|요청\s*예시|주어진\s*상황|당신의\s*요청을\s*이해했습니다|사용자\s*입력(?:이|은)?\s*없|입력(?:을|이)\s*기다|대화(?:가|이)\s*없|시스템|프롬프트|모델\s*(?:이|은)?\s*대기|stage\s+execution\s+plan|new\s+user\s+interaction\s+start|new\s+user\s+input|no\s+user\s+input|waiting\s+for\s+(?:user\s+)?input|system\s+prompt)/iu.test(clean)) return false
-+  // A proactive narrator must not announce work it could not have executed.
-+  if (/\b(?:i\s+(?:ran|used|called|executed)|tool(?:\s+call)?\s+(?:completed|succeeded)|memory\s+(?:was\s+)?updated)\b|(?:도구|툴|메모리).{0,18}(?:실행|사용|완료|업데이트)|(?:실행|사용|완료|업데이트).{0,18}(?:도구|툴|메모리)/i.test(clean)) return false
-+  const next = trigrams(clean)
-+  return !recent.some((previous) => {
-+    const prior = trigrams(previous)
-+    if (!next.size || !prior.size) return clean === previous.trim()
-+    let overlap = 0; next.forEach(part => { if (prior.has(part)) overlap++ })
-+    return overlap / Math.min(next.size, prior.size) >= 0.65
-+  })
-+}
-+
-+export class LocalBroadcastDirector {
-+  state: BroadcastDirectorState = 'disabled'
-+  settings: BroadcastSettings
-+  private timer: ReturnType<typeof setTimeout> | undefined
-+  private recent: string[] = []
-+  /** Invalidates stale timers and async generations after any user activity. */
-+  private epoch = 0
-+  constructor(private readonly deps: BroadcastDirectorDeps, settings?: Partial<BroadcastSettings>) {
-+    this.settings = normalizeBroadcastSettings(settings)
-+  }
-+  private set(next: BroadcastDirectorState) { this.state = next; this.deps.onState?.(next) }
-+  private clear() { if (this.timer) clearTimeout(this.timer); this.timer = undefined }
-+  enable(enabled: boolean) { this.settings.enabled = enabled; if (!enabled) { this.epoch++; this.clear(); this.deps.cancel?.('broadcast-disabled'); this.set('disabled') } else this.activity() }
-+  activity() {
-+    const epoch = ++this.epoch
-+    this.clear()
-+    this.deps.cancel?.('user-activity')
-+    if (!this.settings.enabled) return this.set('disabled')
-+    this.set('waiting')
-+    this.schedule(this.settings.idleMs, epoch, false)
-+  }
-+  /** Test trigger bypasses only the idle delay; safety gates remain mandatory. */
-+  triggerForTest(): Promise<void> {
-+    this.clear()
-+    if (!this.settings.enabled) return Promise.resolve()
-+    const epoch = ++this.epoch
-+    return this.run(epoch, true)
-+  }
-+  private schedule(delay: number, epoch: number, skipRandomDelay: boolean) {
-+    this.timer = setTimeout(() => { void this.run(epoch, skipRandomDelay) }, delay)
-+  }
-+  private async run(epoch: number, skipRandomDelay = false): Promise<void> {
-+    if (epoch !== this.epoch) return
-+    if (!this.settings.enabled) return this.set('disabled')
-+    if (!this.deps.isSafeToBroadcast()) { this.set('waiting'); return this.schedule(this.settings.idleMs, epoch, false) }
-+    this.set('armed')
-+    const random = this.deps.random ?? cryptoRandom
-+    const delay = this.settings.minDelayMs + Math.floor(random() * Math.max(0, this.settings.maxDelayMs - this.settings.minDelayMs))
-+    // The jitter timer enters production on its next callback. Re-entering the
-+    // jitter phase here would reschedule forever for every positive delay.
-+    if (!skipRandomDelay && delay) { this.set('waiting'); this.schedule(delay, epoch, true); return }
-+    this.set('producing')
-+    let candidate: string | null
-+    try {
-+      candidate = await this.deps.produce()
-+    }
-+    catch {
-+      // Cancellation, a local provider outage, or a rejected candidate is an
-+      // expected fail-closed background path. Never leak an unhandled promise
-+      // from an idle/test trigger.
-+      if (epoch === this.epoch) this.activity()
-+      return
-+    }
-+    if (epoch !== this.epoch) return
-+    if (!this.settings.enabled || !this.deps.isSafeToBroadcast()) { this.activity(); return }
-+    this.set('validating')
-+    if (!candidate || !isBroadcastCandidate(candidate, this.recent)) {
-+      this.deps.onCandidateRejected?.()
-+      this.activity()
-+      return
-+    }
-+    this.set('speaking')
-+    let delivered = false
-+    try { delivered = (await this.deps.speak(candidate)) !== false } catch { /* fail closed and re-arm below */ } finally {
-+      if (delivered && epoch === this.epoch)
-+        this.recent = [...this.recent.slice(-8), candidate]
-+      if (epoch !== this.epoch)
-+        return
-+      if (!this.settings.enabled) this.set('disabled')
-+      else {
-+        this.set('cooldown')
-+        if (!delivered) {
-+          // A failed synthesis is not an invitation to retry narration every
-+          // few seconds; re-enter the full idle window instead.
-+          this.activity()
-+          return
-+        }
-+        const random = this.deps.random ?? cryptoRandom
-+        const cooldown = this.settings.cooldownMs + Math.floor(random() * Math.max(0, this.settings.cooldownMaxMs - this.settings.cooldownMs))
-+        this.timer = setTimeout(() => {
-+          if (epoch === this.epoch)
-+            void this.run(epoch, true)
-+        }, cooldown)
-+      }
-+    }
-+  }
-+}
-+
-+export function loadBroadcastSettings(storage: Storage | undefined = globalThis.localStorage): BroadcastSettings {
-+  try {
-+    const parsed = JSON.parse(storage?.getItem(STORAGE_KEY) || '{}') as Partial<BroadcastSettings>
-+    // v1 used 5–10 second loops. Retain the user's opt-in choice, but never
-+    // carry that unsafe cadence into the idle-only v2 policy.
-+    if (parsed.schemaVersion !== 2)
-+      return { ...DEFAULT_BROADCAST_SETTINGS, enabled: parsed.enabled === true }
-+    return normalizeBroadcastSettings(parsed)
-+  }
-+  catch { return { ...DEFAULT_BROADCAST_SETTINGS } }
-+}
-+export function saveBroadcastSettings(settings: BroadcastSettings, storage: Storage | undefined = globalThis.localStorage) {
-+  storage?.setItem(STORAGE_KEY, JSON.stringify(normalizeBroadcastSettings(settings)))
-+}
 diff --git a/packages/stage-ui/src/workers/vad/vad.test.ts b/packages/stage-ui/src/workers/vad/vad.test.ts
 new file mode 100644
-index 0000000..39907c2
+index 0000000000000000000000000000000000000000..39907c2438b9f65a023f34ed854d0da7d19c75c5
 --- /dev/null
 +++ b/packages/stage-ui/src/workers/vad/vad.test.ts
 @@ -0,0 +1,60 @@
@@ -8437,122 +9044,17 @@ index 0000000..39907c2
 +    expect(speechReady).not.toHaveBeenCalled()
 +  })
 +})
-diff --git a/apps/stage-tamagotchi/src/main/app/single-instance.test.ts b/apps/stage-tamagotchi/src/main/app/single-instance.test.ts
-index 24097c6827d05aab1486dbb9a98b833bf5eac70a..65c6c84b8ef9ddc0463fcc0e058c40e86433593c 100644
---- a/apps/stage-tamagotchi/src/main/app/single-instance.test.ts
-+++ b/apps/stage-tamagotchi/src/main/app/single-instance.test.ts
-@@ -65,11 +65,26 @@ describe('installSingleInstanceGuard', async () => {
-     expect(installed).toBe(true)
-     expect(app.on).toHaveBeenCalledWith('second-instance', expect.any(Function))
+diff --git a/packages/stage-ui/src/workers/vad/vad.ts b/packages/stage-ui/src/workers/vad/vad.ts
+index a7e63ab76114b47cab26a1995c43c598bb979f44..7f0f30144c4460ea4347f62a4fd1a15ea5d9d1b7 100644
+--- a/packages/stage-ui/src/workers/vad/vad.ts
++++ b/packages/stage-ui/src/workers/vad/vad.ts
+@@ -231,7 +231,9 @@ export class VAD implements BaseVAD {
+     this.emit('speech-end', undefined)
+     this.emit('speech-ready', {
+       buffer: finalBuffer,
++      sampleRate: this.config.sampleRate,
+       duration,
++      preRollSamples: prevLength,
+     })
  
--    const secondInstanceHandler = app.on.mock.calls[0]?.[1] as () => void
--    secondInstanceHandler()
-+    const secondInstanceHandler = app.on.mock.calls[0]?.[1] as (_: unknown, commandLine: string[]) => void
-+    secondInstanceHandler({}, ['airi.exe'])
- 
-     expect(windowMock.toggleWindowShow).toHaveBeenCalledWith(window)
-   })
-+
-+  it('keeps the current window hidden when a duplicate launch requests background mode', () => {
-+    const app = createMockApp(true)
-+    const window = createMockWindow()
-+
-+    installSingleInstanceGuard({
-+      app,
-+      getWindow: vi.fn(() => window),
-+    })
-+
-+    const secondInstanceHandler = app.on.mock.calls[0]?.[1] as (_: unknown, commandLine: string[]) => void
-+    secondInstanceHandler({}, ['airi.exe', '--background'])
-+
-+    expect(windowMock.toggleWindowShow).not.toHaveBeenCalled()
-+  })
- })
- type MockApp = App & {
-   on: ReturnType<typeof vi.fn>
-diff --git a/apps/stage-tamagotchi/src/main/app/single-instance.ts b/apps/stage-tamagotchi/src/main/app/single-instance.ts
-index b0bcd56cfa78907fbf0e6da4a3bcc73b9f674da5..45efcc59b17cc1e900d2cd8f45073179233e55bf 100644
---- a/apps/stage-tamagotchi/src/main/app/single-instance.ts
-+++ b/apps/stage-tamagotchi/src/main/app/single-instance.ts
-@@ -1,6 +1,7 @@
- import type { App, BrowserWindow } from 'electron'
- 
- import { toggleWindowShow } from '../windows/shared/window'
-+import { startsInBackground } from './startup-mode'
- 
- interface SingleInstanceGuardOptions {
-   app: App
-@@ -49,7 +50,11 @@ export function installSingleInstanceGuard(options: SingleInstanceGuardOptions)
-     return false
-   }
- 
--  options.app.on('second-instance', () => {
-+  options.app.on('second-instance', (_, commandLine) => {
-+    if (startsInBackground(commandLine)) {
-+      return
-+    }
-+
-     focusMainWindow(options.getWindow)
-   })
- 
-diff --git a/apps/stage-tamagotchi/src/main/app/startup-mode.test.ts b/apps/stage-tamagotchi/src/main/app/startup-mode.test.ts
-new file mode 100644
-index 0000000..5ed60c1
---- /dev/null
-+++ b/apps/stage-tamagotchi/src/main/app/startup-mode.test.ts
-@@ -0,0 +1,13 @@
-+import { describe, expect, it } from 'vitest'
-+
-+import { startsInBackground } from './startup-mode'
-+
-+describe('startsInBackground', () => {
-+  it('recognizes the canonical background argument', () => {
-+    expect(startsInBackground(['airi.exe', '--background'])).toBe(true)
-+  })
-+
-+  it('does not treat unrelated arguments as a background launch', () => {
-+    expect(startsInBackground(['airi.exe', '--minimized'])).toBe(false)
-+  })
-+})
-diff --git a/apps/stage-tamagotchi/src/main/app/startup-mode.ts b/apps/stage-tamagotchi/src/main/app/startup-mode.ts
-new file mode 100644
-index 0000000..bc5b856
---- /dev/null
-+++ b/apps/stage-tamagotchi/src/main/app/startup-mode.ts
-@@ -0,0 +1,11 @@
-+const backgroundArgument = '--background'
-+
-+/**
-+ * Returns whether this AIRI launch should keep the main window hidden.
-+ *
-+ * The same command-line convention is used for the initial process and for
-+ * launches forwarded to Electron's primary single-instance process.
-+ */
-+export function startsInBackground(commandLine: readonly string[]) {
-+  return commandLine.includes(backgroundArgument)
-+}
-diff --git a/apps/stage-tamagotchi/src/main/windows/main/index.ts b/apps/stage-tamagotchi/src/main/windows/main/index.ts
-index 0f452fc8a559ca96c133864e0d9b4c2b71c5e5b4..86d4bd286331295539a47d2bfdaee4f5391f8b6c 100644
---- a/apps/stage-tamagotchi/src/main/windows/main/index.ts
-+++ b/apps/stage-tamagotchi/src/main/windows/main/index.ts
-@@ -56,6 +56,7 @@ export async function setupMainWindow(params: {
-   noticeWindow: NoticeWindowManager
-   autoUpdater: AutoUpdater
-   onWindowCreated?: (window: BrowserWindow) => void
-+  startInBackground?: boolean
-   serverChannel: ServerChannel
-   godotStageManager: GodotStageManager
-   mcpStdioManager: McpStdioManager
-@@ -170,7 +171,11 @@ export async function setupMainWindow(params: {
-     window.setWindowButtonVisibility(false)
-   }
- 
--  window.on('ready-to-show', () => window!.show())
-+  window.on('ready-to-show', () => {
-+    if (!params.startInBackground) {
-+      window.show()
-+    }
-+  })
-   protectPrivilegedWindowNavigation(window)
- 
-   await setupMainWindowElectronInvokes({
+     // Reset for the next segment

@@ -11,6 +11,7 @@ export const CLIENT_POSSIBLE_EVENTS = [
   'input:text',
   'output:gen-ai:chat:message',
   'output:gen-ai:chat:complete',
+  'output:gen-ai:chat:cancelled',
 ]
 
 export function assistantText(message) {
@@ -85,11 +86,14 @@ export function createAssistantEventTracker(inputEventId) {
     matchingAssistantMessages: 0,
     completions: 0,
     matchingCompletions: 0,
+    cancellations: 0,
+    matchingCancellations: 0,
     errors: 0,
   }
   let matchingAssistantText = ''
   let matchingAssistantShape = assistantMessageShape(undefined)
   let matchingAssistantSeen = false
+  let terminalClaimed = false
 
   function observe(event) {
     const correlated = isCorrelatedOutputEvent(event, inputEventId)
@@ -109,6 +113,11 @@ export function createAssistantEventTracker(inputEventId) {
       if (correlated)
         eventStats.matchingCompletions++
     }
+    else if (event?.type === 'output:gen-ai:chat:cancelled') {
+      eventStats.cancellations++
+      if (correlated)
+        eventStats.matchingCancellations++
+    }
     return correlated
   }
 
@@ -125,6 +134,19 @@ export function createAssistantEventTracker(inputEventId) {
           event?.data?.message, matchingAssistantShape, matchingAssistantSeen,
         ),
       }
+    },
+    terminal(event, elapsedMs) {
+      if (terminalClaimed || !isCorrelatedOutputEvent(event, inputEventId))
+        return undefined
+      if (event?.type !== 'output:gen-ai:chat:complete' && event?.type !== 'output:gen-ai:chat:cancelled')
+        return undefined
+      if (event?.type === 'output:gen-ai:chat:cancelled' && event?.data?.reason !== 'superseded')
+        return undefined
+
+      terminalClaimed = true
+      return event.type === 'output:gen-ai:chat:cancelled'
+        ? { cancelled: true, elapsedMs }
+        : { cancelled: false, ...this.completion(event, elapsedMs) }
     },
   }
 }
@@ -220,16 +242,20 @@ async function main() {
   })
   const completionTimeout = waitComplete
     ? setTimeout(() => completeReject(new Error(
-        `Timed out waiting for matching AIRI completion (assistant_events=${tracker?.eventStats.assistantMessages ?? 0}, matching_assistant_events=${tracker?.eventStats.matchingAssistantMessages ?? 0}, completion_events=${tracker?.eventStats.completions ?? 0}, matching_completion_events=${tracker?.eventStats.matchingCompletions ?? 0}, errors=${tracker?.eventStats.errors ?? 0}).`,
+        `Timed out waiting for matching AIRI completion (assistant_events=${tracker?.eventStats.assistantMessages ?? 0}, matching_assistant_events=${tracker?.eventStats.matchingAssistantMessages ?? 0}, completion_events=${tracker?.eventStats.completions ?? 0}, matching_completion_events=${tracker?.eventStats.matchingCompletions ?? 0}, cancellation_events=${tracker?.eventStats.cancellations ?? 0}, matching_cancellation_events=${tracker?.eventStats.matchingCancellations ?? 0}, errors=${tracker?.eventStats.errors ?? 0}).`,
       )), 90_000)
     : undefined
-  const unsubscribe = waitComplete
-    ? client.onEvent('output:gen-ai:chat:complete', (event) => {
-        if (!tracker || !isCorrelatedOutputEvent(event, inputEventId))
-          return
-        completeResolve(tracker.completion(event, Math.round(performance.now() - startedAt)))
-      })
-    : undefined
+  const settleTerminal = (event) => {
+    const terminal = tracker?.terminal(event, Math.round(performance.now() - startedAt))
+    if (terminal)
+      completeResolve(terminal)
+  }
+  const unsubscribes = waitComplete
+    ? [
+        client.onEvent('output:gen-ai:chat:complete', settleTerminal),
+        client.onEvent('output:gen-ai:chat:cancelled', settleTerminal),
+      ]
+    : []
 
   let completed
   try {
@@ -244,7 +270,8 @@ async function main() {
   finally {
     if (completionTimeout)
       clearTimeout(completionTimeout)
-    unsubscribe?.()
+    for (const unsubscribe of unsubscribes)
+      unsubscribe()
     client.close(1000, 'local input sent')
   }
 
@@ -252,7 +279,13 @@ async function main() {
     sent: true,
     transport: 'loopback-server-channel',
     chars: Array.from(text).length,
-    ...(completed
+    ...(completed?.cancelled
+      ? {
+          cancelled: true,
+          cancel_reason: 'superseded',
+          cancelled_ms: completed.elapsedMs,
+        }
+      : completed
       ? {
           completed: true,
           completed_ms: completed.elapsedMs,

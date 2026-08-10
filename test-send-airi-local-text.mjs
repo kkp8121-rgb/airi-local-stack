@@ -36,7 +36,9 @@ test('keeps same-text interleaved conversations and empty completions isolated',
   const trackerB = createAssistantEventTracker('input-b')
   const event = (type, parentId, message) => ({
     type,
-    data: { text: 'same text', message },
+    data: type === 'output:gen-ai:chat:cancelled'
+      ? { reason: 'superseded' }
+      : { text: 'same text', message },
     ...(parentId === undefined ? {} : { metadata: { event: { parentId } } }),
   })
 
@@ -62,7 +64,43 @@ test('announces both the input and matching completion event contracts', () => {
     'input:text',
     'output:gen-ai:chat:message',
     'output:gen-ai:chat:complete',
+    'output:gen-ai:chat:cancelled',
   ])
+})
+
+test('claims only the first exact correlated terminal for same-text conversations', () => {
+  const trackerA = createAssistantEventTracker('input-a')
+  const trackerB = createAssistantEventTracker('input-b')
+  const event = (type, parentId, message) => ({
+    type,
+    data: type === 'output:gen-ai:chat:cancelled'
+      ? { reason: 'superseded' }
+      : { text: 'same text', message },
+    ...(parentId === undefined ? {} : { metadata: { event: { parentId } } }),
+  })
+  const messageB = event('output:gen-ai:chat:message', 'input-b', { content: 'answer B' })
+  const cancelledA = event('output:gen-ai:chat:cancelled', 'input-a')
+  const malformedCancelledA = { ...cancelledA, data: { reason: 'other' } }
+  const completeA = event('output:gen-ai:chat:complete', 'input-a', { content: 'late A' })
+  const completeB = event('output:gen-ai:chat:complete', 'input-b', { content: '' })
+
+  for (const item of [messageB, cancelledA, completeB, completeA]) {
+    trackerA.observe(item)
+    trackerB.observe(item)
+  }
+
+  assert.deepEqual(trackerA.terminal(cancelledA, 7), { cancelled: true, elapsedMs: 7 })
+  const malformedTracker = createAssistantEventTracker('input-a')
+  assert.equal(malformedTracker.terminal(malformedCancelledA, 6), undefined)
+  assert.equal(trackerA.terminal(completeB, 8), undefined)
+  assert.equal(trackerA.terminal(completeA, 9), undefined)
+  assert.equal(trackerA.eventStats.matchingCancellations, 1)
+  assert.equal(trackerA.eventStats.matchingCompletions, 1)
+
+  const completedB = trackerB.terminal(completeB, 10)
+  assert.equal(completedB.cancelled, false)
+  assert.equal(completedB.assistant, 'answer B')
+  assert.equal(completedB.assistantSource, 'message-event')
 })
 
 test('extracts assistant text from string or text-part content only', () => {
