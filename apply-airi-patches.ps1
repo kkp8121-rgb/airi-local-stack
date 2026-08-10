@@ -154,6 +154,12 @@ public static class AiriPatchScanner
 # --- 3. Marker table ----------------------------------------------------------
 # Offsets below were measured on the stock 0.11.3 install
 # (app.asar, 1,130,829,614 bytes) with a read-only scan.
+$knownPristineAsarSha256 = 'B3433A29D2E8357A84068DFFCAD80A2A23A4D4C0F5F803764C66839C84B788AF'
+
+function Get-Sha256([string]$Path) {
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToUpperInvariant()
+}
+
 $stockMarkers = @(
     @{ Patch = 'audio-constraints';        Text = "autoGainControl: true,`n`t`techoCancellation: true,`n`t`tnoiseSuppression: true"; Expected = 2 }
     @{ Patch = 'native-media-recorder';    Text = 'function useAudioRecorder(media) {';                                              Expected = 1 }
@@ -213,6 +219,10 @@ Write-Output ''
 # --- 4. Pristine backup -------------------------------------------------------
 $pristineBackupPath = "$resolvedAsar.backup-pristine"
 if (Test-Path -LiteralPath $pristineBackupPath) {
+    $pristineBackupHash = Get-Sha256 $pristineBackupPath
+    if ($pristineBackupHash -ne $knownPristineAsarSha256) {
+        throw "Pristine backup SHA-256 mismatch: got $pristineBackupHash, expected $knownPristineAsarSha256. Refusing to continue."
+    }
     Write-Output "Pristine backup exists - skipping the backup copy: $pristineBackupPath"
 }
 elseif ($isFullyStock) {

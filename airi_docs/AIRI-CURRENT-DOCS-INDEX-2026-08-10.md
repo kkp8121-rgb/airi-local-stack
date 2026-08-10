@@ -43,3 +43,5 @@ playback completion from playback-start evidence.
 - The orchestrator also rejects residual stock markers and child-script
   idempotence now returns to the orchestrator instead of terminating its host
   PowerShell process.
+- Existing `app.asar.backup-pristine` files are now SHA-256 checked against the
+  pinned pristine 0.11.3 archive before patching continues.
