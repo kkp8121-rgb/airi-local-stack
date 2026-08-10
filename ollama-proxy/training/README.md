@@ -81,3 +81,22 @@ explicit enable flag it can only report whether supplied C0/S1 bytes are a
 mechanically valid **candidate** fixture pair; it never creates fixtures, grants
 canonical status, records human approval, or authorizes training. Human custody,
 evaluation authority, and any acceptance decision remain external to this CLI.
+
+Run the standard offline regression suite from this `training` directory:
+
+```powershell
+python -m unittest discover -s .\tests -p "test_*.py"
+```
+
+Fixture readiness remains an explicit opt-in. For local, externally supplied
+fixtures only, run:
+
+```powershell
+python .\audit_airi_style_fixture_readiness.py --audit-airi-style-fixture-readiness `
+  --c0-fixture .\local-c0-fixture.jsonl --s1-fixture .\local-s1-fixture.jsonl
+```
+
+Without the opt-in flag the audit emits `disabled` and exits `0`. A mechanically
+valid pair emits `candidate` and exits `0`; missing, invalid, or unsafe inputs emit
+`not-ready` and exit `2`. These are readiness states only and do not approve
+fixtures or authorize review, training, or deployment.
