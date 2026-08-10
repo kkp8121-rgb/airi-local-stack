@@ -9,8 +9,8 @@ Status: **implemented, verified, source-built, and installed as the live AIRI v0
 - Patch size: 84,743 bytes
 - Scope: 32 files, 817 insertions, 60 deletions
 - Combined local-runtime patch: `AIRI-v0.11.3-local-runtime-source.patch`
-- Combined patch SHA-256: `B3497A1F3AD2521B27B5D29D440C0794D949BB282B731CFFF2C278AF04F311AC`
-- Combined patch size: 414,211 bytes
+- Combined patch SHA-256: `2077D440481D64BD08B9A890C318D3CDFABADFE0E1398C28CAF3A3AB8B76CD86`
+- Combined patch size: 414,208 bytes
 - Combined scope: 84 files, 5,799 insertions, 510 deletions
 
 The patch was generated from the exact diff of a clean v0.11.3 checkout and

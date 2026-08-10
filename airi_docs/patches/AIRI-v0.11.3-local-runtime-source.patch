@@ -8367,7 +8367,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..713ab916f53a3263bd7ed342f71cfa88
 +              const contextMessage: ContextMessage = {
 +                ...update,
 +                // Context metadata travels through the registry and renderer
-+                // broadcasts, so retain source identity only—not transport
++                // broadcasts, so retain source identity only, not transport
 +                // event correlation metadata.
 +                metadata: event.metadata?.source ? { source: event.metadata.source } : undefined,
 +                createdAt,
