@@ -24,8 +24,7 @@
 
 ### A-0. 기존 계획서 재기술로 판정된 항목
 
-- **[EXAONE] `EX-09`** — 기억 검색 지연은 기존 트랙 M 지연 예산 안에 머물러야 한다.  
-  출처 `airi_docs/AIRI-EXAONE-GROWTH-STRATEGY-2026-08-07.md:219`
+- **[EXAONE] `EX-09`** — 기억 검색 지연은 기존 트랙 M 지연 예산 안에 머물러야 한다. (출처 `airi_docs/AIRI-EXAONE-GROWTH-STRATEGY-2026-08-07.md:219`)
 
 ### A-STYLE. 버튜버 스타일·서사·평가
 
