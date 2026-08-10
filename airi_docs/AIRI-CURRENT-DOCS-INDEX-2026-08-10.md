@@ -53,7 +53,7 @@ playback completion from playback-start evidence.
 
 ## Latest audit evidence
 
-- `node --test test-send-airi-local-text.mjs`: 25/25 passed.
+- `node --test test-send-airi-local-text.mjs`: 26/26 passed.
 - The canonical patch and the separate generic-context sanitizer both apply
   cleanly in the pinned v0.11.3 verification checkout.
 - The explicit pinned-checkout applicability run was re-executed after the

@@ -163,6 +163,25 @@ test('treats matching cancellation as immediate while waiting for playback', () 
   assert.deepEqual(tracker.waitTerminal(cancelled, 7), { cancelled: true, elapsedMs: 7 })
 })
 
+test('ignores malformed or non-supersession cancellation payloads', () => {
+  const tracker = createAssistantEventTracker('input-a')
+  const malformed = [null, 'superseded', [], { reason: 'cancelled' }].map(data => ({
+    type: 'output:gen-ai:chat:cancelled',
+    data,
+    metadata: { event: { parentId: 'input-a' } },
+  }))
+
+  for (const event of malformed) {
+    tracker.observe(event)
+    assert.equal(tracker.waitTerminal(event, 2), undefined)
+  }
+
+  const valid = correlatedEvent('output:gen-ai:chat:cancelled', 'input-a', { reason: 'superseded' })
+  tracker.observe(valid)
+  assert.deepEqual(tracker.waitTerminal(valid, 4), { cancelled: true, elapsedMs: 4 })
+  assert.equal(tracker.eventStats.matchingCancellations, 5)
+})
+
 test('cancellation after playback start remains the terminal outcome', () => {
   const tracker = createAssistantEventTracker('input-a')
   const playback = correlatedEvent('output:gen-ai:chat:playback-start', 'input-a', {})
