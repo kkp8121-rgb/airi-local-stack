@@ -74,6 +74,21 @@ does not require that checkout to be present. The GitHub job intentionally
 does not clone or apply a v0.11.3 fixture: patch applicability is a separately
 recorded pristine-checkout result, while CI stays offline and artifact-free.
 
+## Latest installer-script audit
+
+The apply/restore PowerShell boundary was re-audited after this handoff was
+created. No HIGH or MED defect was found. Both supported entry points use the
+same named mutex, reject installation/resources/archive reparse points, verify
+the pinned pristine SHA-256, stage and re-hash bytes before publication, and
+clean temporary files. All six active child steps reject direct invocation and
+the orchestrator stops after the first child failure before final verification.
+
+These are deliberate remaining boundaries, not hidden guarantees: the
+filesystem checks cannot remove every hostile same-privilege TOCTOU window;
+`-InternalOrchestrator` is a PowerShell calling convention rather than an
+authentication boundary; and a failed partial apply is reported for explicit
+manual restore rather than automatically rolled back.
+
 ## Deliberate boundaries
 
 - Do not create or enable a governed topic board from this handoff.
