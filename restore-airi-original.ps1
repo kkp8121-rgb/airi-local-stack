@@ -55,7 +55,15 @@ $asarPath = Join-Path $resolvedInstallDir 'resources\app.asar'
 if (-not (Test-Path -LiteralPath $asarPath)) {
     throw "app.asar not found: $asarPath"
 }
+$asarItemBeforeResolve = Get-Item -LiteralPath $asarPath -Force
+if ($asarItemBeforeResolve.PSIsContainer -or (($asarItemBeforeResolve.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+    throw "app.asar is not a regular non-reparse file: $asarPath"
+}
 $resolvedAsar = (Resolve-Path -LiteralPath $asarPath).Path
+$resolvedAsarItem = Get-Item -LiteralPath $resolvedAsar -Force
+if ($resolvedAsarItem.PSIsContainer -or (($resolvedAsarItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+    throw "Resolved app.asar is not a regular non-reparse file: $resolvedAsar"
+}
 
 # --- 2. AIRI must not be running ---------------------------------------------
 # Checked before the backup lookup so the guard message is the same regardless

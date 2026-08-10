@@ -48,3 +48,6 @@ playback completion from playback-start evidence.
 - `restore-airi-original.ps1` uses the same pristine hash contract, stages the
   backup in the target directory, verifies the staged bytes, and publishes via
   an atomic file replacement instead of truncating `app.asar` in place.
+- Restore also rejects a container or reparse-point `app.asar` before resolving
+  the path, preventing an archive symlink from redirecting replacement outside
+  the installation.
