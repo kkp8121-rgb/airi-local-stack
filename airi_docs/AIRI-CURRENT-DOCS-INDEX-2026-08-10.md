@@ -37,3 +37,6 @@ playback completion from playback-start evidence.
   in the dependency-equipped source checkout.
 - The latest privacy/correlation audit found no HIGH or MED issue in the
   current patch boundary.
+- `apply-airi-patches.ps1` now verifies all 10 active in-place patch sites,
+  including the reaction-latency speech pre-roll marker, plus the required
+  absence of the superseded segmentation marker.

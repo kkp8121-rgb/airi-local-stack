@@ -159,6 +159,7 @@ $stockMarkers = @(
     @{ Patch = 'native-media-recorder';    Text = 'function useAudioRecorder(media) {';                                              Expected = 1 }
     @{ Patch = 'voice-input-segmentation'; Text = 'var DEFAULT_VOLUME_FALLBACK_STOP_DELAY_MS = 900;';                                Expected = 1 }
     @{ Patch = 'reaction-latency';         Text = 'var DEFAULT_VAD_MIN_SILENCE_DURATION_MS = 1200;';                                 Expected = 1 }
+    @{ Patch = 'reaction-latency';         Text = 'var DEFAULT_VAD_SPEECH_PAD_MS = 360;';                                             Expected = 1 }
     @{ Patch = 'reaction-latency';         Text = "flushDelayMs: 1200,`n`t`t`tmaxBufferedTextLength: 90,";                           Expected = 1 }
     @{ Patch = 'playback-latency';         Text = "source.start(0);`n`t`t`t`t`tif (item.intentId.startsWith(`"stream-`")) {";        Expected = 1 }
     @{ Patch = 'session-header';           Text = "`t`tif (providerMode(activeProvider.value) === `"official`" && options?.requestCorrelation) {`n`t`t`theaders[AIRI_CHAT_SESSION_ID_HEADER] = options.requestCorrelation.conversationId;`n`t`t`theaders[AIRI_CHAT_ROUND_ID_HEADER] = options.requestCorrelation.roundId;`n`t`t`theaders[AIRI_CHAT_APP_SURFACE_HEADER] = getConversationAnalyticsSurface();`n`t`t}"; Expected = 1 }
@@ -170,6 +171,7 @@ $patchedMarkers = @(
     @{ Patch = 'voice-input-segmentation'; Site = 'volume fallback 2700';  Text = 'var DEFAULT_VOLUME_FALLBACK_STOP_DELAY_MS =2700;';                  Expected = 1 }
     @{ Patch = 'voice-input-segmentation'; Site = 'empty transcript toast'; Text = 'error.value = void 0; /* Valid empty transcription is silence. */'; Expected = 1 }
     @{ Patch = 'reaction-latency';         Site = 'VAD silence 450';       Text = 'var DEFAULT_VAD_MIN_SILENCE_DURATION_MS =  450;';                   Expected = 1 }
+    @{ Patch = 'reaction-latency';         Site = 'speech pre-roll 600';   Text = 'var DEFAULT_VAD_SPEECH_PAD_MS =  600;';                      Expected = 1 }
     @{ Patch = 'reaction-latency';         Site = 'transcript flush 400';  Text = "flushDelayMs:  400,`n`t`t`tmaxBufferedTextLength: 90,";             Expected = 1 }
     @{ Patch = 'playback-latency';         Site = 'playback start event';  Text = 'request_id:String(item.intentId)';                                  Expected = 1 }
     @{ Patch = 'session-header';           Site = 'custom conversation id'; Text = 'if(options?.requestCorrelation)headers[AIRI_CHAT_SESSION_ID_HEADER]=options.requestCorrelation.conversationId;'; Expected = 1 }
@@ -300,7 +302,8 @@ if ($failedChecks.Count -gt 0 -or $failures.Count -gt 0) {
 
 Write-Output 'All AIRI patches applied and verified.'
 Write-Output 'Effective values: raw mic capture, native MediaRecorder (Opus/WebM), VAD silence 450 ms,'
-Write-Output 'volume-fallback safety net 2700 ms, transcript flush 400 ms, playback start reported to 127.0.0.1:8892,'
+Write-Output 'speech pre-roll 600 ms, volume-fallback safety net 2700 ms, transcript flush 400 ms,'
+Write-Output 'playback start reported to 127.0.0.1:8892,'
 Write-Output 'and stable x-airi-session-id on custom OpenAI-compatible chat requests.'
 if (Test-Path -LiteralPath $pristineBackupPath) {
     Write-Output "Pristine backup: $pristineBackupPath"
