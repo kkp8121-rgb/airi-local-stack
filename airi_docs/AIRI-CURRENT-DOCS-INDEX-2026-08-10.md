@@ -22,7 +22,7 @@ preserve earlier test totals, listener observations, archive hashes, and
 installation procedures. Those values are not current branch status. Do not
 use their old patch hashes or test counts to validate the current checkout.
 `AIRI-WORK-CHECKPOINT-2026-08-10.md` is also historical: it predates the
-current `0dc7cca` handoff and records the superseded `b234abe` baseline and
+current branch handoff and records the superseded `b234abe` baseline and
 82-path patch hash. Use the current patch manifest below instead.
 The same historical rule applies to command examples in other documents dated
 2026-08-07 or 2026-08-08: in particular, do not invoke individual
