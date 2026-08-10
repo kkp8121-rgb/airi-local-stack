@@ -78,6 +78,8 @@ playback completion from playback-start evidence.
 - `test-patch-manifest.ps1` is an offline regression check for the three
   documented patch artifact sizes and SHA-256 values; it does not inspect or
   modify an AIRI installation.
+- `test-current-checkpoint.ps1` runs the manifest, entrypoint, and sender
+  contract checks together as one offline checkpoint command.
 - Restore uses the same mutex, so apply and restore cannot modify the archive
   concurrently.
 - The six active `patch-airi-*.ps1` child files are implementation steps for
