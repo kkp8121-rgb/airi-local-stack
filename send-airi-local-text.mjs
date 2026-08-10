@@ -102,8 +102,9 @@ function isValidMessageEvent(event) {
     || Array.isArray(event.data))
     return false
   const message = event.data.message
-  return message === undefined
-    || (message !== null && typeof message === 'object' && !Array.isArray(message))
+  return message !== null
+    && typeof message === 'object'
+    && !Array.isArray(message)
 }
 
 export function createAssistantEventTracker(inputEventId) {

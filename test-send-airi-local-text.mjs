@@ -394,6 +394,7 @@ test('reports the actual empty event shape instead of the initialized shell', ()
 test('ignores malformed correlated message envelopes when resolving an empty completion shape', () => {
   for (const malformedData of [
     null,
+    {},
     { message: null },
     { message: 'malformed' },
     { message: [] },
