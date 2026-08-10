@@ -140,6 +140,41 @@ test('treats matching cancellation as immediate while waiting for playback', () 
   assert.deepEqual(tracker.waitTerminal(cancelled, 7), { cancelled: true, elapsedMs: 7 })
 })
 
+test('cancellation after playback start remains the terminal outcome', () => {
+  const tracker = createAssistantEventTracker('input-a')
+  const playback = correlatedEvent('output:gen-ai:chat:playback-start', 'input-a', {})
+  const cancelled = correlatedEvent('output:gen-ai:chat:cancelled', 'input-a', { reason: 'superseded' })
+
+  tracker.observe(playback)
+  assert.deepEqual(tracker.waitPlaybackStart(playback, 4), {
+    playback: { playbackStarted: true, playbackStartedMs: 4 },
+  })
+  tracker.observe(cancelled)
+  assert.deepEqual(tracker.waitTerminal(cancelled, 9), { cancelled: true, elapsedMs: 9 })
+
+  const lateComplete = correlatedEvent('output:gen-ai:chat:complete', 'input-a', { message: { content: 'late' } })
+  tracker.observe(lateComplete)
+  assert.equal(tracker.waitTerminal(lateComplete, 10), undefined)
+})
+
+test('a claimed terminal ignores late message and playback events', () => {
+  const tracker = createAssistantEventTracker('input-a')
+  const playback = correlatedEvent('output:gen-ai:chat:playback-start', 'input-a', {})
+  const complete = correlatedEvent('output:gen-ai:chat:complete', 'input-a', { message: { content: 'answer' } })
+
+  tracker.observe(playback)
+  assert.deepEqual(tracker.waitPlaybackStart(playback, 4), {
+    playback: { playbackStarted: true, playbackStartedMs: 4 },
+  })
+  tracker.observe(complete)
+  assert.equal(tracker.waitTerminal(complete, 8).assistant, 'answer')
+
+  const lateMessage = correlatedEvent('output:gen-ai:chat:message', 'input-a', { message: { content: 'late' } })
+  tracker.observe(lateMessage)
+  assert.equal(tracker.waitPlaybackStart(playback, 11), undefined)
+  assert.equal(tracker.waitTerminal(complete, 12), undefined)
+})
+
 test('default completion terminal does not require playback start', () => {
   const tracker = createAssistantEventTracker('input-a')
   const complete = correlatedEvent('output:gen-ai:chat:complete', 'input-a', { message: { content: 'answer' } })
