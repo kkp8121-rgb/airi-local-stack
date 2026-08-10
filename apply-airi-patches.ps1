@@ -50,6 +50,10 @@ $ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath $InstallDir)) {
     throw "AIRI installation directory not found: $InstallDir"
 }
+$installItemBeforeResolve = Get-Item -LiteralPath $InstallDir -Force
+if (-not $installItemBeforeResolve.PSIsContainer -or (($installItemBeforeResolve.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+    throw "AIRI installation path is not a regular non-reparse directory: $InstallDir"
+}
 $resolvedInstallDir = (Resolve-Path -LiteralPath $InstallDir).Path
 if (-not (Test-Path -LiteralPath (Join-Path $resolvedInstallDir 'airi.exe'))) {
     throw "'$resolvedInstallDir' does not look like an AIRI installation (airi.exe not found)."
@@ -58,7 +62,15 @@ $asarPath = Join-Path $resolvedInstallDir 'resources\app.asar'
 if (-not (Test-Path -LiteralPath $asarPath)) {
     throw "app.asar not found: $asarPath"
 }
+$asarItemBeforeResolve = Get-Item -LiteralPath $asarPath -Force
+if ($asarItemBeforeResolve.PSIsContainer -or (($asarItemBeforeResolve.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+    throw "app.asar is not a regular non-reparse file: $asarPath"
+}
 $resolvedAsar = (Resolve-Path -LiteralPath $asarPath).Path
+$resolvedAsarItem = Get-Item -LiteralPath $resolvedAsar -Force
+if ($resolvedAsarItem.PSIsContainer -or (($resolvedAsarItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+    throw "Resolved app.asar is not a regular non-reparse file: $resolvedAsar"
+}
 
 # --- 2. AIRI must not be running ---------------------------------------------
 $airiProcesses = @(Get-Process -Name 'airi' -ErrorAction SilentlyContinue)

@@ -51,3 +51,5 @@ playback completion from playback-start evidence.
 - Restore also rejects a container or reparse-point `app.asar` before resolving
   the path, preventing an archive symlink from redirecting replacement outside
   the installation.
+- The apply orchestrator applies the same non-reparse checks to the install
+  directory and archive before scanning or creating a pristine backup.
