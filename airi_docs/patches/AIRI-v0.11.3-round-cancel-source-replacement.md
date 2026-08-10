@@ -32,7 +32,7 @@ after the combined patch. Both patches pass
 
 ### One bounded round ID
 
-`ChatOrchestratorSendOptions.roundId` accepts only 1–128 characters matching
+`ChatOrchestratorSendOptions.roundId` accepts only 1 to 128 characters matching
 `[A-Za-z0-9][A-Za-z0-9._:-]*`; invalid or absent values fall back to the
 runtime-generated ID. The same ID is stored on the user message and
 `ChatStreamEventContext`.
