@@ -132,6 +132,29 @@ test('ignores wrong-parent and duplicate playback-start events', () => {
   assert.equal(tracker.eventStats.matchingPlaybackStarts, 2)
 })
 
+test('ignores malformed correlated playback payloads', () => {
+  const tracker = createAssistantEventTracker('input-a')
+  const malformed = [null, 'not-an-object', []].map(data => ({
+    type: 'output:gen-ai:chat:playback-start',
+    data,
+    metadata: { event: { parentId: 'input-a' } },
+  }))
+
+  for (const event of malformed) {
+    tracker.observe(event)
+    assert.equal(tracker.waitPlaybackStart(event, 2), undefined)
+  }
+
+  const valid = correlatedEvent('output:gen-ai:chat:playback-start', 'input-a', {})
+  tracker.observe(valid)
+  assert.deepEqual(tracker.waitPlaybackStart(valid, 4), {
+    playback: { playbackStarted: true, playbackStartedMs: 4 },
+  })
+  // The diagnostic counter records correlated envelopes, while the terminal
+  // gate above accepts only the final exact empty-object payload.
+  assert.equal(tracker.eventStats.matchingPlaybackStarts, 4)
+})
+
 test('treats matching cancellation as immediate while waiting for playback', () => {
   const tracker = createAssistantEventTracker('input-a')
   const cancelled = correlatedEvent('output:gen-ai:chat:cancelled', 'input-a', { reason: 'superseded' })
