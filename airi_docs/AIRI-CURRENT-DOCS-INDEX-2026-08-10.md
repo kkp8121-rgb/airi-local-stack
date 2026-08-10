@@ -17,6 +17,9 @@ runtime observations.
   patch for the generic `context:update` occurrence. Apply it after the
   combined patch; it is intentionally separate from the input `contextUpdates`
   sanitizer already present in the combined patch.
+- The other tracked files under `patches/` are retained historical snapshots
+  from superseded iterations. Do not apply them or mix them with the current
+  manifest; use only the combined patch plus the separate sanitizer above.
 
 ## Historical
 
