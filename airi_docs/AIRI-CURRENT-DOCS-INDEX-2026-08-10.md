@@ -21,6 +21,9 @@ runtime observations.
 preserve earlier test totals, listener observations, archive hashes, and
 installation procedures. Those values are not current branch status. Do not
 use their old patch hashes or test counts to validate the current checkout.
+`AIRI-WORK-CHECKPOINT-2026-08-10.md` is also historical: it predates the
+current `b198177` handoff and records the superseded `b234abe` baseline and
+82-path patch hash. Use the current patch manifest below instead.
 The same historical rule applies to command examples in other documents dated
 2026-08-07 or 2026-08-08: in particular, do not invoke individual
 `patch-airi-*.ps1` steps from those pages. Use the current orchestrator contract
@@ -74,8 +77,10 @@ playback completion from playback-start evidence.
   child-script guard and does not inspect or modify an AIRI installation.
 - Restore uses the same mutex, so apply and restore cannot modify the archive
   concurrently.
-- The six `patch-airi-*.ps1` files are implementation steps for the
-  orchestrator, not concurrent standalone entry points; use
+- The six active `patch-airi-*.ps1` child files are implementation steps for
+  the orchestrator; the seventh matching file,
+  `patch-airi-transcript-latency.ps1`, is a deprecated stub. None are
+  concurrent standalone entry points; use
   `apply-airi-patches.ps1` or `restore-airi-original.ps1` for supported
   operations. Each step now requires the orchestrator-only
   `-InternalOrchestrator` switch and refuses direct invocation before touching
