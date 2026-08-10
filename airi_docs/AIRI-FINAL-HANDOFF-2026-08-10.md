@@ -35,7 +35,9 @@ The current patch set covers:
    change their documented size or SHA-256.
 6. Offline PowerShell contracts for patch manifest integrity, orchestrator-only
    child entry points, and the combined checkpoint command. The GitHub
-   workflow runs those checks on Windows with immutable Node 24 action pins.
+   workflow runs those checks on Windows with immutable SHA pins for the
+   Node-24-based official actions; the job itself uses Node.js 22 for the
+   sender contract.
 
 ## Authoritative files
 
