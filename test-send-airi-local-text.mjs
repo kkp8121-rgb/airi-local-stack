@@ -175,6 +175,27 @@ test('a claimed terminal ignores late message and playback events', () => {
   assert.equal(tracker.waitTerminal(complete, 12), undefined)
 })
 
+test('playback-first empty completion does not adopt a later message shell', () => {
+  const tracker = createAssistantEventTracker('input-a')
+  const playback = correlatedEvent('output:gen-ai:chat:playback-start', 'input-a', {})
+  const complete = correlatedEvent('output:gen-ai:chat:complete', 'input-a', { message: {} })
+
+  tracker.observe(playback)
+  assert.deepEqual(tracker.waitPlaybackStart(playback, 3), {
+    playback: { playbackStarted: true, playbackStartedMs: 3 },
+  })
+  tracker.observe(complete)
+  const terminal = tracker.waitTerminal(complete, 7)
+  assert.equal(terminal.assistantSource, 'none')
+  assert.equal(terminal.assistant, '')
+
+  const lateMessage = correlatedEvent('output:gen-ai:chat:message', 'input-a', {
+    message: { content: 'late message' },
+  })
+  tracker.observe(lateMessage)
+  assert.equal(tracker.waitTerminal(complete, 8), undefined)
+})
+
 test('default completion terminal does not require playback start', () => {
   const tracker = createAssistantEventTracker('input-a')
   const complete = correlatedEvent('output:gen-ai:chat:complete', 'input-a', { message: { content: 'answer' } })
