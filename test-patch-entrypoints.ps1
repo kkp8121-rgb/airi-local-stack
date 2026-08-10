@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-<##
+<#
 .SYNOPSIS
     Offline regression test for the supported AIRI patch entrypoint contract.
 
@@ -7,7 +7,7 @@
     Does not inspect or modify an AIRI installation. It verifies that every
     internal patch step rejects direct invocation before path access and that
     the orchestrator passes the explicit internal-call switch.
-##>
+#>
 $ErrorActionPreference = 'Stop'
 
 $children = @(
