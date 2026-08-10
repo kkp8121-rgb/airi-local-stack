@@ -162,13 +162,20 @@ Do not apply this directly to `app.asar`. From a clean upstream checkout:
 ```powershell
 git checkout v0.11.3
 git rev-parse HEAD
-git apply --check airi_docs/patches/AIRI-v0.11.3-local-runtime-source.patch
+git apply --check --whitespace=nowarn airi_docs/patches/AIRI-v0.11.3-local-runtime-source.patch
 git apply airi_docs/patches/AIRI-v0.11.3-local-runtime-source.patch
 ```
 
 The reported HEAD must be
 `dbf812488829a61cc2e95909e021b215704d066c`. The installed artifact above was
 built from this pinned checkout after explicit user authorization.
+
+After the combined patch is applied, verify the generic context sanitizer
+separately with:
+
+```powershell
+git apply --check --whitespace=nowarn airi_docs/patches/AIRI-v0.11.3-context-correlation-sanitizer.patch
+```
 
 ## Remaining live boundaries
 
