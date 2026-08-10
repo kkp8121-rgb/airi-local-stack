@@ -349,6 +349,17 @@ test('reports the actual empty event shape instead of the initialized shell', ()
   )
 })
 
+test('ignores malformed correlated message envelopes when resolving an empty completion shape', () => {
+  const tracker = createAssistantEventTracker('input-a')
+  const malformed = correlatedEvent('output:gen-ai:chat:message', 'input-a', null)
+  tracker.observe(malformed)
+  const complete = correlatedEvent('output:gen-ai:chat:complete', 'input-a', {
+    message: { content: '', slices: [] },
+  })
+  const terminal = tracker.terminal(complete, 4)
+  assert.deepEqual(terminal.assistantShape, assistantMessageShape(complete.data.message))
+})
+
 test('decodes direct and base64 Korean input without changing it', () => {
   const text = '한국어 테스트'
   assert.equal(decodeTextArgument(['--text', text]), text)

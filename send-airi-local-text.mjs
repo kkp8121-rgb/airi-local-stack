@@ -95,6 +95,17 @@ function isValidCompletionEvent(event) {
     && !Array.isArray(event.data)
 }
 
+function isValidMessageEvent(event) {
+  if (event?.type !== 'output:gen-ai:chat:message'
+    || event?.data === null
+    || typeof event?.data !== 'object'
+    || Array.isArray(event.data))
+    return false
+  const message = event.data.message
+  return message === undefined
+    || (message !== null && typeof message === 'object' && !Array.isArray(message))
+}
+
 export function createAssistantEventTracker(inputEventId) {
   const eventStats = {
     assistantMessages: 0,
@@ -121,6 +132,8 @@ export function createAssistantEventTracker(inputEventId) {
       eventStats.assistantMessages++
       if (correlated) {
         eventStats.matchingAssistantMessages++
+        if (!isValidMessageEvent(event))
+          return correlated
         matchingAssistantSeen = true
         matchingAssistantShape = assistantMessageShape(event?.data?.message)
         const candidate = assistantText(event?.data?.message)
