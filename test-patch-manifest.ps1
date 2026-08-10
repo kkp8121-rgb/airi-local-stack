@@ -29,6 +29,9 @@ foreach ($artifact in $artifacts) {
     }
 
     $file = Get-Item -LiteralPath $path
+    if (($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Patch artifact is a reparse point: $($artifact.Path)"
+    }
     if ([int64]$file.Length -ne [int64]$artifact.Length) {
         throw "Patch size mismatch: $($artifact.Path)"
     }
