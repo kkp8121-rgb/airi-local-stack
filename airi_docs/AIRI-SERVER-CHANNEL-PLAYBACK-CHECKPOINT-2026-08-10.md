@@ -98,7 +98,31 @@ do not send real microphone text, and do not expose raw IDs or dialogue in
 your report. If live validation is authorized, use only synthetic input and
 report counts/statuses without text or identifiers.
 
-### Copy/paste message for the next Claude session
+### Copy/paste message for the next Claude session (UTF-8-safe)
+
+```text
+You are the next Claude reviewer for the AIRI remediation branch.
+
+Read README.md, airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md, and
+airi_docs/AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md first.
+Review only the current source patch and sender/bridge protocol for:
+1) playback-start emitted only after successful source.start(0);
+2) exact parent correlation with no round/session/text leakage;
+3) fail-closed handling of completion-first, playback-first, duplicate, stale,
+   remote-mirror, and supersession-cancellation events;
+4) unchanged default --wait-complete behavior; and
+5) clean application of the patch to the pinned v0.11.3 base.
+
+Run offline checks first: git status/log, git diff --check,
+node --test test-send-airi-local-text.mjs, and the available PowerShell
+entrypoint contract test. Do not create a governed topic board, send real
+microphone text, call models/services, or expose raw IDs, paths, or dialogue.
+Report only findings, test counts, and file/line references. If a fix is
+needed, describe the smallest scoped change before editing.
+```
+
+The legacy block below is retained only as historical text; use the block
+above because it is ASCII/UTF-8 safe.
 
 ```text
 이 저장소의 현재 브랜치와 원격 HEAD를 먼저 확인한 뒤, README.md와
