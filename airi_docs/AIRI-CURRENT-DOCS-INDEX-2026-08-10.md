@@ -88,7 +88,9 @@ playback completion from playback-start evidence.
   child-script guard and does not inspect or modify an AIRI installation.
 - `test-patch-manifest.ps1` is an offline regression check for the three
   documented patch artifact sizes and SHA-256 values; it does not inspect or
-  modify an AIRI installation.
+  modify an AIRI installation. The workflow separately checks committed
+  source whitespace with `git show --check` while excluding byte-addressed
+  patch artifacts, whose whitespace is covered by the manifest hashes.
 - `test-current-checkpoint.ps1` runs the manifest, entrypoint, and sender
   contract checks together as one offline checkpoint command; it also invokes
   `test-patch-applicability.ps1` in its inert/default-off mode.

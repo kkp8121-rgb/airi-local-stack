@@ -27,9 +27,12 @@ jobs:
         with:
           node-version: 22
 
-      - name: Check patch whitespace
+      - name: Check committed whitespace
         shell: pwsh
-        run: git diff --check
+        # The checkout is clean, so git diff --check would inspect nothing.
+        # Patch artifacts intentionally preserve byte-level whitespace and are
+        # covered by the manifest hash instead of this source diff check.
+        run: git show --check --pretty=short HEAD -- . ':(exclude)airi_docs/patches/*.patch'
 
       - name: Run offline checkpoint contracts
         shell: pwsh
