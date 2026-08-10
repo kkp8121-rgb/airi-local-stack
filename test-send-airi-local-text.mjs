@@ -5,11 +5,57 @@ import {
   CLIENT_POSSIBLE_EVENTS,
   assistantMessageShape,
   assistantText,
+  buildInputTextEvent,
+  createAssistantEventTracker,
   decodeTextArgument,
+  isCorrelatedOutputEvent,
   resolveAssistantShape,
   resolveAssistantText,
   validateServerConfig,
 } from './send-airi-local-text.mjs'
+
+test('builds input payload with the opaque event id in metadata', () => {
+  assert.deepEqual(buildInputTextEvent('same text', 'input-a'), {
+    type: 'input:text',
+    data: { text: 'same text' },
+    route: { delivery: { required: true } },
+    metadata: { event: { id: 'input-a' } },
+  })
+})
+
+test('correlates output only through metadata.event.parentId', () => {
+  const id = 'input-a'
+  assert.equal(isCorrelatedOutputEvent({ metadata: { event: { parentId: id } } }, id), true)
+  assert.equal(isCorrelatedOutputEvent({ metadata: { event: { parentId: 'input-b' } } }, id), false)
+  assert.equal(isCorrelatedOutputEvent({ metadata: { event: {} } }, id), false)
+  assert.equal(isCorrelatedOutputEvent({ data: { text: 'same text' } }, id), false)
+})
+
+test('keeps same-text interleaved conversations and empty completions isolated', () => {
+  const trackerA = createAssistantEventTracker('input-a')
+  const trackerB = createAssistantEventTracker('input-b')
+  const event = (type, parentId, message) => ({
+    type,
+    data: { text: 'same text', message },
+    ...(parentId === undefined ? {} : { metadata: { event: { parentId } } }),
+  })
+
+  const messageA = event('output:gen-ai:chat:message', 'input-a', { content: 'answer A' })
+  const messageB = event('output:gen-ai:chat:message', 'input-b', { content: 'answer B' })
+  const completeA = event('output:gen-ai:chat:complete', 'input-a', { content: '' })
+  const completeB = event('output:gen-ai:chat:complete', 'input-b', { content: '' })
+  const missing = event('output:gen-ai:chat:message', undefined, { content: 'unrelated' })
+
+  for (const item of [messageA, messageB, missing, completeA, completeB]) {
+    trackerA.observe(item)
+    trackerB.observe(item)
+  }
+  assert.equal(trackerA.completion(completeA, 1).assistant, 'answer A')
+  assert.equal(trackerB.completion(completeB, 1).assistant, 'answer B')
+  assert.equal(trackerA.eventStats.matchingAssistantMessages, 1)
+  assert.equal(trackerB.eventStats.matchingAssistantMessages, 1)
+  assert.equal(trackerA.eventStats.matchingCompletions, 1)
+})
 
 test('announces both the input and matching completion event contracts', () => {
   assert.deepEqual(CLIENT_POSSIBLE_EVENTS, [

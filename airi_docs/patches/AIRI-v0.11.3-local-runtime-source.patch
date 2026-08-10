@@ -5767,7 +5767,7 @@ index 2bafa8c5f5cad7fb2338a50eb487190c12141725..7d4168b612f58373ef375b2de12c7ad1
    })
  
 diff --git a/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts b/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts
-index 566c38875bc979b6407d905a36fe757ba928be85..9d3197d7991aea84f914bef92ecaa52594986413 100644
+index 566c388..03170d1 100644
 --- a/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts
 +++ b/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts
 @@ -139,6 +139,53 @@ function createContextUpdateEvent(overrides: Record<string, unknown> = {}) {
@@ -5850,10 +5850,142 @@ index 566c38875bc979b6407d905a36fe757ba928be85..9d3197d7991aea84f914bef92ecaa525
    /**
     * @example
     * Server context updates record store-ingested before broadcast-posted.
-@@ -608,6 +674,144 @@ describe('context bridge contract', () => {
+@@ -608,6 +674,276 @@ describe('context bridge contract', () => {
      await store.dispose()
    })
  
++  it('keeps a valid input event ID out of core input and echoes it only on both output envelopes', async () => {
++    activeProviderRef.value = 'mock-provider'
++    activeModelRef.value = 'mock-model'
++    getProviderInstanceMock.mockResolvedValueOnce({})
++    const store = useContextBridgeStore()
++    await store.initialize()
++
++    const metadata = {
++      ...createMetadata('weather', 'station-1'),
++      event: { id: 'producer-input-42' },
++    }
++    await emitServerEvent('input:text', {
++      type: 'input:text',
++      source: 'extension-module-host',
++      metadata,
++      data: {
++        text: 'correlated input',
++        contextUpdates: [{
++          strategy: ContextUpdateStrategy.AppendSelf,
++          text: 'correlated context',
++        }],
++      },
++    })
++
++    expect(chatOrchestratorMock.ingest.mock.calls[0]?.[1]?.input).toEqual(expect.objectContaining({
++      data: expect.not.objectContaining({ metadata: expect.anything() }),
++    }))
++    expect(chatOrchestratorMock.ingest.mock.calls[0]?.[1]?.input).not.toHaveProperty('metadata')
++    const ingestedContext = chatContextIngestMock.mock.calls[0]?.[0]
++    expect(ingestedContext).toEqual(expect.objectContaining({
++      metadata: { source: metadata.source },
++    }))
++    expect(ingestedContext.metadata).not.toHaveProperty('event')
++
++    serverSendMock.mockClear()
++    const context = {
++      message: { role: 'user', content: 'correlated input' },
++      contexts: { 'weather:station-1': [ingestedContext] },
++      composedMessage: [],
++      input: chatOrchestratorMock.ingest.mock.calls[0]?.[1]?.input,
++    }
++    await emitHooks(assistantMessageHooks, {
++      role: 'assistant', content: 'reply', slices: [], tool_results: [],
++    }, 'reply', context)
++    await emitHooks(turnCompleteHooks, {
++      output: { role: 'assistant', content: 'reply', slices: [], tool_results: [] },
++      outputText: 'reply', toolCalls: [],
++    }, context)
++
++    const outputs = serverSendMock.mock.calls.map(call => call[0])
++    expect(outputs).toEqual([
++      expect.objectContaining({
++        type: 'output:gen-ai:chat:message',
++        metadata: { event: { parentId: 'producer-input-42' } },
++        data: expect.objectContaining({
++          'gen-ai:chat': expect.objectContaining({
++            input: expect.not.objectContaining({ metadata: expect.anything() }),
++            contexts: {
++              'weather:station-1': [expect.objectContaining({
++                metadata: { source: metadata.source },
++              })],
++            },
++          }),
++        }),
++      }),
++      expect.objectContaining({
++        type: 'output:gen-ai:chat:complete',
++        metadata: { event: { parentId: 'producer-input-42' } },
++        data: expect.objectContaining({
++          'gen-ai:chat': expect.objectContaining({
++            input: expect.not.objectContaining({ metadata: expect.anything() }),
++            contexts: {
++              'weather:station-1': [expect.objectContaining({
++                metadata: { source: metadata.source },
++              })],
++            },
++          }),
++        }),
++      }),
++    ])
++    for (const output of outputs) {
++      const outputContext = output.data['gen-ai:chat'].contexts['weather:station-1'][0]
++      expect(outputContext.metadata).toEqual({ source: metadata.source })
++      expect(outputContext.metadata).not.toHaveProperty('event')
++    }
++
++    await store.dispose()
++  })
++
++  it.each([undefined, 'not valid!', 'x'.repeat(129)])('does not attach output parentId for an invalid or missing input event ID', async (id) => {
++    activeProviderRef.value = 'mock-provider'
++    activeModelRef.value = 'mock-model'
++    getProviderInstanceMock.mockResolvedValueOnce({})
++    const store = useContextBridgeStore()
++    await store.initialize()
++
++    await emitServerEvent('input:text', {
++      type: 'input:text',
++      source: 'extension-module-host',
++      metadata: {
++        ...createMetadata('weather', 'station-1'),
++        event: { id },
++      },
++      data: { text: 'legacy input' },
++    })
++
++    const ingestInput = chatOrchestratorMock.ingest.mock.calls[0]?.[1]?.input
++    expect(ingestInput).not.toHaveProperty('metadata')
++    serverSendMock.mockClear()
++    const context = {
++      message: { role: 'user', content: 'legacy input' },
++      contexts: {},
++      composedMessage: [],
++      input: ingestInput,
++    }
++
++    await emitHooks(assistantMessageHooks, {
++      role: 'assistant', content: 'reply', slices: [], tool_results: [],
++    }, 'reply', context)
++    await emitHooks(turnCompleteHooks, {
++      output: { role: 'assistant', content: 'reply', slices: [], tool_results: [] },
++      outputText: 'reply', toolCalls: [],
++    }, context)
++
++    expect(serverSendMock.mock.calls.map(call => call[0])).toEqual([
++      expect.not.objectContaining({ metadata: expect.anything() }),
++      expect.not.objectContaining({ metadata: expect.anything() }),
++    ])
++
++    await store.dispose()
++  })
++
 +  it('admits a simultaneous server text event in only one bridge instance', async () => {
 +    const lockMock = installExclusiveLockMock()
 +    activeProviderRef.value = 'mock-provider'
@@ -5996,25 +6128,39 @@ index 566c38875bc979b6407d905a36fe757ba928be85..9d3197d7991aea84f914bef92ecaa525
      const store = useContextBridgeStore()
      await store.initialize()
 diff --git a/packages/stage-ui/src/stores/mods/api/context-bridge.ts b/packages/stage-ui/src/stores/mods/api/context-bridge.ts
-index 47321590d65bbb57e41f9f18bd410a70d5b102de..4f88ea64efc62f8c19568c920f72838de5a2fa96 100644
+index 4732159..82d1764 100644
 --- a/packages/stage-ui/src/stores/mods/api/context-bridge.ts
 +++ b/packages/stage-ui/src/stores/mods/api/context-bridge.ts
-@@ -93,6 +93,7 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -91,8 +91,12 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+   const { post: postSparkNotifyBridgeMessage, data: incomingSparkNotifyBridgeMessage } = useBroadcastChannel<SparkNotifyBridgeMessage, SparkNotifyBridgeMessage>({ name: SPARK_NOTIFY_BRIDGE_CHANNEL_NAME })
+ 
    const disposeHookFns = ref<Array<() => void>>([])
++  // Keep transport-only server event correlation out of the chat runtime
++  // object graph (which may be persisted or broadcast to other renderers).
++  const inputTextEventParentIds = new WeakMap<object, string>()
    let remoteStreamGuard: { sessionId: string, generation: number } | null = null
    let initialized = false
 +  let registersChatIngestion = true
  
    function recordContextIngestRejected(options: {
      channel: 'server' | 'broadcast' | 'input'
-@@ -374,14 +375,28 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -374,14 +378,37 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
      return await callback()
    }
  
 -  async function initialize() {
-+  function getInputTextEventLockKey(event: { metadata?: { event?: { id?: unknown } } }) {
++  function getInputTextEventId(event: { metadata?: { event?: { id?: unknown } } }) {
 +    const eventId = event.metadata?.event?.id
 +    if (typeof eventId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(eventId)) {
++      return undefined
++    }
++
++    return eventId
++  }
++
++  function getInputTextEventLockKey(event: { metadata?: { event?: { id?: unknown } } }) {
++    const eventId = getInputTextEventId(event)
++    if (!eventId) {
 +      return undefined
 +    }
 +
@@ -6037,7 +6183,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..4f88ea64efc62f8c19568c920f72838d
          for (const consumerEvent of consumerRegistrationEvents) {
            serverChannelStore.send({
              type: 'module:consumer:register',
-@@ -396,8 +411,10 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -396,8 +423,10 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
  
        await serverChannelStore.ensureConnected()
  
@@ -6050,7 +6196,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..4f88ea64efc62f8c19568c920f72838d
  
        let isProcessingRemoteStream = false
  
-@@ -557,126 +574,108 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -557,143 +586,147 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
        }))
  
        disposeHookFns.value.push(serverChannelStore.onEvent('input:text', async (event) => {
@@ -6145,7 +6291,10 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..4f88ea64efc62f8c19568c920f72838d
 +              })
 +              const contextMessage: ContextMessage = {
 +                ...update,
-+                metadata: event.metadata,
++                // Context metadata travels through the registry and renderer
++                // broadcasts, so retain source identity only—not transport
++                // event correlation metadata.
++                metadata: event.metadata?.source ? { source: event.metadata.source } : undefined,
 +                createdAt,
 +              }
 +              const ingestAttempt = ingestContextMessageSafely({
@@ -6251,14 +6400,38 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..4f88ea64efc62f8c19568c920f72838d
 +              // The Tamagotchi authority listens for this local DOM signal to
 +              // cancel idle/proactive narration before accepting real input.
 +              globalThis.dispatchEvent?.(new Event('airi:user-chat-activity'))
++              const ingestInput = {
++                type: 'input:text' as const,
++                data: {
++                  ...event.data,
++                  text,
++                  textRaw,
++                  overrides,
++                  contextUpdates: acceptedContextUpdates,
++                },
++              }
++              const inputTextEventId = getInputTextEventId(event)
++              if (inputTextEventId) {
++                inputTextEventParentIds.set(ingestInput, inputTextEventId)
++              }
++
                await chatOrchestrator.ingest(messageText, {
                  model: activeModel.value,
                  chatProvider,
+-                input: {
+-                  type: 'input:text',
+-                  data: {
+-                    ...event.data,
+-                    text,
+-                    textRaw,
+-                    overrides,
+-                    contextUpdates: acceptedContextUpdates,
+-                  },
+-                },
 +                supersedeActive: true,
-                 input: {
-                   type: 'input:text',
-                   data: {
-@@ -692,8 +691,21 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
++                input: ingestInput,
+               }, targetSessionId)
+             }
              catch (err) {
                console.error('Error ingesting text input via context bridge:', err)
              }
@@ -6281,27 +6454,35 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..4f88ea64efc62f8c19568c920f72838d
        }))
  
        disposeHookFns.value.push(
-@@ -747,6 +759,9 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -747,8 +780,13 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
          }),
  
          chatOrchestrator.onAssistantMessage(async (message, _messageText, context) => {
 +          if (message.localOnly === true || message.origin === 'local-proactive')
 +            return
 +
++          const parentId = context.input && inputTextEventParentIds.get(context.input)
            serverChannelStore.send({
              type: 'output:gen-ai:chat:message',
++            ...(parentId ? { metadata: { event: { parentId } } } : {}),
              data: {
-@@ -765,6 +780,9 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+               ...context.input?.data,
+               message,
+@@ -765,8 +803,13 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
          }),
  
          chatOrchestrator.onChatTurnComplete(async (chat, context) => {
 +          if (chat.output.localOnly === true || chat.output.origin === 'local-proactive')
 +            return
 +
++          const parentId = context.input && inputTextEventParentIds.get(context.input)
            serverChannelStore.send({
              type: 'output:gen-ai:chat:complete',
++            ...(parentId ? { metadata: { event: { parentId } } } : {}),
              data: {
-@@ -883,15 +901,17 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+               ...context.input?.data,
+               'message': chat.output,
+@@ -883,15 +926,17 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
        if (!initialized)
          return
  
@@ -6328,7 +6509,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..4f88ea64efc62f8c19568c920f72838d
        }
  
        for (const fn of disposeHookFns.value) {
-@@ -900,6 +920,7 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -900,6 +945,7 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
  
        initialized = false
        remoteStreamGuard = null

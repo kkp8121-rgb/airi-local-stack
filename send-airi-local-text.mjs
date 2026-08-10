@@ -1,4 +1,5 @@
 import { readFile, stat } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -65,6 +66,69 @@ export function resolveAssistantShape(completionMessage, matchingMessageShape, m
     : matchingMessageShape
 }
 
+export function buildInputTextEvent(text, inputEventId) {
+  return {
+    type: 'input:text',
+    data: { text },
+    route: { delivery: { required: true } },
+    metadata: { event: { id: inputEventId } },
+  }
+}
+
+export function isCorrelatedOutputEvent(event, inputEventId) {
+  return event?.metadata?.event?.parentId === inputEventId
+}
+
+export function createAssistantEventTracker(inputEventId) {
+  const eventStats = {
+    assistantMessages: 0,
+    matchingAssistantMessages: 0,
+    completions: 0,
+    matchingCompletions: 0,
+    errors: 0,
+  }
+  let matchingAssistantText = ''
+  let matchingAssistantShape = assistantMessageShape(undefined)
+  let matchingAssistantSeen = false
+
+  function observe(event) {
+    const correlated = isCorrelatedOutputEvent(event, inputEventId)
+    if (event?.type === 'output:gen-ai:chat:message') {
+      eventStats.assistantMessages++
+      if (correlated) {
+        eventStats.matchingAssistantMessages++
+        matchingAssistantSeen = true
+        matchingAssistantShape = assistantMessageShape(event?.data?.message)
+        const candidate = assistantText(event?.data?.message)
+        if (candidate)
+          matchingAssistantText = candidate
+      }
+    }
+    else if (event?.type === 'output:gen-ai:chat:complete') {
+      eventStats.completions++
+      if (correlated)
+        eventStats.matchingCompletions++
+    }
+    return correlated
+  }
+
+  return {
+    eventStats,
+    observe,
+    completion(event, elapsedMs) {
+      const completionText = assistantText(event?.data?.message)
+      return {
+        elapsedMs,
+        assistant: resolveAssistantText(event?.data?.message, matchingAssistantText),
+        assistantSource: completionText ? 'completion' : matchingAssistantText ? 'message-event' : 'none',
+        assistantShape: resolveAssistantShape(
+          event?.data?.message, matchingAssistantShape, matchingAssistantSeen,
+        ),
+      }
+    },
+  }
+}
+
 export function decodeTextArgument(args) {
   const textIndex = args.indexOf('--text')
   const base64Index = args.indexOf('--text-base64')
@@ -129,16 +193,8 @@ async function main() {
   const { hostname, token } = await loadServerConfig(configPath)
   const { Client } = await import(pathToFileURL(sdkEntry).href)
 
-  const eventStats = {
-    assistantMessages: 0,
-    matchingAssistantMessages: 0,
-    completions: 0,
-    matchingCompletions: 0,
-    errors: 0,
-  }
-  let matchingAssistantText = ''
-  let matchingAssistantShape = assistantMessageShape(undefined)
-  let matchingAssistantSeen = false
+  let tracker
+  let inputEventId
   const client = new Client({
     name: 'local-codex-chat-ingress',
     url: `ws://${hostname}:6121/ws`,
@@ -146,24 +202,12 @@ async function main() {
     autoConnect: false,
     autoReconnect: false,
     possibleEvents: CLIENT_POSSIBLE_EVENTS,
-    onError: () => { eventStats.errors++ },
+    onError: () => {
+      if (tracker)
+        tracker.eventStats.errors++
+    },
     onAnyMessage: (event) => {
-      if (event?.type === 'output:gen-ai:chat:message') {
-        eventStats.assistantMessages++
-        if (event?.data?.text === text) {
-          eventStats.matchingAssistantMessages++
-          matchingAssistantSeen = true
-          matchingAssistantShape = assistantMessageShape(event?.data?.message)
-          const candidate = assistantText(event?.data?.message)
-          if (candidate)
-            matchingAssistantText = candidate
-        }
-      }
-      else if (event?.type === 'output:gen-ai:chat:complete') {
-        eventStats.completions++
-        if (event?.data?.text === text)
-          eventStats.matchingCompletions++
-      }
+      tracker?.observe(event)
     },
   })
 
@@ -176,33 +220,23 @@ async function main() {
   })
   const completionTimeout = waitComplete
     ? setTimeout(() => completeReject(new Error(
-        `Timed out waiting for matching AIRI completion (assistant_events=${eventStats.assistantMessages}, matching_assistant_events=${eventStats.matchingAssistantMessages}, completion_events=${eventStats.completions}, matching_completion_events=${eventStats.matchingCompletions}, errors=${eventStats.errors}).`,
+        `Timed out waiting for matching AIRI completion (assistant_events=${tracker?.eventStats.assistantMessages ?? 0}, matching_assistant_events=${tracker?.eventStats.matchingAssistantMessages ?? 0}, completion_events=${tracker?.eventStats.completions ?? 0}, matching_completion_events=${tracker?.eventStats.matchingCompletions ?? 0}, errors=${tracker?.eventStats.errors ?? 0}).`,
       )), 90_000)
     : undefined
   const unsubscribe = waitComplete
     ? client.onEvent('output:gen-ai:chat:complete', (event) => {
-        if (event?.data?.text !== text)
+        if (!tracker || !isCorrelatedOutputEvent(event, inputEventId))
           return
-        const completionText = assistantText(event?.data?.message)
-        completeResolve({
-          elapsedMs: Math.round(performance.now() - startedAt),
-          assistant: resolveAssistantText(event?.data?.message, matchingAssistantText),
-          assistantSource: completionText ? 'completion' : matchingAssistantText ? 'message-event' : 'none',
-          assistantShape: resolveAssistantShape(
-            event?.data?.message, matchingAssistantShape, matchingAssistantSeen,
-          ),
-        })
+        completeResolve(tracker.completion(event, Math.round(performance.now() - startedAt)))
       })
     : undefined
 
   let completed
   try {
     await client.connect()
-    client.sendOrThrow({
-      type: 'input:text',
-      data: { text },
-      route: { delivery: { required: true } },
-    })
+    inputEventId = randomUUID()
+    tracker = createAssistantEventTracker(inputEventId)
+    client.sendOrThrow(buildInputTextEvent(text, inputEventId))
     completed = waitComplete
       ? await completion
       : (await new Promise(resolvePromise => setTimeout(resolvePromise, 300)), undefined)
