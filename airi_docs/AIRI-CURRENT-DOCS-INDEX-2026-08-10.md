@@ -20,6 +20,21 @@ runtime observations.
 - The other tracked files under `patches/` are retained historical snapshots
   from superseded iterations. Do not apply them or mix them with the current
   manifest; use only the combined patch plus the separate sanitizer above.
+- `AIRI-INDEPENDENT-REVIEW-2026-08-10.md` is an external read-only review of the
+  weekend delta (`1d8a720..HEAD`). It records measured gate results, 20
+  CRITICAL/HIGH findings with adversarial verdicts, the 149 goals added this
+  weekend, six goal conflicts that need a user decision, and a remediation
+  order. It is a review record, not a branch contract.
+- `AIRI-INDEPENDENT-REVIEW-DATA-2026-08-10.md` is that review's raw data
+  appendix: all extracted goals with source quotes, the 61 MED/LOW findings,
+  and per-axis summaries.
+- `AIRI-EXAONE-GROWTH-STRATEGY-2026-08-07.md` and
+  `AIRI-EXAONE-MODEL-CUSTOMIZATION-PLAN-2026-08-07.md` are current
+  user-approved direction (G0–G6 roadmap, C0–C5 gates), not historical working
+  material. The `AIRI-VTUBER-JUST-CHATTING-REFERENCE-2026-08-08.md` style
+  contract and `ollama-proxy/eval/README.md` baseline rules are likewise
+  current. Reading only the four entries above misses the approved roadmap;
+  the 2026-08-10 review documents that this exact omission happened.
 
 ## Historical
 
