@@ -12,6 +12,7 @@ export const CLIENT_POSSIBLE_EVENTS = [
   'output:gen-ai:chat:message',
   'output:gen-ai:chat:complete',
   'output:gen-ai:chat:cancelled',
+  'output:gen-ai:chat:playback-start',
 ]
 
 export function assistantText(message) {
@@ -88,12 +89,16 @@ export function createAssistantEventTracker(inputEventId) {
     matchingCompletions: 0,
     cancellations: 0,
     matchingCancellations: 0,
+    playbackStarts: 0,
+    matchingPlaybackStarts: 0,
     errors: 0,
   }
   let matchingAssistantText = ''
   let matchingAssistantShape = assistantMessageShape(undefined)
   let matchingAssistantSeen = false
   let terminalClaimed = false
+  let playbackStarted = false
+  let pendingCompletion
 
   function observe(event) {
     const correlated = isCorrelatedOutputEvent(event, inputEventId)
@@ -117,6 +122,11 @@ export function createAssistantEventTracker(inputEventId) {
       eventStats.cancellations++
       if (correlated)
         eventStats.matchingCancellations++
+    }
+    else if (event?.type === 'output:gen-ai:chat:playback-start') {
+      eventStats.playbackStarts++
+      if (correlated)
+        eventStats.matchingPlaybackStarts++
     }
     return correlated
   }
@@ -147,6 +157,48 @@ export function createAssistantEventTracker(inputEventId) {
       return event.type === 'output:gen-ai:chat:cancelled'
         ? { cancelled: true, elapsedMs }
         : { cancelled: false, ...this.completion(event, elapsedMs) }
+    },
+    waitTerminal(event, elapsedMs) {
+      if (terminalClaimed || !isCorrelatedOutputEvent(event, inputEventId))
+        return undefined
+      if (event?.type === 'output:gen-ai:chat:cancelled') {
+        if (event?.data?.reason !== 'superseded')
+          return undefined
+        terminalClaimed = true
+        return { cancelled: true, elapsedMs }
+      }
+      if (event?.type !== 'output:gen-ai:chat:complete')
+        return undefined
+      if (!playbackStarted) {
+        pendingCompletion = { event, elapsedMs }
+        return undefined
+      }
+      terminalClaimed = true
+      return {
+        cancelled: false,
+        ...this.completion(event, elapsedMs),
+        ...(playbackStarted
+          ? { playbackStarted: true, playbackStartedMs: elapsedMs }
+          : {}),
+      }
+    },
+    waitPlaybackStart(event, elapsedMs) {
+      if (event?.type !== 'output:gen-ai:chat:playback-start'
+        || !isCorrelatedOutputEvent(event, inputEventId)
+        || playbackStarted)
+        return undefined
+      playbackStarted = true
+      const playback = { playbackStarted: true, playbackStartedMs: elapsedMs }
+      if (!pendingCompletion || terminalClaimed)
+        return { playback }
+      terminalClaimed = true
+      return {
+        terminal: {
+          cancelled: false,
+          ...this.completion(pendingCompletion.event, pendingCompletion.elapsedMs),
+        },
+        playback,
+      }
     },
   }
 }
@@ -202,6 +254,8 @@ async function main() {
   const printAssistant = args.includes('--print-assistant')
   const printAssistantShape = args.includes('--print-assistant-shape')
   const waitComplete = args.includes('--wait-complete') || printAssistant || printAssistantShape
+  const waitPlaybackStart = args.includes('--wait-playback-start')
+  const waitForTerminal = waitComplete || waitPlaybackStart
   const appData = process.env.APPDATA
   if (!appData)
     throw new Error('APPDATA is unavailable.')
@@ -240,20 +294,28 @@ async function main() {
     completeResolve = resolvePromise
     completeReject = rejectPromise
   })
-  const completionTimeout = waitComplete
+  const completionTimeout = waitForTerminal
     ? setTimeout(() => completeReject(new Error(
-        `Timed out waiting for matching AIRI completion (assistant_events=${tracker?.eventStats.assistantMessages ?? 0}, matching_assistant_events=${tracker?.eventStats.matchingAssistantMessages ?? 0}, completion_events=${tracker?.eventStats.completions ?? 0}, matching_completion_events=${tracker?.eventStats.matchingCompletions ?? 0}, cancellation_events=${tracker?.eventStats.cancellations ?? 0}, matching_cancellation_events=${tracker?.eventStats.matchingCancellations ?? 0}, errors=${tracker?.eventStats.errors ?? 0}).`,
+        `Timed out waiting for matching AIRI ${waitPlaybackStart ? 'completion and playback start' : 'completion'} (assistant_events=${tracker?.eventStats.assistantMessages ?? 0}, matching_assistant_events=${tracker?.eventStats.matchingAssistantMessages ?? 0}, completion_events=${tracker?.eventStats.completions ?? 0}, matching_completion_events=${tracker?.eventStats.matchingCompletions ?? 0}, cancellation_events=${tracker?.eventStats.cancellations ?? 0}, matching_cancellation_events=${tracker?.eventStats.matchingCancellations ?? 0}, playback_start_events=${tracker?.eventStats.playbackStarts ?? 0}, matching_playback_start_events=${tracker?.eventStats.matchingPlaybackStarts ?? 0}, errors=${tracker?.eventStats.errors ?? 0}).`,
       )), 90_000)
     : undefined
   const settleTerminal = (event) => {
-    const terminal = tracker?.terminal(event, Math.round(performance.now() - startedAt))
+    const terminal = waitPlaybackStart
+      ? tracker?.waitTerminal(event, Math.round(performance.now() - startedAt))
+      : tracker?.terminal(event, Math.round(performance.now() - startedAt))
     if (terminal)
       completeResolve(terminal)
   }
-  const unsubscribes = waitComplete
+  const settlePlaybackStart = (event) => {
+    const outcome = tracker?.waitPlaybackStart(event, Math.round(performance.now() - startedAt))
+    if (outcome?.terminal)
+      completeResolve({ ...outcome.terminal, ...outcome.playback })
+  }
+  const unsubscribes = waitForTerminal
     ? [
         client.onEvent('output:gen-ai:chat:complete', settleTerminal),
         client.onEvent('output:gen-ai:chat:cancelled', settleTerminal),
+        ...(waitPlaybackStart ? [client.onEvent('output:gen-ai:chat:playback-start', settlePlaybackStart)] : []),
       ]
     : []
 
@@ -263,7 +325,7 @@ async function main() {
     inputEventId = randomUUID()
     tracker = createAssistantEventTracker(inputEventId)
     client.sendOrThrow(buildInputTextEvent(text, inputEventId))
-    completed = waitComplete
+    completed = waitForTerminal
       ? await completion
       : (await new Promise(resolvePromise => setTimeout(resolvePromise, 300)), undefined)
   }
@@ -289,6 +351,9 @@ async function main() {
       ? {
           completed: true,
           completed_ms: completed.elapsedMs,
+          ...(completed.playbackStarted
+            ? { playback_started: true, playback_started_ms: completed.playbackStartedMs }
+            : {}),
           assistant_chars: Array.from(completed.assistant).length,
           ...(printAssistant ? { assistant: completed.assistant } : {}),
           ...(printAssistantShape

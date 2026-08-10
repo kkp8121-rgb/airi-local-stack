@@ -3944,10 +3944,10 @@ index 77e947e3ec4ace755f074c980c5a2991c77a89aa..6ac4a0b339248746c865285aac72722c
    streamId: string
    priority: number
 diff --git a/packages/plugin-protocol/src/types/events.ts b/packages/plugin-protocol/src/types/events.ts
-index 7949f7f4f02bb49732301cd0040c8e5fd0dd109e..dca4501cf92d6bc640c5607b9d57a5c0c58fc108 100644
+index 7949f7f4f02bb49732301cd0040c8e5fd0dd109e..5ef283c03d97e89b3510cfa4c5d25671a5d83923 100644
 --- a/packages/plugin-protocol/src/types/events.ts
 +++ b/packages/plugin-protocol/src/types/events.ts
-@@ -1071,6 +1071,14 @@ type OutputGenAiChatMessageEvent = {
+@@ -1071,6 +1071,17 @@ type OutputGenAiChatMessageEvent = {
    message: AssistantMessage
  } & Partial<WithInputSource<'stage-web' | 'stage-tamagotchi' | 'discord'>> & Partial<WithOutputSource<'gen-ai:chat'>>
  
@@ -3959,10 +3959,13 @@ index 7949f7f4f02bb49732301cd0040c8e5fd0dd109e..dca4501cf92d6bc640c5607b9d57a5c0
 +  reason: 'superseded'
 +}
 +
++/** A content-free signal emitted when correlated assistant playback begins. */
++export type OutputGenAiChatPlaybackStartEvent = Record<string, never>
++
  interface OutputGenAiChatUsage {
    promptTokens: number
    completionTokens: number
-@@ -1267,9 +1275,26 @@ export const inputVoice = defineProtocolEventa<WebSocketEventInputVoice>('input:
+@@ -1267,9 +1278,27 @@ export const inputVoice = defineProtocolEventa<WebSocketEventInputVoice>('input:
    },
  })
  
@@ -3986,10 +3989,11 @@ index 7949f7f4f02bb49732301cd0040c8e5fd0dd109e..dca4501cf92d6bc640c5607b9d57a5c0
  export const outputGenAiChatMessage = defineProtocolEventa<OutputGenAiChatMessageEvent>('output:gen-ai:chat:message')
  export const outputGenAiChatComplete = defineProtocolEventa<OutputGenAiChatCompleteEvent>('output:gen-ai:chat:complete')
 +export const outputGenAiChatCancelled = defineProtocolEventa<OutputGenAiChatCancelledEvent>('output:gen-ai:chat:cancelled')
++export const outputGenAiChatPlaybackStart = defineProtocolEventa<OutputGenAiChatPlaybackStartEvent>('output:gen-ai:chat:playback-start')
  
  export const sparkNotify = defineProtocolEventa<SparkNotifyEvent>('spark:notify')
  export const sparkEmit = defineProtocolEventa<SparkEmitEvent>('spark:emit')
-@@ -1453,10 +1478,13 @@ export interface ProtocolEvents<C = undefined> {
+@@ -1453,10 +1482,14 @@ export interface ProtocolEvents<C = undefined> {
    'input:text': WebSocketEventInputText
    'input:text:voice': WebSocketEventInputTextVoice
    'input:voice': WebSocketEventInputVoice
@@ -4000,11 +4004,12 @@ index 7949f7f4f02bb49732301cd0040c8e5fd0dd109e..dca4501cf92d6bc640c5607b9d57a5c0
    'output:gen-ai:chat:message': OutputGenAiChatMessageEvent
    'output:gen-ai:chat:complete': OutputGenAiChatCompleteEvent
 +  'output:gen-ai:chat:cancelled': OutputGenAiChatCancelledEvent
++  'output:gen-ai:chat:playback-start': OutputGenAiChatPlaybackStartEvent
  
    /**
     * Spark used for allowing agents in a network to raise an event toward the other destinations (e.g. character).
 diff --git a/packages/stage-ui/src/components/scenes/Stage.vue b/packages/stage-ui/src/components/scenes/Stage.vue
-index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9d30d89a6 100644
+index 966f39b3b849eec527661978c654aa2f0161f208..f7c351f0470983e285ef1cebac48c487b9487a2b 100644
 --- a/packages/stage-ui/src/components/scenes/Stage.vue
 +++ b/packages/stage-ui/src/components/scenes/Stage.vue
 @@ -34,8 +34,13 @@ import { useSpeechPipelineAnalytics } from '../../composables/use-speech-pipelin
@@ -4013,7 +4018,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9
  import { OFFICIAL_SPEECH_PROVIDER_ID, OFFICIAL_SPEECH_STREAMING_PROVIDER_ID } from '../../libs/providers/providers/official'
 +import type { LocalBroadcastPlaybackFailureCode } from '../../libs/speech/local-broadcast-playback-proof'
 +import { localBroadcastPlaybackProof } from '../../libs/speech/local-broadcast-playback-proof'
-+import { voiceTurnLatencyTrace } from '../../libs/latency/voice-turn-latency'
++import { emitChatPlaybackStart, voiceTurnLatencyTrace } from '../../libs/latency/voice-turn-latency'
  import { bindSpeakingStateToPlaybackManager } from '../../libs/speech/playback-speaking-state'
  import { createStageTtsSession } from '../../libs/speech/tts-session'
 +import { AIRI_CHAT_ROUND_ID_HEADER } from '../../libs/analytics-headers'
@@ -4083,7 +4088,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9
        try {
          source.stop()
          source.disconnect()
-@@ -303,19 +331,22 @@ async function playFunction(item: Parameters<Parameters<typeof createPlaybackMan
+@@ -303,19 +331,23 @@ async function playFunction(item: Parameters<Parameters<typeof createPlaybackMan
        resolveOnce()
      }
  
@@ -4107,10 +4112,11 @@ index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9
        source.start(0)
 +      naturalEndEligible = true
 +      voiceTurnLatencyTrace.firstPlaybackStart(item.roundId)
++      emitChatPlaybackStart(item.roundId)
        if (item.intentId.startsWith('stream-')) {
          const model = resolveStreamingSessionModel()
          if (model)
-@@ -323,6 +354,7 @@ async function playFunction(item: Parameters<Parameters<typeof createPlaybackMan
+@@ -323,6 +355,7 @@ async function playFunction(item: Parameters<Parameters<typeof createPlaybackMan
        }
      }
      catch {
@@ -4118,7 +4124,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9
        stopPlayback()
      }
    })
-@@ -333,7 +365,11 @@ const playbackManager = createPlaybackManager<AudioBuffer>({
+@@ -333,7 +366,11 @@ const playbackManager = createPlaybackManager<AudioBuffer>({
    maxVoices: 1,
    maxVoicesPerOwner: 1,
    overflowPolicy: 'queue',
@@ -4131,7 +4137,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9
  })
  
  /**
-@@ -363,7 +399,7 @@ function trackOfficialAutoTtsForTurn(modelId: string) {
+@@ -363,7 +400,7 @@ function trackOfficialAutoTtsForTurn(modelId: string) {
  
  const speechPipeline = createSpeechPipeline<AudioBuffer>({
    tts: async (request, signal) => {
@@ -4140,7 +4146,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9
        return null
  
      if (activeSpeechProvider.value === 'speech-noop')
-@@ -473,16 +509,39 @@ const speechPipeline = createSpeechPipeline<AudioBuffer>({
+@@ -473,16 +510,39 @@ const speechPipeline = createSpeechPipeline<AudioBuffer>({
              },
            }
          : speechRequest.providerConfig
@@ -4186,7 +4192,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9
        trackOfficialAutoTtsForTurn(model)
        return audioBuffer
      }
-@@ -542,6 +601,9 @@ bindSpeakingStateToPlaybackManager(playbackManager, {
+@@ -542,6 +602,9 @@ bindSpeakingStateToPlaybackManager(playbackManager, {
        nowSpeaking.value = true
    },
    onStart: ({ item }) => {
@@ -4196,7 +4202,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9
      // NOTICE: postCaption and postPresent may throw errors if the BroadcastChannel is closed
      // (e.g., when navigating away from the page). We wrap these in try-catch to prevent
      // breaking playback when the channel is unavailable.
-@@ -648,7 +710,21 @@ function setupAnalyser() {
+@@ -648,7 +711,21 @@ function setupAnalyser() {
  // decision point. See `packages/stage-ui/src/libs/speech/tts-session.ts`.
  let currentSession: StageTtsSession | null = null
  
@@ -4218,7 +4224,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9
    currentSession?.cancel(reason)
    currentSession = null
    speechPipeline.stopAll(reason)
-@@ -656,6 +732,196 @@ function stopSpeechOutput(reason: string) {
+@@ -656,6 +733,196 @@ function stopSpeechOutput(reason: string) {
    resetAssistantSpeechSurface(reason)
  }
  
@@ -4415,7 +4421,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9
  /**
   * Resolves the official streaming TTS model for the current Stage session.
   */
-@@ -728,6 +994,7 @@ function openTtsSession(): StageTtsSession {
+@@ -728,6 +995,7 @@ function openTtsSession(): StageTtsSession {
    }
    session = createStageTtsSession<AudioBuffer>({
      transport: resolveSpeechTransport(activeSpeechProvider.value),
@@ -4423,7 +4429,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9
      streaming: buildStreamingSnapshot,
      audioContext,
      playbackManager,
-@@ -765,15 +1032,17 @@ watch(latestStopRequest, (request) => {
+@@ -765,15 +1033,17 @@ watch(latestStopRequest, (request) => {
    stopSpeechOutput(request.reason)
  })
  
@@ -4444,7 +4450,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9
    currentSession = openTtsSession()
  }))
  
-@@ -781,7 +1050,8 @@ chatHookCleanups.push(onBeforeSend(async () => {
+@@ -781,7 +1051,8 @@ chatHookCleanups.push(onBeforeSend(async () => {
    currentMotion.value = { group: EmotionThinkMotionName }
  }))
  
@@ -4454,7 +4460,7 @@ index 966f39b3b849eec527661978c654aa2f0161f208..16c613accd190e2817dddad5d08ab5a9
    currentSession?.appendText(literal)
  }))
  
-@@ -960,6 +1230,8 @@ defineExpose({
+@@ -960,6 +1231,8 @@ defineExpose({
    canvasElement,
    captureFrame,
    readRenderTargetRegionAtClientPoint,
@@ -5523,13 +5529,13 @@ index fb0dd702788db08e38a98544549dd24582785f4f..19a6fdac626aaabc994e2f53d7efb167
    if (message.role === 'system')
 diff --git a/packages/stage-ui/src/libs/latency/voice-turn-latency.test.ts b/packages/stage-ui/src/libs/latency/voice-turn-latency.test.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..48cc12525ab3671b6080baf37690d29ab876a3de
+index 0000000000000000000000000000000000000000..892cd72996315cc996093b88137dc37409b6f972
 --- /dev/null
 +++ b/packages/stage-ui/src/libs/latency/voice-turn-latency.test.ts
-@@ -0,0 +1,49 @@
+@@ -0,0 +1,67 @@
 +import { describe, expect, it, vi } from 'vitest'
 +
-+import { createVoiceTurnLatencyTrace } from './voice-turn-latency'
++import { CHAT_PLAYBACK_START_EVENT, createVoiceTurnLatencyTrace, emitChatPlaybackStart } from './voice-turn-latency'
 +
 +describe('voice turn latency trace', () => {
 +  it('preserves server STT timing and emits only the first substantive LLM delta and playback start for a voice round', () => {
@@ -5575,15 +5581,40 @@ index 0000000000000000000000000000000000000000..48cc12525ab3671b6080baf37690d29a
 +
 +    expect(fetch).not.toHaveBeenCalled()
 +  })
++
++  it('emits one renderer-local signal for a valid playback start id and ignores invalid ids', () => {
++    const target = new EventTarget()
++    const listener = vi.fn()
++    vi.stubGlobal('dispatchEvent', target.dispatchEvent.bind(target))
++    target.addEventListener(CHAT_PLAYBACK_START_EVENT, listener)
++    try {
++      emitChatPlaybackStart('round-42')
++      emitChatPlaybackStart('bad\nround')
++
++      expect(listener).toHaveBeenCalledTimes(1)
++      expect((listener.mock.calls[0]?.[0] as Event & { detail: unknown }).detail).toEqual({ roundId: 'round-42' })
++    }
++    finally {
++      vi.unstubAllGlobals()
++    }
++  })
++
 +})
 diff --git a/packages/stage-ui/src/libs/latency/voice-turn-latency.ts b/packages/stage-ui/src/libs/latency/voice-turn-latency.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..4dba92c136f53331a18d8b7984439355e4f5e964
+index 0000000000000000000000000000000000000000..a96cb363f6d3de7f87f09b45c611b3d6ca4622f5
 --- /dev/null
 +++ b/packages/stage-ui/src/libs/latency/voice-turn-latency.ts
-@@ -0,0 +1,76 @@
+@@ -0,0 +1,101 @@
 +const endpoint = 'http://127.0.0.1:8892/api/event'
 +const maxTrackedTurns = 64
++
++/**
++ * Renderer-local notification emitted only after Web Audio has accepted a
++ * source.start(). This intentionally is not a BroadcastChannel message: a
++ * follower renderer must never claim the originating input event's parent.
++ */
++export const CHAT_PLAYBACK_START_EVENT = 'airi:chat-playback-start'
 +
 +type LatencyFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<unknown>
 +type LatencySource = 'stt' | 'llm' | 'playback'
@@ -5655,6 +5686,24 @@ index 0000000000000000000000000000000000000000..4dba92c136f53331a18d8b7984439355
 +      post('playback', 'start', roundId)
 +    },
 +  }
++}
++
++/**
++ * Carries only an opaque round id inside this renderer. The context bridge
++ * resolves it to an input parent locally and deliberately does not forward the
++ * round id itself to the server.
++ */
++export function emitChatPlaybackStart(roundId?: string) {
++  if (typeof roundId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(roundId))
++    return
++
++  try {
++    const event = typeof CustomEvent === 'function'
++      ? new CustomEvent(CHAT_PLAYBACK_START_EVENT, { detail: { roundId } })
++      : Object.assign(new Event(CHAT_PLAYBACK_START_EVENT), { detail: { roundId } })
++    globalThis.dispatchEvent?.(event)
++  }
++  catch {}
 +}
 +
 +export const voiceTurnLatencyTrace = createVoiceTurnLatencyTrace()
@@ -7444,7 +7493,7 @@ index 2bafa8c5f5cad7fb2338a50eb487190c12141725..f487655ceeb7c37e1b7becee6cd3091e
    })
  
 diff --git a/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts b/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts
-index 566c38875bc979b6407d905a36fe757ba928be85..97ac0ca488716b717e82c925d9a7a6aeb0cffa82 100644
+index 566c38875bc979b6407d905a36fe757ba928be85..b5d3a28c51d4242aca0b51e170cd938d3a7b614b 100644
 --- a/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts
 +++ b/packages/stage-ui/src/stores/mods/api/context-bridge.contract.browser.test.ts
 @@ -37,6 +37,7 @@ const streamEndHooks: HookCallback[] = []
@@ -7563,7 +7612,7 @@ index 566c38875bc979b6407d905a36fe757ba928be85..97ac0ca488716b717e82c925d9a7a6ae
    /**
     * @example
     * Server context updates record store-ingested before broadcast-posted.
-@@ -608,6 +679,397 @@ describe('context bridge contract', () => {
+@@ -608,6 +679,457 @@ describe('context bridge contract', () => {
      await store.dispose()
    })
  
@@ -7958,14 +8007,82 @@ index 566c38875bc979b6407d905a36fe757ba928be85..97ac0ca488716b717e82c925d9a7a6ae
 +    await store.dispose()
 +  })
 +
++  it('emits one content-free playback-start output for the originating input parent only', async () => {
++    activeProviderRef.value = 'mock-provider'
++    activeModelRef.value = 'mock-model'
++    getProviderInstanceMock.mockResolvedValueOnce({})
++    const store = useContextBridgeStore()
++    await store.initialize()
++
++    await emitServerEvent('input:text', {
++      type: 'input:text',
++      source: 'extension-module-host',
++      metadata: { ...createMetadata('weather', 'station-1'), event: { id: 'playback-parent-42' } },
++      data: { text: 'never put this text in the playback event' },
++    })
++    const input = chatOrchestratorMock.ingest.mock.calls[0]?.[1]?.input
++    await emitHooks(beforeComposeHooks, 'message', {
++      roundId: 'round-playback-42',
++      input,
++      message: { role: 'user', content: 'secret' },
++      contexts: { private: [{ text: 'secret' }] },
++      composedMessage: [],
++    })
++
++    serverSendMock.mockClear()
++    globalThis.dispatchEvent(new CustomEvent('airi:chat-playback-start', { detail: { roundId: 'round-playback-42' } }))
++    globalThis.dispatchEvent(new CustomEvent('airi:chat-playback-start', { detail: { roundId: 'round-playback-42' } }))
++
++    expect(serverSendMock.mock.calls.map(call => call[0])).toEqual([{
++      type: 'output:gen-ai:chat:playback-start',
++      metadata: { event: { parentId: 'playback-parent-42' } },
++      data: {},
++    }])
++
++    await store.dispose()
++  })
++
++  it('ignores invalid, unmapped, and remote-mirror playback-start rounds', async () => {
++    const store = useContextBridgeStore()
++    await store.initialize()
++    serverSendMock.mockClear()
++
++    globalThis.dispatchEvent(new CustomEvent('airi:chat-playback-start', { detail: { roundId: 'unmapped-round' } }))
++    globalThis.dispatchEvent(new CustomEvent('airi:chat-playback-start', { detail: { roundId: 'bad\nround' } }))
++
++    const streamSender = createTestChannel(CHAT_STREAM_CHANNEL_NAME)
++    streamSender.postMessage({
++      type: 'before-compose',
++      message: 'remote',
++      sessionId: 'other-renderer',
++      context: { roundId: 'remote-round', input: { type: 'input:text' }, message: { role: 'user', content: 'remote' }, contexts: {}, composedMessage: [] },
++    })
++    await waitForBroadcastDelivery()
++    globalThis.dispatchEvent(new CustomEvent('airi:chat-playback-start', { detail: { roundId: 'remote-round' } }))
++
++    expect(serverSendMock).not.toHaveBeenCalledWith(expect.objectContaining({
++      type: 'output:gen-ai:chat:playback-start',
++    }))
++
++    await store.dispose()
++  })
++
    it('ignores remote literal and end events when generation guard is stale', async () => {
      const store = useContextBridgeStore()
      await store.initialize()
 diff --git a/packages/stage-ui/src/stores/mods/api/context-bridge.ts b/packages/stage-ui/src/stores/mods/api/context-bridge.ts
-index 47321590d65bbb57e41f9f18bd410a70d5b102de..cacdc3de22ab615398c7bb8e2ff1087af65b2255 100644
+index 47321590d65bbb57e41f9f18bd410a70d5b102de..40e4aed01c0c580372359363225a9151bd5cd01b 100644
 --- a/packages/stage-ui/src/stores/mods/api/context-bridge.ts
 +++ b/packages/stage-ui/src/stores/mods/api/context-bridge.ts
-@@ -91,8 +91,18 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -15,6 +15,7 @@ import { defineStore, storeToRefs } from 'pinia'
+ import { ref, toRaw, watch } from 'vue'
+ 
+ import { getEventSourceKey, getMetadataSourceLabel } from '../../../utils/event-source'
++import { CHAT_PLAYBACK_START_EVENT } from '../../../libs/latency/voice-turn-latency'
+ import { useCharacterOrchestratorStore } from '../../character'
+ import { useChatOrchestratorStore } from '../../chat'
+ import { CHAT_STREAM_CHANNEL_NAME, CONTEXT_CHANNEL_NAME } from '../../chat/constants'
+@@ -91,8 +92,21 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
    const { post: postSparkNotifyBridgeMessage, data: incomingSparkNotifyBridgeMessage } = useBroadcastChannel<SparkNotifyBridgeMessage, SparkNotifyBridgeMessage>({ name: SPARK_NOTIFY_BRIDGE_CHANNEL_NAME })
  
    const disposeHookFns = ref<Array<() => void>>([])
@@ -7978,13 +8095,16 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..cacdc3de22ab615398c7bb8e2ff1087a
 +  // itself before it loses the per-event lock; a distinct parent still
 +  // preflights cancellation in every renderer.
 +  const activeInputTextParentsBySession = new Map<string, { parentId: string, input: object }>()
++  // This map is intentionally renderer-local and content-free. A receiving
++  // renderer sees mirrored stream hooks but never records this association.
++  const playbackStartParentsByRoundId = new Map<string, string>()
    let remoteStreamGuard: { sessionId: string, generation: number } | null = null
    let initialized = false
 +  let registersChatIngestion = true
  
    function recordContextIngestRejected(options: {
      channel: 'server' | 'broadcast' | 'input'
-@@ -374,14 +384,48 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -374,14 +388,82 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
      return await callback()
    }
  
@@ -8018,6 +8138,40 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..cacdc3de22ab615398c7bb8e2ff1087a
 +    }
 +  }
 +
++  function bindPlaybackStartParent(roundId: unknown, input: unknown) {
++    const parentId = input && typeof input === 'object' ? inputTextEventParentIds.get(input) : undefined
++    if (typeof roundId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(roundId) || !parentId)
++      return
++
++    playbackStartParentsByRoundId.set(roundId, parentId)
++    while (playbackStartParentsByRoundId.size > 64)
++      playbackStartParentsByRoundId.delete(playbackStartParentsByRoundId.keys().next().value!)
++  }
++
++  function clearPlaybackStartParent(roundId: unknown) {
++    if (typeof roundId === 'string')
++      playbackStartParentsByRoundId.delete(roundId)
++  }
++
++  function onLocalPlaybackStart(event: Event) {
++    const roundId = (event as CustomEvent<{ roundId?: unknown }>).detail?.roundId
++    if (typeof roundId !== 'string')
++      return
++
++    const parentId = playbackStartParentsByRoundId.get(roundId)
++    if (!parentId)
++      return
++
++    // Consume before send: duplicates, a throwing transport, and later stream
++    // mirrors cannot create another output event.
++    playbackStartParentsByRoundId.delete(roundId)
++    serverChannelStore.send({
++      type: 'output:gen-ai:chat:playback-start',
++      metadata: { event: { parentId } },
++      data: {},
++    } as never)
++  }
++
 +  async function initialize(options: { registerChatIngestion?: boolean } = {}) {
      await mutex.acquire()
  
@@ -8034,7 +8188,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..cacdc3de22ab615398c7bb8e2ff1087a
          for (const consumerEvent of consumerRegistrationEvents) {
            serverChannelStore.send({
              type: 'module:consumer:register',
-@@ -396,8 +440,10 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -396,10 +478,14 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
  
        await serverChannelStore.ensureConnected()
  
@@ -8046,8 +8200,12 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..cacdc3de22ab615398c7bb8e2ff1087a
 +      }
  
        let isProcessingRemoteStream = false
++      globalThis.addEventListener?.(CHAT_PLAYBACK_START_EVENT, onLocalPlaybackStart)
++      disposeHookFns.value.push(() => globalThis.removeEventListener?.(CHAT_PLAYBACK_START_EVENT, onLocalPlaybackStart))
  
-@@ -557,143 +603,164 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+       const { stop } = watch(incomingContext, (event) => {
+         if (!event)
+@@ -557,143 +643,164 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
        }))
  
        disposeHookFns.value.push(serverChannelStore.onEvent('input:text', async (event) => {
@@ -8137,7 +8295,14 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..cacdc3de22ab615398c7bb8e2ff1087a
                contextObservability.recordLifecycle({
 -                phase: 'store-ingested',
 +                phase: 'input-context-update',
-+                channel: 'input',
+                 channel: 'input',
+-                sourceKey: ingestAttempt.result.sourceKey,
+-                strategy: contextMessage.strategy,
+-                lane: contextMessage.lane,
+-                contextId: contextMessage.contextId,
+-                eventId: contextMessage.id,
+-                mutation: ingestAttempt.result.mutation,
+-                textPreview: contextMessage.text,
 +                strategy: update.strategy,
 +                lane: update.lane,
 +                contextId: update.contextId,
@@ -8158,14 +8323,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..cacdc3de22ab615398c7bb8e2ff1087a
 +                createdAt,
 +              }
 +              const ingestAttempt = ingestContextMessageSafely({
-                 channel: 'input',
--                sourceKey: ingestAttempt.result.sourceKey,
--                strategy: contextMessage.strategy,
--                lane: contextMessage.lane,
--                contextId: contextMessage.contextId,
--                eventId: contextMessage.id,
--                mutation: ingestAttempt.result.mutation,
--                textPreview: contextMessage.text,
++                channel: 'input',
 +                contextMessage,
                  sourceLabel: getMetadataSourceLabel(event.metadata?.source) ?? event.source,
                  details: {
@@ -8325,7 +8483,16 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..cacdc3de22ab615398c7bb8e2ff1087a
        }))
  
        disposeHookFns.value.push(
-@@ -747,8 +814,13 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -701,6 +808,8 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+           if (isProcessingRemoteStream)
+             return
+ 
++          bindPlaybackStartParent(context.roundId, context.input)
++
+           broadcastStreamEvent({ type: 'before-compose', message, sessionId: chatSession.activeSessionId, context: structuredClone(normalizeContextSnapshot(context)) })
+         }),
+         chatOrchestrator.onAfterMessageComposed(async (message, context) => {
+@@ -747,8 +856,13 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
          }),
  
          chatOrchestrator.onAssistantMessage(async (message, _messageText, context) => {
@@ -8339,7 +8506,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..cacdc3de22ab615398c7bb8e2ff1087a
              data: {
                ...context.input?.data,
                message,
-@@ -765,8 +837,15 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -765,8 +879,15 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
          }),
  
          chatOrchestrator.onChatTurnComplete(async (chat, context) => {
@@ -8355,13 +8522,15 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..cacdc3de22ab615398c7bb8e2ff1087a
              data: {
                ...context.input?.data,
                'message': chat.output,
-@@ -789,6 +868,22 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -789,6 +910,24 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
                },
              },
            })
 +          clearActiveInputTextParent(context.input)
++          clearPlaybackStartParent(context.roundId)
 +        }),
 +        chatOrchestrator.onChatRoundCancelled((context, reason) => {
++          clearPlaybackStartParent(context.roundId)
 +          if (reason !== 'superseded')
 +            return
 +
@@ -8378,7 +8547,7 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..cacdc3de22ab615398c7bb8e2ff1087a
          }),
        )
  
-@@ -883,15 +978,17 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -883,15 +1022,17 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
        if (!initialized)
          return
  
@@ -8405,11 +8574,12 @@ index 47321590d65bbb57e41f9f18bd410a70d5b102de..cacdc3de22ab615398c7bb8e2ff1087a
        }
  
        for (const fn of disposeHookFns.value) {
-@@ -900,6 +997,7 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
+@@ -900,6 +1041,8 @@ export const useContextBridgeStore = defineStore('mods:api:context-bridge', () =
  
        initialized = false
        remoteStreamGuard = null
 +      registersChatIngestion = true
++      playbackStartParentsByRoundId.clear()
  
        for (const [requestId, waiter] of sparkNotifyBridgeWaiters) {
          if (waiter.timeout)

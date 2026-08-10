@@ -65,7 +65,78 @@ test('announces both the input and matching completion event contracts', () => {
     'output:gen-ai:chat:message',
     'output:gen-ai:chat:complete',
     'output:gen-ai:chat:cancelled',
+    'output:gen-ai:chat:playback-start',
   ])
+})
+
+function correlatedEvent(type, parentId, data = {}) {
+  return { type, data, metadata: { event: { parentId } } }
+}
+
+test('waits for playback start when completion arrives first', () => {
+  const tracker = createAssistantEventTracker('input-a')
+  const complete = correlatedEvent('output:gen-ai:chat:complete', 'input-a', { message: { content: 'answer' } })
+  const playback = correlatedEvent('output:gen-ai:chat:playback-start', 'input-a', {})
+
+  tracker.observe(complete)
+  assert.equal(tracker.waitTerminal(complete, 12), undefined)
+  tracker.observe(playback)
+  assert.deepEqual(tracker.waitPlaybackStart(playback, 34), {
+    terminal: {
+      cancelled: false,
+      elapsedMs: 12,
+      assistant: 'answer',
+      assistantSource: 'completion',
+      assistantShape: assistantMessageShape({ content: 'answer' }),
+    },
+    playback: { playbackStarted: true, playbackStartedMs: 34 },
+  })
+})
+
+test('waits for completion when playback start arrives first', () => {
+  const tracker = createAssistantEventTracker('input-a')
+  const playback = correlatedEvent('output:gen-ai:chat:playback-start', 'input-a', {})
+  const complete = correlatedEvent('output:gen-ai:chat:complete', 'input-a', { message: { content: 'answer' } })
+
+  tracker.observe(playback)
+  assert.deepEqual(tracker.waitPlaybackStart(playback, 4), {
+    playback: { playbackStarted: true, playbackStartedMs: 4 },
+  })
+  tracker.observe(complete)
+  assert.equal(tracker.waitTerminal(complete, 18).cancelled, false)
+})
+
+test('ignores wrong-parent and duplicate playback-start events', () => {
+  const tracker = createAssistantEventTracker('input-a')
+  const wrong = correlatedEvent('output:gen-ai:chat:playback-start', 'input-b', {})
+  const playback = correlatedEvent('output:gen-ai:chat:playback-start', 'input-a', {})
+  const complete = correlatedEvent('output:gen-ai:chat:complete', 'input-a', { message: { content: 'answer' } })
+
+  tracker.observe(wrong)
+  assert.equal(tracker.waitPlaybackStart(wrong, 2), undefined)
+  tracker.observe(complete)
+  assert.equal(tracker.waitTerminal(complete, 3), undefined)
+  tracker.observe(playback)
+  assert.ok(tracker.waitPlaybackStart(playback, 4).terminal)
+  tracker.observe(playback)
+  assert.equal(tracker.waitPlaybackStart(playback, 5), undefined)
+  assert.equal(tracker.eventStats.matchingPlaybackStarts, 2)
+})
+
+test('treats matching cancellation as immediate while waiting for playback', () => {
+  const tracker = createAssistantEventTracker('input-a')
+  const cancelled = correlatedEvent('output:gen-ai:chat:cancelled', 'input-a', { reason: 'superseded' })
+
+  tracker.observe(cancelled)
+  assert.deepEqual(tracker.waitTerminal(cancelled, 7), { cancelled: true, elapsedMs: 7 })
+})
+
+test('default completion terminal does not require playback start', () => {
+  const tracker = createAssistantEventTracker('input-a')
+  const complete = correlatedEvent('output:gen-ai:chat:complete', 'input-a', { message: { content: 'answer' } })
+
+  tracker.observe(complete)
+  assert.equal(tracker.terminal(complete, 9).cancelled, false)
 })
 
 test('claims only the first exact correlated terminal for same-text conversations', () => {
