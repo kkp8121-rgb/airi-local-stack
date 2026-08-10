@@ -221,3 +221,12 @@
 - 이 기능은 반복·재진술을 장기 기억 Stage A/B에 적재하지 않는 기존 메모리 문서의
   경계와 일치한다. 장기 기억은 훗날 특정 주제가 사용자에게 왜 중요한지 알려줄 수
   있지만, 현재 반복 행동의 자연스러움은 이 단기 대화 디렉터가 담당한다.
+---
+
+Historical-document notice: the installation procedure and test totals above
+describe the 2026-08-07 checkpoint. For current operations, use
+`apply-airi-patches.ps1` and `restore-airi-original.ps1`, and read
+`airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md` first. The current apply run
+has six implementation scripts and verifies patched markers, stock-marker
+absence, and the superseded-marker absence; do not use the older direct script
+sequence as the current entrypoint.
