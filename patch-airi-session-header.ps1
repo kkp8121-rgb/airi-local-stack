@@ -207,8 +207,8 @@ if ($VerifyOnly) {
         ArchiveSha256 = $currentHash
         EqualLengthBytes = $oldLength
     } | Format-List
-    if ($state -ne 'unrecognized') { exit 0 }
-    exit 1
+    if ($state -ne 'unrecognized') { return }
+    throw "Session-header verification failed: archive state is unrecognized."
 }
 
 if ($state -eq 'unrecognized') {

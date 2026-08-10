@@ -27,4 +27,5 @@ Write-Output 'patch-airi-transcript-latency.ps1 is DEPRECATED and does nothing.'
 Write-Output 'The transcript flush delay (1200 ms -> 400 ms) is now applied by patch-airi-reaction-latency.ps1.'
 Write-Output 'Run .\apply-airi-patches.ps1 to apply the full patch set in the supported order.'
 
-exit 0
+# Return to the caller rather than terminating a hosting PowerShell session.
+return
