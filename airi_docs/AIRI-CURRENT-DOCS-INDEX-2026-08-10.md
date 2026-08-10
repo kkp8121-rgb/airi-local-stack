@@ -56,6 +56,10 @@ playback completion from playback-start evidence.
 - `node --test test-send-airi-local-text.mjs`: 24/24 passed.
 - The canonical patch and the separate generic-context sanitizer both apply
   cleanly in the pinned v0.11.3 verification checkout.
+- The explicit pinned-checkout applicability run was re-executed after the
+  latest sender changes with `-BaseCheckout` at `dbf8124`; canonical and
+  sanitizer apply/reverse checks passed and the AIRI installation was not
+  touched.
 - The focused browser contract suite with the sanitizer applied passed 25/25
   in the dependency-equipped source checkout.
 - The latest privacy/correlation audit found no HIGH or MED issue in the

@@ -89,6 +89,9 @@ cleanly in the dedicated pristine verification checkout; the current branch
 does not require that checkout to be present. The GitHub job intentionally
 does not clone or apply a v0.11.3 fixture: patch applicability is a separately
 recorded pristine-checkout result, while CI stays offline and artifact-free.
+That explicit applicability command was re-run against the local checkout at
+`dbf8124` after the latest sender changes; both patch apply/reverse checks
+passed and the installed AIRI archive was not accessed or modified.
 The workflow's committed-whitespace check inspects the full push/PR range with
 `git diff --check` (falling back to `git diff-tree --check` for other event
 types) and excludes the byte-addressed patch files; those files are checked by
