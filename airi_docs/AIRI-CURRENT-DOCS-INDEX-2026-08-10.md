@@ -40,3 +40,6 @@ playback completion from playback-start evidence.
 - `apply-airi-patches.ps1` now verifies all 10 active in-place patch sites,
   including the reaction-latency speech pre-roll marker, plus the required
   absence of the superseded segmentation marker.
+- The orchestrator also rejects residual stock markers and child-script
+  idempotence now returns to the orchestrator instead of terminating its host
+  PowerShell process.

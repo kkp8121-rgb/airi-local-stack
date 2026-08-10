@@ -267,6 +267,8 @@ $verifyTexts = @()
 $verifyTexts += ($patchedMarkers | ForEach-Object { $_.Text })
 $verifyTexts += $legacyMarker
 $verifyCounts = [AiriPatchScanner]::CountAll($resolvedAsar, $verifyTexts)
+$stockVerifyTexts = @($stockMarkers | ForEach-Object { $_.Text })
+$stockVerifyCounts = [AiriPatchScanner]::CountAll($resolvedAsar, $stockVerifyTexts)
 
 $report = New-Object System.Collections.ArrayList
 for ($i = 0; $i -lt $patchedMarkers.Count; $i++) {
@@ -279,6 +281,17 @@ for ($i = 0; $i -lt $patchedMarkers.Count; $i++) {
         Expected = $marker.Expected
         Found    = $found
         Result   = $(if ($ok) { 'PASS' } else { 'FAIL' })
+    })
+}
+for ($i = 0; $i -lt $stockMarkers.Count; $i++) {
+    $marker = $stockMarkers[$i]
+    $found = $stockVerifyCounts[$i]
+    [void]$report.Add([pscustomobject]@{
+        Patch    = $marker.Patch
+        Site     = 'stock marker absent'
+        Expected = 0
+        Found    = $found
+        Result   = $(if ($found -eq 0) { 'PASS' } else { 'FAIL' })
     })
 }
 $legacyFound = $verifyCounts[$verifyCounts.Length - 1]

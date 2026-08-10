@@ -198,7 +198,10 @@ $patchedMarker = 'audioBitsPerSecond:128e3'
 # pristine, so taking a backup here would capture a patched copy.
 if ((Get-MarkerCount $patchedMarker) -gt 0) {
     Write-Output 'AIRI native MediaRecorder replacement is already applied - nothing to do.'
-    exit 0
+    # Return from the child script so an orchestrator invoking this file can
+    # continue with the remaining patch sites. `exit` would terminate the
+    # hosting PowerShell process instead of returning to apply-airi-patches.ps1.
+    return
 }
 
 # --- 5. Pristine backup contract (shared by every patch-airi-*.ps1) ----------

@@ -217,7 +217,9 @@ if ($state -eq 'unrecognized') {
 if ($state -eq 'patched') {
     Write-Output 'AIRI session-header patch is already applied.'
     Write-Output 'Only the session ID is shared with custom providers; round/app-surface analytics remain official-only.'
-    exit 0
+    # Return to the caller when invoked by apply-airi-patches.ps1; do not exit
+    # the hosting PowerShell process before final verification runs.
+    return
 }
 $expectedPostHash = if ($currentHash -eq $knownPristineAsarSha256) {
     $knownPostSessionPristineAsarSha256
