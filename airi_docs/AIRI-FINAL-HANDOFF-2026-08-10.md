@@ -76,7 +76,7 @@ cleanly in the dedicated pristine verification checkout; the current branch
 does not require that checkout to be present. The GitHub job intentionally
 does not clone or apply a v0.11.3 fixture: patch applicability is a separately
 recorded pristine-checkout result, while CI stays offline and artifact-free.
-The workflow's committed-whitespace check uses `git show --check` and excludes
+The workflow's committed-whitespace check uses `git diff-tree --check` and excludes
 the byte-addressed patch files; those files are checked by exact manifest
 hashes instead.
 

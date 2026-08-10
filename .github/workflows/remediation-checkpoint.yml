@@ -32,7 +32,7 @@ jobs:
         # The checkout is clean, so git diff --check would inspect nothing.
         # Patch artifacts intentionally preserve byte-level whitespace and are
         # covered by the manifest hash instead of this source diff check.
-        run: git show --check --pretty=short HEAD -- . ':(exclude)airi_docs/patches/*.patch'
+        run: git diff-tree --check --no-commit-id -r HEAD -- . ':(exclude)airi_docs/patches/*.patch'
 
       - name: Run offline checkpoint contracts
         shell: pwsh
