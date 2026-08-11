@@ -1,5 +1,7 @@
+import ast
 import asyncio
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -1365,6 +1367,20 @@ def openai_sse_content(wire: str) -> str:
     return "".join(parts)
 
 
+def openai_sse_dialogue(wire: str) -> str:
+    """Return the streamed deltas that follow the immediate acknowledgement.
+
+    The acknowledgement is a fixed application phrase emitted before the model
+    has produced anything, so dialogue assertions must not carry it. The
+    acknowledgement itself is asserted on the raw wire by ImmediateAckTests.
+    """
+    content = openai_sse_content(wire)
+    for ack in (ollama_proxy.SEARCH_IMMEDIATE_ACK, ollama_proxy.LOCAL_IMMEDIATE_ACK):
+        if content.startswith(ack):
+            return content[len(ack):]
+    return content
+
+
 class SearchRoutingTests(unittest.TestCase):
     def test_detects_korean_search_intents(self) -> None:
         for text in (
@@ -1954,8 +1970,12 @@ class CloudSearchFallbackTests(unittest.TestCase):
 
         self.assertEqual(attempted, [])
         self.assertEqual(len(local.requests), 1)
-        self.assertIn("그건 내가 직접 실행할 수 없어.", openai_sse_content(response.text))
-        self.assertNotIn(ollama_proxy.SEARCH_IMMEDIATE_ACK, response.text)
+        streamed = openai_sse_content(response.text)
+        self.assertIn("그건 내가 직접 실행할 수 없어.", streamed)
+        # The local route still speaks its own acknowledgement; only the
+        # search-flavoured one proves the external branch was taken.
+        self.assertTrue(streamed.startswith(ollama_proxy.LOCAL_IMMEDIATE_ACK), streamed)
+        self.assertNotIn(ollama_proxy.SEARCH_IMMEDIATE_ACK, streamed)
         self.assertIn("[DONE]", response.text)
 
     def test_failed_search_falls_back_to_the_local_model(self) -> None:
@@ -2081,16 +2101,102 @@ class SseContractTests(unittest.TestCase):
         self.assertEqual(payload["choices"][0]["delta"]["role"], "assistant")
         self.assertEqual(payload["choices"][0]["delta"]["content"], "응! ")
 
-    def test_immediate_ack_is_silent_control_not_tts_content(self) -> None:
-        for ack in (
-            ollama_proxy.LOCAL_IMMEDIATE_ACK,
-            ollama_proxy.SEARCH_IMMEDIATE_ACK,
+    def test_immediate_ack_speaks_inside_complete_act_envelopes(self) -> None:
+        for ack, emotion in (
+            (ollama_proxy.LOCAL_IMMEDIATE_ACK, "think"),
+            (ollama_proxy.SEARCH_IMMEDIATE_ACK, "curious"),
         ):
             with self.subTest(ack=ack):
-                self.assertEqual(ack.count("<|ACT "), 1)
-                self.assertTrue(ack.endswith("|>"))
-                self.assertIn('"silent":true', ack)
-                self.assertNotIn("응!", ack)
+                # The acknowledgement is the only thing the user hears before
+                # the model answers, so it must carry speech, not silence.
+                self.assertNotIn("silent", ack)
+                self.assertIn("응!", ack)
+                # Both envelopes are complete. A fragmented bare ACT would be
+                # sanitized off the wire and take the emotion cue with it, and
+                # an unterminated one would leak markup into the speech text.
+                envelope = f'<|ACT {{"emotion":"{emotion}"}}|>'
+                self.assertEqual(
+                    ollama_proxy.CONTROL_TOKEN_RE.findall(ack), [envelope, envelope]
+                )
+                self.assertTrue(ack.startswith(envelope))
+                self.assertTrue(ack.endswith(envelope))
+                self.assertTrue(ollama_proxy.CONTROL_TOKEN_RE.sub("", ack).strip())
+
+    def test_immediate_ack_sentences_stay_inside_the_speech_wav_cache(self) -> None:
+        """Every acknowledgement sentence must hit the preloaded WAV cache.
+
+        The speech proxy keys its preload on the whole request text and AIRI
+        sends one sentence per speech request, so a sentence that is not an
+        exact ``IMMEDIATE_RESPONSE_TEXTS`` entry silently pays a full cold
+        synthesis. Asserting set equality breaks whichever side drifts.
+        """
+        speech_proxy = (
+            Path(__file__).resolve().parents[1]
+            / "gpt-sovits"
+            / "openai_compatible_proxy.py"
+        )
+        cached = None
+        for node in ast.parse(speech_proxy.read_text(encoding="utf-8")).body:
+            if isinstance(node, ast.Assign) and any(
+                isinstance(target, ast.Name)
+                and target.id == "IMMEDIATE_RESPONSE_TEXTS"
+                for target in node.targets
+            ):
+                cached = ast.literal_eval(node.value)
+        self.assertIsNotNone(
+            cached, f"IMMEDIATE_RESPONSE_TEXTS disappeared from {speech_proxy.name}"
+        )
+
+        sentence_re = re.compile(r"[^\s][^.!?]*[.!?]")
+        spoken: set[str] = set()
+        for name in ("LOCAL_IMMEDIATE_ACK", "SEARCH_IMMEDIATE_ACK"):
+            ack = getattr(ollama_proxy, name)
+            sentences = [
+                match.strip()
+                for match in sentence_re.findall(
+                    ollama_proxy.CONTROL_TOKEN_RE.sub("", ack).strip()
+                )
+            ]
+            self.assertTrue(sentences, f"{name} produced no spoken sentence")
+            spoken.update(sentences)
+        self.assertEqual(
+            spoken,
+            set(cached),
+            "acknowledgement sentences drifted from IMMEDIATE_RESPONSE_TEXTS, "
+            "so every acknowledgement would miss the preloaded WAV cache",
+        )
+
+    def test_local_turn_puts_the_spoken_ack_on_the_wire_before_the_answer(self) -> None:
+        chat = _CapturingChatClient("final answer")
+        with mock.patch.object(ollama_proxy, "client", chat):
+            response = post_stream("question")
+
+        streamed = openai_sse_content(response.text)
+        self.assertTrue(
+            streamed.startswith(ollama_proxy.LOCAL_IMMEDIATE_ACK), streamed
+        )
+        self.assertEqual(
+            streamed[len(ollama_proxy.LOCAL_IMMEDIATE_ACK):], "final answer"
+        )
+
+    def test_cloud_search_puts_the_search_ack_on_the_wire_before_the_result(self) -> None:
+        async def stub_search(user_text: str, query: str) -> tuple[str, float]:
+            return "이터널 리턴 선수야.", 1.0
+
+        with mock.patch.object(
+            ollama_proxy, "ALLOW_EXTERNAL_SEARCH", True
+        ), mock.patch.object(
+            ollama_proxy, "run_codex_search", stub_search
+        ), mock.patch.object(
+            ollama_proxy, "client", _StubClient(RuntimeError("unused"))
+        ):
+            response = post_stream("음유잉여 검색해줘")
+
+        streamed = openai_sse_content(response.text)
+        self.assertTrue(
+            streamed.startswith(ollama_proxy.SEARCH_IMMEDIATE_ACK), streamed
+        )
+        self.assertIn("이터널 리턴 선수야.", streamed)
 
 
 class MemoryProxyIntegrationTests(unittest.TestCase):
@@ -2157,7 +2263,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
             response = post_stream(answer)
 
-        self.assertEqual(openai_sse_content(response.text), answer)
+        self.assertEqual(openai_sse_dialogue(response.text), answer)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], answer)
 
@@ -2215,7 +2321,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("파일을 삭제할 수 있어?")
 
         expected = "실제로 확인한 작업만 말할게. 지금은 실행을 확인하지 못했어."
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
         self.assertEqual(len(chat.requests), 2)
@@ -2241,7 +2347,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("\uc624\ub298 \uc218\uac74\uc744 \ub110\uc5c8\uc5b4.")
 
         expected = "오늘 수건을 널었구나!"
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertNotIn("\ud55c\uad6d\uc5b4\ub85c \ub2f5\ud560\uac8c", response.text)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
@@ -2272,7 +2378,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("수건을 반듯하게 접어뒀어.")
 
         expected = "수건을 반듯하게 접어뒀네!"
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
         self.assertEqual(len(chat.requests), 2)
@@ -2309,7 +2415,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("수건을 반듯하게 접어뒀어.")
 
         expected = "수건을 반듯하게 접어뒀구나!"
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
         self.assertEqual(len(chat.requests), 2)
@@ -2347,7 +2453,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(response.text.count(expected), 1)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
@@ -2384,7 +2490,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream("창문 손잡이가 헐거워져.")
 
-        self.assertEqual(openai_sse_content(response.text), "")
+        self.assertEqual(openai_sse_dialogue(response.text), "")
         self.assertEqual(memory.completed, [])
         self.assertEqual(len(chat.requests), 2)
         end_meta = next(
@@ -2416,7 +2522,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("철수가 두꺼운 책을 건네줬어.")
 
         expected = "철수가 두꺼운 책을 건네줬구나!"
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertNotIn("나한테", response.text)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
@@ -2442,7 +2548,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), "")
+        self.assertEqual(openai_sse_dialogue(response.text), "")
         self.assertEqual(memory.completed, [])
         self.assertTrue(ollama_proxy.contains_personal_deixis(user))
         self.assertEqual(ollama_proxy.grounded_observation_fallback(user), "")
@@ -2468,7 +2574,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), "")
+        self.assertEqual(openai_sse_dialogue(response.text), "")
         self.assertEqual(memory.completed, [])
 
     def test_colloquial_second_person_cannot_reach_wire_or_journal(self) -> None:
@@ -2497,7 +2603,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
                 ):
                     response = post_stream(user)
 
-                self.assertEqual(openai_sse_content(response.text), "")
+                self.assertEqual(openai_sse_dialogue(response.text), "")
                 self.assertEqual(memory.completed, [])
 
     def test_unpunctuated_yes_no_question_cannot_become_grounded_assertion(self) -> None:
@@ -2521,7 +2627,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), "")
+        self.assertEqual(openai_sse_dialogue(response.text), "")
         self.assertEqual(memory.completed, [])
         self.assertEqual(len(chat.requests), 2)
         self.assertFalse(ollama_proxy.ordinary_korean_grounding_turn(user))
@@ -2552,7 +2658,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream("점심 먹었어")
 
-        self.assertEqual(openai_sse_content(response.text), "난 아직 안 먹었어!")
+        self.assertEqual(openai_sse_dialogue(response.text), "난 아직 안 먹었어!")
         self.assertEqual(memory.completed[0]["assistant"], "난 아직 안 먹었어!")
 
     def test_unpunctuated_personal_echo_cannot_reverse_speaker(self) -> None:
@@ -2584,7 +2690,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
                 ):
                     response = post_stream(user)
 
-                self.assertEqual(openai_sse_content(response.text), "")
+                self.assertEqual(openai_sse_dialogue(response.text), "")
                 self.assertEqual(memory.completed, [])
                 self.assertEqual(len(chat.requests), 2)
 
@@ -2609,7 +2715,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("아이리 잘 잤어?")
 
         expected = "응, 푹 잤어!"
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertNotIn("한국어로 답할게", response.text)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
@@ -2633,7 +2739,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("창문 손잡이가 헐거워졌어.")
 
         expected = "창문 손잡이가 헐거워졌네."
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(len(chat.requests), 2)
         self.assertEqual(memory.completed[0]["assistant"], expected)
         # Native conversion removes the private note name, but the retry must
@@ -2712,7 +2818,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), user)
+        self.assertEqual(openai_sse_dialogue(response.text), user)
         end_meta = next(kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end"))
         fixed_keys = {
             "grounding_initial_reject_mask",
@@ -2753,7 +2859,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), user)
+        self.assertEqual(openai_sse_dialogue(response.text), user)
         end_meta = next(kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end"))
         self.assertEqual(
             end_meta["grounding_selected"],
@@ -2775,7 +2881,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         with mock.patch.object(ollama_proxy, "client", chat):
             response = post_stream("창문 손잡이가 헐거워졌어.")
 
-        self.assertEqual(openai_sse_content(response.text), "창문 손잡이가 헐거워졌어.")
+        self.assertEqual(openai_sse_dialogue(response.text), "창문 손잡이가 헐거워졌어.")
         self.assertEqual(len(chat.requests), 1)
 
     def test_grounded_homographs_do_not_trigger_personal_deixis_retry(self) -> None:
@@ -2794,7 +2900,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(len(chat.requests), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
 
@@ -2819,7 +2925,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
                     ollama_proxy, "memory_runtime", memory
                 ):
                     response = post_stream(user)
-                self.assertEqual(openai_sse_content(response.text), expected)
+                self.assertEqual(openai_sse_dialogue(response.text), expected)
                 self.assertEqual(len(chat.requests), 1)
                 self.assertEqual(memory.completed[0]["assistant"], expected)
 
@@ -3310,7 +3416,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream("창문 손잡이가 헐거워져서 잘 안 돌아가.")
 
-        self.assertEqual(openai_sse_content(response.text), accepted)
+        self.assertEqual(openai_sse_dialogue(response.text), accepted)
         self.assertEqual(memory.completed[0]["assistant"], accepted)
         self.assertEqual(len(chat.requests), 2)
 
@@ -3329,7 +3435,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream("창문 손잡이가 헐거워져서 잘 안 돌아가.")
 
-        self.assertEqual(openai_sse_content(response.text), "")
+        self.assertEqual(openai_sse_dialogue(response.text), "")
         self.assertEqual(memory.completed, [])
         self.assertEqual(len(chat.requests), 2)
 
@@ -3367,7 +3473,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
 
         expected = ollama_proxy.grounded_observation_fallback(user)
         self.assertTrue(expected)
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(memory.completed[0]["assistant"], expected)
         self.assertEqual(len(chat.requests), 2)
 
@@ -3396,7 +3502,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream("창문 손잡이가 헐거워져서 잘 안 돌아가.")
 
-        self.assertEqual(openai_sse_content(response.text), "")
+        self.assertEqual(openai_sse_dialogue(response.text), "")
         self.assertEqual(memory.completed, [])
         self.assertEqual(len(chat.requests), 2)
         self.assertTrue(retry_response.closed)
@@ -3431,7 +3537,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream("창문 손잡이가 헐거워져서 잘 안 돌아가.")
 
-        self.assertEqual(openai_sse_content(response.text), "")
+        self.assertEqual(openai_sse_dialogue(response.text), "")
         self.assertNotIn(ollama_proxy.LOCAL_ERROR_DIALOGUE, response.text)
         self.assertEqual(memory.completed, [])
         self.assertEqual(len(chat.requests), 2)
@@ -3457,7 +3563,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("창문 손잡이가 헐거워졌어.")
 
         expected = ollama_proxy.UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(memory.completed[0]["assistant"], expected)
         self.assertTrue(chat.response.closed)
 
@@ -3476,7 +3582,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("question")
 
         fallback = ollama_proxy.UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
-        self.assertEqual(openai_sse_content(response.text), fallback)
+        self.assertEqual(openai_sse_dialogue(response.text), fallback)
         self.assertEqual(response.text.count('"content": "' + fallback + '"'), 1)
         self.assertEqual(response.text.count("data: [DONE]"), 1)
         self.assertTrue(chat.send_cancelled)
@@ -3505,7 +3611,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("question")
 
         fallback = ollama_proxy.UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
-        self.assertEqual(openai_sse_content(response.text), fallback)
+        self.assertEqual(openai_sse_dialogue(response.text), fallback)
         end_meta = next(kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end"))
         self.assertEqual(end_meta["upstream_response_headers_timeout"], 1)
         self.assertTrue(chat.response.closed)
@@ -3545,7 +3651,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("question")
 
         fallback = ollama_proxy.UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
-        self.assertEqual(openai_sse_content(response.text), fallback)
+        self.assertEqual(openai_sse_dialogue(response.text), fallback)
         self.assertEqual(response.text.count('"content": "' + fallback + '"'), 1)
         self.assertEqual(response.text.count("data: [DONE]"), 1)
         self.assertEqual(journal.call_count, 1)
@@ -3565,7 +3671,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ), mock.patch.object(ollama_proxy, "schedule_completed_turn", new=journal):
             response = post_stream("question")
 
-        self.assertEqual(openai_sse_content(response.text), "final answer")
+        self.assertEqual(openai_sse_dialogue(response.text), "final answer")
         self.assertEqual(journal.call_count, 1)
         self.assertEqual(journal.call_args.kwargs["action"], "local_chat")
 
@@ -3590,7 +3696,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("question")
 
         fallback = ollama_proxy.UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
-        self.assertEqual(openai_sse_content(response.text), fallback)
+        self.assertEqual(openai_sse_dialogue(response.text), fallback)
         self.assertEqual(journal.call_count, 1)
         self.assertEqual(journal.call_args.kwargs["action"], "local_chat_watchdog")
         self.assertTrue(chat.response.closed)
@@ -3697,7 +3803,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertNotIn("<|ACT", memory.completed[0]["assistant"])
         self.assertTrue(memory.completed[0]["assistant"].startswith("응!"))
         self.assertIn("별 이야기 기억하고 있어", memory.completed[0]["assistant"])
-        streamed = openai_sse_content(response.text)
+        streamed = openai_sse_dialogue(response.text)
         self.assertNotIn('"reason":"Local response"', streamed)
         self.assertEqual(streamed.count("별 이야기 기억하고 있어"), 1)
 

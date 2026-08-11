@@ -1584,8 +1584,21 @@ class IncrementalAiriOutputBoundary:
 
     def finish(self) -> str:
         return self.feed("", final=True)
-LOCAL_IMMEDIATE_ACK = '<|ACT {"emotion":"think","silent":true}|>'
-SEARCH_IMMEDIATE_ACK = '<|ACT {"emotion":"curious","silent":true}|>'
+# The spoken part of these acknowledgements is the only thing the user hears
+# before the model answers, so it must stay audible.  Each sentence inside the
+# ACT envelope has to match one entry of the speech proxy's
+# ``IMMEDIATE_RESPONSE_TEXTS`` exactly: that cache is keyed on the whole request
+# text, and AIRI sends one sentence per speech request.  Any edit here that is
+# not mirrored in ``gpt-sovits/openai_compatible_proxy.py`` silently turns the
+# preloaded WAV back into a cold synthesis.
+LOCAL_IMMEDIATE_ACK = (
+    '<|ACT {"emotion":"think"}|> 응! '
+    '<|ACT {"emotion":"think"}|>'
+)
+SEARCH_IMMEDIATE_ACK = (
+    '<|ACT {"emotion":"curious"}|> 응! 바로 찾아볼게. '
+    '<|ACT {"emotion":"curious"}|>'
+)
 SEARCH_FALLBACK_PREFIX = "검색이 안 돼서 아는 만큼만 말할게."
 SEARCH_UNAVAILABLE_DIALOGUE = "검색 연결이 잠시 안 돼. 다시 한 번 말해줘."
 UPSTREAM_TIMEOUT_DIALOGUE = "답이 너무 늦어서 잠깐 멈췄어. 다시 말해줘."
@@ -4919,7 +4932,7 @@ async def proxy(path: str, request: Request):
                     yield openai_sse_delta(
                         completion_id,
                         model,
-                        "",
+                        SEARCH_IMMEDIATE_ACK,
                         include_role=True,
                     )
                     # Keep the stream warm while the search runs so an idle
@@ -5155,10 +5168,13 @@ async def proxy(path: str, request: Request):
                     duration_ms=elapsed_ms(request_started),
                     meta={"immediate_ack": 1, "cloud_search": 0},
                 )
+                # A proactive broadcast answers nobody, and it may still decide
+                # to say nothing at all, so it opens the stream silently.  Only
+                # a user-driven turn gets the spoken acknowledgement.
                 yield openai_sse_delta(
                     completion_id,
                     model,
-                    "",
+                    "" if proactive_turn else LOCAL_IMMEDIATE_ACK,
                     include_role=True,
                 )
                 if proactive_turn:
