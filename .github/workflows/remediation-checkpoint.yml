@@ -72,7 +72,11 @@ jobs:
 
   python-core-tests:
     runs-on: windows-latest
-    timeout-minutes: 10
+    # Two successive runs took 9m40s and 10m18s, so a 10-minute cap cut a
+    # docs-only commit and reported it as cancelled. The wheel download is the
+    # variable part; the cache below removes most of it, and the headroom here
+    # keeps a cold cache from turning into a false red.
+    timeout-minutes: 25
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -83,19 +87,12 @@ jobs:
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
 
       - name: Install lean test dependencies
         shell: pwsh
-        run: |
-          python -m pip install --disable-pip-version-check `
-            pytest==9.1.1 `
-            fastapi==0.141.1 `
-            httpx==0.28.1 `
-            uvicorn==0.52.1 `
-            numpy==2.5.2 `
-            av==18.0.0 `
-            faster-whisper==1.2.1 `
-            python-multipart==0.0.32
+        run: python -m pip install --disable-pip-version-check -r requirements-ci.txt
 
       - name: Run core Python tests
         shell: pwsh

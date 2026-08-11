@@ -1,0 +1,13 @@
+# Direct imports the core Python suite needs on a clean runner.  Deliberately
+# lean: torch, sentence-transformers and h2 stay out because the tests reach
+# their call sites through fakes and lazy imports, and pulling them would add
+# gigabytes for no assertion.  Kept in a file rather than inline in the
+# workflow so the pip cache can key on its hash.
+pytest==9.1.1
+fastapi==0.141.1
+httpx==0.28.1
+uvicorn==0.52.1
+numpy==2.5.2
+av==18.0.0
+faster-whisper==1.2.1
+python-multipart==0.0.32
