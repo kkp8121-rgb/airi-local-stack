@@ -1604,6 +1604,12 @@ SEARCH_UNAVAILABLE_DIALOGUE = "검색 연결이 잠시 안 돼. 다시 한 번 �
 UPSTREAM_TIMEOUT_DIALOGUE = "답이 너무 늦어서 잠깐 멈췄어. 다시 말해줘."
 LOCAL_ERROR_DIALOGUE = "답을 만들다가 문제가 생겼어. 다시 말해줘."
 UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE = "답이 늦어져서 잠깐 멈췄어."
+# A rejected draft must not become total silence.  The user cannot tell an
+# intentionally withheld answer apart from a broken pipeline, and the turn is
+# then also lost from the durable journal.  This line asserts no fact, claims
+# no executed action, and repeats nothing from the user, so it is safe to emit
+# after every grounding/quality rejection in every mode.
+GROUNDING_SILENCE_FALLBACK_DIALOGUE = "음, 잠깐만."
 
 
 def configured_upstream_raw_progress_timeout(value: object) -> float:
@@ -1642,6 +1648,52 @@ UPSTREAM_FIRST_RAW_TIMEOUT_SECONDS = configured_upstream_first_raw_timeout(
 # retry is considered.  Do not let an optional quality pass recreate the long
 # partial-stream stall that the foreground watchdog is meant to prevent.
 CORRECTIVE_RETRY_TIMEOUT_SECONDS = 5.0
+
+# Grounding policy kill switch.  ``strict`` is the original fail-closed
+# behaviour and exists so a regression can be reverted without a code change.
+# ``balanced`` is the default: it keeps every fabrication check that protects
+# the "never claim what did not happen" goal, but stops requiring the answer to
+# repeat the user's own sentence.  ``off`` bypasses grounding retries and
+# rejections entirely and is a diagnostic/A-B lever, not a production mode.
+GROUNDING_MODE_STRICT = "strict"
+GROUNDING_MODE_BALANCED = "balanced"
+GROUNDING_MODE_OFF = "off"
+# Latency metadata is numeric only, so the active mode travels as a small code.
+GROUNDING_MODE_CODES = {
+    GROUNDING_MODE_STRICT: 1,
+    GROUNDING_MODE_BALANCED: 2,
+    GROUNDING_MODE_OFF: 3,
+}
+
+
+def configured_grounding_mode(value: object) -> str:
+    """Return a known grounding mode, falling back to ``balanced``.
+
+    An unreadable or misspelled override must not silently disable the
+    fabrication checks, so anything unrecognized resolves to the default.
+    """
+    default = GROUNDING_MODE_BALANCED
+    try:
+        mode = unicodedata.normalize("NFKC", str(value)).strip().casefold()
+    except (TypeError, ValueError):
+        return default
+    return mode if mode in GROUNDING_MODE_CODES else default
+
+
+GROUNDING_MODE = configured_grounding_mode(
+    os.environ.get("AIRI_GROUNDING_MODE", GROUNDING_MODE_BALANCED)
+)
+
+
+def grounding_mode_is_balanced() -> bool:
+    """Read the module-level switch at call time so tests can patch it."""
+    return GROUNDING_MODE == GROUNDING_MODE_BALANCED
+
+
+def grounding_mode_is_off() -> bool:
+    """Read the module-level switch at call time so tests can patch it."""
+    return GROUNDING_MODE == GROUNDING_MODE_OFF
+
 
 # A search noun only signals intent when it is followed by an imperative ending
 # ("검색해줘", "웹서칭해 봐") or stands alone as its own eojeol. Substring
@@ -2250,11 +2302,209 @@ def build_grounding_correction_body(
         return prepared_body
 
 
+# 안/못/않/없/아니 are the markers that reverse what the user asserted.
+# ``있`` is tracked separately because it is the positive counterpart of ``없``
+# rather than a negation of the predicate.
+_GROUNDING_NEGATION_MARKERS = frozenset({"안", "못", "않", "없", "아니"})
+
+
+def grounding_relaxed_required_overlap(user_text: str) -> int:
+    """Require one shared anchor rather than two in ``balanced``.
+
+    ``strict`` demands two distinct anchors, which a genuinely new reaction
+    almost never reaches without restating the user's sentence. One anchor is
+    still mandatory: a candidate with no lexical contact at all cannot be
+    distinguished from an answer to a different turn.
+    """
+    return 1 if grounding_tokens(user_text) else 0
+
+
+def grounding_candidate_restates_user_action(user_text: str, candidate: str) -> bool:
+    """Return whether the candidate reuses one of the user's action stems."""
+    actions = grounding_action_sequence(user_text)
+    if not actions:
+        return False
+    candidate_actions = grounding_action_sequence(candidate)
+    return any(action in candidate_actions for action in actions)
+
+
+def grounding_candidate_flips_user_polarity(user_text: str, candidate: str) -> bool:
+    """Detect a candidate that reverses what the user asserted.
+
+    ``strict`` requires the whole 안/못/않/없/있/아니 sequence to be identical,
+    which also rejects an unrelated new reaction that simply never mentions
+    those markers. Two narrower rules carry the factual weight instead:
+
+    * A marker the user never used is an ungrounded polarity/existence claim,
+      so introducing one is always a flip.
+    * Dropping the user's own negation is only a flip when the candidate
+      restates the user's action; a reaction that does not repeat the clause
+      makes no claim about it.
+    """
+    user_markers = set(grounding_semantic_marker_sequence(user_text))
+    candidate_markers = set(grounding_semantic_marker_sequence(candidate))
+    if candidate_markers - user_markers:
+        return True
+    user_negated = bool(user_markers & _GROUNDING_NEGATION_MARKERS)
+    candidate_negated = bool(candidate_markers & _GROUNDING_NEGATION_MARKERS)
+    return user_negated != candidate_negated and grounding_candidate_restates_user_action(
+        user_text, candidate
+    )
+
+
+def grounding_candidate_restates_user_content(user_text: str, candidate: str) -> bool:
+    """Return whether the candidate only re-arranges the user's own content.
+
+    A reaction contributes something the user did not say. A candidate whose
+    informative tokens are all borrowed from the user is instead a restatement
+    of the same proposition, and the only remaining degrees of freedom are the
+    ones that reverse it: argument roles, quotation scope, and dropped
+    evidential hedges or attributions. A restatement is therefore still held to
+    the full-surface gate in ``balanced``; only genuinely new content is judged
+    by the fabrication signals alone.
+    """
+    candidate_tokens = grounding_tokens(candidate)
+    return bool(candidate_tokens and candidate_tokens <= grounding_tokens(user_text))
+
+
+_GROUNDING_LATIN_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
+
+
+def grounding_candidate_alters_latin_case(user_text: str, candidate: str) -> bool:
+    """Detect a Latin/numeric anchor echoed back with changed capitalization.
+
+    Token normalization casefolds, so ``AbC`` and ``ABC`` are one anchor for
+    overlap purposes. They are not one identifier: a code, model name, or
+    filename voiced back with different capitalization is a changed fact.
+    """
+    user_variants: dict[str, set[str]] = {}
+    for token in _GROUNDING_LATIN_TOKEN_RE.findall(
+        unicodedata.normalize("NFKC", user_text)
+    ):
+        user_variants.setdefault(token.casefold(), set()).add(token)
+    return any(
+        token not in user_variants.get(token.casefold(), {token})
+        for token in _GROUNDING_LATIN_TOKEN_RE.findall(
+            unicodedata.normalize("NFKC", candidate)
+        )
+    )
+
+
+# The shared token normalizer only strips a particle or ending when one is
+# actually attached, so ``고양이가`` keeps ``고양이`` while a bare ``고양이``
+# becomes ``고양``. A difference the normalizer itself can produce is not
+# evidence that a noun was mangled.
+_GROUNDING_NORMALIZER_SUFFIXES = frozenset(
+    _GROUNDING_PARTICLES
+) | frozenset(_GROUNDING_COPULAR_SUFFIXES) | frozenset(_GROUNDING_VERBAL_SUFFIXES)
+
+
+def grounding_candidate_truncates_user_token(user_text: str, candidate: str) -> bool:
+    """Detect a user anchor silently shortened into a different word.
+
+    ``신사고`` answered with ``신사`` is not a new reaction, it is the same noun
+    mangled into another one. The prefix relation is checked in one direction
+    only: extending a user token into a compound (``커피`` -> ``커피잔``) is
+    ordinary Korean word formation.
+    """
+    user_tokens = grounding_tokens(user_text)
+    return any(
+        len(token) >= 2
+        and token not in user_tokens
+        and any(
+            user_token != token
+            and user_token.startswith(token)
+            and user_token[len(token):] not in _GROUNDING_NORMALIZER_SUFFIXES
+            for user_token in user_tokens
+        )
+        for token in grounding_tokens(candidate)
+    )
+
+
+def grounding_candidate_fabricates(user_text: str, candidate: str) -> bool:
+    """Return the invention signals that disqualify a candidate on their own.
+
+    These serve the "never claim something that did not happen" goal and hold
+    regardless of how closely the wording follows the user: a switch out of the
+    requested language, an invented comparison, unrequested instructions, and a
+    reversed speaker. Style-level checks are deliberately not included.
+    """
+    clean = candidate.strip()
+    return bool(
+        is_unrequested_foreign_dialogue(clean, user_text)
+        or not contains_hangul(clean)
+        or "?" in clean
+        or _GROUNDING_SIMILE_RE.search(clean)
+        or _GROUNDING_UNSOLICITED_ADVICE_RE.search(clean)
+        or contains_personal_deixis(clean)
+    )
+
+
+def grounding_candidate_distorts_user_facts(user_text: str, candidate: str) -> bool:
+    """Return the signals that a candidate changed a fact the user supplied.
+
+    Unlike ``grounding_candidate_fabricates`` these compare the candidate
+    against the user's own wording, so they are only meaningful once the
+    candidate has departed from that wording.
+    """
+    clean = candidate.strip()
+    if grounding_candidate_matches_full_surface(user_text, clean):
+        # An identical surface cannot have changed a fact, and the ending
+        # normalizers are asymmetric enough (``학생이야`` vs ``학생이구나``) that
+        # a token comparison would report a difference that is not there.
+        return False
+    return bool(
+        grounding_candidate_flips_user_polarity(user_text, clean)
+        or grounding_candidate_truncates_user_token(user_text, clean)
+        or grounding_candidate_alters_latin_case(user_text, clean)
+    )
+
+
+def grounding_balanced_candidate_is_acceptable(user_text: str, candidate: str) -> bool:
+    """Accept a fact-preserving reaction that is not a copy of the user's line.
+
+    A full-surface match remains a sufficient condition (fast accept), but it is
+    no longer necessary: the experiment log records that the surface predicate
+    only admits ending/prosody edits, never a new reaction. Everything that can
+    misstate this turn's facts is still rejected here.
+    """
+    clean = candidate.strip()
+    if not clean or not has_exactly_one_complete_sentence(clean):
+        return False
+    if not has_exactly_one_complete_sentence(user_text):
+        return False
+    if not has_unambiguous_declarative_terminal(user_text):
+        return False
+    if not re.search(r"[.!?。！？]$", clean) and not _COMPLETE_UNPUNCTUATED_KOREAN_RE.search(clean):
+        return False
+    # The invention signals run before the fast accept: a candidate that copies
+    # the user's surface can still copy an unresolved ``나는``/``니가`` back at
+    # them, which reverses the speaker.
+    if grounding_candidate_fabricates(user_text, clean):
+        return False
+    if grounding_candidate_matches_full_surface(user_text, clean):
+        return True
+    if grounding_candidate_restates_user_content(user_text, clean):
+        # Same proposition, different structure. Nothing was contributed, so
+        # the difference can only be a reversal of what the user said.
+        return False
+    if grounding_candidate_distorts_user_facts(user_text, clean):
+        return False
+    if grounding_is_generic_echo(user_text, clean):
+        return False
+    return grounding_overlap(user_text, clean) >= grounding_relaxed_required_overlap(user_text)
+
+
 def grounding_retry_is_factual_improvement(
     user_text: str, initial_draft: str, retry_draft: str,
 ) -> bool:
     """Require a concrete improvement, not merely repeated request nouns."""
     candidate = retry_draft.strip()
+    if grounding_mode_is_balanced():
+        # The initial draft already failed the balanced retry gate, so the
+        # correction is judged on its own factual merit instead of on a
+        # comparison that only a near-copy of the user could win.
+        return grounding_balanced_candidate_is_acceptable(user_text, candidate)
     if (
         not candidate
         or not has_exactly_one_complete_sentence(user_text)
@@ -2308,6 +2558,15 @@ def grounding_retry_is_factual_improvement(
 
 
 def grounding_candidate_is_safe_fallback(user_text: str, candidate: str) -> bool:
+    """Apply the configured policy to a draft the strict correction rejected."""
+    if grounding_mode_is_balanced():
+        return grounding_balanced_candidate_is_acceptable(user_text, candidate.strip())
+    return grounding_candidate_is_strict_safe_fallback(user_text, candidate)
+
+
+def grounding_candidate_is_strict_safe_fallback(
+    user_text: str, candidate: str,
+) -> bool:
     """Allow a grounded, non-fabricating draft when strict correction fails.
 
     The correction pass still gets first choice. This fallback deliberately
@@ -2596,10 +2855,14 @@ def grounded_observation_fallback(user_text: str) -> str:
         candidate = clean[:-1] + "!"
     else:
         return ""
+    # This candidate is a mechanical rewrite of the user's own sentence, so
+    # full-surface parity is both available and exactly the right check. Keep
+    # the strict gate here in every mode: the balanced relaxation exists for
+    # model-authored reactions, not for a rewrite that must stay identical.
     return (
         candidate
         if has_exactly_one_complete_sentence(candidate)
-        and grounding_candidate_is_safe_fallback(clean, candidate)
+        and grounding_candidate_is_strict_safe_fallback(clean, candidate)
         else ""
     )
 
@@ -2648,6 +2911,11 @@ def needs_grounding_retry(
     synthetic_evaluation: bool = False,
 ) -> bool:
     """Select zero-grounded and structurally generic one-token drafts."""
+    # ``off`` adopts the first draft as written. Every retry costs one serial
+    # local round trip, so this is also the fastest possible configuration and
+    # the baseline an A/B comparison measures against.
+    if grounding_mode_is_off():
+        return False
     if not ordinary_korean_grounding_turn(
         user_text, proactive=proactive, synthetic_evaluation=synthetic_evaluation
     ):
@@ -2658,7 +2926,12 @@ def needs_grounding_retry(
     # apparently successful empty completion.
     if not candidate.strip():
         return True
-    if grounding_overlap(user_text, candidate) < grounding_required_overlap(user_text):
+    balanced = grounding_mode_is_balanced()
+    required_overlap = (
+        grounding_relaxed_required_overlap(user_text) if balanced
+        else grounding_required_overlap(user_text)
+    )
+    if grounding_overlap(user_text, candidate) < required_overlap:
         return True
     if _GROUNDING_SIMILE_RE.search(candidate):
         return True
@@ -2666,9 +2939,15 @@ def needs_grounding_retry(
         return True
     if _GROUNDING_UNSOLICITED_ADVICE_RE.search(candidate):
         return True
-    if _GROUNDING_BARE_INTERJECTION_RE.search(candidate):
-        return True
     if contains_personal_deixis(candidate):
+        return True
+    if balanced:
+        # A bare interjection opener, an emotion word the user did not use, and
+        # a reaction that does not repeat the user's verb are ordinary VTuber
+        # speech, not fabrication. Retrying them is what made every second turn
+        # pay an extra serial round trip.
+        return grounding_candidate_distorts_user_facts(user_text, candidate)
+    if _GROUNDING_BARE_INTERJECTION_RE.search(candidate):
         return True
     if _GROUNDING_EMOTION_RE.search(candidate) and not _GROUNDING_EMOTION_RE.search(user_text):
         return True
@@ -5415,6 +5694,7 @@ async def proxy(path: str, request: Request):
                 grounding_safe_fallback_used = False
                 grounding_safe_fallback_from_retry = False
                 grounded_observation_fallback_used = False
+                grounding_silence_fallback_used = False
                 grounding_initial_reject_mask = 0
                 grounding_retry_reject_mask = 0
                 grounding_selected = 0
@@ -5858,6 +6138,20 @@ async def proxy(path: str, request: Request):
                     # single canonical interruption cannot conflict with a
                     # spoken response or duplicate a durable journal entry.
                     dialogue = UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
+                if not dialogue and not proactive_turn:
+                    # Every rejection path above deliberately discards the
+                    # unsafe draft, and none of them has a replacement. Total
+                    # silence is not the safe outcome: it is indistinguishable
+                    # from a dead pipeline and it also drops the user's own
+                    # turn from the journal. Emit one content-free listening
+                    # line instead. It restates nothing, so it cannot carry the
+                    # rejected claim, and it still passes the tool-truth rule.
+                    # A proactive turn is excluded because saying nothing is its
+                    # designed outcome when no approved topic exists.
+                    dialogue = enforce_tool_truth(
+                        original_messages, GROUNDING_SILENCE_FALLBACK_DIALOGUE
+                    )
+                    grounding_silence_fallback_used = True
                 if dialogue:
                     emitted_substantive = True
                     emit_substantive_content(trace_id, request_started)
@@ -5870,7 +6164,10 @@ async def proxy(path: str, request: Request):
                 # pair before [DONE], because a conforming client may close
                 # the iterator immediately after that frame. Incomplete and
                 # cancelled streams never reach this point.
-                if dialogue and not proactive_turn:
+                # Journaling is deliberately not conditioned on a draft having
+                # survived the quality gates: a rejected answer must still not
+                # erase the user's turn from durable memory.
+                if not proactive_turn:
                     schedule_completed_turn(
                         original_messages,
                         session_id=memory_session_id,
@@ -5884,6 +6181,9 @@ async def proxy(path: str, request: Request):
                 yield openai_sse_finish(completion_id, model)
                 end_meta: dict[str, int | float] = {
                     "immediate_ack": 1,
+                    # Carry the active policy on every local turn so a mode
+                    # comparison can be read straight out of the trace.
+                    "grounding_mode": GROUNDING_MODE_CODES.get(GROUNDING_MODE, 0),
                     "response_bytes": response_bytes,
                     "raw_content_chunks": raw_content_chunks,
                     "raw_content_chars": raw_content_chars,
@@ -5953,6 +6253,8 @@ async def proxy(path: str, request: Request):
                     })
                 if grounded_observation_fallback_used:
                     end_meta["grounded_observation_fallback_used"] = 1
+                if grounding_silence_fallback_used:
+                    end_meta["grounding_silence_fallback_used"] = 1
                 if raw_content_chars and not dialogue:
                     end_meta.update({
                         "boundary_empty": 1,
