@@ -1429,6 +1429,16 @@ class IncrementalAiriOutputBoundary:
             text = text[:list_marker.start()].rstrip()
             text = re.sub(r"[:：;；]\s*$", ".", text)
             self.closed_early = True
+        if (
+            self.output
+            and text
+            and re.search(r"[.!?。！？]$", self.output)
+            and not text[0].isspace()
+        ):
+            # Tokenizers may deliver the next sentence without its leading
+            # blank.  Wire and journal share this canonical buffer, so repair
+            # only the inter-sentence separator rather than joining words.
+            text = " " + text
         remaining = self.max_chars - len(self.output)
         if remaining <= 0:
             self.closed_early = True
@@ -2285,6 +2295,34 @@ def build_grounding_correction_body(
                 and message.get("name") == REQUEST_LOCAL_SYSTEM_MESSAGE_NAME
             )
         ]
+        if grounding_open_question_turn(user_text):
+            note = (
+                "직전 초안의 확인되지 않은 외부 사실은 쓰지 마. 답변을 삭제하거나 "
+                "짧게 사과하지 말고, 사용자 질문에 바로 답하는 완결된 한두 문장을 새로 써. "
+                "이 대화와 승인된 지식에 있는 내용만 사실처럼 말하고, 일반적인 선택지는 제안할 수 있어. "
+                "현재 날씨, 실제 장소의 존재·위치·영업·재고·가격·인기·전언은 확인하지 못했으면 만들지 마. "
+                "필요하면 취향이나 조건을 하나 물어봐."
+            )
+            if _MEAL_CHOICE_QUESTION_RE.search(user_text):
+                note += (
+                    " 메뉴 선택 질문에는 현실 식당을 아는 척하지 말고, 든든함·가벼움처럼 "
+                    "서로 다른 기준의 일반 메뉴를 직접 제안한 뒤 어느 쪽이 당기는지 물어봐."
+                )
+            insert_at = next(
+                (
+                    index for index in range(len(retained) - 1, -1, -1)
+                    if isinstance(retained[index], dict)
+                    and retained[index].get("role") == "user"
+                ),
+                len(retained),
+            )
+            retained.insert(insert_at, {
+                "role": "system",
+                "name": REQUEST_LOCAL_SYSTEM_MESSAGE_NAME,
+                "content": note,
+            })
+            payload["messages"] = retained
+            return json.dumps(payload, ensure_ascii=False).encode("utf-8")
         anchors = grounding_correction_anchor_sequence(user_text)
         actions = grounding_action_sequence(user_text)
         normalized_draft = normalized_grounding_draft(initial_draft)
@@ -2381,6 +2419,42 @@ def grounding_candidate_flips_user_polarity(user_text: str, candidate: str) -> b
     candidate_negated = bool(candidate_markers & _GROUNDING_NEGATION_MARKERS)
     return user_negated != candidate_negated and grounding_candidate_restates_user_action(
         user_text, candidate
+    )
+
+
+_GROUNDING_POSITIVE_MOOD_RE = re.compile(
+    r"(?:기분(?:이|은|도)?\s*(?:정말\s*|아주\s*|너무\s*)?좋|기쁘|행복|신나)"
+)
+_GROUNDING_NEGATIVE_MOOD_RE = re.compile(
+    r"(?:기분(?:이|은|도)?\s*(?:안\s*좋|좋지\s*않|나쁘)|우울|슬프|속상|피곤|지쳤|지쳐|힘들)"
+)
+
+
+def grounding_candidate_reverses_explicit_mood(
+    user_text: str, candidate: str,
+) -> bool:
+    """Reject a direct positive/negative state reversal.
+
+    Balanced dialogue may infer a sympathetic reaction, but it must not answer
+    an explicit positive mood with a negative user state (or vice versa).  This
+    comparison is deliberately narrower than a general sentiment classifier.
+    """
+    user = unicodedata.normalize("NFKC", user_text)
+    draft = unicodedata.normalize("NFKC", candidate)
+
+    def orientation(text: str) -> int:
+        if _GROUNDING_NEGATIVE_MOOD_RE.search(text):
+            return -1
+        if _GROUNDING_POSITIVE_MOOD_RE.search(text):
+            return 1
+        return 0
+
+    user_orientation = orientation(user)
+    candidate_orientation = orientation(draft)
+    return bool(
+        user_orientation
+        and candidate_orientation
+        and user_orientation != candidate_orientation
     )
 
 
@@ -2488,6 +2562,8 @@ def grounding_candidate_distorts_user_facts(user_text: str, candidate: str) -> b
         return False
     return bool(
         grounding_candidate_flips_user_polarity(user_text, clean)
+        or grounding_candidate_reverses_explicit_mood(user_text, clean)
+        or grounding_candidate_confirms_second_person_action(user_text, clean)
         or grounding_candidate_truncates_user_token(user_text, clean)
         or grounding_candidate_alters_latin_case(user_text, clean)
     )
@@ -2557,7 +2633,7 @@ _GROUNDING_HEARSAY_HOMOGRAPH_RE = re.compile(
 # shared function words in this module, and they date the utterance rather than
 # assert a new fact about it.
 _GROUNDING_TIME_FACT_RE = re.compile(
-    r"(?:어제|그제|그저께|엊그제|모레|글피|새벽|아침|점심|저녁|한밤|자정|정오"
+    r"(?:방금|아까|어제|그제|그저께|엊그제|모레|글피|새벽|아침|점심|저녁|한밤|자정|정오"
     r"|주말|평일|다음\s*주|지난\s*주|다음\s*달|지난\s*달|작년|내년|올해"
     r"|[월화수목금토일]요일)"
 )
@@ -2705,6 +2781,8 @@ def grounding_balanced_candidate_is_acceptable(user_text: str, candidate: str) -
     misstate this turn's facts is still rejected here.
     """
     clean = candidate.strip()
+    if grounding_open_question_turn(user_text):
+        return grounding_question_candidate_is_acceptable(user_text, clean)
     if not clean or not has_exactly_one_complete_sentence(clean):
         return False
     if not has_exactly_one_complete_sentence(user_text):
@@ -2765,6 +2843,12 @@ def grounding_retry_is_factual_improvement(
 ) -> bool:
     """Require a concrete improvement, not merely repeated request nouns."""
     candidate = retry_draft.strip()
+    if grounding_second_person_action_turn(user_text):
+        return grounding_second_person_action_candidate_is_acceptable(
+            user_text, candidate
+        )
+    if grounding_open_question_turn(user_text):
+        return grounding_question_candidate_is_acceptable(user_text, candidate)
     if grounding_mode_is_balanced():
         # The initial draft already failed the balanced retry gate, so the
         # correction is judged on its own factual merit instead of on a
@@ -2825,6 +2909,12 @@ def grounding_retry_is_factual_improvement(
 
 def grounding_candidate_is_safe_fallback(user_text: str, candidate: str) -> bool:
     """Apply the configured policy to a draft the strict correction rejected."""
+    if grounding_second_person_action_turn(user_text):
+        return grounding_second_person_action_candidate_is_acceptable(
+            user_text, candidate
+        )
+    if grounding_open_question_turn(user_text):
+        return grounding_question_candidate_is_acceptable(user_text, candidate)
     if grounding_mode_is_balanced():
         return grounding_balanced_candidate_is_acceptable(user_text, candidate.strip())
     return grounding_candidate_is_strict_safe_fallback(user_text, candidate)
@@ -3173,6 +3263,271 @@ def ordinary_korean_grounding_turn(
     )
 
 
+_QUESTION_EXTERNAL_FACT_CLAIM_RE = re.compile(
+    r"(?:실시간|현재).{0,28}(?:야|이야|해|돼|있어|없어)"
+    r"|(?:날씨|기온|비|눈|미세먼지).{0,24}(?:쌀쌀|선선|서늘|포근|따뜻|무덥|맑|흐리|덥|춥|와|왔|오|내리|있어|없어|좋아|나빠)"
+    r"|(?:근처|주변|동네).{0,28}(?:새로\s*생긴|생겼|유명|인기|맛있대|있대|열었|영업)"
+    r"|(?:근처|주변|동네).{0,20}(?:식당|맛집|레스토랑|가게)"
+    r"|(?:새로|새로운|인기|유명).{0,20}(?:식당|맛집|레스토랑|가게)"
+    r"|(?:요즘|최근|방금|새로).{0,40}(?:출시|발매|개봉|공개|업데이트|생겼|나왔|유행|품절|재고|할인)"
+    r"|(?:식당|맛집|레스토랑|가게).{0,20}(?:새로|새로운|인기|유명)"
+    r"|(?:[가-힣A-Za-z0-9]{2,}\s*(?:에|에서)\s*(?:있어|없어|열어|닫아|팔아|가능해))"
+    r"|(?:[가-힣A-Za-z0-9]{2,}\s*(?:이|가|은|는)\s*(?:열었어|닫았어|영업|팔아|있어|없어|가능해))"
+    r"|(?:가격|비용|대기|예약|영업|재고|웨이팅|인기).{0,20}(?:야|이야|있어|없어|해|많|적당)",
+    re.IGNORECASE,
+)
+_MEAL_CHOICE_QUESTION_RE = re.compile(
+    r"(?:아침|점심|저녁|식사|밥).{0,24}(?:뭐|무엇|먹을까|먹지|골라)"
+    r"|(?:뭐\s*먹을까|뭘\s*먹을까)",
+)
+_WEATHER_QUESTION_RE = re.compile(r"(?:날씨|기온|비|눈|미세먼지)")
+_WEATHER_CONDITION_RE = re.compile(r"(?:맑아|흐려|비가?\s*와|눈이?\s*와|덥다|추워)")
+_OPEN_RECOMMENDATION_REQUEST_RE = re.compile(
+    r"(?:추천(?:해\s*줘|해줘|해|할)|골라\s*줘|골라줘|"
+    r"(?:뭐|무엇|어느).{0,20}(?:먹을까|먹지|살까|고를까|좋을까))"
+)
+_OPEN_CURRENT_LOCAL_QUESTION_RE = re.compile(
+    r"(?:오늘|내일|지금|현재|실시간|근처|주변|동네|날씨|기온|미세먼지|맛집|식당|가게)"
+)
+_MEAL_OPTION_RE = re.compile(
+    r"(?:국물|밥류|면류|면|한식|중식|일식|분식|찌개|덮밥|국수|샌드위치|샐러드|"
+    r"파스타|백반|김밥|비빔밥|볶음밥|라면|우동|쌀국수|카레|죽|버거|피자|치킨)"
+)
+_MEAL_CONCRETE_OPTION_RE = re.compile(
+    r"(?:찌개|덮밥|국수|샌드위치|샐러드|파스타|백반|김밥|비빔밥|볶음밥|"
+    r"라면|우동|쌀국수|카레|죽|버거|피자|치킨|리조또|스테이크|생선구이|두부조림)"
+)
+_HELPFUL_CHOICE_RE = re.compile(r"(?:어때|좋(?:아|겠|을)|가자|골라|추천|먹자)")
+_QUESTION_SOCIAL_PROOF_RE = re.compile(
+    r"(?:(?:요즘\s*)?(?:인기|유명)(?:가|는|라|\s*(?:하|했|있|많))|"
+    r"많은\s*사람(?:들)?이\s*(?:좋아|찾))"
+)
+
+
+def grounding_open_question_turn(
+    user_text: str, *, proactive: bool = False, synthetic_evaluation: bool = False,
+) -> bool:
+    """Select ordinary open questions without treating personal past questions as facts.
+
+    This deliberately sits beside, rather than inside, declarative grounding:
+    answers to questions need not restate the question's words.  A past-action
+    question such as ``점심 먹었어?`` remains ordinary personal dialogue.
+    """
+    text = unicodedata.normalize("NFKC", user_text).strip()
+    is_question = bool(_GROUNDING_QUESTION_RE.search(text))
+    is_recommendation = bool(_OPEN_RECOMMENDATION_REQUEST_RE.search(text))
+    is_open_scope = bool(
+        _MEAL_CHOICE_QUESTION_RE.search(text)
+        or is_recommendation
+        or (is_question and _OPEN_CURRENT_LOCAL_QUESTION_RE.search(text))
+    )
+    return bool(
+        text
+        and contains_hangul(text)
+        and not proactive
+        and not synthetic_evaluation
+        and (is_question or is_recommendation)
+        and is_open_scope
+        and (is_recommendation or not _GROUNDING_COMMAND_RE.search(text))
+        and not ACTION_REQUEST_RE.search(text)
+        and not PAST_ACTION_QUESTION_RE.search(text)
+        and not requests_non_korean_dialogue(text)
+        and not serious_pre_stream_dialogue(text)
+    )
+
+
+def grounding_question_candidate_is_acceptable(user_text: str, candidate: str) -> bool:
+    """Accept useful generic answers while rejecting ungrounded external claims."""
+    clean = unicodedata.normalize("NFKC", candidate).strip()
+    base_acceptable = bool(
+        clean
+        and contains_hangul(clean)
+        and clean != GROUNDING_SILENCE_FALLBACK_DIALOGUE
+        and not is_unrequested_foreign_dialogue(clean, user_text)
+        and not grounding_candidate_has_unsupported_first_person_future_commitment(clean)
+        and not _GROUNDING_BARE_INTERJECTION_RE.search(clean)
+        and not _QUESTION_EXTERNAL_FACT_CLAIM_RE.search(clean)
+        and not (
+            _QUESTION_SOCIAL_PROOF_RE.search(clean)
+            and not _QUESTION_SOCIAL_PROOF_RE.search(user_text)
+        )
+        and not grounding_candidate_asserts_new_measurable_facts(user_text, clean)
+        and not (_WEATHER_QUESTION_RE.search(user_text) and _WEATHER_CONDITION_RE.search(clean))
+    )
+    if not base_acceptable:
+        return False
+    if _MEAL_CHOICE_QUESTION_RE.search(user_text):
+        option_kinds = set(_MEAL_OPTION_RE.findall(clean))
+        return bool(
+            _MEAL_OPTION_RE.search(clean)
+            and _HELPFUL_CHOICE_RE.search(clean)
+            and (
+                _MEAL_CONCRETE_OPTION_RE.search(clean)
+                or len(option_kinds) >= 2
+            )
+        )
+    return True
+
+
+def grounded_question_fallback(user_text: str) -> str:
+    """Return one useful, fact-free recovery for a rejected open question."""
+    if not grounding_open_question_turn(user_text):
+        return ""
+    if _MEAL_CHOICE_QUESTION_RE.search(user_text):
+        return "든든하게는 김치찌개나 덮밥, 가볍게는 국수나 샌드위치가 좋아. 오늘은 어느 쪽이 당겨?"
+    return "확인된 정보 없이 단정하긴 어려워. 원하는 조건을 말해주면 일반적인 선택지를 같이 골라볼게."
+
+
+_EXPLICIT_TIRED_STATE_RE = re.compile(r"(?:피곤|지쳤|지쳐|힘들)")
+_SECOND_PERSON_SUBJECT_ASSERTION_RE = re.compile(
+    r"(?:^|[\s,])(?:니가|네가|너가|너)(?=\s|[,.!?。！？]|$)"
+)
+_SECOND_PERSON_ACTION_CONFIRMATION_RE = re.compile(
+    r"(?:^|[\s,!?.])(?:응|어|그래|맞아|맞지|그랬어)(?=[\s,!?.。！？]|$)"
+)
+_SECOND_PERSON_ACTION_UNCERTAINTY_RE = re.compile(
+    r"(?:확인(?:할\s*(?:수|근거)(?:가)?\s*없|하지\s*못)|모르|기억(?:나지\s*않|못)|"
+    r"아니|않|못\s*했|수\s*없|"
+    r"근거(?:가)?\s*없|돌린\s*말|말이지)"
+)
+_SECOND_PERSON_PAST_ATTRIBUTION_RE = re.compile(
+    r"(?:[가-힣]{1,12}(?:았|었|했)(?:어|어요|다|네|지|니)?(?=\s|[,.!?。！？]|$)|"
+    r"[가-힣]{1,12}은(?=\s|[,.!?。！？]|$)|"
+    r"한\s*(?:건|것|거)|맞(?:지|니|아|는데))"
+)
+_SECOND_PERSON_THIRD_PARTY_ACTOR_RE = re.compile(
+    r"(?:엄마|아빠|부모|친구|동료|직원|사람|누군가|다른\s*사람)(?:이|가|야|였)"
+)
+_SECOND_PERSON_ACTION_CANDIDATE_RISK_RE = re.compile(
+    r"(?:내가|네가|니가|너가|너).{0,18}(?:접었|접은|했어|했지|한\s*거)|"
+    r"(?:접[가-힣]*|했[가-힣]*).{0,18}(?:네가|니가|너가|너)(?:야|였|라고|라니)?|"
+    r"그런\s*것\s*같"
+)
+_SECOND_PERSON_ACTION_SAFE_RESPONSE_RE = re.compile(
+    r"(?:확인(?:할\s*(?:수|근거)(?:가)?\s*없|하지\s*못)|근거(?:가|는)?\s*없|"
+    r"모르|기억(?:나지\s*않|못)|수\s*없|내가\s*(?:한\s*게\s*)?아니|"
+    r"돌린\s*말|말이지)"
+)
+_SECOND_PERSON_SAFE_SUBJECTS = frozenset({
+    "내", "나", "저", "근거", "확인", "기억", "정보", "이유", "행동", "말",
+    "상황", "일", "그것",
+})
+
+
+def grounding_second_person_action_turn(user_text: str) -> bool:
+    """Recognize a past action explicitly attributed to AIRI/second person."""
+    clean = unicodedata.normalize("NFKC", user_text).strip()
+    return bool(
+        _SECOND_PERSON_SUBJECT_ASSERTION_RE.search(clean)
+        and _SECOND_PERSON_PAST_ATTRIBUTION_RE.search(clean)
+    )
+
+
+def grounding_candidate_introduces_third_party_actor(
+    user_text: str, candidate: str,
+) -> bool:
+    """Reject a new external actor while allowing cautious first-person wording."""
+    if _SECOND_PERSON_THIRD_PARTY_ACTOR_RE.search(candidate):
+        return True
+    supplied = _grounding_supplied_forms(user_text)
+    for match in _GROUNDING_NEW_SUBJECT_RE.finditer(candidate):
+        actor = match.group(1).casefold()
+        normalized = _normalized_grounding_token(actor)
+        if actor in {"내", "나", "저"} or normalized in {"내", "나", "저"}:
+            continue
+        if (
+            actor in _SECOND_PERSON_SAFE_SUBJECTS
+            or normalized in _SECOND_PERSON_SAFE_SUBJECTS
+            or actor.startswith("일인")
+            or normalized.startswith("일인")
+        ):
+            continue
+        if actor not in supplied and normalized not in supplied:
+            return True
+    return False
+
+
+def grounding_candidate_confirms_second_person_action(
+    user_text: str, candidate: str,
+) -> bool:
+    """Reject an implicit first-person confirmation of an attributed action.
+
+    Korean commonly omits the subject, so ``응, 아까 접었어`` can reverse
+    ``니가 수건 접었어`` even though the draft contains no deictic token for
+    the existing speaker-role detector to see.
+    """
+    user = unicodedata.normalize("NFKC", user_text).strip()
+    draft = unicodedata.normalize("NFKC", candidate).strip()
+    uncertainty = bool(_SECOND_PERSON_ACTION_UNCERTAINTY_RE.search(draft))
+    explicit_second_person_action = bool(
+        _SECOND_PERSON_SUBJECT_ASSERTION_RE.search(draft)
+        and (
+            grounding_candidate_restates_user_action(user, draft)
+            or _SECOND_PERSON_PAST_ATTRIBUTION_RE.search(draft)
+        )
+    )
+    return bool(
+        grounding_second_person_action_turn(user)
+        and (
+            _SECOND_PERSON_ACTION_CANDIDATE_RISK_RE.search(draft)
+            or
+            explicit_second_person_action
+            or _SECOND_PERSON_ACTION_CONFIRMATION_RE.search(draft)
+            or (
+                grounding_candidate_restates_user_action(user, draft)
+                and not uncertainty
+            )
+        )
+    )
+
+
+def grounding_second_person_action_candidate_is_acceptable(
+    user_text: str, candidate: str,
+) -> bool:
+    """Accept only a complete uncertainty/denial that invents no other actor."""
+    clean = unicodedata.normalize("NFKC", candidate).strip()
+    # The general external-state detector also recognizes the safe epistemic
+    # phrase ``근거가 없어``. Remove only that already-required phrase before
+    # checking whether the candidate appended a separate external claim.
+    external_surface = _SECOND_PERSON_ACTION_SAFE_RESPONSE_RE.sub("", clean)
+    return bool(
+        clean
+        and contains_hangul(clean)
+        and _SECOND_PERSON_ACTION_SAFE_RESPONSE_RE.search(clean)
+        and not _GROUNDING_BARE_INTERJECTION_RE.search(clean)
+        and not grounding_candidate_confirms_second_person_action(user_text, clean)
+        and not grounding_candidate_introduces_third_party_actor(user_text, clean)
+        and not _QUESTION_EXTERNAL_FACT_CLAIM_RE.search(external_surface)
+        and not grounding_candidate_asserts_new_measurable_facts(user_text, clean)
+        and not grounding_candidate_has_unsupported_first_person_future_commitment(clean)
+        and not is_unrequested_foreign_dialogue(clean, user_text)
+        and clean != GROUNDING_SILENCE_FALLBACK_DIALOGUE
+    )
+
+
+def grounded_conversational_fallback(user_text: str) -> str:
+    """Complete a few explicit conversational acts after two unsafe drafts.
+
+    These responses add no world fact: they acknowledge a mood stated by the
+    user or clarify a second-person action attribution without claiming AIRI
+    performed it.  Unknown cases retain the generic last-resort fallback.
+    """
+    clean = unicodedata.normalize(
+        "NFKC", strip_airi_timestamp_prefix(user_text)
+    ).strip()
+    if grounding_second_person_action_turn(clean):
+        if _GROUNDING_QUESTION_RE.search(clean):
+            return "내가 한 일인지는 지금 확인할 근거가 없어. 어떤 상황인지 조금 더 알려줘."
+        return "그 행동을 나에게 돌린 말이구나. 실제로 확인할 근거는 없으니 어떤 상황인지 조금 더 알려줘."
+    if not ordinary_korean_grounding_turn(clean):
+        return ""
+    if _GROUNDING_POSITIVE_MOOD_RE.search(clean) and not _GROUNDING_NEGATIVE_MOOD_RE.search(clean):
+        return "기분 좋은 날이네! 뭐가 제일 좋았어?"
+    if _EXPLICIT_TIRED_STATE_RE.search(clean):
+        return "좀 지쳤구나. 잠깐 쉬고 싶은 정도야, 아니면 일찍 마무리하고 싶어?"
+    return ""
+
+
 def needs_grounding_retry(
     user_text: str, candidate: str, *, proactive: bool = False,
     synthetic_evaluation: bool = False,
@@ -3183,6 +3538,17 @@ def needs_grounding_retry(
     # the baseline an A/B comparison measures against.
     if grounding_mode_is_off():
         return False
+    # Explicit attribution to AIRI can appear in a declarative sentence or a
+    # confirmation question.  Korean subject omission must not turn either
+    # shape into an unverified first-person action claim.
+    if grounding_second_person_action_turn(user_text):
+        return not grounding_second_person_action_candidate_is_acceptable(
+            user_text, candidate
+        )
+    if grounding_open_question_turn(
+        user_text, proactive=proactive, synthetic_evaluation=synthetic_evaluation
+    ):
+        return not grounding_question_candidate_is_acceptable(user_text, candidate)
     if not ordinary_korean_grounding_turn(
         user_text, proactive=proactive, synthetic_evaluation=synthetic_evaluation
     ):
@@ -3230,6 +3596,22 @@ REQUEST_LOCAL_STYLE_CONTRACT = (
     "사용자 말에 없는 감정·원인·속성·비유·다음 장면은 더하지 마. "
     "사용자가 다른 언어를 요청하지 않았으면 한국어 어휘를 쓰고, "
     "사용자 원문·승인 지식에 있는 필요한 고유명사 외 알파벳 단어를 새로 만들지 마."
+)
+
+OPEN_QUESTION_EVIDENCE_SCOPE_CONTRACT = (
+    "이번 질문은 대화와 승인된 지식에 있는 내용만 사실처럼 사용해. 일반적인 선택지는 제안해도 돼. "
+    "현재 날씨나 실제 장소의 존재·위치·영업·재고·가격·인기·전언은 확인하지 못했으면 만들지 마. "
+    "도움이 되게 바로 답하고, 필요하면 취향·조건을 하나 물어봐."
+)
+OPEN_QUESTION_STYLE_CONTRACT = (
+    "이번 응답 문체: 자연스러운 한국어 반말의 완결된 한두 문장. "
+    "첫 문장은 질문에 직접 답하는 제안이나 설명으로 완결하고, 새 사실을 보태는 대신 사용자가 고를 수 있는 일반적인 선택지나 기준을 줘. "
+    "도움이 된다면 두 번째 문장에서 취향이나 조건을 하나만 자연스럽게 물어봐. "
+    "감탄사·질문 복창·사과·회피만 말하지 마."
+)
+MEAL_CHOICE_RESPONSE_CONTRACT = (
+    "메뉴 선택 질문에는 현실 식당을 아는 척하지 말고, 든든함·가벼움처럼 서로 다른 기준의 "
+    "일반 메뉴를 직접 제안해. 가능하면 마지막에 어느 쪽이 당기는지 한 번만 물어봐."
 )
 
 GROUNDING_CORRECTION_STYLE_CONTRACT = (
@@ -3922,15 +4304,26 @@ def response_mode_note(user_text: str) -> str:
 
 
 def response_sentence_limit(user_text: str) -> int:
-    """Reserve a second sentence only for safety or loss support."""
-    return 2 if URGENT_SAFETY_CONTEXT_RE.search(user_text) or BEREAVEMENT_CONTEXT_RE.search(user_text) else 1
+    """Reserve a second sentence for support or a useful open-question follow-up."""
+    return 2 if (
+        URGENT_SAFETY_CONTEXT_RE.search(user_text)
+        or BEREAVEMENT_CONTEXT_RE.search(user_text)
+        or grounding_open_question_turn(user_text)
+    ) else 1
 
 
 def inject_response_mode(body: bytes, user_text: str) -> bytes:
     note = response_mode_note(user_text)
-    combined_note = REQUEST_LOCAL_STYLE_CONTRACT
+    open_question = grounding_open_question_turn(user_text)
+    combined_note = (
+        OPEN_QUESTION_STYLE_CONTRACT if open_question else REQUEST_LOCAL_STYLE_CONTRACT
+    )
     if note:
         combined_note += "\n" + note
+    if open_question:
+        combined_note += "\n" + OPEN_QUESTION_EVIDENCE_SCOPE_CONTRACT
+        if _MEAL_CHOICE_QUESTION_RE.search(user_text):
+            combined_note += "\n" + MEAL_CHOICE_RESPONSE_CONTRACT
     return inject_request_local_system_note(body, combined_note)
 
 
@@ -5353,6 +5746,8 @@ async def stream_local_with_ack(
         grounding_safe_fallback_used = False
         grounding_safe_fallback_from_retry = False
         grounded_observation_fallback_used = False
+        grounded_question_fallback_used = False
+        grounded_conversational_fallback_used = False
         grounding_silence_fallback_used = False
         grounding_initial_reject_mask = 0
         grounding_retry_reject_mask = 0
@@ -5456,6 +5851,15 @@ async def stream_local_with_ack(
                     early_candidate = boundary.output.strip()
                     early_candidate_is_safe = bool(
                         early_candidate
+                        # Open questions may use a second sentence for a
+                        # preference/condition follow-up.  Do not publish the
+                        # first sentence alone and then discard that useful
+                        # completion from both wire and journal.
+                        and (
+                            not grounding_open_question_turn(context.last_user_text)
+                            or boundary.closed_early
+                            or event.get("done")
+                        )
                         and not boundary.language_blocked
                         and not boundary.truncation_failed
                         and not boundary.register_normalization_failed
@@ -5834,6 +6238,27 @@ async def stream_local_with_ack(
             and not grounding_retry_invalid
             and not grounding_retry_language_blocked
         ):
+            conversational_fallback = grounded_conversational_fallback(
+                context.last_user_text
+            )
+            if (
+                conversational_fallback
+                and enforce_tool_truth(
+                    context.original_messages, conversational_fallback
+                ) == conversational_fallback
+            ):
+                dialogue = conversational_fallback
+                grounded_conversational_fallback_used = True
+                grounding_selected = GROUNDING_SELECTED_DETERMINISTIC
+        if (
+            not dialogue
+            and grounding_quality_rejected
+            and grounding_retry_used
+            and grounding_retry_terminal
+            and not retry_timed_out
+            and not grounding_retry_invalid
+            and not grounding_retry_language_blocked
+        ):
             grounded_fallback = grounded_observation_fallback(context.last_user_text)
             if (
                 grounded_fallback
@@ -5842,6 +6267,24 @@ async def stream_local_with_ack(
             ):
                 dialogue = grounded_fallback
                 grounded_observation_fallback_used = True
+                grounding_selected = GROUNDING_SELECTED_DETERMINISTIC
+        if (
+            not dialogue
+            and grounding_quality_rejected
+            and grounding_retry_used
+            and grounding_retry_terminal
+            and not retry_timed_out
+            and not grounding_retry_invalid
+            and not grounding_retry_language_blocked
+        ):
+            question_fallback = grounded_question_fallback(context.last_user_text)
+            if (
+                question_fallback
+                and enforce_tool_truth(context.original_messages, question_fallback)
+                == question_fallback
+            ):
+                dialogue = question_fallback
+                grounded_question_fallback_used = True
                 grounding_selected = GROUNDING_SELECTED_DETERMINISTIC
         if raw_progress_timeout and not emitted_substantive:
             # No context.model text has crossed the public boundary yet, so a
@@ -5963,6 +6406,10 @@ async def stream_local_with_ack(
             })
         if grounded_observation_fallback_used:
             end_meta["grounded_observation_fallback_used"] = 1
+        if grounded_question_fallback_used:
+            end_meta["grounded_question_fallback_used"] = 1
+        if grounded_conversational_fallback_used:
+            end_meta["grounded_conversational_fallback_used"] = 1
         if grounding_silence_fallback_used:
             end_meta["grounding_silence_fallback_used"] = 1
         if raw_content_chars and not dialogue:

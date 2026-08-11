@@ -44,6 +44,11 @@ runtime observations.
   Upgrade Scout scope, isolated and full-stack measurements, regression
   results, and the physical-device gates that remain conditional. It does not
   promote approved test knowledge into an operational deployment contract.
+- `AIRI-GROUNDED-DIALOGUE-QUALITY-HANDOFF-2026-08-12.md` records the grounded
+  dialogue quality follow-up: useful answers are preserved instead of cut,
+  unsupported external facts and speaker/fact reversals are rewritten, and a
+  reproducible loopback probe reports per-answer quality and latency. Read it
+  after the two Upgrade Scout documents above.
 - `AIRI-WORK-CHECKPOINT-2026-08-10.md` is listed as historical above, but its
   lines 88-105 are the only record of the completed source build and the
   installed archive hash. Read that section before planning any client-side

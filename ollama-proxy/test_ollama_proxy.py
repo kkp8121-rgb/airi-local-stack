@@ -2701,15 +2701,19 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
                 ):
                     response = post_stream(user)
 
+                expected = (
+                    ollama_proxy.grounded_conversational_fallback(user)
+                    or ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE
+                )
                 self.assertEqual(
                     openai_sse_dialogue(response.text),
-                    ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+                    expected,
                 )
                 self.assertNotIn(echoed, response.text)
                 self.assertEqual(memory.completed[0]["user"], user)
                 self.assertEqual(
                     memory.completed[0]["assistant"],
-                    ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+                    expected,
                 )
 
     def test_unpunctuated_yes_no_question_cannot_become_grounded_assertion(self) -> None:
@@ -2804,15 +2808,16 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
                 ):
                     response = post_stream(user)
 
-                self.assertEqual(
-                    openai_sse_dialogue(response.text),
-                    ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+                expected = (
+                    ollama_proxy.grounded_conversational_fallback(user)
+                    or ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE
                 )
+                self.assertEqual(openai_sse_dialogue(response.text), expected)
                 self.assertNotIn(echoed, response.text)
                 self.assertEqual(memory.completed[0]["user"], user)
                 self.assertEqual(
                     memory.completed[0]["assistant"],
-                    ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+                    expected,
                 )
                 self.assertEqual(len(chat.requests), 2)
 
@@ -5040,6 +5045,259 @@ class ForegroundContextTests(unittest.TestCase):
         self.assertEqual(len([m for m in json.loads(transformed)["messages"] if m["role"] != "system"]), 5)
 
 
+    def test_open_meal_question_accepts_generic_helpful_first_draft_once(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        answer = "따뜻한 국물 있는 메뉴나 가벼운 면 중에서 골라봐!"
+        chat = _QueuedApiStreamClient([[event(answer)]])
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_stream("점심 뭐 먹을까?")
+
+        self.assertEqual(openai_sse_dialogue(response.text), answer)
+        self.assertEqual(len(chat.requests), 1)
+        self.assertEqual(memory.completed[0]["assistant"], answer)
+        request_note = next(
+            message["content"] for message in chat.requests[0]["messages"]
+            if "일반적인 선택지" in message.get("content", "")
+        )
+        self.assertIn("일반적인 선택지", request_note)
+        self.assertIn("현재 날씨", request_note)
+
+    def test_open_meal_question_retries_unsafe_external_claim_without_wiring_it(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        unsafe = "오늘 비가 와서 홍대 국밥집이 열었어."
+        answer = "든든한 밥류나 가볍게 먹는 면 중에서 골라봐!"
+        chat = _QueuedApiStreamClient([[event(unsafe)], [event(answer)]])
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_stream("점심 뭐 먹을까?")
+
+        self.assertEqual(openai_sse_dialogue(response.text), answer)
+        self.assertNotIn(unsafe, response.text)
+        self.assertEqual(memory.completed[0]["assistant"], answer)
+        self.assertEqual(len(chat.requests), 2)
+        retry_note = next(
+            message["content"] for message in chat.requests[1]["messages"]
+            if "답변을 삭제하거나 짧게 사과하지 말고" in message.get("content", "")
+        )
+        self.assertIn("답변을 삭제하거나 짧게 사과하지 말고", retry_note)
+
+    def test_open_meal_question_two_unsafe_drafts_use_rich_fact_free_fallback(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        unsafe = "오늘 비가 와서 홍대 국밥집이 열었어."
+        user = "점심 뭐 먹을까?"
+        expected = ollama_proxy.grounded_question_fallback(user)
+        chat = _QueuedApiStreamClient([[event(unsafe)], [event(unsafe)]])
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_stream(user)
+
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
+        self.assertIn("김치찌개나 덮밥", expected)
+        self.assertIn("국수나 샌드위치", expected)
+        self.assertIn("?", expected)
+        self.assertNotIn(unsafe, response.text)
+        self.assertNotEqual(openai_sse_dialogue(response.text), ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE)
+        self.assertEqual(memory.completed[0]["assistant"], expected)
+
+    def test_factual_weather_question_rejects_unsafe_response_and_keeps_personal_question(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        unsafe = "오늘 날씨는 맑고 28도야."
+        self.assertTrue(ollama_proxy.needs_grounding_retry("오늘 날씨 어때?", unsafe))
+        answer = "외출 시간과 우산이 있는지에 따라 일반적인 준비를 골라봐!"
+        chat = _QueuedApiStreamClient([[event(unsafe)], [event(answer)]])
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_stream("오늘 날씨 어때?")
+
+        self.assertEqual(openai_sse_dialogue(response.text), answer)
+        self.assertNotIn(unsafe, response.text)
+        self.assertEqual(memory.completed[0]["assistant"], answer)
+        self.assertFalse(ollama_proxy.needs_grounding_retry("점심 먹었어?", "응, 먹었어!"))
+
+    def test_open_question_contract_preserves_two_sentence_helpful_answer(self) -> None:
+        def event(content: str, *, done: bool = False) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": done},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        first = "든든하게는 김치찌개나 덮밥, 가볍게는 국수나 샌드위치가 좋아."
+        second = "오늘은 어느 쪽이 당겨?"
+        chat = _QueuedApiStreamClient([[
+            event(first), event(" " + second), event("", done=True),
+        ]])
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_stream("점심 뭐 먹을까?")
+
+        expected = first + " " + second
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
+        self.assertEqual(memory.completed[0]["assistant"], expected)
+        self.assertEqual(len(chat.requests), 1)
+        note = next(
+            message["content"] for message in chat.requests[0]["messages"]
+            if "완결된 한두 문장" in message.get("content", "")
+        )
+        self.assertIn("취향이나 조건", note)
+        self.assertIn("서로 다른 기준의 일반 메뉴", note)
+        self.assertNotIn("질문으로 끝내지 마", note)
+        self.assertEqual(ollama_proxy.response_sentence_limit("점심 뭐 먹을까?"), 2)
+
+    def test_open_question_gate_keeps_natural_today_word_but_rejects_external_state(self) -> None:
+        user = "점심 뭐 먹을까?"
+        self.assertTrue(ollama_proxy.grounding_question_candidate_is_acceptable(
+            user, "오늘은 김치찌개나 국수 중에서 골라보자!",
+        ))
+        for unsafe in (
+            "오늘 날씨가 쌀쌀하니까 국밥 어때?",
+            "근처에 새로 생긴 이탈리안 식당이 인기 많대.",
+            "홍대 국밥집은 지금 영업 중이고 웨이팅이 없어.",
+            "요즘 인기 있다는 김치찌개랑 비빔밥 어때?",
+            "요즘 인기 있는 한식 백반 어때?",
+            "오늘 날씨가 선선하니까 국수 어때?",
+            "음... 한식은 어때?",
+            "어디서 식사할 건지 먼저 알려줘!",
+            "점심으로 뭘 먹을지 고민 중이야.",
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        ):
+            with self.subTest(unsafe=unsafe):
+                self.assertFalse(
+                    ollama_proxy.grounding_question_candidate_is_acceptable(user, unsafe)
+                )
+
+    def test_explicit_positive_mood_cannot_reverse_to_tired_state(self) -> None:
+        user = "오늘은 기분이 좋아요."
+        unsafe = "응, 오늘은 좀 피곤하네."
+        self.assertTrue(
+            ollama_proxy.grounding_candidate_reverses_explicit_mood(user, unsafe)
+        )
+        self.assertTrue(ollama_proxy.needs_grounding_retry(user, unsafe))
+        self.assertFalse(ollama_proxy.needs_grounding_retry(user, "기분 좋은 날이네!"))
+
+    def test_implicit_confirmation_cannot_claim_second_person_action(self) -> None:
+        cases = (
+            ("니가 수건 접었어.", "응, 접었어."),
+            ("니가 수건 접었어.", "응, 방금 접었어."),
+            ("니가 수건 접었어.", "응, 아까 접었어."),
+            ("너 수건 접었어.", "응, 접었어."),
+            ("수건 접은 건 네가 맞지?", "응, 맞아."),
+        )
+        for user, unsafe in cases:
+            with self.subTest(user=user, unsafe=unsafe):
+                self.assertTrue(
+                    ollama_proxy.grounding_candidate_confirms_second_person_action(
+                        user, unsafe
+                    )
+                )
+                self.assertTrue(ollama_proxy.needs_grounding_retry(user, unsafe))
+
+        self.assertFalse(ollama_proxy.grounding_candidate_confirms_second_person_action(
+            "수건 접은 건 네가 맞지?", "내가 한 일인지는 확인할 근거가 없어."
+        ))
+        for unsafe in (
+            "그런 것 같네.",
+            "네가 수건 접은 거 맞는데, 왜 그랬는지 모르겠어.",
+            "아니, 그건 내가 아니라 엄마가 했어.",
+            "아니, 그건 내가 아니라 엄마야.",
+            "그게 아니라 내가 접었어.",
+            "아니야, 그건 내가 아니라 네가 한 거야.",
+            "수건 접는 건 내가 아니라 너야.",
+            "그런 것 같은데, 정확히는 기억이 안 나.",
+            "확인해보니 수건 접기 담당이 저였네.",
+            "확인할 근거가 없어. 지금 날씨는 맑아.",
+            "확인할 근거가 없어. 고양이는 귀여워.",
+            "확인할 근거가 없어. 세 번 했어.",
+            "아니...",
+        ):
+            with self.subTest(unsafe=unsafe):
+                self.assertFalse(
+                    ollama_proxy.grounding_second_person_action_candidate_is_acceptable(
+                        "수건 접은 건 네가 맞지?", unsafe
+                    )
+                )
+                self.assertTrue(ollama_proxy.needs_grounding_retry(
+                    "수건 접은 건 네가 맞지?", unsafe
+                ))
+        self.assertTrue(
+            ollama_proxy.grounding_second_person_action_candidate_is_acceptable(
+                "수건 접은 건 네가 맞지?",
+                "내가 한 일인지는 지금 확인할 근거가 없어.",
+            )
+        )
+
+    def test_generic_recommendation_rejects_unsupported_recent_release_claim(self) -> None:
+        user = "영화 추천해줘."
+        self.assertTrue(ollama_proxy.grounding_open_question_turn(user))
+        self.assertFalse(ollama_proxy.grounding_question_candidate_is_acceptable(
+            user, "별빛 여행이 최근 개봉해서 요즘 인기 많아."
+        ))
+        self.assertTrue(ollama_proxy.needs_grounding_retry(
+            user, "별빛 여행이 최근 개봉해서 요즘 인기 많아."
+        ))
+
+    def test_rejected_mood_and_second_person_drafts_get_complete_conversation(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        cases = (
+            ("오늘은 조금 피곤해.", "컵은 조심해야 해."),
+            ("오늘은 기분이 좋아요.", "응, 오늘은 좀 피곤하네."),
+            ("니가 수건 접었어.", "니가 수건 접었구나!"),
+            ("수건 접은 건 네가 맞지?", "응, 맞아."),
+        )
+        for user, unsafe in cases:
+            with self.subTest(user=user):
+                expected = ollama_proxy.grounded_conversational_fallback(user)
+                chat = _QueuedApiStreamClient([[event(unsafe)], [event(unsafe)]])
+                memory = _FakeMemoryRuntime()
+                with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+                    ollama_proxy, "memory_runtime", memory
+                ):
+                    response = post_stream(user)
+
+                self.assertTrue(expected)
+                self.assertEqual(openai_sse_dialogue(response.text), expected)
+                self.assertEqual(memory.completed[0]["assistant"], expected)
+                self.assertNotIn(unsafe, response.text)
+                self.assertNotEqual(
+                    expected, ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE
+                )
+
+
 class GroundingModeTests(unittest.TestCase):
     """Cover the ``AIRI_GROUNDING_MODE`` kill switch and its three policies."""
 
@@ -5479,7 +5737,7 @@ class GroundingModeTests(unittest.TestCase):
                     self.assertNotIn("접었구나", response.text)
                     self.assertEqual(
                         memory.completed[0]["assistant"],
-                        ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+                        ollama_proxy.grounded_conversational_fallback(user),
                     )
 
     def test_off_mode_adopts_the_first_draft_without_a_corrective_retry(self) -> None:
