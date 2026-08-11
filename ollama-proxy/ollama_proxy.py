@@ -2309,12 +2309,13 @@ _GROUNDING_NEGATION_MARKERS = frozenset({"안", "못", "않", "없", "아니"})
 
 
 def grounding_relaxed_required_overlap(user_text: str) -> int:
-    """Require one shared anchor rather than two in ``balanced``.
+    """Return the shared-anchor count that fast-accepts a draft in ``balanced``.
 
     ``strict`` demands two distinct anchors, which a genuinely new reaction
     almost never reaches without restating the user's sentence. One anchor is
-    still mandatory: a candidate with no lexical contact at all cannot be
-    distinguished from an answer to a different turn.
+    enough here, and it is no longer a floor: a draft that reaches it skips the
+    new-fact examination, while a draft below it is judged by
+    ``grounding_candidate_asserts_new_facts`` instead of being rejected.
     """
     return 1 if grounding_tokens(user_text) else 0
 
@@ -2460,6 +2461,209 @@ def grounding_candidate_distorts_user_facts(user_text: str, candidate: str) -> b
     )
 
 
+# ``balanced`` no longer rejects a reaction just because it shares no
+# vocabulary with the user, so the lexical floor is replaced by the signals
+# below.  Each one is a shape in which a Korean sentence *introduces a fact*:
+# a case-marked actor, a counted quantity, a proper name, reported speech, and
+# a named time or place.  Empathy (``고생 많았겠다``), a guess (``곧
+# 떨어지겠는데``) and a tease (``지름신 왔구나``) assert nothing about the world
+# and match none of them.  The patterns are grammatical rather than topical.
+_GROUNDING_NEW_SUBJECT_RE = re.compile(
+    r"([가-힣]{2,})(?:이|가|은|는|도)(?=[\s,.!…”’」』)\]'\"]|$)"
+)
+# ``돌아가``/``가져가`` end in the same syllable as the subject particle,
+# ``틀림없이`` in the same syllable as ``이``, ``믿기지가`` carries the auxiliary
+# connective ``-지`` rather than a noun, and ``한계인가`` is the copula plus
+# ``-ㄴ가``.  A verb, adverb or copular ending is not a case-marked noun
+# phrase, so those shapes never count as a new actor.  A one-syllable stem
+# (``많이``, ``값이``) is already excluded by the ``{2,}`` above.
+_GROUNDING_SUBJECT_HOMOGRAPH_RE = re.compile(r"(?:[아어여워져러려]가|없이|지가|인가)$")
+# ``감당이 되겠어``/``보통내기가 아니네`` mark a complement of 되다/아니다
+# (보격조사), which names what something turns into rather than who acted.
+_GROUNDING_COMPLEMENT_FOLLOWER_RE = re.compile(r"^\s*(?:되|돼|된|될|됐|아니)")
+# A locative noun phrase names where something happened.  Only ``에서`` is read
+# this way: bare ``에`` is far more often a plain dative/goal (``마음에
+# 들겠네``) than a place claim.
+_GROUNDING_LOCATIVE_RE = re.compile(
+    r"([가-힣]{2,})에서(?:도|는|만)?(?=[\s,.!…”’」』)\]'\"]|$)"
+)
+# Native Korean numerals plus the two Sino forms that stand alone as a count.
+# ``한`` and ``네`` are deliberately absent: ``한`` is homographic with the
+# adnominal of 하다 and with the idiom ``한 번``, and ``네`` with the
+# interjection and the second-person determiner, so neither is evidence that a
+# quantity was asserted.
+_GROUNDING_NUMERAL_WORDS = frozenset({
+    "하나", "둘", "셋", "넷", "다섯", "여섯", "일곱", "여덟", "아홉",
+    "열", "스물", "스무", "서른", "마흔", "쉰", "예순", "일흔", "여든", "아흔",
+    "두", "세", "백", "천",
+})
+# A numeral fused to its counter (``다섯시간``) is one eojeol, so it is matched
+# through the closed class of Korean counters instead.  Ambiguous counters that
+# form ordinary compounds with a numeral syllable (``두통``, ``세대``, ``열병``)
+# are left out rather than reading a common noun as a count.
+_GROUNDING_COUNTER_RE = re.compile(
+    r"(?:개|명|번|시간|분|초|살|마리|권|잔|켤레|그릇|조각|년|원|시)"
+)
+_GROUNDING_DIGIT_RE = re.compile(r"\d+")
+# A Latin token that starts with a capital is a name, a product, or a service.
+_GROUNDING_LATIN_PROPER_RE = re.compile(r"[A-Z][A-Za-z0-9]*")
+# Reported speech attributes a statement to somebody who is not in this turn.
+# The bare ``-대``/``-래`` contraction is only read as hearsay at the end of the
+# sentence, where it cannot be the last syllable of an ordinary noun in the
+# middle of a clause (``대단한데``).
+_GROUNDING_HEARSAY_RE = re.compile(
+    r"(?:다더라|라더라|다던데|라던데|단다|란다"
+    r"|(?:다|라|자|냐)고\s*(?:하|해|했|한|합|들)"
+    r"|(?:더라|[가-힣](?:대|래))(?=[\s.!…]*$))"
+)
+# ``그래``/``원래``/``미래`` end in the hearsay syllable without reporting
+# anything.
+_GROUNDING_HEARSAY_HOMOGRAPH_RE = re.compile(
+    r"(?:그래|이래|저래|원래|미래|장래)(?=[\s.!…]*$)"
+)
+# Deictic ``오늘``/``내일``/``지금`` are absent on purpose: they are already
+# shared function words in this module, and they date the utterance rather than
+# assert a new fact about it.
+_GROUNDING_TIME_FACT_RE = re.compile(
+    r"(?:어제|그제|그저께|엊그제|모레|글피|새벽|아침|점심|저녁|한밤|자정|정오"
+    r"|주말|평일|다음\s*주|지난\s*주|다음\s*달|지난\s*달|작년|내년|올해"
+    r"|[월화수목금토일]요일)"
+)
+
+
+def _grounding_supplied_forms(text: str) -> set[str]:
+    """Return every surface and normalized word form this turn supplied.
+
+    The shared normalizer strips a trailing particle only when one is attached,
+    so ``고양이`` becomes ``고양`` while ``고양이가`` becomes ``고양이``.  Keeping
+    both forms on the user's side stops that asymmetry from reporting a word the
+    user did in fact say as new.
+    """
+    folded = unicodedata.normalize("NFKC", text).casefold()
+    forms: set[str] = set()
+    for raw in _GROUNDING_TOKEN_RE.findall(folded):
+        forms.add(raw)
+        forms.add(_normalized_grounding_token(raw))
+    return forms
+
+
+def _grounding_marked_stem_is_new(
+    pattern: re.Pattern[str], supplied: set[str], candidate: str,
+) -> bool:
+    """Return whether a particle-marked noun in ``candidate`` is new this turn."""
+    for match in pattern.finditer(candidate):
+        marked = match.group(0)
+        if _GROUNDING_SUBJECT_HOMOGRAPH_RE.search(marked):
+            continue
+        if _GROUNDING_COMPLEMENT_FOLLOWER_RE.match(candidate[match.end():]):
+            continue
+        forms = {match.group(1), marked}
+        forms |= {_normalized_grounding_token(form.casefold()) for form in forms}
+        if forms & supplied or forms & _GROUNDING_FUNCTION_WORDS:
+            continue
+        return True
+    return False
+
+
+def _grounding_numerals(text: str) -> set[str]:
+    """Return the counts a text states, as digits and numeral words.
+
+    A numeral word counts when it stands alone as its own eojeol (``세 시간``)
+    or when it opens one and is immediately followed by a counter
+    (``다섯시간``).  Any other syllable sequence that merely starts with a
+    numeral (``세상``, ``열심히``) is an ordinary word, not a quantity.
+    """
+    numerals = set(_GROUNDING_DIGIT_RE.findall(text))
+    for token in re.findall(r"[가-힣]+", text):
+        if token in _GROUNDING_NUMERAL_WORDS:
+            numerals.add(token)
+            continue
+        for numeral in _GROUNDING_NUMERAL_WORDS:
+            if token.startswith(numeral) and _GROUNDING_COUNTER_RE.match(
+                token[len(numeral):]
+            ):
+                numerals.add(numeral)
+                break
+    return numerals
+
+
+def grounding_candidate_asserts_new_measurable_facts(user_text: str, candidate: str) -> bool:
+    """Return whether the candidate introduces a count, name, hearsay or place.
+
+    These signals compare tokens that carry their own meaning, so they cannot
+    be softened by how much wording the candidate happens to share with the
+    user: answering ``세 시간`` with ``다섯 시간`` restates the turn's own subject
+    and still gets the quantity wrong.  They therefore run on every balanced
+    path, ahead of the anchor shortcut.  The subject-marked actor signal stays
+    behind it instead: its evidence is a particle rather than a lexical item,
+    so it misreads abstract nouns and adnominal endings often enough to be
+    worth paying only where nothing else grounds the candidate.
+    """
+    user = unicodedata.normalize("NFKC", user_text)
+    draft = unicodedata.normalize("NFKC", candidate)
+    # A count the user never gave, including a different count for the same
+    # thing (``세 시간`` answered with ``다섯 시간``).
+    if _grounding_numerals(draft) - _grounding_numerals(user):
+        return True
+    # A proper name in Latin script that this turn never mentioned.
+    user_latin = {
+        token.casefold() for token in _GROUNDING_LATIN_TOKEN_RE.findall(user)
+    }
+    if any(
+        token.casefold() not in user_latin
+        for token in _GROUNDING_LATIN_PROPER_RE.findall(draft)
+    ):
+        return True
+    # Reported speech, which asserts something the speaker did not witness.
+    # Echoing a report the user themselves made adds no claim, so this only
+    # counts when the hearsay starts with the candidate.
+    if (
+        _GROUNDING_HEARSAY_RE.search(draft)
+        and not _GROUNDING_HEARSAY_HOMOGRAPH_RE.search(draft)
+        and not _GROUNDING_HEARSAY_RE.search(user)
+    ):
+        return True
+    quote_marks = set(_GROUNDING_QUOTE_PAIRS) | set(_GROUNDING_QUOTE_PAIRS.values())
+    if any(mark in draft for mark in quote_marks) and not any(
+        mark in user for mark in quote_marks
+    ):
+        return True
+    # A named time or place that was not part of this turn.
+    if set(_GROUNDING_TIME_FACT_RE.findall(draft)) - set(
+        _GROUNDING_TIME_FACT_RE.findall(user)
+    ):
+        return True
+    return _grounding_marked_stem_is_new(
+        _GROUNDING_LOCATIVE_RE, _grounding_supplied_forms(user), draft
+    )
+
+
+def grounding_candidate_asserts_new_facts(user_text: str, candidate: str) -> bool:
+    """Return whether the candidate claims something this turn never supplied.
+
+    The lexical floor this replaces was standing in for the wrong danger.  An
+    answer that shares no words with the user is not automatically unsafe:
+    ``고생 많았겠다`` asserts nothing at all, while ``김철수가 전화했대`` invents
+    a person and a phone call no matter how many words it happens to share.
+    What must be blocked is therefore the *introduction of a fact*, not the
+    absence of an anchor.
+
+    A guess or a judgement is deliberately not a signal.  ``-겠-``, ``-나 보다``
+    and ``-것 같다`` mark an inference about what the user already said, so they
+    add no claim that could be wrong about the world.
+    """
+    user = unicodedata.normalize("NFKC", user_text)
+    draft = unicodedata.normalize("NFKC", candidate)
+    # A new actor or entity carried by a subject/topic/auxiliary particle.  The
+    # remaining signals live in the unconditional check above; calling it here
+    # keeps the anchorless path from drifting away from the shared one.
+    if _grounding_marked_stem_is_new(
+        _GROUNDING_NEW_SUBJECT_RE, _grounding_supplied_forms(user), draft
+    ):
+        return True
+    return grounding_candidate_asserts_new_measurable_facts(user, draft)
+
+
 def grounding_balanced_candidate_is_acceptable(user_text: str, candidate: str) -> bool:
     """Accept a fact-preserving reaction that is not a copy of the user's line.
 
@@ -2482,6 +2686,10 @@ def grounding_balanced_candidate_is_acceptable(user_text: str, candidate: str) -
     # them, which reverses the speaker.
     if grounding_candidate_fabricates(user_text, clean):
         return False
+    # A count, a Latin name or a hearsay claim is wrong regardless of how much
+    # wording the candidate shares, so this runs ahead of both shortcuts below.
+    if grounding_candidate_asserts_new_measurable_facts(user_text, clean):
+        return False
     if grounding_candidate_matches_full_surface(user_text, clean):
         return True
     if grounding_candidate_restates_user_content(user_text, clean):
@@ -2492,7 +2700,12 @@ def grounding_balanced_candidate_is_acceptable(user_text: str, candidate: str) -
         return False
     if grounding_is_generic_echo(user_text, clean):
         return False
-    return grounding_overlap(user_text, clean) >= grounding_relaxed_required_overlap(user_text)
+    if grounding_overlap(user_text, clean) >= grounding_relaxed_required_overlap(user_text):
+        return True
+    # No shared anchor at all.  That is the ordinary shape of the one direct
+    # reaction the style contract asks for, so it is admitted as long as it
+    # states no fact of its own.
+    return not grounding_candidate_asserts_new_facts(user_text, clean)
 
 
 def grounding_retry_is_factual_improvement(
@@ -2932,7 +3145,12 @@ def needs_grounding_retry(
         else grounding_required_overlap(user_text)
     )
     if grounding_overlap(user_text, candidate) < required_overlap:
-        return True
+        # ``balanced`` accepts an anchorless reaction that states no fact of its
+        # own, so retrying one would buy an extra serial round trip and then
+        # adopt an equivalent answer. The retry is kept only for the drafts the
+        # acceptance predicate would actually reject.
+        if not balanced or grounding_candidate_asserts_new_facts(user_text, candidate):
+            return True
     if _GROUNDING_SIMILE_RE.search(candidate):
         return True
     if grounding_is_generic_echo(user_text, candidate):

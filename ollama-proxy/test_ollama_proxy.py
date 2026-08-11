@@ -2410,7 +2410,10 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
 
         chat = _QueuedApiStreamClient([
             [event('<|ACT {"emotion":"neutral","intensity":"medium"}|>')],
-            [event("정말 다행이다!")],
+            # A reaction that invents an actor and reports his speech is
+            # rejected in every mode, so the deterministic observation is still
+            # the only remaining dialogue.
+            [event("김철수가 정리했대!")],
         ])
         memory = _FakeMemoryRuntime()
         events: list[tuple[tuple[object, ...], dict[str, object]]] = []
@@ -2449,7 +2452,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         expected = "창문 손잡이가 헐거워져!"
         chat = _QueuedApiStreamClient([
             [event('<|ACT {"emotion":"neutral","intensity":"medium"}|>', done=True)],
-            [event("정말 다행이다!"), event("", done=True)],
+            [event("김철수가 고쳐줬대!"), event("", done=True)],
         ])
         memory = _FakeMemoryRuntime()
         events: list[tuple[tuple[object, ...], dict[str, object]]] = []
@@ -2486,7 +2489,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
 
         chat = _QueuedApiStreamClient([
             [event('<|ACT {"emotion":"neutral","intensity":"medium"}|>', done=True)],
-            [event("정말 다행이다!", done=False)],
+            [event("김철수가 고쳐줬대!", done=False)],
         ])
         memory = _FakeMemoryRuntime()
         events: list[tuple[tuple[object, ...], dict[str, object]]] = []
@@ -2789,7 +2792,8 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             ) + "\n").encode("utf-8")
 
         chat = _QueuedApiStreamClient([
-            [event("그냥 괜찮을 거야.")],
+            # A first draft that invents an actor still earns one correction.
+            [event("김철수가 고쳐줬대.")],
             [event("창문 손잡이가 헐거워졌네.")],
         ])
         memory = _FakeMemoryRuntime()
@@ -4974,6 +4978,236 @@ class GroundingModeTests(unittest.TestCase):
                             user, "아, 그렇구나!", distortion,
                         )
                     )
+
+    # The reaction kinds the VTuber style contract asks for, none of which
+    # shares a single anchor with the user's sentence.
+    ANCHORLESS_REACTIONS = (
+        # Empathy.
+        ("어제 세 시간이나 야근했어.", "고생 많았겠다."),
+        ("컵이 깨졌어.", "그거 아쉽다."),
+        # A guess is an inference about this turn, not a claim about the world.
+        ("창문 손잡이가 헐거워졌어.", "그거 곧 떨어지겠는데."),
+        ("아침부터 지하철이 멈췄어.", "하루 시작부터 빡세네."),
+        # A light tease.
+        ("새 키보드를 샀어.", "지름신 왔구나."),
+        ("고양이가 소파를 다 긁어놨어.", "발톱 좀 깎아줘야겠다."),
+        # A general judgement.
+        ("처음으로 김치찌개를 끓여봤어.", "첫 도전치곤 대단한데."),
+    )
+    # Two or more cases for each signal in ``grounding_candidate_asserts_new_facts``.
+    NEW_FACT_ASSERTIONS = {
+        "new actor": (
+            ("컵이 깨졌어.", "고양이가 밀었네."),
+            ("어제 세 시간이나 야근했어.", "김철수가 전화했대."),
+            ("창문 손잡이가 헐거워졌어.", "회사는 망하겠다."),
+            ("컵이 깨졌어.", "동생도 그랬네."),
+        ),
+        "new quantity": (
+            ("어제 세 시간이나 야근했어.", "다섯 시간이나 했네."),
+            ("어제 세 시간이나 야근했어.", "다섯시간은 너무하다."),
+            ("사과 두 개를 샀어.", "열 개는 사야지."),
+            ("컵이 깨졌어.", "3개나 깨졌네."),
+        ),
+        "new proper noun": (
+            ("컵이 깨졌어.", "Amazon에서 새로 사."),
+            ("노트북을 켰어.", "Windows가 또 말썽이네."),
+        ),
+        "reported speech": (
+            ("컵이 깨졌어.", "옆집도 깨졌다더라."),
+            ("창문 손잡이가 헐거워졌어.", "수리비 비싸다던데."),
+            ("창문 손잡이가 헐거워졌어.", "그렇다고 들었어."),
+            ("컵이 깨졌어.", "곧 고친다고 했어."),
+        ),
+        "new time or place": (
+            ("창문 손잡이가 헐거워졌어.", "금요일에 고치자."),
+            ("컵이 깨졌어.", "주말에도 조심하자."),
+            ("컵이 깨졌어.", "부산에서도 깨졌네."),
+            ("창문 손잡이가 헐거워졌어.", "뉴스에서 봤어."),
+        ),
+    }
+
+    def test_balanced_speaks_an_anchorless_reaction_without_a_retry(self) -> None:
+        for user, reaction in self.ANCHORLESS_REACTIONS:
+            with self.subTest(user=user, reaction=reaction):
+                # These are exactly the drafts the old lexical floor discarded.
+                self.assertEqual(ollama_proxy.grounding_overlap(user, reaction), 0)
+                self.assertFalse(
+                    ollama_proxy.grounding_candidate_asserts_new_facts(user, reaction)
+                )
+                with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+                    self.assertTrue(
+                        ollama_proxy.grounding_candidate_is_safe_fallback(user, reaction)
+                    )
+                    # An accepted reaction must not also cost a serial retry.
+                    self.assertFalse(ollama_proxy.needs_grounding_retry(user, reaction))
+
+    def test_strict_still_rejects_and_retries_every_anchorless_reaction(self) -> None:
+        for user, reaction in self.ANCHORLESS_REACTIONS:
+            with self.subTest(user=user, reaction=reaction):
+                with grounding_mode(ollama_proxy.GROUNDING_MODE_STRICT):
+                    self.assertFalse(
+                        ollama_proxy.grounding_candidate_is_safe_fallback(user, reaction)
+                    )
+                    self.assertFalse(
+                        ollama_proxy.grounding_candidate_is_strict_safe_fallback(
+                            user, reaction
+                        )
+                    )
+                    self.assertTrue(ollama_proxy.needs_grounding_retry(user, reaction))
+
+    def test_every_new_fact_signal_is_detected_and_rejected(self) -> None:
+        for signal, rows in self.NEW_FACT_ASSERTIONS.items():
+            for user, assertion in rows:
+                with self.subTest(signal=signal, user=user, assertion=assertion):
+                    self.assertTrue(
+                        ollama_proxy.grounding_candidate_asserts_new_facts(
+                            user, assertion
+                        )
+                    )
+                    with grounding_mode(ollama_proxy.GROUNDING_MODE_STRICT):
+                        self.assertFalse(
+                            ollama_proxy.grounding_candidate_is_safe_fallback(
+                                user, assertion
+                            )
+                        )
+                    if ollama_proxy.grounding_overlap(user, assertion):
+                        # A shared anchor still fast-accepts, so only the
+                        # predicate verdict is asserted for those drafts.
+                        continue
+                    with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+                        self.assertFalse(
+                            ollama_proxy.grounding_candidate_is_safe_fallback(
+                                user, assertion
+                            )
+                        )
+                        self.assertTrue(
+                            ollama_proxy.needs_grounding_retry(user, assertion)
+                        )
+
+    def test_anchorless_drafts_split_on_whether_they_assert_a_fact(self) -> None:
+        # One user turn, two drafts with the same zero overlap. Only the one
+        # that states a fact of its own is refused.
+        user = "창문 손잡이가 헐거워졌어."
+        reaction = "그거 곧 떨어지겠는데."
+        invention = "김철수가 고쳐줬대."
+        self.assertEqual(ollama_proxy.grounding_overlap(user, reaction), 0)
+        self.assertEqual(ollama_proxy.grounding_overlap(user, invention), 0)
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+            self.assertTrue(
+                ollama_proxy.grounding_candidate_is_safe_fallback(user, reaction)
+            )
+            self.assertFalse(ollama_proxy.needs_grounding_retry(user, reaction))
+            self.assertFalse(
+                ollama_proxy.grounding_candidate_is_safe_fallback(user, invention)
+            )
+            self.assertTrue(ollama_proxy.needs_grounding_retry(user, invention))
+
+    def test_sharing_an_anchor_does_not_license_a_new_measurable_fact(self) -> None:
+        # A shared word used to short-circuit the accept, so a draft could
+        # restate the user's own subject while changing its quantity, naming a
+        # place the turn never mentioned, or attributing it to someone else.
+        # Those three compare lexical items rather than particles, so they are
+        # checked before the anchor shortcut.
+        cases = (
+            ("어제 세 시간이나 야근했어.", "다섯 시간이나 했네.", "count"),
+            ("사과 두 개를 샀어.", "열 개는 사야지.", "count"),
+            ("컵이 깨졌어.", "부산에서도 깨졌네.", "place"),
+            ("컵이 깨졌어.", "회사에서 또 그랬네.", "place"),
+            ("밥 먹었어.", "민수가 그랬대.", "hearsay"),
+        )
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+            for user, draft, signal in cases:
+                with self.subTest(signal=signal, draft=draft):
+                    self.assertTrue(
+                        ollama_proxy.grounding_candidate_asserts_new_measurable_facts(
+                            user, draft
+                        )
+                    )
+                    self.assertFalse(
+                        ollama_proxy.grounding_candidate_is_safe_fallback(user, draft)
+                    )
+
+    def test_an_anchored_reaction_still_speaks_without_a_retry(self) -> None:
+        # The check above must not cost the reactions that already worked:
+        # reusing the user's own count is not introducing one.
+        cases = (
+            ("어제 세 시간이나 야근했어.", "야근이 세 시간이면 좀 심한데."),
+            ("고양이가 소파를 다 긁어놨어.", "고양이가 아주 신났나 보네."),
+            ("새 키보드를 샀어.", "키보드부터 바꾸는 거 좋아하네."),
+        )
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+            for user, draft in cases:
+                with self.subTest(draft=draft):
+                    self.assertFalse(
+                        ollama_proxy.grounding_candidate_asserts_new_measurable_facts(
+                            user, draft
+                        )
+                    )
+                    self.assertTrue(
+                        ollama_proxy.grounding_candidate_is_safe_fallback(user, draft)
+                    )
+                    self.assertFalse(ollama_proxy.needs_grounding_retry(user, draft))
+
+    def test_balanced_speaks_an_anchorless_reaction_on_one_round_trip(self) -> None:
+        user = "어제 세 시간이나 야근했어."
+        reaction = "고생 많았겠다."
+        chat = _QueuedApiStreamClient([[self._event(reaction)]])
+        memory = _FakeMemoryRuntime()
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
+            response = post_stream(user)
+
+        self.assertEqual(openai_sse_dialogue(response.text), reaction)
+        self.assertEqual(memory.completed[0]["assistant"], reaction)
+        # The parroted restatement is exactly what this change removes.
+        self.assertNotIn("야근했구나", response.text)
+        self.assertEqual(len(chat.requests), 1)
+
+    def test_balanced_never_speaks_an_anchorless_invention(self) -> None:
+        user = "창문 손잡이가 헐거워졌어."
+        invention = "김철수가 고쳐줬대."
+        chat = _QueuedApiStreamClient([
+            [self._event(invention)], [self._event(invention)],
+        ])
+        memory = _FakeMemoryRuntime()
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
+            response = post_stream(user)
+
+        self.assertNotIn("김철수", response.text)
+        self.assertNotIn("김철수", memory.completed[0]["assistant"])
+        self.assertEqual(len(chat.requests), 2)
+
+    def test_new_fact_predicate_reads_grammar_not_a_word_list(self) -> None:
+        user = "창문 손잡이가 헐거워졌어."
+        # A verb or adverb ending that merely looks like a case particle, a
+        # complement of 되다/아니다, and a numeral syllable inside an ordinary
+        # word are all not new facts.
+        for reaction in (
+            "많이 아쉽겠다.",
+            "틀림없이 위험하겠다.",
+            "감당이 되겠어.",
+            "보통내기가 아니네.",
+            "세상 참 그렇지.",
+            "천천히 하지 그랬어.",
+            "원래 그래.",
+        ):
+            with self.subTest(reaction=reaction):
+                self.assertFalse(
+                    ollama_proxy.grounding_candidate_asserts_new_facts(user, reaction)
+                )
+        # The same shapes with a genuine new fact still fire.
+        for reaction in (
+            "옆집이 시끄럽네.",
+            "다섯시간은 너무하다.",
+            "그렇다더라.",
+        ):
+            with self.subTest(reaction=reaction):
+                self.assertTrue(
+                    ollama_proxy.grounding_candidate_asserts_new_facts(user, reaction)
+                )
 
     def test_tool_truth_holds_in_every_grounding_mode(self) -> None:
         messages = [{"role": "user", "content": "메모를 확인해줘."}]
