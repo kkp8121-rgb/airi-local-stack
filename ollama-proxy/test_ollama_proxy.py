@@ -3488,6 +3488,28 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertEqual(end_meta["upstream_response_headers_timeout"], 1)
         self.assertEqual(end_meta["raw_content_chars"], 0)
 
+    def test_first_raw_watchdog_closes_response_when_send_already_completed(self) -> None:
+        # A 10 ms deadline is below the Windows monotonic clock resolution,
+        # so the response-header watchdog fires even though send() below
+        # returns its response immediately (only aiter_raw stalls).  This
+        # exercises the leak path: wait_for's TimeoutError races an already
+        # -completed send, and the abandoned open response must still close.
+        chat = _StallingApiStreamClient([], stall_seconds=0.2)
+        events: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "UPSTREAM_FIRST_RAW_TIMEOUT_SECONDS", 0.01
+        ), mock.patch.object(
+            ollama_proxy, "emit_latency_event",
+            side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
+        ):
+            response = post_stream("question")
+
+        fallback = ollama_proxy.UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
+        self.assertEqual(openai_sse_content(response.text), fallback)
+        end_meta = next(kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end"))
+        self.assertEqual(end_meta["upstream_response_headers_timeout"], 1)
+        self.assertTrue(chat.response.closed)
+
     def test_first_raw_timeout_config_is_bounded(self) -> None:
         self.assertEqual(ollama_proxy.configured_upstream_first_raw_timeout("1"), 1.0)
         self.assertEqual(ollama_proxy.configured_upstream_first_raw_timeout("30"), 30.0)

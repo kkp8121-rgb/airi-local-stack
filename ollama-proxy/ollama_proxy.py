@@ -5317,9 +5317,14 @@ async def proxy(path: str, request: Request):
                         raise asyncio.TimeoutError
                     upstream_response = await asyncio.wait_for(send_task, timeout=remaining)
                 except asyncio.TimeoutError:
-                    # wait_for cancels and awaits the in-flight send task, so
-                    # a stalled header acquisition cannot continue consuming
-                    # the local Ollama connection after the public terminal.
+                    # wait_for's cancellation stops a still in-flight send from
+                    # continuing to consume the local Ollama connection after
+                    # the public terminal. But send may have already returned
+                    # an open streaming response before the deadline fired, in
+                    # which case cancel() is a no-op and that response would
+                    # otherwise leak; discard_upstream_task closes it once the
+                    # task settles.
+                    discard_upstream_task(send_task)
                     fallback = UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
                     emit_substantive_content(trace_id, request_started)
                     if not proactive_turn:
