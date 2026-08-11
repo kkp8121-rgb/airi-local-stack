@@ -28,6 +28,19 @@ runtime observations.
 - `AIRI-INDEPENDENT-REVIEW-DATA-2026-08-10.md` is that review's raw data
   appendix: all extracted goals with source quotes, the 61 MED/LOW findings,
   and per-axis summaries.
+- `AIRI-UPGRADE-SCOUT-2026-08-11.md` is a read-only survey of upgrade paths
+  across TTS, STT, LLM, barge-in, upstream, proxy, runtime, GitHub and Hugging
+  Face, with feasibility verdicts against the 8GB budget, Korean support,
+  commercial licensing and native Windows. It reverses three earlier premises:
+  the 6.9s TTS cold start is not user-facing on the standard launch path, the
+  half-duplex cause is mic teardown rather than `echoCancellation:false`, and
+  the source build transition recorded in `AIRI-WORK-CHECKPOINT-2026-08-10.md`
+  is already complete, which unblocks client chunk playback.
+  `AIRI-UPGRADE-SCOUT-DATA-2026-08-11.md` holds its per-axis candidates.
+- `AIRI-WORK-CHECKPOINT-2026-08-10.md` is listed as historical above, but its
+  lines 88-105 are the only record of the completed source build and the
+  installed archive hash. Read that section before planning any client-side
+  work; the 2026-08-11 survey needed it and the index had hidden it.
 - `AIRI-EXAONE-GROWTH-STRATEGY-2026-08-07.md` and
   `AIRI-EXAONE-MODEL-CUSTOMIZATION-PLAN-2026-08-07.md` are current
   user-approved direction (G0–G6 roadmap, C0–C5 gates), not historical working
