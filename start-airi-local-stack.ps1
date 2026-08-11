@@ -18,16 +18,28 @@ param(
     [ValidateSet('local', 'openai', 'anthropic')]
     [string]$ChatProvider = 'local',
     [bool]$AllowExternalChat = $false,
+    # For the local provider, an omitted value resolves to the stable runtime
+    # tag. Pass -ChatModel exaone-airi:2.4b to roll back without changing files.
     [string]$ChatModel = '',
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
-    [bool]$EnableCharacterEvaluator = $true,
+    [bool]$EnableCharacterEvaluator = $false,
     [ValidateRange(1, 1000000)]
     [int]$EvaluationMaxRecords = 10000
 )
 
 $ErrorActionPreference = 'Stop'
+$effectiveChatModel = if ($ChatProvider -eq 'local' -and [string]::IsNullOrWhiteSpace($ChatModel)) {
+    'midm-airi:2.0-mini'
+} else {
+    $ChatModel
+}
+$effectiveEvaluatorModel = if ($ChatProvider -eq 'local') {
+    $effectiveChatModel
+} else {
+    'midm-airi:2.0-mini'
+}
 
 function Wait-LocalHealth {
     param(
@@ -58,6 +70,24 @@ if (-not $ollamaListener) {
         -WindowStyle Hidden `
         -RedirectStandardOutput (Join-Path $PSScriptRoot 'ollama-proxy\ollama-serve.out.log') `
         -RedirectStandardError (Join-Path $PSScriptRoot 'ollama-proxy\ollama-serve.err.log')
+}
+
+# Do not let a missing model turn into a late first-chat failure after the
+# other local services have started.  This only reads Ollama's local tag list;
+# it never pulls a model or contacts Hugging Face.
+$requiredLocalModels = @()
+if ($ChatProvider -eq 'local') {
+    $requiredLocalModels += $effectiveChatModel
+}
+if ($EnableCharacterEvaluator) {
+    $requiredLocalModels += $effectiveEvaluatorModel
+}
+if ($requiredLocalModels.Count -gt 0) {
+    $null = Wait-LocalHealth -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSeconds 30
+    foreach ($model in @($requiredLocalModels | Sort-Object -Unique)) {
+        & (Join-Path $PSScriptRoot 'ollama-proxy\setup-midm-airi-model.ps1') `
+            -Model $model -PreflightOnly
+    }
 }
 
 function Resolve-LocalOllamaModelDigest {
@@ -110,7 +140,8 @@ if ([string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
         -MemoryExtractionUpstream "http://127.0.0.1:$MemoryExtractionPort" `
         -ChatProvider $ChatProvider `
         -AllowExternalChat $AllowExternalChat `
-        -ChatModel $ChatModel `
+        -ChatModel $effectiveChatModel `
+        -ChatModelPreflighted `
         -AllowExternalSearch $AllowExternalSearch `
         -TopicBoardPath $TopicBoardPath `
         -EnableEvaluation $EnableEvaluation `
@@ -126,7 +157,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
         -EnableKnowledge $EnableKnowledge `
         -AllowExternalMemoryExtraction $AllowExternalMemoryExtraction -MemoryExtractionModel $MemoryExtractionModel `
         -MemoryExtractionGateReport $MemoryExtractionGateReport -MemoryExtractionUpstream "http://127.0.0.1:$MemoryExtractionPort" `
-        -ChatProvider $ChatProvider -AllowExternalChat $AllowExternalChat -ChatModel $ChatModel `
+        -ChatProvider $ChatProvider -AllowExternalChat $AllowExternalChat -ChatModel $effectiveChatModel -ChatModelPreflighted `
         -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `
         -EnableCharacterEvaluator $EnableCharacterEvaluator -EvaluationMaxRecords $EvaluationMaxRecords `
         -VerifyExtractionGateOnly
@@ -157,7 +188,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
             -EnableKnowledge $EnableKnowledge `
             -AllowExternalMemoryExtraction $AllowExternalMemoryExtraction -MemoryExtractionModel $MemoryExtractionModel `
             -MemoryExtractionGateReport $MemoryExtractionGateReport -MemoryExtractionUpstream "http://127.0.0.1:$MemoryExtractionPort" `
-            -ChatProvider $ChatProvider -AllowExternalChat $AllowExternalChat -ChatModel $ChatModel `
+            -ChatProvider $ChatProvider -AllowExternalChat $AllowExternalChat -ChatModel $effectiveChatModel -ChatModelPreflighted `
             -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `
             -EnableCharacterEvaluator $EnableCharacterEvaluator -EvaluationMaxRecords $EvaluationMaxRecords
         $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
@@ -182,48 +213,50 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
 else {
     throw 'Memory extraction gate requires the local ollama provider.'
 }
+$proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
 & (Join-Path $PSScriptRoot 'gpt-sovits\start-local-stack.ps1')
 & (Join-Path $PSScriptRoot 'stt\start-local-stt.ps1') `
     -Model $SttModel `
     -ComputeType $SttComputeType
 
-$proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
 $tts = Wait-LocalHealth -Uri 'http://127.0.0.1:8880/health'
 $stt = Wait-LocalHealth -Uri 'http://127.0.0.1:8890/health'
 if (-not [string]::IsNullOrWhiteSpace($TopicBoardPath) -and -not [bool]$proxy.topic_board.configured) {
     throw 'TopicBoardPath was requested but the live 11435 proxy did not confirm a configured local topic board.'
 }
 
-# Load Ollama's model before the first user turn. Warm the native loopback
-# endpoint directly so this synthetic probe can never enter AIRI's memory,
-# character-state, evaluation, or cloud-routing paths.
-$warmupJson = @{
-    model = 'exaone-airi:2.4b'
-    stream = $false
-    keep_alive = $OllamaKeepAlive
-    messages = @(@{ role = 'user'; content = '준비.' })
-    options = @{
-        num_ctx = 2048
-        num_gpu = $OllamaNumGpu
-        num_predict = 1
-        temperature = 0
-        seed = 42
+# Load the local foreground model before its first user turn.  External chat
+# providers must never have their model name sent to the local Ollama endpoint.
+$warmup = $null
+if ($ChatProvider -eq 'local') {
+    $warmupJson = @{
+        model = $effectiveChatModel
+        stream = $false
+        keep_alive = $OllamaKeepAlive
+        messages = @(@{ role = 'user'; content = '준비.' })
+        options = @{
+            num_ctx = 2048
+            num_gpu = $OllamaNumGpu
+            num_predict = 1
+            temperature = 0
+            seed = 42
+        }
+    } | ConvertTo-Json -Depth 6 -Compress
+    $warmupBytes = [Text.Encoding]::UTF8.GetBytes($warmupJson)
+    $previousProgressPreference = $ProgressPreference
+    $ProgressPreference = 'SilentlyContinue'
+    try {
+        $warmup = Invoke-WebRequest `
+            -Uri 'http://127.0.0.1:11434/api/chat' `
+            -Method Post `
+            -ContentType 'application/json; charset=utf-8' `
+            -Body $warmupBytes `
+            -UseBasicParsing `
+            -TimeoutSec 120
     }
-} | ConvertTo-Json -Depth 6 -Compress
-$warmupBytes = [Text.Encoding]::UTF8.GetBytes($warmupJson)
-$previousProgressPreference = $ProgressPreference
-$ProgressPreference = 'SilentlyContinue'
-try {
-    $warmup = Invoke-WebRequest `
-        -Uri 'http://127.0.0.1:11434/api/chat' `
-        -Method Post `
-        -ContentType 'application/json; charset=utf-8' `
-        -Body $warmupBytes `
-        -UseBasicParsing `
-        -TimeoutSec 120
-}
-finally {
-    $ProgressPreference = $previousProgressPreference
+    finally {
+        $ProgressPreference = $previousProgressPreference
+    }
 }
 
 [pscustomobject]@{
@@ -239,7 +272,10 @@ finally {
     EvaluationEnabled = $proxy.evaluation.enabled
     CharacterEvaluatorEnabled = $proxy.character_state_evaluator.enabled
     CharacterEvaluatorReady = $proxy.character_state_evaluator.ready
-    LLMWarmup = $warmup.StatusCode
+    LLMWarmup = if ($warmup) { $warmup.StatusCode } else { $null }
+    ChatProvider = $ChatProvider
+    ChatModel = $effectiveChatModel
+    CharacterEvaluatorModel = if ($EnableCharacterEvaluator) { $effectiveEvaluatorModel } else { '' }
     NumCtx = $proxy.num_ctx
     NumGpu = $proxy.num_gpu
     TTS = $tts.status

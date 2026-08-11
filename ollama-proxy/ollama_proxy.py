@@ -16,6 +16,7 @@ import threading
 import time
 import unicodedata
 from collections import deque
+from dataclasses import dataclass
 from collections.abc import AsyncIterator
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -101,11 +102,19 @@ def ollama_terminal_metrics(event: dict[str, object]) -> dict[str, int | float]:
     return metrics
 
 
+def merge_ollama_terminal_metrics(
+    total: dict[str, int | float], event: dict[str, object]
+) -> None:
+    """Add one completed native attempt's content-free measurements in place."""
+    for key, value in ollama_terminal_metrics(event).items():
+        total[key] = total.get(key, 0) + value
+
+
 app = FastAPI(title="AIRI Ollama compatibility proxy")
 
 UPSTREAM = "http://127.0.0.1:11434"
 NUM_CTX = 2048
-NUM_GPU = 12
+NUM_GPU = 999
 OLLAMA_KEEP_ALIVE_RE = re.compile(r"^(?:-1|0|[1-9][0-9]*(?:ms|s|m|h))$")
 
 
@@ -2171,7 +2180,15 @@ _GROUNDING_EMOTION_RE = re.compile(
     r"(?:슬프|속상|기쁘|행복|우울|불안|걱정|무섭|두렵|화났|짜증|외롭|놀랐|당황|신났)"
 )
 _GROUNDING_UNSOLICITED_ADVICE_RE = re.compile(
-    r"(?:해야\s*(?:해|돼|겠)|하는\s*게\s*(?:좋|낫)|하지\s*마|조심(?:해|해야)|챙겨(?:야|봐)|해\s*봐)"
+    r"(?:해야\s*(?:해|돼)|하는\s*게\s*(?:좋|낫)|하지\s*마|조심해야(?!겠어)|조심해(?!야겠어)|챙겨(?:야|봐)|해\s*봐)"
+)
+# ``-ㄹ게`` is a first-person volitional/future ending in ordinary Korean.
+# AIRI cannot carry out a later action merely because a response says it will,
+# so reject it at the grounding boundary rather than persisting a promise it
+# cannot fulfil.  The final consonant check below keeps this grammar-based and
+# avoids a brittle list of promise verbs such as ``알려줄게``.
+_GROUNDING_FIRST_PERSON_FUTURE_COMMITMENT_RE = re.compile(
+    r"(?P<stem>[가-힣])게(?:[.!！…]+)?$"
 )
 _GROUNDING_BARE_INTERJECTION_RE = re.compile(r"^(?:아|와|오|어머|헉)\s*[,，!！…]+")
 _GROUNDING_GENERIC_ECHO_RE = re.compile(
@@ -2227,6 +2244,20 @@ def grounding_is_generic_echo(user_text: str, candidate: str) -> bool:
         and _GROUNDING_GENERIC_ECHO_RE.fullmatch(clean)
         and candidate_tokens <= grounding_tokens(user_text)
     )
+
+
+def grounding_candidate_has_unsupported_first_person_future_commitment(
+    candidate: str,
+) -> bool:
+    """Return whether a draft ends in an unsupported ``-ㄹ게`` promise.
+
+    This intentionally recognizes only the ordinary declarative terminal; the
+    grounding turn selector already excludes explicit commands and requests.
+    A Korean syllable whose final consonant is ㄹ has jongseong index 8.
+    """
+    clean = unicodedata.normalize("NFKC", candidate).strip()
+    match = _GROUNDING_FIRST_PERSON_FUTURE_COMMITMENT_RE.search(clean)
+    return bool(match and (ord(match.group("stem")) - ord("가")) % 28 == 8)
 
 
 def build_grounding_correction_body(
@@ -2437,6 +2468,7 @@ def grounding_candidate_fabricates(user_text: str, candidate: str) -> bool:
         or "?" in clean
         or _GROUNDING_SIMILE_RE.search(clean)
         or _GROUNDING_UNSOLICITED_ADVICE_RE.search(clean)
+        or grounding_candidate_has_unsupported_first_person_future_commitment(clean)
         or contains_personal_deixis(clean)
     )
 
@@ -2690,6 +2722,26 @@ def grounding_balanced_candidate_is_acceptable(user_text: str, candidate: str) -
     # wording the candidate shares, so this runs ahead of both shortcuts below.
     if grounding_candidate_asserts_new_measurable_facts(user_text, clean):
         return False
+    # The shared-anchor shortcut must not waive a newly introduced actor.
+    # Otherwise a draft such as "컥은 고양이가 밀었네." can borrow the
+    # user's noun while inventing the actor and action.  Do not use the wider
+    # fact predicate here: it intentionally permits grounded judgements such
+    # as "키보드부터 바꾸는 거 좋아하네."
+    supplied = _grounding_supplied_forms(user_text)
+    for match in _GROUNDING_NEW_SUBJECT_RE.finditer(clean):
+        # The broad subject pattern deliberately also recognizes Korean
+        # adnominal endings.  At this shared-anchor gate, only an overt
+        # nominative actor is unambiguously a newly asserted event; accepting
+        # a new topic judgement remains part of balanced's intended style.
+        if (
+            not match.group(0).endswith("가")
+            # ``덜칙이다가`` is a predicate connective, not an actor.
+            or match.group(0).endswith("이다가")
+        ):
+            continue
+        stem = _normalized_grounding_token(match.group(1).casefold())
+        if stem not in supplied and match.group(1).casefold() not in supplied:
+            return False
     if grounding_candidate_matches_full_surface(user_text, clean):
         return True
     if grounding_candidate_restates_user_content(user_text, clean):
@@ -2729,6 +2781,7 @@ def grounding_retry_is_factual_improvement(
         or _GROUNDING_SIMILE_RE.search(candidate)
         or grounding_is_generic_echo(user_text, candidate)
         or _GROUNDING_UNSOLICITED_ADVICE_RE.search(candidate)
+        or grounding_candidate_has_unsupported_first_person_future_commitment(candidate)
         or _GROUNDING_BARE_INTERJECTION_RE.search(candidate)
         or contains_personal_deixis(candidate)
         or not grounding_candidate_matches_full_surface(user_text, candidate)
@@ -2798,6 +2851,7 @@ def grounding_candidate_is_strict_safe_fallback(
         or "?" in clean
         or _GROUNDING_SIMILE_RE.search(clean)
         or _GROUNDING_UNSOLICITED_ADVICE_RE.search(clean)
+        or grounding_candidate_has_unsupported_first_person_future_commitment(clean)
         or (
             _GROUNDING_EMOTION_RE.search(clean)
             and not _GROUNDING_EMOTION_RE.search(user_text)
@@ -3140,31 +3194,25 @@ def needs_grounding_retry(
     if not candidate.strip():
         return True
     balanced = grounding_mode_is_balanced()
-    required_overlap = (
-        grounding_relaxed_required_overlap(user_text) if balanced
-        else grounding_required_overlap(user_text)
-    )
+    if balanced:
+        # Balanced has one acceptance policy for both the initial response and
+        # the correction response.  Deriving retry eligibility from individual
+        # heuristics drifted from that policy: some fabricated anchored drafts
+        # skipped correction while some rejected restatements did not retry.
+        return not grounding_balanced_candidate_is_acceptable(user_text, candidate)
+    required_overlap = grounding_required_overlap(user_text)
     if grounding_overlap(user_text, candidate) < required_overlap:
-        # ``balanced`` accepts an anchorless reaction that states no fact of its
-        # own, so retrying one would buy an extra serial round trip and then
-        # adopt an equivalent answer. The retry is kept only for the drafts the
-        # acceptance predicate would actually reject.
-        if not balanced or grounding_candidate_asserts_new_facts(user_text, candidate):
-            return True
+        return True
     if _GROUNDING_SIMILE_RE.search(candidate):
         return True
     if grounding_is_generic_echo(user_text, candidate):
         return True
     if _GROUNDING_UNSOLICITED_ADVICE_RE.search(candidate):
         return True
+    if grounding_candidate_has_unsupported_first_person_future_commitment(candidate):
+        return True
     if contains_personal_deixis(candidate):
         return True
-    if balanced:
-        # A bare interjection opener, an emotion word the user did not use, and
-        # a reaction that does not repeat the user's verb are ordinary VTuber
-        # speech, not fabrication. Retrying them is what made every second turn
-        # pay an extra serial round trip.
-        return grounding_candidate_distorts_user_facts(user_text, candidate)
     if _GROUNDING_BARE_INTERJECTION_RE.search(candidate):
         return True
     if _GROUNDING_EMOTION_RE.search(candidate) and not _GROUNDING_EMOTION_RE.search(user_text):
@@ -3613,7 +3661,7 @@ async def run_dialogue_director(
             "temperature": 0,
             "max_tokens": 128,
             "options": {
-                "num_ctx": 1024,
+                "num_ctx": NUM_CTX,
                 "num_gpu": NUM_GPU,
                 "temperature": 0,
                 "num_predict": 128,
@@ -3746,25 +3794,14 @@ def character_session_id(explicit_session: str | None) -> str:
 
 
 def inject_character_state(body: bytes, session_id: str) -> bytes:
-    """Append bounded observations to the existing identity prompt, fail-soft."""
+    """Place bounded observations in the request-local tail, fail-soft.
+
+    Character observations change after each turn.  Keeping them out of the
+    immutable identity message lets Ollama reuse the stable KV prefix.
+    """
     try:
-        payload = json.loads(body)
-        messages = payload.get("messages") if isinstance(payload, dict) else None
-        if not isinstance(messages, list):
-            return body
         block = character_state_runtime.prompt_block(session_id)
-        for message in messages:
-            if not isinstance(message, dict) or message.get("role") != "system":
-                continue
-            content = message.get("content")
-            if isinstance(content, str):
-                message["content"] = f"{content}\n\n{block}"
-            else:
-                message["content"] = block
-            break
-        else:
-            messages.insert(0, {"role": "system", "content": block})
-        return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        return inject_request_local_system_note(body, block)
     except Exception:
         return body
 
@@ -3992,6 +4029,8 @@ def memory_absence_fallback_required(
     """Return true only when a memory-shaped question has no evidence."""
     if not question or not MEMORY_QUERY_RE.search(question):
         return False
+    if not memory_retrieval_successful(result):
+        return False
     if int(getattr(result, "journal_count", 0) or 0) > 0:
         return False
     historical = original_messages[:-1] if original_messages else []
@@ -4023,25 +4062,41 @@ def memory_absence_dialogue(question: str) -> str:
     return "아직 그건 기록이 없어. 다시 알려줄래?"
 
 
+def memory_retrieval_successful(result: object) -> bool:
+    """Distinguish a successful empty lookup from timeout/failure.
+
+    Older test doubles predate the explicit status contract; treat those as a
+    successful lookup while failing closed for ``None`` and known failure
+    states.  This prevents an outage from becoming a false "I don't know".
+    """
+    if result is None:
+        return False
+    successful = getattr(result, "successful", None)
+    if isinstance(successful, bool):
+        return successful
+    status = getattr(result, "status", None)
+    if isinstance(status, str):
+        return status in {"success", "empty"}
+    return True
+
+
 def inject_memory_absence_guard(body: bytes, question: str, result: object) -> bytes:
     """Tell the small model not to invent a fact when recall found nothing.
 
     This is a per-request system note, not a memory record. It is deliberately
     semantic (memory/name questions) rather than a topic-specific exception.
     """
-    if not question or not MEMORY_QUERY_RE.search(question) or int(getattr(result, "journal_count", 0) or 0) > 0:
+    if (
+        not question
+        or not MEMORY_QUERY_RE.search(question)
+        or not memory_retrieval_successful(result)
+        or int(getattr(result, "journal_count", 0) or 0) > 0
+    ):
         return body
-    try:
-        payload = json.loads(body)
-        if not isinstance(payload, dict) or not isinstance(payload.get("messages"), list):
-            return body
-        payload["messages"] = [
-            {"role": "system", "content": "기억에서 일치하는 정보가 없으면 이름이나 사실을 만들지 말고 모른다고 짧게 말해."},
-            *payload["messages"],
-        ]
-        return json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    except Exception:
-        return body
+    return inject_request_local_system_note(
+        body,
+        "기억에서 일치하는 정보가 없으면 이름이나 사실을 만들지 말고 모른다고 짧게 말해.",
+    )
 
 
 async def prepare_memory_body(
@@ -5002,6 +5057,986 @@ async def evaluation_delete(record_id: str):
         return _evaluation_error_response(exc)
 
 
+
+
+@dataclass(frozen=True)
+class LocalStreamRequestContext:
+    """Explicit request state consumed by the local native streaming path.
+
+    Keeping these values together prevents the stream lifecycle from relying
+    on route-handler closure state.
+    """
+
+    request: Request
+    upstream_client: httpx.AsyncClient
+    body: str
+    request_headers: dict[str, str]
+    completion_id: str
+    model: str
+    trace_id: str
+    request_started: float
+    original_messages: list[dict[str, object]]
+    memory_session_id: str | None
+    memory_question: str
+    last_user_text: str
+    user_prefers_korean: bool
+    proactive_turn: bool
+    nonmutating_turn: bool
+    synthetic_evaluation_turn: bool
+    quality_probe_turn: bool
+    topic_board_runtime: object
+
+
+async def stream_local_with_ack(
+    context: LocalStreamRequestContext,
+) -> AsyncIterator[bytes]:
+    upstream_response = None
+    send_task = None
+    selected_topic_id: str | None = None
+    try:
+        emit_latency_event(
+            "llm",
+            "first",
+            context.trace_id,
+            duration_ms=elapsed_ms(context.request_started),
+            meta={"immediate_ack": 1, "cloud_search": 0},
+        )
+        # A proactive broadcast answers nobody, and it may still decide
+        # to say nothing at all, so it opens the stream silently.  Only
+        # a user-driven turn gets the spoken acknowledgement.
+        yield openai_sse_delta(
+            context.completion_id,
+            context.model,
+            "" if context.proactive_turn else LOCAL_IMMEDIATE_ACK,
+            include_role=True,
+        )
+        if context.proactive_turn:
+            # Proactive turns are intentionally detached from user
+            # journal/memory. Only an explicitly approved local topic
+            # may be appended to their already-transformed prompt.
+            # With no approved topic there is nothing worth saying:
+            # finish silently instead of asking the context.model to invent a
+            # user, transcript label, or stale example topic.
+            prepared_body, selected_topic_id = await asyncio.to_thread(
+                context.topic_board_runtime.prepare,
+                context.body,
+            )
+            _memory_result = None
+            if selected_topic_id is None:
+                proactive_output_telemetry.completion("")
+                yield openai_sse_finish(context.completion_id, context.model)
+                emit_latency_event(
+                    "llm",
+                    "end",
+                    context.trace_id,
+                    duration_ms=elapsed_ms(context.request_started),
+                    meta={"proactive_no_topic": 1},
+                )
+                return
+            approved_proactive = context.topic_board_runtime.approved_dialogue(
+                selected_topic_id
+            )
+            if not approved_proactive:
+                proactive_output_telemetry.completion("")
+                yield openai_sse_finish(context.completion_id, context.model)
+                emit_latency_event(
+                    "llm",
+                    "end",
+                    context.trace_id,
+                    duration_ms=elapsed_ms(context.request_started),
+                    meta={"proactive_missing_approved_dialogue": 1},
+                )
+                return
+            emit_substantive_content(context.trace_id, context.request_started)
+            yield openai_sse_delta(
+                context.completion_id,
+                context.model,
+                approved_proactive,
+            )
+            yield openai_sse_finish(context.completion_id, context.model)
+            # The approved line is considered delivered only after the
+            # terminal frame is consumed and this generator resumes.
+            proactive_output_telemetry.completion(approved_proactive)
+            context.topic_board_runtime.completion(selected_topic_id, True)
+            emit_latency_event(
+                "llm",
+                "end",
+                context.trace_id,
+                duration_ms=elapsed_ms(context.request_started),
+                meta={"approved_proactive_dialogue": 1},
+            )
+            return
+        elif context.nonmutating_turn:
+            prepared_body = inject_response_mode(
+                await prepare_knowledge_body(context.body, context.memory_question),
+                context.memory_question,
+            )
+            _memory_result = None
+        else:
+            prepared_body, _memory_result = await prepare_memory_body(
+                context.body,
+                context.original_messages,
+                session_id=context.memory_session_id,
+                question=context.memory_question,
+                trace_id=context.trace_id,
+            )
+        if (
+            not context.proactive_turn
+            and memory_absence_fallback_required(
+                context.memory_question, _memory_result, context.original_messages
+            )
+        ):
+            fallback = memory_absence_dialogue(context.memory_question)
+            emit_substantive_content(context.trace_id, context.request_started)
+            schedule_completed_turn(
+                context.original_messages,
+                session_id=context.memory_session_id,
+                user_text=context.last_user_text,
+                assistant_text=fallback,
+                trace_id=context.trace_id,
+                action="memory_absent",
+                emotion="neutral",
+                emotion_reason="no_matching_memory",
+            )
+            yield openai_sse_delta(context.completion_id, context.model, fallback)
+            yield openai_sse_finish(context.completion_id, context.model)
+            return
+        approved_dialogue = "" if context.proactive_turn else approved_knowledge_dialogue(prepared_body)
+        if approved_dialogue:
+            emit_substantive_content(context.trace_id, context.request_started)
+            # This is already a complete, reviewed local answer. Queue
+            # its durable pair before the terminal SSE frame: clients
+            # are allowed to stop pulling as soon as they see [DONE],
+            # in which case code after the yield is never resumed.
+            schedule_completed_turn(
+                context.original_messages,
+                session_id=context.memory_session_id,
+                user_text=context.last_user_text,
+                assistant_text=approved_dialogue,
+                trace_id=context.trace_id,
+                action="approved_knowledge",
+                emotion="neutral",
+                emotion_reason="reviewed_public_fact",
+            )
+            yield openai_sse_delta(context.completion_id, context.model, approved_dialogue)
+            yield openai_sse_finish(context.completion_id, context.model)
+            emit_latency_event(
+                "llm",
+                "end",
+                context.trace_id,
+                duration_ms=elapsed_ms(context.request_started),
+                meta={"approved_knowledge": 1},
+            )
+            return
+        # The final local hop is native Ollama NDJSON, never the
+        # OpenAI-compatible endpoint.  This keeps loopback streaming
+        # transport independent from the public compatibility wire.
+        # Keep the OpenAI-shaped prepared payload intact.  Its named
+        # context.request-local note is the authoritative replacement point
+        # for a corrective retry; the native conversion deliberately
+        # strips that private name before sending it to Ollama.
+        prepared_openai_body = prepared_body
+        native_body = native_chat_stream_body(
+            prepared_openai_body,
+            apply_sampling_defaults=not context.synthetic_evaluation_turn,
+        )
+        # This is a warm-context.request SLA, not a replacement for httpx's
+        # generous cold-load timeout.  Start it before acquiring the
+        # streaming response: ``AsyncClient.send(..., stream=True)``
+        # does not return until upstream response headers arrive.
+        first_raw_deadline = (
+            asyncio.get_running_loop().time()
+            + UPSTREAM_FIRST_RAW_TIMEOUT_SECONDS
+        )
+        send_task = asyncio.create_task(
+            context.upstream_client.send(
+                context.upstream_client.build_request(
+                    "POST",
+                    f"{UPSTREAM}/api/chat",
+                    params=context.request.query_params,
+                    headers=context.request_headers,
+                    content=native_body,
+                ),
+                stream=True,
+            )
+        )
+        try:
+            remaining = first_raw_deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise asyncio.TimeoutError
+            upstream_response = await asyncio.wait_for(send_task, timeout=remaining)
+        except asyncio.TimeoutError:
+            # wait_for's cancellation stops a still in-flight send from
+            # continuing to consume the local Ollama connection after
+            # the public terminal. But send may have already returned
+            # an open streaming response before the deadline fired, in
+            # which case cancel() is a no-op and that response would
+            # otherwise leak; discard_upstream_task closes it once the
+            # task settles.
+            discard_upstream_task(send_task)
+            fallback = UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
+            emit_substantive_content(context.trace_id, context.request_started)
+            if not context.proactive_turn:
+                schedule_completed_turn(
+                    context.original_messages,
+                    session_id=context.memory_session_id,
+                    user_text=context.last_user_text,
+                    assistant_text=fallback,
+                    trace_id=context.trace_id,
+                    action="local_chat_watchdog",
+                    emotion="neutral",
+                    emotion_reason="upstream_raw_progress_timeout",
+                )
+            yield openai_sse_delta(context.completion_id, context.model, fallback)
+            yield openai_sse_finish(context.completion_id, context.model)
+            emit_latency_event(
+                "llm",
+                "end",
+                context.trace_id,
+                duration_ms=elapsed_ms(context.request_started),
+                meta={
+                    "immediate_ack": 1,
+                    "response_bytes": 0,
+                    "raw_content_chunks": 0,
+                    "raw_content_chars": 0,
+                    "raw_content_last_ms": 0.0,
+                    "raw_chars_8_ms": 0.0,
+                    "raw_chars_16_ms": 0.0,
+                    "raw_chars_24_ms": 0.0,
+                    "upstream_raw_progress_timeout": 1,
+                    "raw_progress_timeout_ms": elapsed_ms(context.request_started),
+                    "upstream_first_raw_timeout": 1,
+                    "upstream_response_headers_timeout": 1,
+                },
+            )
+            return
+        if upstream_response.status_code >= 400:
+            raw_body = await upstream_response.aread()
+            raise RuntimeError(
+                f"Ollama returned {upstream_response.status_code}: "
+                f"{raw_body.decode('utf-8', errors='replace')[:500]}"
+            )
+        decoder = codecs.getincrementaldecoder("utf-8")("strict")
+        ndjson_buffer = ""
+        boundary = IncrementalAiriOutputBoundary(
+            require_korean=context.user_prefers_korean,
+            max_sentences=response_sentence_limit(context.last_user_text),
+            reject_speaker_labels=context.proactive_turn,
+            proactive_strict=context.proactive_turn,
+        )
+        terminal = False
+        terminal_event: dict[str, object] | None = None
+        # A grounding correction is a second completed native attempt.
+        # The context.request-level end span must retain both attempts instead
+        # of depending on whichever terminal event policy later picks.
+        ollama_metrics: dict[str, int | float] = {}
+        response_bytes = 0
+        emitted_substantive = False
+        public_dialogue_emitted = ""
+        emitted_raw_content = False
+        raw_content_chunks = 0
+        raw_content_chars = 0
+        raw_content_last_ms = 0.0
+        raw_chars_8_ms = 0.0
+        raw_chars_16_ms = 0.0
+        raw_chars_24_ms = 0.0
+        grounding_retry_used = False
+        grounding_retry_passed = False
+        grounding_content_free = False
+        grounding_quality_rejected = False
+        grounding_initial_overlap = 0
+        grounding_retry_overlap = 0
+        grounding_required = 0
+        grounding_retry_language_blocked = False
+        grounding_retry_invalid = False
+        grounding_retry_terminal = False
+        grounding_safe_fallback_used = False
+        grounding_safe_fallback_from_retry = False
+        grounded_observation_fallback_used = False
+        grounding_silence_fallback_used = False
+        grounding_initial_reject_mask = 0
+        grounding_retry_reject_mask = 0
+        grounding_selected = 0
+        empty_dialogue_retry_used = False
+        empty_dialogue_retry_passed = False
+        # This watchdog is intentionally armed only after actual
+        # non-whitespace upstream character progress.  It therefore
+        # preserves the generous httpx read timeout for cold loads.
+        raw_progress_text = ""
+        raw_progress_deadline: float | None = None
+        raw_progress_timeout = False
+        raw_progress_timeout_ms = 0.0
+        raw_progress_timeout_before_content = False
+        raw_iterator = upstream_response.aiter_raw().__aiter__()
+
+        while True:
+            try:
+                if raw_progress_deadline is None:
+                    remaining = first_raw_deadline - asyncio.get_running_loop().time()
+                    if remaining <= 0:
+                        raise asyncio.TimeoutError
+                    raw_chunk = await asyncio.wait_for(
+                        anext(raw_iterator),
+                        timeout=remaining,
+                    )
+                else:
+                    remaining = raw_progress_deadline - asyncio.get_running_loop().time()
+                    if remaining <= 0:
+                        raise asyncio.TimeoutError
+                    raw_chunk = await asyncio.wait_for(
+                        anext(raw_iterator),
+                        timeout=remaining,
+                    )
+            except StopAsyncIteration:
+                break
+            except asyncio.TimeoutError:
+                raw_progress_timeout = True
+                raw_progress_timeout_ms = elapsed_ms(context.request_started)
+                raw_progress_timeout_before_content = not emitted_raw_content
+                # Abort the partially generated native response before
+                # producing the canonical public interruption below.
+                await upstream_response.aclose()
+                break
+            response_bytes += len(raw_chunk)
+            ndjson_buffer += decoder.decode(raw_chunk)
+            while "\n" in ndjson_buffer:
+                line, ndjson_buffer = ndjson_buffer.split("\n", 1)
+                if not line.strip():
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise RuntimeError("invalid upstream NDJSON line") from exc
+                if not isinstance(event, dict):
+                    raise RuntimeError("invalid upstream NDJSON item")
+                content = message_content(event.get("message"))
+                if content:
+                    raw_content_chunks += 1
+                    raw_content_chars += len(content)
+                    raw_content_last_ms = elapsed_ms(context.request_started)
+                    if raw_content_chars >= 8 and raw_chars_8_ms == 0.0:
+                        raw_chars_8_ms = raw_content_last_ms
+                    if raw_content_chars >= 16 and raw_chars_16_ms == 0.0:
+                        raw_chars_16_ms = raw_content_last_ms
+                    if raw_content_chars >= 24 and raw_chars_24_ms == 0.0:
+                        raw_chars_24_ms = raw_content_last_ms
+                # Ollama normally sends deltas, but some adapters send
+                # cumulative snapshots.  Repeated snapshots and empty
+                # keepalives must not keep this watchdog alive.
+                candidate = content.strip()
+                if candidate:
+                    if content.startswith(raw_progress_text):
+                        progressed = len(content) > len(raw_progress_text)
+                        if progressed:
+                            raw_progress_text = content
+                    elif raw_progress_text.startswith(content):
+                        progressed = False
+                    else:
+                        raw_progress_text += content
+                        progressed = True
+                    if progressed:
+                        raw_progress_deadline = (
+                            asyncio.get_running_loop().time()
+                            + UPSTREAM_RAW_PROGRESS_TIMEOUT_SECONDS
+                        )
+                if candidate and not emitted_raw_content:
+                    emitted_raw_content = True
+                    emit_latency_event(
+                        "llm", "raw_content", context.trace_id,
+                        duration_ms=elapsed_ms(context.request_started),
+                        meta={"upstream_raw": 1},
+                    )
+                clean = boundary.feed(content)
+                # A complete sentence is already a reversible local
+                # transaction.  If every factual/tool gate accepts it,
+                # publish it immediately instead of waiting for the
+                # native terminal row. Unsafe candidates remain fully
+                # buffered for the existing corrective retry path.
+                if clean and not public_dialogue_emitted:
+                    early_candidate = boundary.output.strip()
+                    early_candidate_is_safe = bool(
+                        early_candidate
+                        and not boundary.language_blocked
+                        and not boundary.truncation_failed
+                        and not boundary.register_normalization_failed
+                        and not needs_grounding_retry(
+                            context.last_user_text,
+                            early_candidate,
+                            proactive=context.proactive_turn,
+                            synthetic_evaluation=context.synthetic_evaluation_turn,
+                        )
+                        and enforce_tool_truth(
+                            context.original_messages, early_candidate
+                        ) == early_candidate
+                    )
+                    if early_candidate_is_safe:
+                        public_dialogue_emitted = early_candidate
+                        emitted_substantive = True
+                        emit_substantive_content(context.trace_id, context.request_started)
+                        yield openai_sse_delta(
+                            context.completion_id, context.model, early_candidate
+                        )
+                if event.get("done"):
+                    terminal = True
+                    terminal_event = event
+                    break
+            # Live turns retain their first-safe-sentence cutoff.  A
+            # loopback quality probe alone drains the native stream so
+            # its terminal timing row can be observed without changing
+            # public dialogue or grounding selection.
+            if terminal or (boundary.closed_early and not context.quality_probe_turn):
+                break
+
+        # A terminal row may be a valid final NDJSON object without a
+        # trailing newline, so parse residual decoded text *before*
+        # deciding whether the stream was incomplete.
+        if (
+            not raw_progress_timeout
+            and not terminal
+            and (not boundary.closed_early or context.quality_probe_turn)
+            and ndjson_buffer.strip()
+        ):
+            try:
+                event = json.loads(ndjson_buffer + decoder.decode(b"", final=True))
+            except json.JSONDecodeError as exc:
+                raise RuntimeError("unterminated upstream NDJSON") from exc
+            if not isinstance(event, dict):
+                raise RuntimeError("invalid upstream NDJSON item")
+            content = message_content(event.get("message"))
+            if content:
+                raw_content_chunks += 1
+                raw_content_chars += len(content)
+                raw_content_last_ms = elapsed_ms(context.request_started)
+                if raw_content_chars >= 8 and raw_chars_8_ms == 0.0:
+                    raw_chars_8_ms = raw_content_last_ms
+                if raw_content_chars >= 16 and raw_chars_16_ms == 0.0:
+                    raw_chars_16_ms = raw_content_last_ms
+                if raw_content_chars >= 24 and raw_chars_24_ms == 0.0:
+                    raw_chars_24_ms = raw_content_last_ms
+            if content.strip() and not emitted_raw_content:
+                emitted_raw_content = True
+                emit_latency_event(
+                    "llm", "raw_content", context.trace_id,
+                    duration_ms=elapsed_ms(context.request_started),
+                    meta={"upstream_raw": 1},
+                )
+            clean = boundary.feed(content)
+            terminal = bool(event.get("done"))
+            if terminal:
+                terminal_event = event
+        # A native terminal can carry the entire short answer in one
+        # unpunctuated delta. Finalize before deciding whether a
+        # corrective retry is needed; otherwise the valid answer is
+        # still pending when the retry gate inspects boundary.output.
+        if terminal and not raw_progress_timeout and not boundary.closed_early:
+            boundary.finish()
+        if terminal_event is not None:
+            merge_ollama_terminal_metrics(ollama_metrics, terminal_event)
+        # Do not expose a canned "I'll say that in Korean" line.
+        # Before the first public sentence, a language rejection is
+        # still reversible: repeat the same native context.request once with
+        # only a context.request-local corrective note appended.
+        language_retry = boundary.language_blocked and not emitted_substantive
+        grounding_retry = needs_grounding_retry(
+            context.last_user_text, boundary.output, proactive=context.proactive_turn,
+            synthetic_evaluation=context.synthetic_evaluation_turn,
+        )
+        empty_dialogue_retry = bool(
+            not context.proactive_turn
+            and not language_retry
+            and not grounding_retry
+            and emitted_raw_content
+            and terminal
+            and not boundary.output.strip()
+            and not boundary.truncation_failed
+            and not boundary.register_normalization_failed
+        )
+        if (
+            not raw_progress_timeout
+            and not context.proactive_turn
+            and (language_retry or grounding_retry or empty_dialogue_retry)
+        ):
+            initial_boundary = boundary
+            initial_terminal = terminal
+            initial_terminal_event = terminal_event
+            initial_overlap = grounding_overlap(context.last_user_text, boundary.output)
+            grounding_initial_overlap = initial_overlap
+            grounding_required = grounding_required_overlap(context.last_user_text)
+            await upstream_response.aclose()
+            grounding_retry_used = grounding_retry
+            empty_dialogue_retry_used = empty_dialogue_retry
+            retry_prepared_body = (
+                build_grounding_correction_body(
+                    prepared_openai_body, boundary.output, context.last_user_text,
+                ) if grounding_retry else inject_request_local_system_note(
+                    prepared_openai_body,
+                    (
+                        "직전 응답은 한국어 문장 안에 일반 알파벳 단어가 있어 보낼 수 없었다. "
+                        "이번에는 필요한 고유명사도 한글로 풀어 쓰고, 영문자를 한 글자도 쓰지 말고 자연스러운 한국어 반말 한 문장으로 다시 답해."
+                        if language_retry else
+                        "직전 응답에는 실제로 말할 대사가 없었다. 제어 표현이나 설명을 쓰지 말고, 사용자의 현재 말에 직접 이어지는 자연스러운 한국어 반말 한 문장만 답해."
+                    ),
+                    replace=True,
+                )
+            )
+            retry_body = native_chat_stream_body(
+                retry_prepared_body,
+                apply_sampling_defaults=not context.synthetic_evaluation_turn,
+            )
+            upstream_response = await context.upstream_client.send(
+                context.upstream_client.build_request(
+                    "POST", f"{UPSTREAM}/api/chat",
+                    params=context.request.query_params, headers=context.request_headers,
+                    content=retry_body,
+                ),
+                stream=True,
+            )
+            retry_decoder = codecs.getincrementaldecoder("utf-8")("strict")
+            retry_pending = ""
+            retry_boundary = IncrementalAiriOutputBoundary(
+                require_korean=context.user_prefers_korean,
+                max_sentences=response_sentence_limit(context.last_user_text),
+            )
+            terminal = False
+            terminal_event = None
+            retry_iterator = upstream_response.aiter_raw().__aiter__()
+            retry_deadline = time.monotonic() + CORRECTIVE_RETRY_TIMEOUT_SECONDS
+            retry_timed_out = False
+            while True:
+                remaining_retry = retry_deadline - time.monotonic()
+                if remaining_retry <= 0:
+                    retry_timed_out = True
+                    break
+                try:
+                    retry_chunk = await asyncio.wait_for(
+                        retry_iterator.__anext__(), timeout=remaining_retry
+                    )
+                except StopAsyncIteration:
+                    break
+                except TimeoutError:
+                    retry_timed_out = True
+                    break
+                try:
+                    retry_pending += retry_decoder.decode(retry_chunk)
+                except UnicodeDecodeError:
+                    if not grounding_retry:
+                        raise
+                    grounding_retry_invalid = True
+                    break
+                while "\n" in retry_pending:
+                    retry_line, retry_pending = retry_pending.split("\n", 1)
+                    if not retry_line.strip():
+                        continue
+                    try:
+                        retry_event = json.loads(retry_line)
+                    except json.JSONDecodeError:
+                        if not grounding_retry:
+                            raise
+                        grounding_retry_invalid = True
+                        break
+                    if not isinstance(retry_event, dict):
+                        if not grounding_retry:
+                            raise RuntimeError("invalid upstream NDJSON item")
+                        grounding_retry_invalid = True
+                        break
+                    retry_clean = retry_boundary.feed(message_content(retry_event.get("message")))
+                    if retry_event.get("done"):
+                        terminal = True
+                        terminal_event = retry_event
+                        break
+                if (
+                    terminal
+                    or grounding_retry_invalid
+                    or (
+                        retry_boundary.closed_early
+                        and not grounding_retry
+                        and not context.quality_probe_turn
+                    )
+                ):
+                    break
+            if retry_timed_out or grounding_retry_invalid:
+                await upstream_response.aclose()
+                if not grounding_retry:
+                    if retry_timed_out:
+                        raise TimeoutError("language corrective retry timed out")
+                    raise RuntimeError("language corrective retry was invalid")
+            if (
+                not retry_timed_out
+                and not grounding_retry_invalid
+                and not terminal
+                and (not retry_boundary.closed_early or context.quality_probe_turn)
+                and retry_pending.strip()
+            ):
+                try:
+                    retry_event = json.loads(retry_pending + retry_decoder.decode(b"", final=True))
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    if not grounding_retry:
+                        raise
+                    grounding_retry_invalid = True
+                else:
+                    if not isinstance(retry_event, dict):
+                        if not grounding_retry:
+                            raise RuntimeError("invalid upstream NDJSON item")
+                        grounding_retry_invalid = True
+                    else:
+                        retry_clean = retry_boundary.feed(message_content(retry_event.get("message")))
+                        terminal = bool(retry_event.get("done"))
+                        terminal_event = retry_event if terminal else None
+            grounding_retry_terminal = bool(terminal)
+            if terminal_event is not None:
+                merge_ollama_terminal_metrics(ollama_metrics, terminal_event)
+            if language_retry and retry_boundary.language_blocked and not emitted_substantive:
+                # A meta apology is not the requested answer. Keep the
+                # failed retry silent instead of speaking "I'll answer
+                # in Korean" as if it were useful dialogue.
+                retry_boundary = IncrementalAiriOutputBoundary(
+                    require_korean=context.user_prefers_korean,
+                    max_sentences=response_sentence_limit(context.last_user_text),
+                )
+                retry_boundary.closed_early = True
+                terminal = initial_terminal
+                terminal_event = initial_terminal_event
+            if terminal and not retry_boundary.closed_early:
+                retry_boundary.finish()
+            if grounding_retry_used and not retry_timed_out and not grounding_retry_invalid:
+                retry_overlap = grounding_overlap(
+                    context.last_user_text, retry_boundary.output
+                )
+                grounding_retry_overlap = retry_overlap
+                grounding_retry_language_blocked = retry_boundary.language_blocked
+                retry_candidate = retry_boundary.output.strip()
+                grounding_retry_passed = bool(
+                    not retry_boundary.language_blocked
+                    and enforce_tool_truth(context.original_messages, retry_candidate)
+                    == retry_candidate
+                    and grounding_retry_is_factual_improvement(
+                        context.last_user_text, initial_boundary.output, retry_candidate,
+                    )
+                )
+                grounding_content_free = not grounding_retry_passed
+                if grounding_retry_passed:
+                    boundary = retry_boundary
+                    grounding_selected = GROUNDING_SELECTED_RETRY_STRICT
+                elif (
+                    grounding_candidate_is_safe_fallback(
+                        context.last_user_text, retry_candidate
+                    )
+                    and enforce_tool_truth(context.original_messages, retry_candidate)
+                    == retry_candidate
+                ):
+                    boundary = retry_boundary
+                    grounding_safe_fallback_used = True
+                    grounding_safe_fallback_from_retry = True
+                    grounding_content_free = False
+                    grounding_selected = GROUNDING_SELECTED_RETRY_SAFE
+                elif (
+                    grounding_candidate_is_safe_fallback(
+                        context.last_user_text, initial_boundary.output
+                    )
+                    and enforce_tool_truth(
+                        context.original_messages, initial_boundary.output.strip()
+                    )
+                    == initial_boundary.output.strip()
+                ):
+                    boundary = initial_boundary
+                    terminal = initial_terminal
+                    terminal_event = initial_terminal_event
+                    grounding_safe_fallback_used = True
+                    grounding_content_free = False
+                    grounding_selected = GROUNDING_SELECTED_INITIAL_SAFE
+                else:
+                    # The first draft already failed the production
+                    # grounding gate.  A failed correction therefore
+                    # has no safe dialogue to recover: exposing the
+                    # rejected draft would turn a detector into a
+                    # fail-open path and persist the same unsupported
+                    # claim in the journal.  Finish the transport with
+                    # no substantive content instead.  This is not a
+                    # spoken fallback and does not select dialogue by
+                    # a scenario/count rule.
+                    grounding_quality_rejected = True
+                    grounding_selected = GROUNDING_SELECTED_CONTENT_FREE
+                    boundary = IncrementalAiriOutputBoundary(
+                        require_korean=context.user_prefers_korean,
+                        max_sentences=response_sentence_limit(context.last_user_text),
+                    )
+                    boundary.closed_early = True
+                    terminal = initial_terminal
+                    terminal_event = initial_terminal_event
+            elif grounding_retry_used and (
+                grounding_candidate_is_safe_fallback(
+                    context.last_user_text, initial_boundary.output
+                )
+                and enforce_tool_truth(
+                    context.original_messages, initial_boundary.output.strip()
+                )
+                == initial_boundary.output.strip()
+            ):
+                boundary = initial_boundary
+                terminal = initial_terminal
+                terminal_event = initial_terminal_event
+                grounding_retry_passed = False
+                grounding_content_free = False
+                grounding_safe_fallback_used = True
+                grounding_selected = GROUNDING_SELECTED_INITIAL_SAFE
+            elif grounding_retry_used:
+                grounding_retry_passed = False
+                grounding_content_free = True
+                grounding_quality_rejected = True
+                grounding_selected = GROUNDING_SELECTED_CONTENT_FREE
+                boundary = IncrementalAiriOutputBoundary(
+                    require_korean=context.user_prefers_korean,
+                    max_sentences=response_sentence_limit(context.last_user_text),
+                )
+                boundary.closed_early = True
+                terminal = initial_terminal
+                terminal_event = initial_terminal_event
+            else:
+                boundary = retry_boundary
+                if empty_dialogue_retry_used:
+                    empty_dialogue_retry_passed = bool(
+                        boundary.output.strip()
+                        and not boundary.language_blocked
+                        and not ambiguous_unpunctuated_grounding_echo(
+                            context.last_user_text, boundary.output,
+                        )
+                    )
+                    if not empty_dialogue_retry_passed:
+                        boundary = IncrementalAiriOutputBoundary(
+                            require_korean=context.user_prefers_korean,
+                            max_sentences=response_sentence_limit(context.last_user_text),
+                        )
+                        boundary.closed_early = True
+                        terminal = initial_terminal
+                        terminal_event = initial_terminal_event
+        # A normal terminal is required for journaling, except where
+        # our deterministic output budget intentionally closed the
+        # upstream after a safe boundary. A dropped stream is never
+        # promoted to durable dialogue.
+        if not raw_progress_timeout and not terminal and not boundary.closed_early:
+            raise RuntimeError("incomplete upstream NDJSON stream")
+        clean = boundary.finish() if terminal else ""
+        # Hold the complete boundary sentence until the tool/safety
+        # truth rule has accepted its public form.  The exact same
+        # canonical string is then used for wire and journal.
+        dialogue = enforce_tool_truth(context.original_messages, boundary.output.strip())
+        if public_dialogue_emitted:
+            # The exact accepted string already crossed the public
+            # boundary. Keep wire and durable journal canonical even
+            # if diagnostic terminal handling changes later.
+            dialogue = public_dialogue_emitted
+        if (
+            not dialogue
+            and grounding_quality_rejected
+            and grounding_retry_used
+            and grounding_retry_terminal
+            and not retry_timed_out
+            and not grounding_retry_invalid
+            and not grounding_retry_language_blocked
+        ):
+            grounded_fallback = grounded_observation_fallback(context.last_user_text)
+            if (
+                grounded_fallback
+                and enforce_tool_truth(context.original_messages, grounded_fallback)
+                == grounded_fallback
+            ):
+                dialogue = grounded_fallback
+                grounded_observation_fallback_used = True
+                grounding_selected = GROUNDING_SELECTED_DETERMINISTIC
+        if raw_progress_timeout and not emitted_substantive:
+            # No context.model text has crossed the public boundary yet, so a
+            # single canonical interruption cannot conflict with a
+            # spoken response or duplicate a durable journal entry.
+            dialogue = UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
+        if not dialogue and not context.proactive_turn:
+            # Every rejection path above deliberately discards the
+            # unsafe draft, and none of them has a replacement. Total
+            # silence is not the safe outcome: it is indistinguishable
+            # from a dead pipeline and it also drops the user's own
+            # turn from the journal. Emit one content-free listening
+            # line instead. It restates nothing, so it cannot carry the
+            # rejected claim, and it still passes the tool-truth rule.
+            # A proactive turn is excluded because saying nothing is its
+            # designed outcome when no approved topic exists.
+            dialogue = enforce_tool_truth(
+                context.original_messages, GROUNDING_SILENCE_FALLBACK_DIALOGUE
+            )
+            grounding_silence_fallback_used = True
+        if dialogue and not public_dialogue_emitted:
+            emitted_substantive = True
+            emit_substantive_content(context.trace_id, context.request_started)
+            yield openai_sse_delta(context.completion_id, context.model, dialogue)
+        if context.proactive_turn:
+            proactive_output_telemetry.completion(dialogue)
+        emotion = "neutral"
+        # The upstream terminal (or our safe complete-sentence output
+        # boundary) proves the answer itself is complete. Queue the
+        # pair before [DONE], because a conforming context.upstream_client may close
+        # the iterator immediately after that frame. Incomplete and
+        # cancelled streams never reach this point.
+        # Journaling is deliberately not conditioned on a draft having
+        # survived the quality gates: a rejected answer must still not
+        # erase the user's turn from durable memory.
+        if not context.proactive_turn:
+            schedule_completed_turn(
+                context.original_messages,
+                session_id=context.memory_session_id,
+                user_text=context.last_user_text,
+                assistant_text=dialogue,
+                trace_id=context.trace_id,
+                action=("local_chat_watchdog" if raw_progress_timeout else "local_chat"),
+                emotion=emotion,
+                emotion_reason=("upstream_raw_progress_timeout" if raw_progress_timeout else "local_response"),
+            )
+        yield openai_sse_finish(context.completion_id, context.model)
+        end_meta: dict[str, int | float] = {
+            "immediate_ack": 1,
+            # Carry the active policy on every local turn so a mode
+            # comparison can be read straight out of the trace.
+            "grounding_mode": GROUNDING_MODE_CODES.get(GROUNDING_MODE, 0),
+            "response_bytes": response_bytes,
+            "raw_content_chunks": raw_content_chunks,
+            "raw_content_chars": raw_content_chars,
+            "raw_content_last_ms": raw_content_last_ms,
+            "raw_chars_8_ms": raw_chars_8_ms,
+            "raw_chars_16_ms": raw_chars_16_ms,
+            "raw_chars_24_ms": raw_chars_24_ms,
+        }
+        response_duration_ms = elapsed_ms(context.request_started)
+        if raw_progress_timeout:
+            end_meta.update({
+                "upstream_raw_progress_timeout": 1,
+                "raw_progress_timeout_ms": raw_progress_timeout_ms,
+            })
+            if raw_progress_timeout_before_content:
+                end_meta["upstream_first_raw_timeout"] = 1
+        if grounding_retry_used:
+            if grounding_retry_language_blocked:
+                grounding_retry_reject_mask |= GROUNDING_REJECTION_LANGUAGE_BLOCKED
+            if grounding_retry_invalid:
+                grounding_retry_reject_mask |= GROUNDING_REJECTION_INVALID_TRANSPORT
+            if retry_timed_out:
+                grounding_retry_reject_mask |= GROUNDING_REJECTION_TIMEOUT
+            try:
+                initial_candidate = initial_boundary.output.strip()
+                retry_candidate = retry_boundary.output.strip()
+                grounding_initial_reject_mask = grounding_rejection_mask(
+                    context.last_user_text, initial_candidate,
+                )
+                grounding_retry_reject_mask |= grounding_rejection_mask(
+                    context.last_user_text, retry_candidate,
+                )
+                if not retry_timed_out and not grounding_retry_invalid:
+                    if (
+                        enforce_tool_truth(context.original_messages, retry_candidate)
+                        != retry_candidate
+                    ):
+                        grounding_retry_reject_mask |= GROUNDING_REJECTION_TOOL_TRUTH
+            except Exception:
+                # Diagnostics run only after the public terminal frame;
+                # they must never alter dialogue selection or delivery.
+                grounding_retry_reject_mask |= GROUNDING_REJECTION_DIAGNOSTIC_ERROR
+            end_meta.update({
+                "grounding_retry_used": 1,
+                "grounding_retry_passed": int(grounding_retry_passed),
+                "grounding_content_free": int(grounding_content_free),
+                "grounding_initial_overlap": grounding_initial_overlap,
+                "grounding_retry_overlap": grounding_retry_overlap,
+                "grounding_required_overlap": grounding_required,
+                "grounding_retry_language_blocked": int(grounding_retry_language_blocked),
+                "grounding_retry_invalid": int(grounding_retry_invalid),
+                "grounding_quality_rejected": int(grounding_quality_rejected),
+                "grounding_safe_fallback_used": int(
+                    grounding_safe_fallback_used
+                ),
+                "grounding_safe_fallback_from_retry": int(
+                    grounding_safe_fallback_from_retry
+                ),
+                "grounding_selected": grounding_selected,
+                "grounding_initial_reject_mask": grounding_initial_reject_mask,
+                "grounding_retry_reject_mask": grounding_retry_reject_mask,
+            })
+        if empty_dialogue_retry_used:
+            end_meta.update({
+                "empty_dialogue_retry_used": 1,
+                "empty_dialogue_retry_passed": int(empty_dialogue_retry_passed),
+            })
+        if grounded_observation_fallback_used:
+            end_meta["grounded_observation_fallback_used"] = 1
+        if grounding_silence_fallback_used:
+            end_meta["grounding_silence_fallback_used"] = 1
+        if raw_content_chars and not dialogue:
+            end_meta.update({
+                "boundary_empty": 1,
+                "boundary_language_blocked": int(boundary.language_blocked),
+                "boundary_truncation_failed": int(boundary.truncation_failed),
+                "boundary_register_normalization_failed": int(
+                    boundary.register_normalization_failed
+                ),
+            })
+        # Measurements enter only after a real native ``done`` row.
+        # Keeping them separately from dialogue selection preserves
+        # both initial and corrective-attempt costs when grounding
+        # deliberately replaces a draft with a safe fallback.
+        end_meta.update(ollama_metrics)
+        emit_latency_event(
+            "llm",
+            "end",
+            context.trace_id,
+            duration_ms=response_duration_ms,
+            meta=end_meta,
+        )
+    except asyncio.CancelledError:
+        if upstream_response is None and send_task is not None:
+            discard_upstream_task(send_task)
+        emit_latency_event(
+            "llm",
+            "error",
+            context.trace_id,
+            duration_ms=elapsed_ms(context.request_started),
+            meta={"client_cancelled": 1},
+        )
+        raise
+    except Exception as exc:
+        if context.proactive_turn:
+            proactive_output_telemetry.error()
+        if upstream_response is None and send_task is not None:
+            discard_upstream_task(send_task)
+        emit_latency_event(
+            "llm",
+            "error",
+            context.trace_id,
+            duration_ms=elapsed_ms(context.request_started),
+            meta={"immediate_ack": 1},
+        )
+        print(
+            json.dumps(
+                {
+                    "event": "local_chat",
+                    "status": "error",
+                    "error_type": type(exc).__name__,
+                }
+            ),
+            flush=True,
+        )
+        # A read/connect timeout ends the stream cleanly instead of
+        # leaving the context.upstream_client waiting forever.
+        spoken = (
+            UPSTREAM_TIMEOUT_DIALOGUE
+            if isinstance(exc, httpx.TimeoutException)
+            else LOCAL_ERROR_DIALOGUE
+        )
+        emit_substantive_content(context.trace_id, context.request_started)
+        yield openai_sse_delta(
+            context.completion_id,
+            context.model,
+            spoken,
+        )
+        yield openai_sse_finish(context.completion_id, context.model)
+    finally:
+        if upstream_response is not None:
+            await upstream_response.aclose()
+
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 async def proxy(path: str, request: Request):
     if client is None:
@@ -5653,900 +6688,21 @@ async def proxy(path: str, request: Request):
             return StreamingResponse(stream_cloud_chat(), status_code=200,
                                      headers=immediate_headers, media_type="text/event-stream")
 
-        async def stream_local_with_ack() -> AsyncIterator[bytes]:
-            upstream_response = None
-            send_task = None
-            selected_topic_id: str | None = None
-            try:
-                emit_latency_event(
-                    "llm",
-                    "first",
-                    trace_id,
-                    duration_ms=elapsed_ms(request_started),
-                    meta={"immediate_ack": 1, "cloud_search": 0},
-                )
-                # A proactive broadcast answers nobody, and it may still decide
-                # to say nothing at all, so it opens the stream silently.  Only
-                # a user-driven turn gets the spoken acknowledgement.
-                yield openai_sse_delta(
-                    completion_id,
-                    model,
-                    "" if proactive_turn else LOCAL_IMMEDIATE_ACK,
-                    include_role=True,
-                )
-                if proactive_turn:
-                    # Proactive turns are intentionally detached from user
-                    # journal/memory. Only an explicitly approved local topic
-                    # may be appended to their already-transformed prompt.
-                    # With no approved topic there is nothing worth saying:
-                    # finish silently instead of asking the model to invent a
-                    # user, transcript label, or stale example topic.
-                    prepared_body, selected_topic_id = await asyncio.to_thread(
-                        topic_board_runtime.prepare,
-                        body,
-                    )
-                    _memory_result = None
-                    if selected_topic_id is None:
-                        proactive_output_telemetry.completion("")
-                        yield openai_sse_finish(completion_id, model)
-                        emit_latency_event(
-                            "llm",
-                            "end",
-                            trace_id,
-                            duration_ms=elapsed_ms(request_started),
-                            meta={"proactive_no_topic": 1},
-                        )
-                        return
-                    approved_proactive = topic_board_runtime.approved_dialogue(
-                        selected_topic_id
-                    )
-                    if not approved_proactive:
-                        proactive_output_telemetry.completion("")
-                        yield openai_sse_finish(completion_id, model)
-                        emit_latency_event(
-                            "llm",
-                            "end",
-                            trace_id,
-                            duration_ms=elapsed_ms(request_started),
-                            meta={"proactive_missing_approved_dialogue": 1},
-                        )
-                        return
-                    emit_substantive_content(trace_id, request_started)
-                    yield openai_sse_delta(
-                        completion_id,
-                        model,
-                        approved_proactive,
-                    )
-                    yield openai_sse_finish(completion_id, model)
-                    # The approved line is considered delivered only after the
-                    # terminal frame is consumed and this generator resumes.
-                    proactive_output_telemetry.completion(approved_proactive)
-                    topic_board_runtime.completion(selected_topic_id, True)
-                    emit_latency_event(
-                        "llm",
-                        "end",
-                        trace_id,
-                        duration_ms=elapsed_ms(request_started),
-                        meta={"approved_proactive_dialogue": 1},
-                    )
-                    return
-                elif nonmutating_turn:
-                    prepared_body = inject_response_mode(
-                        await prepare_knowledge_body(body, memory_question),
-                        memory_question,
-                    )
-                    _memory_result = None
-                else:
-                    prepared_body, _memory_result = await prepare_memory_body(
-                        body,
-                        original_messages,
-                        session_id=memory_session_id,
-                        question=memory_question,
-                        trace_id=trace_id,
-                    )
-                if (
-                    not proactive_turn
-                    and memory_absence_fallback_required(
-                        memory_question, _memory_result, original_messages
-                    )
-                ):
-                    fallback = memory_absence_dialogue(memory_question)
-                    emit_substantive_content(trace_id, request_started)
-                    schedule_completed_turn(
-                        original_messages,
-                        session_id=memory_session_id,
-                        user_text=last_user_text,
-                        assistant_text=fallback,
-                        trace_id=trace_id,
-                        action="memory_absent",
-                        emotion="neutral",
-                        emotion_reason="no_matching_memory",
-                    )
-                    yield openai_sse_delta(completion_id, model, fallback)
-                    yield openai_sse_finish(completion_id, model)
-                    return
-                approved_dialogue = "" if proactive_turn else approved_knowledge_dialogue(prepared_body)
-                if approved_dialogue:
-                    emit_substantive_content(trace_id, request_started)
-                    # This is already a complete, reviewed local answer. Queue
-                    # its durable pair before the terminal SSE frame: clients
-                    # are allowed to stop pulling as soon as they see [DONE],
-                    # in which case code after the yield is never resumed.
-                    schedule_completed_turn(
-                        original_messages,
-                        session_id=memory_session_id,
-                        user_text=last_user_text,
-                        assistant_text=approved_dialogue,
-                        trace_id=trace_id,
-                        action="approved_knowledge",
-                        emotion="neutral",
-                        emotion_reason="reviewed_public_fact",
-                    )
-                    yield openai_sse_delta(completion_id, model, approved_dialogue)
-                    yield openai_sse_finish(completion_id, model)
-                    emit_latency_event(
-                        "llm",
-                        "end",
-                        trace_id,
-                        duration_ms=elapsed_ms(request_started),
-                        meta={"approved_knowledge": 1},
-                    )
-                    return
-                # The final local hop is native Ollama NDJSON, never the
-                # OpenAI-compatible endpoint.  This keeps loopback streaming
-                # transport independent from the public compatibility wire.
-                # Keep the OpenAI-shaped prepared payload intact.  Its named
-                # request-local note is the authoritative replacement point
-                # for a corrective retry; the native conversion deliberately
-                # strips that private name before sending it to Ollama.
-                prepared_openai_body = prepared_body
-                native_body = native_chat_stream_body(
-                    prepared_openai_body,
-                    apply_sampling_defaults=not synthetic_evaluation_turn,
-                )
-                # This is a warm-request SLA, not a replacement for httpx's
-                # generous cold-load timeout.  Start it before acquiring the
-                # streaming response: ``AsyncClient.send(..., stream=True)``
-                # does not return until upstream response headers arrive.
-                first_raw_deadline = (
-                    asyncio.get_running_loop().time()
-                    + UPSTREAM_FIRST_RAW_TIMEOUT_SECONDS
-                )
-                send_task = asyncio.create_task(
-                    client.send(
-                        client.build_request(
-                            "POST",
-                            f"{UPSTREAM}/api/chat",
-                            params=request.query_params,
-                            headers=request_headers,
-                            content=native_body,
-                        ),
-                        stream=True,
-                    )
-                )
-                try:
-                    remaining = first_raw_deadline - asyncio.get_running_loop().time()
-                    if remaining <= 0:
-                        raise asyncio.TimeoutError
-                    upstream_response = await asyncio.wait_for(send_task, timeout=remaining)
-                except asyncio.TimeoutError:
-                    # wait_for's cancellation stops a still in-flight send from
-                    # continuing to consume the local Ollama connection after
-                    # the public terminal. But send may have already returned
-                    # an open streaming response before the deadline fired, in
-                    # which case cancel() is a no-op and that response would
-                    # otherwise leak; discard_upstream_task closes it once the
-                    # task settles.
-                    discard_upstream_task(send_task)
-                    fallback = UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
-                    emit_substantive_content(trace_id, request_started)
-                    if not proactive_turn:
-                        schedule_completed_turn(
-                            original_messages,
-                            session_id=memory_session_id,
-                            user_text=last_user_text,
-                            assistant_text=fallback,
-                            trace_id=trace_id,
-                            action="local_chat_watchdog",
-                            emotion="neutral",
-                            emotion_reason="upstream_raw_progress_timeout",
-                        )
-                    yield openai_sse_delta(completion_id, model, fallback)
-                    yield openai_sse_finish(completion_id, model)
-                    emit_latency_event(
-                        "llm",
-                        "end",
-                        trace_id,
-                        duration_ms=elapsed_ms(request_started),
-                        meta={
-                            "immediate_ack": 1,
-                            "response_bytes": 0,
-                            "raw_content_chunks": 0,
-                            "raw_content_chars": 0,
-                            "raw_content_last_ms": 0.0,
-                            "raw_chars_8_ms": 0.0,
-                            "raw_chars_16_ms": 0.0,
-                            "raw_chars_24_ms": 0.0,
-                            "upstream_raw_progress_timeout": 1,
-                            "raw_progress_timeout_ms": elapsed_ms(request_started),
-                            "upstream_first_raw_timeout": 1,
-                            "upstream_response_headers_timeout": 1,
-                        },
-                    )
-                    return
-                if upstream_response.status_code >= 400:
-                    raw_body = await upstream_response.aread()
-                    raise RuntimeError(
-                        f"Ollama returned {upstream_response.status_code}: "
-                        f"{raw_body.decode('utf-8', errors='replace')[:500]}"
-                    )
-                decoder = codecs.getincrementaldecoder("utf-8")("strict")
-                ndjson_buffer = ""
-                boundary = IncrementalAiriOutputBoundary(
-                    require_korean=user_prefers_korean,
-                    max_sentences=response_sentence_limit(last_user_text),
-                    reject_speaker_labels=proactive_turn,
-                    proactive_strict=proactive_turn,
-                )
-                terminal = False
-                terminal_event: dict[str, object] | None = None
-                response_bytes = 0
-                emitted_substantive = False
-                emitted_raw_content = False
-                raw_content_chunks = 0
-                raw_content_chars = 0
-                raw_content_last_ms = 0.0
-                raw_chars_8_ms = 0.0
-                raw_chars_16_ms = 0.0
-                raw_chars_24_ms = 0.0
-                grounding_retry_used = False
-                grounding_retry_passed = False
-                grounding_content_free = False
-                grounding_quality_rejected = False
-                grounding_initial_overlap = 0
-                grounding_retry_overlap = 0
-                grounding_required = 0
-                grounding_retry_language_blocked = False
-                grounding_retry_invalid = False
-                grounding_retry_terminal = False
-                grounding_safe_fallback_used = False
-                grounding_safe_fallback_from_retry = False
-                grounded_observation_fallback_used = False
-                grounding_silence_fallback_used = False
-                grounding_initial_reject_mask = 0
-                grounding_retry_reject_mask = 0
-                grounding_selected = 0
-                empty_dialogue_retry_used = False
-                empty_dialogue_retry_passed = False
-                # This watchdog is intentionally armed only after actual
-                # non-whitespace upstream character progress.  It therefore
-                # preserves the generous httpx read timeout for cold loads.
-                raw_progress_text = ""
-                raw_progress_deadline: float | None = None
-                raw_progress_timeout = False
-                raw_progress_timeout_ms = 0.0
-                raw_progress_timeout_before_content = False
-                raw_iterator = upstream_response.aiter_raw().__aiter__()
-
-                while True:
-                    try:
-                        if raw_progress_deadline is None:
-                            remaining = first_raw_deadline - asyncio.get_running_loop().time()
-                            if remaining <= 0:
-                                raise asyncio.TimeoutError
-                            raw_chunk = await asyncio.wait_for(
-                                anext(raw_iterator),
-                                timeout=remaining,
-                            )
-                        else:
-                            remaining = raw_progress_deadline - asyncio.get_running_loop().time()
-                            if remaining <= 0:
-                                raise asyncio.TimeoutError
-                            raw_chunk = await asyncio.wait_for(
-                                anext(raw_iterator),
-                                timeout=remaining,
-                            )
-                    except StopAsyncIteration:
-                        break
-                    except asyncio.TimeoutError:
-                        raw_progress_timeout = True
-                        raw_progress_timeout_ms = elapsed_ms(request_started)
-                        raw_progress_timeout_before_content = not emitted_raw_content
-                        # Abort the partially generated native response before
-                        # producing the canonical public interruption below.
-                        await upstream_response.aclose()
-                        break
-                    response_bytes += len(raw_chunk)
-                    ndjson_buffer += decoder.decode(raw_chunk)
-                    while "\n" in ndjson_buffer:
-                        line, ndjson_buffer = ndjson_buffer.split("\n", 1)
-                        if not line.strip():
-                            continue
-                        try:
-                            event = json.loads(line)
-                        except json.JSONDecodeError as exc:
-                            raise RuntimeError("invalid upstream NDJSON line") from exc
-                        if not isinstance(event, dict):
-                            raise RuntimeError("invalid upstream NDJSON item")
-                        content = message_content(event.get("message"))
-                        if content:
-                            raw_content_chunks += 1
-                            raw_content_chars += len(content)
-                            raw_content_last_ms = elapsed_ms(request_started)
-                            if raw_content_chars >= 8 and raw_chars_8_ms == 0.0:
-                                raw_chars_8_ms = raw_content_last_ms
-                            if raw_content_chars >= 16 and raw_chars_16_ms == 0.0:
-                                raw_chars_16_ms = raw_content_last_ms
-                            if raw_content_chars >= 24 and raw_chars_24_ms == 0.0:
-                                raw_chars_24_ms = raw_content_last_ms
-                        # Ollama normally sends deltas, but some adapters send
-                        # cumulative snapshots.  Repeated snapshots and empty
-                        # keepalives must not keep this watchdog alive.
-                        candidate = content.strip()
-                        if candidate:
-                            if content.startswith(raw_progress_text):
-                                progressed = len(content) > len(raw_progress_text)
-                                if progressed:
-                                    raw_progress_text = content
-                            elif raw_progress_text.startswith(content):
-                                progressed = False
-                            else:
-                                raw_progress_text += content
-                                progressed = True
-                            if progressed:
-                                raw_progress_deadline = (
-                                    asyncio.get_running_loop().time()
-                                    + UPSTREAM_RAW_PROGRESS_TIMEOUT_SECONDS
-                                )
-                        if candidate and not emitted_raw_content:
-                            emitted_raw_content = True
-                            emit_latency_event(
-                                "llm", "raw_content", trace_id,
-                                duration_ms=elapsed_ms(request_started),
-                                meta={"upstream_raw": 1},
-                            )
-                        clean = boundary.feed(content)
-                        if event.get("done"):
-                            terminal = True
-                            terminal_event = event
-                            break
-                    if terminal or boundary.closed_early:
-                        break
-
-                # A terminal row may be a valid final NDJSON object without a
-                # trailing newline, so parse residual decoded text *before*
-                # deciding whether the stream was incomplete.
-                if not raw_progress_timeout and not terminal and not boundary.closed_early and ndjson_buffer.strip():
-                    try:
-                        event = json.loads(ndjson_buffer + decoder.decode(b"", final=True))
-                    except json.JSONDecodeError as exc:
-                        raise RuntimeError("unterminated upstream NDJSON") from exc
-                    if not isinstance(event, dict):
-                        raise RuntimeError("invalid upstream NDJSON item")
-                    content = message_content(event.get("message"))
-                    if content:
-                        raw_content_chunks += 1
-                        raw_content_chars += len(content)
-                        raw_content_last_ms = elapsed_ms(request_started)
-                        if raw_content_chars >= 8 and raw_chars_8_ms == 0.0:
-                            raw_chars_8_ms = raw_content_last_ms
-                        if raw_content_chars >= 16 and raw_chars_16_ms == 0.0:
-                            raw_chars_16_ms = raw_content_last_ms
-                        if raw_content_chars >= 24 and raw_chars_24_ms == 0.0:
-                            raw_chars_24_ms = raw_content_last_ms
-                    if content.strip() and not emitted_raw_content:
-                        emitted_raw_content = True
-                        emit_latency_event(
-                            "llm", "raw_content", trace_id,
-                            duration_ms=elapsed_ms(request_started),
-                            meta={"upstream_raw": 1},
-                        )
-                    clean = boundary.feed(content)
-                    terminal = bool(event.get("done"))
-                    if terminal:
-                        terminal_event = event
-                # A native terminal can carry the entire short answer in one
-                # unpunctuated delta. Finalize before deciding whether a
-                # corrective retry is needed; otherwise the valid answer is
-                # still pending when the retry gate inspects boundary.output.
-                if terminal and not raw_progress_timeout and not boundary.closed_early:
-                    boundary.finish()
-                # Do not expose a canned "I'll say that in Korean" line.
-                # Before the first public sentence, a language rejection is
-                # still reversible: repeat the same native request once with
-                # only a request-local corrective note appended.
-                language_retry = boundary.language_blocked and not emitted_substantive
-                grounding_retry = needs_grounding_retry(
-                    last_user_text, boundary.output, proactive=proactive_turn,
-                    synthetic_evaluation=synthetic_evaluation_turn,
-                )
-                empty_dialogue_retry = bool(
-                    not proactive_turn
-                    and not language_retry
-                    and not grounding_retry
-                    and emitted_raw_content
-                    and terminal
-                    and not boundary.output.strip()
-                    and not boundary.truncation_failed
-                    and not boundary.register_normalization_failed
-                )
-                if (
-                    not raw_progress_timeout
-                    and not proactive_turn
-                    and (language_retry or grounding_retry or empty_dialogue_retry)
-                ):
-                    initial_boundary = boundary
-                    initial_terminal = terminal
-                    initial_terminal_event = terminal_event
-                    initial_overlap = grounding_overlap(last_user_text, boundary.output)
-                    grounding_initial_overlap = initial_overlap
-                    grounding_required = grounding_required_overlap(last_user_text)
-                    await upstream_response.aclose()
-                    grounding_retry_used = grounding_retry
-                    empty_dialogue_retry_used = empty_dialogue_retry
-                    retry_prepared_body = (
-                        build_grounding_correction_body(
-                            prepared_openai_body, boundary.output, last_user_text,
-                        ) if grounding_retry else inject_request_local_system_note(
-                            prepared_openai_body,
-                            (
-                                "직전 응답은 한국어 문장 안에 일반 알파벳 단어가 있어 보낼 수 없었다. "
-                                "이번에는 필요한 고유명사도 한글로 풀어 쓰고, 영문자를 한 글자도 쓰지 말고 자연스러운 한국어 반말 한 문장으로 다시 답해."
-                                if language_retry else
-                                "직전 응답에는 실제로 말할 대사가 없었다. 제어 표현이나 설명을 쓰지 말고, 사용자의 현재 말에 직접 이어지는 자연스러운 한국어 반말 한 문장만 답해."
-                            ),
-                            replace=True,
-                        )
-                    )
-                    retry_body = native_chat_stream_body(
-                        retry_prepared_body,
-                        apply_sampling_defaults=not synthetic_evaluation_turn,
-                    )
-                    upstream_response = await client.send(
-                        client.build_request(
-                            "POST", f"{UPSTREAM}/api/chat",
-                            params=request.query_params, headers=request_headers,
-                            content=retry_body,
-                        ),
-                        stream=True,
-                    )
-                    retry_decoder = codecs.getincrementaldecoder("utf-8")("strict")
-                    retry_pending = ""
-                    retry_boundary = IncrementalAiriOutputBoundary(
-                        require_korean=user_prefers_korean,
-                        max_sentences=response_sentence_limit(last_user_text),
-                    )
-                    terminal = False
-                    terminal_event = None
-                    retry_iterator = upstream_response.aiter_raw().__aiter__()
-                    retry_deadline = time.monotonic() + CORRECTIVE_RETRY_TIMEOUT_SECONDS
-                    retry_timed_out = False
-                    while True:
-                        remaining_retry = retry_deadline - time.monotonic()
-                        if remaining_retry <= 0:
-                            retry_timed_out = True
-                            break
-                        try:
-                            retry_chunk = await asyncio.wait_for(
-                                retry_iterator.__anext__(), timeout=remaining_retry
-                            )
-                        except StopAsyncIteration:
-                            break
-                        except TimeoutError:
-                            retry_timed_out = True
-                            break
-                        try:
-                            retry_pending += retry_decoder.decode(retry_chunk)
-                        except UnicodeDecodeError:
-                            if not grounding_retry:
-                                raise
-                            grounding_retry_invalid = True
-                            break
-                        while "\n" in retry_pending:
-                            retry_line, retry_pending = retry_pending.split("\n", 1)
-                            if not retry_line.strip():
-                                continue
-                            try:
-                                retry_event = json.loads(retry_line)
-                            except json.JSONDecodeError:
-                                if not grounding_retry:
-                                    raise
-                                grounding_retry_invalid = True
-                                break
-                            if not isinstance(retry_event, dict):
-                                if not grounding_retry:
-                                    raise RuntimeError("invalid upstream NDJSON item")
-                                grounding_retry_invalid = True
-                                break
-                            retry_clean = retry_boundary.feed(message_content(retry_event.get("message")))
-                            if retry_event.get("done"):
-                                terminal = True
-                                terminal_event = retry_event
-                                break
-                        if (
-                            terminal
-                            or grounding_retry_invalid
-                            or (retry_boundary.closed_early and not grounding_retry)
-                        ):
-                            break
-                    if retry_timed_out or grounding_retry_invalid:
-                        await upstream_response.aclose()
-                        if not grounding_retry:
-                            if retry_timed_out:
-                                raise TimeoutError("language corrective retry timed out")
-                            raise RuntimeError("language corrective retry was invalid")
-                    if (
-                        not retry_timed_out
-                        and not grounding_retry_invalid
-                        and not terminal
-                        and not retry_boundary.closed_early
-                        and retry_pending.strip()
-                    ):
-                        try:
-                            retry_event = json.loads(retry_pending + retry_decoder.decode(b"", final=True))
-                        except (json.JSONDecodeError, UnicodeDecodeError):
-                            if not grounding_retry:
-                                raise
-                            grounding_retry_invalid = True
-                        else:
-                            if not isinstance(retry_event, dict):
-                                if not grounding_retry:
-                                    raise RuntimeError("invalid upstream NDJSON item")
-                                grounding_retry_invalid = True
-                            else:
-                                retry_clean = retry_boundary.feed(message_content(retry_event.get("message")))
-                                terminal = bool(retry_event.get("done"))
-                                terminal_event = retry_event if terminal else None
-                    grounding_retry_terminal = bool(terminal)
-                    if language_retry and retry_boundary.language_blocked and not emitted_substantive:
-                        # A meta apology is not the requested answer. Keep the
-                        # failed retry silent instead of speaking "I'll answer
-                        # in Korean" as if it were useful dialogue.
-                        retry_boundary = IncrementalAiriOutputBoundary(
-                            require_korean=user_prefers_korean,
-                            max_sentences=response_sentence_limit(last_user_text),
-                        )
-                        retry_boundary.closed_early = True
-                        terminal = initial_terminal
-                        terminal_event = initial_terminal_event
-                    if terminal and not retry_boundary.closed_early:
-                        retry_boundary.finish()
-                    if grounding_retry_used and not retry_timed_out and not grounding_retry_invalid:
-                        retry_overlap = grounding_overlap(
-                            last_user_text, retry_boundary.output
-                        )
-                        grounding_retry_overlap = retry_overlap
-                        grounding_retry_language_blocked = retry_boundary.language_blocked
-                        retry_candidate = retry_boundary.output.strip()
-                        grounding_retry_passed = bool(
-                            not retry_boundary.language_blocked
-                            and enforce_tool_truth(original_messages, retry_candidate)
-                            == retry_candidate
-                            and grounding_retry_is_factual_improvement(
-                                last_user_text, initial_boundary.output, retry_candidate,
-                            )
-                        )
-                        grounding_content_free = not grounding_retry_passed
-                        if grounding_retry_passed:
-                            boundary = retry_boundary
-                            grounding_selected = GROUNDING_SELECTED_RETRY_STRICT
-                        elif (
-                            grounding_candidate_is_safe_fallback(
-                                last_user_text, retry_candidate
-                            )
-                            and enforce_tool_truth(original_messages, retry_candidate)
-                            == retry_candidate
-                        ):
-                            boundary = retry_boundary
-                            grounding_safe_fallback_used = True
-                            grounding_safe_fallback_from_retry = True
-                            grounding_content_free = False
-                            grounding_selected = GROUNDING_SELECTED_RETRY_SAFE
-                        elif (
-                            grounding_candidate_is_safe_fallback(
-                                last_user_text, initial_boundary.output
-                            )
-                            and enforce_tool_truth(
-                                original_messages, initial_boundary.output.strip()
-                            )
-                            == initial_boundary.output.strip()
-                        ):
-                            boundary = initial_boundary
-                            terminal = initial_terminal
-                            terminal_event = initial_terminal_event
-                            grounding_safe_fallback_used = True
-                            grounding_content_free = False
-                            grounding_selected = GROUNDING_SELECTED_INITIAL_SAFE
-                        else:
-                            # The first draft already failed the production
-                            # grounding gate.  A failed correction therefore
-                            # has no safe dialogue to recover: exposing the
-                            # rejected draft would turn a detector into a
-                            # fail-open path and persist the same unsupported
-                            # claim in the journal.  Finish the transport with
-                            # no substantive content instead.  This is not a
-                            # spoken fallback and does not select dialogue by
-                            # a scenario/count rule.
-                            grounding_quality_rejected = True
-                            grounding_selected = GROUNDING_SELECTED_CONTENT_FREE
-                            boundary = IncrementalAiriOutputBoundary(
-                                require_korean=user_prefers_korean,
-                                max_sentences=response_sentence_limit(last_user_text),
-                            )
-                            boundary.closed_early = True
-                            terminal = initial_terminal
-                            terminal_event = initial_terminal_event
-                    elif grounding_retry_used and (
-                        grounding_candidate_is_safe_fallback(
-                            last_user_text, initial_boundary.output
-                        )
-                        and enforce_tool_truth(
-                            original_messages, initial_boundary.output.strip()
-                        )
-                        == initial_boundary.output.strip()
-                    ):
-                        boundary = initial_boundary
-                        terminal = initial_terminal
-                        terminal_event = initial_terminal_event
-                        grounding_retry_passed = False
-                        grounding_content_free = False
-                        grounding_safe_fallback_used = True
-                        grounding_selected = GROUNDING_SELECTED_INITIAL_SAFE
-                    elif grounding_retry_used:
-                        grounding_retry_passed = False
-                        grounding_content_free = True
-                        grounding_quality_rejected = True
-                        grounding_selected = GROUNDING_SELECTED_CONTENT_FREE
-                        boundary = IncrementalAiriOutputBoundary(
-                            require_korean=user_prefers_korean,
-                            max_sentences=response_sentence_limit(last_user_text),
-                        )
-                        boundary.closed_early = True
-                        terminal = initial_terminal
-                        terminal_event = initial_terminal_event
-                    else:
-                        boundary = retry_boundary
-                        if empty_dialogue_retry_used:
-                            empty_dialogue_retry_passed = bool(
-                                boundary.output.strip()
-                                and not boundary.language_blocked
-                                and not ambiguous_unpunctuated_grounding_echo(
-                                    last_user_text, boundary.output,
-                                )
-                            )
-                            if not empty_dialogue_retry_passed:
-                                boundary = IncrementalAiriOutputBoundary(
-                                    require_korean=user_prefers_korean,
-                                    max_sentences=response_sentence_limit(last_user_text),
-                                )
-                                boundary.closed_early = True
-                                terminal = initial_terminal
-                                terminal_event = initial_terminal_event
-                # A normal terminal is required for journaling, except where
-                # our deterministic output budget intentionally closed the
-                # upstream after a safe boundary. A dropped stream is never
-                # promoted to durable dialogue.
-                if not raw_progress_timeout and not terminal and not boundary.closed_early:
-                    raise RuntimeError("incomplete upstream NDJSON stream")
-                clean = boundary.finish() if terminal else ""
-                # Hold the complete boundary sentence until the tool/safety
-                # truth rule has accepted its public form.  The exact same
-                # canonical string is then used for wire and journal.
-                dialogue = enforce_tool_truth(original_messages, boundary.output.strip())
-                if (
-                    not dialogue
-                    and grounding_quality_rejected
-                    and grounding_retry_used
-                    and grounding_retry_terminal
-                    and not retry_timed_out
-                    and not grounding_retry_invalid
-                    and not grounding_retry_language_blocked
-                ):
-                    grounded_fallback = grounded_observation_fallback(last_user_text)
-                    if (
-                        grounded_fallback
-                        and enforce_tool_truth(original_messages, grounded_fallback)
-                        == grounded_fallback
-                    ):
-                        dialogue = grounded_fallback
-                        grounded_observation_fallback_used = True
-                        grounding_selected = GROUNDING_SELECTED_DETERMINISTIC
-                if raw_progress_timeout and not emitted_substantive:
-                    # No model text has crossed the public boundary yet, so a
-                    # single canonical interruption cannot conflict with a
-                    # spoken response or duplicate a durable journal entry.
-                    dialogue = UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
-                if not dialogue and not proactive_turn:
-                    # Every rejection path above deliberately discards the
-                    # unsafe draft, and none of them has a replacement. Total
-                    # silence is not the safe outcome: it is indistinguishable
-                    # from a dead pipeline and it also drops the user's own
-                    # turn from the journal. Emit one content-free listening
-                    # line instead. It restates nothing, so it cannot carry the
-                    # rejected claim, and it still passes the tool-truth rule.
-                    # A proactive turn is excluded because saying nothing is its
-                    # designed outcome when no approved topic exists.
-                    dialogue = enforce_tool_truth(
-                        original_messages, GROUNDING_SILENCE_FALLBACK_DIALOGUE
-                    )
-                    grounding_silence_fallback_used = True
-                if dialogue:
-                    emitted_substantive = True
-                    emit_substantive_content(trace_id, request_started)
-                    yield openai_sse_delta(completion_id, model, dialogue)
-                if proactive_turn:
-                    proactive_output_telemetry.completion(dialogue)
-                emotion = "neutral"
-                # The upstream terminal (or our safe complete-sentence output
-                # boundary) proves the answer itself is complete. Queue the
-                # pair before [DONE], because a conforming client may close
-                # the iterator immediately after that frame. Incomplete and
-                # cancelled streams never reach this point.
-                # Journaling is deliberately not conditioned on a draft having
-                # survived the quality gates: a rejected answer must still not
-                # erase the user's turn from durable memory.
-                if not proactive_turn:
-                    schedule_completed_turn(
-                        original_messages,
-                        session_id=memory_session_id,
-                        user_text=last_user_text,
-                        assistant_text=dialogue,
-                        trace_id=trace_id,
-                        action=("local_chat_watchdog" if raw_progress_timeout else "local_chat"),
-                        emotion=emotion,
-                        emotion_reason=("upstream_raw_progress_timeout" if raw_progress_timeout else "local_response"),
-                    )
-                yield openai_sse_finish(completion_id, model)
-                end_meta: dict[str, int | float] = {
-                    "immediate_ack": 1,
-                    # Carry the active policy on every local turn so a mode
-                    # comparison can be read straight out of the trace.
-                    "grounding_mode": GROUNDING_MODE_CODES.get(GROUNDING_MODE, 0),
-                    "response_bytes": response_bytes,
-                    "raw_content_chunks": raw_content_chunks,
-                    "raw_content_chars": raw_content_chars,
-                    "raw_content_last_ms": raw_content_last_ms,
-                    "raw_chars_8_ms": raw_chars_8_ms,
-                    "raw_chars_16_ms": raw_chars_16_ms,
-                    "raw_chars_24_ms": raw_chars_24_ms,
-                }
-                response_duration_ms = elapsed_ms(request_started)
-                if raw_progress_timeout:
-                    end_meta.update({
-                        "upstream_raw_progress_timeout": 1,
-                        "raw_progress_timeout_ms": raw_progress_timeout_ms,
-                    })
-                    if raw_progress_timeout_before_content:
-                        end_meta["upstream_first_raw_timeout"] = 1
-                if grounding_retry_used:
-                    if grounding_retry_language_blocked:
-                        grounding_retry_reject_mask |= GROUNDING_REJECTION_LANGUAGE_BLOCKED
-                    if grounding_retry_invalid:
-                        grounding_retry_reject_mask |= GROUNDING_REJECTION_INVALID_TRANSPORT
-                    if retry_timed_out:
-                        grounding_retry_reject_mask |= GROUNDING_REJECTION_TIMEOUT
-                    try:
-                        initial_candidate = initial_boundary.output.strip()
-                        retry_candidate = retry_boundary.output.strip()
-                        grounding_initial_reject_mask = grounding_rejection_mask(
-                            last_user_text, initial_candidate,
-                        )
-                        grounding_retry_reject_mask |= grounding_rejection_mask(
-                            last_user_text, retry_candidate,
-                        )
-                        if not retry_timed_out and not grounding_retry_invalid:
-                            if (
-                                enforce_tool_truth(original_messages, retry_candidate)
-                                != retry_candidate
-                            ):
-                                grounding_retry_reject_mask |= GROUNDING_REJECTION_TOOL_TRUTH
-                    except Exception:
-                        # Diagnostics run only after the public terminal frame;
-                        # they must never alter dialogue selection or delivery.
-                        grounding_retry_reject_mask |= GROUNDING_REJECTION_DIAGNOSTIC_ERROR
-                    end_meta.update({
-                        "grounding_retry_used": 1,
-                        "grounding_retry_passed": int(grounding_retry_passed),
-                        "grounding_content_free": int(grounding_content_free),
-                        "grounding_initial_overlap": grounding_initial_overlap,
-                        "grounding_retry_overlap": grounding_retry_overlap,
-                        "grounding_required_overlap": grounding_required,
-                        "grounding_retry_language_blocked": int(grounding_retry_language_blocked),
-                        "grounding_retry_invalid": int(grounding_retry_invalid),
-                        "grounding_quality_rejected": int(grounding_quality_rejected),
-                        "grounding_safe_fallback_used": int(
-                            grounding_safe_fallback_used
-                        ),
-                        "grounding_safe_fallback_from_retry": int(
-                            grounding_safe_fallback_from_retry
-                        ),
-                        "grounding_selected": grounding_selected,
-                        "grounding_initial_reject_mask": grounding_initial_reject_mask,
-                        "grounding_retry_reject_mask": grounding_retry_reject_mask,
-                    })
-                if empty_dialogue_retry_used:
-                    end_meta.update({
-                        "empty_dialogue_retry_used": 1,
-                        "empty_dialogue_retry_passed": int(empty_dialogue_retry_passed),
-                    })
-                if grounded_observation_fallback_used:
-                    end_meta["grounded_observation_fallback_used"] = 1
-                if grounding_silence_fallback_used:
-                    end_meta["grounding_silence_fallback_used"] = 1
-                if raw_content_chars and not dialogue:
-                    end_meta.update({
-                        "boundary_empty": 1,
-                        "boundary_language_blocked": int(boundary.language_blocked),
-                        "boundary_truncation_failed": int(boundary.truncation_failed),
-                        "boundary_register_normalization_failed": int(
-                            boundary.register_normalization_failed
-                        ),
-                    })
-                # Do not ascribe a terminal measurement to a stream we closed
-                # at our output boundary. The same applies naturally to
-                # cancellation and incomplete streams, which never reach here.
-                if terminal_event is not None and not boundary.closed_early:
-                    end_meta.update(ollama_terminal_metrics(terminal_event))
-                emit_latency_event(
-                    "llm",
-                    "end",
-                    trace_id,
-                    duration_ms=response_duration_ms,
-                    meta=end_meta,
-                )
-            except asyncio.CancelledError:
-                if upstream_response is None and send_task is not None:
-                    discard_upstream_task(send_task)
-                emit_latency_event(
-                    "llm",
-                    "error",
-                    trace_id,
-                    duration_ms=elapsed_ms(request_started),
-                    meta={"client_cancelled": 1},
-                )
-                raise
-            except Exception as exc:
-                if proactive_turn:
-                    proactive_output_telemetry.error()
-                if upstream_response is None and send_task is not None:
-                    discard_upstream_task(send_task)
-                emit_latency_event(
-                    "llm",
-                    "error",
-                    trace_id,
-                    duration_ms=elapsed_ms(request_started),
-                    meta={"immediate_ack": 1},
-                )
-                print(
-                    json.dumps(
-                        {
-                            "event": "local_chat",
-                            "status": "error",
-                            "error_type": type(exc).__name__,
-                        }
-                    ),
-                    flush=True,
-                )
-                # A read/connect timeout ends the stream cleanly instead of
-                # leaving the client waiting forever.
-                spoken = (
-                    UPSTREAM_TIMEOUT_DIALOGUE
-                    if isinstance(exc, httpx.TimeoutException)
-                    else LOCAL_ERROR_DIALOGUE
-                )
-                emit_substantive_content(trace_id, request_started)
-                yield openai_sse_delta(
-                    completion_id,
-                    model,
-                    spoken,
-                )
-                yield openai_sse_finish(completion_id, model)
-            finally:
-                if upstream_response is not None:
-                    await upstream_response.aclose()
+        # Local native streaming owns transport, safety selection, wire, and journal.
+        local_stream_context = LocalStreamRequestContext(
+            request=request, upstream_client=client, body=body,
+            request_headers=request_headers, completion_id=completion_id, model=model,
+            trace_id=trace_id, request_started=request_started,
+            original_messages=original_messages, memory_session_id=memory_session_id,
+            memory_question=memory_question, last_user_text=last_user_text,
+            user_prefers_korean=user_prefers_korean, proactive_turn=proactive_turn,
+            nonmutating_turn=nonmutating_turn,
+            synthetic_evaluation_turn=synthetic_evaluation_turn,
+            quality_probe_turn=quality_probe_turn, topic_board_runtime=topic_board_runtime,
+        )
 
         return StreamingResponse(
-            stream_local_with_ack(),
+            stream_local_with_ack(local_stream_context),
             status_code=200,
             headers=immediate_headers,
             media_type="text/event-stream",

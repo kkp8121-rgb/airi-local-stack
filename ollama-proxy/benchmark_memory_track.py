@@ -462,7 +462,16 @@ def run_embedding(args: argparse.Namespace, fixtures: dict[str, Any]) -> dict[st
     corpus, queries, results = fixtures["embedding"]["corpus"], fixtures["embedding"]["queries"], []
     for name, path in _embedding_specs(args.embedding_model):
         try:
-            load0 = time.perf_counter(); model = SentenceTransformer(path, device=None if args.embedding_device == "auto" else args.embedding_device, local_files_only=args.local_files_only)
+            constructor_kwargs: dict[str, Any] = {
+                "device": None if args.embedding_device == "auto" else args.embedding_device,
+                "local_files_only": args.local_files_only,
+            }
+            if args.embedding_dtype == "float16":
+                if args.embedding_device != "cuda":
+                    raise ValueError("float16 embedding benchmark requires --embedding-device cuda")
+                import torch
+                constructor_kwargs["model_kwargs"] = {"torch_dtype": torch.float16}
+            load0 = time.perf_counter(); model = SentenceTransformer(path, **constructor_kwargs)
             load_ms = (time.perf_counter()-load0)*1000
             actual_device = str(getattr(model, "device", getattr(model, "_target_device", "unknown")))
             corpus0 = time.perf_counter(); vectors = model.encode([x["text"] for x in corpus], batch_size=16, normalize_embeddings=True); corpus_ms = (time.perf_counter()-corpus0)*1000
@@ -472,8 +481,8 @@ def run_embedding(args: argparse.Namespace, fixtures: dict[str, Any]) -> dict[st
                 ranked = [corpus[i]["id"] for i in sorted(range(len(corpus)), key=lambda i: float(sum(a*b for a,b in zip(q, vectors[i]))), reverse=True)]
                 rank = next((i+1 for i,x in enumerate(ranked) if x in query["relevant"]), None); ranks.append(rank)
             mrr = statistics.mean(1/r for r in ranks if r) if any(ranks) else 0.0
-            results.append({"name": name, "status": "measured", "requested_device":args.embedding_device, "device":actual_device, "model_load_ms":round(load_ms,3), "corpus_batch_build_ms":round(corpus_ms,3), "query_warm_latency":latency_summary(times), "mrr": round(mrr,4), "recall_at_1": round(sum(r is not None and r<=1 for r in ranks)/len(ranks),4), "recall_at_3": round(sum(r is not None and r<=3 for r in ranks)/len(ranks),4)})
-        except Exception as exc: results.append({"name": name, "status": "error", "requested_device":args.embedding_device, "reason": type(exc).__name__})
+            results.append({"name": name, "status": "measured", "requested_device":args.embedding_device, "requested_dtype":args.embedding_dtype, "device":actual_device, "model_load_ms":round(load_ms,3), "corpus_batch_build_ms":round(corpus_ms,3), "query_warm_latency":latency_summary(times), "mrr": round(mrr,4), "recall_at_1": round(sum(r is not None and r<=1 for r in ranks)/len(ranks),4), "recall_at_3": round(sum(r is not None and r<=3 for r in ranks)/len(ranks),4)})
+        except Exception as exc: results.append({"name": name, "status": "error", "requested_device":args.embedding_device, "requested_dtype":args.embedding_dtype, "reason": type(exc).__name__})
     for r in results:
         if r["status"] == "measured": r["gate_pass"] = r["query_warm_latency"]["p50_ms"] <= 80 and r["recall_at_3"] == 1 and r["mrr"] >= 0.8
     return {"status": "measured" if any(x["status"] == "measured" for x in results) else "error", "models": results}
@@ -521,11 +530,24 @@ def inventory(args: argparse.Namespace, fixtures: dict[str, Any]) -> dict[str, A
 
 
 class _RetrievalEmbedder:
-    """Deterministic, local two-dimensional benchmark embedder."""
+    """Deterministic, normalized 1024-dimension local benchmark embedder."""
     def __init__(self) -> None: self.calls = 0
     def encode(self, texts: list[str]) -> list[list[float]]:
         self.calls += len(texts)
-        return [[1.0, float(sum(map(ord, text)) % 997) / 997.0] for text in texts]
+        # Query variants intentionally share a direction: this isolates
+        # retrieval/cache timing from embedding-model semantic drift.
+        return [_retrieval_vector(0) for _text in texts]
+
+
+def _retrieval_vector(seed: int) -> list[float]:
+    """Dense, deterministic unit vector without model/network work."""
+    # A rotated two-coordinate signal keeps fixture rows distinguishable while
+    # requiring the real 1024-float decode/matrix path for every candidate.
+    vector = [0.0] * 1024
+    index = seed % 1024
+    vector[index] = 0.8
+    vector[(index * 37 + 17) % 1024] = 0.6
+    return vector
 
 
 def _validate_retrieval_args(rows: int, runs: int) -> None:
@@ -542,14 +564,14 @@ def _seed_retrieval_fixture(store: MemoryStore, rows: int, *, session_id: str | 
             content = f"memory {index:05d} retrieval fixture"
             cur = conn.execute(
                 "INSERT INTO memory(session_id,source,kind,subtype,name,content,content_hash,vector) VALUES (?,?,?,?,?,?,?,?)",
-                (session_id, source, "entity", "person", f"memory {index:05d}", content, str(index), pack_vector([1.0, index / max(rows, 1)])),
+                (session_id, source, "entity", "person", f"memory {index:05d}", content, str(index), pack_vector(_retrieval_vector(index))),
             )
             entity_ids.append(cur.lastrowid)
         for index in range(entity_count, rows):
             content = f"memory fact {index:05d} retrieval fixture"
             cur = conn.execute(
                 "INSERT INTO memory(session_id,source,kind,subtype,content,content_hash,vector) VALUES (?,?,?,?,?,?,?)",
-                (session_id, source, "fact", "trait", content, str(index), pack_vector([1.0, index / max(rows, 1)])),
+                (session_id, source, "fact", "trait", content, str(index), pack_vector(_retrieval_vector(index))),
             )
             conn.execute("INSERT INTO fact_subject(fact_id,entity_id) VALUES (?,?)", (cur.lastrowid, entity_ids[index % len(entity_ids)]))
         store._touch(conn)
@@ -580,16 +602,21 @@ def run_retrieval(args: argparse.Namespace) -> dict[str, Any]:
     try:
         dynamic_embedder, static_embedder = _RetrievalEmbedder(), _RetrievalEmbedder()
         dynamic_store = MemoryStore(paths[0], embedder=dynamic_embedder, cache_enabled=False)
+        seed_started = time.perf_counter()
         _seed_retrieval_fixture(dynamic_store, args.retrieval_rows, session_id="bench-dynamic", source="conversation")
+        dynamic_seed_ms = (time.perf_counter() - seed_started) * 1000
         query = f"what is memory {args.retrieval_rows - 1:05d}?"
         dynamic = _retrieval_mode(dynamic_store, "bench-dynamic", query, args.retrieval_runs)
         static_store = MemoryStore(paths[1], embedder=static_embedder, cache_enabled=True)
+        seed_started = time.perf_counter()
         _seed_retrieval_fixture(static_store, args.retrieval_rows, session_id=None, source="base")
+        static_seed_ms = (time.perf_counter() - seed_started) * 1000
         static = _retrieval_mode(static_store, None, query, args.retrieval_runs)
         with dynamic_store._session() as conn: dynamic_rows = conn.execute("SELECT count(*) FROM memory").fetchone()[0]
         with static_store._session() as conn: static_rows = conn.execute("SELECT count(*) FROM memory").fetchone()[0]
         semantic_entries = len(static_store._semantic_cache)
         result = {"status":"measured", "network_used":False, "row_count":args.retrieval_rows, "runs":args.retrieval_runs,
+                  "fixture":{"dimensions":1024,"normalized":True,"seed_duration_ms":{"dynamic":round(dynamic_seed_ms,3),"static":round(static_seed_ms,3)}},
                   "modes":{"dynamic_conversation_cache_bypass":{**dynamic,"db_row_count":dynamic_rows,"embed_calls":dynamic_embedder.calls,"semantic_entries":len(dynamic_store._semantic_cache)}, "static_base_canon_semantic_warm":{**static,"db_row_count":static_rows,"embed_calls":static_embedder.calls,"semantic_entries":semantic_entries}}}
         p50s = [dynamic["warm"]["internal_duration"]["p50_ms"], static["warm"]["internal_duration"]["p50_ms"]]
         result["gate"] = {"p50_ms_lte":150, "pass": all(value is not None and value <= 150 for value in p50s)}
@@ -599,23 +626,55 @@ def run_retrieval(args: argparse.Namespace) -> dict[str, Any]:
             if os.path.exists(raw_path): os.remove(raw_path)
 
 
+def run_journal_recall(args: argparse.Namespace) -> dict[str, Any]:
+    """Measure the local FTS journal path on a 10k-message temporary DB."""
+    rows, runs = args.journal_rows, args.retrieval_runs
+    if rows < 10000 or rows % 2 or not 1 <= runs <= 100:
+        raise ValueError("--journal-rows must be an even value >=10000; --retrieval-runs must be 1..100")
+    fd, path = tempfile.mkstemp(prefix="airi-journal-recall-", suffix=".sqlite3"); os.close(fd)
+    try:
+        store = MemoryStore(path, cache_enabled=False)
+        with store._session(immediate=True) as c:
+            c.executemany(
+                "INSERT INTO conversation_message(session_id,turn_no,role,content,content_hash,recall_chars) VALUES (?,?,?,?,?,?)",
+                (("journal-bench", turn, role,
+                  (f"archive marker-{turn:05d}" if role == "user" else "acknowledged"),
+                  f"{turn}-{role}", 32)
+                 for turn in range(1, rows // 2 + 1) for role in ("user", "assistant")),
+            )
+        query = f"marker-{rows // 2:05d}"
+        timings = []
+        for _ in range(runs):
+            started = time.perf_counter(); recalled = store.journal_recall("journal-bench", query, ())
+            timings.append((time.perf_counter() - started) * 1000)
+        health = store.health()
+        return {"status": "measured", "network_used": False, "message_rows": rows, "runs": runs,
+                "journal_fts": health["journal_fts"], "warm": latency_summary(timings),
+                "recalled_messages": len(recalled),
+                "gate": {"p95_ms_lte": 150,
+                         "pass": health["journal_fts"] and bool(recalled)
+                         and (latency_summary(timings)["p95_ms"] or 0) <= 150}}
+    finally:
+        if os.path.exists(path): os.remove(path)
+
+
 def build_parser() -> argparse.ArgumentParser:
-    p=argparse.ArgumentParser(); p.add_argument("--mode", choices=["inventory","extraction","embedding","cloud","retrieval","all"], default="all"); p.add_argument("--report", type=Path)
+    p=argparse.ArgumentParser(); p.add_argument("--mode", choices=["inventory","extraction","embedding","cloud","retrieval","journal-recall","all"], default="all"); p.add_argument("--report", type=Path)
     p.add_argument("--fixtures", type=Path, default=FIXTURES); p.add_argument("--runs", type=int, default=1); p.add_argument("--model", default="exaone-airi:2.4b"); p.add_argument("--model-digest",type=model_digest,default=""); p.add_argument("--ollama-url", default=DEFAULT_OLLAMA); p.add_argument("--timeout", type=float, default=60); p.add_argument("--num-ctx", type=int, default=8192); p.add_argument("--num-gpu", type=int, default=0); p.add_argument("--seed", type=int, default=42); p.add_argument("--max-tokens", type=int, default=2048)
     p.add_argument("--fixture-id", action="append", default=[], help="Run only the named extraction fixture; repeat to select more than one.")
     p.add_argument("--fail-fast", action="store_true", help="Stop extraction after the first row that fails a gate condition.")
     p.add_argument("--stage-a-contract", choices=["legacy", "conversation-v2b"], default="conversation-v2b")
-    p.add_argument("--embedding-model", action="append", default=[]); p.add_argument("--embedding-device", choices=["auto","cpu","cuda"], default="auto"); p.add_argument("--local-files-only", action=argparse.BooleanOptionalAction, default=True)
+    p.add_argument("--embedding-model", action="append", default=[]); p.add_argument("--embedding-device", choices=["auto","cpu","cuda"], default="auto"); p.add_argument("--embedding-dtype", choices=["float32","float16"], default="float32"); p.add_argument("--local-files-only", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--allow-cloud", action="store_true"); p.add_argument("--cloud-provider", choices=["openai","anthropic"], default="anthropic"); p.add_argument("--cloud-model", default="claude-3-5-haiku-latest")
-    p.add_argument("--retrieval-rows", type=int, default=10000); p.add_argument("--retrieval-runs", type=int, default=20)
+    p.add_argument("--retrieval-rows", type=int, default=10000); p.add_argument("--retrieval-runs", type=int, default=20); p.add_argument("--journal-rows", type=int, default=10000)
     return p
 
 
 def main(argv: list[str] | None = None) -> int:
     args=build_parser().parse_args(argv); fixtures=load_fixtures(args.fixtures); modes=[args.mode] if args.mode != "all" else ["inventory","extraction","embedding","cloud"]
-    report={"config":{"mode":args.mode,"runs":args.runs,"retrieval_rows":args.retrieval_rows,"retrieval_runs":args.retrieval_runs,"model":args.model,"model_digest":args.model_digest,"timeout_seconds":args.timeout,"temperature":0,"num_ctx":args.num_ctx,"num_gpu":args.num_gpu,"seed":args.seed,"max_tokens":args.max_tokens,"think":False,"fail_fast":args.fail_fast,"stage_a_contract":args.stage_a_contract,"stage_b_contract":"decision-v2.1","comparison_contract":comparison_contract_for_stage_a(args.stage_a_contract),"embedding_batch_size":16,"normalize_embeddings":True,"embedding_device":args.embedding_device,"local_files_only":args.local_files_only,"allow_cloud":args.allow_cloud,"reproducibility":reproducibility_metadata(args.fixtures, args.stage_a_contract)}, "results":{}}
-    actions={"inventory":inventory,"extraction":run_extraction,"embedding":run_embedding,"cloud":run_cloud,"retrieval":run_retrieval}
-    for mode in modes: report["results"][mode]=actions[mode](args) if mode == "retrieval" else actions[mode](args, fixtures)
+    report={"config":{"mode":args.mode,"runs":args.runs,"retrieval_rows":args.retrieval_rows,"retrieval_runs":args.retrieval_runs,"model":args.model,"model_digest":args.model_digest,"timeout_seconds":args.timeout,"temperature":0,"num_ctx":args.num_ctx,"num_gpu":args.num_gpu,"seed":args.seed,"max_tokens":args.max_tokens,"think":False,"fail_fast":args.fail_fast,"stage_a_contract":args.stage_a_contract,"stage_b_contract":"decision-v2.1","comparison_contract":comparison_contract_for_stage_a(args.stage_a_contract),"embedding_batch_size":16,"normalize_embeddings":True,"embedding_device":args.embedding_device,"embedding_dtype":args.embedding_dtype,"local_files_only":args.local_files_only,"allow_cloud":args.allow_cloud,"reproducibility":reproducibility_metadata(args.fixtures, args.stage_a_contract)}, "results":{}}
+    actions={"inventory":inventory,"extraction":run_extraction,"embedding":run_embedding,"cloud":run_cloud,"retrieval":run_retrieval,"journal-recall":run_journal_recall}
+    for mode in modes: report["results"][mode]=actions[mode](args) if mode in {"retrieval", "journal-recall"} else actions[mode](args, fixtures)
     output=json.dumps(report, ensure_ascii=False, indent=2)
     if args.report: args.report.write_text(output+"\n", encoding="utf-8")
     print(output); return 0

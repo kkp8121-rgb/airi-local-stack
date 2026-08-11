@@ -41,7 +41,7 @@ STREAMING_MODE = int(os.environ.get("GPT_SOVITS_STREAMING_MODE", "2"))
 MIN_CHUNK_LENGTH = int(os.environ.get("GPT_SOVITS_MIN_CHUNK_LENGTH", "16"))
 # One request may hold the engine lock for at most this long, so a stuck backend
 # cannot block every other speech request behind it.
-BACKEND_TIMEOUT_SECONDS = float(os.environ.get("GPT_SOVITS_BACKEND_TIMEOUT", "60"))
+BACKEND_TIMEOUT_SECONDS = float(os.environ.get("GPT_SOVITS_BACKEND_TIMEOUT", "15"))
 # AIRI speaks one sentence chunk at a time; anything longer is a caller bug that
 # would otherwise occupy the engine lock for the whole backend timeout.
 MAX_INPUT_CHARS = int(os.environ.get("TTS_MAX_INPUT_CHARS", "300"))

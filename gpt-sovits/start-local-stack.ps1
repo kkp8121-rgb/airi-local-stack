@@ -31,9 +31,15 @@ $gptRoot = Resolve-GptSovitsRoot $projectRoot
 $python = Join-Path $gptRoot '.venv\Scripts\python.exe'
 New-Item -ItemType Directory -Force -Path (Join-Path $gptRoot 'GPT_SoVITS\pretrained_models\fast_langdetect') | Out-Null
 
-# The speech proxy resolves this itself, but pinning it here keeps the launched
-# process independent of whatever the caller inherited.
-$referenceAudio = Join-Path $projectRoot 'chatterbox\voices\airi-reference.wav'
+# A clean worktree may intentionally reuse the approved reference voice from
+# the stable checkout. Honour an explicit absolute override before falling
+# back to the voice stored beside this launcher.
+$referenceAudio = if (-not [string]::IsNullOrWhiteSpace($env:GPT_SOVITS_REFERENCE_AUDIO)) {
+  [System.IO.Path]::GetFullPath($env:GPT_SOVITS_REFERENCE_AUDIO)
+}
+else {
+  Join-Path $projectRoot 'chatterbox\voices\airi-reference.wav'
+}
 $env:GPT_SOVITS_REFERENCE_AUDIO = $referenceAudio
 if (-not (Test-Path -LiteralPath $referenceAudio)) {
   Write-Warning "AIRI reference voice not found: $referenceAudio - speech synthesis fails until this file exists"
@@ -70,6 +76,36 @@ function Wait-Port([int]$Port, [int]$TimeoutSeconds) {
   throw "Local stack timed out waiting for port $Port after $TimeoutSeconds seconds"
 }
 
+function Wait-ImmediateResponseCache {
+  param(
+    [string]$Uri = 'http://127.0.0.1:8880/health',
+    [int]$TimeoutSeconds = 240
+  )
+
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  $lastObservation = 'health endpoint has not responded'
+  do {
+    try {
+      $health = Invoke-RestMethod -Uri $Uri -Method Get -TimeoutSec 3 -ErrorAction Stop
+      $cache = $health.immediate_response_cache
+      $total = [int]$cache.total
+      $ready = [int]$cache.ready
+      $lastObservation = "ready=$ready total=$total"
+      # A zero-sized cache is not a ready cache: it can otherwise make an
+      # empty or malformed health response pass the startup gate.
+      if ($total -gt 0 -and $ready -eq $total) {
+        return $health
+      }
+    }
+    catch {
+      $lastObservation = "health request failed: $($_.Exception.Message)"
+    }
+    Start-Sleep -Seconds 1
+  } while ((Get-Date) -lt $deadline)
+
+  throw "Speech proxy acknowledgement cache did not become ready within $TimeoutSeconds seconds ($lastObservation)"
+}
+
 if (-not (Test-Port 11434)) {
   $ollama = (Get-Command ollama -ErrorAction SilentlyContinue).Source
   if (-not $ollama) { throw 'ollama.exe was not found in PATH' }
@@ -98,10 +134,10 @@ if (-not (Test-Port 8880)) {
 }
 
 Wait-Port 11434 10
-# The proxy binds immediately because the acknowledgement cache warms up in the
-# background, so this wait only covers process start.
-Wait-Port 8880 20
-Write-Output 'Speech proxy is listening on 8880; acknowledgement cache warmup continues in the background (see /health immediate_response_cache).'
+# Do this even when 8880 was already occupied.  The proxy binds before its
+# acknowledgement cache is generated, so a listening port alone is not ready.
+$speechHealth = Wait-ImmediateResponseCache -TimeoutSeconds 240
+Write-Output "Speech proxy acknowledgement cache is ready: $($speechHealth.immediate_response_cache.ready)/$($speechHealth.immediate_response_cache.total)"
 
 if ($startedBackend -and -not $SkipWarmup) {
   $previousProgressPreference = $ProgressPreference

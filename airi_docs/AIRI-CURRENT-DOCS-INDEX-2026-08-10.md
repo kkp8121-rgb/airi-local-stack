@@ -17,9 +17,12 @@ runtime observations.
   patch for the generic `context:update` occurrence. Apply it after the
   combined patch; it is intentionally separate from the input `contextUpdates`
   sanitizer already present in the combined patch.
+- `patches/AIRI-v0.11.3-upgrade-scout-runtime-20260811.md` is the manifest for
+  the Upgrade Scout client layer. Apply its `.patch` artifact third, after the
+  combined patch and the generic-context sanitizer.
 - The other tracked files under `patches/` are retained historical snapshots
   from superseded iterations. Do not apply them or mix them with the current
-  manifest; use only the combined patch plus the separate sanitizer above.
+  manifest; use only the three ordered runtime layers above.
 - `AIRI-INDEPENDENT-REVIEW-2026-08-10.md` is an external read-only review of the
   weekend delta (`1d8a720..HEAD`). It records measured gate results, 20
   CRITICAL/HIGH findings with adversarial verdicts, the 149 goals added this
@@ -37,6 +40,10 @@ runtime observations.
   the source build transition recorded in `AIRI-WORK-CHECKPOINT-2026-08-10.md`
   is already complete, which unblocks client chunk playback.
   `AIRI-UPGRADE-SCOUT-DATA-2026-08-11.md` holds its per-axis candidates.
+- `AIRI-UPGRADE-SCOUT-MEASUREMENT-2026-08-11.md` records the implemented
+  Upgrade Scout scope, isolated and full-stack measurements, regression
+  results, and the physical-device gates that remain conditional. It does not
+  promote approved test knowledge into an operational deployment contract.
 - `AIRI-WORK-CHECKPOINT-2026-08-10.md` is listed as historical above, but its
   lines 88-105 are the only record of the completed source build and the
   installed archive hash. Read that section before planning any client-side
@@ -82,12 +89,13 @@ playback completion from playback-start evidence.
 ## Latest audit evidence
 
 - `node --test test-send-airi-local-text.mjs`: 26/26 passed.
-- The canonical patch and the separate generic-context sanitizer both apply
-  cleanly in the pinned v0.11.3 verification checkout.
+- The canonical patch, generic-context sanitizer, and Upgrade Scout runtime
+  layer apply cleanly in order in the pinned v0.11.3 verification checkout.
 - The explicit pinned-checkout applicability run was re-executed after the
-  latest sender changes with `-BaseCheckout` at `dbf8124`; canonical and
-  sanitizer apply/reverse checks passed and the AIRI installation was not
-  touched.
+  latest sender changes with `-BaseCheckout` at `dbf8124`; all three runtime
+  layers apply/reverse checks passed and the AIRI installation was not touched.
+- The Upgrade Scout client source builds, Stage UI and Tamagotchi typechecks
+  pass, and the focused playback/speech/interaction suite passes 42/42.
 - The focused browser contract suite with the sanitizer applied passed 25/25
   in the dependency-equipped source checkout.
 - The latest privacy/correlation audit found no HIGH or MED issue in the
@@ -118,9 +126,10 @@ playback completion from playback-start evidence.
   before investigating or retrying.
 - `test-patch-entrypoints.ps1` is an offline regression check for the internal
   child-script guard and does not inspect or modify an AIRI installation.
-- `test-patch-manifest.ps1` is an offline regression check for the three
-  documented patch artifact sizes and SHA-256 values; it does not inspect or
-  modify an AIRI installation. The workflow separately checks committed
+- `test-patch-manifest.ps1` is an offline regression check for every tracked
+  patch artifact size, SHA-256 value, defect classification, and the exact
+  three-layer runtime support set; it does not inspect or modify an AIRI
+  installation. The workflow separately checks committed
   source whitespace over push/PR ranges with `git diff --check` (and uses a
   `git diff-tree --check` fallback for other events) while excluding
   byte-addressed patch artifacts, whose whitespace is covered by the manifest
@@ -128,8 +137,8 @@ playback completion from playback-start evidence.
 - `test-current-checkpoint.ps1` runs the manifest, entrypoint, and sender
   contract checks together as one offline checkpoint command; it also invokes
   `test-patch-applicability.ps1` in its inert/default-off mode.
-- `test-patch-applicability.ps1` can optionally validate canonical and secondary
-  patch application against an explicitly supplied local pinned-base checkout;
+- `test-patch-applicability.ps1` can optionally validate all three ordered
+  runtime patches against an explicitly supplied local pinned-base checkout;
   it never accesses the installed AIRI archive.
 - `.github/workflows/remediation-checkpoint.yml` runs that same checkpoint on
   Windows for every push, pull request, or manual dispatch; it does not install

@@ -1,0 +1,1970 @@
+diff --git a/apps/stage-tamagotchi/src/renderer/pages/index.vue b/apps/stage-tamagotchi/src/renderer/pages/index.vue
+index e788e8f0a743416d42844c646d4687f397f4252e..99156a6331e7dac073509deca203b1dce5618ece 100644
+--- a/apps/stage-tamagotchi/src/renderer/pages/index.vue
++++ b/apps/stage-tamagotchi/src/renderer/pages/index.vue
+@@ -35,8 +35,10 @@ import {
+ import { voiceTurnLatencyTrace } from '@proj-airi/stage-ui/libs/latency/voice-turn-latency'
+ import type { BroadcastSettingsChannelEvent } from '@proj-airi/stage-ui/stores/broadcast-director'
+ import { useChatOrchestratorStore } from '@proj-airi/stage-ui/stores/chat'
++import { useSpeechOutputControlStore } from '@proj-airi/stage-ui/stores/speech-output-control'
+ import { useHearingSpeechInputPipeline, useHearingStore } from '@proj-airi/stage-ui/stores/modules/hearing'
+ import { localBroadcastPlaybackProof } from '@proj-airi/stage-ui/libs/speech/local-broadcast-playback-proof'
++import { createAssistantSpeechTextEchoGuard } from '@proj-airi/stage-ui/libs/speech/text-self-echo'
+ import { useOnboardingStore } from '@proj-airi/stage-ui/stores/onboarding'
+ import { useSettings, useSettingsAudioDevice } from '@proj-airi/stage-ui/stores/settings'
+ import { useModsServerChannelStore, isExactLoopbackServerChannelUrl } from '@proj-airi/stage-ui/stores/mods/api/channel-server'
+@@ -57,6 +59,8 @@ import { useControlsIslandStore } from '../stores/controls-island'
+ import { useStageWindowLifecycleStore } from '../stores/stage-window-lifecycle'
+ import { shouldSampleStageTransparency } from '../utils/stage-three-transparency'
+ import { createVoiceInputInteractionLifecycle } from '../utils/voice-input-lifecycle'
++import { acceptVoiceTranscript } from '../utils/voice-transcript-ingestion-guard'
++import { shouldBlockVoiceTransmission } from '../utils/audio-interaction-mode'
+ import {
+   assistantSpeechCooldownDeadline,
+   DEFAULT_ASSISTANT_SPEECH_INPUT_COOLDOWN_MS,
+@@ -274,6 +278,7 @@ const { transcribeForMediaStream, stopStreamingTranscription } = hearingPipeline
+ const { error: transcriptionError, supportsStreamInput } = storeToRefs(hearingPipeline)
+ const chatSyncStore = useChatSyncStore()
+ const chatOrchestrator = useChatOrchestratorStore()
++const speechOutputControlStore = useSpeechOutputControlStore()
+ const broadcastSettings = loadBroadcastSettings()
+ let producedBroadcastRoundId: string | undefined
+ let activeBroadcastRoundId: string | undefined
+@@ -355,6 +360,9 @@ const voiceTranscriptBuffer = createTranscriptBuffer<VoiceTranscriptContext>({
+ 
+ const assistantSpeechSuppressedUntil = shallowRef(0)
+ const assistantSpeechResumeTimer = shallowRef<ReturnType<typeof setTimeout>>()
++const assistantSpeechTextEchoGuard = createAssistantSpeechTextEchoGuard()
++const audioInteractionMode = storeToRefs(settingsAudioDeviceStore).interactionMode
++let bargeInConfirmationTimer: ReturnType<typeof setTimeout> | undefined
+ let voiceInputGeneration = 0
+ 
+ /** Controls transcript cleanup while voice input stops. */
+@@ -402,7 +410,7 @@ function isVoiceInputSuppressed(now = Date.now()) {
+ function inspectVoiceInputProviderRequestGate(generation: unknown) {
+   const current = generation === voiceInputGeneration
+   const audioEnabled = enabled.value
+-  const suppressed = isVoiceInputSuppressed()
++  const suppressed = isVoiceTransmissionSuppressed()
+   let reason: string | undefined
+   if (!current)
+     reason = 'Skipped stale voice input segment'
+@@ -427,7 +435,7 @@ function inspectVoiceInputProviderRequestGate(generation: unknown) {
+  */
+ function inspectVoiceInputStreamingRequestGate() {
+   const audioEnabled = enabled.value
+-  const suppressed = isVoiceInputSuppressed()
++  const suppressed = isVoiceTransmissionSuppressed()
+ 
+   return {
+     enabled: audioEnabled,
+@@ -518,6 +526,15 @@ function postSpeakerCaption(text: string) {
+     console.warn('[Main Page] Failed to post voice input caption:', error)
+ }
+ 
++function isVoiceTransmissionSuppressed() {
++  return shouldBlockVoiceTransmission(audioInteractionMode.value, isVoiceInputSuppressed())
++}
++
++/** Records only text from a TTS fragment that has actually started playback. */
++function recordPlayedAssistantSpeech(text: string) {
++  assistantSpeechTextEchoGuard.record(text)
++}
++
+ /**
+  * Sends buffered voice input text to the active chat session.
+  */
+@@ -542,9 +559,11 @@ function handleStreamingSentenceEnd(delta: string) {
+     return
+ 
+   const roundId = globalThis.crypto.randomUUID()
+-  voiceTurnLatencyTrace.sttAccepted(roundId)
+-  postSpeakerCaption(finalText)
+-  void sendVoiceInputTextToChat(finalText, roundId)
++  acceptVoiceTranscript(finalText, text => assistantSpeechTextEchoGuard.isEcho(text), () => {
++    voiceTurnLatencyTrace.sttAccepted(roundId)
++    postSpeakerCaption(finalText)
++    void sendVoiceInputTextToChat(finalText, roundId)
++  })
+ }
+ 
+ /** Publishes the provider's final streaming-ASR text to the caption overlay. */
+@@ -552,7 +571,9 @@ function handleStreamingSpeechEnd(text: string) {
+   if (isVoiceInputSuppressed())
+     return
+ 
+-  postSpeakerCaption(text)
++  acceptVoiceTranscript(text, transcript => assistantSpeechTextEchoGuard.isEcho(transcript), () => {
++    postSpeakerCaption(text)
++  })
+ }
+ 
+ /** Reads the listening generation attached to recorder-backed transcription metadata. */
+@@ -584,7 +605,7 @@ const noteLocalVoiceCapture = (outcome: typeof localVoiceLastCapture.value.outco
+ const voiceInputSession = useVoiceInputSession(stream, {
+   shouldUseStreamInput,
+   canStartSegment: () => {
+-    const allowed = enabled.value && !isVoiceInputSuppressed()
++    const allowed = enabled.value
+     noteLocalVoiceCapture(allowed ? 'capture-started' : 'capture-skipped')
+     return allowed
+   },
+@@ -607,11 +628,31 @@ const voiceInputSession = useVoiceInputSession(stream, {
+   },
+   onTranscriptionStart: () => noteLocalVoiceCapture('transcription-started'),
+   onTranscriptionResult: ({ text, metadata }) => {
+-    noteLocalVoiceCapture('transcription-accepted')
+-    voiceTurnLatencyTrace.sttAccepted(typeof metadata?.roundId === 'string' ? metadata.roundId : undefined)
+-    postSpeakerCaption(text)
+-    toast(`Voice input transcribed: ${text}`)
+-    voiceTranscriptBuffer.push(text, getVoiceTranscriptReservation(metadata))
++    const accepted = acceptVoiceTranscript(text, transcript => assistantSpeechTextEchoGuard.isEcho(transcript), () => {
++      noteLocalVoiceCapture('transcription-accepted')
++      voiceTurnLatencyTrace.sttAccepted(typeof metadata?.roundId === 'string' ? metadata.roundId : undefined)
++      postSpeakerCaption(text)
++      toast(`Voice input transcribed: ${text}`)
++      voiceTranscriptBuffer.push(text, getVoiceTranscriptReservation(metadata))
++    })
++    if (!accepted) {
++      noteLocalVoiceCapture('capture-skipped')
++      releaseVoiceTranscriptReservation(metadata)
++    }
++  },
++  onVadSpeechStart: () => {
++    if (!nowSpeaking.value || bargeInConfirmationTimer)
++      return
++    // VAD emits one start per segment, so confirmation must observe sustained
++    // VAD state rather than wait for a second event that will never arrive.
++    bargeInConfirmationTimer = setTimeout(() => {
++      bargeInConfirmationTimer = undefined
++      if (!nowSpeaking.value || !voiceInputSession.isSpeechVAD.value)
++        return
++      const requestedAt = performance.now()
++      speechOutputControlStore.requestStopSpeaking('barge-in')
++      console.debug('[Voice Barge-in] stop completed', { elapsedMs: Math.round(performance.now() - requestedAt) })
++    }, 250)
+   },
+   onTranscriptionEmpty: ({ metadata }) => {
+     noteLocalVoiceCapture(transcriptionError.value ? 'transcription-error' : 'transcription-empty')
+@@ -654,6 +695,9 @@ async function startAudioInteractionConsumers() {
+     await transcribeForMediaStream(currentStream, {
+       onSentenceEnd: handleStreamingSentenceEnd,
+       onSpeechEnd: handleStreamingSpeechEnd,
++      // Local websocket hypotheses are visual feedback only.  They never go
++      // through chat or the transcript journal until the server marks final.
++      onPartialTranscript: text => postSpeakerCaption(text),
+     })
+ 
+     if (inspectVoiceInputStreamingRequestGate().skip) {
+@@ -734,12 +778,6 @@ watch(nowSpeaking, async (speaking) => {
+     broadcastDirector.activity()
+   if (speaking) {
+     clearAssistantSpeechResumeTimer()
+-    try {
+-      await voiceInputInteractionLifecycle.stop({ flushTranscript: false })
+-    }
+-    catch (error) {
+-      reportVoiceInputFailure('pause while assistant is speaking', error)
+-    }
+     return
+   }
+ 
+@@ -920,6 +958,7 @@ const cursorPosition = computed(() => ({
+         <WidgetStage
+           ref="widgetStageRef"
+           v-model:state="componentStateStage"
++          @assistant-speech-playback-start="recordPlayedAssistantSpeech"
+           h-full w-full
+           flex-1
+           :cursor-position="cursorPosition"
+diff --git a/apps/stage-tamagotchi/src/renderer/utils/audio-interaction-mode.test.ts b/apps/stage-tamagotchi/src/renderer/utils/audio-interaction-mode.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..9629f4fb8550808a9e9c1837cd92f01b7308c527
+--- /dev/null
++++ b/apps/stage-tamagotchi/src/renderer/utils/audio-interaction-mode.test.ts
+@@ -0,0 +1,22 @@
++import { describe, expect, it } from 'vitest'
++
++import { audioInteractionConstraints, createBargeInConfirmation, shouldBlockVoiceTransmission } from './audio-interaction-mode'
++
++describe('audio interaction modes', () => {
++  it('allows full duplex and enables AEC only for speakers', () => {
++    expect(shouldBlockVoiceTransmission('half-duplex', true)).toBe(true)
++    expect(shouldBlockVoiceTransmission('headphones-full-duplex', true)).toBe(false)
++    expect(audioInteractionConstraints('headphones-full-duplex')).toEqual({ echoCancellation: false, noiseSuppression: false, autoGainControl: false })
++    expect(audioInteractionConstraints('speakers-aec')).toEqual({ echoCancellation: true, noiseSuppression: false, autoGainControl: false })
++  })
++})
++
++describe('createBargeInConfirmation', () => {
++  it('rejects a pop and confirms sustained speech within the bounded window', () => {
++    const confirmation = createBargeInConfirmation(300)
++    expect(confirmation.observe(1000)).toBe(false)
++    expect(confirmation.observe(1250)).toBe(true)
++    expect(confirmation.observe(2000)).toBe(false)
++    expect(confirmation.observe(2350)).toBe(false)
++  })
++})
+diff --git a/apps/stage-tamagotchi/src/renderer/utils/audio-interaction-mode.ts b/apps/stage-tamagotchi/src/renderer/utils/audio-interaction-mode.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..7cad5dbb4ab1cbd46aa9558cb46ca63ceb9465ca
+--- /dev/null
++++ b/apps/stage-tamagotchi/src/renderer/utils/audio-interaction-mode.ts
+@@ -0,0 +1,27 @@
++export type AudioInteractionMode = 'half-duplex' | 'headphones-full-duplex' | 'speakers-aec'
++
++export const defaultAudioInteractionMode: AudioInteractionMode = 'half-duplex'
++
++export function audioInteractionConstraints(mode: AudioInteractionMode) {
++  return { echoCancellation: mode === 'speakers-aec', noiseSuppression: false, autoGainControl: false }
++}
++
++export function shouldBlockVoiceTransmission(mode: AudioInteractionMode, assistantPlaybackActive: boolean) {
++  return mode === 'half-duplex' && assistantPlaybackActive
++}
++
++/** Requires two VAD speech starts inside a 300ms confirmation window. */
++export function createBargeInConfirmation(windowMs = 300) {
++  let firstSpeechAt: number | undefined
++  return {
++    observe(now: number) {
++      if (firstSpeechAt === undefined || now - firstSpeechAt > windowMs) {
++        firstSpeechAt = now
++        return false
++      }
++      firstSpeechAt = undefined
++      return true
++    },
++    reset() { firstSpeechAt = undefined },
++  }
++}
+diff --git a/apps/stage-tamagotchi/src/renderer/utils/voice-transcript-ingestion-guard.test.ts b/apps/stage-tamagotchi/src/renderer/utils/voice-transcript-ingestion-guard.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..982d6723a0b2fa6a55fb1c6b70f8653d3408c909
+--- /dev/null
++++ b/apps/stage-tamagotchi/src/renderer/utils/voice-transcript-ingestion-guard.test.ts
+@@ -0,0 +1,37 @@
++import { describe, expect, it, vi } from 'vitest'
++import { createAssistantSpeechTextEchoGuard } from '@proj-airi/stage-ui/libs/speech/text-self-echo'
++
++import { acceptVoiceTranscript } from './voice-transcript-ingestion-guard'
++
++describe('acceptVoiceTranscript', () => {
++  it('keeps a blocked self-echo out of caption, chat, journal, and memory ingestion', () => {
++    const echoGuard = createAssistantSpeechTextEchoGuard()
++    echoGuard.record('오늘 날씨를 알려줘')
++    const caption = vi.fn()
++    const chat = vi.fn()
++    const journal = vi.fn()
++    const memory = vi.fn()
++
++    const accepted = acceptVoiceTranscript('오늘 날씨 알려줘요', text => echoGuard.isEcho(text), () => {
++      caption()
++      chat()
++      journal()
++      memory()
++    })
++
++    expect(accepted).toBe(false)
++    expect(caption).not.toHaveBeenCalled()
++    expect(chat).not.toHaveBeenCalled()
++    expect(journal).not.toHaveBeenCalled()
++    expect(memory).not.toHaveBeenCalled()
++  })
++
++  it('runs the user-text pipeline for a genuine transcript', () => {
++    const ingest = vi.fn()
++
++    const accepted = acceptVoiceTranscript('네, 계속해줘', () => false, ingest)
++
++    expect(accepted).toBe(true)
++    expect(ingest).toHaveBeenCalledOnce()
++  })
++})
+diff --git a/apps/stage-tamagotchi/src/renderer/utils/voice-transcript-ingestion-guard.ts b/apps/stage-tamagotchi/src/renderer/utils/voice-transcript-ingestion-guard.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..fad8607c4d2cfaee6f724041e68bf6c64e6960e6
+--- /dev/null
++++ b/apps/stage-tamagotchi/src/renderer/utils/voice-transcript-ingestion-guard.ts
+@@ -0,0 +1,16 @@
++/**
++ * Runs user-text side effects only when a transcript is not a recently played
++ * assistant utterance. Keeping this boundary around the callbacks ensures an
++ * echo cannot reach captions, chat, journal, or memory ingestion indirectly.
++ */
++export function acceptVoiceTranscript(
++  text: string,
++  isAssistantSpeechEcho: (text: string) => boolean,
++  ingest: () => void,
++) {
++  if (isAssistantSpeechEcho(text))
++    return false
++
++  ingest()
++  return true
++}
+diff --git a/packages/pipelines-audio/src/managers/playback-manager.test.ts b/packages/pipelines-audio/src/managers/playback-manager.test.ts
+index e8e8f16421e978177e4b819b6862a837ba280a75..dba1fa71d3c328e16949129518d1c53274504d4c 100644
+--- a/packages/pipelines-audio/src/managers/playback-manager.test.ts
++++ b/packages/pipelines-audio/src/managers/playback-manager.test.ts
+@@ -1,4 +1,5 @@
+ import type { PlaybackItem } from '../types'
++import { isStreamingPlaybackAudio } from '../types'
+ 
+ import { describe, expect, it, vi } from 'vitest'
+ 
+@@ -44,6 +45,39 @@ describe('createPlaybackManager', () => {
+     expect(play).toHaveBeenCalledTimes(2)
+   })
+ 
++  it('emits streamed playback start only after the item confirms audible pre-roll', async () => {
++    let confirmAudibleStart: (() => void) | undefined
++    let finish: (() => void) | undefined
++    const streamed: PlaybackItem<unknown> = {
++      ...createPlaybackItem('streamed', 1, 'intent-streamed'),
++      audio: {
++        kind: 'streaming-playback',
++        start: async (signal, onAudibleStart) => {
++          confirmAudibleStart = onAudibleStart
++          await new Promise<void>((resolve) => {
++            finish = resolve
++            signal.addEventListener('abort', resolve, { once: true })
++          })
++        },
++      },
++    }
++    const manager = createPlaybackManager({ play: async (item, signal, onAudibleStart) => {
++      if (isStreamingPlaybackAudio(item.audio))
++        await item.audio.start(signal, onAudibleStart)
++    } })
++    const starts = vi.fn()
++    const ends = vi.fn()
++    manager.onStart(starts)
++    manager.onEnd(ends)
++
++    manager.schedule(streamed)
++    expect(starts).not.toHaveBeenCalled()
++    confirmAudibleStart?.()
++    expect(starts).toHaveBeenCalledOnce()
++    finish?.()
++    await vi.waitFor(() => expect(ends).toHaveBeenCalledOnce())
++  })
++
+   it.each(['stopByIntent', 'stopAll'])(
+     'does not restart queued playback when stopping with %s',
+     (method) => {
+@@ -221,6 +255,6 @@ describe('createPlaybackManager', () => {
+     await Promise.resolve()
+ 
+     expect(play).toHaveBeenCalledTimes(3)
+-    expect(play).toHaveBeenNthCalledWith(3, expect.objectContaining({ id: 'a2' }), expect.any(AbortSignal))
++    expect(play).toHaveBeenNthCalledWith(3, expect.objectContaining({ id: 'a2' }), expect.any(AbortSignal), expect.any(Function))
+   })
+ })
+diff --git a/packages/pipelines-audio/src/managers/playback-manager.ts b/packages/pipelines-audio/src/managers/playback-manager.ts
+index 34abcc2ba8aa000cfbd00e921be89f9c1ef50da2..ad28313c6adb16207aa9554857f4005cd2ab0b77 100644
+--- a/packages/pipelines-audio/src/managers/playback-manager.ts
++++ b/packages/pipelines-audio/src/managers/playback-manager.ts
+@@ -7,6 +7,7 @@ import type {
+ } from '../types'
+ 
+ import { errorMessageFrom } from '@moeru/std'
++import { isStreamingPlaybackAudio } from '../types'
+ 
+ export type OverflowPolicy = 'queue' | 'reject' | 'steal-oldest' | 'steal-lowest-priority'
+ 
+@@ -29,6 +30,7 @@ export interface PlaybackManagerOptions<TAudio> {
+   play: (
+     item: PlaybackItem<TAudio>,
+     signal: AbortSignal,
++    onAudibleStart: () => void,
+   ) => Promise<void>
+ 
+   maxVoices?: number
+@@ -177,18 +179,24 @@ export function createPlaybackManager<TAudio>(
+ 
+     active.set(item.id, entry)
+ 
+-    emit(
+-      listeners.start,
+-      {
+-        item,
+-        startedAt: entry.startedAt,
+-      },
+-    )
++    let audibleStarted = false
++    const emitAudibleStart = () => {
++      if (audibleStarted || !active.has(item.id) || entry.controller.signal.aborted)
++        return
++      audibleStarted = true
++      emit(listeners.start, { item, startedAt: entry.startedAt })
++    }
++
++    // Existing buffer playback is scheduled synchronously by the host. A
++    // streamed item waits for its worklet pre-roll before it reports start.
++    if (!isStreamingPlaybackAudio(item.audio))
++      emitAudibleStart()
+ 
+     void options
+       .play(
+         item,
+         entry.controller.signal,
++        emitAudibleStart,
+       )
+       .then(() => {
+         finalize(entry)
+diff --git a/packages/pipelines-audio/src/types.ts b/packages/pipelines-audio/src/types.ts
+index 6ac4a0b339248746c865285aac72722c365a9d1b..028461ecdc4bbf67df4f17110e66319ba3752fe9 100644
+--- a/packages/pipelines-audio/src/types.ts
++++ b/packages/pipelines-audio/src/types.ts
+@@ -54,6 +54,21 @@ export interface TtsResult<TAudio> {
+   createdAt: number
+ }
+ 
++/** Audio that begins asynchronously and must explicitly confirm audible start. */
++export interface StreamingPlaybackAudio {
++  kind: 'streaming-playback'
++  start: (signal: AbortSignal, onAudibleStart: () => void) => Promise<void>
++}
++
++export function isStreamingPlaybackAudio(audio: unknown): audio is StreamingPlaybackAudio {
++  return typeof audio === 'object'
++    && audio !== null
++    && 'kind' in audio
++    && audio.kind === 'streaming-playback'
++    && 'start' in audio
++    && typeof audio.start === 'function'
++}
++
+ export interface PlaybackItem<TAudio> {
+   id: string
+   turnId?: string
+@@ -66,7 +81,7 @@ export interface PlaybackItem<TAudio> {
+   priority: number
+   text: string
+   special: string | null
+-  audio: TAudio
++  audio: TAudio | StreamingPlaybackAudio
+   createdAt: number
+ }
+ 
+diff --git a/packages/stage-ui/src/components/scenes/Stage.vue b/packages/stage-ui/src/components/scenes/Stage.vue
+index f7c351f0470983e285ef1cebac48c487b9487a2b..4a5c56c6f8ebe83aec225c80c0bd735acd571b44 100644
+--- a/packages/stage-ui/src/components/scenes/Stage.vue
++++ b/packages/stage-ui/src/components/scenes/Stage.vue
+@@ -10,7 +10,8 @@ import type { SpeechTransport, StageTtsSession, StreamingSessionSnapshot } from
+ import { sleep } from '@moeru/std'
+ import { createLive2DLipSync } from '@proj-airi/model-driver-lipsync'
+ import { wlipsyncProfile } from '@proj-airi/model-driver-lipsync/shared/wlipsync'
+-import { createPlaybackManager, createSpeechPipeline, normalizeActPayload } from '@proj-airi/pipelines-audio'
++import type { StreamingPlaybackAudio } from '@proj-airi/pipelines-audio'
++import { createPlaybackManager, createSpeechPipeline, isStreamingPlaybackAudio, normalizeActPayload } from '@proj-airi/pipelines-audio'
+ import { Live2DScene, useLive2dParams } from '@proj-airi/stage-ui-live2d'
+ import { SpineScene } from '@proj-airi/stage-ui-spine'
+ import { ThreeScene } from '@proj-airi/stage-ui-three'
+@@ -22,6 +23,7 @@ import { useBroadcastChannel } from '@vueuse/core'
+ // import embedWorkerURL from '@xsai-transformers/embed/worker?worker&url'
+ // import { embed } from '@xsai/embed'
+ import { generateSpeech } from '@xsai/generate-speech'
++import { requestBody, requestHeaders, requestURL } from '@xsai/shared'
+ import { storeToRefs } from 'pinia'
+ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+ 
+@@ -41,6 +43,7 @@ import { bindSpeakingStateToPlaybackManager } from '../../libs/speech/playback-s
+ import { createStageTtsSession } from '../../libs/speech/tts-session'
+ import { AIRI_CHAT_ROUND_ID_HEADER } from '../../libs/analytics-headers'
+ import { createAttemptTimeoutSignal } from '../../libs/speech/attempt-timeout'
++import { createLocalWavStreamingPlayback } from '../../libs/speech/local-wav-playback'
+ import { useAudioContext, useSpeakingStore } from '../../stores/audio'
+ import { useBackgroundStore } from '../../stores/background'
+ import { useChatOrchestratorStore } from '../../stores/chat'
+@@ -62,6 +65,9 @@ const props = withDefaults(defineProps<{
+ })
+ 
+ const componentState = defineModel<'pending' | 'loading' | 'mounted'>('state', { default: 'pending' })
++const emit = defineEmits<{
++  assistantSpeechPlaybackStart: [text: string]
++}>()
+ 
+ const { getDb } = useDuckDb()
+ // const transformersProvider = createTransformers({ embedWorkerURL })
+@@ -271,13 +277,26 @@ async function playSpecialToken(
+ const lipSyncNode = ref<AudioNode>()
+ const naturalProactivePlaybackEnds = new Map<string, string>()
+ 
+-async function playFunction(item: Parameters<Parameters<typeof createPlaybackManager<AudioBuffer>>[0]['play']>[0], signal: AbortSignal): Promise<void> {
++async function playFunction(item: Parameters<Parameters<typeof createPlaybackManager<AudioBuffer | StreamingPlaybackAudio>>[0]['play']>[0], signal: AbortSignal): Promise<void> {
+   if (item.roundId && item.roundId !== activeSpeechRoundId)
+     return
+ 
+   if (!audioContext || !item.audio)
+     return
+ 
++  if (isStreamingPlaybackAudio(item.audio)) {
++    await item.audio.start(signal, () => {
++      voiceTurnLatencyTrace.firstPlaybackStart(item.roundId)
++      emitChatPlaybackStart(item.roundId)
++      if (item.intentId.startsWith('stream-')) {
++        const model = resolveStreamingSessionModel()
++        if (model)
++          trackOfficialAutoTtsForTurn(model)
++      }
++    })
++    return
++  }
++
+   // Ensure audio context is resumed (browsers suspend it by default until user interaction)
+   if (audioContext.state === 'suspended') {
+     try {
+@@ -361,7 +380,7 @@ async function playFunction(item: Parameters<Parameters<typeof createPlaybackMan
+   })
+ }
+ 
+-const playbackManager = createPlaybackManager<AudioBuffer>({
++const playbackManager = createPlaybackManager<AudioBuffer | StreamingPlaybackAudio>({
+   play: playFunction,
+   maxVoices: 1,
+   maxVoicesPerOwner: 1,
+@@ -398,7 +417,7 @@ function trackOfficialAutoTtsForTurn(modelId: string) {
+   })
+ }
+ 
+-const speechPipeline = createSpeechPipeline<AudioBuffer>({
++const speechPipeline = createSpeechPipeline<AudioBuffer | StreamingPlaybackAudio>({
+   tts: async (request, signal) => {
+     if (signal.aborted || (request.roundId && request.roundId !== activeSpeechRoundId))
+       return null
+@@ -517,6 +536,56 @@ const speechPipeline = createSpeechPipeline<AudioBuffer>({
+       if (mayAttachRoundId && request.roundId)
+         headers.set(AIRI_CHAT_ROUND_ID_HEADER, request.roundId)
+ 
++      // Loopback TTS servers commonly return PCM WAV progressively. Defer the
++      // request until this item reaches the playback queue, then let the
++      // worklet confirm its pre-roll before the manager emits onStart.
++      if (isLoopbackEndpoint(providerRequest.baseURL) && audioContext instanceof AudioContext) {
++        const headerEntries: Record<string, string> = {}
++        headers.forEach((value, key) => {
++          headerEntries[key] = value
++        })
++        const body = requestBody({
++          ...providerRequest,
++          headers: undefined,
++          input: speechRequest.input,
++          voice: voice.id,
++          responseFormat: 'wav',
++        })
++        return createLocalWavStreamingPlayback({
++          audioContext,
++          request: {
++            url: requestURL('audio/speech', providerRequest.baseURL),
++            headers: requestHeaders({
++              'Content-Type': 'application/json',
++              ...headerEntries,
++            }, providerRequest.apiKey),
++            body,
++            fetch: providerRequest.fetch,
++          },
++          async playFallback(bytes, playbackSignal, onAudibleStart) {
++            const fallbackAudio = await audioContext.decodeAudioData(bytes)
++            if (playbackSignal.aborted)
++              return
++            const source = audioContext.createBufferSource()
++            source.buffer = fallbackAudio
++            source.connect(audioContext.destination)
++            await new Promise<void>((resolve) => {
++              const stop = () => {
++                try { source.stop(); source.disconnect() } catch {}
++                resolve()
++              }
++              playbackSignal.addEventListener('abort', stop, { once: true })
++              source.onended = () => {
++                playbackSignal.removeEventListener('abort', stop)
++                resolve()
++              }
++              source.start()
++              onAudibleStart()
++            })
++          },
++        })
++      }
++
+       // A proactive local broadcast has a global deadline, but each physical
+       // synthesis request needs to fail earlier so the pipeline's one retry
+       // can still run. This deliberately never aborts the intent signal.
+@@ -605,6 +674,8 @@ bindSpeakingStateToPlaybackManager(playbackManager, {
+     if (item.roundId && item.roundId !== activeSpeechRoundId)
+       return
+ 
++    emit('assistantSpeechPlaybackStart', item.text)
++
+     // NOTICE: postCaption and postPresent may throw errors if the BroadcastChannel is closed
+     // (e.g., when navigating away from the page). We wrap these in try-catch to prevent
+     // breaking playback when the channel is unavailable.
+diff --git a/packages/stage-ui/src/composables/audio/audio-device.ts b/packages/stage-ui/src/composables/audio/audio-device.ts
+index 9571d16c400e3e728d17f50a78ba7e3136cc35ce..db9d35f815e794efb4a9ae3f42da2f12fa7e100a 100644
+--- a/packages/stage-ui/src/composables/audio/audio-device.ts
++++ b/packages/stage-ui/src/composables/audio/audio-device.ts
+@@ -47,6 +47,7 @@ export function useAudioDevice(requestPermission: boolean = false) {
+   } = useAnalytics()
+   const { audioInputs, permissionGranted, ensurePermissions } = useDevicesList({ constraints: { audio: true }, requestPermissions: requestPermission })
+   const selectedAudioInput = ref<string>(audioInputs.value.find(device => device.deviceId === 'default')?.deviceId || '')
++  const echoCancellation = ref(false)
+   /**
+    * Keeps the selected microphone aligned with the currently available device list.
+    */
+@@ -64,12 +65,12 @@ export function useAudioDevice(requestPermission: boolean = false) {
+       ? {
+           deviceId: { exact: selectedAudioInput.value },
+           autoGainControl: false,
+-          echoCancellation: false,
++          echoCancellation: echoCancellation.value,
+           noiseSuppression: false,
+         }
+       : {
+           autoGainControl: false,
+-          echoCancellation: false,
++          echoCancellation: echoCancellation.value,
+           noiseSuppression: false,
+         },
+   }))
+@@ -139,6 +140,7 @@ export function useAudioDevice(requestPermission: boolean = false) {
+   return {
+     audioInputs,
+     selectedAudioInput,
++    setEchoCancellation: (enabled: boolean) => { echoCancellation.value = enabled },
+     stream,
+     deviceConstraints,
+     permissionGranted,
+diff --git a/packages/stage-ui/src/composables/audio/voice-input-session.test.ts b/packages/stage-ui/src/composables/audio/voice-input-session.test.ts
+index 7e6480e1fa618162e9797b6d40045f911d326c38..36ab69d150abd9a119e6a556fea1551fb1462b2d 100644
+--- a/packages/stage-ui/src/composables/audio/voice-input-session.test.ts
++++ b/packages/stage-ui/src/composables/audio/voice-input-session.test.ts
+@@ -14,6 +14,7 @@ const hearingPipelineMock = vi.hoisted(() => ({
+ 
+ const vadMock = vi.hoisted(() => ({
+   options: undefined as undefined | { onSpeechStart?: () => void, onSpeechReady?: (event: { buffer: Float32Array, sampleRate: number, duration: number, preRollSamples: number }) => void },
++  minSilenceDurationMs: { value: 450 },
+ }))
+ 
+ vi.mock('../../workers/vad/process.worklet?worker&url', () => ({
+@@ -35,6 +36,7 @@ vi.mock('../../stores/ai/models/vad', async () => {
+       isSpeechProb: vue.ref(0),
+       isSpeechHistory: vue.ref([]),
+       inferenceError: vue.ref(),
++      minSilenceDurationMs: vadMock.minSilenceDurationMs,
+       })
+     },
+   }
+@@ -76,6 +78,7 @@ describe('useVoiceInputSession', () => {
+     vi.clearAllMocks()
+     audioRecorderMock.onStopRecordCallback = undefined
+     vadMock.options = undefined
++    vadMock.minSilenceDurationMs.value = 450
+     hearingPipelineMock.transcribeForRecording.mockResolvedValue('')
+   })
+ 
+@@ -235,7 +238,7 @@ describe('useVoiceInputSession', () => {
+     expect(session.activeRecordingTrigger.value).toBeUndefined()
+   })
+ 
+-  it('lets volume fallback finalize a VAD-owned segment after silence', async () => {
++  it('waits for the dynamic VAD silence window plus 900ms before fallback finalization', async () => {
+     vi.useFakeTimers()
+     vi.setSystemTime(1000)
+ 
+@@ -303,6 +306,12 @@ describe('useVoiceInputSession', () => {
+     animationFrames.shift()?.(1011)
+     await Promise.resolve()
+ 
++    expect(stopRecord).not.toHaveBeenCalled()
++
++    vi.setSystemTime(2351)
++    animationFrames.shift()?.(2351)
++    await Promise.resolve()
++
+     expect(stopRecord).toHaveBeenCalledOnce()
+     expect(session.activeRecordingTrigger.value).toBeUndefined()
+   })
+diff --git a/packages/stage-ui/src/composables/audio/voice-input-session.ts b/packages/stage-ui/src/composables/audio/voice-input-session.ts
+index 78bee795786dca8c14349eb769d7efc41e1aeeb8..759cfc6f42a851d6d1e4c26519bc13c7901eac18 100644
+--- a/packages/stage-ui/src/composables/audio/voice-input-session.ts
++++ b/packages/stage-ui/src/composables/audio/voice-input-session.ts
+@@ -59,6 +59,7 @@ export interface VoiceInputSessionOptions {
+   vad?: VoiceInputSessionVadOptions
+   volumeFallback?: VoiceInputSessionVolumeFallbackOptions
+   canStartSegment?: (event: VoiceInputSessionEvent) => boolean | Promise<boolean>
++  onVadSpeechStart?: () => void | Promise<void>
+   inspectBeforeTranscription?: (event: VoiceInputSessionEvent) => VoiceInputSessionGate | Promise<VoiceInputSessionGate | undefined> | undefined
+   inspectAfterTranscription?: (event: VoiceInputSessionEvent) => VoiceInputSessionGate | Promise<VoiceInputSessionGate | undefined> | undefined
+   onLog?: (level: VoiceInputSessionLogLevel, event: string, message: string, details?: Record<string, unknown>) => void
+@@ -80,6 +81,10 @@ const DEFAULT_VOLUME_FALLBACK_STOP_THRESHOLD = 6
+ const DEFAULT_VOLUME_FALLBACK_START_FRAMES = 4
+ const DEFAULT_VOLUME_FALLBACK_STOP_DELAY_MS = 2700
+ const DEFAULT_VOLUME_FALLBACK_LOG_INTERVAL_MS = 2000
++// Keep the recorder fallback alive after VAD's own trailing-silence window.
++// This is the #2095 compatibility window needed when VAD speech-ready work
++// races the analyser's lower-fidelity silence detector.
++const VAD_VOLUME_FALLBACK_GRACE_MS = 900
+ 
+ function calculateTimeDomainVolumeLevel(dataArray: Uint8Array<ArrayBuffer>) {
+   let sum = 0
+@@ -143,12 +148,14 @@ export function useVoiceInputSession(
+     isSpeechProb,
+     isSpeechHistory,
+     inferenceError: vadError,
++    minSilenceDurationMs: vadMinSilenceDurationMs,
+   } = useVAD(workletUrl, {
+     threshold: options.vad?.threshold,
+     minSilenceDurationMs: options.vad?.minSilenceDurationMs,
+     speechPadMs: options.vad?.speechPadMs,
+     minSpeechDurationMs: options.vad?.minSpeechDurationMs,
+     onSpeechStart: () => {
++      void options.onVadSpeechStart?.()
+       void startVadSegment()
+     },
+     onSpeechEnd: () => {
+@@ -629,18 +636,22 @@ export function useVoiceInputSession(
+           }
+         }
+         else if (activeRecordingTrigger.value === 'volume' || activeRecordingTrigger.value === 'vad') {
++          const requiredSilenceMs = activeRecordingTrigger.value === 'vad'
++            ? (vadMinSilenceDurationMs.value ?? 0) + VAD_VOLUME_FALLBACK_GRACE_MS
++            : stopDelayMs
++
+           if (level > stopThreshold) {
+             volumeFallbackLastSpeechAt = now
+           }
+           else if (!volumeFallbackLastSpeechAt) {
+             volumeFallbackLastSpeechAt = now
+           }
+-          else if (volumeFallbackLastSpeechAt && now - volumeFallbackLastSpeechAt >= stopDelayMs) {
++          else if (volumeFallbackLastSpeechAt && now - volumeFallbackLastSpeechAt >= requiredSilenceMs) {
+             const trigger = activeRecordingTrigger.value
+             volumeFallbackLastSpeechAt = 0
+             log('info', 'volume-fallback-speech-end', 'Volume fallback detected silence; finalizing recorder segment.', {
+               level: Number(level.toFixed(1)),
+-              silenceMs: stopDelayMs,
++              silenceMs: requiredSilenceMs,
+               trigger,
+             })
+             void stopSegment(trigger)
+diff --git a/packages/stage-ui/src/composables/audio/voice-input-vad-experiment.test.ts b/packages/stage-ui/src/composables/audio/voice-input-vad-experiment.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..615a475c50c68f0af8cf5e6e4677561c201e8625
+--- /dev/null
++++ b/packages/stage-ui/src/composables/audio/voice-input-vad-experiment.test.ts
+@@ -0,0 +1,53 @@
++import { describe, expect, it } from 'vitest'
++
++import {
++  VAD_MIN_SILENCE_EXPERIMENTS,
++  canPromoteVadMinSilenceCandidate,
++  summarizeVadExperiment,
++} from './voice-input-vad-experiment'
++
++describe('VAD min-silence experiment harness', () => {
++  it('keeps 450ms as the production configuration and exposes 300ms only as a candidate', () => {
++    expect(VAD_MIN_SILENCE_EXPERIMENTS.production.minSilenceDurationMs).toBe(450)
++    expect(VAD_MIN_SILENCE_EXPERIMENTS.candidate.minSilenceDurationMs).toBe(300)
++  })
++
++  it('detects a synthetic split and false final before a resumed utterance', () => {
++    const measurement = summarizeVadExperiment(
++      'candidate',
++      'proper-noun-pause',
++      'AIRI Kizuna AI',
++      'AIRI Kizuna AI',
++      [
++        { atMs: 0, type: 'speech-start' },
++        { atMs: 300, type: 'speech-ready' },
++        { atMs: 340, type: 'speech-start' },
++        { atMs: 900, type: 'speech-ready' },
++      ],
++    )
++
++    expect(measurement.split).toBe(true)
++    expect(measurement.falseFinal).toBe(true)
++    expect(measurement.properNounPreserved).toBe(true)
++  })
++
++  it('does not promote 300ms until twenty mic measurements pass split, proper-noun, and error gates', () => {
++    const passing = summarizeVadExperiment(
++      'candidate',
++      'complete-utterance',
++      'AIRI Kizuna AI',
++      'AIRI Kizuna AI',
++      [
++        { atMs: 0, type: 'speech-start' },
++        { atMs: 900, type: 'speech-ready' },
++      ],
++    )
++
++    expect(canPromoteVadMinSilenceCandidate(Array.from({ length: 19 }, () => passing))).toBe(false)
++    expect(canPromoteVadMinSilenceCandidate(Array.from({ length: 20 }, () => passing))).toBe(true)
++    expect(canPromoteVadMinSilenceCandidate([passing, {
++      ...passing,
++      split: true,
++    }, ...Array.from({ length: 18 }, () => passing)])).toBe(false)
++  })
++})
+diff --git a/packages/stage-ui/src/composables/audio/voice-input-vad-experiment.ts b/packages/stage-ui/src/composables/audio/voice-input-vad-experiment.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..41374442de6746e90ae42115479d4e3751da1339
+--- /dev/null
++++ b/packages/stage-ui/src/composables/audio/voice-input-vad-experiment.ts
+@@ -0,0 +1,56 @@
++export const VAD_MIN_SILENCE_EXPERIMENTS = {
++  production: { id: 'production-450ms', minSilenceDurationMs: 450 },
++  candidate: { id: 'candidate-300ms', minSilenceDurationMs: 300 },
++} as const
++
++export type VadMinSilenceExperimentArm = keyof typeof VAD_MIN_SILENCE_EXPERIMENTS
++
++export interface VadSyntheticEvent {
++  atMs: number
++  type: 'speech-start' | 'speech-ready'
++}
++
++export interface VadExperimentMeasurement {
++  arm: VadMinSilenceExperimentArm
++  utteranceId: string
++  expectedTranscript: string
++  transcript: string
++  split: boolean
++  falseFinal: boolean
++  properNounPreserved: boolean
++  transcriptionError: boolean
++}
++
++/**
++ * Synthetic event harness for comparing VAD finalization behavior without
++ * opening a microphone or calling a transcription service.
++ */
++export function summarizeVadExperiment(
++  arm: VadMinSilenceExperimentArm,
++  utteranceId: string,
++  expectedTranscript: string,
++  transcript: string,
++  events: readonly VadSyntheticEvent[],
++): VadExperimentMeasurement {
++  const finalCount = events.filter(event => event.type === 'speech-ready').length
++
++  return {
++    arm,
++    utteranceId,
++    expectedTranscript,
++    transcript,
++    split: finalCount > 1,
++    falseFinal: finalCount > 1 && events.some((event, index) => event.type === 'speech-ready'
++      && events.slice(index + 1).some(next => next.type === 'speech-start')),
++    properNounPreserved: expectedTranscript === transcript,
++    transcriptionError: !transcript.trim(),
++  }
++}
++
++export function canPromoteVadMinSilenceCandidate(measurements: readonly VadExperimentMeasurement[]) {
++  return measurements.length >= 20
++    && measurements.every(measurement => !measurement.split
++      && !measurement.falseFinal
++      && measurement.properNounPreserved
++      && !measurement.transcriptionError)
++}
+diff --git a/packages/stage-ui/src/libs/speech/incremental-wav.test.ts b/packages/stage-ui/src/libs/speech/incremental-wav.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..04d81446247a6020c8288559b7161231ed3707b7
+--- /dev/null
++++ b/packages/stage-ui/src/libs/speech/incremental-wav.test.ts
+@@ -0,0 +1,33 @@
++import { describe, expect, it } from 'vitest'
++
++import type { PcmWavChunk } from './incremental-wav'
++import { IncrementalPcmWavParser, pcm16ToFloat32 } from './incremental-wav'
++
++function wav(chunks: Array<{ id: string, bytes: number[] }>) {
++  const payload = chunks.flatMap(({ id, bytes }) => [...id].map(char => char.charCodeAt(0)).concat([bytes.length, 0, 0, 0], bytes, bytes.length % 2 ? [0] : []))
++  return new Uint8Array([...('RIFFWAVE')].map(char => char.charCodeAt(0)).slice(0, 4).concat([payload.length + 4, 0, 0, 0], [...'WAVE'].map(char => char.charCodeAt(0)), payload))
++}
++const fmt = [1, 0, 2, 0, 0x44, 0xac, 0, 0, 0x10, 0xb1, 2, 0, 4, 0, 16, 0]
++
++describe('IncrementalPcmWavParser', () => {
++  it('parses headers and PCM split across arbitrary network boundaries', () => {
++    const source = wav([{ id: 'fmt ', bytes: fmt }, { id: 'JUNK', bytes: [1, 2, 3] }, { id: 'data', bytes: [0, 0, 0, 128, 255, 127, 0, 0] }])
++    const parser = new IncrementalPcmWavParser()
++    const out = source.reduce<PcmWavChunk[]>((all, _byte, index) => all.concat(parser.push(source.slice(index, index + 1))), [])
++    expect(parser.parsedFormat).toEqual({ channels: 2, sampleRate: 44100 })
++    expect(out.flatMap(chunk => [...chunk.samples])).toEqual([0, -32768, 32767, 0])
++  })
++
++  it('rejects compressed input without exposing payload as PCM', () => {
++    const parser = new IncrementalPcmWavParser()
++    const source = wav([{ id: 'fmt ', bytes: [3, 0, ...fmt.slice(2)] }, { id: 'data', bytes: [1, 2, 3, 4] }])
++    expect(parser.push(source)).toEqual([])
++    expect(parser.supported).toBe(false)
++  })
++})
++
++describe('pcm16ToFloat32', () => {
++  it('converts signed PCM16 without changing interleaved channel order', () => {
++    expect([...pcm16ToFloat32(new Int16Array([-32768, 0, 32767, -16384]))]).toEqual([-1, 0, 32767 / 32768, -0.5])
++  })
++})
+diff --git a/packages/stage-ui/src/libs/speech/incremental-wav.ts b/packages/stage-ui/src/libs/speech/incremental-wav.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..b319357fa05a61df68802ee549545de192349bdc
+--- /dev/null
++++ b/packages/stage-ui/src/libs/speech/incremental-wav.ts
+@@ -0,0 +1,133 @@
++export interface PcmWavFormat {
++  sampleRate: number
++  channels: 1 | 2
++}
++
++export interface PcmWavChunk {
++  format: PcmWavFormat
++  samples: Int16Array
++}
++
++/** Incrementally extracts PCM16 WAV data without ever exposing RIFF headers as audio samples. */
++export class IncrementalPcmWavParser {
++  private bytes = new Uint8Array()
++  private offset = 0
++  private format: PcmWavFormat | undefined
++  private containerRead = false
++  private remainingDataBytes = 0
++  private rejected = false
++
++  get supported() { return !this.rejected }
++  get parsedFormat() { return this.format }
++
++  push(chunk: Uint8Array): PcmWavChunk[] {
++    if (this.rejected)
++      return []
++    this.append(chunk)
++    const output: PcmWavChunk[] = []
++    while (true) {
++      if (!this.format && !this.readContainerAndFormat())
++        break
++      if (this.remainingDataBytes === 0 && !this.readNextChunk())
++        break
++      if (this.remainingDataBytes > 0) {
++        const available = Math.min(this.remainingDataBytes, this.bytes.length - this.offset)
++        // PCM16 samples must never be split; retain one trailing byte for the next network chunk.
++        const usable = available - (available % 2)
++        if (usable === 0)
++          break
++        const pcmBytes = this.bytes.slice(this.offset, this.offset + usable)
++        this.offset += usable
++        this.remainingDataBytes -= usable
++        output.push({ format: this.format!, samples: new Int16Array(pcmBytes.buffer) })
++        continue
++      }
++    }
++    this.compact()
++    return output
++  }
++
++  private append(chunk: Uint8Array) {
++    const remaining = this.bytes.slice(this.offset)
++    this.bytes = new Uint8Array(remaining.length + chunk.length)
++    this.bytes.set(remaining)
++    this.bytes.set(chunk, remaining.length)
++    this.offset = 0
++  }
++
++  private readContainerAndFormat() {
++    if (this.containerRead)
++      return this.readNextChunk()
++    if (this.bytes.length - this.offset < 12)
++      return false
++    const view = new DataView(this.bytes.buffer, this.bytes.byteOffset + this.offset)
++    if (this.readAscii(this.offset, 4) !== 'RIFF' || this.readAscii(this.offset + 8, 4) !== 'WAVE') {
++      this.rejected = true
++      return false
++    }
++    // RIFF's declared length only applies to the container; transport may still split it arbitrarily.
++    view.getUint32(4, true)
++    this.offset += 12
++    this.containerRead = true
++    return this.readNextChunk()
++  }
++
++  private readNextChunk() {
++    while (this.bytes.length - this.offset >= 8) {
++      const id = this.readAscii(this.offset, 4)
++      const size = new DataView(this.bytes.buffer, this.bytes.byteOffset + this.offset).getUint32(4, true)
++      const paddedSize = size + (size % 2)
++      if (id === 'data') {
++        if (!this.format) {
++          this.rejected = true
++          return false
++        }
++        this.offset += 8
++        this.remainingDataBytes = size
++        return true
++      }
++      if (this.bytes.length - this.offset < 8 + paddedSize)
++        return false
++      const dataOffset = this.offset + 8
++      if (id === 'fmt ') {
++        if (size < 16) {
++          this.rejected = true
++          return false
++        }
++        const view = new DataView(this.bytes.buffer, this.bytes.byteOffset + dataOffset, size)
++        const encoding = view.getUint16(0, true)
++        const channels = view.getUint16(2, true)
++        const sampleRate = view.getUint32(4, true)
++        const bitsPerSample = view.getUint16(14, true)
++        if (encoding !== 1 || (channels !== 1 && channels !== 2) || bitsPerSample !== 16 || sampleRate === 0) {
++          this.rejected = true
++          return false
++        }
++        this.format = { channels, sampleRate }
++        this.offset += 8 + paddedSize
++        continue
++      }
++      this.offset += 8 + paddedSize
++    }
++    return false
++  }
++
++  private readAscii(offset: number, length: number) {
++    return String.fromCharCode(...this.bytes.slice(offset, offset + length))
++  }
++
++  private compact() {
++    if (this.offset === 0)
++      return
++    this.bytes = this.bytes.slice(this.offset)
++    this.offset = 0
++  }
++}
++
++/** Converts signed interleaved PCM16 samples into Web Audio's float range. */
++export function pcm16ToFloat32(samples: Int16Array) {
++  const output = new Float32Array(samples.length)
++  for (let index = 0; index < samples.length; index += 1)
++    output[index] = Math.max(-1, samples[index] / 32768)
++  return output
++}
+diff --git a/packages/stage-ui/src/libs/speech/local-wav-playback.ts b/packages/stage-ui/src/libs/speech/local-wav-playback.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..13e3bacf34a4b805fc734c23ec3b1c9c71556e8b
+--- /dev/null
++++ b/packages/stage-ui/src/libs/speech/local-wav-playback.ts
+@@ -0,0 +1,58 @@
++import type { StreamingPlaybackAudio } from '@proj-airi/pipelines-audio'
++
++import { readLocalWavResponse } from './local-wav-response'
++import { createPcmWorkletPlayback } from './pcm-worklet'
++
++export interface LocalWavStreamingPlaybackOptions {
++  audioContext: AudioContext
++  request: Parameters<typeof readLocalWavResponse>[0]
++  /** Preserves decodeAudioData playback when the local response is not PCM WAV. */
++  playFallback: (audio: ArrayBuffer, signal: AbortSignal, onAudibleStart: () => void) => Promise<void>
++}
++
++/**
++ * Creates one queue-owned streamed playback item. It is inert until the
++ * playback manager reaches it, so network/audio work follows queue order.
++ */
++export function createLocalWavStreamingPlayback(options: LocalWavStreamingPlaybackOptions): StreamingPlaybackAudio {
++  return {
++    kind: 'streaming-playback',
++    async start(signal, onAudibleStart) {
++      let worklet: ReturnType<typeof createPcmWorkletPlayback> | undefined
++      let audible = false
++      const abort = () => worklet?.abort()
++      signal.addEventListener('abort', abort, { once: true })
++      try {
++        const result = await readLocalWavResponse(options.request, {
++          signal,
++          onPcm: async (chunk) => {
++            if (signal.aborted)
++              return
++            if (!worklet) {
++              worklet = createPcmWorkletPlayback(options.audioContext, chunk.format)
++              await worklet.ready
++            }
++            if (signal.aborted)
++              return
++            if (worklet.writePcm16(chunk.samples) && !audible) {
++              audible = true
++              onAudibleStart()
++            }
++          },
++        })
++        if (signal.aborted)
++          return
++        if (result.streamed) {
++          worklet?.end()
++          await worklet?.finished
++          return
++        }
++        if (result.fallback)
++          await options.playFallback(result.fallback, signal, onAudibleStart)
++      }
++      finally {
++        signal.removeEventListener('abort', abort)
++      }
++    },
++  }
++}
+diff --git a/packages/stage-ui/src/libs/speech/local-wav-response.test.ts b/packages/stage-ui/src/libs/speech/local-wav-response.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..913d10999014443128625c616a645ed101be984c
+--- /dev/null
++++ b/packages/stage-ui/src/libs/speech/local-wav-response.test.ts
+@@ -0,0 +1,59 @@
++import { describe, expect, it, vi } from 'vitest'
++
++import { readLocalWavResponse } from './local-wav-response'
++
++describe('readLocalWavResponse', () => {
++  it('passes abort through fetch and never emits PCM after cancellation', async () => {
++    const controller = new AbortController()
++    controller.abort()
++    const onPcm = vi.fn()
++    const fetch = vi.fn(async (_url: string | URL, init?: RequestInit) => {
++      expect(init?.signal).toBe(controller.signal)
++      return new Response(new ReadableStream({}), { status: 200 })
++    })
++    const response = await readLocalWavResponse({ url: 'http://127.0.0.1/tts', body: '', fetch }, {
++      signal: controller.signal,
++      onPcm,
++    })
++    expect(response.streamed).toBe(false)
++    expect(response.fallback).toBeUndefined()
++    expect(onPcm).not.toHaveBeenCalled()
++  })
++
++  it('returns non-WAV payload for the full-buffer decoder fallback', async () => {
++    const response = await readLocalWavResponse({
++      url: 'http://127.0.0.1/tts',
++      body: '',
++      fetch: async () => new Response(new Uint8Array([1, 2, 3])),
++    }, { signal: new AbortController().signal, onPcm: () => {} })
++    expect(response.streamed).toBe(false)
++    expect(response.fallback).toEqual(new Uint8Array([1, 2, 3]).buffer)
++  })
++
++  it('preserves the resolved speech endpoint, headers, and body', async () => {
++    const fetch = vi.fn(async () => new Response(new Uint8Array([1])))
++    await readLocalWavResponse({
++      url: 'http://127.0.0.1:5000/v1/audio/speech',
++      headers: {
++        Authorization: 'Bearer local-key',
++        'Content-Type': 'application/json',
++        'X-Airi-Chat-Round-Id': 'round-1',
++      },
++      body: '{"input":"hello","response_format":"wav"}',
++      fetch,
++    }, { signal: new AbortController().signal, onPcm: () => {} })
++
++    expect(fetch).toHaveBeenCalledWith(
++      new URL('http://127.0.0.1:5000/v1/audio/speech'),
++      expect.objectContaining({
++        body: '{"input":"hello","response_format":"wav"}',
++        headers: expect.objectContaining({
++          Authorization: 'Bearer local-key',
++          'Content-Type': 'application/json',
++          'X-Airi-Chat-Round-Id': 'round-1',
++        }),
++        method: 'POST',
++      }),
++    )
++  })
++})
+diff --git a/packages/stage-ui/src/libs/speech/local-wav-response.ts b/packages/stage-ui/src/libs/speech/local-wav-response.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..31bc0149efdbeb24d666c69f5f3eb1e4822d4fc3
+--- /dev/null
++++ b/packages/stage-ui/src/libs/speech/local-wav-response.ts
+@@ -0,0 +1,71 @@
++import { IncrementalPcmWavParser } from './incremental-wav'
++
++export interface LocalSpeechResponseRequest {
++  url: string | URL
++  headers?: HeadersInit
++  body: BodyInit
++  fetch?: (input: URL, init: RequestInit) => Promise<Response>
++}
++
++export interface ReadLocalWavOptions {
++  signal: AbortSignal
++  onPcm: (chunk: ReturnType<IncrementalPcmWavParser['push']>[number]) => void | Promise<void>
++}
++
++/**
++ * Fetches local TTS with the caller's abort signal and exposes parsed PCM as
++ * soon as the WAV data chunk arrives. Unsupported input remains available as
++ * an ArrayBuffer fallback for decodeAudioData.
++ */
++export async function readLocalWavResponse(request: LocalSpeechResponseRequest, options: ReadLocalWavOptions) {
++  const response = await (request.fetch ?? globalThis.fetch)(new URL(request.url), {
++    method: 'POST',
++    headers: request.headers,
++    body: request.body,
++    signal: options.signal,
++  })
++  if (!response.ok)
++    throw new Error(`Local speech request failed: ${response.status}`)
++
++  if (!response.body)
++    return { response, streamed: false, fallback: await response.arrayBuffer() }
++
++  const reader = response.body.getReader()
++  const parser = new IncrementalPcmWavParser()
++  const sourceChunks: Uint8Array[] = []
++  let streamed = false
++  try {
++    while (!options.signal.aborted) {
++      const { done, value } = await reader.read()
++      if (done)
++        break
++      if (!value)
++        continue
++      sourceChunks.push(value)
++      const pcmChunks = parser.push(value)
++      if (!parser.supported)
++        continue
++      for (const pcm of pcmChunks) {
++        streamed = true
++        await options.onPcm(pcm)
++      }
++    }
++  }
++  finally {
++    if (options.signal.aborted)
++      await reader.cancel().catch(() => {})
++  }
++  if (options.signal.aborted)
++    return { response, streamed: false, fallback: undefined }
++  if (streamed)
++    return { response, streamed: true, fallback: undefined }
++
++  const length = sourceChunks.reduce((total, chunk) => total + chunk.byteLength, 0)
++  const fallback = new Uint8Array(length)
++  let offset = 0
++  for (const chunk of sourceChunks) {
++    fallback.set(chunk, offset)
++    offset += chunk.byteLength
++  }
++  return { response, streamed: false, fallback: fallback.buffer }
++}
+diff --git a/packages/stage-ui/src/libs/speech/pcm-ring.test.ts b/packages/stage-ui/src/libs/speech/pcm-ring.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..42baafa9072b907a15bf73ae9cc7b85d961aad10
+--- /dev/null
++++ b/packages/stage-ui/src/libs/speech/pcm-ring.test.ts
+@@ -0,0 +1,17 @@
++import { describe, expect, it } from 'vitest'
++
++import { PcmRingBuffer } from './pcm-ring'
++
++describe('PcmRingBuffer', () => {
++  it('applies bounded backpressure and drops all queued audio on abort', () => {
++    const ring = new PcmRingBuffer(4)
++    expect(ring.write(new Float32Array([1, 2, 3]))).toBe(true)
++    expect(ring.write(new Float32Array([4, 5]))).toBe(false)
++    expect([...ring.read(2)]).toEqual([1, 2])
++    expect(ring.write(new Float32Array([4, 5]))).toBe(true)
++    ring.flush(true)
++    expect(ring.available).toBe(0)
++    expect(ring.isAborted).toBe(true)
++    expect(ring.write(new Float32Array([1]))).toBe(false)
++  })
++})
+diff --git a/packages/stage-ui/src/libs/speech/pcm-ring.ts b/packages/stage-ui/src/libs/speech/pcm-ring.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..a7a2fb1ebfec4f841bb8d1520a2a531b9ce15c6b
+--- /dev/null
++++ b/packages/stage-ui/src/libs/speech/pcm-ring.ts
+@@ -0,0 +1,36 @@
++/** Bounded PCM queue state shared by the AudioWorklet transport and its tests. */
++export class PcmRingBuffer {
++  private samples = new Float32Array(0)
++  private ended = false
++  private aborted = false
++
++  constructor(readonly capacity: number) {}
++
++  get available() { return this.samples.length }
++  get writable() { return Math.max(0, this.capacity - this.samples.length) }
++  get isEnded() { return this.ended }
++  get isAborted() { return this.aborted }
++
++  write(input: Float32Array) {
++    if (this.ended || this.aborted || input.length > this.writable)
++      return false
++    const next = new Float32Array(this.samples.length + input.length)
++    next.set(this.samples)
++    next.set(input, this.samples.length)
++    this.samples = next
++    return true
++  }
++
++  read(count: number) {
++    const output = this.samples.slice(0, count)
++    this.samples = this.samples.slice(output.length)
++    return output
++  }
++
++  end() { this.ended = true }
++  flush(aborted = false) {
++    this.samples = new Float32Array(0)
++    this.ended = true
++    this.aborted = aborted
++  }
++}
+diff --git a/packages/stage-ui/src/libs/speech/pcm-worklet.ts b/packages/stage-ui/src/libs/speech/pcm-worklet.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..db38f7dc470637a3db51f45da0e9108f98a2a25e
+--- /dev/null
++++ b/packages/stage-ui/src/libs/speech/pcm-worklet.ts
+@@ -0,0 +1,75 @@
++import { pcm16ToFloat32 } from './incremental-wav'
++
++export interface PcmWorkletOptions {
++  channels: 1 | 2
++  sampleRate: number
++  /** Audio buffered before the node is connected. @default 80 */
++  preRollMs?: number
++  /** Maximum interleaved samples accepted by the worklet. @default 176400 */
++  capacitySamples?: number
++}
++
++/** Browser-side handle for a bounded PCM AudioWorklet queue. */
++export interface PcmWorkletPlayback {
++  writePcm16: (samples: Int16Array) => boolean
++  end: () => void
++  abort: () => void
++  ready: Promise<void>
++  finished: Promise<void>
++}
++
++const processorSource = `
++class AiriPcmRingProcessor extends AudioWorkletProcessor {
++  constructor(options) { super(); this.channels = options.processorOptions.channels; this.capacity = options.processorOptions.capacity; this.queue = []; this.offset = 0; this.ended = false; this.aborted = false; this.buffered = 0; this.fadeFrames = 0;
++    this.port.onmessage = ({data}) => { if (data.type === 'write' && !this.ended && !this.aborted && this.buffered + data.samples.length <= this.capacity) { this.queue.push(new Float32Array(data.samples)); this.buffered += data.samples.length; this.port.postMessage({type:'space', writable:this.capacity-this.buffered}); } else if (data.type === 'end') this.ended = true; else if (data.type === 'abort') { this.aborted=true; this.ended=true; this.fadeFrames=Math.ceil(sampleRate * 0.012); } };
++  }
++  process(_inputs, outputs) { const output = outputs[0]; for (let frame=0; frame<output[0].length; frame++) { const gain=this.aborted ? Math.max(0, this.fadeFrames / Math.ceil(sampleRate * 0.012)) : 1; for (let channel=0; channel<this.channels; channel++) { let value=0; const sampleIndex = this.offset + channel; if (this.queue.length && sampleIndex < this.queue[0].length) value=this.queue[0][sampleIndex]; output[channel][frame]=value * gain; } if (this.aborted) { this.fadeFrames--; if (this.fadeFrames <= 0) { this.queue=[]; this.offset=0; this.buffered=0; } } else if (this.queue.length) { this.offset += this.channels; this.buffered -= this.channels; if (this.offset >= this.queue[0].length) { this.queue.shift(); this.offset=0; } } } this.port.postMessage({type:'space', writable:this.capacity-this.buffered}); if (this.ended && this.buffered <= 0) { this.port.postMessage({type:'finished'}); return false; } return true; }
++}
++registerProcessor('airi-pcm-ring', AiriPcmRingProcessor)`
++
++/**
++ * Creates an AudioWorklet that accepts interleaved PCM16 chunks. Calls to
++ * `abort()` flush the queue synchronously so cancelled intents cannot play a
++ * later buffered frame.
++ */
++export function createPcmWorkletPlayback(audioContext: AudioContext, options: PcmWorkletOptions): PcmWorkletPlayback {
++  const preRollSamples = Math.ceil((options.preRollMs ?? 80) * options.sampleRate * options.channels / 1000)
++  const capacitySamples = options.capacitySamples ?? 176_400
++  let node: AudioWorkletNode | undefined
++  let buffered = 0
++  let ended = false
++  let aborted = false
++  let resolveFinished!: () => void
++  const finished = new Promise<void>((resolve) => { resolveFinished = resolve })
++  const blobUrl = URL.createObjectURL(new Blob([processorSource], { type: 'application/javascript' }))
++  const ready = audioContext.audioWorklet.addModule(blobUrl).then(() => {
++    URL.revokeObjectURL(blobUrl)
++    if (aborted)
++      return
++    node = new AudioWorkletNode(audioContext, 'airi-pcm-ring', { outputChannelCount: [options.channels], processorOptions: { channels: options.channels, capacity: capacitySamples } })
++    node.port.onmessage = ({ data }: MessageEvent<{ type: string, writable?: number }>) => {
++      if (data.type === 'space' && typeof data.writable === 'number')
++        buffered = capacitySamples - data.writable
++      else if (data.type === 'finished')
++        resolveFinished()
++    }
++    node.connect(audioContext.destination)
++  }).catch((error) => {
++    URL.revokeObjectURL(blobUrl)
++    throw error
++  })
++  return {
++    ready,
++    writePcm16(samples) {
++      if (!node || ended || aborted || samples.length > capacitySamples - buffered)
++        return false
++      const floats = pcm16ToFloat32(samples)
++      buffered += floats.length
++      node.port.postMessage({ type: 'write', samples: floats }, [floats.buffer])
++      return buffered >= preRollSamples
++    },
++    end() { ended = true; node?.port.postMessage({ type: 'end' }) },
++    abort() { aborted = true; ended = true; buffered = 0; node?.port.postMessage({ type: 'abort' }); setTimeout(() => { node?.disconnect(); resolveFinished() }, 15) },
++    finished,
++  }
++}
+diff --git a/packages/stage-ui/src/libs/speech/text-self-echo.test.ts b/packages/stage-ui/src/libs/speech/text-self-echo.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..b4eb03b3478f19e45b636279044a425a633167b5
+--- /dev/null
++++ b/packages/stage-ui/src/libs/speech/text-self-echo.test.ts
+@@ -0,0 +1,35 @@
++import { describe, expect, it } from 'vitest'
++
++import { createAssistantSpeechTextEchoGuard, isLikelySpeechTextEcho, normalizeSpeechText } from './text-self-echo'
++
++describe('speech text self-echo comparison', () => {
++  it('matches exact, whitespace/punctuation, and NFKC variants', () => {
++    expect(isLikelySpeechTextEcho('안녕하세요 여러분', '안녕하세요 여러분')).toBe(true)
++    expect(isLikelySpeechTextEcho('안녕하세요, 여러분!', '안녕하세요 여러분')).toBe(true)
++    expect(normalizeSpeechText('ＡＢＣ １２３')).toBe('abc123')
++    expect(isLikelySpeechTextEcho('ABC 123', 'ＡＢＣ１２３')).toBe(true)
++  })
++
++  it('matches a benign Korean particle or polite-ending variation', () => {
++    expect(isLikelySpeechTextEcho('오늘 날씨 알려줘요', '오늘 날씨를 알려줘')).toBe(true)
++  })
++
++  it('does not suppress acknowledgements or partial overlap', () => {
++    expect(isLikelySpeechTextEcho('네', '네, 지금 도와드릴게요')).toBe(false)
++    expect(isLikelySpeechTextEcho('날씨 알려줘', '오늘 날씨를 알려줘. 서울의 현재 날씨를 확인할게요.')).toBe(false)
++  })
++})
++
++describe('createAssistantSpeechTextEchoGuard', () => {
++  it('expires entries and bounds the retained text ring', () => {
++    const guard = createAssistantSpeechTextEchoGuard({ capacity: 1, ttlMs: 100 })
++    guard.record('첫 번째 응답입니다', 1_000)
++    expect(guard.isEcho('첫 번째 응답입니다', 1_050)).toBe(true)
++    expect(guard.isEcho('첫 번째 응답입니다', 1_100)).toBe(false)
++
++    guard.record('바다와 파도가 아름답습니다', 2_000)
++    guard.record('컴퓨터 화면을 정리할게요', 2_001)
++    expect(guard.isEcho('바다와 파도가 아름답습니다', 2_010)).toBe(false)
++    expect(guard.isEcho('컴퓨터 화면을 정리할게요', 2_010)).toBe(true)
++  })
++})
+diff --git a/packages/stage-ui/src/libs/speech/text-self-echo.ts b/packages/stage-ui/src/libs/speech/text-self-echo.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..65af8764729fa042ee9068fb7c42c6c173a50446
+--- /dev/null
++++ b/packages/stage-ui/src/libs/speech/text-self-echo.ts
+@@ -0,0 +1,115 @@
++export interface AssistantSpeechTextEchoGuardOptions {
++  /** Maximum number of played TTS fragments retained. @default 16 */
++  capacity?: number
++  /** How long a played fragment may suppress a matching transcript, in milliseconds. @default 6000 */
++  ttlMs?: number
++}
++
++interface PlayedText {
++  text: string
++  playedAt: number
++}
++
++const minimumComparableLength = 6
++const defaultCapacity = 16
++const defaultTtlMs = 6_000
++
++/**
++ * Normalizes speech text before comparison.
++ *
++ * Before:
++ * - "오늘 날씨를 알려줘!"
++ *
++ * After:
++ * - "오늘날씨를알려줘"
++ */
++export function normalizeSpeechText(text: string) {
++  return text
++    .normalize('NFKC')
++    .toLocaleLowerCase()
++    .replace(/[\s\p{P}\p{S}]+/gu, '')
++}
++
++function createCharacterNgrams(text: string) {
++  const ngrams = new Map<string, number>()
++  for (let index = 0; index < text.length - 1; index += 1) {
++    const ngram = text.slice(index, index + 2)
++    ngrams.set(ngram, (ngrams.get(ngram) ?? 0) + 1)
++  }
++  return ngrams
++}
++
++function ngramSimilarity(left: string, right: string) {
++  const leftNgrams = createCharacterNgrams(left)
++  const rightNgrams = createCharacterNgrams(right)
++  let shared = 0
++  for (const [ngram, count] of leftNgrams)
++    shared += Math.min(count, rightNgrams.get(ngram) ?? 0)
++
++  return (2 * shared) / Math.max(1, left.length + right.length - 2)
++}
++
++function characterSubsequenceSimilarity(left: string, right: string) {
++  const previous = new Uint16Array(right.length + 1)
++  const current = new Uint16Array(right.length + 1)
++  for (const leftCharacter of left) {
++    for (let index = 1; index <= right.length; index += 1)
++      current[index] = leftCharacter === right[index - 1] ? previous[index - 1] + 1 : Math.max(previous[index], current[index - 1])
++    previous.set(current)
++  }
++  return previous[right.length] / Math.max(left.length, right.length)
++}
++
++/**
++ * Returns whether two speech strings are likely the same utterance after
++ * ASR-friendly normalization. It intentionally ignores very short phrases so
++ * ordinary acknowledgements such as "네" are never treated as an echo.
++ */
++export function isLikelySpeechTextEcho(transcript: string, playedText: string) {
++  const normalizedTranscript = normalizeSpeechText(transcript)
++  const normalizedPlayedText = normalizeSpeechText(playedText)
++  if (normalizedTranscript.length < minimumComparableLength || normalizedPlayedText.length < minimumComparableLength)
++    return false
++  if (normalizedTranscript === normalizedPlayedText)
++    return true
++
++  // Korean particles and polite endings often add one or two syllables in ASR.
++  // Keep the lengths close as well, so a user quoting only part of a longer TTS
++  // line cannot be suppressed by incidental n-gram overlap.
++  const lengthRatio = normalizedTranscript.length / normalizedPlayedText.length
++  return lengthRatio >= 0.72
++    && lengthRatio <= 1.3
++    && (ngramSimilarity(normalizedTranscript, normalizedPlayedText) >= 0.75
++      || characterSubsequenceSimilarity(normalizedTranscript, normalizedPlayedText) >= 0.85)
++}
++
++/**
++ * Keeps only recent, actually-played TTS text for microphone echo rejection.
++ * Audio is never retained; entries expire automatically and the ring is bounded.
++ */
++export function createAssistantSpeechTextEchoGuard(options: AssistantSpeechTextEchoGuardOptions = {}) {
++  const capacity = options.capacity ?? defaultCapacity
++  const ttlMs = options.ttlMs ?? defaultTtlMs
++  const playedTexts: PlayedText[] = []
++
++  const discardExpired = (now: number) => {
++    while (playedTexts.length > 0 && now - playedTexts[0].playedAt >= ttlMs)
++      playedTexts.shift()
++  }
++
++  return {
++    record(text: string, playedAt = Date.now()) {
++      const normalized = normalizeSpeechText(text)
++      if (normalized.length < minimumComparableLength)
++        return
++      discardExpired(playedAt)
++      playedTexts.push({ text, playedAt })
++      while (playedTexts.length > capacity)
++        playedTexts.shift()
++    },
++    isEcho(transcript: string, now = Date.now()) {
++      discardExpired(now)
++      return playedTexts.some(entry => isLikelySpeechTextEcho(transcript, entry.text))
++    },
++  }
++}
+diff --git a/packages/stage-ui/src/services/speech/pipeline-runtime.ts b/packages/stage-ui/src/services/speech/pipeline-runtime.ts
+index e2d258bede94fdf031b50518b38b6bb4b8d018e7..c9072beb17e41a9bf5f52b786bb880808778fa3a 100644
+--- a/packages/stage-ui/src/services/speech/pipeline-runtime.ts
++++ b/packages/stage-ui/src/services/speech/pipeline-runtime.ts
+@@ -1,4 +1,4 @@
+-import type { createSpeechPipeline, IntentHandle, IntentOptions, TextToken } from '@proj-airi/pipelines-audio'
++import type { createSpeechPipeline, IntentHandle, IntentOptions, StreamingPlaybackAudio, TextToken } from '@proj-airi/pipelines-audio'
+ 
+ import type { SpeechIntentStartPayload, SpeechIntentTokenPayload } from './bus'
+ 
+@@ -22,7 +22,7 @@ function createId(prefix: string) {
+ 
+ export interface SpeechPipelineRuntime {
+   openIntent: (options?: IntentOptions) => IntentHandle
+-  registerHost: (pipeline: ReturnType<typeof createSpeechPipeline<AudioBuffer>>) => Promise<void>
++  registerHost: (pipeline: ReturnType<typeof createSpeechPipeline<AudioBuffer | StreamingPlaybackAudio>>) => Promise<void>
+   isHost: () => boolean
+   dispose: () => Promise<void>
+ }
+@@ -31,7 +31,7 @@ export function createSpeechPipelineRuntime(): SpeechPipelineRuntime {
+   const mutex = new Mutex()
+   const originId = `speech-${nanoid()}`
+ 
+-  let hostPipeline: ReturnType<typeof createSpeechPipeline<AudioBuffer>> | null = null
++  let hostPipeline: ReturnType<typeof createSpeechPipeline<AudioBuffer | StreamingPlaybackAudio>> | null = null
+   let hostReady = false
+   let bound = false
+ 
+@@ -242,7 +242,7 @@ export function createSpeechPipelineRuntime(): SpeechPipelineRuntime {
+     return handle
+   }
+ 
+-  async function registerHost(pipeline: ReturnType<typeof createSpeechPipeline<AudioBuffer>>) {
++  async function registerHost(pipeline: ReturnType<typeof createSpeechPipeline<AudioBuffer | StreamingPlaybackAudio>>) {
+     await mutex.acquire()
+     try {
+       if (hostPipeline)
+diff --git a/packages/stage-ui/src/stores/modules/hearing.ts b/packages/stage-ui/src/stores/modules/hearing.ts
+index 6f92418f33d6a557ecac03c0a4a16ced0d3ce989..ce3546a240f1113fc791292f316b544e2b405d10 100644
+--- a/packages/stage-ui/src/stores/modules/hearing.ts
++++ b/packages/stage-ui/src/stores/modules/hearing.ts
+@@ -19,6 +19,7 @@ import { AIRI_CHAT_ROUND_ID_HEADER } from '../../libs/analytics-headers'
+ import { OFFICIAL_TRANSCRIPTION_PROVIDER_ID } from '../../libs/providers'
+ import { useProvidersStore } from '../providers'
+ import { streamAliyunTranscription } from '../providers/aliyun/stream-transcription'
++import { streamLocalSttTranscription } from '../providers/local-stt/stream-transcription'
+ import { streamWebSpeechAPITranscription } from '../providers/web-speech-api'
+ 
+ function errorMessage(err: unknown): string {
+@@ -275,6 +276,7 @@ export function resolveRecordingFileName(mimeType?: string) {
+ const STREAM_TRANSCRIPTION_EXECUTORS: Record<string, StreamTranscription> = {
+   'aliyun-nls-transcription': streamAliyunTranscription,
+   [OFFICIAL_TRANSCRIPTION_PROVIDER_ID]: streamAliyunTranscription,
++  'app-local-audio-transcription': streamLocalSttTranscription,
+   // Web Speech API is handled specially in transcribeForMediaStream since it works directly with MediaStream
+ }
+ 
+@@ -842,6 +844,7 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
+     idleTimeoutMs?: number
+     onSentenceEnd?: (delta: string) => void
+     onSpeechEnd?: (text: string) => void
++    onPartialTranscript?: (text: string) => void
+   }) {
+     console.info('[Hearing Pipeline] transcribeForMediaStream called', {
+       supportsStreamInput: supportsStreamInput.value,
+@@ -1110,6 +1113,26 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
+         },
+       }
+ 
++      // AIRI local streaming sends hypotheses separately so they remain
++      // caption-only.  Only its final event enters the existing sentence/chat
++      // path below, preserving the transmission and echo gates in the stage.
++      const partialStream = (result as typeof result & { partialStream?: ReadableStream<string> }).partialStream
++      if (providerId === 'app-local-audio-transcription' && partialStream && options?.onPartialTranscript) {
++        void (async () => {
++          try {
++            const reader = partialStream.getReader()
++            while (true) {
++              const { done, value } = await reader.read()
++              if (done) break
++              if (value) options.onPartialTranscript?.(value)
++            }
++          }
++          catch (err) {
++            if (!isExpectedStreamStopError(err)) console.error('Error reading local STT partial captions:', err)
++          }
++        })()
++      }
++
+       // Stream out text deltas to caller without tearing down the session.
+       if (result.mode === 'stream' && result.textStream) {
+         void (async () => {
+diff --git a/packages/stage-ui/src/stores/providers.ts b/packages/stage-ui/src/stores/providers.ts
+index 2704efcd16cb5c18e2e549ba176e2b2dec7173d2..b5cc20996ee4fc373d353a8d1b4186add3a0880e 100644
+--- a/packages/stage-ui/src/stores/providers.ts
++++ b/packages/stage-ui/src/stores/providers.ts
+@@ -422,6 +422,13 @@ export const useProvidersStore = defineStore('providers', () => {
+       tasks: ['speech-to-text', 'automatic-speech-recognition', 'asr', 'stt'],
+       isAvailableBy: isStageTamagotchi,
+       creator: createOpenAI,
++      // The normal OpenAI-compatible request remains available for recorded
++      // files; realtime microphone input uses AIRI's loopback websocket executor.
++      transcriptionFeatures: {
++        supportsGenerate: true,
++        supportsStreamOutput: true,
++        supportsStreamInput: true,
++      },
+       validation: [],
+       validators: {
+         chatPingCheckAvailable: false,
+diff --git a/packages/stage-ui/src/stores/providers/local-stt/stream-transcription.test.ts b/packages/stage-ui/src/stores/providers/local-stt/stream-transcription.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..a8065355d254045171ace0cf83f048a70b6ff919
+--- /dev/null
++++ b/packages/stage-ui/src/stores/providers/local-stt/stream-transcription.test.ts
+@@ -0,0 +1,92 @@
++import { afterEach, describe, expect, it, vi } from 'vitest'
++
++import { streamLocalSttTranscription } from './stream-transcription'
++
++class FakeSocket {
++  static CONNECTING = 0
++  static OPEN = 1
++  static CLOSED = 3
++  static instances: FakeSocket[] = []
++
++  bufferedAmount = 0
++  readyState = FakeSocket.CONNECTING
++  sent: string[] = []
++  onclose: ((event: CloseEvent) => unknown) | null = null
++  onerror: ((event: Event) => unknown) | null = null
++  onmessage: ((event: MessageEvent) => unknown) | null = null
++  onopen: ((event: Event) => unknown) | null = null
++
++  constructor(_url: string) {
++    FakeSocket.instances.push(this)
++  }
++
++  close() {
++    if (this.readyState === FakeSocket.CLOSED) return
++    this.readyState = FakeSocket.CLOSED
++    this.onclose?.({} as CloseEvent)
++  }
++
++  open() {
++    this.readyState = FakeSocket.OPEN
++    void this.onopen?.({} as Event)
++  }
++
++  send(payload: string) {
++    this.sent.push(payload)
++  }
++}
++
++function pendingAudioStream(onCancel: () => void) {
++  return new ReadableStream<ArrayBuffer>({ cancel: onCancel })
++}
++
++async function flushAsyncWork() {
++  await Promise.resolve()
++  await Promise.resolve()
++}
++
++describe('streamLocalSttTranscription', () => {
++  afterEach(() => {
++    FakeSocket.instances = []
++    vi.unstubAllGlobals()
++  })
++
++  it('cancels and releases a blocked microphone reader when aborted', async () => {
++    vi.stubGlobal('WebSocket', FakeSocket)
++    const abortController = new AbortController()
++    const cancelled = vi.fn()
++    const result = streamLocalSttTranscription({
++      abortSignal: abortController.signal,
++      baseURL: 'http://127.0.0.1:2026/v1/',
++      inputAudioStream: pendingAudioStream(cancelled),
++    })
++    void result.text.catch(() => {})
++
++    FakeSocket.instances[0].open()
++    await flushAsyncWork()
++    abortController.abort()
++    await flushAsyncWork()
++
++    expect(cancelled).toHaveBeenCalledTimes(1)
++    expect(FakeSocket.instances[0].readyState).toBe(FakeSocket.CLOSED)
++  })
++
++  it('cancels the reader and closes the transport after a server error', async () => {
++    vi.stubGlobal('WebSocket', FakeSocket)
++    const cancelled = vi.fn()
++    const result = streamLocalSttTranscription({
++      baseURL: 'http://127.0.0.1:2026/v1/',
++      inputAudioStream: pendingAudioStream(cancelled),
++    })
++    void result.text.catch(() => {})
++
++    const socket = FakeSocket.instances[0]
++    socket.open()
++    await flushAsyncWork()
++    socket.onmessage?.({ data: JSON.stringify({ type: 'error', message: 'decoder failed' }) } as MessageEvent)
++    await flushAsyncWork()
++
++    expect(cancelled).toHaveBeenCalledTimes(1)
++    expect(socket.readyState).toBe(FakeSocket.CLOSED)
++  })
++})
+diff --git a/packages/stage-ui/src/stores/providers/local-stt/stream-transcription.ts b/packages/stage-ui/src/stores/providers/local-stt/stream-transcription.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..8c94a5abf4d6ff3987fa0d55ecfc5c05fb65e219
+--- /dev/null
++++ b/packages/stage-ui/src/stores/providers/local-stt/stream-transcription.ts
+@@ -0,0 +1,144 @@
++import type { CommonRequestOptions } from '@xsai/shared'
++import type { StreamTranscriptionDelta, StreamTranscriptionResult } from '@xsai/stream-transcription'
++
++type AudioChunk = ArrayBuffer | ArrayBufferView
++
++export interface LocalSttStreamOptions {
++  baseURL?: CommonRequestOptions['baseURL']
++  inputAudioStream?: ReadableStream<AudioChunk>
++  abortSignal?: AbortSignal
++  language?: string
++}
++
++export interface LocalSttStreamResult extends StreamTranscriptionResult {
++  /** Interim captions are intentionally separate from final text/chat deltas. */
++  partialStream: ReadableStream<string>
++}
++
++function deferred<T>() {
++  let resolve!: (value: T) => void
++  let reject!: (reason?: unknown) => void
++  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
++  return { promise, reject, resolve }
++}
++
++function websocketUrl(baseURL?: CommonRequestOptions['baseURL']) {
++  const url = new URL(baseURL instanceof URL ? baseURL : (typeof baseURL === 'string' ? baseURL : 'http://127.0.0.1:2026/v1/'))
++  if (!['localhost', '127.0.0.1', '[::1]', '::1'].includes(url.hostname.toLowerCase()))
++    throw new TypeError('Local streaming transcription requires a loopback base URL.')
++  if (url.protocol === 'https:') url.protocol = 'wss:'
++  else url.protocol = 'ws:'
++  url.pathname = `${url.pathname.replace(/\/$/, '')}/audio/transcriptions/stream`.replace(/\/v1\/v1\//, '/v1/')
++  return url.toString()
++}
++
++function base64(chunk: AudioChunk) {
++  const bytes = chunk instanceof ArrayBuffer
++    ? new Uint8Array(chunk)
++    : new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength)
++  let binary = ''
++  for (const byte of bytes) binary += String.fromCharCode(byte)
++  return btoa(binary)
++}
++
++/** Loopback-only AIRI STT websocket executor. PCM16 is supplied by hearing.ts. */
++export function streamLocalSttTranscription(options: LocalSttStreamOptions): LocalSttStreamResult {
++  if (!options.inputAudioStream) throw new TypeError('Audio stream is required for local streaming transcription.')
++  const result = deferred<string>()
++  let textController!: ReadableStreamDefaultController<string>
++  let fullController!: ReadableStreamDefaultController<StreamTranscriptionDelta>
++  let partialController!: ReadableStreamDefaultController<string>
++  const textStream = new ReadableStream<string>({ start: c => { textController = c } })
++  const fullStream = new ReadableStream<StreamTranscriptionDelta>({ start: c => { fullController = c } })
++  const partialStream = new ReadableStream<string>({ start: c => { partialController = c } })
++  const socket = new WebSocket(websocketUrl(options.baseURL))
++  let reader: ReadableStreamDefaultReader<AudioChunk> | undefined
++  let finalText = ''
++  let finished = false
++
++  const releaseInput = (reason?: unknown) => {
++    const currentReader = reader
++    reader = undefined
++    if (!currentReader) return
++    void currentReader.cancel(reason).catch(() => {}).finally(() => currentReader.releaseLock())
++  }
++
++  const closeSocket = () => {
++    if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)
++      socket.close()
++  }
++
++  const finish = (error?: unknown) => {
++    if (finished) return
++    finished = true
++    releaseInput(error)
++    if (error) {
++      textController.error(error); fullController.error(error); partialController.error(error); result.reject(error)
++    } else {
++      textController.close(); fullController.close(); partialController.close(); result.resolve(finalText)
++    }
++  }
++
++  socket.onopen = async () => {
++    try {
++      if (finished || options.abortSignal?.aborted) return
++      socket.send(JSON.stringify({ type: 'start', format: 'pcm16', sample_rate: 16000, language: options.language }))
++      const activeReader = options.inputAudioStream!.getReader()
++      reader = activeReader
++      while (!options.abortSignal?.aborted) {
++        if (socket.readyState !== WebSocket.OPEN) break
++        const { done, value } = await activeReader.read()
++        if (done) break
++        if (value) {
++          // Do not let a slow loopback decoder turn an unlimited microphone
++          // stream into renderer memory pressure.
++          while (socket.bufferedAmount > 256 * 1024) {
++            if (options.abortSignal?.aborted) break
++            await new Promise(resolve => setTimeout(resolve, 10))
++          }
++          if (!options.abortSignal?.aborted && socket.readyState === WebSocket.OPEN)
++            socket.send(JSON.stringify({ type: 'pcm16', data: base64(value) }))
++        }
++      }
++      releaseInput()
++      if (!finished && socket.readyState === WebSocket.OPEN)
++        socket.send(JSON.stringify({ type: options.abortSignal?.aborted ? 'cancel' : 'end' }))
++    } catch (error) { finish(error); closeSocket() }
++  }
++  socket.onmessage = ({ data }) => {
++    if (finished) return
++    let event: { type?: string, delta?: string, text?: string, message?: string }
++    try {
++      event = JSON.parse(String(data)) as typeof event
++    } catch {
++      finish(new Error('Local streaming transcription sent malformed JSON.'))
++      closeSocket()
++      return
++    }
++    if (!event || typeof event !== 'object') return
++    if (event.type === 'partial' && event.text) partialController.enqueue(event.text)
++    if (event.type === 'final') {
++      finalText = event.text ?? ''
++      if (finalText) {
++        const delta: StreamTranscriptionDelta = { type: 'transcript.text.delta', delta: finalText }
++        fullController.enqueue(delta); textController.enqueue(finalText)
++      }
++      fullController.enqueue({ type: 'transcript.text.done', delta: '' })
++      finish(); closeSocket()
++    }
++    if (event.type === 'error') {
++      finish(new Error(event.message ?? 'Local streaming transcription failed.'))
++      closeSocket()
++    }
++  }
++  socket.onerror = () => { finish(new Error('Local streaming transcription websocket failed.')); closeSocket() }
++  socket.onclose = () => { if (!finished) finish(options.abortSignal?.reason ?? new DOMException('Closed', 'AbortError')) }
++  const abortStream = () => {
++    if (!finished && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'cancel' }))
++    finish(options.abortSignal?.reason ?? new DOMException('Aborted', 'AbortError'))
++    closeSocket()
++  }
++  options.abortSignal?.addEventListener('abort', abortStream, { once: true })
++  if (options.abortSignal?.aborted) abortStream()
++  return { fullStream, partialStream, text: result.promise, textStream }
++}
+diff --git a/packages/stage-ui/src/stores/settings/audio-device.ts b/packages/stage-ui/src/stores/settings/audio-device.ts
+index 8e945d2e4e7c547fd88daa873d9210947985692a..14974c5e0a5480556c24832d275b5c96f76890b6 100644
+--- a/packages/stage-ui/src/stores/settings/audio-device.ts
++++ b/packages/stage-ui/src/stores/settings/audio-device.ts
+@@ -4,6 +4,8 @@ import { watch } from 'vue'
+ 
+ import { useAudioDevice } from '../../composables/audio'
+ 
++export type AudioInteractionMode = 'half-duplex' | 'headphones-full-duplex' | 'speakers-aec'
++
+ let microphonePermissionStatus: PermissionStatus
+ 
+ export const useSettingsAudioDevice = defineStore('settings-audio-devices', () => {
+@@ -15,10 +17,14 @@ export const useSettingsAudioDevice = defineStore('settings-audio-devices', () =
+     stopStream: stopAudioInputStream,
+     stream,
+     askPermission: askAudioInputPermission,
++    setEchoCancellation,
+   } = useAudioDevice()
+ 
+   const selectedAudioInputPersist = useLocalStorageManualReset<string>('settings/audio/input', selectedAudioInputNonPersist.value)
+   const audioInputEnabled = useLocalStorageManualReset<boolean>('settings/audio/input/enabled', false)
++  // Persist only a mode enum; it carries no device id, transcript, or audio data.
++  const interactionMode = useLocalStorageManualReset<AudioInteractionMode>('settings/audio/interaction-mode', 'half-duplex')
++  watch(interactionMode, mode => setEchoCancellation(mode === 'speakers-aec'), { immediate: true })
+   let audioInputStartGeneration = 0
+   let audioInputStart: ReturnType<typeof startAudioInputStream> | undefined
+ 
+@@ -148,6 +154,7 @@ export const useSettingsAudioDevice = defineStore('settings-audio-devices', () =
+     deviceConstraints,
+     selectedAudioInput: selectedAudioInputPersist,
+     enabled: audioInputEnabled,
++    interactionMode,
+ 
+     stream,
+ 
+diff --git a/packages/stage-ui/src/stores/speech-output-control.ts b/packages/stage-ui/src/stores/speech-output-control.ts
+index 3e2a8004ea4dc4d1be38553fab502e4a8854774a..486f231a0bdee2e765f5f83b127c73e6ed3842c7 100644
+--- a/packages/stage-ui/src/stores/speech-output-control.ts
++++ b/packages/stage-ui/src/stores/speech-output-control.ts
+@@ -1,7 +1,7 @@
+ import { defineStore } from 'pinia'
+ import { ref } from 'vue'
+ 
+-export type SpeechOutputStopReason = 'manual-chat'
++export type SpeechOutputStopReason = 'manual-chat' | 'barge-in'
+ 
+ /**
+  * Represents a user-requested stop-speaking command for the stage output host.

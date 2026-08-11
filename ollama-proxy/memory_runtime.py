@@ -164,9 +164,33 @@ class SentenceTransformerEmbedder:
         kwargs: dict[str, Any] = {"local_files_only": True}
         if device != "auto":
             kwargs["device"] = device
+        # KURE is commonly used through this adapter on the dedicated CUDA
+        # worker.  Be explicit about fp16 there: relying on a model default
+        # can silently allocate fp32 weights.  Do not import torch or alter
+        # dtype selection for CPU/auto, where fp16 is not universally safe.
+        if device == "cuda":
+            import torch
+            kwargs["model_kwargs"] = {"torch_dtype": torch.float16}
         self.model = SentenceTransformer(resolved_model, **kwargs)
         self.fingerprint = f"{model_name}@{Path(resolved_model).name}"
         self.dimension = int(self.model.get_sentence_embedding_dimension())
+        self.device = "unknown"
+        self.cuda_allocated_mib = 0.0
+        self.cuda_reserved_mib = 0.0
+        try:
+            first_parameter = next(self.model.parameters())
+            dtype = str(first_parameter.dtype)
+            self.dtype = dtype.removeprefix("torch.")
+            self.device = str(getattr(first_parameter, "device", "unknown"))
+        except (AttributeError, StopIteration):
+            self.dtype = "unknown"
+        if self.device.startswith("cuda"):
+            try:
+                import torch
+                self.cuda_allocated_mib = round(torch.cuda.memory_allocated() / (1024 * 1024), 3)
+                self.cuda_reserved_mib = round(torch.cuda.memory_reserved() / (1024 * 1024), 3)
+            except (AttributeError, RuntimeError):
+                pass
         self._lock = threading.Lock()
 
     def encode(self, texts: list[str]):
@@ -386,31 +410,45 @@ class MemoryRuntime:
         sid = session or self._implicit_session
         await self._ensure_session(sid)
         start = time.perf_counter(); self._emit("retrieve_start", trace_id, session_default=bool(not session))
+        deadline = time.monotonic() + self.config.retrieve_timeout_ms / 1000
+        cancel_event = threading.Event()
         try:
             result = await asyncio.wait_for(
                 asyncio.to_thread(self.store.retrieve, sid, question, current_turn, attendees,
-                                  journal_retained_turns, journal_recall_allowed),
+                                  journal_retained_turns, journal_recall_allowed,
+                                  deadline=deadline, cancel_event=cancel_event),
                 self.config.retrieve_timeout_ms / 1000,
             )
             self._emit("retrieve_end", trace_id, (time.perf_counter()-start)*1000, gate=result.gate, cache_hit=result.cache_hit)
             return result
         except Exception as exc:
+            cancel_event.set()
             self._emit("error", trace_id, (time.perf_counter()-start)*1000, timeout=isinstance(exc, asyncio.TimeoutError), retrieval=True)
-            return RetrievalResult()
+            return RetrievalResult(duration_ms=(time.perf_counter()-start)*1000,
+                                   status="timed_out" if isinstance(exc, asyncio.TimeoutError) else "failed")
 
     def assemble_payload_context(self, payload: dict[str, Any], original_messages: Iterable[dict[str, Any]], *,
                                  extraction_watermark: int, memory_block: str = "", system_intro: Any = None,
                                  static_prompt: Any = None,
                                  journal_messages: Iterable[dict[str, Any]] = ()) -> dict[str, Any]:
-        """Copy transformed payload; assemble against untouched original turns."""
+        """Copy transformed payload with a stable prefix and dynamic tail."""
         out = copy.deepcopy(payload)
         transformed = out.get("messages", [])
         if static_prompt is None and isinstance(transformed, list) and transformed:
             static_prompt = transformed[0]  # AIRI prompt remains first.
+        tail_system_messages = (
+            [copy.deepcopy(message) for message in transformed[1:]
+             if isinstance(message, dict) and message.get("role") == "system"]
+            if isinstance(transformed, list)
+            else []
+        )
         # assemble_context preserves its first system argument at the front;
         # AIRI's static identity therefore always precedes any optional intro.
+        # Every other transformed system message is request-local and moves to
+        # the tail together with memory and recalled journal evidence.
         out["messages"] = assemble_context(static_prompt, system_intro, original_messages, extraction_watermark,
-                                           memory_block, journal_messages)
+                                           memory_block, journal_messages,
+                                           tail_system_messages=tail_system_messages)
         return out
 
     async def prepare_payload_context(self, payload: dict[str, Any], original_messages: Iterable[dict[str, Any]],
@@ -456,6 +494,11 @@ class MemoryRuntime:
                                          attendees=None, trace_id=trace_id,
                                          journal_retained_turns=retained_turns,
                                          journal_recall_allowed=bool(retained_turns))
+            # A failed/deadline-bound retrieval must never be reinterpreted as
+            # successful absence. Keep the proxy's projected foreground bytes
+            # untouched; callers can inspect the explicit result state.
+            if result.failed:
+                return copy.deepcopy(payload), result
             rendered_block = render_memory_placeholders(
                 result.block,
                 user_name=self.config.user_display_name,
@@ -772,7 +815,8 @@ class MemoryRuntime:
         try:
             journal_health = await asyncio.to_thread(self.store.journal_health, session or self._implicit_session)
             store_health = await asyncio.to_thread(self.store.health)
-            return {"enabled": True, "ready": bool(store_health["ok"]), "embedder": bool(self.store.embedder), "extraction_enabled": self.extraction_provider.can_extract, "extraction_isolated": extraction_isolated, "extraction_ready": extraction_ready, "schema": 1, "data_version": int(store_health["data_version"]), "journal_recall_window_messages": JOURNAL_RECALL_WINDOW_MESSAGES, **journal_health, **provider_health, **retry_health}
+            embedder = self.store.embedder
+            return {"enabled": True, "ready": bool(store_health["ok"]), "embedder": bool(embedder), "embedder_dtype": getattr(embedder, "dtype", "disabled") if embedder else "disabled", "embedder_device": getattr(embedder, "device", "disabled") if embedder else "disabled", "embedder_cuda_allocated_mib": getattr(embedder, "cuda_allocated_mib", 0.0) if embedder else 0.0, "embedder_cuda_reserved_mib": getattr(embedder, "cuda_reserved_mib", 0.0) if embedder else 0.0, "extraction_enabled": self.extraction_provider.can_extract, "extraction_isolated": extraction_isolated, "extraction_ready": extraction_ready, "schema": 1, "data_version": int(store_health["data_version"]), "journal_recall_window_messages": JOURNAL_RECALL_WINDOW_MESSAGES, **journal_health, **provider_health, **retry_health}
         except Exception:
             return {"enabled": True, "ready": False, "embedder": bool(self.store.embedder), "extraction_enabled": self.extraction_provider.can_extract, "extraction_isolated": extraction_isolated, "extraction_ready": extraction_ready, "schema": 1, "data_version": 0, "pending": 0, "pending_total": 0, "pending_sessions": 0, "journal_recall_window_messages": JOURNAL_RECALL_WINDOW_MESSAGES, **provider_health, **retry_health}
 

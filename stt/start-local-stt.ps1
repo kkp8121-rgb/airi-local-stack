@@ -1,10 +1,15 @@
 param(
-    [string]$Model = 'small',
+    # Scout operating default.  CPU remains a deliberate safe override below.
+    [string]$Model = 'mobiuslabsgmbh/faster-whisper-large-v3-turbo',
     [ValidateSet('cuda', 'cpu')]
     [string]$Device = 'cuda',
-    [string]$ComputeType = 'float16',
+    [string]$ComputeType = 'int8_float16',
     [ValidateRange(1, 32)]
     [int]$CpuThreads = 8,
+    [ValidateRange(1, 16)]
+    [int]$BeamSize = 1,
+    [ValidateRange(1, 16)]
+    [int]$RecoveryBeamSize = 3,
     [switch]$EnableDebugAudio,
     [switch]$VerboseTranscriptionLog
 )
@@ -102,7 +107,9 @@ $serverArguments = @(
     '--model-root', $modelRoot,
     '--device', $Device,
     '--compute-type', $ComputeType,
-    '--cpu-threads', $CpuThreads
+    '--cpu-threads', $CpuThreads,
+    '--beam-size', $BeamSize,
+    '--recovery-beam-size', $RecoveryBeamSize
 )
 if ($EnableDebugAudio) {
     $debugAudioRoot = Join-Path $repo 'debug-recordings'
@@ -132,7 +139,7 @@ for ($attempt = 1; $attempt -le 60; $attempt++) {
         $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8890/health' -TimeoutSec 2
         if ($health.status -eq 'ok') {
             $ready = $true
-            Write-Output "AIRI local STT ready (model=$($health.model), device=$($health.device), threads=$($health.cpu_threads))."
+            Write-Output "AIRI local STT ready (model=$($health.model), compute=$($health.compute_type), device=$($health.device), threads=$($health.cpu_threads), beam=$($health.primary_beam_size)/$($health.recovery_beam_size))."
             break
         }
     } catch {

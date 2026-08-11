@@ -32,21 +32,52 @@ param(
     [ValidateSet('local', 'openai', 'anthropic')]
     [string]$ChatProvider = 'local',
     [bool]$AllowExternalChat = $false,
+    # For the local provider, an omitted value resolves to the stable runtime
+    # tag. Specify -ChatModel exaone-airi:2.4b for a reversible rollback.
     [string]$ChatModel = '',
+    # The root stack launcher runs the same local-tag preflight before it
+    # starts any downstream service, then supplies this switch to avoid doing
+    # the identical checks a second time.
+    [switch]$ChatModelPreflighted,
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
-    [bool]$EnableCharacterEvaluator = $true,
+    [bool]$EnableCharacterEvaluator = $false,
     [ValidateRange(1, 1000000)]
     [int]$EvaluationMaxRecords = 10000
 )
 
 $ErrorActionPreference = 'Stop'
+$effectiveChatModel = if ($ChatProvider -eq 'local' -and [string]::IsNullOrWhiteSpace($ChatModel)) {
+    'midm-airi:2.0-mini'
+} else {
+    $ChatModel
+}
+$effectiveEvaluatorModel = if ($ChatProvider -eq 'local') {
+    $effectiveChatModel
+} else {
+    'midm-airi:2.0-mini'
+}
 $repo = $PSScriptRoot
 $stackRoot = Split-Path -Parent $repo
 $server = Join-Path $repo 'ollama_proxy.py'
 $stdoutLog = Join-Path $repo 'ollama-proxy.out.log'
 $stderrLog = Join-Path $repo 'ollama-proxy.err.log'
+
+$requiredLocalModels = @()
+if (-not $VerifyExtractionGateOnly) {
+    if ($ChatProvider -eq 'local') {
+        $requiredLocalModels += $effectiveChatModel
+    }
+    if ($EnableCharacterEvaluator) {
+        $requiredLocalModels += $effectiveEvaluatorModel
+    }
+}
+if (-not $ChatModelPreflighted) {
+    foreach ($model in @($requiredLocalModels | Sort-Object -Unique)) {
+        & (Join-Path $repo 'setup-midm-airi-model.ps1') -Model $model -PreflightOnly
+    }
+}
 $resolvedTopicBoardPath = ''
 if (-not [string]::IsNullOrWhiteSpace($TopicBoardPath)) {
     $topicItem = Get-Item -LiteralPath $TopicBoardPath -ErrorAction Stop
@@ -210,7 +241,7 @@ $memoryEnvironment = @{
     AIRI_MEMORY_EXTRACTION_BATCH_CHARS = '24000'
     AIRI_CHAT_PROVIDER = $ChatProvider
     AIRI_ALLOW_EXTERNAL_CHAT = if ($AllowExternalChat) { '1' } else { '0' }
-    AIRI_CHAT_MODEL = $ChatModel
+    AIRI_CHAT_MODEL = $effectiveChatModel
     AIRI_OLLAMA_KEEP_ALIVE = $OllamaKeepAlive
     AIRI_OLLAMA_TEMPERATURE = $OllamaTemperature.ToString([Globalization.CultureInfo]::InvariantCulture)
     AIRI_OLLAMA_TOP_P = $OllamaTopP.ToString([Globalization.CultureInfo]::InvariantCulture)
@@ -224,7 +255,9 @@ $memoryEnvironment = @{
     AIRI_EVAL_MAX_RECORDS = $EvaluationMaxRecords.ToString([Globalization.CultureInfo]::InvariantCulture)
     AIRI_CHARACTER_EVALUATOR_ENABLED = if ($EnableCharacterEvaluator) { '1' } else { '0' }
     AIRI_CHARACTER_EVALUATOR_PROVIDER = 'ollama'
-    AIRI_CHARACTER_EVALUATOR_MODEL = 'exaone-airi:2.4b'
+    # For local chat, keep the evaluator on the same selected model so a
+    # -ChatModel rollback applies consistently to the entire local path.
+    AIRI_CHARACTER_EVALUATOR_MODEL = $effectiveEvaluatorModel
     AIRI_CHARACTER_EVALUATOR_UPSTREAM = 'http://127.0.0.1:11434'
     AIRI_CHARACTER_EVALUATOR_NUM_CTX = '2048'
     AIRI_CHARACTER_EVALUATOR_NUM_GPU = $NumGpu.ToString([Globalization.CultureInfo]::InvariantCulture)
@@ -261,4 +294,4 @@ finally {
     }
 }
 
-Write-Output "Started AIRI Ollama compatibility proxy (PID $($process.Id), memory=$EnableMemory, extraction=$MemoryExtractionProvider/$([bool]$MemoryExtractionModel), chat=$ChatProvider, externalSearch=$AllowExternalSearch, evaluation=$EnableEvaluation, characterEvaluator=$EnableCharacterEvaluator)."
+Write-Output "Started AIRI Ollama compatibility proxy (PID $($process.Id), memory=$EnableMemory, extraction=$MemoryExtractionProvider/$([bool]$MemoryExtractionModel), chat=$ChatProvider/$effectiveChatModel, externalSearch=$AllowExternalSearch, evaluation=$EnableEvaluation, characterEvaluator=$EnableCharacterEvaluator/$effectiveEvaluatorModel)."

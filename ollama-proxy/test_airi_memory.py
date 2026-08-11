@@ -1,4 +1,4 @@
-import os, sqlite3, tempfile, unittest
+import os, sqlite3, tempfile, time, unittest
 from unittest.mock import patch
 from concurrent.futures import ThreadPoolExecutor
 from airi_memory import (
@@ -20,6 +20,25 @@ class MemoryTests(unittest.TestCase):
     def tearDown(self): os.unlink(self.db)
     def test_schema_and_null_vector(self):
         self.s.embedder=None; x=self.s.add_item(kind='entity',subtype='person',name='Ada',content='person'); self.assertIsNone(self.s.active_rows(None)[0]['vector']); self.assertTrue(self.s.health()['ok'])
+
+    def test_deadline_returns_distinct_timeout_state(self):
+        self.s.add_item(kind='entity', subtype='person', name='Ada', content='Ada', vector=pack_vector([1., 0.]))
+        result = self.s.retrieve(None, 'who is Ada?', deadline=time.monotonic() - .001)
+        self.assertEqual(result.status, 'timed_out')
+        self.assertTrue(result.failed)
+        self.assertEqual(result.block, '')
+
+    def test_vector_score_cache_is_version_scoped_and_lru_bounded(self):
+        self.s.add_item(kind='entity', subtype='person', name='Ada', content='Ada', vector=pack_vector([1., 0.]))
+        rows = self.s.active_rows(None, 'entity')
+        version = self.s.health()['data_version']
+        first = self.s._vector_scores([1., 0.], rows, str(version), ('scope',), lambda: None)
+        self.assertAlmostEqual(first[int(rows[0]['id'])], 1.0, places=6)
+        self.s.add_item(kind='entity', subtype='person', name='Bea', content='Bea', vector=pack_vector([0., 1.]))
+        next_rows = self.s.active_rows(None, 'entity')
+        second = self.s._vector_scores([1., 0.], next_rows, str(self.s.health()['data_version']), ('scope',), lambda: None)
+        self.assertEqual(len(second), 2)
+        self.assertEqual(len(self.s._vector_score_cache), 2)
 
     def test_act_control_is_saved_as_private_event_not_dialogue(self):
         raw = '<|ACT {"mood":"calm"}|> Hello there'
@@ -220,7 +239,7 @@ class MemoryTests(unittest.TestCase):
         self.assertEqual((subject,edge,source),(new_id,new_id,new_id))
     def test_snapshot_and_context(self):
         a=self.s.add_item(kind='entity',subtype='person',name='A',content='a'); f=self.s.add_item(kind='fact',subtype='trait',content='kind',subject_ids=[a]); mp=self.s.canon_snapshot('z'); self.assertIn(a,mp); self.assertEqual(len(self.s.active_rows('z','fact')),1)
-        msgs=[{'id':i,'role':'user','content':str(i)} for i in range(70)]; c=assemble_context('intro','static',msgs,0,'mem'); self.assertEqual(len(c),63); self.assertEqual(c[3]['id'],10)
+        msgs=[{'id':i,'role':'user','content':str(i)} for i in range(70)]; c=assemble_context('intro','static',msgs,0,'mem'); self.assertEqual(len(c),63); self.assertEqual(c[2]['id'],10); self.assertEqual(c[-2]['content'],'mem'); self.assertEqual(c[-1]['id'],69)
     def test_retrieval_cache_and_names(self):
         self.s.add_item(kind='entity',subtype='person',name='Ann',content='Ann'); self.s.add_item(kind='fact',subtype='trait',content='brave',subject_ids=[1]); r=self.s.retrieve(None,'Tell me about Ann?'); self.assertTrue(r.gate); self.assertLessEqual(r.counts['traits'],8); n=self.e.calls; self.s.retrieve(None,'Tell me about Ann?'); self.assertEqual(n,self.e.calls)
         self.s.retrieve(None,'Tell me about Ann?',current_turn=9); self.assertEqual(n,self.e.calls)
@@ -281,6 +300,37 @@ class MemoryTests(unittest.TestCase):
         contents = [message['content'] for message in recalled]
         self.assertIn('code inside-window', contents)
         self.assertNotIn('code outside-window', contents)
+
+    def test_journal_recall_uses_fts_candidates_and_keeps_korean_stem_aliases(self):
+        self.s.append_turn('s', '제 별명은 반짝이야', '기억해둘게', 1)
+        queries = []
+        original_connect = self.s._connect
+        def traced_connect():
+            connection = original_connect(); connection.set_trace_callback(queries.append); return connection
+        self.s._connect = traced_connect
+        try:
+            recalled = self.s.journal_recall('s', '별명 기억나?', ())
+        finally:
+            self.s._connect = original_connect
+        self.assertIn('제 별명은 반짝이야', [message['content'] for message in recalled])
+        self.assertTrue(any('CONVERSATION_MESSAGE_FTS MATCH' in query.upper() for query in queries))
+
+    def test_retention_bounds_session_journal_and_memory_without_base_deletion(self):
+        self.s.add_item(kind='entity', subtype='person', name='base', content='base', source='base')
+        with self.s._session() as c:
+            c.executemany("INSERT INTO conversation_message(session_id,turn_no,role,content,content_hash,recall_chars) VALUES (?,?,?,?,?,?)",
+                [('room', index, 'user', 'u', str(index), 1) for index in range(1, 4101)])
+            c.execute("INSERT INTO session_activity(session_id,latest_message_id,latest_turn) "
+                      "SELECT 'room',MAX(id),MAX(turn_no) FROM conversation_message WHERE session_id='room'")
+            c.executemany("INSERT INTO memory(session_id,source,kind,subtype,name,content) VALUES (?,?,?,?,?,?)",
+                [('room', 'conversation', 'entity', 'person', f'n{index}', 'x') for index in range(2050)])
+        result = self.s.run_retention(force=True)
+        with self.s._session() as c:
+            messages = c.execute("SELECT COUNT(*) FROM conversation_message WHERE session_id='room'").fetchone()[0]
+            memories = c.execute("SELECT COUNT(*) FROM memory WHERE session_id='room'").fetchone()[0]
+            base = c.execute("SELECT COUNT(*) FROM memory WHERE session_id IS NULL").fetchone()[0]
+        self.assertTrue(result['ran'])
+        self.assertEqual((messages, memories, base), (4096, 2048, 1))
 
     def test_journal_recall_does_not_tokenize_overlong_recent_window_pairs(self):
         overlong = "needle " + ("x" * 16384)

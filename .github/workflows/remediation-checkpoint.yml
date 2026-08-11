@@ -72,11 +72,57 @@ jobs:
 
   python-core-tests:
     runs-on: windows-latest
-    # Two successive runs took 9m40s and 10m18s, so a 10-minute cap cut a
-    # docs-only commit and reported it as cancelled. The wheel download is the
-    # variable part; the cache below removes most of it, and the headroom here
-    # keeps a cold cache from turning into a false red.
-    timeout-minutes: 25
+    # A cold runner must still fit this checkpoint's ten-minute contract.
+    # Keep every original test root below in the matrix, but divide the large
+    # ollama-proxy suite by test-file ownership so one slow root cannot consume
+    # the budget of the smaller, independent suites.
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: ollama-proxy-model
+            tests: >-
+              ollama-proxy/test_airi_memory.py ollama-proxy/test_airi_session_header_patch.py
+              ollama-proxy/test_character_state.py ollama-proxy/test_character_state_evaluator.py
+              ollama-proxy/test_cloud_chat_provider.py
+          - shard: ollama-proxy-memory
+            tests: >-
+              ollama-proxy/test_collect_topic_candidates.py ollama-proxy/test_create_wikimedia_source_policy.py
+              ollama-proxy/test_evaluation_api.py ollama-proxy/test_evaluation_store.py
+              ollama-proxy/test_knowledge_store.py ollama-proxy/test_memory_benchmark.py
+              ollama-proxy/test_memory_e2e.py ollama-proxy/test_memory_extraction_provider.py
+              ollama-proxy/test_memory_runtime.py
+          - shard: ollama-proxy-api
+            tests: >-
+              ollama-proxy/test_ollama_proxy.py ollama-proxy/test_provider_usage.py
+          - shard: ollama-proxy-topic-workflows
+            tests: >-
+              ollama-proxy/test_topic_board.py ollama-proxy/test_topic_discovery_workflow.py
+              ollama-proxy/test_topic_review_workflow.py ollama-proxy/test_topic_workflow_status.py
+              ollama-proxy/test_validate_approved_topics.py ollama-proxy/test_verify_extraction_gate.py
+              ollama-proxy/test_wikimedia_topic_scheduler.py ollama-proxy/test_wikimedia_topic_source.py
+          - shard: ollama-proxy-evaluations
+            tests: >-
+              ollama-proxy/eval/test_airi_baseline.py ollama-proxy/eval/test_airi_conversation_soak.py
+              ollama-proxy/eval/test_airi_proactive_soak.py
+          - shard: ollama-proxy-training
+            tests: >-
+              ollama-proxy/training/tests/test_audit_airi_style_fixture_readiness.py
+              ollama-proxy/training/tests/test_compile_airi_style_reviewed.py
+              ollama-proxy/training/tests/test_review_airi_style_pending.py
+              ollama-proxy/training/tests/test_validate_airi_style_pending.py
+              ollama-proxy/training/tests/test_verify_airi_style_dataset.py
+          - shard: latency-trace
+            tests: test_latency_trace.py
+          - shard: startup
+            tests: test_start_airi_background.py
+          - shard: model-configuration
+            tests: test_midm_model_configuration.py
+          - shard: latency-monitor
+            tests: latency-monitor
+          - shard: stt
+            tests: stt
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -94,6 +140,6 @@ jobs:
         shell: pwsh
         run: python -m pip install --disable-pip-version-check -r requirements-ci.txt
 
-      - name: Run core Python tests
+      - name: Run core Python tests (${{ matrix.shard }})
         shell: pwsh
-        run: python -m pytest -q ollama-proxy test_latency_trace.py test_start_airi_background.py latency-monitor stt
+        run: python -m pytest -q ${{ matrix.tests }}

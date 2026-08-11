@@ -387,7 +387,7 @@ class MemoryBenchmarkTests(unittest.TestCase):
         fake=types.ModuleType("sentence_transformers")
         class FakeModel:
             device="cpu"
-            def __init__(self, path, device=None, local_files_only=True):
+            def __init__(self, path, device=None, local_files_only=True, **kwargs):
                 self.requested_device=device
                 if path == "bad": raise RuntimeError("CUDA out of memory")
             def encode(self, texts, batch_size, normalize_embeddings):
@@ -400,6 +400,7 @@ class MemoryBenchmarkTests(unittest.TestCase):
         good, bad=result["models"]
         self.assertEqual(good["device"], "cpu")
         self.assertEqual(good["requested_device"], "auto")
+        self.assertEqual(good["requested_dtype"], "float32")
         self.assertIn("corpus_batch_build_ms", good)
         self.assertIn("query_warm_latency", good)
         self.assertEqual(bad["status"], "error")
@@ -414,6 +415,9 @@ class MemoryBenchmarkTests(unittest.TestCase):
         result=bench.run_retrieval(args)
         self.assertFalse(result["network_used"])
         self.assertEqual((result["row_count"],result["runs"]),(100,2))
+        self.assertEqual(result["fixture"]["dimensions"],1024)
+        self.assertTrue(result["fixture"]["normalized"])
+        self.assertIn("dynamic", result["fixture"]["seed_duration_ms"])
         self.assertEqual(set(result["modes"]),{"dynamic_conversation_cache_bypass","static_base_canon_semantic_warm"})
         dynamic=result["modes"]["dynamic_conversation_cache_bypass"]
         static=result["modes"]["static_base_canon_semantic_warm"]

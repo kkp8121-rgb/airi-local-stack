@@ -5,13 +5,11 @@ param()
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-# Every tracked patch is pinned, not just the three the current procedure
-# applies. An unpinned artifact can be rewritten with nothing detecting it,
-# and two of the historical ones reached this state already: their Korean was
-# replaced by '?' at some point and cannot be recovered from the bytes here.
-# Usable = whether `git apply` accepts the file against the pinned v0.11.3
-# base. That was measured, not assumed; the three false entries carry the
-# defect that makes them unusable.
+# Every tracked patch is pinned, not just the runtime artifacts the current
+# procedure supports. The tracked-file comparison below makes additions and
+# removals fail closed; an unpinned artifact cannot silently appear. `Usable`
+# records historical `git apply` applicability against the pinned v0.11.3 base,
+# while `Support` records the deliberately narrower runtime procedure.
 $artifacts = @(
     [pscustomobject]@{
         Path = 'airi_docs/patches/AIRI-v0.11.3-round-cancel.patch'
@@ -19,6 +17,7 @@ $artifacts = @(
         Sha256 = '8BD061184BB98B48FCA1946DCAF1C8AE6707FB404541640F744A6A0B5AA9B26C'
         Usable = $true
         Defect = ''
+        Support = 'Historical'
     }
     [pscustomobject]@{
         Path = 'airi_docs/patches/AIRI-v0.11.3-local-runtime-source.patch'
@@ -26,6 +25,7 @@ $artifacts = @(
         Sha256 = '2077D440481D64BD08B9A890C318D3CDFABADFE0E1398C28CAF3A3AB8B76CD86'
         Usable = $true
         Defect = ''
+        Support = 'Runtime'
     }
     [pscustomobject]@{
         Path = 'airi_docs/patches/AIRI-v0.11.3-context-correlation-sanitizer.patch'
@@ -33,6 +33,15 @@ $artifacts = @(
         Sha256 = 'BA38C5F13670DECEEDAB3F0BFE9473AE7FB3BE1DE1A652A26E80E046F572B59E'
         Usable = $true
         Defect = ''
+        Support = 'Runtime'
+    }
+    [pscustomobject]@{
+        Path = 'airi_docs/patches/AIRI-v0.11.3-upgrade-scout-runtime-20260811.patch'
+        Length = 85541
+        Sha256 = 'EDE9FA204DB1869C8A3A7F2A9587A6B321742F008728EE489C2B6F49D435F9DA'
+        Usable = $true
+        Defect = ''
+        Support = 'Runtime'
     }
     [pscustomobject]@{
         Path = 'airi_docs/patches/AIRI-v0.11.3-session-header.patch'
@@ -40,6 +49,7 @@ $artifacts = @(
         Sha256 = 'FD6711F3716DFE926DBAF053F66C04E44CA3E6B4FEB28151193D49965DD4D273'
         Usable = $true
         Defect = ''
+        Support = 'Historical'
     }
     [pscustomobject]@{
         Path = 'airi_docs/patches/AIRI-v0.11.3-local-broadcast-meta-filter-20260809.patch'
@@ -47,6 +57,7 @@ $artifacts = @(
         Sha256 = 'F1BA41639A814C9B92162CF2ADD4C8633660D6131BB7257B3B9DBFA230E6331A'
         Usable = $false
         Defect = 'BareHunkHeader'
+        Support = 'Historical'
     }
     [pscustomobject]@{
         Path = 'airi_docs/patches/AIRI-v0.11.3-local-runtime-source-retry.patch'
@@ -54,6 +65,7 @@ $artifacts = @(
         Sha256 = 'B6F24532FA7821B623B74F8EAA9DBABAF2774E8A91FFB0E1C1D55AF67B7B0038'
         Usable = $false
         Defect = 'LostKorean'
+        Support = 'Historical'
     }
     [pscustomobject]@{
         Path = 'airi_docs/patches/AIRI-v0.11.3-local-runtime-source-retry-normalized.patch'
@@ -61,8 +73,40 @@ $artifacts = @(
         Sha256 = '63D231990D44124E6D3641E1A3B68660FD25BF05461395C26E5A2A7DF2D96FB6'
         Usable = $false
         Defect = 'LostKorean'
+        Support = 'Historical'
     }
 )
+
+$trackedArtifacts = @(git -C $root ls-files -- 'airi_docs/patches/*.patch')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Could not list tracked patch artifacts.'
+}
+$trackedArtifacts = @($trackedArtifacts | ForEach-Object { $_.Replace('\', '/') } | Sort-Object -Unique)
+$manifestArtifacts = @($artifacts.Path | Sort-Object -Unique)
+if ($manifestArtifacts.Count -ne $artifacts.Count) {
+    throw 'Patch manifest contains duplicate artifact paths.'
+}
+$missingFromManifest = @($trackedArtifacts | Where-Object { $_ -notin $manifestArtifacts })
+$notTracked = @($manifestArtifacts | Where-Object { $_ -notin $trackedArtifacts })
+if ($missingFromManifest.Count -or $notTracked.Count) {
+    throw "Tracked patch set and manifest differ. Missing: $($missingFromManifest -join ', '); untracked manifest entries: $($notTracked -join ', ')"
+}
+
+# Runtime support is intentionally not synonymous with historical applicability:
+# the documented procedure is the combined runtime patch, the generic context
+# sanitizer, and then the Upgrade Scout runtime layer. All three must remain
+# usable and defect-free.
+$supportedArtifacts = @($artifacts | Where-Object { $_.Support -eq 'Runtime' })
+$expectedSupportedPaths = @(
+    'airi_docs/patches/AIRI-v0.11.3-local-runtime-source.patch'
+    'airi_docs/patches/AIRI-v0.11.3-context-correlation-sanitizer.patch'
+    'airi_docs/patches/AIRI-v0.11.3-upgrade-scout-runtime-20260811.patch'
+)
+$actualSupportedSet = (@($supportedArtifacts.Path | Sort-Object) -join "`n")
+$expectedSupportedSet = (@($expectedSupportedPaths | Sort-Object) -join "`n")
+if ($actualSupportedSet -ne $expectedSupportedSet) {
+    throw 'Runtime support set must be exactly the combined patch, context sanitizer, and Upgrade Scout layer.'
+}
 
 foreach ($artifact in $artifacts) {
     $path = Join-Path $root $artifact.Path
@@ -91,6 +135,19 @@ foreach ($artifact in $artifacts) {
     $text = [IO.File]::ReadAllText($path, [Text.Encoding]::UTF8)
     $bareHunk = [regex]::IsMatch($text, '(?m)^@@\s*$')
     $lostKorean = [regex]::IsMatch($text, '\?{3,}')
+
+    if ($artifact.Usable -and $artifact.Defect) {
+        throw "Usable artifact has a recorded defect: $($artifact.Path)"
+    }
+    if (-not $artifact.Usable -and -not $artifact.Defect) {
+        throw "Unusable artifact has no recorded defect: $($artifact.Path)"
+    }
+    if ($artifact.Support -notin @('Runtime', 'Historical')) {
+        throw "Unknown support classification: $($artifact.Path)"
+    }
+    if ($artifact.Support -eq 'Runtime' -and (-not $artifact.Usable -or $artifact.Defect)) {
+        throw "Supported runtime artifact is not usable and defect-free: $($artifact.Path)"
+    }
 
     switch ($artifact.Defect) {
         'BareHunkHeader' {
@@ -129,6 +186,65 @@ if ($workflow -notmatch 'actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c
     $workflow -notmatch 'fetch-depth: 0' -or
     $workflow -notmatch [regex]::Escape(':(exclude)airi_docs/patches/*.patch')) {
     throw 'Checkpoint workflow contract failed.'
+}
+
+$pythonJob = [regex]::Match($workflow, '(?ms)^  python-core-tests:\r?\n(?<body>.*?)(?=^  [^\s]|\z)')
+if (-not $pythonJob.Success) {
+    throw 'Missing python-core-tests workflow job.'
+}
+$pythonJobBody = $pythonJob.Groups['body'].Value
+$requiredTestRoots = @(
+    'ollama-proxy/'
+    'test_latency_trace.py'
+    'test_start_airi_background.py'
+    'test_midm_model_configuration.py'
+    'latency-monitor'
+    'stt'
+)
+if ($pythonJobBody -notmatch '(?m)^    timeout-minutes: 10\s*$' -or
+    $pythonJobBody -notmatch '(?m)^    strategy:' -or
+    $pythonJobBody -notmatch '(?m)^      fail-fast: false\s*$' -or
+    $pythonJobBody -notmatch '(?m)^      matrix:' -or
+    $pythonJobBody -match '(?m)^    timeout-minutes: (?!10\s*$)' -or
+    @($requiredTestRoots | Where-Object { $pythonJobBody -notlike "*$_*" }).Count -ne 0) {
+    throw 'Python CI sharding and ten-minute timeout contract failed.'
+}
+
+# Directory roots keep latency-monitor and STT future-proof. Ollama-proxy is
+# split by file for predictable shard duration, so fail closed when a tracked
+# test file is added or removed without updating the matrix.
+$trackedProxyTests = @(
+    git -C $root ls-files -- `
+        'ollama-proxy/test_*.py' `
+        'ollama-proxy/eval/test_*.py' `
+        'ollama-proxy/training/tests/test_*.py'
+)
+if ($LASTEXITCODE -ne 0) {
+    throw 'Could not list tracked ollama-proxy Python tests.'
+}
+$trackedProxyTests = @(
+    $trackedProxyTests |
+        ForEach-Object { $_.Replace('\', '/') } |
+        Sort-Object -Unique
+)
+$matrixProxyTests = @(
+    [regex]::Matches(
+        $pythonJobBody,
+        'ollama-proxy/[A-Za-z0-9_./-]*test_[A-Za-z0-9_.-]+\.py'
+    ) |
+        ForEach-Object { $_.Value } |
+        Sort-Object -Unique
+)
+$missingProxyTests = @($trackedProxyTests | Where-Object { $_ -notin $matrixProxyTests })
+$staleProxyTests = @($matrixProxyTests | Where-Object { $_ -notin $trackedProxyTests })
+if ($missingProxyTests.Count -or $staleProxyTests.Count) {
+    throw "Python CI matrix differs from tracked ollama-proxy tests. Missing: $($missingProxyTests -join ', '); stale: $($staleProxyTests -join ', ')"
+}
+
+$checkpointPath = Join-Path $root 'test-current-checkpoint.ps1'
+$checkpoint = Get-Content -LiteralPath $checkpointPath -Raw
+if ($checkpoint -notmatch [regex]::Escape('gpt-sovits\test_start_local_stack_contract.ps1')) {
+    throw 'Offline checkpoint must enforce the GPT-SoVITS cache-ready launcher contract.'
 }
 
 Write-Output 'Patch manifest contract: PASS (offline, no archive access).'
