@@ -161,7 +161,8 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 
 ## 최신 검증 증거 (2026-08-12)
 
-- 통합 Python: 816 passed / 1 skipped / 706 subtests (dev PC 재실측,
+- 통합 Python: 825 passed / 1 skipped / 706 subtests (현재 tip의 CI
+  `python-core-tests` matrix 41개 추적 경로를 dev PC에서 재실측,
   SSoT·I1 게이트·MEM-04·B3 모더레이션·cloud latency 하네스 포함).
 - `node --test test-send-airi-local-text.mjs`: 27/27.
 - `test-current-checkpoint.ps1`: PASS(기본 실행의 applicability는 의도적

@@ -213,10 +213,9 @@ T0~T3 기준):
 
 최신 스냅샷은 `airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md`의 "최신
 검증 증거(2026-08-12)" 절이 단일 출처다. 이 문서에 수치를 중복 기재하지
-않고 인용만 남긴다 — 통합 Python 816 passed / 1 skipped / 706 subtests,
-node 27/27, `test-current-checkpoint.ps1`·`test-patch-manifest.ps1` PASS
-(2026-08-12 dev PC 현재 배치). CI 2-job green은 `294c4e6` 기준이며 이후
-커밋은 push 시 재검증.
+않고 인용만 남긴다. 통합 Python·node·checkpoint·patch manifest의 현재
+총계와 범위는 해당 절을 따른다. CI 2-job green은 `294c4e6` 기준이며 이후
+커밋은 push 시 재검증한다.
 
 ## 다음 게이트 (확인 필요 항목 포함)
 

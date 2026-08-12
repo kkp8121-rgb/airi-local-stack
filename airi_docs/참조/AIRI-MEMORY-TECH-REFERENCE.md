@@ -12,7 +12,7 @@
 2단 추출: Stage A가 대화/캐릭터 시트를 원자적 항목으로 분해하고, Stage B가 기존 기억 후보(top-5)와 대조해 적용 연산을 결정한다. 입력은 `<character>`(메타)/`<turns>`(본문) 블록, Stage B는 `<extracted>`/`<candidates>` 블록으로 감싼 user 메시지 1개.
 
 주의사항 (원본 운영 경험):
-- 원본은 gpt-5.4-mini 사용 — **"분해는 결정론적이라 nano급 충분" 가정은 품질 미달로 실패**했음. 로컬 소형 모델 적용 시 M0 게이트 실측 필수. (작성 당시 로컬 모델은 EXAONE이었고, 2026-08-11~12에 `midm-airi:2.0-mini`로 교체됐다. Mi:dm은 추출기 후보로 아직 미측정이다.)
+- 원본은 gpt-5.4-mini 사용 — **"분해는 결정론적이라 nano급 충분" 가정은 품질 미달로 실패**했음. 로컬 소형 모델 적용 시 M0 게이트 실측 필수. (작성 당시 로컬 모델은 EXAONE이었고, 2026-08-11~12에 `midm-airi:2.0-mini`로 교체됐다. Mi:dm도 2026-08-12 balanced 게이트에서 품질 FAIL해 추출은 off다.)
 - 원본은 structured output 미사용(코드펜스 스트립+JSON 파싱, fail-soft). 소형 모델은 준수력이 낮으므로 **JSON schema/GBNF 강제 권장**.
 - 캐릭터 base(페르소나 시트) 추출은 Stage B 생략 fast-path (후보가 없으므로).
 - 트리거: 응답 완료 후 fire-and-forget, 미추출 메시지 ≥3 + 세션 종료 시 강제 flush. JSON/coverage 같은 품질 실패 5회 시 skip(dead-letter), 세션 재시작 시 리셋. worker/model/transport 일시 장애는 품질 실패에 포함하지 않고 pending을 보존해 bounded backoff한다.
@@ -410,7 +410,7 @@ naive `.Replace`는 모음 이름에 "세리은"처럼 조사를 깨뜨린다. �
 5. **프롬프트 캐싱 배치**: 정적 블록(가이드라인→페르소나→관계단계) 선두 고정 + `cache_control`, 변동 블록(메모리·최근 턴)은 뒤에. (talkain은 이걸 안 해서 캐시 활용 0 — 반면교사)
 6. **사용량 로깅**: 호출별 토큰·duration만 적재, 비용은 조회 시점 단가로 계산(단가 변경이 과거 집계에 자동 반영).
 7. **스트리밍 fallback 불가** — 토큰 전송 시작 후엔 모델 교체 불가. fallback 판정(429/5xx만)은 첫 토큰 전. SSE로 토큰을 보낼 땐 JSON 인코딩(멀티라인 델타 프레임 깨짐 방지).
-8. **소형 모델 추출은 미검증 가정** — talkain: nano 품질 미달로 mini 상향. rag_rnd: 처음부터 Opus. 로컬 추출 후보의 채택은 M0 게이트 실측 후 결정하고, 미달 시 추출만 클라우드 mini급(비실시간·배치)으로 돌린다. 2026-08-12 기준 기존 후보(EXAONE 2.4B, Qwen3 4B/8B)는 완화된 `balanced` 프로파일로도 전부 불합격이며 현행 대화 모델 Mi:dm은 추출기로 미측정이다.
+8. **소형 모델 추출은 검증 없이 채택할 수 없는 가정** — talkain: nano 품질 미달로 mini 상향. rag_rnd: 처음부터 Opus. 로컬 추출 후보의 채택은 M0 게이트 실측 후 결정하고, 미달 시 추출만 클라우드 mini급(비실시간·배치)으로 돌린다. 2026-08-12 기준 기존 후보(EXAONE 2.4B, Qwen3 4B/8B)와 현행 대화 모델 Mi:dm은 완화된 `balanced` 프로파일에서도 모두 불합격이다. Mi:dm 상세는 `완료/AIRI-MIDM-EXTRACTION-GATE-MEASUREMENT-2026-08-12.md`를 따른다.
 9. **로컬 추출 자원 격리** — 방송 응답용 Ollama(11434)와 CPU batch 추출용
    Ollama(기본 11436)를 별도 상주 프로세스/connection pool로 분리한다. 추출
    endpoint는 HTTP loopback만 허용하고 `num_gpu=0`, parallel=1,

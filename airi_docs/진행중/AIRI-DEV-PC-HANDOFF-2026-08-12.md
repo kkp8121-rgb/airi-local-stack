@@ -5,7 +5,8 @@
 목록이다. 착수 전 이 문서와 아래 근거 문서를 정독하라.
 
 - 완료 커밋: `7dc4e76`(문서), `932eae6`(코드) — 기반 `294c4e6`
-- 오프라인 검증: 전체 스위트 **816 passed / 1 skipped / 706 subtests**
+- 오프라인 검증: 현재 tip의 CI `python-core-tests` matrix 41개 추적 경로
+  **825 passed / 1 skipped / 706 subtests**
   (기준 733/1/504), `test-patch-manifest.ps1` PASS, 소스·문서
   `git diff --check` 클린(생성된 runtime patch 내부 source whitespace 제외)
 - 계획 근거: `진행예정/AIRI-BROADCAST-CHARACTER-PLAN-2026-08-12.md` (M1
@@ -153,8 +154,9 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
 
 방송 계획 §4의 4건 처리됨: ① 관계 축 — AI 단독형 + 메타 서사("사장님")
 확정 ② 방송 중 클라우드 LLM — 조건부(즉시 승인 아님, dev PC 실측 2종 후
-재결정) ③ 캐릭터 확정 — 이름 AIRI·호칭 "사장님"·시그니처 인사·클로징은
-확정. 팬덤명 “아이리스”는 공개 충돌 FAIL로 철회했고, 정식 팬덤명 없이 일반
+재결정) ③ 캐릭터 **방향 결정** — 이름 AIRI·호칭 "사장님"·시그니처
+인사·클로징은 확정. 헌법 자체의 최종 승인은 인간 검수 대기다. 팬덤명
+“아이리스”는 공개 충돌 FAIL로 철회했고, 정식 팬덤명 없이 일반
 호칭 “시청자들”을 쓰다가 방송에서 자연스러운 호칭이 쌓인 뒤 재검토한다
 (`완료/AIRI-FANDOM-NAME-COLLISION-CHECK-2026-08-12.md`). T-05는 126번을
 한국어 예비 후보로 보존하되 낭독조·감정 부족 때문에 운영 승격하지 않고
