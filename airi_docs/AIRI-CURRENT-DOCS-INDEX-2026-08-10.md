@@ -73,6 +73,11 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-SOURCE-ASAR-PREFLIGHT-2026-08-13.md` — source ASAR 후보·설치
+  baseline·unpacked·patch provenance를 묶는 read-only 사전점검과 합성 계약
+  시험. 실경로 호출은 설치 AIRI 프로세스 7개에서 fail-closed 거부했으며
+  설치 승인·파일 변경·runtime TTS PASS를 뜻하지 않는다.
+
 - `AIRI-TTS-ASAR-CANDIDATE-BUILD-2026-08-13.md` — 고정 source commit/tree에서
   설치 후보 ASAR를 생성해 digest·28,167 entries·핵심 payload·설치본과 동일한
   135-file unpacked manifest를 검증한 기록. outer `electron-builder`는 후보 생성

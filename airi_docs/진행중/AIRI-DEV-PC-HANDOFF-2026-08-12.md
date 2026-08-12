@@ -25,6 +25,21 @@ Source-only TTS work is distinct from installed-ASAR evidence: source
 test/typecheck/build do not modify or prove an installed ASAR. Installed-runtime
 claims require their own recorded ASAR and live-turn verification.
 
+## Source ASAR read-only preflight handoff (2026-08-13)
+
+The evidence-pinned preflight command and offline synthetic suite are wired into
+`test-current-checkpoint.ps1`. They validate ASAR/executable digests, strict
+sidecar types, fuses, source patch bytes, unpacked manifests, non-reparse/file
+identity boundaries, process state, and final drift without installation
+mutators. A real read-only invocation reached the process gate and refused
+because seven exact installed AIRI processes were running. No process was
+stopped and no installed file was changed. This is a point-in-time refusal, not
+an install authorization or a live preflight PASS. The installer must revalidate
+the hashes and acquire its mutex/executable barrier after issue #2 explicitly
+authorizes installation. Runtime TTS duration/pitch, text-to-render, portable
+packaging, and Godot remain pending; STT/mic remains OFF/deferred. See
+`완료/AIRI-SOURCE-ASAR-PREFLIGHT-2026-08-13.md`.
+
 ## Source ASAR deployment-safety handoff (2026-08-13)
 
 The new source-built-ASAR install/restore scripts have passed only their
