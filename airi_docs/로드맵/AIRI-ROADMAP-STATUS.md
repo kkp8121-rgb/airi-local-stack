@@ -153,6 +153,19 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-13** (source ASAR deployment safety): source-built-ASAR install,
+  automatic rollback, and explicit restore scripts completed their synthetic
+  >1 MiB test path. They require artifact/current/backup SHA-256 checks,
+  bounded critical-payload ASAR validation, no-reparse/hard-link checks,
+  fail-closed AIRI process handling plus an exclusive launch barrier,
+  per-target Global mutex, exact displaced-file backups, atomic replace,
+  rollback, and idempotency. The full validator passed the actual installed
+  ASAR read-only at SHA-256 `1B68AE...B0`; it was not stopped or modified. This does not
+  complete an installation or runtime TTS duration/pitch verification.
+  [GitHub issue #2](https://github.com/kkp8121-rgb/airi-local-stack/issues/2)
+  remains the authorization/tracking gate. Detail:
+  `완료/AIRI-SOURCE-ASAR-DEPLOY-SAFETY-2026-08-13.md`.
+
 - **2026-08-13** (B4a chat priority policy): `broadcast-director/priority-policy.mjs`에 B1 screened event를 동결된 `{priority}` 또는 invalid `null`로 분류하는 무상태 결정론적 정책을 추가했다. 질문 > 화제 확장 > 진심 리액션 > 응원 > 긍정 fallback 순서이며 strict shape/ID/Unicode code point/timestamp·descriptor snapshot을 검증한다. V8 legacy RegExp 보존 위험을 피하기 위해 개인정보 매처는 RegExp 없이 수동 문자열 처리만 사용하고 sentinel 회귀가 비변경을 확인한다. Korean-first 휴리스틱의 오분류는 순서만 바꾸며 B3 모더레이션을 대체하지 않는다. 로컬 broadcast 집중 시험은 24/24 PASS, 독립 combined ingress/policy/director 검토는 36/36 PASS다. B4a/G5/M4는 partial이며 B4b 런타임과 외부·인간 게이트는 남는다. 상세: `완료/AIRI-B4A-CHAT-PRIORITY-POLICY-2026-08-13.md`.
 
 - **2026-08-13** (B4a broadcast-director foundation): Node built-ins-only,

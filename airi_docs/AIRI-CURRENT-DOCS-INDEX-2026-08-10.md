@@ -73,6 +73,13 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-SOURCE-ASAR-DEPLOY-SAFETY-2026-08-13.md` — source-built ASAR의
+  fail-closed install/restore 안전 도구와 >1 MiB synthetic PASS, 실제 설치
+  ASAR의 read-only full-validator PASS 기록. 실제 설치 AIRI는 변경하지
+  않았으며, 설치·runtime TTS duration/pitch는
+  [GitHub issue #2](https://github.com/kkp8121-rgb/airi-local-stack/issues/2)
+  승인 게이트 뒤 별도 검증이 필요하다.
+
 - `AIRI-B4A-CHAT-PRIORITY-POLICY-2026-08-13.md` — B1 screened event를 위한 순수·무상태 결정론적 우선순위 정책의 좁은 오프라인 완료 기록. 개인정보 비보존 문자열 매처, strict 입력 검증, Korean-first 휴리스틱 및 로컬 broadcast 집중 시험 24/24·독립 combined 검토 36/36을 다루며 B4a/G5/M4 전체 완료나 런타임 증거를 의미하지 않는다.
 
 - `AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md` — 기본 OFF/inert,

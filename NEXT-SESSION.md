@@ -18,6 +18,15 @@ production-context v2 gate는 구현·측정을 완료했지만 **FAIL**이다. 
 
 현재 exact tip과 원격 동기화·CI 상태는 `git status`, `git log -1`, PR checks로 확인한다. v2 전체 CI-equivalent Python 3.12.13 matrix는 858 passed / 1 skipped / 708 subtests다. historical test count는 해당 historical base에만 적용한다.
 
+Source-built ASAR deployment safety tooling has synthetic >1 MiB PASS coverage,
+and its full validator passed the installed ASAR read-only at SHA-256
+`1B68AE...B0`, but the installed AIRI remains unchanged.
+[GitHub issue #2](https://github.com/kkp8121-rgb/airi-local-stack/issues/2) is
+the authorization and tracking gate for an installed-ASAR operation. Until
+then, do not stop or write the installed app and do not claim installation
+completion or runtime TTS duration/pitch verification. See
+`airi_docs/완료/AIRI-SOURCE-ASAR-DEPLOY-SAFETY-2026-08-13.md`.
+
 ## 외부/인간 입력이 필요한 항목
 
 - cloud streaming latency 재측정: 제공자 자격증명과 외부 사용 승인
