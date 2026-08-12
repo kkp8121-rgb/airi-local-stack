@@ -26,8 +26,8 @@
 
 기계 판독 원본과 정규화된 경로·정확한 해시·도구 버전은
 `airi_docs/evidence/AIRI-TTS-ASAR-CANDIDATE-BUILD-2026-08-13.json`에 있다
-(5,374 bytes, SHA-256
-`98356562995CCA5188452CB1DA0EBD7D64AD7F4D7711718CD4625AB4C9377288`).
+(5,774 bytes, SHA-256
+`5A5960A52E1337E0F4F4EFE3C6F9C5BE5787D353B7908CE002A90552F87A3813`).
 
 ## 패키징 경계와 다음 게이트
 
@@ -36,7 +36,8 @@ integrity resource를 만든 뒤, `winCodeSign-2.6.0.7z`의 macOS dylib symlink�
 Windows 권한 없이 만들지 못해 최종 실패했다. 따라서 full portable
 `win-unpacked` PASS를 주장하지 않으며, 누락된 Godot `extraResources`도 portable
 배포 범위에서 별도 해결해야 한다. 이 실패는 이미 생성된 ASAR의 내용 검증과는
-분리했다.
+분리했다. 정확한 console transcript는 별도 보존하지 않았으므로, terminal 결과와
+생성 파일·timestamp·hash·validator를 provenance 근거로 사용한다.
 
 현재 설치 archive는 read-only 재확인 후에도 `1,356,257,019` bytes,
 SHA-256 `1B68AE5E...19B88B0`로 변하지 않았다. 설치·백업·AIRI 종료·실행은 하지

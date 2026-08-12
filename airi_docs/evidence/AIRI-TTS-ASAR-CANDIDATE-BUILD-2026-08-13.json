@@ -47,7 +47,8 @@
       "full_win_unpacked_build_passed": false,
       "failure_stage": "winCodeSign-2.6.0.7z extraction",
       "failure_reason": "Windows host could not create macOS dylib symbolic links without the required privilege",
-      "asar_content_affected_by_failure": false
+      "asar_content_affected_by_failure": false,
+      "transcript_preserved": false
     }
   },
   "candidate": {
@@ -67,13 +68,14 @@
       "out/renderer/index.html": true,
       "renderer_pages_bundle": true
     },
-    "markers": {
+    "raw_marker_scope": "First raw UTF-8 byte occurrence anywhere in the archive; presence evidence only, not member-path or runtime-execution proof",
+    "raw_marker_first_offsets": {
       "PcmStreamResampler": 514526346,
       "unsupported_fallback_limit": 514525341,
       "airi-moderation": 1549426,
-      "필터당함": 1105712188,
-      "pcm_ack_write_tail_contract": true
-    }
+      "필터당함": 1105712188
+    },
+    "pcm_ack_write_tail_contract_markers_present": true
   },
   "unpacked_compatibility": {
     "candidate_files": 135,
@@ -121,6 +123,7 @@
   "known_risks": [
     "The candidate app.asar is 225179759 bytes smaller than the installed archive; critical payload and unpacked compatibility checks pass, but runtime behavior is not yet proven.",
     "The active Node version is one patch release newer than the repository pin, so byte-for-byte rebuild reproducibility is not claimed.",
+    "The exact build and packaging console transcript was not preserved; this report relies on the resulting files, timestamps, hashes, validators, and observed terminal outcome.",
     "The generated win-unpacked tree is not a validated portable distribution: outer packaging failed and the configured Godot extraResources source was absent.",
     "An app.asar does not embed the Git commit; this sidecar binds its digest to the audited source commit and tree."
   ]
