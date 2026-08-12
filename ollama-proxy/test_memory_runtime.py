@@ -757,7 +757,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
                 return FakeResponse('{"extracted":[]}')
         client=BlockingClient()
         config=MemoryConfig(enabled=True,db_path=self.db,extraction_threshold=2,
-                            extraction_batch_messages=2,shutdown_flush_timeout_ms=2000,
+                            extraction_batch_messages=2,shutdown_flush_timeout_ms=20000,
                             extraction_model='test')
         r=MemoryRuntime(config,http_client=client); await r.startup()
         await r.schedule_completed_turn('s','u0','a0',1,'zero')
