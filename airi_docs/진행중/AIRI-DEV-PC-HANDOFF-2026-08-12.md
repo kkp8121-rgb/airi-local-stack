@@ -24,6 +24,24 @@ The current CI-equivalent 44-path Python 3.12 matrix passed 877 tests, skipped
 Source-only TTS work is distinct from installed-ASAR evidence: source
 test/typecheck/build do not modify or prove an installed ASAR. Installed-runtime
 claims require their own recorded ASAR and live-turn verification.
+
+## B4a handoff update (2026-08-13)
+
+현재 source 경계는 `broadcast-director/core.mjs`와 README·집중 테스트의
+오프라인 결정론 코어다. 기본 OFF/inert, Node 내장 모듈만 사용하며 caller의
+단조 `nowMs` 외 시간·I/O·환경·로그·네트워크·파일·영속성을 사용하지 않는다.
+20분×6 블록, 12초 질문 대기/3:2 cycle, 침묵 사다리, B1 screened event
+우선순위와 bounded backpressure, 이름만의 후원 ACK·이연 읽기, opaque 토픽
+lease, pause/kill/replay/frozen output 계약이 범위다. 집중 테스트 17 PASS와
+독립 최종 검토 PASS는 compressed deterministic simulation만 의미한다.
+
+실제 2시간 private stream·무오디오 공백·YouTube chat latency/quota/OAuth,
+runtime adapter, AIRI sender/TTS/OBS, 외부 killswitch, 실제 moderation, 설치 ASAR은
+아직 증명·변경되지 않았다. **정확한 재개 다음 단계:** B1b 외부 자격증명·쿼터
+실측·운영 승인을 먼저 확보한 뒤, B4b의 명시적 런타임 어댑터 경계를 설계하고
+승인된 비공개 리허설을 별도 실측한다. STT는 OFF/deferred 유지. 고정 커밋 해시는
+약속하지 않으며 현 tip은 `git log -1`로 확인한다. 상세:
+`완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`.
 - 오프라인 historical 검증: **`aef5300`의 CI `python-core-tests` matrix 41개 추적 경로**
   **829 passed / 1 skipped / 706 subtests**
   (기준 733/1/504), `test-patch-manifest.ps1` PASS, 소스·문서

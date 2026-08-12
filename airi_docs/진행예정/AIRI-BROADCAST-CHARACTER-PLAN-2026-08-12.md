@@ -85,6 +85,19 @@
 
 ### B4. 방송 디렉터 (G5의 실체화)
 
+**구현 현황 (2026-08-13, 계획 원문은 아래와 같이 유지):** B4a
+`broadcast-director/` 오프라인 기반 코어·README·집중 테스트가 추가됐다. 기본
+OFF/inert, Node 내장 모듈만 사용, caller monotonic `nowMs`만 사용하며 I/O·시계·환경·로그·네트워크·파일·영속성은 없다. 20분×6 블록, 첫 블록 boolean
+시그니처, 정확한 12초/3:2 질문 cycle, 채팅 시 자문자답 억제, 기본 60초의
+침묵 사다리, B1 screened event의 별도 우선순위/FIFO/backpressure, 이름만의
+후원 ACK·이연 낭독, opaque approved-topic lease, pause/resume·kill/close·inflight
+1건 replay·frozen output·content-free stats·bounded queue/LRU·strict Unicode shape를
+다룬다. 집중 테스트 17 PASS 및 독립 최종 검토 PASS는 compressed deterministic
+simulation 범위다. B4b 런타임 어댑터·실제 비공개 리허설, YouTube/OAuth·쿼터,
+AIRI sender/TTS/OBS, 외부 killswitch·실제 모더레이션 및 설치 ASAR 변경은 포함하지
+않는다. STT는 OFF/deferred를 유지한다. 상세:
+`완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`.
+
 **20분 블록 상태기계** (2시간 = 6블록):
 
 ```

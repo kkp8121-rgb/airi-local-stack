@@ -73,6 +73,13 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md` — 기본 OFF/inert,
+  Node 내장 모듈만 쓰는 B4a 오프라인 broadcast-director 기반. caller monotonic
+  `nowMs`의 20분×6 블록·질문/침묵/후원/토픽 lease·pause/kill 계약과 집중 테스트
+  17 PASS·독립 최종 검토 PASS를 기록한다. compressed deterministic simulation일
+  뿐 실제 2시간 방송·무오디오 공백·YouTube/OAuth·런타임 adapter·AIRI/TTS/OBS·외부
+  killswitch·실제 moderation·설치 ASAR 변경의 증거는 아니다.
+
 - `AIRI-I2A-VIEWER-MEMORY-FOUNDATION-2026-08-13.md` — I2a default-OFF
   separate SQLite viewer-memory foundation, content-free observation boundary,
   strict HMAC pseudonyms, bounded retention/facts/tier/deletion/count-only

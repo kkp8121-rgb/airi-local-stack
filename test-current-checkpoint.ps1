@@ -16,4 +16,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Sender contract tests failed.' }
 & node --test (Join-Path $PSScriptRoot 'chat-ingress\test-*.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Chat ingress contract tests failed.' }
 
+& node --test (Join-Path $PSScriptRoot 'broadcast-director\test-*.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Broadcast director contract tests failed.' }
+
 Write-Output 'Current checkpoint contract: PASS (offline, no archive/service/model access).'

@@ -65,7 +65,13 @@
   - [ ] 스타일 데이터셋 승격 재개 (`보류/AIRI-STYLE-PROMOTION-CHECKPOINT-2026-08-10.md`)
 - [~] **G5. 자발 행동·방송 디렉터**
   - [x] 설계 (방송 계획 §B4 20분 블록 상태기계 = G5 실체화) — 2026-08-12
-  - [ ] 구현 (선행: 결정 1~4 + M1~M3. 착수 시 토픽 거버넌스 보류 자산 해제)
+  - [~] B4a 오프라인 방송 디렉터 기반 — 기본 OFF/inert, caller monotonic `nowMs`,
+    20분×6 블록·질문/침묵/후원/토픽 lease·pause/kill 계약과 집중 테스트 17 PASS,
+    독립 최종 검토 PASS — 2026-08-13
+    (`완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`). 실제 런타임,
+    AIRI/TTS/OBS, YouTube/OAuth·쿼터, 외부 killswitch·모더레이션 및 2시간 실기는 미증명.
+  - [ ] B4b 어댑터·승인 비공개 리허설 (보류: B1b 외부 자격증명·쿼터 실측·운영 승인;
+    STT OFF/deferred 유지)
 - [ ] **G6. 화면·게임·채팅 에이전트** (G5 이후)
 
 ## C축 — 모델 커스터마이징 게이트
@@ -121,7 +127,10 @@
   - [x] B3 배선 3종 — TTS 폴백 7/7·런처 env·Electron "필터당함" 배지,
     신규 3층 source test/typecheck/build 및 설치본 실제 차단 턴 확인 — 2026-08-12 (`완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`)
   - [ ] B2 송출 (OBS Browser Source + App Audio Capture — 결정 2 이후)
-- [ ] **M4** (B4 방송 디렉터 + C3/C4 ∥ I3 주제 풀)
+- [~] **M4** (B4 방송 디렉터 + C3/C4 ∥ I3 주제 풀)
+  - [~] B4a 기반 구현 — 기본 OFF/inert; simulation-only 집중 테스트 17 PASS·독립 최종 검토 PASS.
+    B4b 런타임 어댑터와 실제 비공개 리허설은 미착수
+    (`완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`)
 - [ ] **M5** (리허설 → 데뷔 → I4 플라이휠)
 
 ## 모델 SSoT 게이트 (전환 고정 선언의 전제)
@@ -142,6 +151,17 @@
 ---
 
 ## 갱신 로그 (최신이 위)
+
+- **2026-08-13** (B4a broadcast-director foundation): Node built-ins-only,
+  default-OFF/inert 오프라인 코어를 추가했다. caller monotonic `nowMs`를 쓰는
+  20분×6 블록, 정확한 12초 질문 대기·3:2 closed/open cycle, 침묵 사다리,
+  B1 screened event 우선순위/유실 없는 bounded backpressure, 이름만의 후원 ACK,
+  opaque approved-topic lease, pause/kill/replay/frozen output 계약을 포함한다.
+  집중 테스트 17 PASS와 독립 최종 검토 PASS는 compressed deterministic simulation
+  범위뿐이다. 실제 2시간 방송·무오디오 공백·YouTube 지연/쿼터/OAuth·런타임
+  adapter·AIRI/TTS/OBS·외부 killswitch·실제 moderation·설치 ASAR 변경은 증명하지
+  않는다. G5/B4와 M4는 partial이며 B4b와 승인 비공개 리허설이 남고 STT는
+  OFF/deferred다. 상세: `완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`.
 
 - **2026-08-13** (I2a viewer-memory foundation): default-inert, separate
   SQLite storage and the content-free B1 observation boundary were added.
