@@ -25,14 +25,19 @@
 - `AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md` — EXAONE→Mi:dm 전환 분석.
   **미해결 게이트**: model SSoT 강제(프록시에 EXAONE 하드코딩 폴백 3곳),
   eval provenance, ACK metadata, digest pin, 인간 검수 100건.
-- `AIRI-LOCAL-TECH-SPECS.md` — 현행 스펙 문서. ⚠️ **stale** (STT=CPU·
-  EXAONE·Chatterbox 기재 — 실제는 GPU STT·Mi:dm·GPT-SoVITS). 갱신 대상.
+- `AIRI-LOCAL-TECH-SPECS.md` — 현행 스펙 문서. 2026-08-12 갱신 완료
+  (STT=large-v3-turbo GPU·LLM=midm-airi:2.0-mini·TTS=GPT-SoVITS 반영,
+  롤백 태그·SSoT 갭·확인 필요 항목 명시).
 
 ## 진행예정 — 계획
 
 - `AIRI-BROADCAST-CHARACTER-PLAN-2026-08-12.md` — 지능·캐릭터성·방송 통합
   계획. **사용자 결정 4건 대기** (관계 축·방송 중 클라우드 LLM·캐릭터
   확정·목표 시점). 근거는 `참조/AIRI-BROADCAST-RESEARCH-2026-08-12.md`.
+- `AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md` — C1 캐릭터 헌법
+  초안. **사용자 결정 1·3 대기, 코드 미반영**. 정체성·가치관·말버릇
+  후보·관계 규정 2안(사용자 출연 여부 분기)·리액션 톤 3단계를 포함하며,
+  `AIRI_SYSTEM_PROMPT`를 대체하지 않고 확장한다.
 - `AIRI-NEUROSAMA-LOW-LATENCY-PLAN.md` (v2.1) — 마스터 계획. §6 지연 예산·
   §12 완료 기준은 실측 후 재정의 제안(첫 반응 ≤1.5s / 본답변 ≤2.5s)과
   공존 중 — 공식 개정은 사용자 결정 사항.
