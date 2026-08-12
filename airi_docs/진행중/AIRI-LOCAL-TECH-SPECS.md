@@ -39,7 +39,7 @@
 | 롤백 태그 | `exaone-airi:2.4b` — `start-airi-local-stack.ps1 -ChatModel exaone-airi:2.4b`로 되돌릴 수 있음. 원본 모델과 Modelfile 모두 보존 |
 | 양자화 | Q4_K_M |
 | 컨텍스트 | `num_ctx=2048` (모델 교체 전후 동일 — Mi:dm 원본의 더 긴 최대 context는 사용하지 않음) |
-| GPU 사용 | `num_gpu=999`(요청값). 프로덕션 경로는 프록시 CLI 인자가 최종 승리하며, 8GB 예산 초과 시 Ollama가 로드 시점에 레이어를 자동 하향한다. 현재 구성의 실제 오프로드 층수·VRAM 분해 실측은 확인 필요 |
+| GPU 사용 | `num_gpu=999`(요청값). 프로덕션 경로는 프록시 CLI 인자가 최종 승리하며, 8GB 예산 초과 시 Ollama가 로드 시점에 레이어를 자동 하향한다. B0-2 3단계 실측은 6,084/6,131/6,289MiB(+47/+158, 총 +205), 최소 여유 1,736MiB이며 실제 NVENC H.264 1080p60 확인 |
 | 프록시 주소 | `http://127.0.0.1:11435` (`ollama-proxy/ollama_proxy.py`, SSE `text/event-stream`) |
 | 업스트림 | `http://127.0.0.1:11434` |
 
@@ -64,7 +64,12 @@ ACK metadata는 분기별 실측값(`audible`/`silent`)으로 교정됐다. 증�
 `AIRI_OUTPUT_MODERATION`·`AIRI_OUTPUT_MODERATION_TERMS`로 전달된다. custom
 사전은 절대 일반 파일로 검증하며 기존 11435 process에는 재사용하지 않는다.
 모더레이션 폴백 5종은 ACK 2종과 literal mirror되어 TTS 시작 시 전부 preload
-된다. dev PC 실기 cache readiness는 7/7이었다.
+된다. dev PC 실기 cache readiness는 7/7이었다. B3의 Electron 표시까지
+완료했으며, 3층 source test/typecheck/build과 설치본 실제 차단 턴의 가시
+배지를 확인했다(`완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`).
+설치본 `app.asar` SHA-256은
+`1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0`; 기본
+런타임은 moderation off, Mi:dm pin, TTS cache 7/7로 복원했다.
 
 ## STT
 
@@ -158,6 +163,8 @@ fallback 자동 전환은 없다. Chatterbox는 legacy 설치 후보로만 남�
 | STT WebSocket 스트리밍(3.3초 합성 음성) | 첫 partial 504.0ms, final 2,447.4ms | 〃 |
 | Electron 텍스트 입력 → 첫 실질 렌더 신호(n=20, 실기) | P50 1,963ms, P95 2,720ms | `AIRI-ELECTRON-TEXT-TTS-MEASUREMENT-2026-08-12.md` |
 | Electron 텍스트 입력 → 응답 완료(n=20, 실기) | P50 718ms, P95 794ms | 〃 |
+| 설치 Electron matched 모델 A/B(first substantive render, 모델별 n=10) | Mi:dm P50/P95 1,501.5/2,597.2ms; EXAONE 1,752.5/3,233.0ms | `AIRI-INSTALLED-MODEL-RENDER-AB-2026-08-12.md` |
+| B0-3 x264 1080p30 veryfast(설치 Electron 실제 턴) | CPU 평균 44.8%, 최대 70%, 최소 headroom 30%, 정상 5,346 frames | `AIRI-B0-RESOURCE-MEASUREMENT-2026-08-12.md` |
 
 **확인 필요 — 실측되지 않음**:
 
@@ -167,11 +174,10 @@ fallback 자동 전환은 없다. Chatterbox는 legacy 설치 후보로만 남�
   추론하지 말 것"이라고 명시했다.
 - large-v3-turbo/beam=1 SSoT 정렬 이후의 STT 단독 P50·한국어 WER
   재측정치.
-- 현재 `num_gpu=999` 구성의 VRAM 실측 분해(합/모델별). Mi:dm 도입 후
-  전체 스택 동시 상주 peak(7,350/8,192MiB, 여유 약 842MiB)는 있으나,
-  이는 STT+TTS+KURE+Mi:dm 합산 실측이며 모델별 세부 분해는 아니다.
-- installed Electron `app.asar`의 Mi:dm first-audible 실측(위 Electron
-  측정은 소스 빌드 `ef0217c5` 기준이며 설치본과 다르다).
+- 모델별 오프로드 층수·세부 VRAM 분해. B0-2의 3단계 총량·NVENC 실측은
+  완료했으나 모델별 분해는 별도 계측이 필요하다.
+- 설치 Electron의 default-render 신호까지는 matched 실측을 완료했다. 물리
+  스피커 음압·자연 재생 종료·lip-sync는 이 계측으로 증명되지 않는다.
 - barge-in 200~500ms, real-mic VAD 20+20, speaker AEC 실측 — 모두
   `AIRI-UPGRADE-SCOUT-MEASUREMENT-2026-08-11.md`가 "아직 운영 채택으로
   승격하면 안 되는 항목"으로 명시.
@@ -207,10 +213,10 @@ T0~T3 기준):
 
 최신 스냅샷은 `airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md`의 "최신
 검증 증거(2026-08-12)" 절이 단일 출처다. 이 문서에 수치를 중복 기재하지
-않고 인용만 남긴다 — 통합 Python 809 passed / 1 skipped / 706 subtests,
+않고 인용만 남긴다 — 통합 Python 816 passed / 1 skipped / 706 subtests,
 node 27/27, `test-current-checkpoint.ps1`·`test-patch-manifest.ps1` PASS
-(tip `932eae6` 기준). CI 2-job green은 `294c4e6` 기준이며 이후 커밋은 push
-시 재검증.
+(2026-08-12 dev PC 현재 배치). CI 2-job green은 `294c4e6` 기준이며 이후
+커밋은 push 시 재검증.
 
 ## 다음 게이트 (확인 필요 항목 포함)
 
@@ -219,8 +225,9 @@ node 27/27, `test-current-checkpoint.ps1`·`test-patch-manifest.ps1` PASS
 
 1. model SSoT 강제(하드코딩 폴백 제거), evaluation provenance 정정,
    ACK metadata, model digest pin을 먼저 해소한다. — **코드 해소 완료
-   (2026-08-12, `932eae6`). 위 "SSoT 갭" 절 참조. 남은 것은 실기 검증뿐.**
+   (2026-08-12, `932eae6`). dev PC 실기까지 완료.**
 2. 최소 100개 인간 검수 대화 + 장문 context/memory/card corpus에서
    정확성·답변 완전성·화자 보존·retry율을 함께 측정한다.
-3. 같은 Electron build·TTS warm state에서 모델 순서를 교차한 matched
-   text→render A/B를 추가해야 모델 교체의 체감 지연을 확정할 수 있다.
+3. 같은 설치 Electron·TTS warm state의 교차 matched text→render A/B는
+   모델별 n=10으로 완료했다. 작은 표본이므로 일반 성능·품질 우위가 아니라
+   현 구성의 지연 checkpoint로만 사용한다.

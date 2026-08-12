@@ -5,8 +5,9 @@
 목록이다. 착수 전 이 문서와 아래 근거 문서를 정독하라.
 
 - 완료 커밋: `7dc4e76`(문서), `932eae6`(코드) — 기반 `294c4e6`
-- 오프라인 검증: 전체 스위트 **809 passed / 1 skipped / 706 subtests**
-  (기준 733/1/504), `test-patch-manifest.ps1` PASS, `git diff --check` 클린
+- 오프라인 검증: 전체 스위트 **816 passed / 1 skipped / 706 subtests**
+  (기준 733/1/504), `test-patch-manifest.ps1` PASS, 소스·문서
+  `git diff --check` 클린(생성된 runtime patch 내부 source whitespace 제외)
 - 계획 근거: `진행예정/AIRI-BROADCAST-CHARACTER-PLAN-2026-08-12.md` (M1
   착수분), `진행중/AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md` (게이트)
 
@@ -19,8 +20,8 @@
 | 모델 SSoT | `resolve_chat_model()` 단일화, Electron 정규화, foreground 단일 runner, 롤백·eval provenance, digest pin | **dev PC 실기 PASS**, Mi:dm 실측 digest 기본 pin 반영 (`완료/AIRI-DEV-PC-SSOT-VERIFICATION-2026-08-12.md`) |
 | I1 기억 추출 | 게이트 리포트 자동 해석 → 추출 자동 ON 배선(fail-open), 게이트 프로파일 strict/balanced | Mi:dm balanced **실측 FAIL**, 추출 off 유지 (`완료/AIRI-MIDM-EXTRACTION-GATE-MEASUREMENT-2026-08-12.md`) |
 | MEM-04 | SQLite WAL + busy_timeout=5000ms (당초 500ms → 저하된 CI runner에서 락 실패 재발해 sqlite3 기본 예산 복원) | 완료, 활성화 후 락 경합 실측만 남음 |
-| B3 모더레이션 | 한국어 금칙어 사전·SSE 문장 게이트·캐릭터 폴백 대사(C3) | TTS 7/7 프리로드·런처 env 완료, **Electron 표시 배선 진행중** |
-| C1 헌법 | 캐릭터 헌법 초안 (`진행예정/AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md`) | 초안 — 사용자 결정 1·3 대기 |
+| B3 모더레이션 | 한국어 금칙어 사전·SSE 문장 게이트·캐릭터 폴백 대사(C3) | **3종 배선·신규 3층 source test/typecheck/build·설치본 "필터당함" 배지 실기 완료** (`완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`) |
+| C1 헌법 | 캐릭터 헌법 초안 (`진행예정/AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md`) | 결정 1·3 문구 반영, T-05 청취·인간 검수 대기 |
 | 문서 | TECH-SPECS 현행화, 색인 갱신 | 완료 |
 
 ## 2. dev PC 필수 작업 — SSoT 실기 검증
@@ -58,8 +59,8 @@ op alias accuracy 0.1429로 불합격했다. total latency P50/P95는
 `완료/AIRI-MIDM-EXTRACTION-GATE-MEASUREMENT-2026-08-12.md` 참조.
 
 추출 자동 ON은 **게이트 리포트가 존재하고 검증을 통과할 때만** 발효된다.
-현재 리포트는 없으며, 완화(balanced)로도 기존 후보(EXAONE 2.4B, Qwen3
-4B/8B)는 전부 불합격이다. **Mi:dm 2.0-mini는 추출기 후보로 미측정.**
+현재 Mi:dm balanced 리포트는 존재하지만 FAIL이며, 추출 off를 유지한다.
+다음 통과 후보 선정·재측정이 필요하다.
 
 ```powershell
 # 11436 격리 Ollama 서버 필요 (기존 절차)
@@ -79,36 +80,42 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
 
 1. **TTS 캐시 프리로드 (오디오 공백 금지의 실제 성립 조건)**:
    모더레이션 폴백 대사 5종(`ollama-proxy/moderation_terms_ko.json`의
-   `blocked_dialogue`)은 GPT-SoVITS 프리로드 캐시에 없어 현재 cold
-   synthesis다. `gpt-sovits/openai_compatible_proxy.py`의
+   `blocked_dialogue`)은 검토 PC 시점 GPT-SoVITS 프리로드 캐시에 없어
+   cold synthesis였다. `gpt-sovits/openai_compatible_proxy.py`의
    `IMMEDIATE_RESPONSE_TEXTS`와 동일한 mirror 계약으로 추가하라 —
    프록시 데이터 파일과 문자열이 1자라도 다르면 조용히 캐시 미스가 난다.
    — **완료:** literal mirror 테스트와 실기 cache readiness 7/7 통과.
 2. **런처 env 배선**: `AIRI_OUTPUT_MODERATION`(on|off), 선택적
    `AIRI_OUTPUT_MODERATION_TERMS`(사전 경로)를 두 런처
-   (`start-airi-local-stack.ps1` → `start-local-ollama-proxy.ps1`)에 전달
-   (현재 두 런처 모두 참조 0건 — 검토 PC에서 동시 편집 충돌을 피하려고
-   의도적으로 남긴 유일한 배선 갭).
+   (`start-airi-local-stack.ps1` → `start-local-ollama-proxy.ps1`)에 전달한다.
+   검토 PC 시점에는 동시 편집 충돌을 피하려고 의도적으로 남긴 배선 갭이었다.
    — **완료:** 기본 off, on/off 검증, 절대 사전 경로, 기존 proxy 재사용
    불일치 fail-closed, health 요약까지 배선.
 3. **Electron "필터당함" 표시**: SSE 청크의 최상위 `airi_moderation:
    {blocked, category, rule, replaced}` 필드를 읽어 화면 표시(C3 결함의
-   콘텐츠화). 클라이언트 패치 계약(3층) 안에서 진행.
+   콘텐츠화). **완료:** 3층 source test/typecheck/build과 설치 Electron의
+   실제 차단 턴에서 보이는 배지를 확인했다. 상세:
+   `완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`.
 
 추가 판단 항목: 사전 큐레이션 확대(리허설 트랜스크립트 기반 — JSON 작업),
 반복 문자 패딩 우회(오차단 위험으로 의도적 미구현 — 실제 관측 시 옵션
 추가), 비스트리밍 경로 2곳(`to_openai_sse`·native non-stream)은 TTS 경로가
 아니라 미게이트(다른 클라이언트를 붙일 경우 재검토).
 
-## 5. 기존 실기 게이트 (이월 — 변동 없음)
+## 5. 기존 실기 게이트 (이월)
 
-- **B0 선행 실측 3종** (방송 계획의 모든 결정의 전제):
-  `liveChatMessages.streamList` 쿼터 과금 실측 / VRAM 3단계 델타
-  (①STT+LLM+TTS ②+OBS ③+NVENC) / 5600X x264 CPU 여유.
-- Mi:dm installed-app first-audible, 실제 마이크 20+20, barge-in
-  200~500ms, speaker AEC, STT-06 마이크 품질.
-- 같은 Electron build·TTS warm 상태에서 모델 순서 교차 matched
-  text→render A/B (모델 교체의 체감 지연 확정용).
+- **B0 선행 실측:** B0-2 완료 — 3단계 VRAM 6,084/6,131/6,289MiB,
+  델타 +47/+158MiB(+205MiB), 최소 여유 1,736MiB, 실제 NVENC H.264 1080p60.
+  B0-3 완료 — 설치 Electron 실제 턴 중 x264 1080p30 veryfast CPU 평균
+  44.8%, 최대 70%, 최소 headroom 30%, 정상 5,346 frames
+  (`완료/AIRI-B0-RESOURCE-MEASUREMENT-2026-08-12.md`). B0-1만 자격증명·
+  외부 YouTube 실측 대기.
+- **설치 Electron matched 모델 A/B 완료:** 같은 ASAR·TTS warm 상태에서
+  Mi:dm→EXAONE→Mi:dm→EXAONE 교차 블록, 모델별 n=10. first substantive
+  render P50/P95는 Mi:dm 1,501.5/2,597.2ms, EXAONE
+  1,752.5/3,233.0ms였다
+  (`완료/AIRI-INSTALLED-MODEL-RENDER-AB-2026-08-12.md`).
+- 실제 마이크 20+20, barge-in 200~500ms, speaker AEC, STT-06 마이크 품질.
 - **인간 검수 100건 수집** — eval provenance가 해소됐으므로 이제 수집한
   평가 데이터를 승격 근거로 쓸 수 있다 (이전에는 모델 오표기 위험으로
   불가).
@@ -123,8 +130,9 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
 - health 스키마 변경: `immediate_ack`가 `silent`→`audible`(사용자 턴
   기준), `chat_model`·`output_moderation` 섹션 신설. 외부 소비자는 레포
   내 0건 확인됨 — 별도 대시보드가 있으면 확인.
-- digest pin은 opt-in이 기본: 미설정 시 관측·기록만 한다. 완전한
-  fail-closed는 §2-4의 pin 고정 후 성립.
+- generic proxy launcher의 digest pin은 명시값이 없으면 관측 모드다. root
+  운영 런처는 Mi:dm 실측 digest를 기본값으로 고정해 fail-closed가 성립한다.
+  EXAONE 롤백은 승인 digest를 별도로 주지 않으면 unpinned 관측 모드다.
 
 ## 7. 로드맵 현황판 갱신 의무 (신규 규칙)
 
@@ -138,22 +146,23 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
 방송 계획 §4의 4건 처리됨: ① 관계 축 — AI 단독형 + 메타 서사("사장님")
 확정 ② 방송 중 클라우드 LLM — 조건부(즉시 승인 아님, dev PC 실측 2종 후
 재결정) ③ 캐릭터 확정 — 이름 AIRI·호칭 "사장님" 확정, 시그니처 인사·
-팬덤명은 포지 후보 제안 → 사용자 확정 대기, T-05 음성 화자는 dev PC
-샘플 생성 → 사용자 청취 검토 대기 ④ 첫 방송 목표 시점 — 조건 기반
+팬덤명 "아이리스"·클로징은 확정, T-05는 라이선스 확인된
+한국어 후보 3개 샘플 생성 완료 후 사용자 청취 검토 대기
+(`완료/AIRI-T05-KOREAN-SPEAKER-CANDIDATES-2026-08-12.md`) ④ 첫 방송 목표 시점 — 조건 기반
 확정(M3 → 비공개 리허설 → 데뷔, 날짜 고정 없음). 헌법 초안 §5(관계
 규정)·§6(인사·팬덤명)이 이 결과를 반영했다
 (`진행예정/AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md`). 모더레이션
-폴백 대사 문구 확정은 여전히 결정 3의 잔여 항목(인사·팬덤명 선택)에
-걸려 있다.
+폴백 대사 5종은 B3 실기까지 완료했으며, 향후 문구 재승인은 선택적 조정이다.
 
 ## 9. dev PC 신규 작업 2건 (2026-08-12 사용자 결정 반영)
 
 1. **cloud_chat_provider 스트리밍 지연 실측** (결정 2의 전제) —
-   `cloud_chat_provider.py` 스트리밍 경로의 TTFT/지연 P50을 실측한다.
+   `ollama-proxy/benchmark_cloud_chat_latency.py` 하네스와 테스트는 완료.
+   live TTFT/지연 P50은 `OPENAI_API_KEY` 또는 `ANTHROPIC_API_KEY`와 외부
+   승인 부재로 보류(`진행중/AIRI-CLOUD-CHAT-LATENCY-MEASUREMENT-2026-08-12.md`).
    codex 구독 경로(비스트리밍)는 TTFT 8~15s로 이미 부적합 확정됐으므로,
    이 실측은 스트리밍 경로 단독 대상이다. 결과가 결정 2(방송 중 클라우드
    LLM)의 재결정 근거가 된다.
-2. **T-05 한국어 화자 후보 합성 샘플 생성** (결정 3의 잔여 항목) — 공개
-   라이선스 화자만 사용해 후보 화자 합성 샘플을 생성한다. 사용자 청취
-   검토 1회 후 어울리는 후보가 없으면 현행(일본어 참조 교차클로닝)을
-   유지한다.
+2. **T-05 한국어 화자 후보 합성 샘플** — 라이선스 확인된 3개 후보를
+   생성 완료. 사용자 청취 검토 후 어울리는 후보가 없으면 현행(일본어 참조
+   교차클로닝)을 유지한다.

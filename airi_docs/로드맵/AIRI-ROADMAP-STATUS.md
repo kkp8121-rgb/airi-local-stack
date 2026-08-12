@@ -22,10 +22,10 @@
 - [x] 결정 1 — 관계 축: AI 단독형 + 메타 서사("사장님") 채택 — 2026-08-12
   (호칭은 당초 "주인님"에서 같은 날 "사장님"으로 변경)
 - [~] 결정 2 — 방송 중 클라우드 LLM: 조건부 — dev PC 실측 2종
-  (`cloud_chat_provider` 스트리밍 지연·B0-3 x264 CPU 여유) 후 재결정
+  (B0-3 x264 완료, cloud streaming live TTFT는 자격증명·외부 승인 대기) 후 재결정
 - [~] 결정 3 — 캐릭터 확정: 이름 AIRI·호칭 "사장님"·시그니처 인사(메타
   개그형)·팬덤명 "아이리스"·클로징(메타 개그형) 확정 — 2026-08-12.
-  남은 것: T-05 한국어 음성 샘플 청취 검토, 아이리스 실존 충돌 확인
+  남은 것: 생성 완료한 T-05 한국어 음성 후보 3종 청취 검토, 아이리스 실존 충돌 확인
 - [x] 결정 4 — 첫 방송 목표 시점: 조건 기반(M3 달성 → 비공개 리허설 통과 →
   데뷔), 날짜 고정 없음 — 2026-08-12
 - [x] 결정 5 — 지연 목표: 재정의 제안(첫 반응 ≤1.5s / 본답변 ≤2.5s)
@@ -80,7 +80,10 @@
   (`완료/AIRI-ELECTRON-TEXT-TTS-MEASUREMENT-2026-08-12.md`), 실제 마이크
   음성 전체 체인은 미실측. 후속 최적화(소스 빌드 전환·TTS 청크 스트리밍)가
   활성 목표로 남음
-- [ ] matched Electron 모델 A/B (같은 build·TTS warm, dev PC)
+- [x] matched Electron 모델 A/B — 같은 설치 ASAR·TTS warm, 교차 블록
+  모델별 n=10. Mi:dm first substantive render P50/P95 1,501.5/2,597.2ms,
+  EXAONE 1,752.5/3,233.0ms — 2026-08-12
+  (`완료/AIRI-INSTALLED-MODEL-RENDER-AB-2026-08-12.md`)
 - [ ] 실제 마이크 음성 체인 P50/P95 실측 (dev PC)
 - [x] §12 완료 기준 공식 개정 (결정 5) — 2026-08-12 결정 완료: 재정의
   제안 기각, 원문 유지 확정
@@ -88,16 +91,16 @@
 ## 방송 실행 (M1~M5)
 
 - [~] **M1** (B0 실측 ∥ I1 추출 ∥ C1 헌법)
-  - [ ] B0-1 `liveChatMessages.streamList` 쿼터 과금 실측 (dev PC)
-  - [ ] B0-2 VRAM 3단계 델타 실측 (dev PC)
-  - [ ] B0-3 5600X x264 CPU 여유 실측 (dev PC)
+  - [ ] B0-1 `liveChatMessages.streamList` 쿼터 과금 실측 (보류: 자격증명·외부 YouTube)
+  - [x] B0-2 VRAM 3단계 델타 — 6,084/6,131/6,289MiB, +47/+158MiB(+205), 최소 여유 1,736MiB, NVENC H.264 1080p60 — 2026-08-12
+  - [x] B0-3 5600X x264 1080p30 veryfast — 설치 Electron 실제 턴 CPU 평균 44.8%/최대 70%/최소 headroom 30%, 정상 5,346 frames — 2026-08-12 (`완료/AIRI-B0-RESOURCE-MEASUREMENT-2026-08-12.md`)
   - [x] I1 추출 활성화 코드 — 2026-08-12 (`932eae6`, 발효는 G2 리포트 대기)
   - [x] C1 헌법 초안 — 2026-08-12 (확정은 결정 1·3)
 - [ ] **M2** (B1 채팅 브리지 ∥ C2 루프 배선 ∥ I2 시청자 기억)
 - [~] **M3** (B2 송출 + B3 안전)
   - [x] B3 모더레이션 게이트 코드 (사전 113항목+패턴 7, 기본 off) — 2026-08-12 (`932eae6`)
-  - [~] B3 배선 3종: TTS 폴백 7/7 프리로드·런처 env 완료 — 2026-08-12.
-    Electron "필터당함" 표시 진행중 (dev PC, 인수인계 §4)
+  - [x] B3 배선 3종 — TTS 폴백 7/7·런처 env·Electron "필터당함" 배지,
+    신규 3층 source test/typecheck/build 및 설치본 실제 차단 턴 확인 — 2026-08-12 (`완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`)
   - [ ] B2 송출 (OBS Browser Source + App Audio Capture — 결정 2 이후)
 - [ ] **M4** (B4 방송 디렉터 + C3/C4 ∥ I3 주제 풀)
 - [ ] **M5** (리허설 → 데뷔 → I4 플라이휠)
@@ -116,12 +119,25 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-12** (dev PC): 동일 설치 Electron·warm TTS에서 모델 순서를
+  Mi:dm→EXAONE→Mi:dm→EXAONE으로 교차하고 모델별 n=10의 matched
+  text→render A/B를 완료했다. Mi:dm first substantive render는 P50
+  1,501.5ms/P95 2,597.2ms, EXAONE은 1,752.5/3,233.0ms였다. 작은 표본과
+  TTS 분산 때문에 지연 gate 완료 근거로만 사용하며 품질 우위로 해석하지 않는다.
+
+- **2026-08-12** (dev PC): B3 3종 배선과 설치 Electron 가시 배지를 완료
+  (3층 source test/typecheck/build 신규 검증 포함). B0-2는 VRAM
+  6,084/6,131/6,289MiB·최소 여유 1,736MiB에서 실제 NVENC H.264 1080p60,
+  B0-3는 x264 1080p30 veryfast CPU 평균 44.8%·최대 70%·정상 5,346 frames를
+  확인했다. cloud streaming 하네스·테스트와 T-05 라이선스 확인 후보 3종은
+  준비 완료이나 live TTFT는 API key·외부 승인, T-05는 사용자 청취 검토 대기.
+
 - **2026-08-12** (dev PC): 필수 실기 1차 배치 — 설치 Electron의 stale
   EXAONE tag→Mi:dm 정규화, foreground 단일 runner, evaluator/eval provenance,
   EXAONE 롤백, digest 일치/불일치 fail-closed를 검증하고 Mi:dm 실측 digest를
   운영 런처 기본 pin으로 고정. I1 Mi:dm balanced 7-fixture는 품질 기준 FAIL로
   추출 off 유지. B3는 TTS 폴백 5종을 기존 ACK 2종과 함께 7/7 preload하고
-  moderation launcher env를 fail-closed로 배선. Electron 표시는 진행중.
+  moderation launcher env를 fail-closed로 배선.
 
 - **2026-08-12** (검토 PC): CI job 타임아웃 해소 — `d13c27c` run에서
   ollama-proxy-model shard가 10분 cap에 정확히 잘림(저하 runner + 5s

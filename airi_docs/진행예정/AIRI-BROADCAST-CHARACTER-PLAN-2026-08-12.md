@@ -40,7 +40,7 @@
 |---|---|---|
 | **C1** | 캐릭터 헌법 | 949자 시스템 프롬프트 → 캐릭터 카드 확장: 정체성·가치관·**말버릇 3~5개**(밈 시드)·좋아하는 것/약점(갭 요소)·관계 규정. 기존 signal garden 서사 활용. 시청자 해석이 정본이 되는 경로(Evil Neuro "사랑받지 못한 아이" = 팬 해석의 정본화)를 의도적으로 열어둔다 |
 | **C2** | G1 캐릭터 루프 배선 | `character_state.py`에 이미 있는 상태(current_topic·dialogue_goal·emotion·relationship_stage·repeat_intent·silence_ms)를 **프롬프트에 실제 주입** + 평가자 재활성화(방송 중은 클라우드 LLM이라 VRAM 경합 없음). 리액션 톤 3단계(평상 1 / 감탄 1.5 / 큰 사건 2)를 상태 파라미터로 노출 |
-| **C3** | 결함의 콘텐츠화 | 모더레이션 차단 시 침묵 대신 화면에 "필터당함" 표시 + 캐릭터 반응 대사("방금 그건 말하면 안 된대"). 기존 grounding 폴백 문장을 캐릭터 대사로 승격. **프록시 측은 2026-08-12 완료** — 차단 문장을 `moderation_terms_ko.json`의 `blocked_dialogue` 5종 순환으로 대체하고 SSE 최상위 `airi_moderation` 시그널을 실어 보낸다(오디오 공백 금지). **남은 것은 Electron 화면 표시 배선**과 대사 문구 확정(사용자 결정 ③ 연동) |
+| **C3** | 결함의 콘텐츠화 | 모더레이션 차단 시 침묵 대신 화면에 "필터당함" 표시 + 캐릭터 반응 대사("방금 그건 말하면 안 된대"). 2026-08-12 **B3 3종 배선 완료**: `blocked_dialogue` 5종 SSE 게이트·TTS 7/7·런처 env·Electron 배지, 신규 3층 source test/typecheck/build 및 설치본 실제 차단 턴 확인 (`완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`). 대사 문구의 사용자 재승인은 별도 |
 | **C4** | 관계 장치 | 시그니처 인사(10~30초, 한국 관례) · 팬덤명 · 고정 클로징(감사 + 다음 방송 예고) — **문구 확정 완료(2026-08-12, 헌법 §6)**: 인사·클로징 메타 개그형, 팬덤명 "아이리스". 공동 창작 경로는 팬덤명 공모 대신 밈 시드 해석 정본화로 유지 |
 | **C5** | 일관성 게이트 | 배포 전 회귀: 16케이스 + 스타일 계약 + 인간 검수. "성격이 바뀌었다"가 최대 리스크(83% 근거) — 캐릭터 카드 변경도 코드와 동일한 회귀 게이트를 거친다 |
 
@@ -48,9 +48,9 @@
 
 ### B0. 선행 실측 3종 (모든 결정의 전제)
 
-1. **`liveChatMessages.streamList` 쿼터 과금 방식** — 컷오프 이후 추가된 공식 gRPC push API. 저비용이면 채팅 아키텍처가 폴링 없이 확정된다. 문서에 과금 방식이 없어 실측 필수
-2. **VRAM 3단계 델타** — ① STT+LLM+TTS만 ② +OBS ③ +NVENC 방송. `nvidia-smi`
-3. **5600X x264 CPU 여유** — NVENC 불가 시 폴백 경로 검증
+1. **`liveChatMessages.streamList` 쿼터 과금 방식** — **보류:** 자격증명·외부 YouTube 실측 필요
+2. **VRAM 3단계 델타** — **완료:** ①~③ 6,084/6,131/6,289MiB, +47/+158MiB(총 +205), 최소 여유 1,736MiB, 실제 NVENC H.264 1080p60
+3. **5600X x264 CPU 여유** — **완료:** 설치 Electron 실제 턴 x264 1080p30 veryfast CPU 평균 44.8%·최대 70%·최소 headroom 30%, 정상 5,346 frames (`완료/AIRI-B0-RESOURCE-MEASUREMENT-2026-08-12.md`)
 
 ### B1. 채팅 수신 (최대 신규 갭 — 단, 주입 지점은 이미 있음)
 
@@ -66,13 +66,13 @@
 - **OBS Browser Source로 `stage-web` 직접 렌더** (Electron 창 캡처 대신) — 투명 배경 네이티브 해결, WGC·크로마키·Spout 문제 소멸
 - 오디오: OBS 28+ 내장 **Application Audio Capture**로 AIRI 프로세스만 분리 캡처 — 가상 케이블 불필요
 - 자막: 프록시 TTS 문장 분기 → obs-websocket `SetInputSettings` → Text(GDI+) 소스
-- **VRAM 판정: 여유 842MiB로 NVENC 상주는 권고 불가** (인코더 풀만 195~340MiB, 운영 마진 0). 해법: **방송 중 클라우드 LLM 전환**으로 Mi:dm VRAM(~1.9GB) 반납 — 실제 스위치는 `AIRI_CHAT_PROVIDER` + `AIRI_ALLOW_EXTERNAL_CHAT`(레포 실측. 과거 표기 `AIRI_LLM_MODE`는 현행 코드에 없음), 전환 절차는 실기 확인 필요. 대안: x264 CPU 인코딩(B0-3 실측 후). **조건부(2026-08-12 결정)**: 즉시 승인 아님 — codex 비스트리밍 경로는 TTFT 8~15s로 부적합 확정, `cloud_chat_provider.py` 스트리밍 실측 후 재결정
+- **VRAM 판정:** B0-2에서 실제 NVENC H.264 1080p60까지 6,289MiB·최소 여유 1,736MiB로 성립을 확인했다. 대안 x264도 B0-3에서 1080p30 veryfast CPU 평균 44.8%·최대 70%로 성립. **클라우드 LLM은 여전히 조건부**: `ollama-proxy/benchmark_cloud_chat_latency.py` 하네스·테스트는 있으나 live TTFT는 `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` 및 외부 승인 부재로 보류(`진행중/AIRI-CLOUD-CHAT-LATENCY-MEASUREMENT-2026-08-12.md`).
 
 ### B3. 안전 (상업 방송의 전제)
 
 | 장치 | 내용 | 비용 |
 |---|---|---|
-| 한국어 출력 모더레이션 | **한국어 지원 기성 가드 모델 전무 확정**(Llama Guard·ShieldGemma·Detoxify 전부 미지원). 금칙어 사전 + 정규식 필터 자체 구축, 삽입 지점은 문장 단위 TTS 게이트 | 프록시 코드와 기본 off 유지. 2026-08-12 dev PC에서 런처 env와 TTS 폴백 7/7 preload 완료. 남은 것은 Electron 표시 |
+| 한국어 출력 모더레이션 | **한국어 지원 기성 가드 모델 전무 확정**(Llama Guard·ShieldGemma·Detoxify 전부 미지원). 금칙어 사전 + 정규식 필터 자체 구축, 삽입 지점은 문장 단위 TTS 게이트 | **B3 배선 3종 완료:** 기본 off·런처 env·TTS 7/7·Electron "필터당함" 배지, 신규 3층 source test/typecheck/build 및 설치본 실제 차단 턴 검증 (`완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`) |
 | 지연 버퍼 30~60초 | OBS 소스 코드로 확정: RAM만 사용(60초 ≈ 60MB), VRAM 0. 이상 발화 개입 시간 확보 | 설정 1개 |
 | Killswitch 3중 | L1 obs-websocket 대기씬+뮤트(즉시) / L2 프록시 취소 경로 재사용(ASGI finally 실측 검증됨) / L3 방송 종료 API | 배선 |
 | 입력 방어 | comment-intelligence 인젝션 차단 + `liveChatBans` API | 채택 |
@@ -110,8 +110,8 @@
 | # | 결정 | 결과 |
 |---|---|---|
 | **1** | **관계 축** — 사용자가 방송에 출연하는가 | **AI 단독형 + 메타 서사 채택.** 사용자는 화면 밖 "사장님"으로만 존재. 성능·하드웨어 한계 자학 개그를 콘텐츠화 허용(경계는 캐릭터 헌법 §5 메타 서사 절). 채팅 실질 공동 진행자화·시청자 기억 콜백 1차 축·팬덤명 포지 제안→사용자 확정 등 보완장치 유지 |
-| 2 | **방송 중 클라우드 LLM** — 127.0.0.1 원칙의 예외 승인 | **조건부(즉시 승인 아님).** codex 구독 경로(비스트리밍)는 TTFT 8~15s로 부적합 확정. `cloud_chat_provider.py` 스트리밍 경로는 신설됐으나 미실측 — dev PC 실측 2종(① 스트리밍 지연 P50 ② B0-3 x264 CPU 여유) 후 재결정 |
-| 3 | **캐릭터 확정** — 이름(AIRI 유지 여부)·시그니처 인사·팬덤명 방향 + T-05 한국어 음성 레퍼런스 화자 승인 | **이름 AIRI·호칭 "사장님"·시그니처 인사(메타 개그형)·팬덤명 "아이리스"·클로징(메타 개그형) 전부 확정**(확정 문구는 캐릭터 헌법 §6). T-05는 dev PC에서 후보 화자 합성 샘플 생성 → 사용자 청취 검토 1회 → 어울리는 게 없으면 현행(일본어 참조 교차클로닝) 유지 |
+| 2 | **방송 중 클라우드 LLM** — 127.0.0.1 원칙의 예외 승인 | **조건부(즉시 승인 아님).** B0-3 x264는 완료. `ollama-proxy/benchmark_cloud_chat_latency.py` 하네스·테스트는 신설됐으나 live TTFT는 API key·외부 승인 부재로 보류 — 측정 후 재결정 |
+| 3 | **캐릭터 확정** — 이름(AIRI 유지 여부)·시그니처 인사·팬덤명 방향 + T-05 한국어 음성 레퍼런스 화자 승인 | **이름 AIRI·호칭 "사장님"·시그니처 인사(메타 개그형)·팬덤명 "아이리스"·클로징(메타 개그형) 전부 확정**(확정 문구는 캐릭터 헌법 §6). T-05 라이선스 확인 한국어 후보 3개 샘플 생성 완료(`완료/AIRI-T05-KOREAN-SPEAKER-CANDIDATES-2026-08-12.md`), 사용자 청취 검토 대기 |
 | 4 | **첫 방송 목표 시점** | **조건 기반 확정.** M3(기술적 방송 가능) 달성 → 비공개 리허설 통과 → 데뷔. 날짜 고정 없음 |
 
 ## 5. 실행 순서

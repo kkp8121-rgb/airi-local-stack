@@ -89,16 +89,17 @@ retry 횟수를 이 보고서가 직접 집계하지 않았으므로 인과 확�
 
 ## 3. 전체 Electron 체인과의 관계
 
-현재 Mi:dm Electron text→default-render 20회는 substantive output P50
-1,963ms, P95 2,720ms였고 20/20이 완료·출력됐다. 이는 현재 구성의 유효한
-실측이지만 같은 Electron build에서 EXAONE을 사용한 matched control이 없어
-모델 교체 이득으로 계산할 수 없다.
+소스 build의 Mi:dm Electron text→default-render 20회는 substantive output
+P50 1,963ms, P95 2,720ms였고 20/20이 완료·출력됐다. 이후 dev PC에서 동일
+설치 ASAR·warm TTS를 고정하고 Mi:dm→EXAONE→Mi:dm→EXAONE 교차 블록으로
+모델별 n=10의 matched control을 추가했다. first substantive render
+P50/P95는 Mi:dm 1,501.5/2,597.2ms, EXAONE 1,752.5/3,233.0ms였다.
 
-이전의 같은 TTS 문장 n=6 순차 표본에서는 오히려 Mi:dm 구성의 TTS 첫
-byte가 EXAONE보다 약 301ms, 완료가 약 153ms 늦었다. TTS 비결정성과 완전
-무작위화되지 않은 순서가 섞인 약한 연관 결과다. 따라서 현재 proxy A/B와
-모순으로 보지 말고, installed/source Electron의 counterbalanced matched
-A/B가 끝날 때까지 whole-chain 인과는 미판정으로 둔다.
+따라서 요구한 installed Electron matched 지연 gate는 완료됐고 현 구성에서
+Mi:dm 기본 후보 유지에 모순되는 지연 증거는 없었다. 다만 n=10의 작은
+표본이고 prompt별 TTS·render 분산이 커 일반적인 인과 우위나 품질 우위로
+확대하지 않는다. 원시값과 통제 조건은
+`완료/AIRI-INSTALLED-MODEL-RENDER-AB-2026-08-12.md`에 보존했다.
 
 ## 장점
 
@@ -143,12 +144,13 @@ A/B가 끝날 때까지 whole-chain 인과는 미판정으로 둔다.
 
 - Mi:dm 기본 후보는 유지한다. 지금 증거에서는 EXAONE으로 되돌릴 이유보다
   품질·라이선스 이득이 크다.
-- model SSoT 강제, evaluation provenance, ACK metadata, model digest pin을
-  수정하기 전에는 “운영 전환이 완전히 고정됐다”고 선언하지 않는다.
+- model SSoT 강제, evaluation provenance, ACK metadata, model digest pin은
+  코드와 dev PC 실기 검증을 완료했다.
 - 최소 100개 인간 검수 대화와 장문 context/memory/card corpus에서 정확성,
   답변 완전성, 화자·부정 보존, retry율, 출력 token을 함께 측정한다.
-- 같은 Electron build·TTS warm state에서 모델 순서를 교차한 matched
-  text→render A/B를 추가해야 모델 교체의 체감 지연을 확정할 수 있다.
+- 같은 설치 Electron·TTS warm state의 교차 matched text→render A/B는
+  모델별 n=10으로 완료했다. 이는 지연 checkpoint이며 인간 품질 검수를
+  대신하지 않는다.
 - 승인 지식 fixture 재현성과 운영 지식 배포는 계속 별도 과제다. 이 모델
   비교는 어떤 승인 지식도 운영에 자동 배포하지 않았다.
 
@@ -181,18 +183,17 @@ python ollama-proxy\benchmark_dialogue_quality.py `
 
 ## 후속 반영 (2026-08-12)
 
-위 본문은 2026-08-12 분석 시점의 기록이며 수정하지 않는다. 그 시점 이후
+위 raw/proxy 분석은 2026-08-12 최초 분석 시점의 기록이다. 그 시점 이후
 `932eae6`(feat: close model SSoT gates, arm memory extraction, add Korean
-output moderation)에서 §단점 7~10이 **코드 레벨로 해소**됐다. 네 항목 모두
-**실기(dev PC) 검증 대기** 상태이므로 "운영 전환 고정" 선언은 아직 성립하지
-않는다.
+output moderation)에서 §단점 7~10이 코드 레벨로 해소됐고, 후속 dev PC
+배치에서 네 항목의 실기 검증도 완료했다.
 
-| 항목 | 원 지적 | 해소 내용 | 남은 것 |
+| 항목 | 원 지적 | 해소 내용 | dev PC 실기 결과 |
 |---|---|---|---|
-| 7. model SSoT | 런처 `ChatModel`이 local request의 `model` 필드를 강제하지 않음 | `resolve_chat_model()`(env `AIRI_CHAT_MODEL` → 기본 `midm-airi:2.0-mini`) 단일 경유로 통일하고 프록시 소스의 EXAONE 하드코딩 8곳을 제거(소스 0건을 테스트로 고정). local provider의 foreground `model` 필드를 SSoT로 정규화하며, loopback 검증 마커(`local-quality-probe`/`local-evaluation`, 127.0.0.1 한정)만 면제하고 `AIRI_CHAT_MODEL_ENFORCE=0`이 진단용 escape hatch다. 외부 provider는 비강제 | 실제 Electron→11435 턴에서 `/health`의 `chat_model.normalized_requests > 0` 확인 |
-| 8. eval provenance | fallback이 EXAONE이고 launcher가 `AIRI_EVAL_MODEL`을 설정하지 않음 | `AIRI_EVAL_MODEL` 미설정 시 SSoT 폴백으로 전환하고 런처가 값을 설정 | 수집 평가 데이터의 모델 표기 실기 확인 |
-| 9. ACK 표기 | audible ACK인데 header/health가 `silent`로 보고 | `X-AIRI-Immediate-Ack`를 분기별 실측값으로 교정(발화 분기 `audible`, 무음 분기 `silent`, 네이티브 `api/chat` 통과 경로 `false`). `/health`의 `immediate_ack`는 사용자 턴 기준 `audible`로 정정하고 `chat_model` 텔레메트리 섹션을 신설 | 실기 latency 해석 재확인 |
-| 10. digest pin | preflight가 tag 이름만 보고 digest를 pin하지 않음 | `AIRI_CHAT_MODEL_DIGEST` 설정 시 불일치를 fail-closed로 기동 차단, 미설정 시 관측 digest만 기록(opt-in). PS preflight도 `-ExpectedDigest` 지원 | 실측 digest를 복사해 pin 고정 — 그 전까지는 완전한 fail-closed가 아님 |
+| 7. model SSoT | 런처 `ChatModel`이 local request의 `model` 필드를 강제하지 않음 | `resolve_chat_model()` 단일 경유와 local foreground 모델 정규화 | 설치 Electron이 보낸 stale EXAONE 요청을 Mi:dm으로 정규화, `normalized_requests=1`; `ollama ps` Mi:dm 단일 runner 확인 |
+| 8. eval provenance | fallback이 EXAONE이고 launcher가 `AIRI_EVAL_MODEL`을 설정하지 않음 | 미설정 시 SSoT 폴백, 런처가 evaluator/eval model 설정 | root 요약의 evaluator model, 실제 턴 후 terminal `last_status=ok`, provenance `model`·`model_version` 일치 확인; EXAONE 롤백도 동일 확인 |
+| 9. ACK 표기 | audible ACK인데 header/health가 `silent`로 보고 | 분기별 `X-AIRI-Immediate-Ack`, health 사용자 턴 기준 `audible` | 설치 Electron 턴과 latency 해석에서 audible ACK를 본답변 render와 분리 확인 |
+| 10. digest pin | preflight가 tag 이름만 보고 digest를 pin하지 않음 | digest 설정 시 불일치 fail-closed, 관측·상태 노출 | Mi:dm 실측 digest를 운영 기본 pin으로 고정; 일치 pin verified, 1자 불일치 pin은 11435 listen 전 차단 확인 |
 
-관련 문서: `진행중/AIRI-DEV-PC-HANDOFF-2026-08-12.md` §2(실기 검증 절차),
-`진행중/AIRI-LOCAL-TECH-SPECS.md` "SSoT 갭" 절.
+관련 증거: `완료/AIRI-DEV-PC-SSOT-VERIFICATION-2026-08-12.md`,
+`완료/AIRI-INSTALLED-MODEL-RENDER-AB-2026-08-12.md`.

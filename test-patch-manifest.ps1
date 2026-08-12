@@ -37,8 +37,8 @@ $artifacts = @(
     }
     [pscustomobject]@{
         Path = 'airi_docs/patches/AIRI-v0.11.3-upgrade-scout-runtime-20260811.patch'
-        Length = 86899
-        Sha256 = '00663A809050BAF52834E1265419CC2D13E0CB48C01C59D28E3BF8AD1B8865F5'
+        Length = 106205
+        Sha256 = '13417A7464C35B2A8C2E8FDC54F37E629C32F031F9F7DA5EB6073B995E1F63DA'
         Usable = $true
         Defect = ''
         Support = 'Runtime'
@@ -186,6 +186,26 @@ if ($workflow -notmatch 'actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c
     $workflow -notmatch 'fetch-depth: 0' -or
     $workflow -notmatch [regex]::Escape(':(exclude)airi_docs/patches/*.patch')) {
     throw 'Checkpoint workflow contract failed.'
+}
+
+# An apply/reverse check alone cannot detect a regenerated layer being replaced
+# by a smaller, unrelated delta. Keep representative markers from every
+# Upgrade Scout capability in the pinned artifact, including B3 moderation.
+$upgradeScoutPatch = Join-Path $root 'airi_docs/patches/AIRI-v0.11.3-upgrade-scout-runtime-20260811.patch'
+$upgradeScoutText = [IO.File]::ReadAllText($upgradeScoutPatch, [Text.Encoding]::UTF8)
+$requiredUpgradeScoutMarkers = @(
+    'packages/stage-ui/src/libs/speech/pcm-worklet.ts',
+    'packages/stage-ui/src/libs/speech/incremental-wav.ts',
+    'packages/stage-ui/src/composables/audio/voice-input-vad-experiment.ts',
+    'packages/stage-ui/src/stores/providers/local-stt/stream-transcription.ts',
+    'packages/stage-ui/src/libs/speech/text-self-echo.ts',
+    'type: ''airi-moderation''',
+    'airiModerationNotice'
+)
+foreach ($marker in $requiredUpgradeScoutMarkers) {
+    if (-not $upgradeScoutText.Contains($marker)) {
+        throw "Upgrade Scout semantic marker missing: $marker"
+    }
 }
 
 $pythonJob = [regex]::Match($workflow, '(?ms)^  python-core-tests:\r?\n(?<body>.*?)(?=^  [^\s]|\z)')

@@ -1,5 +1,5 @@
 diff --git a/apps/stage-tamagotchi/src/renderer/pages/index.vue b/apps/stage-tamagotchi/src/renderer/pages/index.vue
-index e788e8f0a743416d42844c646d4687f397f4252e..99156a6331e7dac073509deca203b1dce5618ece 100644
+index e788e8f0a743416d42844c646d4687f397f4252e..b67c005e08e59bf973f0449d76694ed9ba3d27e1 100644
 --- a/apps/stage-tamagotchi/src/renderer/pages/index.vue
 +++ b/apps/stage-tamagotchi/src/renderer/pages/index.vue
 @@ -35,8 +35,10 @@ import {
@@ -22,15 +22,16 @@ index e788e8f0a743416d42844c646d4687f397f4252e..99156a6331e7dac073509deca203b1dc
  import {
    assistantSpeechCooldownDeadline,
    DEFAULT_ASSISTANT_SPEECH_INPUT_COOLDOWN_MS,
-@@ -274,6 +278,7 @@ const { transcribeForMediaStream, stopStreamingTranscription } = hearingPipeline
+@@ -274,6 +278,8 @@ const { transcribeForMediaStream, stopStreamingTranscription } = hearingPipeline
  const { error: transcriptionError, supportsStreamInput } = storeToRefs(hearingPipeline)
  const chatSyncStore = useChatSyncStore()
  const chatOrchestrator = useChatOrchestratorStore()
++const { airiModerationNotice } = storeToRefs(chatOrchestrator)
 +const speechOutputControlStore = useSpeechOutputControlStore()
  const broadcastSettings = loadBroadcastSettings()
  let producedBroadcastRoundId: string | undefined
  let activeBroadcastRoundId: string | undefined
-@@ -355,6 +360,9 @@ const voiceTranscriptBuffer = createTranscriptBuffer<VoiceTranscriptContext>({
+@@ -355,6 +361,9 @@ const voiceTranscriptBuffer = createTranscriptBuffer<VoiceTranscriptContext>({
  
  const assistantSpeechSuppressedUntil = shallowRef(0)
  const assistantSpeechResumeTimer = shallowRef<ReturnType<typeof setTimeout>>()
@@ -40,7 +41,7 @@ index e788e8f0a743416d42844c646d4687f397f4252e..99156a6331e7dac073509deca203b1dc
  let voiceInputGeneration = 0
  
  /** Controls transcript cleanup while voice input stops. */
-@@ -402,7 +410,7 @@ function isVoiceInputSuppressed(now = Date.now()) {
+@@ -402,7 +411,7 @@ function isVoiceInputSuppressed(now = Date.now()) {
  function inspectVoiceInputProviderRequestGate(generation: unknown) {
    const current = generation === voiceInputGeneration
    const audioEnabled = enabled.value
@@ -49,7 +50,7 @@ index e788e8f0a743416d42844c646d4687f397f4252e..99156a6331e7dac073509deca203b1dc
    let reason: string | undefined
    if (!current)
      reason = 'Skipped stale voice input segment'
-@@ -427,7 +435,7 @@ function inspectVoiceInputProviderRequestGate(generation: unknown) {
+@@ -427,7 +436,7 @@ function inspectVoiceInputProviderRequestGate(generation: unknown) {
   */
  function inspectVoiceInputStreamingRequestGate() {
    const audioEnabled = enabled.value
@@ -58,7 +59,7 @@ index e788e8f0a743416d42844c646d4687f397f4252e..99156a6331e7dac073509deca203b1dc
  
    return {
      enabled: audioEnabled,
-@@ -518,6 +526,15 @@ function postSpeakerCaption(text: string) {
+@@ -518,6 +527,15 @@ function postSpeakerCaption(text: string) {
      console.warn('[Main Page] Failed to post voice input caption:', error)
  }
  
@@ -74,7 +75,7 @@ index e788e8f0a743416d42844c646d4687f397f4252e..99156a6331e7dac073509deca203b1dc
  /**
   * Sends buffered voice input text to the active chat session.
   */
-@@ -542,9 +559,11 @@ function handleStreamingSentenceEnd(delta: string) {
+@@ -542,9 +560,11 @@ function handleStreamingSentenceEnd(delta: string) {
      return
  
    const roundId = globalThis.crypto.randomUUID()
@@ -89,7 +90,7 @@ index e788e8f0a743416d42844c646d4687f397f4252e..99156a6331e7dac073509deca203b1dc
  }
  
  /** Publishes the provider's final streaming-ASR text to the caption overlay. */
-@@ -552,7 +571,9 @@ function handleStreamingSpeechEnd(text: string) {
+@@ -552,7 +572,9 @@ function handleStreamingSpeechEnd(text: string) {
    if (isVoiceInputSuppressed())
      return
  
@@ -100,7 +101,7 @@ index e788e8f0a743416d42844c646d4687f397f4252e..99156a6331e7dac073509deca203b1dc
  }
  
  /** Reads the listening generation attached to recorder-backed transcription metadata. */
-@@ -584,7 +605,7 @@ const noteLocalVoiceCapture = (outcome: typeof localVoiceLastCapture.value.outco
+@@ -584,7 +606,7 @@ const noteLocalVoiceCapture = (outcome: typeof localVoiceLastCapture.value.outco
  const voiceInputSession = useVoiceInputSession(stream, {
    shouldUseStreamInput,
    canStartSegment: () => {
@@ -109,7 +110,7 @@ index e788e8f0a743416d42844c646d4687f397f4252e..99156a6331e7dac073509deca203b1dc
      noteLocalVoiceCapture(allowed ? 'capture-started' : 'capture-skipped')
      return allowed
    },
-@@ -607,11 +628,31 @@ const voiceInputSession = useVoiceInputSession(stream, {
+@@ -607,11 +629,31 @@ const voiceInputSession = useVoiceInputSession(stream, {
    },
    onTranscriptionStart: () => noteLocalVoiceCapture('transcription-started'),
    onTranscriptionResult: ({ text, metadata }) => {
@@ -146,7 +147,7 @@ index e788e8f0a743416d42844c646d4687f397f4252e..99156a6331e7dac073509deca203b1dc
    },
    onTranscriptionEmpty: ({ metadata }) => {
      noteLocalVoiceCapture(transcriptionError.value ? 'transcription-error' : 'transcription-empty')
-@@ -654,6 +695,9 @@ async function startAudioInteractionConsumers() {
+@@ -654,6 +696,9 @@ async function startAudioInteractionConsumers() {
      await transcribeForMediaStream(currentStream, {
        onSentenceEnd: handleStreamingSentenceEnd,
        onSpeechEnd: handleStreamingSpeechEnd,
@@ -156,7 +157,7 @@ index e788e8f0a743416d42844c646d4687f397f4252e..99156a6331e7dac073509deca203b1dc
      })
  
      if (inspectVoiceInputStreamingRequestGate().skip) {
-@@ -734,12 +778,6 @@ watch(nowSpeaking, async (speaking) => {
+@@ -734,12 +779,6 @@ watch(nowSpeaking, async (speaking) => {
      broadcastDirector.activity()
    if (speaking) {
      clearAssistantSpeechResumeTimer()
@@ -169,7 +170,16 @@ index e788e8f0a743416d42844c646d4687f397f4252e..99156a6331e7dac073509deca203b1dc
      return
    }
  
-@@ -920,6 +958,7 @@ const cursorPosition = computed(() => ({
+@@ -917,9 +956,16 @@ const cursorPosition = computed(() => ({
+       >
+         <StatusIsland v-if="IS_DEV" ref="statusIslandRef" />
+         <ResourceStatusIsland />
++        <div
++          v-if="airiModerationNotice"
++          class="pointer-events-none absolute left-1/2 top-4 z-50 -translate-x-1/2 rounded-full bg-amber-500/90 px-3 py-1 text-sm text-black font-bold shadow"
++        >
++          필터당함
++        </div>
          <WidgetStage
            ref="widgetStageRef"
            v-model:state="componentStateStage"
@@ -303,6 +313,33 @@ index 0000000000000000000000000000000000000000..fad8607c4d2cfaee6f724041e68bf6c6
 +  ingest()
 +  return true
 +}
+diff --git a/packages/core-agent/src/runtime/chat-orchestrator-runtime.ts b/packages/core-agent/src/runtime/chat-orchestrator-runtime.ts
+index 4253a307fd1d21d46ab567eff81ec3dfcd08aec4..83b748b1c65986f3c5a3a865b507c1f31e392e96 100644
+--- a/packages/core-agent/src/runtime/chat-orchestrator-runtime.ts
++++ b/packages/core-agent/src/runtime/chat-orchestrator-runtime.ts
+@@ -879,6 +879,10 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
+                 patchForegroundStream(sessionId, buildingMessage)
+               break
+             }
++            case 'airi-moderation':
++              // UI-only transport metadata; it must not enter assistant text,
++              // speech, history, or the runtime's durable message state.
++              break
+             case 'finish':
+               break
+             case 'error':
+diff --git a/packages/core-agent/src/types/llm.ts b/packages/core-agent/src/types/llm.ts
+index 2f93f8432470ec9856e9ee339a16f1f23d1e8a6f..a97b47e4faaaf21a55c777a058198fc1009d40b2 100644
+--- a/packages/core-agent/src/types/llm.ts
++++ b/packages/core-agent/src/types/llm.ts
+@@ -15,6 +15,7 @@ export interface LlmUsage {
+ export type StreamEvent
+   = | { type: 'text-delta', text: string }
+     | { type: 'reasoning-delta', text: string }
++    | { type: 'airi-moderation', blocked: true, replaced: true, category: string, rule: string }
+     | ({ type: 'finish' } & any)
+     | ({ type: 'tool-call' } & CompletionToolCall)
+     | (CompletionToolResult & { type: 'tool-error' })
 diff --git a/packages/pipelines-audio/src/managers/playback-manager.test.ts b/packages/pipelines-audio/src/managers/playback-manager.test.ts
 index e8e8f16421e978177e4b819b6862a837ba280a75..dba1fa71d3c328e16949129518d1c53274504d4c 100644
 --- a/packages/pipelines-audio/src/managers/playback-manager.test.ts
@@ -869,6 +906,48 @@ index 0000000000000000000000000000000000000000..41374442de6746e90ae42115479d4e37
 +      && measurement.properNounPreserved
 +      && !measurement.transcriptionError)
 +}
+diff --git a/packages/stage-ui/src/libs/providers/airi-moderation-stream.test.ts b/packages/stage-ui/src/libs/providers/airi-moderation-stream.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..3bca07278ec380122ed350948ef769005990b384
+--- /dev/null
++++ b/packages/stage-ui/src/libs/providers/airi-moderation-stream.test.ts
+@@ -0,0 +1,36 @@
++import { streamText } from '@xsai/stream-text'
++import { describe, expect, it } from 'vitest'
++
++describe('patched xsAI stream-text AIRI moderation event', () => {
++  it('emits validated top-level airi_moderation before an empty choices chunk returns', async () => {
++    const events: unknown[] = []
++    const payload = JSON.stringify({
++      airi_moderation: {
++        blocked: true,
++        category: 'safety',
++        rule: 'term',
++        replaced: true,
++      },
++      choices: [],
++    })
++    const result = streamText({
++      baseURL: 'http://127.0.0.1:11435/v1/',
++      model: 'local-model',
++      messages: [{ role: 'user', content: 'hello' }],
++      fetch: async () => new Response(`data: ${payload}\n\n`, {
++        headers: { 'content-type': 'text/event-stream' },
++      }),
++      onEvent: event => events.push(event),
++    })
++
++    await result.steps
++
++    expect(events).toContainEqual({
++      type: 'airi-moderation',
++      blocked: true,
++      category: 'safety',
++      rule: 'term',
++      replaced: true,
++    })
++  })
++})
 diff --git a/packages/stage-ui/src/libs/speech/incremental-wav.test.ts b/packages/stage-ui/src/libs/speech/incremental-wav.test.ts
 new file mode 100644
 index 0000000000000000000000000000000000000000..1c517548490bc5592f53133c10d4ee8fde0e7a13
@@ -1625,6 +1704,157 @@ index e2d258bede94fdf031b50518b38b6bb4b8d018e7..c9072beb17e41a9bf5f52b786bb88080
      await mutex.acquire()
      try {
        if (hostPipeline)
+diff --git a/packages/stage-ui/src/stores/chat.contract.test.ts b/packages/stage-ui/src/stores/chat.contract.test.ts
+index 7ca6a8fc717973a5ba0bf8f41fac022278ac3a11..aad8d5b1a46533fda3322299e789b536c6cb2284 100644
+--- a/packages/stage-ui/src/stores/chat.contract.test.ts
++++ b/packages/stage-ui/src/stores/chat.contract.test.ts
+@@ -333,6 +333,89 @@ describe('chat orchestrator contract', () => {
+     })
+   })
+ 
++  it('shows an ephemeral moderation notice only for a verified loopback replacement', async () => {
++    const loopbackProvider = {
++      chat: () => ({ baseURL: 'http://127.0.0.1:11435/v1/' }),
++    } as unknown as ChatProvider
++    llmStreamMock.mockImplementation(async (_model: string, _chatProvider: ChatProvider, _messages: Message[], options: any) => {
++      await options.onStreamEvent({
++        type: 'airi-moderation',
++        blocked: true,
++        replaced: true,
++        category: 'safety',
++        rule: 'term',
++      })
++      await options.onStreamEvent({ type: 'text-delta', text: 'safe replacement' })
++      await options.onStreamEvent({ type: 'finish', finishReason: 'stop' })
++    })
++
++    const store = useChatOrchestratorStore()
++    await store.ingest('local reply', { model: 'gpt-test', chatProvider: loopbackProvider })
++
++    expect(store.airiModerationNotice).toBe(true)
++    expect(sessionMessages['session-1']?.at(-1)).toMatchObject({
++      role: 'assistant',
++      content: 'safe replacement',
++    })
++  })
++
++  it('ignores malformed or non-replacement moderation metadata', async () => {
++    const loopbackProvider = {
++      chat: () => ({ baseURL: 'http://localhost:11435/v1/' }),
++    } as unknown as ChatProvider
++    llmStreamMock.mockImplementation(async (_model: string, _chatProvider: ChatProvider, _messages: Message[], options: any) => {
++      await options.onStreamEvent({ type: 'airi-moderation', blocked: false, replaced: true } as any)
++      await options.onStreamEvent({ type: 'airi-moderation', blocked: true, replaced: false } as any)
++      await options.onStreamEvent({ type: 'airi-moderation', blocked: true, replaced: true, category: 3, rule: [] } as any)
++      await options.onStreamEvent({ type: 'text-delta', text: 'normal text' })
++      await options.onStreamEvent({ type: 'finish', finishReason: 'stop' })
++    })
++
++    const store = useChatOrchestratorStore()
++    await store.ingest('local reply', { model: 'gpt-test', chatProvider: loopbackProvider })
++
++    expect(store.airiModerationNotice).toBe(false)
++    expect(sessionMessages['session-1']?.at(-1)).toMatchObject({ role: 'assistant', content: 'normal text' })
++  })
++
++  it('never accepts a moderation signal from a remote provider', async () => {
++    llmStreamMock.mockImplementation(async (_model: string, _chatProvider: ChatProvider, _messages: Message[], options: any) => {
++      await options.onStreamEvent({
++        type: 'airi-moderation',
++        blocked: true,
++        replaced: true,
++        category: 'safety',
++        rule: 'term',
++      })
++      await options.onStreamEvent({ type: 'finish', finishReason: 'stop' })
++    })
++
++    const store = useChatOrchestratorStore()
++    await store.ingest('remote reply', { model: 'gpt-test', chatProvider: provider })
++
++    expect(store.airiModerationNotice).toBe(false)
++  })
++
++  it('clears the moderation notice when the next foreground round resets', async () => {
++    const loopbackProvider = {
++      chat: () => ({ baseURL: 'http://[::1]:11435/v1/' }),
++    } as unknown as ChatProvider
++    llmStreamMock.mockImplementationOnce(async (_model: string, _chatProvider: ChatProvider, _messages: Message[], options: any) => {
++      await options.onStreamEvent({ type: 'airi-moderation', blocked: true, replaced: true, category: 'safety', rule: 'term' })
++      await options.onStreamEvent({ type: 'finish', finishReason: 'stop' })
++    }).mockImplementationOnce(async (_model: string, _chatProvider: ChatProvider, _messages: Message[], options: any) => {
++      await options.onStreamEvent({ type: 'text-delta', text: 'next normal reply' })
++      await options.onStreamEvent({ type: 'finish', finishReason: 'stop' })
++    })
++
++    const store = useChatOrchestratorStore()
++    await store.ingest('first', { model: 'gpt-test', chatProvider: loopbackProvider })
++    expect(store.airiModerationNotice).toBe(true)
++
++    await store.ingest('second', { model: 'gpt-test', chatProvider: loopbackProvider })
++    expect(store.airiModerationNotice).toBe(false)
++  })
++
+   it('marks only the first system message for generated default prompts sent to loopback', async () => {
+     let providerMessages: Message[] = []
+     llmStreamMock.mockImplementation(async (_model: string, _chatProvider: ChatProvider, messages: Message[], options: any) => {
+diff --git a/packages/stage-ui/src/stores/chat.ts b/packages/stage-ui/src/stores/chat.ts
+index a3bb53727dad3aec251f2a537a817bd5c3d0ca50..63dd719fec6539f169e908d8ac988d2ccb590b67 100644
+--- a/packages/stage-ui/src/stores/chat.ts
++++ b/packages/stage-ui/src/stores/chat.ts
+@@ -47,6 +47,14 @@ function isTextDelta(event: StreamEvent): event is Extract<StreamEvent, { type:
+   return event.type === 'text-delta'
+ }
+ 
++function isBlockedAiriModeration(event: StreamEvent): event is Extract<StreamEvent, { type: 'airi-moderation' }> {
++  return event.type === 'airi-moderation'
++    && event.blocked === true
++    && event.replaced === true
++    && typeof event.category === 'string'
++    && typeof event.rule === 'string'
++}
++
+ function isLoopbackChatEndpoint(chatProvider: ChatProvider, model: string): boolean {
+   try {
+     const { hostname } = new URL(String(chatProvider.chat(model).baseURL))
+@@ -119,6 +127,9 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
+ 
+   const sending = ref(false)
+   const pendingQueuedSendCount = ref(0)
++  // Deliberately ephemeral: this signal never joins text, TTS, session history,
++  // cloud sync, or memory. The Electron stage is the only consumer.
++  const airiModerationNotice = ref(false)
+   let ownedActiveTurnSpan: typeof activeTurnSpan.value
+ 
+   async function streamWithStageAdapters(
+@@ -127,6 +138,9 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
+     messages: Message[],
+     options?: StreamOptions,
+   ) {
++    // A foreground reset starts every fresh round, so the badge cannot leak
++    // from a prior moderated reply into a later conversation turn.
++    airiModerationNotice.value = false
+     let llmTextLength = 0
+     const headers = { ...options?.headers }
+     const isOfficialProvider = providerMode(activeProvider.value) === 'official'
+@@ -161,6 +175,9 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
+         ...options,
+         headers,
+         onStreamEvent: async (event: StreamEvent) => {
++          if (isLoopbackChatEndpoint(chatProvider, model) && isBlockedAiriModeration(event))
++            airiModerationNotice.value = true
++
+           if (isTextDelta(event)) {
+             if (!llmFirstTokenEmitted) {
+               llmFirstTokenEmitted = true
+@@ -461,6 +478,7 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
+   return {
+     sending,
+     pendingQueuedSendCount,
++    airiModerationNotice,
+ 
+     ingest,
+     ingestOnFork,
 diff --git a/packages/stage-ui/src/stores/modules/hearing.ts b/packages/stage-ui/src/stores/modules/hearing.ts
 index 6f92418f33d6a557ecac03c0a4a16ced0d3ce989..ce3546a240f1113fc791292f316b544e2b405d10 100644
 --- a/packages/stage-ui/src/stores/modules/hearing.ts
@@ -1995,3 +2225,162 @@ index 3e2a8004ea4dc4d1be38553fab502e4a8854774a..486f231a0bdee2e765f5f83b127c73e6
  
  /**
   * Represents a user-requested stop-speaking command for the stage output host.
+diff --git a/patches/@xsai__stream-text@0.5.0-beta.2.patch b/patches/@xsai__stream-text@0.5.0-beta.2.patch
+index b88f2248fa50d338f017576ea15111204ec524fc..fdf3cb4823224ebe28fca1dbde56455a1d7ec96e 100644
+--- a/patches/@xsai__stream-text@0.5.0-beta.2.patch
++++ b/patches/@xsai__stream-text@0.5.0-beta.2.patch
+@@ -1,20 +1,26 @@
+ diff --git a/dist/index.d.ts b/dist/index.d.ts
+-index e184d851f8f0dec7456bab129ed90eaad8944125..e363d3d15261fa57831cf4d6fee384644bd45d00 100644
++index e184d851f8f0dec7456bab129ed90eaad8944125..8336bc7da83b108e5161217b6e99fc16d5cc35dd 100644
+ --- a/dist/index.d.ts
+ +++ b/dist/index.d.ts
+-@@ -1,8 +1,10 @@
++@@ -1,8 +1,16 @@
+  import { WithUnknown } from '@xsai/shared';
+ -import { CompletionToolCall, CompletionToolResult, FinishReason, Usage, ChatOptions, CompletionStep, PrepareStep, StopCondition, Message } from '@xsai/shared-chat';
+ +import { CompletionToolCall, CompletionToolResult, FinishReason, OnToolCallFinishCallback, OnToolCallStartCallback, RepairToolCallFunction, Usage, ChatOptions, CompletionStep, PrepareStep, StopCondition, Message } from '@xsai/shared-chat';
+  
+  type StreamTextEvent = (CompletionToolCall & {
+      type: 'tool-call';
+++} | {
+++    blocked: true;
+++    category: string;
+++    replaced: true;
+++    rule: string;
+++    type: 'airi-moderation';
+ +}) | (CompletionToolResult & {
+ +    type: 'tool-error';
+  }) | (CompletionToolResult & {
+      type: 'tool-result';
+  }) | {
+-@@ -33,7 +35,11 @@ interface StreamTextOptions extends ChatOptions {
++@@ -33,7 +41,11 @@ interface StreamTextOptions extends ChatOptions {
+      onEvent?: (event: StreamTextEvent) => Promise<unknown> | unknown;
+      onFinish?: (step?: CompletionStep) => Promise<unknown> | unknown;
+      onStepFinish?: (step: CompletionStep) => Promise<unknown> | unknown;
+@@ -27,10 +33,28 @@ index e184d851f8f0dec7456bab129ed90eaad8944125..e363d3d15261fa57831cf4d6fee38464
+      stopWhen?: StopCondition;
+      /**
+ diff --git a/dist/index.js b/dist/index.js
+-index 6353da4d45ad65340104530d83b5337bba8d9d77..34e6e4fda7f390be6334fe3eadcbc5199957e998 100644
++index 6353da4d45ad65340104530d83b5337bba8d9d77..b95c7f8aecf1a7c76616c594a29c8dfcb27fc244 100644
+ --- a/dist/index.js
+ +++ b/dist/index.js
+-@@ -139,6 +139,10 @@ const streamText = (options) => {
++@@ -77,6 +77,16 @@ const streamText = (options) => {
++       write: (chunk) => {
++         if (chunk.usage)
++           pushUsage(chunk.usage);
+++        const moderation = chunk.airi_moderation;
+++        if (moderation != null && typeof moderation === "object" && !Array.isArray(moderation) && moderation.blocked === true && moderation.replaced === true && typeof moderation.category === "string" && typeof moderation.rule === "string") {
+++          pushEvent({
+++            blocked: true,
+++            category: moderation.category,
+++            replaced: true,
+++            rule: moderation.rule,
+++            type: "airi-moderation"
+++          });
+++        }
++         if (chunk.choices == null || chunk.choices.length === 0)
++           return;
++         const choice = chunk.choices[0];
++@@ -138,7 +148,11 @@ const streamText = (options) => {
++       const results = await Promise.all(
+          validToolCalls.map(async (toolCall) => executeTool({
+            abortSignal: options.abortSignal,
+ +          captureToolErrors: options.captureToolErrors,
+@@ -41,7 +65,7 @@ index 6353da4d45ad65340104530d83b5337bba8d9d77..34e6e4fda7f390be6334fe3eadcbc519
+            toolCall,
+            tools: options.tools
+          }))
+-@@ -148,7 +151,10 @@ const streamText = (options) => {
++@@ -148,7 +162,10 @@ const streamText = (options) => {
+          toolResults.push(completionToolResult);
+          messages.push(message);
+          pushEvent({ ...completionToolCall, type: "tool-call" });
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 546772d89419dcf54ef43db67f39202a44231a22..2bd8ace5d25e35eda21db470b2cee1b193a57487 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -1185,7 +1185,7 @@ patchedDependencies:
+     hash: 26f2819b987245ec85f216b821ddf73aeb28fd7e611238a2d37250e42f838a01
+     path: patches/@xsai__shared-chat@0.5.0-beta.2.patch
+   '@xsai/stream-text@0.5.0-beta.2':
+-    hash: 90dfe10d02f5946658508ec019937eab600745c93446ce7b2fdb1a0ed70e3e49
++    hash: ee0882cd4043b9aba1546cbdd7a33ee972dbf2052c9dca390119d2fbad2dd870
+     path: patches/@xsai__stream-text@0.5.0-beta.2.patch
+   mineflayer-pathfinder:
+     hash: 4bbfdca823ab48b74086e6e7d4b2f9baf5ee7c0ba9aee0c279b3c91c50bfd797
+@@ -1353,7 +1353,7 @@ importers:
+         version: 0.5.0-beta.2(patch_hash=26f2819b987245ec85f216b821ddf73aeb28fd7e611238a2d37250e42f838a01)
+       '@xsai/stream-text':
+         specifier: 'catalog:'
+-        version: 0.5.0-beta.2(patch_hash=90dfe10d02f5946658508ec019937eab600745c93446ce7b2fdb1a0ed70e3e49)
++        version: 0.5.0-beta.2(patch_hash=ee0882cd4043b9aba1546cbdd7a33ee972dbf2052c9dca390119d2fbad2dd870)
+       valibot:
+         specifier: 'catalog:'
+         version: 1.3.1(typescript@5.9.3)
+@@ -1685,7 +1685,7 @@ importers:
+         version: 0.5.0-beta.2(patch_hash=26f2819b987245ec85f216b821ddf73aeb28fd7e611238a2d37250e42f838a01)
+       '@xsai/stream-text':
+         specifier: 'catalog:'
+-        version: 0.5.0-beta.2(patch_hash=90dfe10d02f5946658508ec019937eab600745c93446ce7b2fdb1a0ed70e3e49)
++        version: 0.5.0-beta.2(patch_hash=ee0882cd4043b9aba1546cbdd7a33ee972dbf2052c9dca390119d2fbad2dd870)
+       '@xsai/stream-transcription':
+         specifier: 'catalog:'
+         version: 0.5.0-beta.2
+@@ -2103,7 +2103,7 @@ importers:
+         version: 0.5.0-beta.2(patch_hash=26f2819b987245ec85f216b821ddf73aeb28fd7e611238a2d37250e42f838a01)
+       '@xsai/stream-text':
+         specifier: 'catalog:'
+-        version: 0.5.0-beta.2(patch_hash=90dfe10d02f5946658508ec019937eab600745c93446ce7b2fdb1a0ed70e3e49)
++        version: 0.5.0-beta.2(patch_hash=ee0882cd4043b9aba1546cbdd7a33ee972dbf2052c9dca390119d2fbad2dd870)
+       '@xsai/stream-transcription':
+         specifier: 'catalog:'
+         version: 0.5.0-beta.2
+@@ -2578,7 +2578,7 @@ importers:
+         version: 0.5.0-beta.2(patch_hash=26f2819b987245ec85f216b821ddf73aeb28fd7e611238a2d37250e42f838a01)
+       '@xsai/stream-text':
+         specifier: 'catalog:'
+-        version: 0.5.0-beta.2(patch_hash=90dfe10d02f5946658508ec019937eab600745c93446ce7b2fdb1a0ed70e3e49)
++        version: 0.5.0-beta.2(patch_hash=ee0882cd4043b9aba1546cbdd7a33ee972dbf2052c9dca390119d2fbad2dd870)
+       '@xsai/stream-transcription':
+         specifier: 'catalog:'
+         version: 0.5.0-beta.2
+@@ -3334,7 +3334,7 @@ importers:
+         version: 0.5.0-beta.2(patch_hash=26f2819b987245ec85f216b821ddf73aeb28fd7e611238a2d37250e42f838a01)
+       '@xsai/stream-text':
+         specifier: 'catalog:'
+-        version: 0.5.0-beta.2(patch_hash=90dfe10d02f5946658508ec019937eab600745c93446ce7b2fdb1a0ed70e3e49)
++        version: 0.5.0-beta.2(patch_hash=ee0882cd4043b9aba1546cbdd7a33ee972dbf2052c9dca390119d2fbad2dd870)
+       '@xsai/tool':
+         specifier: 'catalog:'
+         version: 0.5.0-beta.2(zod-to-json-schema@3.25.2(zod@4.3.6))(zod@4.3.6)
+@@ -4138,7 +4138,7 @@ importers:
+         version: 0.5.0-beta.2(patch_hash=26f2819b987245ec85f216b821ddf73aeb28fd7e611238a2d37250e42f838a01)
+       '@xsai/stream-text':
+         specifier: 'catalog:'
+-        version: 0.5.0-beta.2(patch_hash=90dfe10d02f5946658508ec019937eab600745c93446ce7b2fdb1a0ed70e3e49)
++        version: 0.5.0-beta.2(patch_hash=ee0882cd4043b9aba1546cbdd7a33ee972dbf2052c9dca390119d2fbad2dd870)
+       '@xsai/stream-transcription':
+         specifier: 'catalog:'
+         version: 0.5.0-beta.2
+@@ -4927,7 +4927,7 @@ importers:
+         version: 0.5.0-beta.2(patch_hash=26f2819b987245ec85f216b821ddf73aeb28fd7e611238a2d37250e42f838a01)
+       '@xsai/stream-text':
+         specifier: 'catalog:'
+-        version: 0.5.0-beta.2(patch_hash=90dfe10d02f5946658508ec019937eab600745c93446ce7b2fdb1a0ed70e3e49)
++        version: 0.5.0-beta.2(patch_hash=ee0882cd4043b9aba1546cbdd7a33ee972dbf2052c9dca390119d2fbad2dd870)
+       pinia:
+         specifier: 'catalog:'
+         version: 3.0.4(typescript@5.9.3)(vue@3.5.32(typescript@5.9.3))
+@@ -26112,7 +26112,7 @@ snapshots:
+ 
+   '@xsai/shared@0.5.0-beta.2': {}
+ 
+-  '@xsai/stream-text@0.5.0-beta.2(patch_hash=90dfe10d02f5946658508ec019937eab600745c93446ce7b2fdb1a0ed70e3e49)':
++  '@xsai/stream-text@0.5.0-beta.2(patch_hash=ee0882cd4043b9aba1546cbdd7a33ee972dbf2052c9dca390119d2fbad2dd870)':
+     dependencies:
+       '@xsai/shared': 0.5.0-beta.2
+       '@xsai/shared-chat': 0.5.0-beta.2(patch_hash=26f2819b987245ec85f216b821ddf73aeb28fd7e611238a2d37250e42f838a01)
