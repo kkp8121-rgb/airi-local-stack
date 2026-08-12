@@ -73,6 +73,10 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-TTS-PCM-SAMPLE-RATE-HARDENING-2026-08-13.md` — progressive
+  GPT-SoVITS PCM의 32 kHz→AudioContext output-rate resampling, lossless bounded
+  backpressure와 bounded fallback retention을 구현·빌드 검증한 source 증거.
+  설치 ASAR 교체와 duration/pitch 실기는 아직 수행하지 않았다.
 - `AIRI-KANANA-EXTRACTION-CANDIDATE-GATE-2026-08-13.md` — Kakao 공식
   Kanana-2-3B commit/shard 기반 프로젝트 자체 Q4_K_M 변환 provenance와
   11436 격리 CPU smoke FAIL 증적. full은 생략했고 extraction은 off이며,

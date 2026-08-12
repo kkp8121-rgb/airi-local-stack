@@ -90,9 +90,10 @@
 - [~] 본답변 지연 — §12 원문 목표(뉴로사마급) 기준으로 계속 추구(결정 5,
   2026-08-12 재정의 제안 기각 확정). 텍스트 경로 P50 1,963ms 달성
   (`완료/AIRI-ELECTRON-TEXT-TTS-MEASUREMENT-2026-08-12.md`), 실제 마이크
-  음성 전체 체인은 미실측. 후속 최적화(운영 설치본의 source rebuild·채택 검증,
-  TTS 청크 스트리밍)가 활성 목표로 남음. 여기서 source build 전환은 개발 측정의
-  즉시 운영 채택이 아니라 설치본 rebuild와 실기 검증을 뜻한다.
+  음성 전체 체인은 미실측. TTS progressive chunk 재생은 이미 설치본에서 증명됐고,
+  32 kHz source→AudioContext output-rate 보정과 lossless bounded backpressure도
+  source 구현·빌드 검증을 완료했다. 남은 활성 목표는 이 새 source의 설치본
+  rebuild·백업·채택 및 실제 duration/pitch·text→render 회귀다.
 - [x] matched Electron 모델 A/B — 같은 설치 ASAR·TTS warm, 교차 블록
   모델별 n=10. Mi:dm first substantive render P50/P95 1,501.5/2,597.2ms,
   EXAONE 1,752.5/3,233.0ms — 2026-08-12
@@ -111,7 +112,9 @@
   - [x] I1 추출 활성화 코드 — 2026-08-12 (`932eae6`, 발효는 G2 리포트 대기)
   - [x] C1 헌법 초안·사용자 방향 결정 반영 — 2026-08-12
     (헌법 최종 승인은 인간 검수 후이며 C축 C1과 동일 병목)
-- [ ] **M2** (B1 채팅 브리지 ∥ C2 루프 배선 ∥ I2 시청자 기억)
+- [~] **M2** (B1 채팅 브리지 ∥ C2 루프 배선 ∥ I2 시청자 기억)
+  - [x] B1a offline transport-neutral chat-ingress core — strict YouTube candidate admission, HMAC pseudonyms, bounded FIFO screening/delivery, established AIRI envelope (`data.text` only; viewer sidecar 없음), Node contract tests; 기본 OFF, B1 persistence 없음 — 2026-08-13
+  - [ ] B1b live adapter/quota/OAuth 및 실제 AIRI 주입 (보류: 외부 YouTube 자격증명·쿼터 실측·운영 승인)
 - [~] **M3** (B2 송출 + B3 안전)
   - [x] B3 모더레이션 게이트 코드 (사전 113항목+패턴 7, 기본 off) — 2026-08-12 (`932eae6`)
   - [x] B3 배선 3종 — TTS 폴백 7/7·런처 env·Electron "필터당함" 배지,
@@ -138,6 +141,16 @@
 ---
 
 ## 갱신 로그 (최신이 위)
+
+- **2026-08-13** (dev PC, TTS PCM sample-rate hardening): 이미 동작하던
+  progressive WAV 경로가 32 kHz PCM을 output rate에 맞추지 않던 결함을 수정했다.
+  chunk-safe mono/stereo resampler, 실제 worklet의 lossless bounded backpressure,
+  pre-roll/terminal flush, abort waiter 해제, streaming body 비보관을 추가했다.
+  focused Stage UI 28 tests, Stage UI·Tamagotchi typecheck, Electron production
+  build와 3층 apply/reverse가 PASS했다. layer-3는 130,974 bytes, SHA-256
+  `CC172A16281E56DC03E6A6F261B5531367711C0393D57E171C932EA8544C5E3E`다.
+  설치본은 변경하지 않았으므로 실제 duration/pitch 회귀가 다음 게이트다. 상세:
+  `완료/AIRI-TTS-PCM-SAMPLE-RATE-HARDENING-2026-08-13.md`.
 
 - **2026-08-13** (dev PC, production-context source binding v2): 실제 proxy
   context shaping을 0/8/20/48 압력×3회 재측정했다. generic structured-output

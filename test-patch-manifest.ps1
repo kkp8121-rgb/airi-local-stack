@@ -37,8 +37,8 @@ $artifacts = @(
     }
     [pscustomobject]@{
         Path = 'airi_docs/patches/AIRI-v0.11.3-upgrade-scout-runtime-20260811.patch'
-        Length = 106205
-        Sha256 = '13417A7464C35B2A8C2E8FDC54F37E629C32F031F9F7DA5EB6073B995E1F63DA'
+        Length = 130974
+        Sha256 = 'CC172A16281E56DC03E6A6F261B5531367711C0393D57E171C932EA8544C5E3E'
         Usable = $true
         Defect = ''
         Support = 'Runtime'
@@ -196,6 +196,7 @@ $upgradeScoutText = [IO.File]::ReadAllText($upgradeScoutPatch, [Text.Encoding]::
 $requiredUpgradeScoutMarkers = @(
     'packages/stage-ui/src/libs/speech/pcm-worklet.ts',
     'packages/stage-ui/src/libs/speech/incremental-wav.ts',
+    'packages/stage-ui/src/libs/speech/pcm-resampler.ts',
     'packages/stage-ui/src/composables/audio/voice-input-vad-experiment.ts',
     'packages/stage-ui/src/stores/providers/local-stt/stream-transcription.ts',
     'packages/stage-ui/src/libs/speech/text-self-echo.ts',
