@@ -1213,6 +1213,9 @@ class _ApiStreamResponse:
         for chunk in self._chunks:
             yield chunk
 
+    async def aread(self) -> bytes:
+        return b"".join(self._chunks)
+
     async def aclose(self) -> None:
         self.closed = True
 
@@ -2149,6 +2152,63 @@ class SseContractTests(unittest.TestCase):
             "ollama_eval_ms": ollama_proxy.OLLAMA_MAX_DURATION_MS,
             "ollama_eval_count": ollama_proxy.OLLAMA_MAX_COUNT,
         })
+
+    def test_prompt_budget_telemetry_is_content_free_bounded_and_terminal_only(self) -> None:
+        telemetry = ollama_proxy.PromptBudgetTelemetry()
+        secret = "do-not-expose-this-prompt"
+        telemetry.prepared_native(json.dumps({"messages": [
+            {"role": "system", "content": secret},
+            {"role": "user", "content": "hello"},
+        ]}).encode())
+        telemetry.terminal({"done": False, "prompt_eval_count": 2048}, 2048)
+        telemetry.terminal({"done": True, "prompt_eval_count": 2040}, 2048)
+        telemetry.terminal({"done": True, "prompt_eval_count": 10**30}, 2048)
+
+        health = telemetry.health(2048)
+        self.assertEqual(health["configured_num_ctx"], 2048)
+        self.assertEqual(health["saturation_threshold"], 2040)
+        self.assertEqual(health["prepared_observations"], 1)
+        self.assertEqual(health["terminal_observations"], 2)
+        self.assertEqual(health["saturation_observations"], 2)
+        self.assertEqual(health["last_prepared_message_count"], 2)
+        self.assertEqual(health["last_prepared_input_chars"], len(secret) + 5)
+        self.assertEqual(health["last_prompt_eval_count"], ollama_proxy.OLLAMA_MAX_COUNT)
+        self.assertEqual(health["last_utilization"], 1.0)
+        self.assertNotIn(secret, json.dumps(health))
+
+    def test_local_fallback_dialogue_records_native_prompt_budget(self) -> None:
+        class FallbackClient:
+            def build_request(self, *args: object, **kwargs: object) -> bytes:
+                content = kwargs.get("content", b"")
+                return content if isinstance(content, bytes) else b""
+
+            async def send(self, request: bytes, *args: object, **kwargs: object) -> object:
+                return type("Response", (), {
+                    "status_code": 200,
+                    "content": json.dumps({
+                        "message": {"role": "assistant", "content": "대답이야."},
+                        "done": True,
+                        "prompt_eval_count": 321,
+                    }, ensure_ascii=False).encode(),
+                })()
+
+        telemetry = ollama_proxy.PromptBudgetTelemetry()
+        body = json.dumps({
+            "model": "midm-airi:2.0-mini",
+            "messages": [{"role": "user", "content": "질문"}],
+        }, ensure_ascii=False).encode()
+        with mock.patch.object(ollama_proxy, "client", FallbackClient()), mock.patch.object(
+            ollama_proxy, "prompt_budget_telemetry", telemetry
+        ):
+            dialogue = asyncio.run(ollama_proxy.fetch_local_dialogue(
+                "POST", "chat/completions", None, {}, body
+            ))
+
+        self.assertEqual(dialogue, "대답이야.")
+        health = telemetry.health(2048)
+        self.assertEqual(health["prepared_observations"], 1)
+        self.assertEqual(health["terminal_observations"], 1)
+        self.assertEqual(health["last_prompt_eval_count"], 321)
 
     def test_immediate_ack_and_final_content_have_distinct_latency_events(self) -> None:
         events: list[tuple[object, ...]] = []
@@ -4228,6 +4288,38 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertEqual(memory.prepared, 1)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], "hello there")
+
+    def test_native_api_chat_retry_counts_both_prepared_and_terminal_attempts(self) -> None:
+        def event(content: str, prompt_eval_count: int) -> bytes:
+            return (json.dumps({
+                "message": {"role": "assistant", "content": content},
+                "done": True,
+                "prompt_eval_count": prompt_eval_count,
+            }, ensure_ascii=False) + "\n").encode()
+
+        for requested_stream in (True, False):
+            with self.subTest(stream=requested_stream):
+                chat = _QueuedApiStreamClient([
+                    [event("This is rejected.", 100)],
+                    [event("다시 대답했어.", 110)],
+                ])
+                telemetry = ollama_proxy.PromptBudgetTelemetry()
+                with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+                    ollama_proxy, "memory_runtime", _FakeMemoryRuntime()
+                ), mock.patch.object(
+                    ollama_proxy, "prompt_budget_telemetry", telemetry
+                ):
+                    response = TestClient(ollama_proxy.app).post(
+                        "/api/chat",
+                        json={"model": "midm-airi:2.0-mini", "stream": requested_stream,
+                              "messages": [{"role": "user", "content": "질문"}]},
+                    )
+
+                self.assertEqual(response.status_code, 200)
+                health = telemetry.health(2048)
+                self.assertEqual(health["prepared_observations"], 2)
+                self.assertEqual(health["terminal_observations"], 2)
+                self.assertEqual(health["last_prompt_eval_count"], 110)
 
     def test_native_api_chat_preserves_explicit_keep_alive(self) -> None:
         chat = _ApiStreamClient([

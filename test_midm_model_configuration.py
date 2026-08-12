@@ -32,6 +32,34 @@ class MidmModelConfigurationTests(unittest.TestCase):
         self.assertIn("OutputModerationEnabled = $proxy.output_moderation.enabled", STACK)
         self.assertIn("OutputModerationReady = $proxy.output_moderation.ready", STACK)
 
+    def test_foreground_num_ctx_has_one_validated_source_and_reuse_fails_closed(self) -> None:
+        self.assertIn("[object]$NumCtx = $null", STACK)
+        self.assertIn("AIRI_NUM_CTX", STACK)
+        self.assertIn("function Resolve-AiriNumCtx", STACK)
+        self.assertIn("NumCtx must be an integer from 512 through 32768", STACK)
+        self.assertIn("num_ctx = $NumCtx", STACK)
+        self.assertIn("Live proxy num_ctx differs from the requested NumCtx", STACK)
+        self.assertIn("NumCtx = $NumCtx", STACK)
+        self.assertIn("[object]$NumCtx = 2048", PROXY)
+        self.assertIn("$parsedNumCtx = 0", PROXY)
+        self.assertIn("Existing proxy num_ctx differs from the requested configuration", PROXY)
+        self.assertIn("[Globalization.NumberStyles]::None", STACK)
+        self.assertIn("[Globalization.NumberStyles]::None", PROXY)
+        self.assertNotIn("[int]$proxy.num_ctx", STACK)
+        self.assertNotIn("[int]$existingHealth.num_ctx", PROXY)
+        self.assertIn("--num-ctx', $NumCtx", PROXY)
+        self.assertIn(
+            "A service is already listening on port 11435; it was not reconfigured.",
+            PROXY,
+        )
+        self.assertNotRegex(PROXY, r"(?m)^\s*exit\s+0\s*$")
+        commands = re.findall(
+            r"start-local-ollama-proxy\.ps1'\)(?:[^\n]*`\r?\n)*[^\n]*", STACK
+        )
+        self.assertGreaterEqual(len(commands), 4)
+        for command in commands:
+            self.assertIn("-NumCtx $NumCtx", command)
+
     def test_local_midm_default_uses_the_verified_digest_without_affecting_rollbacks_or_external_chat(self) -> None:
         verified_digest = "92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f"
         self.assertIn(verified_digest, STACK)

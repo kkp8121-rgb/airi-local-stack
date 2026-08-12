@@ -13,7 +13,7 @@
   지연 = `AIRI-NEUROSAMA-LOW-LATENCY-PLAN.md` (v2.1)
 - 실행 계획(M1~M5 상세): `진행예정/AIRI-BROADCAST-CHARACTER-PLAN-2026-08-12.md`
 
-최종 갱신: 2026-08-12
+최종 갱신: 2026-08-13
 
 ---
 
@@ -55,7 +55,8 @@
     Mi:dm 0/12로 양 모델 FAIL — 2026-08-12
     (`완료/AIRI-LONG-CONTEXT-MEMORY-CARD-AB-2026-08-12.md`)
   - [ ] 장문 context budget·card/정정 표현 개선 후 고정 4압력×3회 회귀
-    (측정 구현은 완료, 품질 gate는 FAIL)
+    (4096 물리 절단 해소 측정·prompt telemetry는 완료, card/부정 품질 gate는 FAIL;
+    운영 기본값 2048 유지)
   - [x] eval provenance 해소 (수집 데이터를 승격 근거로 사용 가능) — 2026-08-12 (`932eae6`)
   - [ ] 인간 검수 100건 수집 (dev PC)
   - [ ] 16케이스 자동 게이트 PASS (현재 양 모델 FAIL)
@@ -128,11 +129,30 @@
   (`완료/AIRI-DEV-PC-SSOT-VERIFICATION-2026-08-12.md`)
 - [x] 장문 context·memory·card 비교 측정 — 2026-08-12 (양 모델 FAIL,
   개선 후 회귀 필요)
+- [x] context window SSoT·fail-closed·prompt-budget 관측성 — 2026-08-13
+  (측정/관측 완료, 4096 품질 승격 아님;
+  `완료/AIRI-CONTEXT-WINDOW-SSOT-AND-4096-TRIAGE-2026-08-13.md`)
 - [ ] 인간 검수 100건 (G3와 공유)
 
 ---
 
 ## 갱신 로그 (최신이 위)
+
+- **2026-08-13** (dev PC, context window SSoT/4096 triage): root
+  `-NumCtx`/비공백 `AIRI_NUM_CTX`를 strict 512..32768(기본 2048)로 모든 proxy
+  child·verify-only·warmup·health 재사용에 배선했다. invalid env는 서비스 작업 전,
+  live 2048 재사용에 4096 요청은 health mismatch로 fail-closed다. `/health.prompt_budget`
+  은 prompt 원문 없는 terminal-sampled 숫자 telemetry다. raw Mi:dm 4096은
+  complete/schema 12/12, retry 0이지만 exact/card/부정 0/12 FAIL; 초기 사용자
+  물리 절단만 해소했다. GPU paired/live 최소 여유 543 MiB도 승격 근거가 아니다.
+  따라서 관측성은 완료, 품질 remediation은 계속 FAIL이고 운영 기본값 2048을 유지한다.
+  current Python 3.12 41-path matrix는 **833 passed / 1 skipped / 708 subtests /
+  7 warnings** (64.98s) PASS이며, proxy full은 286 passed / 377 subtests / 5 warnings
+  (2.23s), API shard는 323 passed / 569 subtests다. historical 829는 base `aef5300`에만
+  해당한다.
+  다음 조건은 production-path deterministic context gate, holdout/continuity ledger
+  또는 더 나은 모델, 인간 100건 검수다. 상세:
+  `완료/AIRI-CONTEXT-WINDOW-SSOT-AND-4096-TRIAGE-2026-08-13.md`.
 
 - **2026-08-13** (dev PC, I1 Kanana 공식 원본 후보): Kakao 공식 commit
   `6a5d7889964c4c590299d16e309eabab1f73f8a9`의 BF16 shard 해시를 검증하고,
@@ -145,9 +165,11 @@
   `완료/AIRI-KANANA-EXTRACTION-CANDIDATE-GATE-2026-08-13.md`.
   공개 방송은 Kanana License §2.2/§3.1/§4.1/§4.2의 법률/Kakao 확인 전
   미승격이며 표시·Notice만으로 충분하다고 보지 않는다.
-  같은 배치에서 `aef5300`의 CI 41경로를 Python 3.12 고정 환경으로 재실행해
-  **829 passed / 1 skipped / 706 subtests**를 확인했고 checkpoint·Node 27/27·
-  patch manifest도 PASS했다.
+  같은 계열의 historical base `aef5300` CI 41경로는 829 passed / 1 skipped /
+  706 subtests였고, 현 배치 Python 3.12 41경로는 **833 passed / 1 skipped /
+  708 subtests / 7 warnings** (64.98s) PASS다. proxy full은 286 passed / 377
+  subtests / 5 warnings (2.23s), API shard는 323 passed / 569 subtests다. checkpoint·Node 27/27·patch
+  manifest도 PASS했다.
 
 - **2026-08-12** (dev PC, 사용자 결정): 기본 방송 프로파일을 chat/text 입력 +
   STT OFF로 고정했고 Electron 마이크 토글도 OFF로 둔다. `-Stt off` 런처 재실행은

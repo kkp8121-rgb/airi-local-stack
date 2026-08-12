@@ -56,3 +56,14 @@ fixture를 회귀 실행해야 한다.
 
 측정 후 EXAONE만 unload했고 `ollama ps`는 Mi:dm 단일 100% GPU·context 2048,
 `/health`는 Mi:dm digest pinned/verified, extraction off, moderation off로 복구했다.
+
+## 2026-08-13 4096 후속 triage
+
+같은 fixture/runner·temperature 0·seed 42·3회로 Mi:dm `num_ctx=4096`을 재측정했다.
+`eval/results/model-llm-context-midm-4096-2026-08-13.json`은 30,609 B, SHA-256
+`542B0632765F10B8807C76EE2EC451383414A4F0CD99B995095B3AED01D316ED`이며 schema
+first-pass 12/12·retry 0이지만 exact 0/12 FAIL이다. p0/p1/p2/p3 prompt P50은
+1139/1547/2159/3587, active card·부정은 각각 0/12, 초기 사용자는 12/12, 초기
+assistant는 3/3·0/3·0/3·2/3, 정정/tail은 12/12였다. 2048의 p2/p3 2042 ceiling
+및 초기 사용자 물리 절단은 사라졌지만 card/부정 귀속은 실패했다. **4096은 품질
+PASS가 아니며 운영 기본값은 2048을 유지한다.**

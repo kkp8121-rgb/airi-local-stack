@@ -213,6 +213,19 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
    4압력×3회 실측 완료. 양 모델 FAIL이므로 측정 항목은 닫되 품질 위험은
    인간 검수와 문맥 예산/표현 개선 후 회귀 대상으로 유지한다.
 
+   **2026-08-13 후속:** root `-NumCtx`/비공백 `AIRI_NUM_CTX`를 strict
+   512..32768(기본 2048) SSoT로 모든 child·verify-only·warmup·재사용 health에
+   배선했다. invalid env는 서비스 작업 전 거부, live 2048 재사용에 4096 요청은
+   fail-closed 거부다. `/health.prompt_budget`은 prompt 원문 없이 terminal-sampled
+   숫자 telemetry만 제공한다. Mi:dm raw 4096은 초기 사용자 절단을 해소했지만
+   exact/card/부정 0/12이므로 품질 FAIL, default는 2048 유지다. GPU 최소 여유
+   543 MiB도 clean B0 proof가 아니다. malformed/fractional health `num_ctx`도
+   정확히 거부된다. current Python 3.12 41-path matrix는 833 passed / 1 skipped /
+   708 subtests / 7 warnings (64.98s) PASS이며, proxy full은 286 passed / 377
+   subtests / 5 warnings (2.23s), API shard는 323 passed / 569 subtests다.
+   historical 829는 base `aef5300`만의 수치다. 상세:
+   `완료/AIRI-CONTEXT-WINDOW-SSOT-AND-4096-TRIAGE-2026-08-13.md`.
+
 4. **STT/실제 마이크** — 기본 방송은 chat/text 입력 + STT OFF이며 Electron
    마이크 토글도 OFF다. 기본 런처는 `-Stt off`; 명시적인 `-Stt on` 또는
    `AIRI_STT=on`만 opt-in이다. 사용자가 STT/마이크 개발 재개를 요청하면

@@ -1,6 +1,5 @@
 param(
-    [ValidateRange(512, 32768)]
-    [int]$NumCtx = 2048,
+    [object]$NumCtx = 2048,
     [ValidateRange(0, 999)]
     # Ollama interprets num_gpu=0 as CPU-only. AIRI's local model is small
     # enough to fully offload on the supported local GPU; callers can still
@@ -60,6 +59,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$parsedNumCtx = 0
+if (-not [int]::TryParse(
+        [string]$NumCtx, [Globalization.NumberStyles]::Integer,
+        [Globalization.CultureInfo]::InvariantCulture, [ref]$parsedNumCtx) -or
+        $parsedNumCtx -lt 512 -or $parsedNumCtx -gt 32768) {
+    throw 'NumCtx must be an integer from 512 through 32768.'
+}
+$NumCtx = $parsedNumCtx
 $effectiveChatModel = if ($ChatProvider -eq 'local' -and [string]::IsNullOrWhiteSpace($ChatModel)) {
     'midm-airi:2.0-mini'
 } else {
@@ -244,12 +251,21 @@ if ($listener) {
     catch {
         throw 'Existing proxy output moderation state could not be verified; stop it and restart.'
     }
+    $existingNumCtx = 0
+    $existingNumCtxText = [Convert]::ToString(
+        $existingHealth.num_ctx, [Globalization.CultureInfo]::InvariantCulture)
+    if (-not [int]::TryParse(
+            $existingNumCtxText, [Globalization.NumberStyles]::None,
+            [Globalization.CultureInfo]::InvariantCulture, [ref]$existingNumCtx) -or
+            $existingNumCtx -ne $NumCtx) {
+        throw 'Existing proxy num_ctx differs from the requested configuration; stop it and restart.'
+    }
     $requestedModerationEnabled = $OutputModeration -eq 'on'
     if ($existingModerationEnabled -ne $requestedModerationEnabled) {
         throw 'Existing proxy output moderation state differs from the requested configuration; stop it and restart.'
     }
     Write-Output 'A service is already listening on port 11435; it was not reconfigured.'
-    exit 0
+    return
 }
 
 $memoryEnvironment = @{

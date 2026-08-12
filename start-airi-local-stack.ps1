@@ -9,6 +9,10 @@ param(
     # Keep the local chat model on the GPU by default.  num_gpu=0 forces
     # CPU-only inference and makes first-token latency several seconds slower.
     [int]$OllamaNumGpu = 999,
+    # Foreground context is explicit so all local chat hops share one window.
+    # A null parameter permits a nonblank AIRI_NUM_CTX override to be resolved
+    # below with the same strict validation as an explicit invocation.
+    [object]$NumCtx = $null,
     # Keep the foreground Ollama runner loaded across normal chat gaps.
     [string]$OllamaKeepAlive = '30m',
     [bool]$EnableKnowledge = $true,
@@ -52,6 +56,17 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+function Resolve-AiriNumCtx {
+    param([object]$Value)
+    $parsed = 0
+    if (-not [int]::TryParse([string]$Value, [Globalization.NumberStyles]::Integer,
+            [Globalization.CultureInfo]::InvariantCulture, [ref]$parsed) -or
+            $parsed -lt 512 -or $parsed -gt 32768) {
+        throw 'NumCtx must be an integer from 512 through 32768. Check -NumCtx or AIRI_NUM_CTX.'
+    }
+    return $parsed
+}
+$NumCtx = Resolve-AiriNumCtx $(if ($null -ne $NumCtx) { $NumCtx } elseif (-not [string]::IsNullOrWhiteSpace($env:AIRI_NUM_CTX)) { $env:AIRI_NUM_CTX } else { 2048 })
 if ($Stt -notin @('on', 'off')) {
     throw 'Stt must be on or off. Check the -Stt parameter or AIRI_STT environment variable.'
 }
@@ -220,6 +235,7 @@ if ($EnableMemoryExtraction -and [string]::IsNullOrWhiteSpace($MemoryExtractionM
             # aborting startup for every other service.
             try {
                 & (Join-Path $PSScriptRoot 'ollama-proxy\start-local-ollama-proxy.ps1') `
+                    -NumCtx $NumCtx `
                     -MemoryExtractionProvider $MemoryExtractionProvider `
                     -MemoryExtractionModel $autoModel `
                     -MemoryExtractionGateReport $autoGateReport `
@@ -242,6 +258,7 @@ $latencyMonitor = Wait-LocalHealth -Uri 'http://127.0.0.1:8892/health' -TimeoutS
 if ([string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
     # The established OFF path does not perform an extraction gate check.
     & (Join-Path $PSScriptRoot 'ollama-proxy\start-local-ollama-proxy.ps1') `
+        -NumCtx $NumCtx `
         -NumGpu $OllamaNumGpu `
         -OllamaKeepAlive $OllamaKeepAlive `
         -EnableKnowledge $EnableKnowledge `
@@ -268,6 +285,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
     # Verify first without listening on 11435. A pending proxy request can
     # therefore never reach an unverified or mismatched isolated extractor.
     & (Join-Path $PSScriptRoot 'ollama-proxy\start-local-ollama-proxy.ps1') `
+        -NumCtx $NumCtx `
         -NumGpu $OllamaNumGpu -MemoryExtractionProvider $MemoryExtractionProvider `
         -OllamaKeepAlive $OllamaKeepAlive `
         -EnableKnowledge $EnableKnowledge `
@@ -301,6 +319,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
         }
         $null = Wait-LocalHealth -Uri "http://127.0.0.1:$MemoryExtractionPort/api/tags" -TimeoutSeconds 30
         & (Join-Path $PSScriptRoot 'ollama-proxy\start-local-ollama-proxy.ps1') `
+            -NumCtx $NumCtx `
             -NumGpu $OllamaNumGpu -MemoryExtractionProvider $MemoryExtractionProvider `
             -OllamaKeepAlive $OllamaKeepAlive `
             -EnableKnowledge $EnableKnowledge `
@@ -335,6 +354,15 @@ else {
     throw 'Memory extraction gate requires the local ollama provider.'
 }
 $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
+$liveNumCtx = 0
+$liveNumCtxText = [Convert]::ToString(
+    $proxy.num_ctx, [Globalization.CultureInfo]::InvariantCulture)
+if (-not [int]::TryParse(
+        $liveNumCtxText, [Globalization.NumberStyles]::None,
+        [Globalization.CultureInfo]::InvariantCulture, [ref]$liveNumCtx) -or
+        $liveNumCtx -ne $NumCtx) {
+    throw 'Live proxy num_ctx differs from the requested NumCtx; refusing to start dependent services.'
+}
 & (Join-Path $PSScriptRoot 'gpt-sovits\start-local-stack.ps1')
 if ($Stt -eq 'on') {
     & (Join-Path $PSScriptRoot 'stt\start-local-stt.ps1') `
@@ -362,7 +390,7 @@ if ($ChatProvider -eq 'local') {
         keep_alive = $OllamaKeepAlive
         messages = @(@{ role = 'user'; content = '준비.' })
         options = @{
-            num_ctx = 2048
+            num_ctx = $NumCtx
             num_gpu = $OllamaNumGpu
             num_predict = 1
             temperature = 0
@@ -410,7 +438,7 @@ if ($ChatProvider -eq 'local') {
     ChatModelDigest = $proxy.chat_model.digest.digest
     ChatModelDigestStatus = $proxy.chat_model.digest.status
     CharacterEvaluatorModel = if ($EnableCharacterEvaluator) { $effectiveEvaluatorModel } else { '' }
-    NumCtx = $proxy.num_ctx
+    NumCtx = $NumCtx
     NumGpu = $proxy.num_gpu
     TTS = $tts.status
     TTSEngine = $tts.engine

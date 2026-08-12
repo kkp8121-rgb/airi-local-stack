@@ -170,12 +170,20 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 
 ## 최신 검증 증거 (2026-08-13)
 
+- `완료/AIRI-CONTEXT-WINDOW-SSOT-AND-4096-TRIAGE-2026-08-13.md` — root context
+  window SSoT(512..32768, 기본 2048), health mismatch fail-closed와 content-free
+  prompt-budget telemetry의 측정/관측 증거. Mi:dm raw 4096은 초기 사용자 물리 절단을
+  해소했지만 exact/card/부정 FAIL이고 GPU 최소 여유 543 MiB여서 운영 승격하지 않는다.
+  current Python 3.12 41-path matrix는 833 passed / 1 skipped / 708 subtests /
+  7 warnings (64.98s) PASS다. proxy full은 286 passed / 377 subtests / 5 warnings
+  (2.23s), API shard는 323 passed / 569 subtests다.
+
 - `완료/AIRI-STT-OFF-BROADCAST-PROFILE-2026-08-12.md` — 기본 방송 프로파일
   chat/text 입력 + STT OFF, Electron 마이크 OFF 결정 및 런처 OFF 실기 기록.
   `-Stt on`/`AIRI_STT=on`은 명시적 opt-in이며, GPU 1044 MiB는 동시 무관 작업이
   있는 paired observation으로 formal clean B0 capacity proof가 아니다.
 
-- 통합 Python: **829 passed / 1 skipped / 706 subtests** (`aef5300`의 CI
+- 통합 Python historical base: **829 passed / 1 skipped / 706 subtests** (`aef5300`의 CI
   `python-core-tests` matrix 41개 추적 경로를 Python 3.12 dev PC에서 재실측,
   SSoT·I1 게이트·MEM-04·B3 모더레이션·cloud latency 하네스 포함).
 - `node --test test-send-airi-local-text.mjs`: 27/27.

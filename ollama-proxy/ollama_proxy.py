@@ -79,6 +79,99 @@ OLLAMA_COUNT_METRIC_FIELDS = {
 }
 OLLAMA_MAX_DURATION_MS = 86_400_000.0  # One day.
 OLLAMA_MAX_COUNT = 1_000_000_000
+PROMPT_BUDGET_MAX_MESSAGES = 100_000
+PROMPT_BUDGET_MAX_INPUT_CHARS = 10_000_000
+
+
+class PromptBudgetTelemetry:
+    """Bounded, content-free observations of native local prompt usage.
+
+    An observation saturates at ``num_ctx - 8`` (or zero for an invalidly
+    small window). The eight-token reserve makes this an early warning rather
+    than a claim that the upstream will reject the prompt at exactly num_ctx.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._prepared_observations = 0
+        self._terminal_observations = 0
+        self._saturation_observations = 0
+        self._last_prepared_message_count = 0
+        self._last_prepared_input_chars = 0
+        self._last_prompt_eval_count = 0
+        self._last_utilization = 0.0
+
+    @staticmethod
+    def _native_payload_stats(body: bytes) -> tuple[int, int]:
+        try:
+            payload = json.loads(body)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return 0, 0
+        messages = payload.get("messages") if isinstance(payload, dict) else None
+        if not isinstance(messages, list):
+            return 0, 0
+        count = min(len(messages), PROMPT_BUDGET_MAX_MESSAGES)
+        chars = 0
+        for message in messages[:PROMPT_BUDGET_MAX_MESSAGES]:
+            if not isinstance(message, dict):
+                continue
+            content = message.get("content")
+            if isinstance(content, str):
+                chars = min(chars + len(content), PROMPT_BUDGET_MAX_INPUT_CHARS)
+        return count, chars
+
+    def prepared_native(self, body: bytes) -> None:
+        count, chars = self._native_payload_stats(body)
+        with self._lock:
+            self._prepared_observations = min(
+                self._prepared_observations + 1, OLLAMA_MAX_COUNT
+            )
+            self._last_prepared_message_count = count
+            self._last_prepared_input_chars = chars
+
+    def terminal(self, event: dict[str, object], num_ctx: int) -> None:
+        # Only a real native done row is an observation. Retries call this
+        # separately, preserving the actual number of terminal attempts.
+        if not event.get("done"):
+            return
+        value = event.get("prompt_eval_count")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return
+        numeric = float(value)
+        if not math.isfinite(numeric) or numeric < 0:
+            return
+        prompt_eval_count = min(int(numeric), OLLAMA_MAX_COUNT)
+        configured = min(max(int(num_ctx), 1), 32768)
+        utilization = min(prompt_eval_count / configured, 1.0)
+        saturation_threshold = max(configured - 8, 0)
+        with self._lock:
+            self._terminal_observations = min(
+                self._terminal_observations + 1, OLLAMA_MAX_COUNT
+            )
+            self._last_prompt_eval_count = prompt_eval_count
+            self._last_utilization = round(utilization, 6)
+            if prompt_eval_count >= saturation_threshold:
+                self._saturation_observations = min(
+                    self._saturation_observations + 1, OLLAMA_MAX_COUNT
+                )
+
+    def health(self, num_ctx: int) -> dict[str, int | float]:
+        configured = min(max(int(num_ctx), 1), 32768)
+        with self._lock:
+            return {
+                "configured_num_ctx": configured,
+                "saturation_threshold": max(configured - 8, 0),
+                "prepared_observations": self._prepared_observations,
+                "terminal_observations": self._terminal_observations,
+                "saturation_observations": self._saturation_observations,
+                "last_prepared_message_count": self._last_prepared_message_count,
+                "last_prepared_input_chars": self._last_prepared_input_chars,
+                "last_prompt_eval_count": self._last_prompt_eval_count,
+                "last_utilization": self._last_utilization,
+            }
+
+
+prompt_budget_telemetry = PromptBudgetTelemetry()
 
 
 def ollama_terminal_metrics(event: dict[str, object]) -> dict[str, int | float]:
@@ -5451,6 +5544,8 @@ async def fetch_local_dialogue(
         body = json.dumps(native_payload, ensure_ascii=False).encode("utf-8")
         path = "api/chat"
         method = "POST"
+    if path.endswith("api/chat"):
+        prompt_budget_telemetry.prepared_native(body)
     response = await client.send(
         client.build_request(
             method,
@@ -5463,6 +5558,8 @@ async def fetch_local_dialogue(
     if response.status_code >= 400:
         raise RuntimeError(f"Ollama returned {response.status_code}")
     payload = json.loads(response.content)
+    if path.endswith("api/chat") and isinstance(payload, dict):
+        prompt_budget_telemetry.terminal(payload, NUM_CTX)
     choices = payload.get("choices") or []
     message = (
         payload.get("message", {})
@@ -5510,6 +5607,7 @@ async def health() -> dict[str, object]:
         "topic_board": topic_board_runtime.health(),
         "output_moderation": output_moderation_runtime.health(),
         "num_ctx": NUM_CTX,
+        "prompt_budget": prompt_budget_telemetry.health(NUM_CTX),
         "num_gpu": NUM_GPU,
         "ollama_keep_alive": OLLAMA_KEEP_ALIVE,
         "ollama_sampling_defaults": dict(OLLAMA_SAMPLING_DEFAULTS),
@@ -5967,6 +6065,7 @@ async def stream_local_with_ack(
             prepared_openai_body,
             apply_sampling_defaults=not context.synthetic_evaluation_turn,
         )
+        prompt_budget_telemetry.prepared_native(native_body)
         # This is a warm-context.request SLA, not a replacement for httpx's
         # generous cold-load timeout.  Start it before acquiring the
         # streaming response: ``AsyncClient.send(..., stream=True)``
@@ -6270,6 +6369,7 @@ async def stream_local_with_ack(
             boundary.finish()
         if terminal_event is not None:
             merge_ollama_terminal_metrics(ollama_metrics, terminal_event)
+            prompt_budget_telemetry.terminal(terminal_event, NUM_CTX)
         # Do not expose a canned "I'll say that in Korean" line.
         # Before the first public sentence, a language rejection is
         # still reversible: repeat the same native context.request once with
@@ -6321,6 +6421,7 @@ async def stream_local_with_ack(
                 retry_prepared_body,
                 apply_sampling_defaults=not context.synthetic_evaluation_turn,
             )
+            prompt_budget_telemetry.prepared_native(retry_body)
             upstream_response = await context.upstream_client.send(
                 context.upstream_client.build_request(
                     "POST", f"{UPSTREAM}/api/chat",
@@ -6423,6 +6524,7 @@ async def stream_local_with_ack(
             grounding_retry_terminal = bool(terminal)
             if terminal_event is not None:
                 merge_ollama_terminal_metrics(ollama_metrics, terminal_event)
+                prompt_budget_telemetry.terminal(terminal_event, NUM_CTX)
             if language_retry and retry_boundary.language_blocked and not emitted_substantive:
                 # A meta apology is not the requested answer. Keep the
                 # failed retry silent instead of speaking "I'll answer
@@ -7659,6 +7761,7 @@ async def proxy(path: str, request: Request):
             body,
             apply_sampling_defaults=not synthetic_evaluation_turn,
         )
+        prompt_budget_telemetry.prepared_native(body)
 
     upstream_request = client.build_request(
         request.method,
@@ -7886,11 +7989,17 @@ async def proxy(path: str, request: Request):
                         break
                 if boundary.language_blocked and not emitted_content:
                     await upstream_response.aclose()
+                    if terminal_item is not None:
+                        # The rejected first attempt still reached a native
+                        # terminal row. Preserve it before the retry replaces
+                        # terminal_item so attempt counters remain honest.
+                        prompt_budget_telemetry.terminal(terminal_item, NUM_CTX)
                     retry_body = inject_request_local_system_note(
                         body,
                         "직전 응답은 한국어 문장 안에 일반 알파벳 단어가 있어 보낼 수 없었다. "
                         "이번에는 필요한 고유명사도 한글로 풀어 쓰고, 영문자를 한 글자도 쓰지 말고 자연스러운 한국어 반말 한 문장으로 다시 답해.",
                     )
+                    prompt_budget_telemetry.prepared_native(retry_body)
                     retry_response = await client.send(
                         client.build_request(request.method, f"{UPSTREAM}/{path}",
                             params=request.query_params, headers=request_headers, content=retry_body),
@@ -7941,6 +8050,8 @@ async def proxy(path: str, request: Request):
                 if terminal_item is None and not boundary.closed_early:
                     raise RuntimeError("incomplete upstream NDJSON stream")
                 final_clean = boundary.finish() if terminal_item is not None else ""
+                if terminal_item is not None:
+                    prompt_budget_telemetry.terminal(terminal_item, NUM_CTX)
                 terminal_source = terminal_item or {
                     "model": str(json.loads(body).get("model") or ""),
                     "done_reason": "length",
@@ -7989,6 +8100,8 @@ async def proxy(path: str, request: Request):
         finally:
             await upstream_response.aclose()
         if isinstance(native_payload, dict):
+            if native_payload.get("done"):
+                prompt_budget_telemetry.terminal(native_payload, NUM_CTX)
             boundary = IncrementalAiriOutputBoundary(
                 require_korean=user_prefers_korean,
                 max_sentences=response_sentence_limit(last_user_text),
@@ -8005,6 +8118,7 @@ async def proxy(path: str, request: Request):
                     "직전 응답은 한국어 문장 안에 일반 알파벳 단어가 있어 보낼 수 없었다. "
                     "이번에는 필요한 고유명사도 한글로 풀어 쓰고, 영문자를 한 글자도 쓰지 말고 자연스러운 한국어 반말 한 문장으로 다시 답해.",
                 )
+                prompt_budget_telemetry.prepared_native(retry_body)
                 retry_response = await client.send(
                     client.build_request(request.method, f"{UPSTREAM}/{path}",
                         params=request.query_params, headers=request_headers, content=retry_body),
@@ -8015,6 +8129,8 @@ async def proxy(path: str, request: Request):
                 finally:
                     await retry_response.aclose()
                 if isinstance(retry_payload, dict):
+                    if retry_payload.get("done"):
+                        prompt_budget_telemetry.terminal(retry_payload, NUM_CTX)
                     native_payload = retry_payload
                     boundary = IncrementalAiriOutputBoundary(
                         require_korean=user_prefers_korean,
@@ -8154,6 +8270,8 @@ async def proxy(path: str, request: Request):
                 else:
                     api_parts[:] = [part]
             done = bool(payload.get("done")) if isinstance(payload, dict) else False
+            if done and isinstance(payload, dict):
+                prompt_budget_telemetry.terminal(payload, NUM_CTX)
             if (done or not requested_stream) and api_parts and not api_journaled:
                 final_text = strip_leading_reaction(normalize_dialogue("".join(api_parts)))
                 schedule_completed_turn(
@@ -8223,11 +8341,20 @@ async def proxy(path: str, request: Request):
 def main() -> None:
     global UPSTREAM, NUM_CTX, NUM_GPU, CHAT_MODEL_DIGEST_STATE
 
+    def bounded_num_ctx(value: str) -> int:
+        try:
+            parsed = int(value)
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError("num-ctx must be an integer") from exc
+        if parsed < 512 or parsed > 32768:
+            raise argparse.ArgumentTypeError("num-ctx must be from 512 through 32768")
+        return parsed
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=11435)
     parser.add_argument("--upstream", default=UPSTREAM)
-    parser.add_argument("--num-ctx", type=int, default=NUM_CTX)
+    parser.add_argument("--num-ctx", type=bounded_num_ctx, default=NUM_CTX)
     parser.add_argument("--num-gpu", type=int, default=NUM_GPU)
     args = parser.parse_args()
 
