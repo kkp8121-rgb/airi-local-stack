@@ -37,6 +37,79 @@ from memory_extraction_provider import (
 )
 
 
+def _decorate_snapshot_messages(raw_messages: Iterable[dict[str, Any]], latest_turn: int) -> list[dict[str, Any]]:
+    """Return copied non-system messages with stable journal turn IDs."""
+    raw = [message for message in raw_messages if isinstance(message, dict)]
+    user_count = sum(message.get("role") == "user" for message in raw)
+    non_system = [message for message in raw if message.get("role") != "system"]
+    has_current_user = bool(non_system and non_system[-1].get("role") == "user")
+    turn = max(0, int(latest_turn) + (1 if has_current_user else 0) - user_count)
+    decorated: list[dict[str, Any]] = []
+    for message in raw:
+        if message.get("role") == "system":
+            continue
+        item = copy.deepcopy(message)
+        if item.get("role") == "user":
+            turn += 1
+        item["id"] = turn if turn else 1
+        decorated.append(item)
+    return decorated
+
+
+def assemble_payload_context_from_snapshot(
+    payload: dict[str, Any],
+    raw_messages: Iterable[dict[str, Any]],
+    *,
+    latest_turn: int,
+    extraction_watermark: int,
+    retrieval_result: RetrievalResult | None = None,
+    projected_message_count: int | None = None,
+    user_display_name: str | None = None,
+    character_display_name: str | None = None,
+    memory_block: str | None = None,
+    journal_messages: Iterable[dict[str, Any]] | None = None,
+    system_intro: Any = None,
+    static_prompt: Any = None,
+) -> dict[str, Any]:
+    """Build upstream context from immutable request and retrieval snapshots.
+
+    This deliberately has no runtime/store dependency, so callers can test or
+    replay the exact production transformation without database access.
+    """
+    if retrieval_result is not None and retrieval_result.failed:
+        return copy.deepcopy(payload)
+    decorated = _decorate_snapshot_messages(raw_messages, latest_turn)
+    if projected_message_count is None:
+        foreground = decorated
+    else:
+        retained = max(0, min(int(projected_message_count), len(decorated)))
+        foreground = decorated[-retained:] if retained else []
+
+    out = copy.deepcopy(payload)
+    transformed = out.get("messages", [])
+    if static_prompt is None and isinstance(transformed, list) and transformed:
+        static_prompt = transformed[0]
+    tail_system_messages = (
+        [copy.deepcopy(message) for message in transformed[1:]
+         if isinstance(message, dict) and message.get("role") == "system"]
+        if isinstance(transformed, list) else []
+    )
+    if memory_block is None:
+        memory_block = retrieval_result.block if retrieval_result is not None else ""
+    if journal_messages is None:
+        journal_messages = retrieval_result.journal_messages if retrieval_result is not None else ()
+    rendered_block = render_memory_placeholders(
+        memory_block,
+        user_name=user_display_name,
+        char_name=character_display_name,
+    )
+    out["messages"] = assemble_context(
+        static_prompt, system_intro, foreground, extraction_watermark,
+        rendered_block, journal_messages, tail_system_messages=tail_system_messages,
+    )
+    return out
+
+
 def _bool(name: str, default: bool) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -463,26 +536,8 @@ class MemoryRuntime:
         raw_messages = [message for message in original_messages if isinstance(message, dict)]
         sid = await self._resolve_session(session, raw_messages, trace_id)
         await self._ensure_session(sid)
-        user_count = sum(message.get("role") == "user" for message in raw_messages)
         latest_turn = await asyncio.to_thread(self.store.latest_turn, sid)
-        non_system = [message for message in raw_messages if message.get("role") != "system"]
-        # A complete client tail ends with an assistant and is entirely
-        # journal-resident already; a request tail ends with the new user turn
-        # which has not yet been appended.  This keeps forwarded IDs aligned
-        # in both cases so journal recall cannot quote a short full history.
-        has_current_user = bool(non_system and non_system[-1].get("role") == "user")
-        turn = max(0, latest_turn + (1 if has_current_user else 0) - user_count)
-        original: list[dict[str, Any]] = []
-        decorated_by_source: dict[int, dict[str, Any]] = {}
-        for message in raw_messages:
-            if not isinstance(message, dict) or message.get("role") == "system":
-                continue
-            item = copy.deepcopy(message)
-            if item.get("role") == "user":
-                turn += 1
-            item["id"] = turn if turn else 1
-            original.append(item)
-            decorated_by_source[id(message)] = item
+        original = _decorate_snapshot_messages(raw_messages, latest_turn)
         try:
             state = await asyncio.to_thread(self.store.job_state_readonly, sid)
             eligible = [item for item in original if int(item.get("id", 0)) > int(state["extracted_up_to_msg"])]
@@ -499,28 +554,13 @@ class MemoryRuntime:
             # untouched; callers can inspect the explicit result state.
             if result.failed:
                 return copy.deepcopy(payload), result
-            rendered_block = render_memory_placeholders(
-                result.block,
-                user_name=self.config.user_display_name,
-                char_name=self.config.character_name,
-            )
-            # The raw list remains authoritative above for session adoption,
-            # IDs, retrieval and journal gating.  Assemble only the request's
-            # foreground suffix so memory cannot restore a dropped topic.
-            # Direct runtime callers retain the historical API behavior; the
-            # proxy always supplies its already-projected suffix.
-            if projected_message_count is None:
-                foreground = original
-            else:
-                # Projection is always a trailing non-system suffix.  Use its
-                # bounded count rather than Python object identity: the proxy
-                # parses the original and transformed JSON independently, so
-                # equivalent message dictionaries are different objects.
-                retained = max(0, min(int(projected_message_count), len(original)))
-                foreground = original[-retained:] if retained else []
-            return self.assemble_payload_context(payload, foreground, extraction_watermark=int(state["extracted_up_to_msg"]),
-                                                 memory_block=rendered_block,
-                                                 journal_messages=result.journal_messages), result
+            return assemble_payload_context_from_snapshot(
+                payload, raw_messages, latest_turn=latest_turn,
+                extraction_watermark=int(state["extracted_up_to_msg"]),
+                retrieval_result=result, projected_message_count=projected_message_count,
+                user_display_name=self.config.user_display_name,
+                character_display_name=self.config.character_name,
+            ), result
         except Exception:
             return copy.deepcopy(payload), RetrievalResult()
 

@@ -75,7 +75,29 @@ class CharacterStateRuntimeTests(unittest.TestCase):
         block = runtime.prompt_block("s")
         self.assertTrue(block.startswith("[Character State] "))
         self.assertNotIn(raw, block)
-        self.assertIn("current_topic", block)
+        self.assertNotIn(raw[:16], block)
+        self.assertNotIn("current_topic", block)
+        self.assertNotIn("last_question", block)
+
+    def test_model_owned_free_text_never_enters_prompt_block(self):
+        runtime = CharacterStateRuntime()
+        canary = "RAW-USER-SECRET-CANARY"
+        runtime.apply_model_state_update("s", {
+            "dialogue_goal": canary,
+            "user_interest": canary,
+            "airi_interest": canary,
+            "emotion": canary,
+            "emotion_reason": canary,
+            "relationship_stage": canary,
+            "intimacy_evidence": [canary],
+        })
+        block = runtime.prompt_block("s")
+        self.assertNotIn(canary, block)
+        for key in (
+            "dialogue_goal", "user_interest", "airi_interest", "emotion",
+            "emotion_reason", "relationship_stage", "intimacy_evidence",
+        ):
+            self.assertNotIn(key, block)
 
     def test_concurrent_calls_smoke(self):
         runtime = CharacterStateRuntime(max_sessions=8)

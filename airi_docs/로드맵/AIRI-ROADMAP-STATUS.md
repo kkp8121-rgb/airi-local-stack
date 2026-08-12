@@ -54,9 +54,8 @@
   - [x] 장문 context·memory·card 합성 A/B 실측 — EXAONE exact 3/12,
     Mi:dm 0/12로 양 모델 FAIL — 2026-08-12
     (`완료/AIRI-LONG-CONTEXT-MEMORY-CARD-AB-2026-08-12.md`)
-  - [ ] 장문 context budget·card/정정 표현 개선 후 고정 4압력×3회 회귀
-    (4096 물리 절단 해소 측정·prompt telemetry는 완료, card/부정 품질 gate는 FAIL;
-    운영 기본값 2048 유지)
+  - [x] 장문 context budget·card/정정 표현 및 고정 4압력×3회 production 회귀 측정 완료 — **FAIL**
+    (`bridge_fact` 0/12, continuity/latest correction 각 11/12의 field binding 후속 필요; 운영 기본값 2048 유지)
   - [x] eval provenance 해소 (수집 데이터를 승격 근거로 사용 가능) — 2026-08-12 (`932eae6`)
   - [ ] 인간 검수 100건 수집 (dev PC)
   - [ ] 16케이스 자동 게이트 PASS (현재 양 모델 FAIL)
@@ -272,3 +271,4 @@
 - **2026-08-12** (`41b1c20`, 검토 PC): 현황판 신설. 검토 PC 선행 배치
   반영 — 모델 SSoT 게이트 4종 코드 해소, I1 추출 배선(발효 대기),
   MEM-04 WAL, B3 모더레이션 코드 완료(M3 일부 선행), C1 헌법 초안.
+- **2026-08-13** (production context): budget/card/정정 표현과 고정 4압력×3회 production 회귀 구현·측정을 완료했다. 구조 변환은 PASS이나 `bridge_fact` 0/12, continuity/latest correction 각 11/12로 semantic gate는 FAIL이다. default `num_ctx=2048`·extraction OFF를 유지하며, 다음 작업은 모델의 bridge-vs-memory field binding 개선 후 같은 게이트 재실행이다.

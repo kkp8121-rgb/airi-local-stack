@@ -1,0 +1,1928 @@
+{
+  "version": "1.0",
+  "timestamp_utc": "2026-08-12T17:03:44.833552+00:00",
+  "endpoint": "http://127.0.0.1:11434/api/chat",
+  "model": "midm-airi:2.0-mini",
+  "metadata": {
+    "ollama_version": "0.32.6",
+    "model_digest": "92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f",
+    "model_size_bytes": 1426273511,
+    "family": "llama",
+    "parameter_size": "2.3B",
+    "quantization_level": "Q4_K_M",
+    "template_sha256": "af6fe088a0d58f0b6ba00143fa9e6f639a4456d88fa978fe8a58a5d1bba70138"
+  },
+  "fixture_sha256": "92fd7d0eb190b59cef2da8ccc947a05ce0c34a73494cca86f620aff7c2cc67ab",
+  "fixture_file_sha256": "15628cf32deb737a9d3aac1e86924efe37d9ea3e76c47fda7148ee325e79a251",
+  "runner_sha256": "dafe904292c0042bb2de3b765e0bbd806821aeb86401e87186b42d8b885eca03",
+  "production_source_sha256": {
+    "ollama_proxy.py": "5ead00816546dddf8af8c6f945887195df742bb95f9cf5fad034bb9a650cf32d",
+    "memory_runtime.py": "6bee09e886aac7d6609f3e96413aaaee71da40c9e685ac590b8b59bae54f9531",
+    "airi_memory.py": "1d2f4ca6301e0ed0e41020dcc22c03fda27cca8f8de3ae964e1e591f87aef965",
+    "foreground_context.py": "455f50cbbaf786b83da57edd4f3c15293977667529300da4d2dd8c593b6dde5c",
+    "continuity_ledger.py": "b1129d01dd0aaf98db90d2a99dd7790cbc6d303e836f27f77f937c8b963fc4f1",
+    "character_state.py": "a5d5e933dbf510f03fed451e448a840ee166550c58cc9608ff5aae525d0541e1"
+  },
+  "configuration": {
+    "endpoint": "http://127.0.0.1:11434/api/chat",
+    "allow_host": false,
+    "model": "midm-airi:2.0-mini",
+    "runs": 3,
+    "num_ctx": 2048,
+    "num_gpu": 999,
+    "temperature": 0.0,
+    "seed": 42,
+    "num_predict": 128,
+    "keep_alive": "5m",
+    "timeout": 180,
+    "output": "ollama-proxy\\eval\\results\\airi-production-context-gate-midm-2048-2026-08-13.json",
+    "fail_on_gate": true
+  },
+  "authoritative": true,
+  "pressures": [
+    {
+      "pressure": 0,
+      "runs": [
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\n  \"active_card\": \"violet-otter\",\n  \"bridge_fact\": \"tail_memory_canary=violet-otter\",\n  \"continuity_fact\": \"favorite.color=green-lantern\",\n  \"correction\": \"favorite.color=green-lantern\",\n  \"dropped_holdout_seen\": false,\n  \"pet_negation\": true,\n  \"tail_memory\": \"silver-fern\"\n}",
+          "raw_response_sha256": "c8a6a7b6f425a1a6d81a3f0e433eeb5d8870a4af664b5e31665bf4fe9639fbc2",
+          "parsed_result": {
+            "active_card": "violet-otter",
+            "bridge_fact": "tail_memory_canary=violet-otter",
+            "continuity_fact": "favorite.color=green-lantern",
+            "correction": "favorite.color=green-lantern",
+            "dropped_holdout_seen": false,
+            "pet_negation": true,
+            "tail_memory": "silver-fern"
+          },
+          "parsed_result_sha256": "94b8e7b82212e302576017281eae99944b1dbee9ad8764b0f821f1ee1afeb23d",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "active_card": true,
+              "continuity_fact": false,
+              "pet_negation": true,
+              "correction": false,
+              "tail_memory": true,
+              "bridge_fact": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "continuity_fact",
+              "correction",
+              "bridge_fact"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1435,
+            "eval_count": 95,
+            "prompt_eval_duration_ms": 368.679,
+            "eval_duration_ms": 885.924,
+            "total_duration_ms": 3339.17
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 14,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "78f0bd9ceb26985addb4deddbf07220fa92c9062b221bf0747016920b23ddca7",
+            "native_messages_hash": "a47bc52c28cdaabc8d7e638d5ee65d2dbb3dc4b51bd93d5243ec2386d17a8cf2",
+            "native_hash": "9e9502fd22b6096c01744a6409ae8d174fc4546922818ed50284bf27cb9650ab",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 696,
+            "prepared_chars": 1933,
+            "native_chars": 2267,
+            "occurrence_counts": {
+              "active_card": 1,
+              "tail_memory": 1,
+              "continuity_ledger": 1,
+              "correction": 1,
+              "bridge": 5,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "bridge_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "num_gpu": 999,
+                "num_predict": 128,
+                "seed": 42,
+                "temperature": 0.0
+              },
+              "format": {
+                "additionalProperties": false,
+                "properties": {
+                  "active_card": {
+                    "description": "Bare value after ACTIVE_CARD_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "bridge_fact": {
+                    "description": "Exact repeated bridge marker token only; never include surrounding words",
+                    "type": "string"
+                  },
+                  "continuity_fact": {
+                    "description": "Bare latest active favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "correction": {
+                    "description": "Bare corrected favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "dropped_holdout_seen": {
+                    "description": "True only if a dropped old holdout marker is actually visible",
+                    "type": "boolean"
+                  },
+                  "pet_negation": {
+                    "description": "True exactly when the pet ownership ledger entry has negated polarity",
+                    "type": "boolean"
+                  },
+                  "tail_memory": {
+                    "description": "Bare value after TAIL_MEMORY_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "active_card",
+                  "continuity_fact",
+                  "pet_negation",
+                  "correction",
+                  "tail_memory",
+                  "bridge_fact",
+                  "dropped_holdout_seen"
+                ],
+                "type": "object"
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"active_card\": \"violet-otter\", \"bridge_fact\": \"silver-fern\", \"continuity_fact\": \"green-lantern\", \"correction\": \"green-lantern\", \"dropped_holdout_seen\": false, \"pet_negation\": true, \"tail_memory\": \"silver-fern\"}",
+          "raw_response_sha256": "19ec9e22a94b017b6229244a0d671114d71203d9b53d80be1eb06922b616e89a",
+          "parsed_result": {
+            "active_card": "violet-otter",
+            "bridge_fact": "silver-fern",
+            "continuity_fact": "green-lantern",
+            "correction": "green-lantern",
+            "dropped_holdout_seen": false,
+            "pet_negation": true,
+            "tail_memory": "silver-fern"
+          },
+          "parsed_result_sha256": "f033486646da28d71acb4df3b72380ff34491f2d00cbec2ed97078fa0b027297",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "active_card": true,
+              "continuity_fact": true,
+              "pet_negation": true,
+              "correction": true,
+              "tail_memory": true,
+              "bridge_fact": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "bridge_fact"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1435,
+            "eval_count": 71,
+            "prompt_eval_duration_ms": 46.796,
+            "eval_duration_ms": 674.071,
+            "total_duration_ms": 877.888
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 14,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "78f0bd9ceb26985addb4deddbf07220fa92c9062b221bf0747016920b23ddca7",
+            "native_messages_hash": "a47bc52c28cdaabc8d7e638d5ee65d2dbb3dc4b51bd93d5243ec2386d17a8cf2",
+            "native_hash": "9e9502fd22b6096c01744a6409ae8d174fc4546922818ed50284bf27cb9650ab",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 696,
+            "prepared_chars": 1933,
+            "native_chars": 2267,
+            "occurrence_counts": {
+              "active_card": 1,
+              "tail_memory": 1,
+              "continuity_ledger": 1,
+              "correction": 1,
+              "bridge": 5,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "bridge_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "num_gpu": 999,
+                "num_predict": 128,
+                "seed": 42,
+                "temperature": 0.0
+              },
+              "format": {
+                "additionalProperties": false,
+                "properties": {
+                  "active_card": {
+                    "description": "Bare value after ACTIVE_CARD_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "bridge_fact": {
+                    "description": "Exact repeated bridge marker token only; never include surrounding words",
+                    "type": "string"
+                  },
+                  "continuity_fact": {
+                    "description": "Bare latest active favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "correction": {
+                    "description": "Bare corrected favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "dropped_holdout_seen": {
+                    "description": "True only if a dropped old holdout marker is actually visible",
+                    "type": "boolean"
+                  },
+                  "pet_negation": {
+                    "description": "True exactly when the pet ownership ledger entry has negated polarity",
+                    "type": "boolean"
+                  },
+                  "tail_memory": {
+                    "description": "Bare value after TAIL_MEMORY_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "active_card",
+                  "continuity_fact",
+                  "pet_negation",
+                  "correction",
+                  "tail_memory",
+                  "bridge_fact",
+                  "dropped_holdout_seen"
+                ],
+                "type": "object"
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"active_card\": \"violet-otter\", \"bridge_fact\": \"silver-fern\", \"continuity_fact\": \"green-lantern\", \"correction\": \"green-lantern\", \"dropped_holdout_seen\": false, \"pet_negation\": true, \"tail_memory\": \"silver-fern\"}",
+          "raw_response_sha256": "19ec9e22a94b017b6229244a0d671114d71203d9b53d80be1eb06922b616e89a",
+          "parsed_result": {
+            "active_card": "violet-otter",
+            "bridge_fact": "silver-fern",
+            "continuity_fact": "green-lantern",
+            "correction": "green-lantern",
+            "dropped_holdout_seen": false,
+            "pet_negation": true,
+            "tail_memory": "silver-fern"
+          },
+          "parsed_result_sha256": "f033486646da28d71acb4df3b72380ff34491f2d00cbec2ed97078fa0b027297",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "active_card": true,
+              "continuity_fact": true,
+              "pet_negation": true,
+              "correction": true,
+              "tail_memory": true,
+              "bridge_fact": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "bridge_fact"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1435,
+            "eval_count": 71,
+            "prompt_eval_duration_ms": 52.708,
+            "eval_duration_ms": 698.217,
+            "total_duration_ms": 911.138
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 14,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "78f0bd9ceb26985addb4deddbf07220fa92c9062b221bf0747016920b23ddca7",
+            "native_messages_hash": "a47bc52c28cdaabc8d7e638d5ee65d2dbb3dc4b51bd93d5243ec2386d17a8cf2",
+            "native_hash": "9e9502fd22b6096c01744a6409ae8d174fc4546922818ed50284bf27cb9650ab",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 696,
+            "prepared_chars": 1933,
+            "native_chars": 2267,
+            "occurrence_counts": {
+              "active_card": 1,
+              "tail_memory": 1,
+              "continuity_ledger": 1,
+              "correction": 1,
+              "bridge": 5,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "bridge_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "num_gpu": 999,
+                "num_predict": 128,
+                "seed": 42,
+                "temperature": 0.0
+              },
+              "format": {
+                "additionalProperties": false,
+                "properties": {
+                  "active_card": {
+                    "description": "Bare value after ACTIVE_CARD_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "bridge_fact": {
+                    "description": "Exact repeated bridge marker token only; never include surrounding words",
+                    "type": "string"
+                  },
+                  "continuity_fact": {
+                    "description": "Bare latest active favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "correction": {
+                    "description": "Bare corrected favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "dropped_holdout_seen": {
+                    "description": "True only if a dropped old holdout marker is actually visible",
+                    "type": "boolean"
+                  },
+                  "pet_negation": {
+                    "description": "True exactly when the pet ownership ledger entry has negated polarity",
+                    "type": "boolean"
+                  },
+                  "tail_memory": {
+                    "description": "Bare value after TAIL_MEMORY_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "active_card",
+                  "continuity_fact",
+                  "pet_negation",
+                  "correction",
+                  "tail_memory",
+                  "bridge_fact",
+                  "dropped_holdout_seen"
+                ],
+                "type": "object"
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "structural_pass": true,
+        "semantic_pass": false,
+        "gate_pass": false,
+        "complete": true,
+        "runs": 3,
+        "completed_runs": 3,
+        "retry_runs": 0,
+        "deterministic_raw_output": false,
+        "deterministic_parsed_output": false,
+        "prompt_eval_count_min": 1435,
+        "prompt_eval_count_max": 1435,
+        "total_duration_ms_p50": 911.138,
+        "total_duration_ms_p95": 3339.17,
+        "field_pass_rates": {
+          "active_card": 1.0,
+          "continuity_fact": 0.6666666666666666,
+          "pet_negation": 1.0,
+          "correction": 0.6666666666666666,
+          "tail_memory": 1.0,
+          "bridge_fact": 0.0,
+          "dropped_holdout_seen": 1.0
+        }
+      }
+    },
+    {
+      "pressure": 8,
+      "runs": [
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"active_card\": \"violet-otter\", \"bridge_fact\": \"silver-fern\", \"continuity_fact\": \"green-lantern\", \"correction\": \"green-lantern\", \"dropped_holdout_seen\": false, \"pet_negation\": true, \"tail_memory\": \"silver-fern\"}",
+          "raw_response_sha256": "19ec9e22a94b017b6229244a0d671114d71203d9b53d80be1eb06922b616e89a",
+          "parsed_result": {
+            "active_card": "violet-otter",
+            "bridge_fact": "silver-fern",
+            "continuity_fact": "green-lantern",
+            "correction": "green-lantern",
+            "dropped_holdout_seen": false,
+            "pet_negation": true,
+            "tail_memory": "silver-fern"
+          },
+          "parsed_result_sha256": "f033486646da28d71acb4df3b72380ff34491f2d00cbec2ed97078fa0b027297",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "active_card": true,
+              "continuity_fact": true,
+              "pet_negation": true,
+              "correction": true,
+              "tail_memory": true,
+              "bridge_fact": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "bridge_fact"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1435,
+            "eval_count": 71,
+            "prompt_eval_duration_ms": 48.669,
+            "eval_duration_ms": 675.4,
+            "total_duration_ms": 875.888
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 30,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "78f0bd9ceb26985addb4deddbf07220fa92c9062b221bf0747016920b23ddca7",
+            "native_messages_hash": "a47bc52c28cdaabc8d7e638d5ee65d2dbb3dc4b51bd93d5243ec2386d17a8cf2",
+            "native_hash": "9e9502fd22b6096c01744a6409ae8d174fc4546922818ed50284bf27cb9650ab",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 1272,
+            "prepared_chars": 1933,
+            "native_chars": 2267,
+            "occurrence_counts": {
+              "active_card": 1,
+              "tail_memory": 1,
+              "continuity_ledger": 1,
+              "correction": 1,
+              "bridge": 5,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "bridge_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "num_gpu": 999,
+                "num_predict": 128,
+                "seed": 42,
+                "temperature": 0.0
+              },
+              "format": {
+                "additionalProperties": false,
+                "properties": {
+                  "active_card": {
+                    "description": "Bare value after ACTIVE_CARD_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "bridge_fact": {
+                    "description": "Exact repeated bridge marker token only; never include surrounding words",
+                    "type": "string"
+                  },
+                  "continuity_fact": {
+                    "description": "Bare latest active favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "correction": {
+                    "description": "Bare corrected favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "dropped_holdout_seen": {
+                    "description": "True only if a dropped old holdout marker is actually visible",
+                    "type": "boolean"
+                  },
+                  "pet_negation": {
+                    "description": "True exactly when the pet ownership ledger entry has negated polarity",
+                    "type": "boolean"
+                  },
+                  "tail_memory": {
+                    "description": "Bare value after TAIL_MEMORY_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "active_card",
+                  "continuity_fact",
+                  "pet_negation",
+                  "correction",
+                  "tail_memory",
+                  "bridge_fact",
+                  "dropped_holdout_seen"
+                ],
+                "type": "object"
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"active_card\": \"violet-otter\", \"bridge_fact\": \"silver-fern\", \"continuity_fact\": \"green-lantern\", \"correction\": \"green-lantern\", \"dropped_holdout_seen\": false, \"pet_negation\": true, \"tail_memory\": \"silver-fern\"}",
+          "raw_response_sha256": "19ec9e22a94b017b6229244a0d671114d71203d9b53d80be1eb06922b616e89a",
+          "parsed_result": {
+            "active_card": "violet-otter",
+            "bridge_fact": "silver-fern",
+            "continuity_fact": "green-lantern",
+            "correction": "green-lantern",
+            "dropped_holdout_seen": false,
+            "pet_negation": true,
+            "tail_memory": "silver-fern"
+          },
+          "parsed_result_sha256": "f033486646da28d71acb4df3b72380ff34491f2d00cbec2ed97078fa0b027297",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "active_card": true,
+              "continuity_fact": true,
+              "pet_negation": true,
+              "correction": true,
+              "tail_memory": true,
+              "bridge_fact": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "bridge_fact"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1435,
+            "eval_count": 71,
+            "prompt_eval_duration_ms": 43.181,
+            "eval_duration_ms": 677.4,
+            "total_duration_ms": 877.649
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 30,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "78f0bd9ceb26985addb4deddbf07220fa92c9062b221bf0747016920b23ddca7",
+            "native_messages_hash": "a47bc52c28cdaabc8d7e638d5ee65d2dbb3dc4b51bd93d5243ec2386d17a8cf2",
+            "native_hash": "9e9502fd22b6096c01744a6409ae8d174fc4546922818ed50284bf27cb9650ab",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 1272,
+            "prepared_chars": 1933,
+            "native_chars": 2267,
+            "occurrence_counts": {
+              "active_card": 1,
+              "tail_memory": 1,
+              "continuity_ledger": 1,
+              "correction": 1,
+              "bridge": 5,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "bridge_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "num_gpu": 999,
+                "num_predict": 128,
+                "seed": 42,
+                "temperature": 0.0
+              },
+              "format": {
+                "additionalProperties": false,
+                "properties": {
+                  "active_card": {
+                    "description": "Bare value after ACTIVE_CARD_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "bridge_fact": {
+                    "description": "Exact repeated bridge marker token only; never include surrounding words",
+                    "type": "string"
+                  },
+                  "continuity_fact": {
+                    "description": "Bare latest active favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "correction": {
+                    "description": "Bare corrected favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "dropped_holdout_seen": {
+                    "description": "True only if a dropped old holdout marker is actually visible",
+                    "type": "boolean"
+                  },
+                  "pet_negation": {
+                    "description": "True exactly when the pet ownership ledger entry has negated polarity",
+                    "type": "boolean"
+                  },
+                  "tail_memory": {
+                    "description": "Bare value after TAIL_MEMORY_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "active_card",
+                  "continuity_fact",
+                  "pet_negation",
+                  "correction",
+                  "tail_memory",
+                  "bridge_fact",
+                  "dropped_holdout_seen"
+                ],
+                "type": "object"
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"active_card\": \"violet-otter\", \"bridge_fact\": \"silver-fern\", \"continuity_fact\": \"green-lantern\", \"correction\": \"green-lantern\", \"dropped_holdout_seen\": false, \"pet_negation\": true, \"tail_memory\": \"silver-fern\"}",
+          "raw_response_sha256": "19ec9e22a94b017b6229244a0d671114d71203d9b53d80be1eb06922b616e89a",
+          "parsed_result": {
+            "active_card": "violet-otter",
+            "bridge_fact": "silver-fern",
+            "continuity_fact": "green-lantern",
+            "correction": "green-lantern",
+            "dropped_holdout_seen": false,
+            "pet_negation": true,
+            "tail_memory": "silver-fern"
+          },
+          "parsed_result_sha256": "f033486646da28d71acb4df3b72380ff34491f2d00cbec2ed97078fa0b027297",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "active_card": true,
+              "continuity_fact": true,
+              "pet_negation": true,
+              "correction": true,
+              "tail_memory": true,
+              "bridge_fact": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "bridge_fact"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1435,
+            "eval_count": 71,
+            "prompt_eval_duration_ms": 42.559,
+            "eval_duration_ms": 670.775,
+            "total_duration_ms": 872.421
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 30,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "78f0bd9ceb26985addb4deddbf07220fa92c9062b221bf0747016920b23ddca7",
+            "native_messages_hash": "a47bc52c28cdaabc8d7e638d5ee65d2dbb3dc4b51bd93d5243ec2386d17a8cf2",
+            "native_hash": "9e9502fd22b6096c01744a6409ae8d174fc4546922818ed50284bf27cb9650ab",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 1272,
+            "prepared_chars": 1933,
+            "native_chars": 2267,
+            "occurrence_counts": {
+              "active_card": 1,
+              "tail_memory": 1,
+              "continuity_ledger": 1,
+              "correction": 1,
+              "bridge": 5,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "bridge_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "num_gpu": 999,
+                "num_predict": 128,
+                "seed": 42,
+                "temperature": 0.0
+              },
+              "format": {
+                "additionalProperties": false,
+                "properties": {
+                  "active_card": {
+                    "description": "Bare value after ACTIVE_CARD_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "bridge_fact": {
+                    "description": "Exact repeated bridge marker token only; never include surrounding words",
+                    "type": "string"
+                  },
+                  "continuity_fact": {
+                    "description": "Bare latest active favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "correction": {
+                    "description": "Bare corrected favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "dropped_holdout_seen": {
+                    "description": "True only if a dropped old holdout marker is actually visible",
+                    "type": "boolean"
+                  },
+                  "pet_negation": {
+                    "description": "True exactly when the pet ownership ledger entry has negated polarity",
+                    "type": "boolean"
+                  },
+                  "tail_memory": {
+                    "description": "Bare value after TAIL_MEMORY_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "active_card",
+                  "continuity_fact",
+                  "pet_negation",
+                  "correction",
+                  "tail_memory",
+                  "bridge_fact",
+                  "dropped_holdout_seen"
+                ],
+                "type": "object"
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "structural_pass": true,
+        "semantic_pass": false,
+        "gate_pass": false,
+        "complete": true,
+        "runs": 3,
+        "completed_runs": 3,
+        "retry_runs": 0,
+        "deterministic_raw_output": true,
+        "deterministic_parsed_output": true,
+        "prompt_eval_count_min": 1435,
+        "prompt_eval_count_max": 1435,
+        "total_duration_ms_p50": 875.888,
+        "total_duration_ms_p95": 877.649,
+        "field_pass_rates": {
+          "active_card": 1.0,
+          "continuity_fact": 1.0,
+          "pet_negation": 1.0,
+          "correction": 1.0,
+          "tail_memory": 1.0,
+          "bridge_fact": 0.0,
+          "dropped_holdout_seen": 1.0
+        }
+      }
+    },
+    {
+      "pressure": 20,
+      "runs": [
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"active_card\": \"violet-otter\", \"bridge_fact\": \"silver-fern\", \"continuity_fact\": \"green-lantern\", \"correction\": \"green-lantern\", \"dropped_holdout_seen\": false, \"pet_negation\": true, \"tail_memory\": \"silver-fern\"}",
+          "raw_response_sha256": "19ec9e22a94b017b6229244a0d671114d71203d9b53d80be1eb06922b616e89a",
+          "parsed_result": {
+            "active_card": "violet-otter",
+            "bridge_fact": "silver-fern",
+            "continuity_fact": "green-lantern",
+            "correction": "green-lantern",
+            "dropped_holdout_seen": false,
+            "pet_negation": true,
+            "tail_memory": "silver-fern"
+          },
+          "parsed_result_sha256": "f033486646da28d71acb4df3b72380ff34491f2d00cbec2ed97078fa0b027297",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "active_card": true,
+              "continuity_fact": true,
+              "pet_negation": true,
+              "correction": true,
+              "tail_memory": true,
+              "bridge_fact": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "bridge_fact"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1435,
+            "eval_count": 71,
+            "prompt_eval_duration_ms": 54.36,
+            "eval_duration_ms": 657.991,
+            "total_duration_ms": 867.201
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 54,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "78f0bd9ceb26985addb4deddbf07220fa92c9062b221bf0747016920b23ddca7",
+            "native_messages_hash": "a47bc52c28cdaabc8d7e638d5ee65d2dbb3dc4b51bd93d5243ec2386d17a8cf2",
+            "native_hash": "9e9502fd22b6096c01744a6409ae8d174fc4546922818ed50284bf27cb9650ab",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 2156,
+            "prepared_chars": 1933,
+            "native_chars": 2267,
+            "occurrence_counts": {
+              "active_card": 1,
+              "tail_memory": 1,
+              "continuity_ledger": 1,
+              "correction": 1,
+              "bridge": 5,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "bridge_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "num_gpu": 999,
+                "num_predict": 128,
+                "seed": 42,
+                "temperature": 0.0
+              },
+              "format": {
+                "additionalProperties": false,
+                "properties": {
+                  "active_card": {
+                    "description": "Bare value after ACTIVE_CARD_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "bridge_fact": {
+                    "description": "Exact repeated bridge marker token only; never include surrounding words",
+                    "type": "string"
+                  },
+                  "continuity_fact": {
+                    "description": "Bare latest active favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "correction": {
+                    "description": "Bare corrected favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "dropped_holdout_seen": {
+                    "description": "True only if a dropped old holdout marker is actually visible",
+                    "type": "boolean"
+                  },
+                  "pet_negation": {
+                    "description": "True exactly when the pet ownership ledger entry has negated polarity",
+                    "type": "boolean"
+                  },
+                  "tail_memory": {
+                    "description": "Bare value after TAIL_MEMORY_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "active_card",
+                  "continuity_fact",
+                  "pet_negation",
+                  "correction",
+                  "tail_memory",
+                  "bridge_fact",
+                  "dropped_holdout_seen"
+                ],
+                "type": "object"
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"active_card\": \"violet-otter\", \"bridge_fact\": \"silver-fern\", \"continuity_fact\": \"green-lantern\", \"correction\": \"green-lantern\", \"dropped_holdout_seen\": false, \"pet_negation\": true, \"tail_memory\": \"silver-fern\"}",
+          "raw_response_sha256": "19ec9e22a94b017b6229244a0d671114d71203d9b53d80be1eb06922b616e89a",
+          "parsed_result": {
+            "active_card": "violet-otter",
+            "bridge_fact": "silver-fern",
+            "continuity_fact": "green-lantern",
+            "correction": "green-lantern",
+            "dropped_holdout_seen": false,
+            "pet_negation": true,
+            "tail_memory": "silver-fern"
+          },
+          "parsed_result_sha256": "f033486646da28d71acb4df3b72380ff34491f2d00cbec2ed97078fa0b027297",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "active_card": true,
+              "continuity_fact": true,
+              "pet_negation": true,
+              "correction": true,
+              "tail_memory": true,
+              "bridge_fact": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "bridge_fact"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1435,
+            "eval_count": 71,
+            "prompt_eval_duration_ms": 40.297,
+            "eval_duration_ms": 664.471,
+            "total_duration_ms": 855.135
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 54,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "78f0bd9ceb26985addb4deddbf07220fa92c9062b221bf0747016920b23ddca7",
+            "native_messages_hash": "a47bc52c28cdaabc8d7e638d5ee65d2dbb3dc4b51bd93d5243ec2386d17a8cf2",
+            "native_hash": "9e9502fd22b6096c01744a6409ae8d174fc4546922818ed50284bf27cb9650ab",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 2156,
+            "prepared_chars": 1933,
+            "native_chars": 2267,
+            "occurrence_counts": {
+              "active_card": 1,
+              "tail_memory": 1,
+              "continuity_ledger": 1,
+              "correction": 1,
+              "bridge": 5,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "bridge_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "num_gpu": 999,
+                "num_predict": 128,
+                "seed": 42,
+                "temperature": 0.0
+              },
+              "format": {
+                "additionalProperties": false,
+                "properties": {
+                  "active_card": {
+                    "description": "Bare value after ACTIVE_CARD_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "bridge_fact": {
+                    "description": "Exact repeated bridge marker token only; never include surrounding words",
+                    "type": "string"
+                  },
+                  "continuity_fact": {
+                    "description": "Bare latest active favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "correction": {
+                    "description": "Bare corrected favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "dropped_holdout_seen": {
+                    "description": "True only if a dropped old holdout marker is actually visible",
+                    "type": "boolean"
+                  },
+                  "pet_negation": {
+                    "description": "True exactly when the pet ownership ledger entry has negated polarity",
+                    "type": "boolean"
+                  },
+                  "tail_memory": {
+                    "description": "Bare value after TAIL_MEMORY_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "active_card",
+                  "continuity_fact",
+                  "pet_negation",
+                  "correction",
+                  "tail_memory",
+                  "bridge_fact",
+                  "dropped_holdout_seen"
+                ],
+                "type": "object"
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"active_card\": \"violet-otter\", \"bridge_fact\": \"silver-fern\", \"continuity_fact\": \"green-lantern\", \"correction\": \"green-lantern\", \"dropped_holdout_seen\": false, \"pet_negation\": true, \"tail_memory\": \"silver-fern\"}",
+          "raw_response_sha256": "19ec9e22a94b017b6229244a0d671114d71203d9b53d80be1eb06922b616e89a",
+          "parsed_result": {
+            "active_card": "violet-otter",
+            "bridge_fact": "silver-fern",
+            "continuity_fact": "green-lantern",
+            "correction": "green-lantern",
+            "dropped_holdout_seen": false,
+            "pet_negation": true,
+            "tail_memory": "silver-fern"
+          },
+          "parsed_result_sha256": "f033486646da28d71acb4df3b72380ff34491f2d00cbec2ed97078fa0b027297",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "active_card": true,
+              "continuity_fact": true,
+              "pet_negation": true,
+              "correction": true,
+              "tail_memory": true,
+              "bridge_fact": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "bridge_fact"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1435,
+            "eval_count": 71,
+            "prompt_eval_duration_ms": 39.532,
+            "eval_duration_ms": 660.804,
+            "total_duration_ms": 848.464
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 54,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "78f0bd9ceb26985addb4deddbf07220fa92c9062b221bf0747016920b23ddca7",
+            "native_messages_hash": "a47bc52c28cdaabc8d7e638d5ee65d2dbb3dc4b51bd93d5243ec2386d17a8cf2",
+            "native_hash": "9e9502fd22b6096c01744a6409ae8d174fc4546922818ed50284bf27cb9650ab",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 2156,
+            "prepared_chars": 1933,
+            "native_chars": 2267,
+            "occurrence_counts": {
+              "active_card": 1,
+              "tail_memory": 1,
+              "continuity_ledger": 1,
+              "correction": 1,
+              "bridge": 5,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "bridge_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "num_gpu": 999,
+                "num_predict": 128,
+                "seed": 42,
+                "temperature": 0.0
+              },
+              "format": {
+                "additionalProperties": false,
+                "properties": {
+                  "active_card": {
+                    "description": "Bare value after ACTIVE_CARD_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "bridge_fact": {
+                    "description": "Exact repeated bridge marker token only; never include surrounding words",
+                    "type": "string"
+                  },
+                  "continuity_fact": {
+                    "description": "Bare latest active favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "correction": {
+                    "description": "Bare corrected favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "dropped_holdout_seen": {
+                    "description": "True only if a dropped old holdout marker is actually visible",
+                    "type": "boolean"
+                  },
+                  "pet_negation": {
+                    "description": "True exactly when the pet ownership ledger entry has negated polarity",
+                    "type": "boolean"
+                  },
+                  "tail_memory": {
+                    "description": "Bare value after TAIL_MEMORY_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "active_card",
+                  "continuity_fact",
+                  "pet_negation",
+                  "correction",
+                  "tail_memory",
+                  "bridge_fact",
+                  "dropped_holdout_seen"
+                ],
+                "type": "object"
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "structural_pass": true,
+        "semantic_pass": false,
+        "gate_pass": false,
+        "complete": true,
+        "runs": 3,
+        "completed_runs": 3,
+        "retry_runs": 0,
+        "deterministic_raw_output": true,
+        "deterministic_parsed_output": true,
+        "prompt_eval_count_min": 1435,
+        "prompt_eval_count_max": 1435,
+        "total_duration_ms_p50": 855.135,
+        "total_duration_ms_p95": 867.201,
+        "field_pass_rates": {
+          "active_card": 1.0,
+          "continuity_fact": 1.0,
+          "pet_negation": 1.0,
+          "correction": 1.0,
+          "tail_memory": 1.0,
+          "bridge_fact": 0.0,
+          "dropped_holdout_seen": 1.0
+        }
+      }
+    },
+    {
+      "pressure": 48,
+      "runs": [
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"active_card\": \"violet-otter\", \"bridge_fact\": \"silver-fern\", \"continuity_fact\": \"green-lantern\", \"correction\": \"green-lantern\", \"dropped_holdout_seen\": false, \"pet_negation\": true, \"tail_memory\": \"silver-fern\"}",
+          "raw_response_sha256": "19ec9e22a94b017b6229244a0d671114d71203d9b53d80be1eb06922b616e89a",
+          "parsed_result": {
+            "active_card": "violet-otter",
+            "bridge_fact": "silver-fern",
+            "continuity_fact": "green-lantern",
+            "correction": "green-lantern",
+            "dropped_holdout_seen": false,
+            "pet_negation": true,
+            "tail_memory": "silver-fern"
+          },
+          "parsed_result_sha256": "f033486646da28d71acb4df3b72380ff34491f2d00cbec2ed97078fa0b027297",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "active_card": true,
+              "continuity_fact": true,
+              "pet_negation": true,
+              "correction": true,
+              "tail_memory": true,
+              "bridge_fact": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "bridge_fact"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1435,
+            "eval_count": 71,
+            "prompt_eval_duration_ms": 40.967,
+            "eval_duration_ms": 655.305,
+            "total_duration_ms": 839.546
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 110,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "78f0bd9ceb26985addb4deddbf07220fa92c9062b221bf0747016920b23ddca7",
+            "native_messages_hash": "a47bc52c28cdaabc8d7e638d5ee65d2dbb3dc4b51bd93d5243ec2386d17a8cf2",
+            "native_hash": "9e9502fd22b6096c01744a6409ae8d174fc4546922818ed50284bf27cb9650ab",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 4228,
+            "prepared_chars": 1933,
+            "native_chars": 2267,
+            "occurrence_counts": {
+              "active_card": 1,
+              "tail_memory": 1,
+              "continuity_ledger": 1,
+              "correction": 1,
+              "bridge": 5,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "bridge_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "num_gpu": 999,
+                "num_predict": 128,
+                "seed": 42,
+                "temperature": 0.0
+              },
+              "format": {
+                "additionalProperties": false,
+                "properties": {
+                  "active_card": {
+                    "description": "Bare value after ACTIVE_CARD_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "bridge_fact": {
+                    "description": "Exact repeated bridge marker token only; never include surrounding words",
+                    "type": "string"
+                  },
+                  "continuity_fact": {
+                    "description": "Bare latest active favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "correction": {
+                    "description": "Bare corrected favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "dropped_holdout_seen": {
+                    "description": "True only if a dropped old holdout marker is actually visible",
+                    "type": "boolean"
+                  },
+                  "pet_negation": {
+                    "description": "True exactly when the pet ownership ledger entry has negated polarity",
+                    "type": "boolean"
+                  },
+                  "tail_memory": {
+                    "description": "Bare value after TAIL_MEMORY_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "active_card",
+                  "continuity_fact",
+                  "pet_negation",
+                  "correction",
+                  "tail_memory",
+                  "bridge_fact",
+                  "dropped_holdout_seen"
+                ],
+                "type": "object"
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"active_card\": \"violet-otter\", \"bridge_fact\": \"silver-fern\", \"continuity_fact\": \"green-lantern\", \"correction\": \"green-lantern\", \"dropped_holdout_seen\": false, \"pet_negation\": true, \"tail_memory\": \"silver-fern\"}",
+          "raw_response_sha256": "19ec9e22a94b017b6229244a0d671114d71203d9b53d80be1eb06922b616e89a",
+          "parsed_result": {
+            "active_card": "violet-otter",
+            "bridge_fact": "silver-fern",
+            "continuity_fact": "green-lantern",
+            "correction": "green-lantern",
+            "dropped_holdout_seen": false,
+            "pet_negation": true,
+            "tail_memory": "silver-fern"
+          },
+          "parsed_result_sha256": "f033486646da28d71acb4df3b72380ff34491f2d00cbec2ed97078fa0b027297",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "active_card": true,
+              "continuity_fact": true,
+              "pet_negation": true,
+              "correction": true,
+              "tail_memory": true,
+              "bridge_fact": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "bridge_fact"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1435,
+            "eval_count": 71,
+            "prompt_eval_duration_ms": 40.653,
+            "eval_duration_ms": 656.05,
+            "total_duration_ms": 839.876
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 110,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "78f0bd9ceb26985addb4deddbf07220fa92c9062b221bf0747016920b23ddca7",
+            "native_messages_hash": "a47bc52c28cdaabc8d7e638d5ee65d2dbb3dc4b51bd93d5243ec2386d17a8cf2",
+            "native_hash": "9e9502fd22b6096c01744a6409ae8d174fc4546922818ed50284bf27cb9650ab",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 4228,
+            "prepared_chars": 1933,
+            "native_chars": 2267,
+            "occurrence_counts": {
+              "active_card": 1,
+              "tail_memory": 1,
+              "continuity_ledger": 1,
+              "correction": 1,
+              "bridge": 5,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "bridge_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "num_gpu": 999,
+                "num_predict": 128,
+                "seed": 42,
+                "temperature": 0.0
+              },
+              "format": {
+                "additionalProperties": false,
+                "properties": {
+                  "active_card": {
+                    "description": "Bare value after ACTIVE_CARD_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "bridge_fact": {
+                    "description": "Exact repeated bridge marker token only; never include surrounding words",
+                    "type": "string"
+                  },
+                  "continuity_fact": {
+                    "description": "Bare latest active favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "correction": {
+                    "description": "Bare corrected favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "dropped_holdout_seen": {
+                    "description": "True only if a dropped old holdout marker is actually visible",
+                    "type": "boolean"
+                  },
+                  "pet_negation": {
+                    "description": "True exactly when the pet ownership ledger entry has negated polarity",
+                    "type": "boolean"
+                  },
+                  "tail_memory": {
+                    "description": "Bare value after TAIL_MEMORY_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "active_card",
+                  "continuity_fact",
+                  "pet_negation",
+                  "correction",
+                  "tail_memory",
+                  "bridge_fact",
+                  "dropped_holdout_seen"
+                ],
+                "type": "object"
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"active_card\": \"violet-otter\", \"bridge_fact\": \"silver-fern\", \"continuity_fact\": \"green-lantern\", \"correction\": \"green-lantern\", \"dropped_holdout_seen\": false, \"pet_negation\": true, \"tail_memory\": \"silver-fern\"}",
+          "raw_response_sha256": "19ec9e22a94b017b6229244a0d671114d71203d9b53d80be1eb06922b616e89a",
+          "parsed_result": {
+            "active_card": "violet-otter",
+            "bridge_fact": "silver-fern",
+            "continuity_fact": "green-lantern",
+            "correction": "green-lantern",
+            "dropped_holdout_seen": false,
+            "pet_negation": true,
+            "tail_memory": "silver-fern"
+          },
+          "parsed_result_sha256": "f033486646da28d71acb4df3b72380ff34491f2d00cbec2ed97078fa0b027297",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "active_card": true,
+              "continuity_fact": true,
+              "pet_negation": true,
+              "correction": true,
+              "tail_memory": true,
+              "bridge_fact": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "bridge_fact"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1435,
+            "eval_count": 71,
+            "prompt_eval_duration_ms": 48.146,
+            "eval_duration_ms": 662.545,
+            "total_duration_ms": 869.495
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 110,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "78f0bd9ceb26985addb4deddbf07220fa92c9062b221bf0747016920b23ddca7",
+            "native_messages_hash": "a47bc52c28cdaabc8d7e638d5ee65d2dbb3dc4b51bd93d5243ec2386d17a8cf2",
+            "native_hash": "9e9502fd22b6096c01744a6409ae8d174fc4546922818ed50284bf27cb9650ab",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 4228,
+            "prepared_chars": 1933,
+            "native_chars": 2267,
+            "occurrence_counts": {
+              "active_card": 1,
+              "tail_memory": 1,
+              "continuity_ledger": 1,
+              "correction": 1,
+              "bridge": 5,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "bridge_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "num_gpu": 999,
+                "num_predict": 128,
+                "seed": 42,
+                "temperature": 0.0
+              },
+              "format": {
+                "additionalProperties": false,
+                "properties": {
+                  "active_card": {
+                    "description": "Bare value after ACTIVE_CARD_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "bridge_fact": {
+                    "description": "Exact repeated bridge marker token only; never include surrounding words",
+                    "type": "string"
+                  },
+                  "continuity_fact": {
+                    "description": "Bare latest active favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "correction": {
+                    "description": "Bare corrected favorite.color value; never include key or equals sign",
+                    "type": "string"
+                  },
+                  "dropped_holdout_seen": {
+                    "description": "True only if a dropped old holdout marker is actually visible",
+                    "type": "boolean"
+                  },
+                  "pet_negation": {
+                    "description": "True exactly when the pet ownership ledger entry has negated polarity",
+                    "type": "boolean"
+                  },
+                  "tail_memory": {
+                    "description": "Bare value after TAIL_MEMORY_CANARY=; never include key or equals sign",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "active_card",
+                  "continuity_fact",
+                  "pet_negation",
+                  "correction",
+                  "tail_memory",
+                  "bridge_fact",
+                  "dropped_holdout_seen"
+                ],
+                "type": "object"
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "structural_pass": true,
+        "semantic_pass": false,
+        "gate_pass": false,
+        "complete": true,
+        "runs": 3,
+        "completed_runs": 3,
+        "retry_runs": 0,
+        "deterministic_raw_output": true,
+        "deterministic_parsed_output": true,
+        "prompt_eval_count_min": 1435,
+        "prompt_eval_count_max": 1435,
+        "total_duration_ms_p50": 839.876,
+        "total_duration_ms_p95": 869.495,
+        "field_pass_rates": {
+          "active_card": 1.0,
+          "continuity_fact": 1.0,
+          "pet_negation": 1.0,
+          "correction": 1.0,
+          "tail_memory": 1.0,
+          "bridge_fact": 0.0,
+          "dropped_holdout_seen": 1.0
+        }
+      }
+    }
+  ],
+  "cross_pressure_native_hash_equal": true,
+  "aggregate": {
+    "structural_pass": true,
+    "semantic_pass": false,
+    "gate_pass": false,
+    "complete": true,
+    "runs": 12,
+    "completed_runs": 12,
+    "retry_runs": 0,
+    "deterministic_raw_output": false,
+    "deterministic_parsed_output": false,
+    "prompt_eval_count_min": 1435,
+    "prompt_eval_count_max": 1435,
+    "total_duration_ms_p50": 869.495,
+    "total_duration_ms_p95": 3339.17,
+    "field_pass_rates": {
+      "active_card": 1.0,
+      "continuity_fact": 0.9166666666666666,
+      "pet_negation": 1.0,
+      "correction": 0.9166666666666666,
+      "tail_memory": 1.0,
+      "bridge_fact": 0.0,
+      "dropped_holdout_seen": 1.0
+    },
+    "authoritative_gate_pass": false
+  }
+}

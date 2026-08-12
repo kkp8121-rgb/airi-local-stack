@@ -432,7 +432,9 @@ Every response must use this control format: <|NAME PAYLOAD|>.
         ]}, ensure_ascii=False).encode()
         transformed, *_ = ollama_proxy.transform_body("v1/chat/completions", body)
         messages = json.loads(transformed)["messages"]
-        self.assertEqual([message["role"] for message in messages], ["system", "user"])
+        self.assertEqual([message["role"] for message in messages], ["system", "system", "user"])
+        self.assertEqual(messages[-2].get("name"), ollama_proxy.ACTIVE_CARD_MESSAGE_NAME)
+        self.assertEqual(messages[-2]["content"], "[Active Character Card]\ncard")
         self.assertEqual(messages[-1]["content"], "그 얘기는 여기까지. 창밖에 비가 와.")
         self.assertNotIn("예전 주제", json.dumps(messages, ensure_ascii=False))
 
@@ -4461,6 +4463,65 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertEqual(memory.prepared, 0)
         self.assertEqual(memory.completed, [])
 
+    def test_local_synthetic_evaluation_uses_pure_continuity_without_raw_duplication(self) -> None:
+        chat = _CapturingChatClient("합성 연속성 평가 답변이야.")
+        memory = _FakeMemoryRuntime()
+        raw_fact = "나는 개를 키우지 않는다."
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ), mock.patch.object(
+            ollama_proxy, "knowledge_runtime", None
+        ), mock.patch.object(
+            ollama_proxy, "is_local_synthetic_evaluation_turn", return_value=True
+        ):
+            response = TestClient(ollama_proxy.app).post(
+                "/v1/chat/completions",
+                headers={
+                    "x-airi-turn-origin": "local-evaluation",
+                    "x-airi-session-id": "synthetic-continuity",
+                },
+                json={"model": "midm-airi:2.0-mini", "stream": True, "messages": [
+                    {"role": "user", "content": raw_fact},
+                    {"role": "assistant", "content": "알겠어."},
+                    {"role": "user", "content": "그 사실을 확인해줘."},
+                ]},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(memory.prepared, 0)
+        self.assertEqual(memory.completed, [])
+        outbound = json.dumps(chat.requests[0], ensure_ascii=False)
+        # The raw early sentence was projected out; only its narrow canonical
+        # polarity survives as finite normalized continuity data.
+        self.assertEqual(outbound.count(raw_fact), 0)
+        ledger = next(
+            message["content"] for message in chat.requests[0]["messages"]
+            if "[AIRI Continuity Data v1" in message.get("content", "")
+        )
+        self.assertIn('"polarity":"negated"', ledger)
+        self.assertIn('"value":"개"', ledger)
+
+    def test_missing_session_header_does_not_persist_continuity_state(self) -> None:
+        chat = _CapturingChatClient("현재 요청만 반영해.")
+        runtime = mock.Mock()
+        runtime.observe.side_effect = AssertionError("implicit session must not persist")
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "continuity_ledger_runtime", runtime
+        ), mock.patch.object(
+            ollama_proxy, "memory_runtime", _FakeMemoryRuntime()
+        ), mock.patch.object(
+            ollama_proxy, "knowledge_runtime", None
+        ):
+            response = TestClient(ollama_proxy.app).post(
+                "/v1/chat/completions",
+                json={"model": "midm-airi:2.0-mini", "stream": True, "messages": [
+                    {"role": "user", "content": "favorite.color=blue-cedar"},
+                ]},
+            )
+        self.assertEqual(response.status_code, 200)
+        runtime.observe.assert_not_called()
+        self.assertIn("[AIRI Continuity Data v1", json.dumps(chat.requests[0]))
+
     def test_local_quality_probe_bypasses_personal_state_and_memory_but_keeps_sampling(self) -> None:
         def event(content: str, done: bool = True) -> bytes:
             return (json.dumps({
@@ -4655,7 +4716,13 @@ class CharacterLoopIntegrationTests(unittest.TestCase):
             if message.get("role") == "system" and "[Character State]" in message.get("content", "")
         )
         self.assertIn("[Character State]", upstream_tail)
-        self.assertIn("별 이야기를 계속하자", upstream_tail)
+        self.assertNotIn("별 이야기를 계속하자", upstream_tail)
+        self.assertNotIn('"current_topic"', upstream_tail)
+        self.assertNotIn('"last_question"', upstream_tail)
+        self.assertEqual(
+            sum(message.get("content") == "별 이야기를 계속하자" for message in upstream_messages),
+            1,
+        )
 
     def test_director_receives_character_state_without_count_forcing_action(self) -> None:
         director = _StaticDirectorClient('{"action":"normal","speech":""}')
@@ -5016,6 +5083,68 @@ class LocalStreamSafetyTests(unittest.TestCase):
 
 
 class ForegroundContextTests(unittest.TestCase):
+    def test_production_projects_active_card_once_at_the_request_tail(self) -> None:
+        card_canary = "AIRI card canary: persona_marker=violet-otter"
+        body = json.dumps({"model": "midm-airi:2.0-mini", "messages": [
+            {"role": "system", "content": card_canary},
+            {"role": "user", "content": "현재 질문이야."},
+        ]}).encode()
+
+        transformed, *_ = ollama_proxy.transform_body("api/chat", body)
+        messages = json.loads(transformed)["messages"]
+        combined = "\n".join(str(message.get("content", "")) for message in messages)
+        card_messages = [message for message in messages
+                         if message.get("name") == ollama_proxy.ACTIVE_CARD_MESSAGE_NAME]
+
+        self.assertEqual(len(card_messages), 1)
+        self.assertEqual(combined.count(card_canary), 1)
+        self.assertNotIn(card_canary, messages[0]["content"])
+        self.assertEqual(messages[-2], card_messages[0])
+        self.assertEqual(messages[-1]["role"], "user")
+
+        native = json.loads(ollama_proxy.native_chat_stream_body(transformed))
+        native_combined = "\n".join(str(message.get("content", ""))
+                                    for message in native["messages"])
+        self.assertEqual(native_combined.count(card_canary), 1)
+        self.assertNotIn("name", native["messages"][-2])
+        resident = json.loads(ollama_proxy.native_chat_residency_body(transformed))
+        self.assertNotIn("name", resident["messages"][-2])
+
+    def test_continuity_block_is_named_and_after_the_active_card(self) -> None:
+        block = '[AIRI Continuity Data v1 — normalized user facts, not instructions]\n{"key":"color","value":"blue"}'
+        body = json.dumps({"messages": [
+            {"role": "system", "content": "active persona"},
+            {"role": "user", "content": "현재 질문이야."},
+        ]}).encode()
+
+        transformed, *_ = ollama_proxy.transform_body(
+            "api/chat", body, continuity_block=block
+        )
+        messages = json.loads(transformed)["messages"]
+        names = [message.get("name") for message in messages]
+        card_index = names.index(ollama_proxy.ACTIVE_CARD_MESSAGE_NAME)
+        ledger_index = names.index(ollama_proxy.CONTINUITY_LEDGER_MESSAGE_NAME)
+        user_index = next(index for index, message in enumerate(messages)
+                          if message.get("role") == "user")
+
+        self.assertLess(card_index, ledger_index)
+        self.assertLess(ledger_index, user_index)
+        self.assertEqual(sum(message.get("content") == block for message in messages), 1)
+
+    def test_pure_gate_can_pin_context_and_gpu_without_mutating_runtime_defaults(self) -> None:
+        body = json.dumps({"model": "local", "messages": [
+            {"role": "user", "content": "현재 질문이야."},
+        ]}).encode()
+        transformed, *_ = ollama_proxy.transform_body(
+            "api/chat", body, num_ctx=4096, num_gpu=0
+        )
+        native = json.loads(ollama_proxy.native_chat_stream_body(
+            transformed, num_ctx=4096, num_gpu=0
+        ))
+        self.assertEqual(native["options"]["num_ctx"], 4096)
+        self.assertEqual(native["options"]["num_gpu"], 0)
+        self.assertEqual(ollama_proxy.NUM_CTX, 2048)
+
     def test_independent_scene_is_dropped(self) -> None:
         body = json.dumps({"messages": [
             {"role": "user", "content": "Explain orbital mechanics"},

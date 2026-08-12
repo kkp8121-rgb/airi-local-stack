@@ -1,3 +1,27 @@
+# AIRI evaluations
+
+## Production continuity/projection gate
+
+`run_airi_production_context_gate.py` is distinct from the raw capacity gate:
+it runs a frozen synthetic conversation through the current proxy projection,
+continuity-ledger, snapshot memory assembler, language/mode injection and
+native Ollama conversion. It does not start the proxy or access a memory
+runtime, store, or session. The live CLI calls only a literal loopback
+`/api/chat` endpoint by default; tests use a fake transport.
+
+```powershell
+cd <repo>\ollama-proxy\eval
+python -m unittest -v test_airi_production_context_gate.py
+python run_airi_production_context_gate.py --output airi-production-context-report.json --fail-on-gate
+```
+
+The raw capacity gate (`run_airi_context_gate.py`) measures model retention
+against a direct synthetic prompt. This production continuity/projection gate
+instead verifies that production shaping removes old pressure/holdout text,
+preserves the deterministic tail, and strips private message names before the
+native request. Three runs across pressures 0, 8, 20, and 48 are authoritative;
+other `--runs` values are marked non-authoritative in the report.
+
 # AIRI C0 baseline evaluation
 
 ## Synthetic context gate

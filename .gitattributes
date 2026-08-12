@@ -2,3 +2,4 @@
 *.patch -text
 *.asar binary
 ollama-proxy/eval/results/extraction-gate-*.json text eol=lf
+ollama-proxy/eval/results/airi-production-context-*.json text eol=lf

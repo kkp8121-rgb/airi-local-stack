@@ -226,6 +226,8 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
    historical 829는 base `aef5300`만의 수치다. 상세:
    `완료/AIRI-CONTEXT-WINDOW-SSOT-AND-4096-TRIAGE-2026-08-13.md`.
 
+3. **production context·continuity gate (2026-08-13)** — 실제 proxy 경로의 budget/card/정정 표현과 고정 0/8/20/48 압력×3회 측정은 완료했다. 구조·privacy·ordering은 PASS지만 `bridge_fact` 0/12, continuity fact/latest correction 각 11/12로 semantic 전체는 FAIL이다. raw capacity A/B를 대체하지 않으며 default 2048, extraction OFF를 유지한다. 다음은 bridge-vs-memory field binding 개선 후 같은 게이트 재실행이다. CI-equivalent Python 3.12.13 exact matrix는 855 passed / 1 skipped / 7 warnings / 708 subtests (44.67s) PASS; CI push는 아직 pending이다. 상세: `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md`.
+
 4. **STT/실제 마이크** — 기본 방송은 chat/text 입력 + STT OFF이며 Electron
    마이크 토글도 OFF다. 기본 런처는 `-Stt off`; 명시적인 `-Stt on` 또는
    `AIRI_STT=on`만 opt-in이다. 사용자가 STT/마이크 개발 재개를 요청하면

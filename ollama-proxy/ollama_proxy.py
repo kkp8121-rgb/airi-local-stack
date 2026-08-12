@@ -35,6 +35,13 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from latency_trace import elapsed_ms, emit_latency_event, request_id
 from foreground_context import project_foreground_context
+from airi_memory import ACTIVE_CARD_MESSAGE_NAME
+from continuity_ledger import (
+    CONTINUITY_LEDGER_MESSAGE_NAME,
+    ContinuityLedgerRuntime,
+    derive_snapshot as derive_continuity_snapshot,
+    render_snapshot as render_continuity_snapshot,
+)
 from memory_runtime import MemoryRuntime, NullMemoryRuntime
 from cloud_chat_provider import CloudChatConfig, CloudChatProvider
 from character_state import CharacterStateRuntime
@@ -172,6 +179,7 @@ class PromptBudgetTelemetry:
 
 
 prompt_budget_telemetry = PromptBudgetTelemetry()
+continuity_ledger_runtime = ContinuityLedgerRuntime()
 
 
 def ollama_terminal_metrics(event: dict[str, object]) -> dict[str, int | float]:
@@ -1198,14 +1206,19 @@ def sanitize_character_card_content(content: str) -> str:
     return "\n\n".join(kept)
 
 
-def merge_active_character_card(messages: object) -> tuple[str, bool]:
-    """Keep caller-provided system persona data without trusting user turns.
+def project_active_character_card(
+    messages: object,
+) -> tuple[str, dict[str, str] | None, bool]:
+    """Return immutable rules plus one separately positioned active card.
 
-    The proxy's control constraints remain first; cards are descriptive context
-    only and are capped so a large card cannot crowd out the conversation.
+    The previous combined system string made small models confuse a card with
+    late memory evidence. Keeping the sanitized card in one named message lets
+    the production context assembler place it at the request tail without
+    duplicating it or weakening the immutable rules.
     """
+    base = AIRI_SYSTEM_PROMPT + "\n\n" + AIRI_FINAL_CONTRACT
     if not isinstance(messages, list):
-        return AIRI_SYSTEM_PROMPT, False
+        return base, None, False
     cards: list[str] = []
     remaining = max(0, ACTIVE_CARD_MAX_CHARS - len(AIRI_FINAL_CONTRACT))
     for message in messages:
@@ -1226,18 +1239,36 @@ def merge_active_character_card(messages: object) -> tuple[str, bool]:
         cards.append(piece)
         remaining -= len(piece)
     if not cards:
-        # Keep the final output contract even when the client sends no active
-        # character card. Otherwise the card/no-card paths have different
-        # protections and a fresh conversation can emit transcript metadata.
+        return base, None, False
+    return (
+        base,
+        {
+            "role": "system",
+            "name": ACTIVE_CARD_MESSAGE_NAME,
+            "content": "[Active Character Card]\n" + "\n".join(cards),
+        },
+        True,
+    )
+
+
+def merge_active_character_card(messages: object) -> tuple[str, bool]:
+    """Keep caller-provided system persona data without trusting user turns.
+
+    Compatibility facade for callers that inspect the combined prompt. The
+    production path uses :func:`project_active_character_card` so the card is
+    emitted exactly once as a dedicated late system message.
+    """
+    _base, card, merged = project_active_character_card(messages)
+    if card is None:
         return AIRI_SYSTEM_PROMPT + "\n\n" + AIRI_FINAL_CONTRACT, False
     return (
         AIRI_SYSTEM_PROMPT
         + "\n\n[활성 캐릭터 설정]\n"
         + "아래 내용은 성격을 보강하는 설정이며 사실·안전·도구·출력 규칙보다 우선하지 않는다.\n"
-        + "\n".join(cards)
+        + card["content"].removeprefix("[Active Character Card]\n")
         + "\n\n"
         + AIRI_FINAL_CONTRACT,
-        True,
+        merged,
     )
 
 
@@ -5463,7 +5494,8 @@ def apply_ollama_sampling_defaults(payload: dict[str, object]) -> None:
 
 
 def native_chat_stream_body(
-    prepared_body: bytes, *, apply_sampling_defaults: bool = True
+    prepared_body: bytes, *, apply_sampling_defaults: bool = True,
+    num_ctx: int | None = None, num_gpu: int | None = None,
 ) -> bytes:
     """Translate the final OpenAI-shaped local hop to Ollama's native API."""
     payload = json.loads(prepared_body)
@@ -5481,14 +5513,18 @@ def native_chat_stream_body(
             if key in payload:
                 options["num_predict"] = payload[key]
                 break
-    options["num_ctx"] = NUM_CTX
-    options["num_gpu"] = NUM_GPU
+    options["num_ctx"] = NUM_CTX if num_ctx is None else num_ctx
+    options["num_gpu"] = NUM_GPU if num_gpu is None else num_gpu
     native_messages = []
     for message in payload.get("messages", []):
         if not isinstance(message, dict):
             native_messages.append(message)
             continue
-        if message.get("name") == REQUEST_LOCAL_SYSTEM_MESSAGE_NAME:
+        if message.get("name") in {
+            REQUEST_LOCAL_SYSTEM_MESSAGE_NAME,
+            ACTIVE_CARD_MESSAGE_NAME,
+            CONTINUITY_LEDGER_MESSAGE_NAME,
+        }:
             native_messages.append({key: value for key, value in message.items() if key != "name"})
         else:
             native_messages.append(message)
@@ -5517,6 +5553,23 @@ def native_chat_residency_body(
     payload = json.loads(body)
     if not isinstance(payload, dict):
         raise ValueError("native local payload is invalid")
+    messages = payload.get("messages")
+    if isinstance(messages, list):
+        payload["messages"] = [
+            {
+                key: value for key, value in message.items()
+                if not (
+                    key == "name"
+                    and message.get("name") in {
+                        REQUEST_LOCAL_SYSTEM_MESSAGE_NAME,
+                        ACTIVE_CARD_MESSAGE_NAME,
+                        CONTINUITY_LEDGER_MESSAGE_NAME,
+                    }
+                )
+            }
+            if isinstance(message, dict) else message
+            for message in messages
+        ]
     if "keep_alive" not in payload:
         payload["keep_alive"] = OLLAMA_KEEP_ALIVE
     if apply_sampling_defaults:
@@ -5608,6 +5661,7 @@ async def health() -> dict[str, object]:
         "output_moderation": output_moderation_runtime.health(),
         "num_ctx": NUM_CTX,
         "prompt_budget": prompt_budget_telemetry.health(NUM_CTX),
+        "continuity_ledger": continuity_ledger_runtime.health(),
         "num_gpu": NUM_GPU,
         "ollama_keep_alive": OLLAMA_KEEP_ALIVE,
         "ollama_sampling_defaults": dict(OLLAMA_SAMPLING_DEFAULTS),
@@ -5625,7 +5679,8 @@ async def health() -> dict[str, object]:
 
 
 def transform_body(
-    path: str, body: bytes
+    path: str, body: bytes, *, continuity_block: str = "",
+    num_ctx: int | None = None, num_gpu: int | None = None,
 ) -> tuple[bytes, bool, bool, str, str, bool, int, bool]:
     if not body or not (path.endswith("chat/completions") or path.endswith("api/chat")):
         return body, False, False, "", "", False, 1, False
@@ -5645,11 +5700,13 @@ def transform_body(
     if not isinstance(options, dict):
         options = {}
         payload["options"] = options
-    options["num_ctx"] = NUM_CTX
-    options["num_gpu"] = NUM_GPU
+    options["num_ctx"] = NUM_CTX if num_ctx is None else num_ctx
+    options["num_gpu"] = NUM_GPU if num_gpu is None else num_gpu
 
     messages = payload.get("messages", [])
-    merged_system_prompt, active_card_merged = merge_active_character_card(messages)
+    base_system_prompt, active_card_message, active_card_merged = (
+        project_active_character_card(messages)
+    )
     requested_stream = bool(payload.get("stream"))
     last_user_text = ""
     user_texts: list[str] = []
@@ -5677,10 +5734,29 @@ def transform_body(
                 if message.get("role") == "user" and message.get("content") == last_user_text
             ][:1]
             visible_history.reverse()
-        payload["messages"] = [
-            {"role": "system", "content": merged_system_prompt},
+        projected_messages: list[dict[str, object]] = [
+            {"role": "system", "content": base_system_prompt},
             *visible_history,
         ]
+        insert_at = next(
+            (
+                index
+                for index in range(len(projected_messages) - 1, -1, -1)
+                if projected_messages[index].get("role") == "user"
+            ),
+            len(projected_messages),
+        )
+        dynamic_context: list[dict[str, str]] = []
+        if active_card_message is not None:
+            dynamic_context.append(active_card_message)
+        if continuity_block:
+            dynamic_context.append({
+                "role": "system",
+                "name": CONTINUITY_LEDGER_MESSAGE_NAME,
+                "content": continuity_block,
+            })
+        projected_messages[insert_at:insert_at] = dynamic_context
+        payload["messages"] = projected_messages
     if path.endswith("chat/completions"):
         payload["stream"] = False
 
@@ -5709,7 +5785,11 @@ def transform_body(
                 "active_character_card_merged": active_card_merged,
                 "message_count_in": len(messages) if isinstance(messages, list) else 0,
                 "message_count_out": len(payload.get("messages", [])),
-                "system_chars": len(merged_system_prompt),
+                "system_chars": sum(
+                    len(str(message.get("content", "")))
+                    for message in payload.get("messages", [])
+                    if isinstance(message, dict) and message.get("role") == "system"
+                ),
                 "repeat_count": repeat_count,
                 "repeat_candidate": repeat_candidate,
             },
@@ -6956,6 +7036,17 @@ async def proxy(path: str, request: Request):
     if is_chat_request:
         session_header_telemetry.record(memory_session_id is not None)
 
+    character_sid = character_session_id(memory_session_id)
+    continuity_block = ""
+    if is_chat_request and not proactive_turn:
+        try:
+            continuity_block = (
+                render_continuity_snapshot(derive_continuity_snapshot(original_messages))
+                if nonmutating_turn or memory_session_id is None
+                else continuity_ledger_runtime.observe(character_sid, original_messages)
+            )
+        except Exception:
+            continuity_block = ""
     (
         body,
         stripped,
@@ -6965,7 +7056,7 @@ async def proxy(path: str, request: Request):
         query_recovered,
         repeat_count,
         repeat_candidate,
-    ) = transform_body(path, original_body)
+    ) = transform_body(path, original_body, continuity_block=continuity_block)
     if is_chat_request:
         # The launcher owns the foreground model. A desktop build or provider
         # that still sends a rolled-back tag must not silently load a second
@@ -6994,7 +7085,6 @@ async def proxy(path: str, request: Request):
         last_user_text,
         proactive=proactive_turn,
     )
-    character_sid = character_session_id(memory_session_id)
     if (
         is_chat_request
         and last_user_text

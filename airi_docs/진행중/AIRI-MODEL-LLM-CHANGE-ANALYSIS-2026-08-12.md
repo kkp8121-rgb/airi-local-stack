@@ -214,3 +214,9 @@ Mi:dm은 최신 정정과 tail memory는 12/12 보존했지만 활성 card와 �
 gate만으로 롤백을 결정하지 않지만 Mi:dm의 장문/card 안전성을 주장하지도
 않는다. 상세 조건과
 원시 보고서는 `완료/AIRI-LONG-CONTEXT-MEMORY-CARD-AB-2026-08-12.md` 참조.
+
+## production 경로 후속 (2026-08-13)
+
+이 문서의 최초 분석에 남은 model SSoT/eval provenance/ACK/digest 미구현 지적은 **당시의 역사적 상태이며 해소됨**이다. production proxy에는 이어서 typed active card, bounded canonical continuity ledger, 순수 snapshot seam 및 명시 session만의 persistence가 들어갔다. 이는 raw Ollama A/B와 구분해야 한다.
+
+권위 production-context gate는 `num_ctx=2048`, 0/8/20/48 압력×3회에서 구조·privacy·ordering PASS를 확인했으나, `bridge_fact`가 0/12이고 continuity/latest correction도 각 11/12라 semantic 전체는 FAIL이다. active card·한국어 pet negation·tail memory·dropped holdout은 모두 12/12였다. 이 결과는 raw capacity 2048/4096 근거를 바꾸지 않으며 default 2048과 extraction OFF를 유지한다. 다음은 모델의 bridge-vs-memory field binding을 좁힌 뒤 같은 production gate를 재실행하는 일이다. 상세는 `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md` 참조.

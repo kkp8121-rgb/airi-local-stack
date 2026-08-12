@@ -67,3 +67,7 @@ first-pass 12/12·retry 0이지만 exact 0/12 FAIL이다. p0/p1/p2/p3 prompt P50
 assistant는 3/3·0/3·0/3·2/3, 정정/tail은 12/12였다. 2048의 p2/p3 2042 ceiling
 및 초기 사용자 물리 절단은 사라졌지만 card/부정 귀속은 실패했다. **4096은 품질
 PASS가 아니며 운영 기본값은 2048을 유지한다.**
+
+## 2026-08-13 production-context 후속 (별도 권위 결과)
+
+위 raw capacity A/B와 4096 triage는 계속 유효하며 대체되지 않는다. 실제 proxy의 projection·typed card·continuity data 경로는 별도 `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md`에서 2048, 4압력×3회로 측정했다. 구조·privacy·ordering은 PASS였지만 `bridge_fact` 0/12, continuity/latest correction 각 11/12로 semantic 전체는 FAIL이다. 따라서 운영 context 승격은 없고 기본값 2048을 유지한다.

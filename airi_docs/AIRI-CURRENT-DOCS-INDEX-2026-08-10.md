@@ -170,6 +170,8 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 
 ## 최신 검증 증거 (2026-08-13)
 
+- `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md` — 실제 proxy context shaping의 0/8/20/48 압력×3회 권위 결과. 구조·privacy·ordering PASS, 그러나 Mi:dm의 `bridge_fact` 0/12, continuity/latest correction 각 11/12로 semantic/gate FAIL이다. 구현·측정 체크는 완료했지만 default 2048을 유지하고 field binding 개선이 다음 작업이다. extraction OFF, STT/mic은 사용자 보류 상태다.
+
 - `완료/AIRI-CONTEXT-WINDOW-SSOT-AND-4096-TRIAGE-2026-08-13.md` — root context
   window SSoT(512..32768, 기본 2048), health mismatch fail-closed와 content-free
   prompt-budget telemetry의 측정/관측 증거. Mi:dm raw 4096은 초기 사용자 물리 절단을

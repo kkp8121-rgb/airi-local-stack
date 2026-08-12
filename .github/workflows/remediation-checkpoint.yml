@@ -88,6 +88,7 @@ jobs:
             tests: >-
               ollama-proxy/test_airi_session_header_patch.py
               ollama-proxy/test_character_state.py ollama-proxy/test_character_state_evaluator.py
+              ollama-proxy/test_continuity_ledger.py
               ollama-proxy/test_benchmark_cloud_chat_latency.py
               ollama-proxy/test_cloud_chat_provider.py
           - shard: ollama-proxy-memory
@@ -112,6 +113,7 @@ jobs:
               ollama-proxy/test_dialogue_quality_benchmark.py
               ollama-proxy/eval/test_airi_baseline.py ollama-proxy/eval/test_airi_conversation_soak.py
               ollama-proxy/eval/test_airi_context_gate.py ollama-proxy/eval/test_airi_proactive_soak.py
+              ollama-proxy/eval/test_airi_production_context_gate.py
           - shard: ollama-proxy-training
             tests: >-
               ollama-proxy/training/tests/test_audit_airi_style_fixture_readiness.py
