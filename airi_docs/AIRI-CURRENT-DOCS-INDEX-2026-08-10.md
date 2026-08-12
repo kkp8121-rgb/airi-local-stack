@@ -23,8 +23,12 @@
 - `AIRI-GROUNDED-DIALOGUE-QUALITY-HANDOFF-2026-08-12.md` — 그라운딩 품질
   후속 계약.
 - `AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md` — EXAONE→Mi:dm 전환 분석.
-  **미해결 게이트**: model SSoT 강제(프록시에 EXAONE 하드코딩 폴백 3곳),
-  eval provenance, ACK metadata, digest pin, 인간 검수 100건.
+  게이트 중 model SSoT 강제·eval provenance·ACK metadata·digest pin은
+  2026-08-12 코드 해소 완료(commit `932eae6`). **남은 게이트**: 인간 검수
+  100건 + 실기 검증(`AIRI-DEV-PC-HANDOFF-2026-08-12.md` §2).
+- `AIRI-DEV-PC-HANDOFF-2026-08-12.md` — **검토 PC 선행 작업 배치의
+  인수인계.** dev PC(codex) 필수 작업 전체 목록(SSoT 실기 검증·I1 게이트
+  리포트 생산·B3 배선 3종·이월 실기 게이트). dev PC 착수 전 필독.
 - `AIRI-LOCAL-TECH-SPECS.md` — 현행 스펙 문서. 2026-08-12 갱신 완료
   (STT=large-v3-turbo GPU·LLM=midm-airi:2.0-mini·TTS=GPT-SoVITS 반영,
   롤백 태그·SSoT 갭·확인 필요 항목 명시).
@@ -117,13 +121,14 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 
 ## 최신 검증 증거 (2026-08-12)
 
-- 통합 Python: 733 passed / 1 skipped / 504 subtests (검토 PC 실측).
+- 통합 Python: 809 passed / 1 skipped / 706 subtests (검토 PC 실측,
+  commit `932eae6` 기준 — SSoT·I1 게이트·MEM-04·B3 모더레이션 포함).
 - `node --test test-send-airi-local-text.mjs`: 27/27.
 - `test-current-checkpoint.ps1`: PASS. 3층 런타임 패치가 핀 checkout에서
   정방향·역방향 적용 통과.
 - Upgrade Scout 클라이언트: Stage UI·Tamagotchi 타입검사 + 집중 42 테스트
   통과. 최신 `main` 포팅 브랜치: 25/25 빌드 + 집중 168 테스트.
 - CI: `offline-contracts` + `python-core-tests` 두 job green
-  (tip `a231ab0` 기준; 이후 커밋은 push 시 재검증).
+  (tip `294c4e6` 기준; `7dc4e76`·`932eae6` 이후 커밋은 push 시 재검증).
 - 실기 게이트 미통과 항목은 `완료/AIRI-UPGRADE-SCOUT-MEASUREMENT-2026-08-11.md`
   §판정 참조 (Mi:dm first-audible, 실제 마이크 20+20, barge-in 등).
