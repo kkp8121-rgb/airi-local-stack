@@ -139,6 +139,18 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-13** (dev PC, production-context source binding v2): 실제 proxy
+  context shaping을 0/8/20/48 압력×3회 재측정했다. generic structured-output
+  계약은 언어·문체 문단만 제거하고 character-state·knowledge 근거를 보존하며,
+  source-oriented field와 swapped/reordered anti-overfit 회귀를 통과했다. 구조는
+  PASS, 7개 필드 중 6개는 12/12지만 `dialogue_marker`는 memory marker
+  `silver-fern`을 12/12 복사해 semantic/gate/authoritative 결과가 FAIL이다.
+  prompt tuning은 여기서 중단하고 default 2048·extraction OFF를 유지한다.
+  Python 3.12.13 전체 matrix는 **858 passed / 1 skipped / 708 subtests /
+  7 warnings** PASS, checkpoint·Node는 27/27 PASS다. `f4c765f`의 push run
+  `31623362906`과 PR run `31623367654`도 모두 PASS했다. 상세:
+  `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md`.
+
 - **2026-08-13** (dev PC, context window SSoT/4096 triage): root
   `-NumCtx`/비공백 `AIRI_NUM_CTX`를 strict 512..32768(기본 2048)로 모든 proxy
   child·verify-only·warmup·health 재사용에 배선했다. invalid env는 서비스 작업 전,

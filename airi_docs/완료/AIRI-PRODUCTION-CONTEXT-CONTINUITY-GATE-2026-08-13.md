@@ -57,5 +57,5 @@ v2는 spoken style 충돌을 제거한 generic structured-output 계약, source-
 ## 검증 한계와 후속
 
 - v2 전체 CI-equivalent Python 3.12.13 matrix는 **858 passed / 1 skipped / 7 warnings / 708 subtests, 45.04s PASS**다.
-- 첫 커밋과 CI는 성공했다. 이 v2 batch는 아직 커밋/CI 실행 전이다. extraction과 설치본 STT는 OFF를 유지하며, 실제 mic은 사용자 재개 요청까지 보류한다.
+- v2는 `f4c765f`로 커밋·푸시했으며 push run `31623362906`과 PR run `31623367654`가 모두 PASS했다. extraction과 설치본 STT는 OFF를 유지하며, 실제 mic은 사용자 재개 요청까지 보류한다.
 - `dialogue_marker`는 현 prompt/schema 개선의 범위를 넘는 모델 한계로 결론냈다. 추가 prompt tuning은 하지 않는다.

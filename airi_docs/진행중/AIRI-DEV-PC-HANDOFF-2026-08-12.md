@@ -6,8 +6,8 @@
 
 - historical base: `aef5300`(STT OFF 방송 프로필; 기반 배치
   `7dc4e76` 문서, `932eae6` 코드). 이는 현행 branch tip이 아니다.
-- 현재 branch는 `0db431c`의 continuity hardening 이후 production-context v2
-  source-binding batch까지 포함한다. exact tip은 `git log -1`로 확인한다.
+- 현재 branch tip `f4c765f`는 continuity hardening과 production-context v2
+  source-binding batch를 포함한다. exact tip은 `git log -1`로 재확인한다.
 - 오프라인 historical 검증: **`aef5300`의 CI `python-core-tests` matrix 41개 추적 경로**
   **829 passed / 1 skipped / 706 subtests**
   (기준 733/1/504), `test-patch-manifest.ps1` PASS, 소스·문서
