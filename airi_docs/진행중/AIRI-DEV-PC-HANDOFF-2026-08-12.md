@@ -16,14 +16,21 @@
 
 | 트랙 | 내용 | 상태 |
 |---|---|---|
-| 모델 SSoT | `resolve_chat_model()` 단일화(프록시 내 EXAONE 문자열 0건), foreground model 정규화, eval provenance, digest pin(opt-in), ACK metadata 교정 | 코드 완료, **실기 검증 대기** |
-| I1 기억 추출 | 게이트 리포트 자동 해석 → 추출 자동 ON 배선(fail-open), 게이트 프로파일 strict/balanced | 코드 완료, **게이트 리포트 생산 대기** |
+| 모델 SSoT | `resolve_chat_model()` 단일화, Electron 정규화, foreground 단일 runner, 롤백·eval provenance, digest pin | **dev PC 실기 PASS**, Mi:dm 실측 digest 기본 pin 반영 (`완료/AIRI-DEV-PC-SSOT-VERIFICATION-2026-08-12.md`) |
+| I1 기억 추출 | 게이트 리포트 자동 해석 → 추출 자동 ON 배선(fail-open), 게이트 프로파일 strict/balanced | Mi:dm balanced **실측 FAIL**, 추출 off 유지 (`완료/AIRI-MIDM-EXTRACTION-GATE-MEASUREMENT-2026-08-12.md`) |
 | MEM-04 | SQLite WAL + busy_timeout=5000ms (당초 500ms → 저하된 CI runner에서 락 실패 재발해 sqlite3 기본 예산 복원) | 완료, 활성화 후 락 경합 실측만 남음 |
-| B3 모더레이션 | 한국어 금칙어 사전(113항목+개인정보 패턴 7)·우회 표기 8형 전수 차단·SSE 문장 게이트·캐릭터 폴백 대사(C3) | 코드 완료(기본 off), **배선·프리로드 대기** |
+| B3 모더레이션 | 한국어 금칙어 사전·SSE 문장 게이트·캐릭터 폴백 대사(C3) | TTS 7/7 프리로드·런처 env 완료, **Electron 표시 배선 진행중** |
 | C1 헌법 | 캐릭터 헌법 초안 (`진행예정/AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md`) | 초안 — 사용자 결정 1·3 대기 |
 | 문서 | TECH-SPECS 현행화, 색인 갱신 | 완료 |
 
 ## 2. dev PC 필수 작업 — SSoT 실기 검증
+
+**2026-08-12 완료.** 아래 1~4를 실제 설치 Electron 턴으로 검증했다. Mi:dm은
+stale EXAONE tag 1회를 정규화했고 GPU runner는 단일이었다. EXAONE 롤백은
+warmup·evaluator·provenance가 모두 일치했다. Mi:dm digest
+`92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f`는
+일치 pin 통과·고의 불일치 기동 차단 후 운영 런처 기본값으로 고정했다.
+상세 증거는 `완료/AIRI-DEV-PC-SSOT-VERIFICATION-2026-08-12.md`에 있다.
 
 1. 스택 기동 후 실제 Electron→11435 턴에서 `/health`의
    `chat_model.normalized_requests > 0`과 `last_requested_model`(Electron이
@@ -42,6 +49,13 @@
    없다.
 
 ## 3. dev PC 필수 작업 — I1 게이트 리포트 생산
+
+**Mi:dm 후보 측정 완료, FAIL.** 11436 격리 CPU 서버의 balanced 7 fixtures에서
+구조 schema는 1.0이었지만 critical recall 0.2619, Stage B coverage 0.4286,
+op alias accuracy 0.1429로 불합격했다. total latency P50/P95는
+20.19/34.16초였고 독립 verifier도 거부했다. 실패 리포트는 운영 추출을
+활성화하지 않으며 다음 후보 선정이 필요하다. 상세는
+`완료/AIRI-MIDM-EXTRACTION-GATE-MEASUREMENT-2026-08-12.md` 참조.
 
 추출 자동 ON은 **게이트 리포트가 존재하고 검증을 통과할 때만** 발효된다.
 현재 리포트는 없으며, 완화(balanced)로도 기존 후보(EXAONE 2.4B, Qwen3
@@ -69,11 +83,14 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
    synthesis다. `gpt-sovits/openai_compatible_proxy.py`의
    `IMMEDIATE_RESPONSE_TEXTS`와 동일한 mirror 계약으로 추가하라 —
    프록시 데이터 파일과 문자열이 1자라도 다르면 조용히 캐시 미스가 난다.
+   — **완료:** literal mirror 테스트와 실기 cache readiness 7/7 통과.
 2. **런처 env 배선**: `AIRI_OUTPUT_MODERATION`(on|off), 선택적
    `AIRI_OUTPUT_MODERATION_TERMS`(사전 경로)를 두 런처
    (`start-airi-local-stack.ps1` → `start-local-ollama-proxy.ps1`)에 전달
    (현재 두 런처 모두 참조 0건 — 검토 PC에서 동시 편집 충돌을 피하려고
    의도적으로 남긴 유일한 배선 갭).
+   — **완료:** 기본 off, on/off 검증, 절대 사전 경로, 기존 proxy 재사용
+   불일치 fail-closed, health 요약까지 배선.
 3. **Electron "필터당함" 표시**: SSE 청크의 최상위 `airi_moderation:
    {blocked, category, rule, replaced}` 필드를 읽어 화면 표시(C3 결함의
    콘텐츠화). 클라이언트 패치 계약(3층) 안에서 진행.

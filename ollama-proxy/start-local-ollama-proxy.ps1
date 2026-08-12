@@ -48,6 +48,9 @@ param(
     # starts any downstream service, then supplies this switch to avoid doing
     # the identical checks a second time.
     [switch]$ChatModelPreflighted,
+    [ValidateSet('on', 'off')]
+    [string]$OutputModeration = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_OUTPUT_MODERATION)) { 'off' } else { $env:AIRI_OUTPUT_MODERATION }),
+    [string]$OutputModerationTerms = $env:AIRI_OUTPUT_MODERATION_TERMS,
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
@@ -72,6 +75,15 @@ $stackRoot = Split-Path -Parent $repo
 $server = Join-Path $repo 'ollama_proxy.py'
 $stdoutLog = Join-Path $repo 'ollama-proxy.out.log'
 $stderrLog = Join-Path $repo 'ollama-proxy.err.log'
+$resolvedOutputModerationTerms = ''
+if (-not [string]::IsNullOrWhiteSpace($OutputModerationTerms)) {
+    $termsItem = Get-Item -LiteralPath $OutputModerationTerms -ErrorAction Stop
+    if ($termsItem.PSIsContainer -or $termsItem -isnot [IO.FileInfo] -or
+            ($termsItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'OutputModerationTerms must be a regular file.'
+    }
+    $resolvedOutputModerationTerms = [IO.Path]::GetFullPath($termsItem.FullName)
+}
 
 $requiredLocalModels = @()
 if (-not $VerifyExtractionGateOnly) {
@@ -218,6 +230,24 @@ if ($listener) {
     if (-not [string]::IsNullOrWhiteSpace($resolvedTopicBoardPath)) {
         throw 'Existing proxy cannot be reused with TopicBoardPath; stop it and restart so the approved board is loaded.'
     }
+    if (-not [string]::IsNullOrWhiteSpace($resolvedOutputModerationTerms)) {
+        throw 'Existing proxy cannot be reused with OutputModerationTerms; stop it and restart so the policy identity is known.'
+    }
+    try {
+        $existingHealth = Invoke-RestMethod -Uri 'http://127.0.0.1:11435/health' -TimeoutSec 3 -ErrorAction Stop
+        if ($null -eq $existingHealth.output_moderation -or
+                $null -eq $existingHealth.output_moderation.PSObject.Properties['enabled']) {
+            throw 'Existing proxy health does not report output moderation state.'
+        }
+        $existingModerationEnabled = [bool]$existingHealth.output_moderation.enabled
+    }
+    catch {
+        throw 'Existing proxy output moderation state could not be verified; stop it and restart.'
+    }
+    $requestedModerationEnabled = $OutputModeration -eq 'on'
+    if ($existingModerationEnabled -ne $requestedModerationEnabled) {
+        throw 'Existing proxy output moderation state differs from the requested configuration; stop it and restart.'
+    }
     Write-Output 'A service is already listening on port 11435; it was not reconfigured.'
     exit 0
 }
@@ -257,6 +287,8 @@ $memoryEnvironment = @{
     # Empty means "no pin": the proxy then records the digest it observed
     # instead of refusing to start.
     AIRI_CHAT_MODEL_DIGEST = $ChatModelDigest
+    AIRI_OUTPUT_MODERATION = $OutputModeration
+    AIRI_OUTPUT_MODERATION_TERMS = $resolvedOutputModerationTerms
     AIRI_OLLAMA_KEEP_ALIVE = $OllamaKeepAlive
     AIRI_OLLAMA_TEMPERATURE = $OllamaTemperature.ToString([Globalization.CultureInfo]::InvariantCulture)
     AIRI_OLLAMA_TOP_P = $OllamaTopP.ToString([Globalization.CultureInfo]::InvariantCulture)

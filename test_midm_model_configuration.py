@@ -11,6 +11,46 @@ MODELFILE = (ROOT / "ollama-proxy" / "Modelfile.midm-airi").read_text(encoding="
 
 
 class MidmModelConfigurationTests(unittest.TestCase):
+    def test_output_moderation_launcher_contract_is_validated_and_forwarded(self) -> None:
+        for script in (STACK, PROXY):
+            self.assertIn("[ValidateSet('on', 'off')]", script)
+            self.assertIn("[string]$OutputModerationTerms = $env:AIRI_OUTPUT_MODERATION_TERMS", script)
+            self.assertIn("throw 'OutputModerationTerms must be a regular file.'", script)
+            self.assertIn("[IO.Path]::GetFullPath($termsItem.FullName)", script)
+        self.assertEqual(STACK.count("-OutputModeration $OutputModeration"), 3)
+        self.assertEqual(STACK.count("-OutputModerationTerms $resolvedOutputModerationTerms"), 3)
+        self.assertIn("AIRI_OUTPUT_MODERATION = $OutputModeration", PROXY)
+        self.assertIn("AIRI_OUTPUT_MODERATION_TERMS = $resolvedOutputModerationTerms", PROXY)
+
+    def test_existing_proxy_moderation_reuse_fails_closed(self) -> None:
+        self.assertIn("Existing proxy cannot be reused with OutputModerationTerms", PROXY)
+        self.assertIn("Existing proxy output moderation state could not be verified", PROXY)
+        self.assertIn("Existing proxy health does not report output moderation state.", PROXY)
+        self.assertIn("$existingHealth.output_moderation.enabled", PROXY)
+        self.assertIn("$existingModerationEnabled -ne $requestedModerationEnabled", PROXY)
+        self.assertIn("OutputModerationEnabled = $proxy.output_moderation.enabled", STACK)
+        self.assertIn("OutputModerationReady = $proxy.output_moderation.ready", STACK)
+
+    def test_local_midm_default_uses_the_verified_digest_without_affecting_rollbacks_or_external_chat(self) -> None:
+        verified_digest = "92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f"
+        self.assertIn(verified_digest, STACK)
+        self.assertIn("$ChatProvider -eq 'local' -and $effectiveChatModel -ceq 'midm-airi:2.0-mini'", STACK)
+        self.assertIn("[string]::IsNullOrWhiteSpace($ChatModelDigest)", STACK)
+
+        # Mirrors the launcher resolution: parameter/environment values win;
+        # only the standard local Mi:dm tag acquires the verified default.
+        def resolved_digest(provider: str, model: str, supplied_digest: str) -> str:
+            effective_model = "midm-airi:2.0-mini" if provider == "local" and not model else model
+            if provider == "local" and effective_model == "midm-airi:2.0-mini" and not supplied_digest.strip():
+                return verified_digest
+            return supplied_digest
+
+        self.assertEqual(resolved_digest("local", "", ""), verified_digest)
+        self.assertEqual(resolved_digest("local", "midm-airi:2.0-mini", ""), verified_digest)
+        self.assertEqual(resolved_digest("local", "", "environment-or-parameter-pin"), "environment-or-parameter-pin")
+        self.assertEqual(resolved_digest("local", "exaone-airi:2.4b", ""), "")
+        self.assertEqual(resolved_digest("openai", "gpt-4.1-mini", ""), "")
+
     def test_midm_runtime_tag_and_local_source_are_pinned(self) -> None:
         self.assertIn("'midm-airi:2.0-mini'", STACK)
         self.assertIn("'midm-airi:2.0-mini'", PROXY)

@@ -41,7 +41,8 @@
   - [x] 저장·검색·저널 회상 운영 — 2026-08-09 라이브 스모크, KURE fp16 2026-08-11
   - [x] 추출 승격 루프 코드 + 게이트 프로파일 strict/balanced — 2026-08-12 (`932eae6`)
   - [x] MEM-04 SQLite WAL·busy_timeout — 2026-08-12 (`932eae6`)
-  - [ ] 게이트 리포트 생산 → 추출 발효 (dev PC, 11436 격리 서버 — 통과 후보 모델 미확정)
+  - [~] 게이트 리포트 생산 → 추출 발효 (dev PC Mi:dm balanced 실측 FAIL,
+    추출 off 유지 — 통과 후보 모델 미확정, `완료/AIRI-MIDM-EXTRACTION-GATE-MEASUREMENT-2026-08-12.md`)
   - [ ] I2 시청자 기억 시스템 (M2)
 - [~] **G3. 평가·데이터 플라이휠**
   - [x] 오프라인 eval 하네스·120턴 A/B — 2026-08-12 (`진행중/AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md`)
@@ -68,7 +69,8 @@
 - [ ] **C3. 선택적 제어 토큰** (ACT 계약 Mi:dm 재측정 필요)
 - [ ] **C4. 구조 프루닝 연구**
 - [ ] **C5. Ollama 배포**
-  - [x] digest pin 배포 전제 확보 (`AIRI_CHAT_MODEL_DIGEST`, opt-in) — 2026-08-12 (`932eae6`)
+  - [x] digest pin 배포 — 2026-08-12 (dev PC 실측 Mi:dm digest를 운영 런처
+    기본 pin으로 고정, 명시 override·EXAONE unpinned 롤백 유지)
 
 ## 지연 마스터 플랜 (v2.1)
 
@@ -94,7 +96,8 @@
 - [ ] **M2** (B1 채팅 브리지 ∥ C2 루프 배선 ∥ I2 시청자 기억)
 - [~] **M3** (B2 송출 + B3 안전)
   - [x] B3 모더레이션 게이트 코드 (사전 113항목+패턴 7, 기본 off) — 2026-08-12 (`932eae6`)
-  - [ ] B3 배선 3종: TTS 폴백 프리로드(mirror 계약)·런처 env·Electron "필터당함" 표시 (dev PC, 인수인계 §4)
+  - [~] B3 배선 3종: TTS 폴백 7/7 프리로드·런처 env 완료 — 2026-08-12.
+    Electron "필터당함" 표시 진행중 (dev PC, 인수인계 §4)
   - [ ] B2 송출 (OBS Browser Source + App Audio Capture — 결정 2 이후)
 - [ ] **M4** (B4 방송 디렉터 + C3/C4 ∥ I3 주제 풀)
 - [ ] **M5** (리허설 → 데뷔 → I4 플라이휠)
@@ -105,12 +108,20 @@
 - [x] eval provenance — 2026-08-12 (`932eae6`)
 - [x] ACK metadata 교정 — 2026-08-12 (`932eae6`)
 - [x] digest pin 코드 (opt-in) — 2026-08-12 (`932eae6`)
-- [ ] SSoT 실기 검증 + digest 실값 pin 고정 (dev PC, 인수인계 §2)
+- [x] SSoT 실기 검증 + digest 실값 pin 고정 — 2026-08-12
+  (`완료/AIRI-DEV-PC-SSOT-VERIFICATION-2026-08-12.md`)
 - [ ] 인간 검수 100건 (G3와 공유)
 
 ---
 
 ## 갱신 로그 (최신이 위)
+
+- **2026-08-12** (dev PC): 필수 실기 1차 배치 — 설치 Electron의 stale
+  EXAONE tag→Mi:dm 정규화, foreground 단일 runner, evaluator/eval provenance,
+  EXAONE 롤백, digest 일치/불일치 fail-closed를 검증하고 Mi:dm 실측 digest를
+  운영 런처 기본 pin으로 고정. I1 Mi:dm balanced 7-fixture는 품질 기준 FAIL로
+  추출 off 유지. B3는 TTS 폴백 5종을 기존 ACK 2종과 함께 7/7 preload하고
+  moderation launcher env를 fail-closed로 배선. Electron 표시는 진행중.
 
 - **2026-08-12** (검토 PC): CI job 타임아웃 해소 — `d13c27c` run에서
   ollama-proxy-model shard가 10분 cap에 정확히 잘림(저하 runner + 5s

@@ -43,18 +43,28 @@
 | 프록시 주소 | `http://127.0.0.1:11435` (`ollama-proxy/ollama_proxy.py`, SSE `text/event-stream`) |
 | 업스트림 | `http://127.0.0.1:11434` |
 
-**SSoT 갭 — 코드 해소 완료, 실기 검증 대기** (2026-08-12 해소. 원 출처:
+**SSoT 갭 — 코드·dev PC 실기 해소 완료** (2026-08-12. 원 출처:
 `AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md` §단점 7~10): 프록시 내
 `"exaone-airi:2.4b"` 하드코딩 8곳을 `resolve_chat_model()`(env
 `AIRI_CHAT_MODEL` → 기본 `midm-airi:2.0-mini`) 단일 경유로 교체했고 소스에
 EXAONE 문자열 0건을 테스트로 고정했다. foreground chat 요청의 model 필드는
 SSoT로 정규화된다(loopback 검증 마커 면제, `AIRI_CHAT_MODEL_ENFORCE=0`
 진단 스위치). 런처가 `AIRI_EVAL_MODEL`을 설정해 평가 provenance가 실제
-모델과 일치한다. digest pin은 `AIRI_CHAT_MODEL_DIGEST` opt-in — 설정 시
-불일치면 기동 차단(fail-closed), 미설정 시 관측 digest 기록만. ACK
-metadata는 분기별 실측값(`audible`/`silent`)으로 교정됐다. 실제
-Electron→proxy 턴에서의 정규화 동작·digest 실값 pin은 실기(dev PC) 검증
-대기다.
+모델과 일치한다. 설치 Electron의 EXAONE tag가 Mi:dm으로 정규화되는 것과
+단일 GPU runner, evaluator/eval provenance, EXAONE 롤백을 실기 확인했다.
+Mi:dm 실측 digest
+`92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f`는
+root 운영 런처의 기본 pin이며 불일치면 proxy 전 단계에서 fail-closed한다.
+명시적 env/인자 pin은 override하고 EXAONE 롤백은 digest 미지정 시 unpinned다.
+ACK metadata는 분기별 실측값(`audible`/`silent`)으로 교정됐다. 증거는
+`완료/AIRI-DEV-PC-SSOT-VERIFICATION-2026-08-12.md` 참조.
+
+출력 모더레이션은 두 런처의 `-OutputModeration on|off`와 선택적
+`-OutputModerationTerms <path>`로 배선되며 기본은 off다. 자식 프로세스에는
+`AIRI_OUTPUT_MODERATION`·`AIRI_OUTPUT_MODERATION_TERMS`로 전달된다. custom
+사전은 절대 일반 파일로 검증하며 기존 11435 process에는 재사용하지 않는다.
+모더레이션 폴백 5종은 ACK 2종과 literal mirror되어 TTS 시작 시 전부 preload
+된다. dev PC 실기 cache readiness는 7/7이었다.
 
 ## STT
 

@@ -66,6 +66,12 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-DEV-PC-SSOT-VERIFICATION-2026-08-12.md` — 설치 Electron 정규화,
+  Mi:dm 단일 runner, EXAONE 롤백, evaluator/eval provenance, digest pin
+  일치·불일치와 운영 기본 pin의 dev PC 실기 증거.
+- `AIRI-MIDM-EXTRACTION-GATE-MEASUREMENT-2026-08-12.md` — 11436 격리 CPU
+  Mi:dm balanced 추출 게이트 FAIL(품질·Stage B 연결 미달, 추출 off 유지).
+
 - `AIRI-ELECTRON-TEXT-TTS-MEASUREMENT-2026-08-12.md` — Electron 실기
   text→render 실측 (P50 1,963ms / P95 2,720ms) + 스트리밍 WAV 결함 수정.
 - `AIRI-UPGRADE-SCOUT-MEASUREMENT-2026-08-11.md` — Upgrade Scout 구현·실측

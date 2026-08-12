@@ -32,6 +32,13 @@ param(
     # it (directly or through AIRI_CHAT_MODEL_DIGEST) makes startup fail closed
     # when the tag was rebuilt from other bytes.
     [string]$ChatModelDigest = $env:AIRI_CHAT_MODEL_DIGEST,
+    # The output gate remains opt-in. An explicit environment value is honored
+    # when callers do not provide a switch; invalid values fail parameter binding.
+    [ValidateSet('on', 'off')]
+    [string]$OutputModeration = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_OUTPUT_MODERATION)) { 'off' } else { $env:AIRI_OUTPUT_MODERATION }),
+    # Optional custom policy dictionary. Resolve it before the proxy child
+    # changes its working directory so relative paths cannot drift at launch.
+    [string]$OutputModerationTerms = $env:AIRI_OUTPUT_MODERATION_TERMS,
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
@@ -41,10 +48,26 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$resolvedOutputModerationTerms = ''
+if (-not [string]::IsNullOrWhiteSpace($OutputModerationTerms)) {
+    $termsItem = Get-Item -LiteralPath $OutputModerationTerms -ErrorAction Stop
+    if ($termsItem.PSIsContainer -or $termsItem -isnot [IO.FileInfo] -or
+            ($termsItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'OutputModerationTerms must be a regular file.'
+    }
+    $resolvedOutputModerationTerms = [IO.Path]::GetFullPath($termsItem.FullName)
+}
 $effectiveChatModel = if ($ChatProvider -eq 'local' -and [string]::IsNullOrWhiteSpace($ChatModel)) {
     'midm-airi:2.0-mini'
 } else {
     $ChatModel
+}
+# The dev-PC verified Mi:dm artifact is the normal local runtime default.
+# Respect an explicit parameter or environment pin, and leave rollback tags
+# and external providers unpinned unless the caller supplied a digest.
+if ($ChatProvider -eq 'local' -and $effectiveChatModel -ceq 'midm-airi:2.0-mini' `
+        -and [string]::IsNullOrWhiteSpace($ChatModelDigest)) {
+    $ChatModelDigest = '92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f'
 }
 $effectiveEvaluatorModel = if ($ChatProvider -eq 'local') {
     $effectiveChatModel
@@ -213,6 +236,8 @@ if ([string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
         -AllowExternalChat $AllowExternalChat `
         -ChatModel $effectiveChatModel `
         -ChatModelDigest $ChatModelDigest `
+        -OutputModeration $OutputModeration `
+        -OutputModerationTerms $resolvedOutputModerationTerms `
         -ChatModelPreflighted `
         -AllowExternalSearch $AllowExternalSearch `
         -TopicBoardPath $TopicBoardPath `
@@ -231,6 +256,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
         -MemoryExtractionGateReport $MemoryExtractionGateReport -MemoryExtractionUpstream "http://127.0.0.1:$MemoryExtractionPort" `
         -MemoryExtractionGateProfile $MemoryExtractionGateProfile `
         -ChatProvider $ChatProvider -AllowExternalChat $AllowExternalChat -ChatModel $effectiveChatModel -ChatModelPreflighted `
+        -OutputModeration $OutputModeration -OutputModerationTerms $resolvedOutputModerationTerms `
         -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `
         -EnableCharacterEvaluator $EnableCharacterEvaluator -EvaluationMaxRecords $EvaluationMaxRecords `
         -VerifyExtractionGateOnly
@@ -264,6 +290,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
             -MemoryExtractionGateProfile $MemoryExtractionGateProfile `
             -ChatProvider $ChatProvider -AllowExternalChat $AllowExternalChat -ChatModel $effectiveChatModel -ChatModelPreflighted `
             -ChatModelDigest $ChatModelDigest `
+            -OutputModeration $OutputModeration -OutputModerationTerms $resolvedOutputModerationTerms `
             -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `
             -EnableCharacterEvaluator $EnableCharacterEvaluator -EvaluationMaxRecords $EvaluationMaxRecords
         $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
@@ -349,6 +376,8 @@ if ($ChatProvider -eq 'local') {
     EvaluationEnabled = $proxy.evaluation.enabled
     CharacterEvaluatorEnabled = $proxy.character_state_evaluator.enabled
     CharacterEvaluatorReady = $proxy.character_state_evaluator.ready
+    OutputModerationEnabled = $proxy.output_moderation.enabled
+    OutputModerationReady = $proxy.output_moderation.ready
     LLMWarmup = if ($warmup) { $warmup.StatusCode } else { $null }
     ChatProvider = $ChatProvider
     ChatModel = $effectiveChatModel

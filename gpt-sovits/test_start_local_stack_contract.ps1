@@ -47,4 +47,18 @@ if ($source -notmatch '\$env:GPT_SOVITS_REFERENCE_AUDIO' -or
   throw 'Launcher must honor an explicit reference-audio path for clean worktrees.'
 }
 
+$verifierPath = Join-Path $PSScriptRoot 'verify-local-stack.ps1'
+$verifierSource = Get-Content -LiteralPath $verifierPath -Raw
+foreach ($requiredFragment in @(
+  '$cache.total -le 0',
+  '$cache.ready -ne $cache.total'
+)) {
+  if ($verifierSource -notmatch [regex]::Escape($requiredFragment)) {
+    throw "Verifier must require every configured cached phrase to be ready: $requiredFragment"
+  }
+}
+if ($verifierSource -match '\$cache\.ready\s*-lt\s*2') {
+  throw 'Verifier must not accept only two ready cached phrases.'
+}
+
 Write-Output 'start_local_stack_cache_readiness_contract=passed'

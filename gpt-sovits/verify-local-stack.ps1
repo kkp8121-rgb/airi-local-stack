@@ -27,7 +27,7 @@ if (-not $health.reference_audio_found) {
 # The acknowledgement WAVs warm up in the background, so a verified stack must
 # actually have them: a miss silently costs the whole first-response latency win.
 $cache = $health.immediate_response_cache
-if ($cache.ready -lt 2) {
+if ($cache.total -le 0 -or $cache.ready -ne $cache.total) {
   throw "immediate response cache is not ready: $($cache.ready)/$($cache.total)"
 }
 Write-Output "speech_health=ok engine=$($health.engine) cache_ready=$($cache.ready)/$($cache.total)"

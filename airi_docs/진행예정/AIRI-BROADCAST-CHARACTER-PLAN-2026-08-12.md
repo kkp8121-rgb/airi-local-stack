@@ -29,7 +29,7 @@
 
 | # | 작업 | 내용 | 기반 자산 (이미 있음) |
 |---|---|---|---|
-| **I1** | 기억 추출 활성화 | Stage A/B 추출기를 켜서 대화→기억 승격 루프 완성. 현재 "검색만 되고 쌓이지 않는" 반쪽 상태. **게이트 완화 판정은 2026-08-12(`932eae6`) 완료** — `GATE_PROFILES`의 `strict`/`balanced` 2프로파일로 분리했고 기본은 `balanced`(구조 지표는 두 프로파일 모두 1.0 고정, 모델 판단 지표만 완화). 자동 ON 배선도 완료(게이트 리포트 통과 시 fail-open). **남은 것은 게이트 리포트 생산** — 완화 후에도 기존 후보는 전부 불합격이고 Mi:dm은 추출기로 미측정 | `airi_memory.py`, `memory_extraction_provider.py`, `verify_extraction_gate.py` |
+| **I1** | 기억 추출 활성화 | Stage A/B 추출기를 켜서 대화→기억 승격 루프 완성. strict/balanced와 자동 ON 배선은 완료. **Mi:dm balanced도 2026-08-12 dev PC 실측 FAIL**(critical recall 0.2619, Stage B coverage 0.4286, total P50 20.19s)로 추출 off 유지. 남은 것은 통과 후보 선정·재측정 | `airi_memory.py`, `memory_extraction_provider.py`, `verify_extraction_gate.py` |
 | **I2** | 시청자 기억 시스템 | 실무 표준 등급제(1등급 10~20명: 이름·관심사·근황 / 2등급 30~50명: 닉·특징)를 트랙 M 스키마로 구현. 닉네임별 첫 방문·후원 이력·관심사에서 **콜백 자동 생성**("지난번에 말한 그 게임 해봤어?") | SQLite+KURE 검색(1만 행 P50 78~110ms), `[Character Memory]` 주입 경로 |
 | **I3** | 주제 풀 확장 | 토픽 보드를 "승인 문장 6개 낭독"에서 **방송 시간 1.5배 분량의 주제 풀**로 확장. 블록당 주제 1개 + 예비 2~3개. 지식 RAG(`knowledge_store.py`)와 연결해 주제별 근거 제공 | topic board 승인 파이프라인, knowledge_store |
 | **I4** | 평가 플라이휠 (G3) | 방송 트랜스크립트 → 사람 큐레이션 → 오프라인 개선 → 회귀 시험 (뉴로사마와 동일 구조: 방송→수동 큐레이션→파인튜닝). 우선 **인간 검수 100건**으로 16케이스 게이트 FAIL 해소 | eval 하네스(120턴 A/B), `training/` 승인 파이프라인 |
@@ -72,7 +72,7 @@
 
 | 장치 | 내용 | 비용 |
 |---|---|---|
-| 한국어 출력 모더레이션 | **한국어 지원 기성 가드 모델 전무 확정**(Llama Guard·ShieldGemma·Detoxify 전부 미지원). 금칙어 사전 + 정규식 필터 자체 구축, 삽입 지점은 문장 단위 TTS 게이트 | **코드 구축 완료** (2026-08-12 `932eae6` — `output_moderation.py` + `moderation_terms_ko.json`, SSE 문장 게이트 `openai_sse_delta`에 삽입, **기본 off**). 남은 것은 배선 3종(런처 env `AIRI_OUTPUT_MODERATION`, TTS 폴백 대사 프리로드, Electron 표시) |
+| 한국어 출력 모더레이션 | **한국어 지원 기성 가드 모델 전무 확정**(Llama Guard·ShieldGemma·Detoxify 전부 미지원). 금칙어 사전 + 정규식 필터 자체 구축, 삽입 지점은 문장 단위 TTS 게이트 | 프록시 코드와 기본 off 유지. 2026-08-12 dev PC에서 런처 env와 TTS 폴백 7/7 preload 완료. 남은 것은 Electron 표시 |
 | 지연 버퍼 30~60초 | OBS 소스 코드로 확정: RAM만 사용(60초 ≈ 60MB), VRAM 0. 이상 발화 개입 시간 확보 | 설정 1개 |
 | Killswitch 3중 | L1 obs-websocket 대기씬+뮤트(즉시) / L2 프록시 취소 경로 재사용(ASGI finally 실측 검증됨) / L3 방송 종료 API | 배선 |
 | 입력 방어 | comment-intelligence 인젝션 차단 + `liveChatBans` API | 채택 |

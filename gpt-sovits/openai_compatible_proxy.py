@@ -53,11 +53,19 @@ WAV_HEADER_BYTES = 44
 # run on different threadpool threads. That is why this is a plain (non-owner
 # bound) Lock rather than an RLock.
 TTS_LOCK = threading.Lock()
-# These short acknowledgements are intentionally fixed application phrases.  Only
-# their synthesized WAV bytes live in memory; user-provided speech is never cached.
+# These fixed application phrases are preloaded. Only their synthesized WAV bytes
+# live in memory; user-provided speech is never cached.
 IMMEDIATE_RESPONSE_TEXTS = ("응!", "바로 찾아볼게.")
+MODERATION_BLOCKED_DIALOGUE_TEXTS = (
+    "방금 그건 말하면 안 된대.",
+    "앗, 지금 그 말은 걸러졌어.",
+    "음, 그건 내가 말하면 안 되는 쪽인가 봐.",
+    "어라, 그 말은 여기서 막혔대.",
+    "그건 못 넘어가나 봐. 다른 얘기 하자.",
+)
+PRELOADED_RESPONSE_TEXTS = IMMEDIATE_RESPONSE_TEXTS + MODERATION_BLOCKED_DIALOGUE_TEXTS
 _WAV_CACHE: dict[str, bytes] = {}
-_WAV_CACHE_STATUS: dict[str, str] = {text: "pending" for text in IMMEDIATE_RESPONSE_TEXTS}
+_WAV_CACHE_STATUS: dict[str, str] = {text: "pending" for text in PRELOADED_RESPONSE_TEXTS}
 _WAV_CACHE_LOCK = threading.Lock()
 
 
@@ -121,7 +129,7 @@ def build_backend_payload(text: str, speed: float = 1.0) -> dict:
 
 def cached_wav_for_request(text: str, response_format: str, speed: float) -> bytes | None:
     """Return a preload only when it is byte-for-byte compatible with the request."""
-    if response_format.casefold() != "wav" or speed != 1.0 or text not in IMMEDIATE_RESPONSE_TEXTS:
+    if response_format.casefold() != "wav" or speed != 1.0 or text not in PRELOADED_RESPONSE_TEXTS:
         return None
     with _WAV_CACHE_LOCK:
         return _WAV_CACHE.get(text)
@@ -147,7 +155,7 @@ def _fetch_wav_from_backend(payload: dict) -> bytes:
 
 def warm_immediate_response_cache() -> None:
     """Best-effort server-start warmup. Each failure leaves normal streaming intact."""
-    for text in IMMEDIATE_RESPONSE_TEXTS:
+    for text in PRELOADED_RESPONSE_TEXTS:
         with _WAV_CACHE_LOCK:
             _WAV_CACHE_STATUS[text] = "warming"
         try:
