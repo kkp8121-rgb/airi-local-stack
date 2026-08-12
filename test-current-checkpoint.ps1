@@ -9,6 +9,7 @@ $ErrorActionPreference = 'Stop'
 & (Join-Path $PSScriptRoot 'test-patch-applicability.ps1')
 & (Join-Path $PSScriptRoot 'gpt-sovits\test_start_local_stack_contract.ps1')
 & (Join-Path $PSScriptRoot 'test-airi-source-asar-deploy.ps1')
+& (Join-Path $PSScriptRoot 'test-airi-source-asar-preflight-contract.ps1')
 
 $senderTest = Join-Path $PSScriptRoot 'test-send-airi-local-text.mjs'
 & node --test $senderTest

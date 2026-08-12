@@ -45,3 +45,9 @@ SHA-256 `1B68AE5E...19B88B0`로 변하지 않았다. 설치·백업·AIRI 종료
 설치본 변경 권한이 명시적으로 주어지면, 고정 artifact/current 해시로 안전
 installer를 실행하고 32 kHz fixture duration/pitch 및 text→render 회귀를 별도
 증거로 남긴다. STT와 마이크는 계속 OFF/deferred다.
+
+후속 read-only preflight는 이 sidecar와 실제 후보·설치 baseline·unpacked
+트리·patch layer를 다시 묶어 검사한다. 현재 실경로 호출은 설치 AIRI 프로세스
+7개를 감지해 의도대로 거부했으며 앱 종료나 설치 파일 변경은 없었다. 이는
+설치 승인이나 live PASS가 아니다. 상세:
+`AIRI-SOURCE-ASAR-PREFLIGHT-2026-08-13.md`.

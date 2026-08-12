@@ -46,3 +46,9 @@ source behavior, or runtime TTS duration/pitch verification.
 the tracking gate for any authorized installed-ASAR operation. Before that gate
 is explicitly cleared, use the scripts only on the synthetic fixture path; do
 not treat source build success or these tests as installed-runtime evidence.
+
+The follow-up evidence-pinned read-only preflight is recorded in
+`AIRI-SOURCE-ASAR-PREFLIGHT-2026-08-13.md`. It does not replace the installer
+mutex, executable launch barrier, or installer-side digest validation. Its real
+current-state probe refused at seven running installed AIRI processes and made
+no installed-app mutation.

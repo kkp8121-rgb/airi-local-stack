@@ -154,6 +154,14 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-13** (dev PC, source ASAR read-only preflight): 고정 evidence
+  SHA와 후보/current ASAR·설치 exe·fuse·unpacked manifest·3개 patch layer를
+  strict type/path/file-identity/final-drift로 재검증하는 비변경 사전점검과
+  합성 계약 시험을 checkpoint에 추가했다. 실경로 호출은 설치 AIRI 프로세스
+  7개를 감지해 fail-closed 거부했다. 프로세스 종료·설치 파일 변경은 없었고,
+  install 승인/runtime TTS·text→render/portable·Godot은 계속 미완료다. 설치 시
+  installer가 digest를 재검증하고 mutex·launch barrier를 획득해야 한다.
+
 - **2026-08-13** (TTS source ASAR candidate): 고정 source `bf173f2` / tree
   `ff71039c`에서 1,131,077,260-byte 후보 ASAR를 생성했다. SHA-256
   `6767625E...9BCED`, package 0.11.3, 28,167 entries와 critical payload를
