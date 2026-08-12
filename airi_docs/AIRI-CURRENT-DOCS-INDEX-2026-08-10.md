@@ -73,6 +73,14 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-LATENCY-DASHBOARD-SUBSTANTIVE-KPI-2026-08-13.md` — 상단 대시보드가
+  raw `playback.start`가 아니라 strict substantive playback KPI만으로
+  newest-five/P50/P95/worst/pass를 계산하도록 정합성을 고정한 오프라인 증거.
+  Node 5/5, focused latency Python 32 passed + 15 subtests, checkpoint,
+  independent review 및 별도 전체 Python 3.12 875 passed / 1 skipped / 738
+  subtests / 7 warnings (49.88s)를 기록한다. live mic/runtime 실측, 설치
+  AIRI·서비스·모델 변경, 물리적 5-turn gate 완료를 뜻하지 않는다.
+
 - `AIRI-SOURCE-ASAR-PREFLIGHT-2026-08-13.md` — source ASAR 후보·설치
   baseline·unpacked·patch provenance를 묶는 read-only 사전점검과 합성 계약
   시험. 실경로 호출은 설치 AIRI 프로세스 7개에서 fail-closed 거부했으며

@@ -108,6 +108,12 @@
   (`완료/AIRI-INSTALLED-MODEL-RENDER-AB-2026-08-12.md`)
 - [ ] 실제 마이크 음성 체인 P50/P95 실측 (보류: 사용자 요청. “마이크 테스트
   시작” 요청 시 dev PC의 `마이크(USB Audio Device)`로 재개)
+- [x] 상단 대시보드 substantive KPI 정합성 — raw `playback.start` 대신
+  `kpi.substantive_playback_start`만으로 newest-five/P50/P95/worst/pass를
+  집계. non-synthetic cloud-search와 explicit STT/LLM/playback 상관 및
+  시간 순서를 엄격히 요구하고 raw scalar는 진단용 유지 — 2026-08-13
+  (`완료/AIRI-LATENCY-DASHBOARD-SUBSTANTIVE-KPI-2026-08-13.md`; 이는
+  live mic/runtime 실측 또는 물리적 5-turn gate 완료가 아님)
 - [x] §12 완료 기준 공식 개정 (결정 5) — 2026-08-12 결정 완료: 재정의
   제안 기각, 원문 유지 확정
 
@@ -369,3 +375,20 @@
   반영 — 모델 SSoT 게이트 4종 코드 해소, I1 추출 배선(발효 대기),
   MEM-04 WAL, B3 모더레이션 코드 완료(M3 일부 선행), C1 헌법 초안.
 - **2026-08-13** (production context v2): generic structured-output 계약으로 spoken style 충돌을 제거하고 source-oriented fields, 답 canary가 없는 질문, swapped/reordered anti-overfit test를 적용했다. 구조 변환 PASS, 7개 필드 중 6개 12/12이며 두 continuity color는 v1보다 개선됐지만 `dialogue_marker` 0/12가 memory marker `silver-fern`을 결정적으로 복사해 semantic/gate/authoritative는 FAIL이다. dialogue-vs-memory는 모델 한계로 결론냈고 prompt tuning을 계속하지 않는다. default `num_ctx=2048`·extraction OFF를 유지한다.
+
+- **2026-08-13** (latency dashboard KPI): 상단 대시보드의 기존 raw
+  `playback.start` 집계가 heuristic/mixed 행을 포함해 상단은 통과로 보이는
+  반면 per-turn 행은 heuristic 포함 및 substantive KPI 보류를 정확히 표시하는
+  모순이 가능했던 점을 수정했다. fixed `/dashboard-metrics.mjs`의
+  pure 집계는 non-synthetic cloud-search, explicit STT/LLM/playback,
+  유한 `vadEndWaitMs >= 0`, `stt.start <= llm.content <=
+  kpi.substantive_playback_start`, 유한 nonnegative 결과만 허용한다.
+  newest-five/P50/P95/worst/pass는 substantive KPI만 사용하며 raw scalar는
+  진단용이다. Node 5/5, latency Python 32 passed + 15 subtests, checkpoint,
+  independent review 모두 PASS이며, 별도 Python 3.12 전체 명령
+  `python -m pytest -q ollama-proxy test_latency_trace.py
+  test_start_airi_background.py latency-monitor stt`도 875 passed / 1 skipped /
+  738 subtests / 7 warnings (49.88s) PASS다. live mic/runtime 실측은 없고 STT는
+  OFF/deferred, 설치 AIRI·서비스·모델은 변경하지 않았으며 물리적 5-turn
+  gate는 닫지 않았다. 상세:
+  `완료/AIRI-LATENCY-DASHBOARD-SUBSTANTIVE-KPI-2026-08-13.md`.

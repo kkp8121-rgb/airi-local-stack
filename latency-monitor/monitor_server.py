@@ -534,6 +534,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health": return self.send_json(200, {"status": "ok", "local_broadcast": LOCAL_BROADCAST_PROOFS.snapshot()})
         if self.path == "/api/snapshot": return self.send_json(200, {"now_ms": now_ms(), "turns": CORRELATOR.snapshot(), "resources": RESOURCES.snapshot(), "local_broadcast": LOCAL_BROADCAST_PROOFS.snapshot()})
+        if self.path == "/dashboard-metrics.mjs":
+            try:
+                with open(os.path.join(os.path.dirname(__file__), "dashboard-metrics.mjs"), "rb") as f: body = f.read()
+                self.send_response(200); self.send_header("Content-Type", "application/javascript; charset=utf-8"); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+            except OSError: self.send_error(404)
+            return
         if self.path in ("/", "/dashboard.html"):
             try:
                 with open(os.path.join(os.path.dirname(__file__), "dashboard.html"), "rb") as f: body = f.read()
