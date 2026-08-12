@@ -18,7 +18,7 @@
 |---|---|---|
 | 모델 SSoT | `resolve_chat_model()` 단일화(프록시 내 EXAONE 문자열 0건), foreground model 정규화, eval provenance, digest pin(opt-in), ACK metadata 교정 | 코드 완료, **실기 검증 대기** |
 | I1 기억 추출 | 게이트 리포트 자동 해석 → 추출 자동 ON 배선(fail-open), 게이트 프로파일 strict/balanced | 코드 완료, **게이트 리포트 생산 대기** |
-| MEM-04 | SQLite WAL + busy_timeout=500ms | 완료, 활성화 후 락 경합 실측만 남음 |
+| MEM-04 | SQLite WAL + busy_timeout=5000ms (당초 500ms → 저하된 CI runner에서 락 실패 재발해 sqlite3 기본 예산 복원) | 완료, 활성화 후 락 경합 실측만 남음 |
 | B3 모더레이션 | 한국어 금칙어 사전(113항목+개인정보 패턴 7)·우회 표기 8형 전수 차단·SSE 문장 게이트·캐릭터 폴백 대사(C3) | 코드 완료(기본 off), **배선·프리로드 대기** |
 | C1 헌법 | 캐릭터 헌법 초안 (`진행예정/AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md`) | 초안 — 사용자 결정 1·3 대기 |
 | 문서 | TECH-SPECS 현행화, 색인 갱신 | 완료 |

@@ -127,7 +127,7 @@ fallback 자동 전환은 없다. Chatterbox는 legacy 설치 후보로만 남�
 | 항목 | 사양 |
 |---|---|
 | 저장소 | SQLite. 대화/기억은 `runtime/airi-memory.sqlite3`, 승인 지식은 별도 파일 `runtime/airi-knowledge.sqlite3` (`ollama-proxy/start-local-ollama-proxy.ps1:232-233`) |
-| 동시성 | `_connect`에서 `PRAGMA busy_timeout=500` 후 `PRAGMA journal_mode=WAL` (MEM-04, `airi_memory.py:59,315-325`). 500ms는 8-thread 동시 쓰기 실측으로 확정(100ms는 락 실패, 500ms 10/10 안정). 추출 활성 상태의 락 경합 재평가는 실기 대기 |
+| 동시성 | `_connect`에서 `PRAGMA busy_timeout=5000` 후 `PRAGMA journal_mode=WAL` (MEM-04, `airi_memory.py`). 당초 500ms(로컬 8-thread 10/10)로 잡았으나 저하된 CI runner(5배 느린 shard)에서 "database is locked" 재발 — 턴 쓰기 실패가 드문 대기보다 나쁘므로 sqlite3 connect 기본 예산(5s)을 복원. WAL로 실제 경합 창은 짧아 상한은 사실상 미발동. 추출 활성 상태의 락 경합 재평가는 실기 대기 |
 | 임베딩 | KURE-v1, CUDA 상주, fp16 (`memory_runtime.py:156-174`의 `torch_dtype=torch.float16` 명시 캐스팅) |
 | fp16 절감 실측 | CUDA allocated 2,165.938MiB(fp32) → 1,083.032MiB(fp16), 회수 약 1,082.9MiB (`AIRI-UPGRADE-SCOUT-MEASUREMENT-2026-08-11.md`). 검색 품질(MRR·Recall@1·Recall@3)은 fp32/fp16 양쪽 모두 1.0으로 동일 |
 | journal 검색 | FTS5 인덱스(KM-08) — 기존 O(N) 파이썬 재토큰화를 대체. 실측 0.060ms/메시지, 미추출 4,096건 기준 247.4ms (`AIRI-UPGRADE-SCOUT-2026-08-11.md`) |

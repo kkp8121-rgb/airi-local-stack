@@ -422,7 +422,10 @@ class MemoryTests(unittest.TestCase):
         for index in range(256): self.s.bootstrap_turns_if_empty(f'session-{index}', turns)
         started = __import__('time').perf_counter()
         self.assertIsNone(self.s.find_session_by_turn_tail([('x', 'y'), ('z', 'q')]))
-        self.assertLess(__import__('time').perf_counter() - started, .15)
+        # An algorithmic regression here shows up in whole seconds; 0.6s keeps
+        # the guard while surviving degraded CI runners (0.38s observed on a
+        # 5x-slow shard, 2026-08-12, where the old 0.15s bound false-failed).
+        self.assertLess(__import__('time').perf_counter() - started, .6)
 
     def test_completed_turn_tail_caps_and_append_message_completion(self):
         for turn in range(1, 66): self.s.append_turn('tail', f'u{turn}', f'a{turn}', turn)

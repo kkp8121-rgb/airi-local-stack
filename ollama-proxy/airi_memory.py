@@ -47,16 +47,19 @@ JOURNAL_FTS_CANDIDATE_MESSAGES = 256
 # the asyncio layer even if the underlying call is still blocked in SQLite.
 # Every other store call (append_turn, extraction commits, ...) instead runs
 # via plain asyncio.to_thread with no wrapping timeout, so whatever this
-# connection blocks on lands directly on request latency — it must stay a
-# fast-fail bound, not Python sqlite3's implicit 5000ms default.  100ms (the
-# initial guess, sized off the single-digit-ms cost of one INSERT/UPDATE
-# transaction) measurably regressed test_concurrent_completed_turns_are_
-# serialized_in_sqlite (8 threads racing append_turn on one session): queuing
-# behind 7 other writers' lock handoffs — not any one commit — is what needs
-# covering. 500ms passed that test 10/10 with no failures where 100ms failed
-# ~2/3 runs; it stays far below Python's old 5s default while giving genuine
-# contention room to resolve instead of surfacing as "database is locked".
-SQLITE_BUSY_TIMEOUT_MS = 500
+# connection blocks on lands directly on request latency, so this value is a
+# worst-case ceiling on a turn write.  100ms (sized off the single-digit-ms
+# cost of one INSERT/UPDATE transaction) measurably regressed
+# test_concurrent_completed_turns_are_serialized_in_sqlite (8 threads racing
+# append_turn on one session): queuing behind 7 other writers' lock handoffs
+# — not any one commit — is what needs covering.  500ms passed that test
+# 10/10 on a healthy local machine but still hit "database is locked" on a
+# degraded CI runner where the same shard ran 5x slower (2026-08-12) — a
+# failed user-turn write is strictly worse than a rare longer wait.  5000ms
+# restores the effective pre-WAL budget (Python sqlite3's connect default,
+# which never showed lock failures); with WAL below, genuine contention
+# windows stay tiny and this ceiling almost never engages in production.
+SQLITE_BUSY_TIMEOUT_MS = 5000
 
 
 _PLACEHOLDER_PARTICLE_RE = re.compile(
