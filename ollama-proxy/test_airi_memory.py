@@ -764,7 +764,11 @@ class MemoryTests(unittest.TestCase):
         """One connection holds an open write transaction well past busy_timeout;
         a second connection's write must retry (not fail instantly) and then
         give up with a clear error (not hang) once busy_timeout elapses."""
-        hold_seconds = (SQLITE_BUSY_TIMEOUT_MS / 1000) * 6  # generous margin over busy_timeout
+        # The production ceiling (5s) would add fixed multi-second waits to
+        # every run; the bounded-wait semantics are identical at any value,
+        # so pin a small test-only timeout for both connections below.
+        test_busy_ms = 400
+        hold_seconds = (test_busy_ms / 1000) * 6  # generous margin over busy_timeout
         ready, release = threading.Event(), threading.Event()
         holder_errors: list[Exception] = []
 
@@ -784,26 +788,27 @@ class MemoryTests(unittest.TestCase):
             finally:
                 holder.close()
 
-        t = threading.Thread(target=hold_write_lock)
-        t.start()
-        try:
-            self.assertTrue(ready.wait(2), 'holder never acquired the write lock')
-            other = self.s._connect()
-            start = time.monotonic()
+        with patch('airi_memory.SQLITE_BUSY_TIMEOUT_MS', test_busy_ms):
+            t = threading.Thread(target=hold_write_lock)
+            t.start()
             try:
-                with self.assertRaises(sqlite3.OperationalError) as ctx:
-                    other.execute('BEGIN IMMEDIATE')
-                elapsed = time.monotonic() - start
-                self.assertIn('locked', str(ctx.exception).lower())
-                # Not an instant failure: busy_timeout was actually honoured.
-                self.assertGreaterEqual(elapsed, (SQLITE_BUSY_TIMEOUT_MS / 1000) * 0.5)
-                # Not an unbounded hang: it gave up well before the holder released.
-                self.assertLess(elapsed, hold_seconds)
+                self.assertTrue(ready.wait(2), 'holder never acquired the write lock')
+                other = self.s._connect()
+                start = time.monotonic()
+                try:
+                    with self.assertRaises(sqlite3.OperationalError) as ctx:
+                        other.execute('BEGIN IMMEDIATE')
+                    elapsed = time.monotonic() - start
+                    self.assertIn('locked', str(ctx.exception).lower())
+                    # Not an instant failure: busy_timeout was actually honoured.
+                    self.assertGreaterEqual(elapsed, (test_busy_ms / 1000) * 0.5)
+                    # Not an unbounded hang: it gave up well before the holder released.
+                    self.assertLess(elapsed, hold_seconds)
+                finally:
+                    other.close()
             finally:
-                other.close()
-        finally:
-            release.set()
-            t.join(2)
+                release.set()
+                t.join(2)
         self.assertEqual(holder_errors, [])
 
 if __name__=='__main__': unittest.main()

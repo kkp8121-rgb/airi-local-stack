@@ -81,9 +81,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - shard: ollama-proxy-memory-store
+            tests: >-
+              ollama-proxy/test_airi_memory.py
           - shard: ollama-proxy-model
             tests: >-
-              ollama-proxy/test_airi_memory.py ollama-proxy/test_airi_session_header_patch.py
+              ollama-proxy/test_airi_session_header_patch.py
               ollama-proxy/test_character_state.py ollama-proxy/test_character_state_evaluator.py
               ollama-proxy/test_cloud_chat_provider.py
           - shard: ollama-proxy-memory

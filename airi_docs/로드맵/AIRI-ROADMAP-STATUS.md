@@ -112,6 +112,12 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-12** (검토 PC): CI job 타임아웃 해소 — `d13c27c` run에서
+  ollama-proxy-model shard가 10분 cap에 정확히 잘림(저하 runner + 5s
+  busy_timeout 기준 bounded-wait 테스트의 고정 대기). ① bounded-wait
+  테스트를 테스트 전용 400ms timeout으로 패치(의미 동일, 고정 5s+ 제거,
+  76 passed 32s→25s) ② 최중량 test_airi_memory.py를 전용 shard로 분할
+  (10분 계약 유지, manifest 자동 대조 PASS). 상태값 변화 없음.
 - **2026-08-12** (검토 PC): CI 저하 runner 견고성 수정 2건 — ① MEM-04
   busy_timeout 500→5000ms (저하 runner에서 8-thread 락 실패 재발. 당초
   500ms가 sqlite3 기본 5s 예산을 축소한 회귀였음 — WAL 유지, 상한 복원)
