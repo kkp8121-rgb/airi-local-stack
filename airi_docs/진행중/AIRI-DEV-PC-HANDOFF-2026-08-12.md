@@ -21,7 +21,7 @@
 | I1 기억 추출 | 게이트 리포트 자동 해석 → 추출 자동 ON 배선(fail-open), 게이트 프로파일 strict/balanced | Mi:dm balanced **실측 FAIL**, 추출 off 유지 (`완료/AIRI-MIDM-EXTRACTION-GATE-MEASUREMENT-2026-08-12.md`) |
 | MEM-04 | SQLite WAL + busy_timeout=5000ms (당초 500ms → 저하된 CI runner에서 락 실패 재발해 sqlite3 기본 예산 복원) | 완료, 활성화 후 락 경합 실측만 남음 |
 | B3 모더레이션 | 한국어 금칙어 사전·SSE 문장 게이트·캐릭터 폴백 대사(C3) | **3종 배선·신규 3층 source test/typecheck/build·설치본 "필터당함" 배지 실기 완료** (`완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`) |
-| C1 헌법 | 캐릭터 헌법 초안 (`진행예정/AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md`) | 관계·인사·클로징 반영. 팬덤명 “아이리스” 충돌 FAIL로 재선정, T-05 청취·인간 검수 대기 |
+| C1 헌법 | 캐릭터 헌법 초안 (`진행예정/AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md`) | 관계·인사·클로징 반영. 정식 팬덤명 유보·일반 호칭 “시청자들” 확정. T-05 126번 예비 후보 보존·현행 음성 유지. 인간 검수 대기 |
 | 문서 | TECH-SPECS 현행화, 색인 갱신 | 완료 |
 
 ## 2. dev PC 필수 작업 — SSoT 실기 검증
@@ -115,7 +115,9 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
   render P50/P95는 Mi:dm 1,501.5/2,597.2ms, EXAONE
   1,752.5/3,233.0ms였다
   (`완료/AIRI-INSTALLED-MODEL-RENDER-AB-2026-08-12.md`).
-- 실제 마이크 20+20, barge-in 200~500ms, speaker AEC, STT-06 마이크 품질.
+- 실제 마이크 20+20, barge-in 200~500ms, speaker AEC, STT-06 마이크 품질은
+  사용자 요청으로 추후 보류한다. 사용자가 “마이크 테스트 시작”을 요청하면
+  현재 확인된 `마이크(USB Audio Device)`로 재개한다.
 - **인간 검수 100건 수집** — eval provenance가 해소됐으므로 이제 수집한
   평가 데이터를 승격 근거로 쓸 수 있다 (이전에는 모델 오표기 위험으로
   불가).
@@ -146,16 +148,18 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
 방송 계획 §4의 4건 처리됨: ① 관계 축 — AI 단독형 + 메타 서사("사장님")
 확정 ② 방송 중 클라우드 LLM — 조건부(즉시 승인 아님, dev PC 실측 2종 후
 재결정) ③ 캐릭터 확정 — 이름 AIRI·호칭 "사장님"·시그니처 인사·클로징은
-확정. 팬덤명 “아이리스”는 공개 충돌 FAIL로 사용자 재선정이 필요하다
-(`완료/AIRI-FANDOM-NAME-COLLISION-CHECK-2026-08-12.md`). T-05는 라이선스
-확인된 한국어 후보 3개 샘플 생성 완료 후 사용자 청취 검토 대기
+확정. 팬덤명 “아이리스”는 공개 충돌 FAIL로 철회했고, 정식 팬덤명 없이 일반
+호칭 “시청자들”을 쓰다가 방송에서 자연스러운 호칭이 쌓인 뒤 재검토한다
+(`완료/AIRI-FANDOM-NAME-COLLISION-CHECK-2026-08-12.md`). T-05는 126번을
+한국어 예비 후보로 보존하되 낭독조·감정 부족 때문에 운영 승격하지 않고
+현행 일본어 참조 음성을 유지한다
 (`완료/AIRI-T05-KOREAN-SPEAKER-CANDIDATES-2026-08-12.md`) ④ 첫 방송 목표 시점 — 조건 기반
 확정(M3 → 비공개 리허설 → 데뷔, 날짜 고정 없음). 헌법 초안 §5(관계
-규정)·§6(인사·팬덤명)이 이 결과를 반영했다
+규정)·§6(인사·클로징·시청자 호칭)이 이 결과를 반영했다
 (`진행예정/AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md`). 모더레이션
 폴백 대사 5종은 B3 실기까지 완료했으며, 향후 문구 재승인은 선택적 조정이다.
 
-## 9. dev PC 신규 작업 2건 (2026-08-12 사용자 결정 반영)
+## 9. dev PC 신규 작업 상태 (2026-08-12 사용자 결정 반영)
 
 1. **cloud_chat_provider 스트리밍 지연 실측** (결정 2의 전제) —
    `ollama-proxy/benchmark_cloud_chat_latency.py` 하네스와 테스트는 완료.
@@ -164,6 +168,7 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
    codex 구독 경로(비스트리밍)는 TTFT 8~15s로 이미 부적합 확정됐으므로,
    이 실측은 스트리밍 경로 단독 대상이다. 결과가 결정 2(방송 중 클라우드
    LLM)의 재결정 근거가 된다.
-2. **T-05 한국어 화자 후보 합성 샘플** — 라이선스 확인된 3개 후보를
-   생성 완료. 사용자 청취 검토 후 어울리는 후보가 없으면 현행(일본어 참조
-   교차클로닝)을 유지한다.
+2. **T-05 한국어 화자 후보 합성 샘플** — 라이선스 확인된 3개 후보 생성과
+   사용자 1차 청취 완료. 126번을 예비 후보로 선택했지만 낭독조·감정 부족
+   때문에 운영 승격은 보류하고 현행 일본어 참조 교차클로닝을 유지한다.
+   감정이 드러나는 대화체 조건으로 다시 A/B할 때 126번을 우선 사용한다.
