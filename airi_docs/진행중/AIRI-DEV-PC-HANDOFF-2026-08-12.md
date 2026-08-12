@@ -6,8 +6,24 @@
 
 - historical base: `aef5300`(STT OFF 방송 프로필; 기반 배치
   `7dc4e76` 문서, `932eae6` 코드). 이는 현행 branch tip이 아니다.
-- 현재 branch tip `f4c765f`는 continuity hardening과 production-context v2
-  source-binding batch를 포함한다. exact tip은 `git log -1`로 재확인한다.
+- 현행 branch tip은 후속 승인 배치마다 전진할 수 있으므로, 이 문서의 고정
+  해시에 의존하지 말고 `git log -1`로 확인한다.
+
+## I2a handoff update (2026-08-13)
+
+Viewer memory is foundation-only: default-inert, separate SQLite, strict HMAC
+`yt:v1`/`viewer:v1`/`broadcast:v1` keys, content-free observation, bounded
+manual tiers/facts/retention/deletion, count-only donations, and untrusted
+callback candidates. Focused JS 17 and Python unittest 19 passed. There is no
+B1b live adapter/OAuth, AIRI injection, renderer, model parsing/prompt, or
+runtime DB/launcher integration. I2 remains partial pending an authorized
+next-broadcast callback smoke. See `완료/AIRI-I2A-VIEWER-MEMORY-FOUNDATION-2026-08-13.md`.
+The current CI-equivalent 44-path Python 3.12 matrix passed 877 tests, skipped
+1, and passed 723 subtests with 7 warnings.
+
+Source-only TTS work is distinct from installed-ASAR evidence: source
+test/typecheck/build do not modify or prove an installed ASAR. Installed-runtime
+claims require their own recorded ASAR and live-turn verification.
 - 오프라인 historical 검증: **`aef5300`의 CI `python-core-tests` matrix 41개 추적 경로**
   **829 passed / 1 skipped / 706 subtests**
   (기준 733/1/504), `test-patch-manifest.ps1` PASS, 소스·문서

@@ -114,6 +114,7 @@
     (헌법 최종 승인은 인간 검수 후이며 C축 C1과 동일 병목)
 - [~] **M2** (B1 채팅 브리지 ∥ C2 루프 배선 ∥ I2 시청자 기억)
   - [x] B1a offline transport-neutral chat-ingress core — strict YouTube candidate admission, HMAC pseudonyms, bounded FIFO screening/delivery, established AIRI envelope (`data.text` only; viewer sidecar 없음), Node contract tests; 기본 OFF, B1 persistence 없음 — 2026-08-13
+  - [x] I2a viewer-memory foundation — separate opt-in SQLite, strict `yt:v1`/`viewer:v1`/`broadcast:v1` HMAC pseudonyms, content-free B1 observation boundary, manual capped tiers, bounded explicit facts, retention/deletion, count-only donations, and untrusted callback candidates; no runtime wiring or AIRI injection. I2 remains partial pending an authorized next-broadcast callback smoke — 2026-08-13 (`완료/AIRI-I2A-VIEWER-MEMORY-FOUNDATION-2026-08-13.md`)
   - [ ] B1b live adapter/quota/OAuth 및 실제 AIRI 주입 (보류: 외부 YouTube 자격증명·쿼터 실측·운영 승인)
 - [~] **M3** (B2 송출 + B3 안전)
   - [x] B3 모더레이션 게이트 코드 (사전 113항목+패턴 7, 기본 off) — 2026-08-12 (`932eae6`)
@@ -141,6 +142,19 @@
 ---
 
 ## 갱신 로그 (최신이 위)
+
+- **2026-08-13** (I2a viewer-memory foundation): default-inert, separate
+  SQLite storage and the content-free B1 observation boundary were added.
+  Strict `broadcast:v1` pseudonyms, manual tier caps, five-name history,
+  explicit typed facts (90-day maximum), 730-day event dedup retention,
+  365-day inactive pruning, deletion, count-only donations, and untrusted
+  callback candidates are covered by focused JS 17 and Python unittest 19
+  PASS. The CI-equivalent 44-path Python 3.12 matrix also passed 877 tests,
+  skipped 1, and passed 723 subtests with 7 warnings. No B1b/OAuth/live
+  adapter, AIRI injection, model parsing/prompt,
+  renderer, or runtime DB/launcher wiring was added; I2 remains partial until
+  an authorized next-broadcast callback smoke. Detail:
+  `완료/AIRI-I2A-VIEWER-MEMORY-FOUNDATION-2026-08-13.md`.
 
 - **2026-08-13** (dev PC, TTS PCM sample-rate hardening): 이미 동작하던
   progressive WAV 경로가 32 kHz PCM을 output rate에 맞추지 않던 결함을 수정했다.

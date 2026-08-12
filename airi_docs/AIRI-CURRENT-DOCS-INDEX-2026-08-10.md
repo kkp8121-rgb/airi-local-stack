@@ -73,6 +73,11 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-I2A-VIEWER-MEMORY-FOUNDATION-2026-08-13.md` — I2a default-OFF
+  separate SQLite viewer-memory foundation, content-free observation boundary,
+  strict HMAC pseudonyms, bounded retention/facts/tier/deletion/count-only
+  donation contracts, and focused JS 17/Python unittest 19 PASS. B1b/live
+  adapter/AIRI injection/runtime integration은 포함하지 않았고 I2는 partial이다.
 - `AIRI-TTS-PCM-SAMPLE-RATE-HARDENING-2026-08-13.md` — progressive
   GPT-SoVITS PCM의 32 kHz→AudioContext output-rate resampling, lossless bounded
   backpressure와 bounded fallback retention을 구현·빌드 검증한 source 증거.

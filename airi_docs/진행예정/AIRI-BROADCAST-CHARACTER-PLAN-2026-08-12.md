@@ -2,9 +2,9 @@
 
 - 목표: ① 지능(기억·판단)과 캐릭터성(일관된 성격·관계)을 구축하고 ② 유튜브 저스트챗 방송을 실제로 성립시킨다.
 - 근거: `AIRI-BROADCAST-RESEARCH-2026-08-12.md` (저스트챗 방송 구조·뉴로사마 벤치마크·한국 씬 사례 + 기술 파이프라인 조사, 출처 포함)
-- 상태: **계획 승인 대기(2026-08-12: 결정 1·3·4 확정, 결정 2 조건부)**.
+- 상태: **계획 승인 대기/코드 미변경이라는 종전 표기는 stale이다.** B1a와 I2a foundation은 2026-08-13에 구현됐지만 기본 OFF이며, B1b live adapter/OAuth/AIRI injection과 I2의 authorized next-broadcast callback smoke는 아직 보류다.
   정식 팬덤명은 유보하고 T-05는 126번을 예비 후보로 보존하며 현행 음성을
-  유지한다. 코드 변경 없음.
+  유지한다.
 - 전제 브랜치: `feat/upgrade-scout-full-2026-08-11` (Upgrade Scout 적용 완료 상태)
 
 ---
@@ -56,6 +56,7 @@
 ### B1. 채팅 수신 (최대 신규 갭 — 단, 주입 지점은 이미 있음)
 
 - **B1a 완료 (2026-08-13, 기본 OFF):** repo-native `chat-ingress/`에 transport-neutral·offline 수신 코어와 Node 계약 테스트를 추가했다. YouTube 후보 스키마를 엄격 검증·정규화하고, 원본 upstream ID는 HMAC 의사식별자로만 일회 처리한다. bounded FIFO/screen/deliver 재시도와 established `input:text` 매퍼(`data.text`, `route.delivery.required`, `metadata.event.id`)를 제공하며 WebSocket·SDK·라이브 어댑터·영속성은 포함하지 않는다. `text`와 `displayName`은 bounded 메모리 큐 및 전달 뒤 기존 로컬 AIRI history에만 존재할 수 있는 개인 데이터이며 B1 자체 영속성은 없다.
+- **I2a foundation 완료 (2026-08-13, 기본 OFF):** separate SQLite와 strict `broadcast:v1` pseudonym을 포함한 viewer-memory store를 추가했다. B1 screened text는 observation에서 제외하며, tier 1/2 수동 cap, 최대 5개 이름, 명시 typed fact만(90일 최대), 730일 event dedup, 365일 inactive prune, deletion, count-only donation, content-free health, untrusted callback candidate까지만 제공한다. B1b·renderer·runtime integration·model parsing/prompt는 포함하지 않았고 I2는 authorized next-broadcast callback smoke 전까지 partial이다 (`완료/AIRI-I2A-VIEWER-MEMORY-FOUNDATION-2026-08-13.md`).
 - **정정:** AIRI `WithInputSource` union에 `'youtube'`를 추가해야 한다는 종전 주장은 틀렸다. B1a는 기존 transport-neutral `input:text` envelope만 사용하며 `data.youtube` 또는 viewer sidecar를 아직 내보내지 않으므로 AIRI source-union 수정은 없다.
 - **B1b 보류:** YouTube live adapter(공식 API/SSE), 실제 쿼터 측정, Google Cloud/OAuth 자격증명·refresh-token 운영, 외부 moderation 공급자 및 실제 AIRI 주입 연결은 별도 승인·외부 실측이 필요하다.
 - 경로 우선순위: streamList(실측 통과 시) → 공식 `list` 폴링(쿼터 예산: 5 units 가정 시 하루 2~3시간) → Social Stream Ninja SSE(쿼터 무관 폴백, GPL이므로 별도 프로세스+SSE 소비만)
