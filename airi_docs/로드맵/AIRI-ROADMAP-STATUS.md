@@ -42,8 +42,9 @@
   - [x] 저장·검색·저널 회상 운영 — 2026-08-09 라이브 스모크, KURE fp16 2026-08-11
   - [x] 추출 승격 루프 코드 + 게이트 프로파일 strict/balanced — 2026-08-12 (`932eae6`)
   - [x] MEM-04 SQLite WAL·busy_timeout — 2026-08-12 (`932eae6`)
-  - [~] 게이트 리포트 생산 → 추출 발효 (dev PC Mi:dm balanced 실측 FAIL,
-    추출 off 유지 — 통과 후보 모델 미확정, `완료/AIRI-MIDM-EXTRACTION-GATE-MEASUREMENT-2026-08-12.md`)
+  - [~] 게이트 리포트 생산 → 추출 발효 (Mi:dm balanced, Qwen3.5·Granite 4.0
+    smoke, Gemma3 full 모두 FAIL; 독립 verifier 거부, 추출 off 유지 — 통과 후보 모델
+    미확정, `완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`)
   - [ ] I2 시청자 기억 시스템 (M2)
 - [~] **G3. 평가·데이터 플라이휠**
   - [x] 오프라인 eval 하네스·120턴 A/B — 2026-08-12 (`진행중/AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md`)
@@ -128,12 +129,17 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-12** (dev PC, I1 신규 후보): 11436 격리 CPU에서 Qwen3.5 4B
+  Q4_K_M과 Granite 4.0 3B smoke는 첫 행 fail-fast FAIL, Gemma3 4B는 smoke
+  PASS 뒤 full 7-row balanced FAIL(독립 verifier 거부)했다. 셋 다 설치된 로컬
+  후보일 뿐 운영 모델이 아니며 extraction은 off다. Kanana-2-3B는 공식 BF16 원본 직접 변환
+  provenance 및 Kanana Open License broadcast/attribution 검토 전 보류했고,
+  제3자 pull CLI 중단 뒤 설치가 완료된 tag도 load·측정하지 않았다. 상태값은 변하지 않는다.
 - **2026-08-12** (dev PC): 현재 tip의 CI `python-core-tests` matrix 41개
   추적 경로를 같은 `requirements-ci.txt` 환경에서 재실행해
   **825 passed / 1 skipped / 706 subtests**를 확인했다. 기억 기술 레퍼런스의
   “Mi:dm 추출 미측정”을 실측 balanced FAIL로 고치고, C1 사용자 방향 결정과
   헌법 최종 인간 승인을 분리했다. 로드맵 상태값은 변하지 않는다.
-
 - **2026-08-12** (dev PC): 공개 합성 장문 context·memory·card 하네스를
   추가하고 `num_ctx=2048`에서 EXAONE/Mi:dm을 4압력×3회 실측했다. exact는
   EXAONE 3/12, Mi:dm 0/12로 양 모델 FAIL. Mi:dm은 같은 무압력 입력도

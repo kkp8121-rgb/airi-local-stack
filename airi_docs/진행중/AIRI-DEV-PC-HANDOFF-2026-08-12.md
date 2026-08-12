@@ -5,7 +5,7 @@
 목록이다. 착수 전 이 문서와 아래 근거 문서를 정독하라.
 
 - 완료 커밋: `7dc4e76`(문서), `932eae6`(코드) — 기반 `294c4e6`
-- 오프라인 검증: 현재 tip의 CI `python-core-tests` matrix 41개 추적 경로
+- 오프라인 검증: **현재 tip CI `python-core-tests` matrix의 41개 추적 경로만**
   **825 passed / 1 skipped / 706 subtests**
   (기준 733/1/504), `test-patch-manifest.ps1` PASS, 소스·문서
   `git diff --check` 클린(생성된 runtime patch 내부 source whitespace 제외)
@@ -20,7 +20,7 @@
 |---|---|---|
 | 모델 SSoT | `resolve_chat_model()` 단일화, Electron 정규화, foreground 단일 runner, 롤백·eval provenance, digest pin | **dev PC 실기 PASS**, Mi:dm 실측 digest 기본 pin 반영 (`완료/AIRI-DEV-PC-SSOT-VERIFICATION-2026-08-12.md`) |
 | 장문 모델 A/B | `num_ctx=2048`의 card·초기 화자·최신 부정 정정·tail memory 합성 비교 | **실측 완료, 양 모델 FAIL**. EXAONE exact 3/12, Mi:dm 0/12; Mi:dm 20 filler쌍에서 token 포화 (`완료/AIRI-LONG-CONTEXT-MEMORY-CARD-AB-2026-08-12.md`) |
-| I1 기억 추출 | 게이트 리포트 자동 해석 → 검증 PASS 때만 추출 ON(fail-closed), 게이트 프로파일 strict/balanced | Mi:dm balanced **실측 FAIL**, 추출 off 유지 (`완료/AIRI-MIDM-EXTRACTION-GATE-MEASUREMENT-2026-08-12.md`) |
+| I1 기억 추출 | 게이트 리포트 자동 해석 → 검증 PASS 때만 추출 ON(fail-closed), 게이트 프로파일 strict/balanced | Mi:dm·Qwen3.5 smoke·Gemma full·Granite 4.0 smoke 모두 FAIL, 추출 off 유지 (`완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`) |
 | MEM-04 | SQLite WAL + busy_timeout=5000ms (당초 500ms → 저하된 CI runner에서 락 실패 재발해 sqlite3 기본 예산 복원) | 완료, 활성화 후 락 경합 실측만 남음 |
 | B3 모더레이션 | 한국어 금칙어 사전·SSE 문장 게이트·캐릭터 폴백 대사(C3) | **3종 배선·신규 3층 source test/typecheck/build·설치본 "필터당함" 배지 실기 완료** (`완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`) |
 | C1 헌법 | 캐릭터 헌법 초안 (`진행예정/AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md`) | 관계·인사·클로징 반영. 정식 팬덤명 유보·일반 호칭 “시청자들” 확정. T-05 126번 예비 후보 보존·현행 음성 유지. 인간 검수 대기 |
@@ -53,7 +53,16 @@ warmup·evaluator·provenance가 모두 일치했다. Mi:dm digest
 
 ## 3. dev PC 필수 작업 — I1 게이트 리포트 생산
 
-**Mi:dm 후보 측정 완료, FAIL.** 11436 격리 CPU 서버의 balanced 7 fixtures에서
+**Mi:dm 및 신규 로컬 후보 측정 완료, 모두 FAIL.** Mi:dm의 11436 격리 CPU
+balanced 7 fixtures 결과는 기존과 같고,
+`qwen3.5:4b-q4_K_M`은 `persistent_trait` smoke에서 recall 0/unexpected 1/alias
+0으로 25,696.794 ms에 fail-fast FAIL했다. `gemma3:4b`는 같은 smoke는 PASS했지만
+full 7-row balanced에서 recall 0.5, unexpected 5, op/alias 0.5714285714,
+connectivity 0.8571428571, coverage 0.7142857143으로 FAIL했고 독립 verifier도
+거부했다. 마지막 공식 후보 `granite4:3b`도 smoke에서 schema/connectivity/coverage는
+통과했지만 recall 0/alias 0으로 20,067.440 ms에 fail-fast FAIL했다. 상세 증적은
+`완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`다.
+Mi:dm은 11436 격리 CPU 서버의 balanced 7 fixtures에서
 구조 schema는 1.0이었지만 critical recall 0.2619, Stage B coverage 0.4286,
 op alias accuracy 0.1429로 불합격했다. total latency P50/P95는
 20.19/34.16초였고 독립 verifier도 거부했다. 실패 리포트는 운영 추출을
@@ -61,8 +70,12 @@ op alias accuracy 0.1429로 불합격했다. total latency P50/P95는
 `완료/AIRI-MIDM-EXTRACTION-GATE-MEASUREMENT-2026-08-12.md` 참조.
 
 추출 자동 ON은 **게이트 리포트가 존재하고 검증을 통과할 때만** 발효된다.
-현재 Mi:dm balanced 리포트는 존재하지만 FAIL이며, 추출 off를 유지한다.
-다음 통과 후보 선정·재측정이 필요하다.
+현재 모든 candidate report가 FAIL이며, `/health`도 `extraction_enabled=false`,
+`extraction_ready=false`, external extraction=false다. 다음 통과 후보 선정·재측정이
+필요하다. Kanana-2-3B는 유망한 한국어 후보이나 공식 BF16 Safetensors의 직접 변환
+provenance와 Kanana Open License broadcast/attribution 검토 전에는 실행하지 않는다.
+제3자 GGUF pull CLI는 중단했지만 Ollama 서비스가 tag 설치를 마쳤다. 다만 해당
+tag는 load·측정하지 않았으며 공식 변환/라이선스 전에는 사용하지 않는다.
 
 ```powershell
 # 11436 격리 Ollama 서버 필요 (기존 절차)

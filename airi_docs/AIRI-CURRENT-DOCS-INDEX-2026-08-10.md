@@ -72,6 +72,10 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md` — 11436 격리 CPU의
+  Qwen3.5·Granite 4.0 smoke FAIL 및 Gemma3 smoke PASS/full 7-row FAIL 고정
+  증적. 독립 verifier 거부로 extraction은 off이며, Kanana-2-3B는 공식 변환
+  provenance·라이선스 검토 전 미시험이다.
 - `AIRI-LONG-CONTEXT-MEMORY-CARD-AB-2026-08-12.md` — `num_ctx=2048`의
   활성 card·초기 화자·최신 부정 정정·tail memory를 EXAONE/Mi:dm 각
   4압력×3회 비교한 실측과 양 모델 FAIL 판정.

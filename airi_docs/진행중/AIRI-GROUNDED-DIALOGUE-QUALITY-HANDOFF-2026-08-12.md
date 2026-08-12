@@ -87,8 +87,9 @@ Final recorded results:
   step remained an expected SKIP
 - Python suite: 733 passed, 1 skipped, 504 subtests passed in 36.62 seconds.
   Later work grew the CI-tracked suite. The current 2026-08-12 tip reports
-  825 passed, 1 skipped, 706 subtests across the `python-core-tests` matrix's
-  41 tracked paths; superseded intermediate totals are not current acceptance evidence.
+  **825 passed / 1 skipped / 706 subtests only for the current-tip CI
+  `python-core-tests` matrix's 41 tracked paths**; superseded intermediate
+  totals are not current acceptance evidence.
 - `git diff --check`: PASS
 
 The probe accepts only a loopback endpoint and uses `midm-airi:2.0-mini` by

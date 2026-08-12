@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-08-12T22:17:22.9434924+09:00",
+  "sources": {
+    "model_inventory": "GET http://127.0.0.1:11434/api/tags",
+    "foreground_runners": "ollama ps",
+    "extractor_listener": "Get-NetTCPConnection -State Listen -LocalPort 11436",
+    "proxy_health": "GET http://127.0.0.1:11435/health"
+  },
+  "candidate_inventory": [
+    {
+      "model": "qwen3.5:4b-q4_K_M",
+      "digest": "2a654d98e6fba55d452b7043684e9b57a947e393bbffa62485a7aac05ee4eefd",
+      "size_bytes": 3389983735,
+      "family": "qwen35",
+      "parameter_size": "4.7B",
+      "quantization": "Q4_K_M"
+    },
+    {
+      "model": "gemma3:4b",
+      "digest": "a2af6cc3eb7fa8be8504abaf9b04e88f17a119ec3f04a3addf55f92841195f5a",
+      "size_bytes": 3338801804,
+      "family": "gemma3",
+      "parameter_size": "4.3B",
+      "quantization": "Q4_K_M"
+    },
+    {
+      "model": "granite4:3b",
+      "digest": "89962fcc75239ac434cdebceb6b7e0669397f92eaef9c487774b718bc36a3e5f",
+      "size_bytes": 2099521385,
+      "family": "granite",
+      "parameter_size": "3.4B",
+      "quantization": "Q4_K_M"
+    },
+    {
+      "model": "hf.co/dummy9996/kanana-2-3b-instruct-GGUF:Q8_0",
+      "digest": "da01b037bb195c2a86aa5145f0b3591f990ac51e49ff8429fc2e0a9e85bd22b1",
+      "size_bytes": 3734222612,
+      "family": "qwen3",
+      "parameter_size": "3.51B",
+      "quantization": "Q8_0",
+      "provenance": "third-party GGUF; not Kakao official",
+      "loaded": false,
+      "measured": false
+    }
+  ],
+  "operational_recovery": {
+    "extractor_port": 11436,
+    "extractor_listener_count": 0,
+    "foreground_runners": [
+      {
+        "model": "midm-airi:2.0-mini",
+        "id_prefix": "92a9ba2ee8c7",
+        "processor": "100% GPU",
+        "context": 2048
+      }
+    ],
+    "proxy_health": {
+      "status": "ok",
+      "chat_model": "midm-airi:2.0-mini",
+      "chat_model_enforced": true,
+      "chat_model_digest_pinned": true,
+      "chat_model_digest_verified": true,
+      "memory_extraction_enabled": false,
+      "memory_extraction_ready": false,
+      "memory_extraction_configured": false,
+      "memory_extraction_external_approved": false,
+      "chat_external_approved": false
+    }
+  }
+}

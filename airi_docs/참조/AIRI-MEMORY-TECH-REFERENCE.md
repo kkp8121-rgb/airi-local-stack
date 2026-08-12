@@ -410,7 +410,7 @@ naive `.Replace`는 모음 이름에 "세리은"처럼 조사를 깨뜨린다. �
 5. **프롬프트 캐싱 배치**: 정적 블록(가이드라인→페르소나→관계단계) 선두 고정 + `cache_control`, 변동 블록(메모리·최근 턴)은 뒤에. (talkain은 이걸 안 해서 캐시 활용 0 — 반면교사)
 6. **사용량 로깅**: 호출별 토큰·duration만 적재, 비용은 조회 시점 단가로 계산(단가 변경이 과거 집계에 자동 반영).
 7. **스트리밍 fallback 불가** — 토큰 전송 시작 후엔 모델 교체 불가. fallback 판정(429/5xx만)은 첫 토큰 전. SSE로 토큰을 보낼 땐 JSON 인코딩(멀티라인 델타 프레임 깨짐 방지).
-8. **소형 모델 추출은 검증 없이 채택할 수 없는 가정** — talkain: nano 품질 미달로 mini 상향. rag_rnd: 처음부터 Opus. 로컬 추출 후보의 채택은 M0 게이트 실측 후 결정하고, 미달 시 추출만 클라우드 mini급(비실시간·배치)으로 돌린다. 2026-08-12 기준 기존 후보(EXAONE 2.4B, Qwen3 4B/8B)와 현행 대화 모델 Mi:dm은 완화된 `balanced` 프로파일에서도 모두 불합격이다. Mi:dm 상세는 `완료/AIRI-MIDM-EXTRACTION-GATE-MEASUREMENT-2026-08-12.md`를 따른다.
+8. **소형 모델 추출은 검증 없이 채택할 수 없는 가정** — talkain: nano 품질 미달로 mini 상향. rag_rnd: 처음부터 Opus. 로컬 추출 후보의 채택은 M0 게이트 실측 후 결정하고, 미달 시 추출만 클라우드 mini급(비실시간·배치)으로 돌린다. 2026-08-12 기준 기존 후보(EXAONE 2.4B, Qwen3 4B/8B)와 현행 대화 모델 Mi:dm, 신규 Qwen3.5 4B Q4_K_M·Granite 4.0 3B smoke, Gemma3 4B full 모두 완화된 `balanced` 프로파일에서도 불합격이다. Gemma는 smoke 한 행을 통과했지만 full에서 독립 verifier가 거부했다. 추출은 off이며 상세는 `완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`를 따른다. Kanana-2-3B는 유망한 한국어 후보이나 공식 BF16 Safetensors 직접 변환 provenance 및 Kanana Open License broadcast/attribution 검토 전 미시험이다. 제3자 GGUF tag는 설치됐지만 load·측정하지 않았다.
 9. **로컬 추출 자원 격리** — 방송 응답용 Ollama(11434)와 CPU batch 추출용
    Ollama(기본 11436)를 별도 상주 프로세스/connection pool로 분리한다. 추출
    endpoint는 HTTP loopback만 허용하고 `num_gpu=0`, parallel=1,
