@@ -871,10 +871,10 @@ index 0000000000000000000000000000000000000000..41374442de6746e90ae42115479d4e37
 +}
 diff --git a/packages/stage-ui/src/libs/speech/incremental-wav.test.ts b/packages/stage-ui/src/libs/speech/incremental-wav.test.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..04d81446247a6020c8288559b7161231ed3707b7
+index 0000000000000000000000000000000000000000..1c517548490bc5592f53133c10d4ee8fde0e7a13
 --- /dev/null
 +++ b/packages/stage-ui/src/libs/speech/incremental-wav.test.ts
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,53 @@
 +import { describe, expect, it } from 'vitest'
 +
 +import type { PcmWavChunk } from './incremental-wav'
@@ -895,6 +895,26 @@ index 0000000000000000000000000000000000000000..04d81446247a6020c8288559b7161231
 +    expect(out.flatMap(chunk => [...chunk.samples])).toEqual([0, -32768, 32767, 0])
 +  })
 +
++  it('streams PCM after a zero-length data header without exposing WAV headers', () => {
++    const header = wav([{ id: 'fmt ', bytes: fmt }, { id: 'data', bytes: [] }])
++    const streamedPcm = new Uint8Array([0, 0, 0, 128, 255, 127, 0, 0])
++    const source = new Uint8Array(header.length + streamedPcm.length)
++    source.set(header)
++    source.set(streamedPcm, header.length)
++    const parser = new IncrementalPcmWavParser()
++    const out = source.reduce<PcmWavChunk[]>((all, _byte, index) => all.concat(parser.push(source.slice(index, index + 1))), [])
++
++    expect(out.flatMap(chunk => [...chunk.samples])).toEqual([0, -32768, 32767, 0])
++    expect(parser.supported).toBe(true)
++  })
++
++  it('does not emit audio for a genuinely empty WAV', () => {
++    const parser = new IncrementalPcmWavParser()
++
++    expect(parser.push(wav([{ id: 'fmt ', bytes: fmt }, { id: 'data', bytes: [] }]))).toEqual([])
++    expect(parser.supported).toBe(true)
++  })
++
 +  it('rejects compressed input without exposing payload as PCM', () => {
 +    const parser = new IncrementalPcmWavParser()
 +    const source = wav([{ id: 'fmt ', bytes: [3, 0, ...fmt.slice(2)] }, { id: 'data', bytes: [1, 2, 3, 4] }])
@@ -910,10 +930,10 @@ index 0000000000000000000000000000000000000000..04d81446247a6020c8288559b7161231
 +})
 diff --git a/packages/stage-ui/src/libs/speech/incremental-wav.ts b/packages/stage-ui/src/libs/speech/incremental-wav.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..b319357fa05a61df68802ee549545de192349bdc
+index 0000000000000000000000000000000000000000..f6ed492bfa63741cabbf9cd7d035bddc602682af
 --- /dev/null
 +++ b/packages/stage-ui/src/libs/speech/incremental-wav.ts
-@@ -0,0 +1,133 @@
+@@ -0,0 +1,140 @@
 +export interface PcmWavFormat {
 +  sampleRate: number
 +  channels: 1 | 2
@@ -931,6 +951,9 @@ index 0000000000000000000000000000000000000000..b319357fa05a61df68802ee549545de1
 +  private format: PcmWavFormat | undefined
 +  private containerRead = false
 +  private remainingDataBytes = 0
++  // Some streaming encoders send a canonical empty data chunk header, then append
++  // PCM frames over the transport. Treat that particular header as open-ended.
++  private unboundedData = false
 +  private rejected = false
 +
 +  get supported() { return !this.rejected }
@@ -944,17 +967,20 @@ index 0000000000000000000000000000000000000000..b319357fa05a61df68802ee549545de1
 +    while (true) {
 +      if (!this.format && !this.readContainerAndFormat())
 +        break
-+      if (this.remainingDataBytes === 0 && !this.readNextChunk())
++      if (!this.unboundedData && this.remainingDataBytes === 0 && !this.readNextChunk())
 +        break
-+      if (this.remainingDataBytes > 0) {
-+        const available = Math.min(this.remainingDataBytes, this.bytes.length - this.offset)
++      if (this.unboundedData || this.remainingDataBytes > 0) {
++        const available = this.unboundedData
++          ? this.bytes.length - this.offset
++          : Math.min(this.remainingDataBytes, this.bytes.length - this.offset)
 +        // PCM16 samples must never be split; retain one trailing byte for the next network chunk.
 +        const usable = available - (available % 2)
 +        if (usable === 0)
 +          break
 +        const pcmBytes = this.bytes.slice(this.offset, this.offset + usable)
 +        this.offset += usable
-+        this.remainingDataBytes -= usable
++        if (!this.unboundedData)
++          this.remainingDataBytes -= usable
 +        output.push({ format: this.format!, samples: new Int16Array(pcmBytes.buffer) })
 +        continue
 +      }
@@ -1000,6 +1026,7 @@ index 0000000000000000000000000000000000000000..b319357fa05a61df68802ee549545de1
 +        }
 +        this.offset += 8
 +        this.remainingDataBytes = size
++        this.unboundedData = size === 0
 +        return true
 +      }
 +      if (this.bytes.length - this.offset < 8 + paddedSize)

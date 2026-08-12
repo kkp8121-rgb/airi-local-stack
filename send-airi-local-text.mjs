@@ -77,6 +77,12 @@ export function buildInputTextEvent(text, inputEventId) {
   }
 }
 
+// Keep this wall-clock value separate from the monotonic elapsed-time clock:
+// the meter runs in another process and can only correlate on Date.now().
+export function createSendTiming() {
+  return { sentEpochMs: Date.now(), startedAt: performance.now() }
+}
+
 export function isCorrelatedOutputEvent(event, inputEventId) {
   return event?.metadata?.event?.parentId === inputEventId
 }
@@ -290,6 +296,7 @@ async function main() {
   const text = decodeTextArgument(args)
   const printAssistant = args.includes('--print-assistant')
   const printAssistantShape = args.includes('--print-assistant-shape')
+  const printWallClockTiming = args.includes('--print-wall-clock-timing')
   const waitComplete = args.includes('--wait-complete') || printAssistant || printAssistantShape
   const waitPlaybackStart = args.includes('--wait-playback-start')
   const waitForTerminal = waitComplete || waitPlaybackStart
@@ -324,18 +331,15 @@ async function main() {
     },
   })
 
-  const startedAt = performance.now()
+  let startedAt
+  let sentEpochMs
   let completeResolve
   let completeReject
   const completion = new Promise((resolvePromise, rejectPromise) => {
     completeResolve = resolvePromise
     completeReject = rejectPromise
   })
-  const completionTimeout = waitForTerminal
-    ? setTimeout(() => completeReject(new Error(
-        `Timed out waiting for matching AIRI ${waitPlaybackStart ? 'completion and playback start' : 'completion'} (assistant_events=${tracker?.eventStats.assistantMessages ?? 0}, matching_assistant_events=${tracker?.eventStats.matchingAssistantMessages ?? 0}, completion_events=${tracker?.eventStats.completions ?? 0}, matching_completion_events=${tracker?.eventStats.matchingCompletions ?? 0}, cancellation_events=${tracker?.eventStats.cancellations ?? 0}, matching_cancellation_events=${tracker?.eventStats.matchingCancellations ?? 0}, playback_start_events=${tracker?.eventStats.playbackStarts ?? 0}, matching_playback_start_events=${tracker?.eventStats.matchingPlaybackStarts ?? 0}, errors=${tracker?.eventStats.errors ?? 0}).`,
-      )), 90_000)
-    : undefined
+  let completionTimeout
   const settleTerminal = (event) => {
     const terminal = waitPlaybackStart
       ? tracker?.waitTerminal(event, Math.round(performance.now() - startedAt))
@@ -361,6 +365,17 @@ async function main() {
     await client.connect()
     inputEventId = randomUUID()
     tracker = createAssistantEventTracker(inputEventId)
+    // Start the delay budget only once the WebSocket is ready.  This makes
+    // both elapsed fields and sent_epoch_ms describe the actual input send,
+    // not connection setup or module loading.
+    const sendTiming = createSendTiming()
+    sentEpochMs = sendTiming.sentEpochMs
+    startedAt = sendTiming.startedAt
+    if (waitForTerminal) {
+      completionTimeout = setTimeout(() => completeReject(new Error(
+        `Timed out waiting for matching AIRI ${waitPlaybackStart ? 'completion and playback start' : 'completion'} (assistant_events=${tracker?.eventStats.assistantMessages ?? 0}, matching_assistant_events=${tracker?.eventStats.matchingAssistantMessages ?? 0}, completion_events=${tracker?.eventStats.completions ?? 0}, matching_completion_events=${tracker?.eventStats.matchingCompletions ?? 0}, cancellation_events=${tracker?.eventStats.cancellations ?? 0}, matching_cancellation_events=${tracker?.eventStats.matchingCancellations ?? 0}, playback_start_events=${tracker?.eventStats.playbackStarts ?? 0}, matching_playback_start_events=${tracker?.eventStats.matchingPlaybackStarts ?? 0}, errors=${tracker?.eventStats.errors ?? 0}).`,
+      )), 90_000)
+    }
     client.sendOrThrow(buildInputTextEvent(text, inputEventId))
     completed = waitForTerminal
       ? await completion
@@ -378,6 +393,7 @@ async function main() {
     sent: true,
     transport: 'loopback-server-channel',
     chars: Array.from(text).length,
+    ...(printWallClockTiming ? { sent_epoch_ms: sentEpochMs } : {}),
     ...(completed?.cancelled
       ? {
           cancelled: true,

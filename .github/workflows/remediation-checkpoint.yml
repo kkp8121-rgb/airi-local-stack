@@ -104,6 +104,7 @@ jobs:
               ollama-proxy/test_wikimedia_topic_scheduler.py ollama-proxy/test_wikimedia_topic_source.py
           - shard: ollama-proxy-evaluations
             tests: >-
+              ollama-proxy/test_dialogue_quality_benchmark.py
               ollama-proxy/eval/test_airi_baseline.py ollama-proxy/eval/test_airi_conversation_soak.py
               ollama-proxy/eval/test_airi_proactive_soak.py
           - shard: ollama-proxy-training

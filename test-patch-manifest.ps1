@@ -37,8 +37,8 @@ $artifacts = @(
     }
     [pscustomobject]@{
         Path = 'airi_docs/patches/AIRI-v0.11.3-upgrade-scout-runtime-20260811.patch'
-        Length = 85541
-        Sha256 = 'EDE9FA204DB1869C8A3A7F2A9587A6B321742F008728EE489C2B6F49D435F9DA'
+        Length = 86899
+        Sha256 = '00663A809050BAF52834E1265419CC2D13E0CB48C01C59D28E3BF8AD1B8865F5'
         Usable = $true
         Defect = ''
         Support = 'Runtime'

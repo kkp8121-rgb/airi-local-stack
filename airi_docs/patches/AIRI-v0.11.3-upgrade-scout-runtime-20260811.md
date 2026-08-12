@@ -11,15 +11,16 @@ only after these two existing layers, in order:
 
 - Base release commit: `dbf812488829a61cc2e95909e021b215704d066c`
 - Verified source commit after layers 1 and 2: `cfd46d321b2159d6f737ae4732b82fa04779a5da`
-- Verified source commit after layer 3: `16dbb36316b27c832b6ec8bf6a470f3a9a3e434e`
-- Size: `85,541` bytes
-- SHA-256: `EDE9FA204DB1869C8A3A7F2A9587A6B321742F008728EE489C2B6F49D435F9DA`
+- Verified source commit after layer 3: `ef0217c5cf599413807723a6935d5076da5f3b90`
+- Size: `86,899` bytes
+- SHA-256: `00663A809050BAF52834E1265419CC2D13E0CB48C01C59D28E3BF8AD1B8865F5`
 
 ## Scope
 
 The layer contains the client-side Upgrade Scout work only:
 
 - incremental loopback WAV playback with bounded PCM buffering and abort;
+- progressive PCM for streaming WAV responses whose `data` size is zero;
 - playback-start ownership and a 12 ms abort fade;
 - text self-echo suppression before caption, chat, journal, or memory effects;
 - half-duplex, headphones, and speakers-with-AEC interaction modes;

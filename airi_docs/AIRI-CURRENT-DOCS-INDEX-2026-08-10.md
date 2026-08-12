@@ -49,6 +49,10 @@ runtime observations.
   unsupported external facts and speaker/fact reversals are rewritten, and a
   reproducible loopback probe reports per-answer quality and latency. Read it
   after the two Upgrade Scout documents above.
+- `AIRI-ELECTRON-TEXT-TTS-MEASUREMENT-2026-08-12.md` records the actual
+  Electron text→Mi:dm→GPT-SoVITS→Windows render measurement, the zero-length
+  streaming-WAV fallback fix, P50/P95 results, and the remaining correlation
+  and physical-audibility limits. STT is intentionally excluded.
 - `AIRI-WORK-CHECKPOINT-2026-08-10.md` is listed as historical above, but its
   lines 88-105 are the only record of the completed source build and the
   installed archive hash. Read that section before planning any client-side
@@ -93,7 +97,7 @@ playback completion from playback-start evidence.
 
 ## Latest audit evidence
 
-- `node --test test-send-airi-local-text.mjs`: 26/26 passed.
+- `node --test test-send-airi-local-text.mjs`: 27/27 passed.
 - The canonical patch, generic-context sanitizer, and Upgrade Scout runtime
   layer apply cleanly in order in the pinned v0.11.3 verification checkout.
 - The explicit pinned-checkout applicability run was re-executed after the
