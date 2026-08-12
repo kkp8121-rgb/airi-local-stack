@@ -72,7 +72,65 @@ jobs:
 
   python-core-tests:
     runs-on: windows-latest
+    # A cold runner must still fit this checkpoint's ten-minute contract.
+    # Keep every original test root below in the matrix, but divide the large
+    # ollama-proxy suite by test-file ownership so one slow root cannot consume
+    # the budget of the smaller, independent suites.
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: ollama-proxy-memory-store
+            tests: >-
+              ollama-proxy/test_airi_memory.py
+          - shard: ollama-proxy-model
+            tests: >-
+              ollama-proxy/test_airi_session_header_patch.py
+              ollama-proxy/test_character_state.py ollama-proxy/test_character_state_evaluator.py
+              ollama-proxy/test_continuity_ledger.py
+              ollama-proxy/test_benchmark_cloud_chat_latency.py
+              ollama-proxy/test_cloud_chat_provider.py
+          - shard: ollama-proxy-memory
+            tests: >-
+              ollama-proxy/test_collect_topic_candidates.py ollama-proxy/test_create_wikimedia_source_policy.py
+              ollama-proxy/test_evaluation_api.py ollama-proxy/test_evaluation_store.py
+              ollama-proxy/test_knowledge_store.py ollama-proxy/test_memory_benchmark.py
+              ollama-proxy/test_memory_e2e.py ollama-proxy/test_memory_extraction_provider.py
+              ollama-proxy/test_memory_runtime.py ollama-proxy/test_viewer_memory.py
+          - shard: ollama-proxy-api
+            tests: >-
+              ollama-proxy/test_ollama_proxy.py ollama-proxy/test_output_moderation.py
+              ollama-proxy/test_provider_usage.py
+          - shard: ollama-proxy-topic-workflows
+            tests: >-
+              ollama-proxy/test_topic_board.py ollama-proxy/test_topic_discovery_workflow.py
+              ollama-proxy/test_topic_review_workflow.py ollama-proxy/test_topic_workflow_status.py
+              ollama-proxy/test_validate_approved_topics.py ollama-proxy/test_verify_extraction_gate.py
+              ollama-proxy/test_wikimedia_topic_scheduler.py ollama-proxy/test_wikimedia_topic_source.py
+          - shard: ollama-proxy-evaluations
+            tests: >-
+              ollama-proxy/test_dialogue_quality_benchmark.py
+              ollama-proxy/eval/test_airi_baseline.py ollama-proxy/eval/test_airi_conversation_soak.py
+              ollama-proxy/eval/test_airi_context_gate.py ollama-proxy/eval/test_airi_proactive_soak.py
+              ollama-proxy/eval/test_airi_production_context_gate.py
+          - shard: ollama-proxy-training
+            tests: >-
+              ollama-proxy/training/tests/test_audit_airi_style_fixture_readiness.py
+              ollama-proxy/training/tests/test_compile_airi_style_reviewed.py
+              ollama-proxy/training/tests/test_review_airi_style_pending.py
+              ollama-proxy/training/tests/test_validate_airi_style_pending.py
+              ollama-proxy/training/tests/test_verify_airi_style_dataset.py
+          - shard: latency-trace
+            tests: test_latency_trace.py
+          - shard: startup
+            tests: test_start_airi_background.py
+          - shard: model-configuration
+            tests: test_midm_model_configuration.py
+          - shard: latency-monitor
+            tests: latency-monitor
+          - shard: stt
+            tests: stt
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -83,20 +141,13 @@ jobs:
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
 
       - name: Install lean test dependencies
         shell: pwsh
-        run: |
-          python -m pip install --disable-pip-version-check `
-            pytest==9.1.1 `
-            fastapi==0.141.1 `
-            httpx==0.28.1 `
-            uvicorn==0.52.1 `
-            numpy==2.5.2 `
-            av==18.0.0 `
-            faster-whisper==1.2.1 `
-            python-multipart==0.0.32
+        run: python -m pip install --disable-pip-version-check -r requirements-ci.txt
 
-      - name: Run core Python tests
+      - name: Run core Python tests (${{ matrix.shard }})
         shell: pwsh
-        run: python -m pytest -q ollama-proxy test_latency_trace.py test_start_airi_background.py latency-monitor stt
+        run: python -m pytest -q ${{ matrix.tests }}

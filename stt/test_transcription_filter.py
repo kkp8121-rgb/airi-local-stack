@@ -1,22 +1,91 @@
 import unittest
+import asyncio
+from pathlib import Path
+from unittest.mock import patch
 import numpy as np
+import openai_stt_server as stt
 
 from openai_stt_server import (
+    BEAM_SIZE,
+    COMPUTE_TYPE,
     DEBUG_AUDIO_DIR,
+    MODEL_NAME,
+    RECOVERY_BEAM_SIZE,
     VERBOSE_TRANSCRIPTION_LOG,
     build_hotwords,
     calculate_input_gain,
+    health,
     filter_implausible_transcription,
     filter_low_confidence_transcription,
     frame_energy_stats,
     is_quiet_speech_candidate,
     is_allowed_origin,
     normalize_proper_nouns,
+    prepare_audio_for_whisper,
     preserve_debug_audio,
     should_retry_rejected_transcription,
     should_retry_without_vad,
     validate_decoded_transcription,
 )
+
+
+class RuntimeDefaultTests(unittest.TestCase):
+    def test_direct_and_launcher_defaults_match_scout_profile(self) -> None:
+        launcher = Path(__file__).with_name("start-local-stt.ps1").read_text(encoding="utf-8")
+        root_launcher = Path(__file__).parents[1].joinpath("start-airi-local-stack.ps1").read_text(encoding="utf-8")
+        expected_model = "mobiuslabsgmbh/faster-whisper-large-v3-turbo"
+        self.assertEqual((MODEL_NAME, COMPUTE_TYPE), (expected_model, "int8_float16"))
+        self.assertIn(f"[string]$Model = '{expected_model}'", launcher)
+        self.assertIn(f"[string]$SttModel = '{expected_model}'", root_launcher)
+        self.assertIn("[string]$ComputeType = 'int8_float16'", launcher)
+        self.assertIn("[string]$SttComputeType = 'int8_float16'", root_launcher)
+        self.assertIn("$ComputeType = 'int8'", launcher)
+
+    def test_primary_and_recovery_beams_are_intentionally_tiered(self) -> None:
+        self.assertEqual(BEAM_SIZE, 1)
+        self.assertEqual(RECOVERY_BEAM_SIZE, 3)
+
+    def test_health_exposes_exact_runtime_and_beam_configuration(self) -> None:
+        payload = asyncio.run(health())
+        self.assertEqual(payload["model"], MODEL_NAME)
+        self.assertEqual(payload["compute_type"], COMPUTE_TYPE)
+        self.assertEqual(payload["primary_beam_size"], BEAM_SIZE)
+        self.assertEqual(payload["recovery_beam_size"], RECOVERY_BEAM_SIZE)
+
+
+class PreparedAudioTests(unittest.TestCase):
+    def test_preparation_reuses_contiguous_decoded_samples_and_preserves_unamplified_audio(self) -> None:
+        decoded = np.ascontiguousarray(np.array([0.1, -0.2, 0.3], dtype=np.float32))
+        metrics = {"rms": 0.2, "peak": 0.3}
+        prepared = prepare_audio_for_whisper(decoded, metrics)
+        self.assertTrue(prepared.flags.c_contiguous)
+        np.testing.assert_array_equal(prepared, decoded)
+        self.assertEqual(metrics["input_gain"], 1.0)
+
+
+class BeamDecodeTests(unittest.TestCase):
+    def test_transcription_uses_primary_then_recovery_beam_without_changing_retry_contract(self) -> None:
+        calls = []
+
+        class Segment:
+            start, end, text = 0.0, 0.1, "ok"
+            avg_logprob, compression_ratio, no_speech_prob = -0.1, 1.0, 0.1
+
+        class WhisperDouble:
+            def transcribe(self, _audio, **options):
+                calls.append(options)
+                return iter([Segment()]), type("Info", (), {"language": "ko"})()
+
+        metrics = {"duration_seconds": 1.0, "rms": 0.04, "peak": 0.4}
+        with patch.object(stt, "whisper", WhisperDouble()):
+            stt.transcribe_file(np.zeros(1600, dtype=np.float32), "ko", None, metrics)
+            stt.transcribe_file(np.zeros(1600, dtype=np.float32), "ko", None, metrics, True)
+        self.assertEqual(calls[0]["beam_size"], 1)
+        self.assertEqual(calls[0]["best_of"], 1)
+        self.assertTrue(calls[0]["vad_filter"])
+        self.assertEqual(calls[1]["beam_size"], 3)
+        self.assertEqual(calls[1]["best_of"], 3)
+        self.assertFalse(calls[1]["vad_filter"])
 
 
 class AdaptiveInputGainTests(unittest.TestCase):

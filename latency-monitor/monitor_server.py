@@ -66,8 +66,23 @@ class Correlator:
         if not isinstance(meta, dict):
             return {}
         # 텍스트·오디오 원문을 보관하지 않는다. 숫자/불리언 값만 제한적으로 허용한다.
-        return {str(k)[:48]: v for k, v in list(meta.items())[:24]
-                if isinstance(v, (int, float, bool)) and not isinstance(v, str)}
+        # Completed Ollama rows are emitted after the fixed grounding fields,
+        # so retain these content-free measurements even when an older caller
+        # fills the ordinary bounded metadata budget first.
+        required_ollama_metrics = {
+            "ollama_prompt_eval_count",
+            "ollama_prompt_eval_ms",
+            "ollama_eval_count",
+            "ollama_eval_ms",
+        }
+        cleaned = {}
+        for key, value in meta.items():
+            clean_key = str(key)[:48]
+            if not isinstance(value, (int, float, bool)) or isinstance(value, str):
+                continue
+            if len(cleaned) < 24 or clean_key in required_ollama_metrics:
+                cleaned[clean_key] = value
+        return cleaned
 
     def _new_turn(self, event):
         if len(self.turns) == self.turns.maxlen:

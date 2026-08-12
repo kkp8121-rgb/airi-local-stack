@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 $PinnedCommit = 'dbf812488829a61cc2e95909e021b215704d066c'
 $CanonicalPatch = Join-Path $PSScriptRoot 'airi_docs/patches/AIRI-v0.11.3-local-runtime-source.patch'
 $SanitizerPatch = Join-Path $PSScriptRoot 'airi_docs/patches/AIRI-v0.11.3-context-correlation-sanitizer.patch'
+$UpgradeScoutPatch = Join-Path $PSScriptRoot 'airi_docs/patches/AIRI-v0.11.3-upgrade-scout-runtime-20260811.patch'
 
 if ([string]::IsNullOrWhiteSpace($BaseCheckout)) {
     Write-Output 'Patch applicability: SKIP (offline and inert; supply -BaseCheckout to opt in).'
@@ -55,7 +56,7 @@ if ((Resolve-Path -LiteralPath $top).Path -ne $resolvedBase) { throw 'BaseChecko
 $head = ((Invoke-Git $resolvedBase @('rev-parse', '--verify', 'HEAD')).Output | Select-Object -Last 1).ToString().Trim().ToLowerInvariant()
 if ($head -ne $PinnedCommit) { throw "Base checkout HEAD must be $PinnedCommit (found $head)." }
 
-foreach ($patch in @($CanonicalPatch, $SanitizerPatch)) {
+foreach ($patch in @($CanonicalPatch, $SanitizerPatch, $UpgradeScoutPatch)) {
     if (-not (Test-Path -LiteralPath $patch -PathType Leaf)) { throw "Missing patch artifact: $patch" }
 }
 
@@ -69,13 +70,17 @@ try {
     Invoke-Git $worktree @('apply', '--whitespace=nowarn', $CanonicalPatch) | Out-Null
     Invoke-Git $worktree @('apply', '--check', '--whitespace=nowarn', $SanitizerPatch) | Out-Null
     Invoke-Git $worktree @('apply', '--whitespace=nowarn', $SanitizerPatch) | Out-Null
+    Invoke-Git $worktree @('apply', '--check', '--whitespace=nowarn', $UpgradeScoutPatch) | Out-Null
+    Invoke-Git $worktree @('apply', '--whitespace=nowarn', $UpgradeScoutPatch) | Out-Null
+    Invoke-Git $worktree @('apply', '--reverse', '--check', '--whitespace=nowarn', $UpgradeScoutPatch) | Out-Null
+    Invoke-Git $worktree @('apply', '--reverse', '--whitespace=nowarn', $UpgradeScoutPatch) | Out-Null
     Invoke-Git $worktree @('apply', '--reverse', '--check', '--whitespace=nowarn', $SanitizerPatch) | Out-Null
     Invoke-Git $worktree @('apply', '--reverse', '--whitespace=nowarn', $SanitizerPatch) | Out-Null
     Invoke-Git $worktree @('apply', '--reverse', '--check', '--whitespace=nowarn', $CanonicalPatch) | Out-Null
     Invoke-Git $worktree @('apply', '--reverse', '--whitespace=nowarn', $CanonicalPatch) | Out-Null
     $status = (Invoke-Git $worktree @('status', '--porcelain')).Output
     if ($status.Count -ne 0) { throw 'Temporary worktree was not clean after reverse application.' }
-    Write-Output 'Patch applicability: PASS (canonical and sanitizer apply/reverse-check cleanly; AIRI untouched).'
+    Write-Output 'Patch applicability: PASS (canonical, sanitizer, and Upgrade Scout layer apply/reverse-check cleanly; AIRI untouched).'
 }
 finally {
     if ($worktreeAdded) {

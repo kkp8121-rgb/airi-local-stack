@@ -1,5 +1,6 @@
 import ast
 import asyncio
+import json
 import re
 import threading
 import unittest
@@ -12,6 +13,7 @@ from fastapi.testclient import TestClient
 import openai_compatible_proxy as proxy
 
 OLLAMA_PROXY = Path(__file__).resolve().parents[1] / "ollama-proxy" / "ollama_proxy.py"
+MODERATION_TERMS = Path(__file__).resolve().parents[1] / "ollama-proxy" / "moderation_terms_ko.json"
 SENTENCE_RE = re.compile(r"[^\s][^.!?]*[.!?]")
 
 
@@ -58,7 +60,14 @@ class ImmediateResponseCacheTests(unittest.TestCase):
     def test_cache_only_matches_wav_default_speed_and_known_phrase(self):
         with proxy._WAV_CACHE_LOCK:
             proxy._WAV_CACHE["응!"] = b"RIFFcached"
+            for index, moderation_response in enumerate(proxy.MODERATION_BLOCKED_DIALOGUE_TEXTS):
+                proxy._WAV_CACHE[moderation_response] = f"RIFFmoderation-{index}".encode()
         self.assertEqual(proxy.cached_wav_for_request("응!", "wav", 1.0), b"RIFFcached")
+        for index, moderation_response in enumerate(proxy.MODERATION_BLOCKED_DIALOGUE_TEXTS):
+            self.assertEqual(
+                proxy.cached_wav_for_request(moderation_response, "wav", 1.0),
+                f"RIFFmoderation-{index}".encode(),
+            )
         self.assertIsNone(proxy.cached_wav_for_request("응!", "pcm", 1.0))
         self.assertIsNone(proxy.cached_wav_for_request("응!", "wav", 1.1))
         self.assertIsNone(proxy.cached_wav_for_request("다른 사용자 문장", "wav", 1.0))
@@ -77,7 +86,21 @@ class ImmediateResponseCacheTests(unittest.TestCase):
             proxy._fetch_wav_from_backend = original
         self.assertEqual(proxy.cached_wav_for_request("응!", "wav", 1.0), b"RIFFok")
         self.assertEqual(proxy.cache_health()["states"]["바로 찾아볼게."], "failed")
-        self.assertEqual(calls, list(proxy.IMMEDIATE_RESPONSE_TEXTS))
+        self.assertEqual(calls, list(proxy.PRELOADED_RESPONSE_TEXTS))
+
+    def test_moderation_dialogue_exactly_mirrors_policy_in_order(self):
+        policy = json.loads(MODERATION_TERMS.read_text(encoding="utf-8"))
+        self.assertEqual(proxy.MODERATION_BLOCKED_DIALOGUE_TEXTS, tuple(policy["blocked_dialogue"]))
+        self.assertEqual(len(proxy.MODERATION_BLOCKED_DIALOGUE_TEXTS), 5)
+
+    def test_warmup_covers_all_seven_preloaded_responses(self):
+        calls = []
+        with mock.patch.object(proxy, "_fetch_wav_from_backend", side_effect=lambda payload: calls.append(payload["text"]) or b"RIFFok"):
+            proxy.warm_immediate_response_cache()
+        self.assertEqual(calls, list(proxy.PRELOADED_RESPONSE_TEXTS))
+        health = proxy.cache_health()
+        self.assertEqual(health["total"], 7)
+        self.assertEqual(health["ready"], 7)
 
     def test_payload_preserves_existing_generation_options(self):
         payload = proxy.build_backend_payload("응!", 1.25)

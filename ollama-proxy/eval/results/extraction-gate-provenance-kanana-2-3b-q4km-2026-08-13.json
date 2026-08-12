@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "purpose": "local extraction candidate conversion provenance; not an activation report",
+  "source": {
+    "repository": "https://huggingface.co/kakaocorp/kanana-2-3b-instruct",
+    "commit": "6a5d7889964c4c590299d16e309eabab1f73f8a9",
+    "checkout_clean": true,
+    "license": {
+      "path": "LICENSE",
+      "bytes": 11675,
+      "sha256": "4d1bbe938ae7000016623be19f53f78c71c5e19e89ff627b9596c8e6c3e415c2",
+      "url": "https://huggingface.co/kakaocorp/kanana-2-3b-instruct/blob/6a5d7889964c4c590299d16e309eabab1f73f8a9/LICENSE"
+    },
+    "files": [
+      {
+        "path": "model-00001-of-00002.safetensors",
+        "bytes": 4962632064,
+        "sha256": "879fd56f37b7452f34208ea99be40ac2c8ebcd36db636fe953303a753314171d"
+      },
+      {
+        "path": "model-00002-of-00002.safetensors",
+        "bytes": 2055352808,
+        "sha256": "76d38f1e8aff33a43fe038888b9c041cec6d6cbfe735e3368bcea3536b11f186"
+      },
+      {
+        "path": "model.safetensors.index.json",
+        "bytes": 29635,
+        "sha256": "fb1bd5b3451fa235bf9346f7526c47a24f181227f87eddc79a8858f0d418864e"
+      },
+      {
+        "path": "config.json",
+        "bytes": 1602,
+        "sha256": "d14a6f3f6cab5b8eb3a66dac68f86058265a40f0b69a345d2c96096d8e035631"
+      },
+      {
+        "path": "tokenizer.json",
+        "bytes": 10698857,
+        "sha256": "6b0c5263aa9bf16cfaab35cb177c476d6124ca6663d934d9fb898e5583f5b3d4"
+      },
+      {
+        "path": "tokenizer_config.json",
+        "bytes": 52218,
+        "sha256": "b9224f45a7400d3ca1687bc4092bd494f61f2c4694922987aa0856d24c998d3b"
+      },
+      {
+        "path": "chat_template.jinja",
+        "bytes": 10935,
+        "sha256": "3e1eb8352092e26c977da29b5ec3be8f025208dd7b370bc7ac5b98fa7dc0af02"
+      }
+    ]
+  },
+  "converter": {
+    "repository": "https://github.com/ggml-org/llama.cpp",
+    "tag": "b10375",
+    "commit": "ba360efe1f574ebae727aad64112d18ecedca85a",
+    "checkout_clean": true,
+    "files": [
+      {
+        "path": "convert_hf_to_gguf.py",
+        "bytes": 13105,
+        "sha256": "21b70f59d9cfa5f3963bfe9b1c648c16b1fdeca9cff67778bf776d1137b267b5"
+      },
+      {
+        "path": "conversion/qwen.py",
+        "bytes": 33386,
+        "sha256": "1a8b39ae979cd575cf2fd0361ec866e5e2897bf916d24b2c22a79476347f8594"
+      },
+      {
+        "path": "conversion/base.py",
+        "bytes": 140386,
+        "sha256": "401189d6312ac92e25d0d6d637b7b45642bc36fedc162685959456dc09ffcca6"
+      },
+      {
+        "path": "gguf-py/gguf/vocab.py",
+        "bytes": 43364,
+        "sha256": "34744a689d361b58ddd9c5b7057a275aabcb4056365b4b7f18694628ee177936"
+      },
+      {
+        "path": "requirements/requirements-convert_hf_to_gguf.txt",
+        "bytes": 205,
+        "sha256": "d3d51500d1ec00b102d53b4cde29cb36ecfa28199bcda506b9d807bfa50a39be"
+      },
+      {
+        "path": "requirements/requirements-convert_legacy_llama.txt",
+        "bytes": 109,
+        "sha256": "e0158e184a54d0d79a40f0883c5af4a7cdb412df9f815e0967e356fc8aa4955e"
+      }
+    ],
+    "python": "3.12.13",
+    "dependencies": {
+      "gguf": "0.19.0",
+      "numpy": "1.26.4",
+      "protobuf": "4.25.9",
+      "safetensors": "0.8.0",
+      "sentencepiece": "0.2.2",
+      "tokenizers": "0.22.2",
+      "torch": "2.11.0+cpu",
+      "transformers": "4.57.6"
+    },
+    "command": [
+      "D:\\AIRI-Models\\venv-llama-b10375-py312\\Scripts\\python.exe",
+      "D:\\AIRI-Models\\llama.cpp-b10375\\convert_hf_to_gguf.py",
+      "D:\\AIRI-Models\\kanana-2-3b-instruct-6a5d788",
+      "--outfile",
+      "D:\\AIRI-Models\\kanana-build-6a5d788\\kanana-2-3b-instruct-b10375-BF16.gguf",
+      "--outtype",
+      "bf16",
+      "--model-name",
+      "kakaocorp-kanana-2-3b-instruct-6a5d788"
+    ],
+    "warnings_preserved": [
+      "the official config explicitly sets YaRN factor 40.0 while max/original context ratio is 8.0; source config was not modified",
+      "Transformers emitted fix_mistral_regex guidance; llama.cpp identified and stored its kanana2 pre-tokenizer contract"
+    ]
+  },
+  "quantizer": {
+    "release_asset": "llama-b10375-bin-win-cpu-x64.zip",
+    "release_asset_bytes": 18460055,
+    "release_asset_sha256": "c18ad6aa9cef9d119e957472d71e34eb5183848eb9c57f51647fd18692a456c7",
+    "executable": "llama-quantize.exe",
+    "executable_bytes": 9216,
+    "executable_sha256": "647b2a4e73fd87ea77435d2c5ba03eae35a4bdc8937568297c69251c9696740c",
+    "command": [
+      "D:\\AIRI-Models\\llama-b10375-bin-win-cpu-x64\\llama-quantize.exe",
+      "D:\\AIRI-Models\\kanana-build-6a5d788\\kanana-2-3b-instruct-b10375-BF16.gguf",
+      "D:\\AIRI-Models\\kanana-build-6a5d788\\kanana-2-3b-instruct-b10375-Q4_K_M.gguf",
+      "Q4_K_M"
+    ],
+    "importance_matrix_used": false,
+    "elapsed_ms": 94196.64
+  },
+  "artifacts": {
+    "bf16_gguf": {
+      "bytes": 7023719904,
+      "sha256": "2613368af347bbed8dfef968cfedc7449e117a82c28ffb5c3dda8c41eaae8e3c"
+    },
+    "q4_k_m_gguf": {
+      "bytes": 2161793504,
+      "sha256": "a676f57850bdfe6a016fa1991067b3f81b6ccb16e2ce4ee7dc454f1300deb77b"
+    }
+  },
+  "ollama": {
+    "version": "0.32.6",
+    "direct_safetensors_import": {
+      "attempted": true,
+      "success": false,
+      "error": "unsupported architecture \"Qwen3ForCausalLM\""
+    },
+    "modelfile": {
+      "bytes": 83,
+      "sha256": "895a4923b6b29d5b37801a54cafbecbafd2949fd2c06336921ff15db1258b8c4",
+      "content": "FROM \"D:\\AIRI-Models\\kanana-build-6a5d788\\kanana-2-3b-instruct-b10375-Q4_K_M.gguf\"\n"
+    },
+    "create_command": [
+      "ollama",
+      "create",
+      "kanana-airi-extraction:3b-q4_k_m",
+      "-f",
+      "D:\\AIRI-Models\\kanana-build-6a5d788\\Modelfile"
+    ],
+    "endpoint": "http://127.0.0.1:11436",
+    "models_store": "D:\\AIRI-Models\\ollama-extraction-store",
+    "tag": "kanana-airi-extraction:3b-q4_k_m",
+    "manifest": {
+      "bytes": 416,
+      "sha256": "4a1d0b3322b50ffe5b16990129ab14f46abe1835e9b871e2b42a5ed144f65b9a",
+      "config_blob_sha256": "dff4eb48b2a69faa6a3c9e7b1867a4ddd95d2f81f2e50b0c070807e5149dd6c8",
+      "config_blob_bytes": 265,
+      "model_layer_sha256": "a676f57850bdfe6a016fa1991067b3f81b6ccb16e2ce4ee7dc454f1300deb77b",
+      "model_layer_bytes": 2161793504
+    },
+    "model_layer_rehashed": true
+  }
+}

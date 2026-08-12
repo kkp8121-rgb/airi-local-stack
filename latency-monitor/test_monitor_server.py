@@ -255,4 +255,21 @@ class CorrelationTests(unittest.TestCase):
         c=Correlator(); c.add(validate({"source":"stt","phase":"start","request_id":"x","meta":{"frames":3,"voice":True,"text":"secret"}}))
         self.assertEqual(c.snapshot()[0]["stt"]["meta"], {"frames":3,"voice":True})
 
+    def test_ollama_terminal_metrics_survive_the_generic_meta_budget(self):
+        c = Correlator()
+        meta = {f"diagnostic_{index}": index for index in range(24)}
+        meta.update({
+            "ollama_prompt_eval_count": 17,
+            "ollama_prompt_eval_ms": 2.0,
+            "ollama_eval_count": 9,
+            "ollama_eval_ms": 3.5,
+        })
+        c.add(event("llm", "start", "turn-1", 90))
+        c.add({**event("llm", "end", "turn-1", 100), "meta": meta})
+        saved = c.snapshot()[0]["llm"]["meta"]
+        self.assertEqual(saved["ollama_prompt_eval_count"], 17)
+        self.assertEqual(saved["ollama_prompt_eval_ms"], 2.0)
+        self.assertEqual(saved["ollama_eval_count"], 9)
+        self.assertEqual(saved["ollama_eval_ms"], 3.5)
+
 if __name__ == "__main__": unittest.main()

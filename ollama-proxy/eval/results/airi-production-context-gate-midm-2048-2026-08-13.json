@@ -1,0 +1,1926 @@
+{
+  "version": "2.0",
+  "timestamp_utc": "2026-08-12T17:28:19.698484+00:00",
+  "endpoint": "http://127.0.0.1:11434/api/chat",
+  "model": "midm-airi:2.0-mini",
+  "metadata": {
+    "ollama_version": "0.32.6",
+    "model_digest": "92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f",
+    "model_size_bytes": 1426273511,
+    "family": "llama",
+    "parameter_size": "2.3B",
+    "quantization_level": "Q4_K_M",
+    "template_sha256": "af6fe088a0d58f0b6ba00143fa9e6f639a4456d88fa978fe8a58a5d1bba70138"
+  },
+  "fixture_sha256": "543e581b19d6b35f4116a5d984f3b72552e83a2505c9519057529ea5dc1950ab",
+  "fixture_file_sha256": "73e3a63d920c6b495e648425571221704477a5622263f2b4181c1560628d661d",
+  "runner_sha256": "bb52b9b41a470308b162b9db076f67cf7e028950aa657e93459b0f3bc869c297",
+  "production_source_sha256": {
+    "ollama_proxy.py": "af67b573c71792c24aca096956d2c3c36486edffb9fbd2f0c4bab6bcced96a22",
+    "memory_runtime.py": "6bee09e886aac7d6609f3e96413aaaee71da40c9e685ac590b8b59bae54f9531",
+    "airi_memory.py": "1d2f4ca6301e0ed0e41020dcc22c03fda27cca8f8de3ae964e1e591f87aef965",
+    "foreground_context.py": "455f50cbbaf786b83da57edd4f3c15293977667529300da4d2dd8c593b6dde5c",
+    "continuity_ledger.py": "b1129d01dd0aaf98db90d2a99dd7790cbc6d303e836f27f77f937c8b963fc4f1",
+    "character_state.py": "a5d5e933dbf510f03fed451e448a840ee166550c58cc9608ff5aae525d0541e1"
+  },
+  "configuration": {
+    "endpoint": "http://127.0.0.1:11434/api/chat",
+    "allow_host": false,
+    "model": "midm-airi:2.0-mini",
+    "runs": 3,
+    "num_ctx": 2048,
+    "num_gpu": 999,
+    "temperature": 0.0,
+    "seed": 42,
+    "num_predict": 128,
+    "keep_alive": "5m",
+    "timeout": 180,
+    "output": "ollama-proxy\\eval\\results\\airi-production-context-gate-midm-2048-2026-08-13.json",
+    "fail_on_gate": true
+  },
+  "authoritative": true,
+  "pressures": [
+    {
+      "pressure": 0,
+      "runs": [
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"card_marker\":\"violet-otter\",\"dialogue_marker\":\"silver-fern\",\"dropped_holdout_seen\":false,\"ledger_active_color\": \"green-lantern\",\"ledger_corrected_color\": \"green-lantern\",\"ledger_pet_negated\":true,\"memory_marker\":\"silver-fern\"}",
+          "raw_response_sha256": "603da185aee6683e20cc890c6551d1c7254b0346b4c3118a9919cc1ee4f451cb",
+          "parsed_result": {
+            "card_marker": "violet-otter",
+            "dialogue_marker": "silver-fern",
+            "dropped_holdout_seen": false,
+            "ledger_active_color": "green-lantern",
+            "ledger_corrected_color": "green-lantern",
+            "ledger_pet_negated": true,
+            "memory_marker": "silver-fern"
+          },
+          "parsed_result_sha256": "247087614068dbe957f628dacabbe1dfb1b1f02a6497d9c65bbdb1061a3fa11e",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "card_marker": true,
+              "ledger_active_color": true,
+              "ledger_pet_negated": true,
+              "ledger_corrected_color": true,
+              "memory_marker": true,
+              "dialogue_marker": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "dialogue_marker"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1245,
+            "eval_count": 97,
+            "prompt_eval_duration_ms": 325.116,
+            "eval_duration_ms": 1547.606,
+            "total_duration_ms": 3962.483
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 14,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "f6fee3729e1bb566f4e5e967436fb89c2cf0ca9310ad545f1e041b91d4928165",
+            "native_messages_hash": "6d37ed2002f0f935e61440cc8059af0ce656a5053bba742f20f39e03be1afcb2",
+            "native_hash": "1f1c1eb39ca2c0d1036b45659f47069fcc623ec808ad9056ea04953a1ed404ec",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 389,
+            "prepared_chars": 1626,
+            "native_chars": 1791,
+            "occurrence_counts": {
+              "card_marker": 1,
+              "memory_marker": 1,
+              "continuity_ledger": 1,
+              "ledger_corrected_color": 1,
+              "dialogue_marker": 4,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "dialogue_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "temperature": 0.0,
+                "seed": 42,
+                "num_predict": 128,
+                "num_gpu": 999
+              },
+              "format": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "card_marker",
+                  "ledger_active_color",
+                  "ledger_pet_negated",
+                  "ledger_corrected_color",
+                  "memory_marker",
+                  "dialogue_marker",
+                  "dropped_holdout_seen"
+                ],
+                "properties": {
+                  "card_marker": {
+                    "type": "string",
+                    "description": "보이는 Active Character Card의 표식 값"
+                  },
+                  "ledger_active_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 현재 favorite.color 값"
+                  },
+                  "ledger_pet_negated": {
+                    "type": "boolean",
+                    "description": "보이는 AIRI Continuity Data의 반려동물 negated polarity"
+                  },
+                  "ledger_corrected_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 수정된 favorite.color 값"
+                  },
+                  "memory_marker": {
+                    "type": "string",
+                    "description": "보이는 Character Memory 시스템 블록의 표식 값(user/assistant 제외)"
+                  },
+                  "dialogue_marker": {
+                    "type": "string",
+                    "description": "보존된 user/assistant 대화의 반복 표식 값(시스템 블록 제외)"
+                  },
+                  "dropped_holdout_seen": {
+                    "type": "boolean",
+                    "description": "보이는 현재 입력의 오래된 holdout 표식 여부"
+                  }
+                }
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"card_marker\":\"violet-otter\",\"dialogue_marker\":\"silver-fern\",\"dropped_holdout_seen\":false,\"ledger_active_color\": \"green-lantern\",\"ledger_corrected_color\": \"green-lantern\",\"ledger_pet_negated\":true,\"memory_marker\":\"silver-fern\"}",
+          "raw_response_sha256": "603da185aee6683e20cc890c6551d1c7254b0346b4c3118a9919cc1ee4f451cb",
+          "parsed_result": {
+            "card_marker": "violet-otter",
+            "dialogue_marker": "silver-fern",
+            "dropped_holdout_seen": false,
+            "ledger_active_color": "green-lantern",
+            "ledger_corrected_color": "green-lantern",
+            "ledger_pet_negated": true,
+            "memory_marker": "silver-fern"
+          },
+          "parsed_result_sha256": "247087614068dbe957f628dacabbe1dfb1b1f02a6497d9c65bbdb1061a3fa11e",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "card_marker": true,
+              "ledger_active_color": true,
+              "ledger_pet_negated": true,
+              "ledger_corrected_color": true,
+              "memory_marker": true,
+              "dialogue_marker": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "dialogue_marker"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1245,
+            "eval_count": 97,
+            "prompt_eval_duration_ms": 39.175,
+            "eval_duration_ms": 1560.501,
+            "total_duration_ms": 1754.71
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 14,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "f6fee3729e1bb566f4e5e967436fb89c2cf0ca9310ad545f1e041b91d4928165",
+            "native_messages_hash": "6d37ed2002f0f935e61440cc8059af0ce656a5053bba742f20f39e03be1afcb2",
+            "native_hash": "1f1c1eb39ca2c0d1036b45659f47069fcc623ec808ad9056ea04953a1ed404ec",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 389,
+            "prepared_chars": 1626,
+            "native_chars": 1791,
+            "occurrence_counts": {
+              "card_marker": 1,
+              "memory_marker": 1,
+              "continuity_ledger": 1,
+              "ledger_corrected_color": 1,
+              "dialogue_marker": 4,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "dialogue_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "temperature": 0.0,
+                "seed": 42,
+                "num_predict": 128,
+                "num_gpu": 999
+              },
+              "format": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "card_marker",
+                  "ledger_active_color",
+                  "ledger_pet_negated",
+                  "ledger_corrected_color",
+                  "memory_marker",
+                  "dialogue_marker",
+                  "dropped_holdout_seen"
+                ],
+                "properties": {
+                  "card_marker": {
+                    "type": "string",
+                    "description": "보이는 Active Character Card의 표식 값"
+                  },
+                  "ledger_active_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 현재 favorite.color 값"
+                  },
+                  "ledger_pet_negated": {
+                    "type": "boolean",
+                    "description": "보이는 AIRI Continuity Data의 반려동물 negated polarity"
+                  },
+                  "ledger_corrected_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 수정된 favorite.color 값"
+                  },
+                  "memory_marker": {
+                    "type": "string",
+                    "description": "보이는 Character Memory 시스템 블록의 표식 값(user/assistant 제외)"
+                  },
+                  "dialogue_marker": {
+                    "type": "string",
+                    "description": "보존된 user/assistant 대화의 반복 표식 값(시스템 블록 제외)"
+                  },
+                  "dropped_holdout_seen": {
+                    "type": "boolean",
+                    "description": "보이는 현재 입력의 오래된 holdout 표식 여부"
+                  }
+                }
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"card_marker\":\"violet-otter\",\"dialogue_marker\":\"silver-fern\",\"dropped_holdout_seen\":false,\"ledger_active_color\": \"green-lantern\",\"ledger_corrected_color\": \"green-lantern\",\"ledger_pet_negated\":true,\"memory_marker\":\"silver-fern\"}",
+          "raw_response_sha256": "603da185aee6683e20cc890c6551d1c7254b0346b4c3118a9919cc1ee4f451cb",
+          "parsed_result": {
+            "card_marker": "violet-otter",
+            "dialogue_marker": "silver-fern",
+            "dropped_holdout_seen": false,
+            "ledger_active_color": "green-lantern",
+            "ledger_corrected_color": "green-lantern",
+            "ledger_pet_negated": true,
+            "memory_marker": "silver-fern"
+          },
+          "parsed_result_sha256": "247087614068dbe957f628dacabbe1dfb1b1f02a6497d9c65bbdb1061a3fa11e",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "card_marker": true,
+              "ledger_active_color": true,
+              "ledger_pet_negated": true,
+              "ledger_corrected_color": true,
+              "memory_marker": true,
+              "dialogue_marker": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "dialogue_marker"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1245,
+            "eval_count": 97,
+            "prompt_eval_duration_ms": 44.48,
+            "eval_duration_ms": 1504.77,
+            "total_duration_ms": 1696.118
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 14,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "f6fee3729e1bb566f4e5e967436fb89c2cf0ca9310ad545f1e041b91d4928165",
+            "native_messages_hash": "6d37ed2002f0f935e61440cc8059af0ce656a5053bba742f20f39e03be1afcb2",
+            "native_hash": "1f1c1eb39ca2c0d1036b45659f47069fcc623ec808ad9056ea04953a1ed404ec",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 389,
+            "prepared_chars": 1626,
+            "native_chars": 1791,
+            "occurrence_counts": {
+              "card_marker": 1,
+              "memory_marker": 1,
+              "continuity_ledger": 1,
+              "ledger_corrected_color": 1,
+              "dialogue_marker": 4,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "dialogue_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "temperature": 0.0,
+                "seed": 42,
+                "num_predict": 128,
+                "num_gpu": 999
+              },
+              "format": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "card_marker",
+                  "ledger_active_color",
+                  "ledger_pet_negated",
+                  "ledger_corrected_color",
+                  "memory_marker",
+                  "dialogue_marker",
+                  "dropped_holdout_seen"
+                ],
+                "properties": {
+                  "card_marker": {
+                    "type": "string",
+                    "description": "보이는 Active Character Card의 표식 값"
+                  },
+                  "ledger_active_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 현재 favorite.color 값"
+                  },
+                  "ledger_pet_negated": {
+                    "type": "boolean",
+                    "description": "보이는 AIRI Continuity Data의 반려동물 negated polarity"
+                  },
+                  "ledger_corrected_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 수정된 favorite.color 값"
+                  },
+                  "memory_marker": {
+                    "type": "string",
+                    "description": "보이는 Character Memory 시스템 블록의 표식 값(user/assistant 제외)"
+                  },
+                  "dialogue_marker": {
+                    "type": "string",
+                    "description": "보존된 user/assistant 대화의 반복 표식 값(시스템 블록 제외)"
+                  },
+                  "dropped_holdout_seen": {
+                    "type": "boolean",
+                    "description": "보이는 현재 입력의 오래된 holdout 표식 여부"
+                  }
+                }
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "structural_pass": true,
+        "semantic_pass": false,
+        "gate_pass": false,
+        "complete": true,
+        "runs": 3,
+        "completed_runs": 3,
+        "retry_runs": 0,
+        "deterministic_raw_output": true,
+        "deterministic_parsed_output": true,
+        "prompt_eval_count_min": 1245,
+        "prompt_eval_count_max": 1245,
+        "total_duration_ms_p50": 1754.71,
+        "total_duration_ms_p95": 3962.483,
+        "field_pass_rates": {
+          "card_marker": 1.0,
+          "ledger_active_color": 1.0,
+          "ledger_pet_negated": 1.0,
+          "ledger_corrected_color": 1.0,
+          "memory_marker": 1.0,
+          "dialogue_marker": 0.0,
+          "dropped_holdout_seen": 1.0
+        }
+      }
+    },
+    {
+      "pressure": 8,
+      "runs": [
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"card_marker\":\"violet-otter\",\"dialogue_marker\":\"silver-fern\",\"dropped_holdout_seen\":false,\"ledger_active_color\": \"green-lantern\",\"ledger_corrected_color\": \"green-lantern\",\"ledger_pet_negated\":true,\"memory_marker\":\"silver-fern\"}",
+          "raw_response_sha256": "603da185aee6683e20cc890c6551d1c7254b0346b4c3118a9919cc1ee4f451cb",
+          "parsed_result": {
+            "card_marker": "violet-otter",
+            "dialogue_marker": "silver-fern",
+            "dropped_holdout_seen": false,
+            "ledger_active_color": "green-lantern",
+            "ledger_corrected_color": "green-lantern",
+            "ledger_pet_negated": true,
+            "memory_marker": "silver-fern"
+          },
+          "parsed_result_sha256": "247087614068dbe957f628dacabbe1dfb1b1f02a6497d9c65bbdb1061a3fa11e",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "card_marker": true,
+              "ledger_active_color": true,
+              "ledger_pet_negated": true,
+              "ledger_corrected_color": true,
+              "memory_marker": true,
+              "dialogue_marker": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "dialogue_marker"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1245,
+            "eval_count": 97,
+            "prompt_eval_duration_ms": 47.288,
+            "eval_duration_ms": 1514.677,
+            "total_duration_ms": 1712.783
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 30,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "f6fee3729e1bb566f4e5e967436fb89c2cf0ca9310ad545f1e041b91d4928165",
+            "native_messages_hash": "6d37ed2002f0f935e61440cc8059af0ce656a5053bba742f20f39e03be1afcb2",
+            "native_hash": "1f1c1eb39ca2c0d1036b45659f47069fcc623ec808ad9056ea04953a1ed404ec",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 965,
+            "prepared_chars": 1626,
+            "native_chars": 1791,
+            "occurrence_counts": {
+              "card_marker": 1,
+              "memory_marker": 1,
+              "continuity_ledger": 1,
+              "ledger_corrected_color": 1,
+              "dialogue_marker": 4,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "dialogue_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "temperature": 0.0,
+                "seed": 42,
+                "num_predict": 128,
+                "num_gpu": 999
+              },
+              "format": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "card_marker",
+                  "ledger_active_color",
+                  "ledger_pet_negated",
+                  "ledger_corrected_color",
+                  "memory_marker",
+                  "dialogue_marker",
+                  "dropped_holdout_seen"
+                ],
+                "properties": {
+                  "card_marker": {
+                    "type": "string",
+                    "description": "보이는 Active Character Card의 표식 값"
+                  },
+                  "ledger_active_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 현재 favorite.color 값"
+                  },
+                  "ledger_pet_negated": {
+                    "type": "boolean",
+                    "description": "보이는 AIRI Continuity Data의 반려동물 negated polarity"
+                  },
+                  "ledger_corrected_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 수정된 favorite.color 값"
+                  },
+                  "memory_marker": {
+                    "type": "string",
+                    "description": "보이는 Character Memory 시스템 블록의 표식 값(user/assistant 제외)"
+                  },
+                  "dialogue_marker": {
+                    "type": "string",
+                    "description": "보존된 user/assistant 대화의 반복 표식 값(시스템 블록 제외)"
+                  },
+                  "dropped_holdout_seen": {
+                    "type": "boolean",
+                    "description": "보이는 현재 입력의 오래된 holdout 표식 여부"
+                  }
+                }
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"card_marker\":\"violet-otter\",\"dialogue_marker\":\"silver-fern\",\"dropped_holdout_seen\":false,\"ledger_active_color\": \"green-lantern\",\"ledger_corrected_color\": \"green-lantern\",\"ledger_pet_negated\":true,\"memory_marker\":\"silver-fern\"}",
+          "raw_response_sha256": "603da185aee6683e20cc890c6551d1c7254b0346b4c3118a9919cc1ee4f451cb",
+          "parsed_result": {
+            "card_marker": "violet-otter",
+            "dialogue_marker": "silver-fern",
+            "dropped_holdout_seen": false,
+            "ledger_active_color": "green-lantern",
+            "ledger_corrected_color": "green-lantern",
+            "ledger_pet_negated": true,
+            "memory_marker": "silver-fern"
+          },
+          "parsed_result_sha256": "247087614068dbe957f628dacabbe1dfb1b1f02a6497d9c65bbdb1061a3fa11e",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "card_marker": true,
+              "ledger_active_color": true,
+              "ledger_pet_negated": true,
+              "ledger_corrected_color": true,
+              "memory_marker": true,
+              "dialogue_marker": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "dialogue_marker"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1245,
+            "eval_count": 97,
+            "prompt_eval_duration_ms": 42.594,
+            "eval_duration_ms": 1540.201,
+            "total_duration_ms": 1729.085
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 30,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "f6fee3729e1bb566f4e5e967436fb89c2cf0ca9310ad545f1e041b91d4928165",
+            "native_messages_hash": "6d37ed2002f0f935e61440cc8059af0ce656a5053bba742f20f39e03be1afcb2",
+            "native_hash": "1f1c1eb39ca2c0d1036b45659f47069fcc623ec808ad9056ea04953a1ed404ec",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 965,
+            "prepared_chars": 1626,
+            "native_chars": 1791,
+            "occurrence_counts": {
+              "card_marker": 1,
+              "memory_marker": 1,
+              "continuity_ledger": 1,
+              "ledger_corrected_color": 1,
+              "dialogue_marker": 4,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "dialogue_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "temperature": 0.0,
+                "seed": 42,
+                "num_predict": 128,
+                "num_gpu": 999
+              },
+              "format": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "card_marker",
+                  "ledger_active_color",
+                  "ledger_pet_negated",
+                  "ledger_corrected_color",
+                  "memory_marker",
+                  "dialogue_marker",
+                  "dropped_holdout_seen"
+                ],
+                "properties": {
+                  "card_marker": {
+                    "type": "string",
+                    "description": "보이는 Active Character Card의 표식 값"
+                  },
+                  "ledger_active_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 현재 favorite.color 값"
+                  },
+                  "ledger_pet_negated": {
+                    "type": "boolean",
+                    "description": "보이는 AIRI Continuity Data의 반려동물 negated polarity"
+                  },
+                  "ledger_corrected_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 수정된 favorite.color 값"
+                  },
+                  "memory_marker": {
+                    "type": "string",
+                    "description": "보이는 Character Memory 시스템 블록의 표식 값(user/assistant 제외)"
+                  },
+                  "dialogue_marker": {
+                    "type": "string",
+                    "description": "보존된 user/assistant 대화의 반복 표식 값(시스템 블록 제외)"
+                  },
+                  "dropped_holdout_seen": {
+                    "type": "boolean",
+                    "description": "보이는 현재 입력의 오래된 holdout 표식 여부"
+                  }
+                }
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"card_marker\":\"violet-otter\",\"dialogue_marker\":\"silver-fern\",\"dropped_holdout_seen\":false,\"ledger_active_color\": \"green-lantern\",\"ledger_corrected_color\": \"green-lantern\",\"ledger_pet_negated\":true,\"memory_marker\":\"silver-fern\"}",
+          "raw_response_sha256": "603da185aee6683e20cc890c6551d1c7254b0346b4c3118a9919cc1ee4f451cb",
+          "parsed_result": {
+            "card_marker": "violet-otter",
+            "dialogue_marker": "silver-fern",
+            "dropped_holdout_seen": false,
+            "ledger_active_color": "green-lantern",
+            "ledger_corrected_color": "green-lantern",
+            "ledger_pet_negated": true,
+            "memory_marker": "silver-fern"
+          },
+          "parsed_result_sha256": "247087614068dbe957f628dacabbe1dfb1b1f02a6497d9c65bbdb1061a3fa11e",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "card_marker": true,
+              "ledger_active_color": true,
+              "ledger_pet_negated": true,
+              "ledger_corrected_color": true,
+              "memory_marker": true,
+              "dialogue_marker": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "dialogue_marker"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1245,
+            "eval_count": 97,
+            "prompt_eval_duration_ms": 43.346,
+            "eval_duration_ms": 1533.047,
+            "total_duration_ms": 1735.388
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 30,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "f6fee3729e1bb566f4e5e967436fb89c2cf0ca9310ad545f1e041b91d4928165",
+            "native_messages_hash": "6d37ed2002f0f935e61440cc8059af0ce656a5053bba742f20f39e03be1afcb2",
+            "native_hash": "1f1c1eb39ca2c0d1036b45659f47069fcc623ec808ad9056ea04953a1ed404ec",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 965,
+            "prepared_chars": 1626,
+            "native_chars": 1791,
+            "occurrence_counts": {
+              "card_marker": 1,
+              "memory_marker": 1,
+              "continuity_ledger": 1,
+              "ledger_corrected_color": 1,
+              "dialogue_marker": 4,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "dialogue_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "temperature": 0.0,
+                "seed": 42,
+                "num_predict": 128,
+                "num_gpu": 999
+              },
+              "format": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "card_marker",
+                  "ledger_active_color",
+                  "ledger_pet_negated",
+                  "ledger_corrected_color",
+                  "memory_marker",
+                  "dialogue_marker",
+                  "dropped_holdout_seen"
+                ],
+                "properties": {
+                  "card_marker": {
+                    "type": "string",
+                    "description": "보이는 Active Character Card의 표식 값"
+                  },
+                  "ledger_active_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 현재 favorite.color 값"
+                  },
+                  "ledger_pet_negated": {
+                    "type": "boolean",
+                    "description": "보이는 AIRI Continuity Data의 반려동물 negated polarity"
+                  },
+                  "ledger_corrected_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 수정된 favorite.color 값"
+                  },
+                  "memory_marker": {
+                    "type": "string",
+                    "description": "보이는 Character Memory 시스템 블록의 표식 값(user/assistant 제외)"
+                  },
+                  "dialogue_marker": {
+                    "type": "string",
+                    "description": "보존된 user/assistant 대화의 반복 표식 값(시스템 블록 제외)"
+                  },
+                  "dropped_holdout_seen": {
+                    "type": "boolean",
+                    "description": "보이는 현재 입력의 오래된 holdout 표식 여부"
+                  }
+                }
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "structural_pass": true,
+        "semantic_pass": false,
+        "gate_pass": false,
+        "complete": true,
+        "runs": 3,
+        "completed_runs": 3,
+        "retry_runs": 0,
+        "deterministic_raw_output": true,
+        "deterministic_parsed_output": true,
+        "prompt_eval_count_min": 1245,
+        "prompt_eval_count_max": 1245,
+        "total_duration_ms_p50": 1729.085,
+        "total_duration_ms_p95": 1735.388,
+        "field_pass_rates": {
+          "card_marker": 1.0,
+          "ledger_active_color": 1.0,
+          "ledger_pet_negated": 1.0,
+          "ledger_corrected_color": 1.0,
+          "memory_marker": 1.0,
+          "dialogue_marker": 0.0,
+          "dropped_holdout_seen": 1.0
+        }
+      }
+    },
+    {
+      "pressure": 20,
+      "runs": [
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"card_marker\":\"violet-otter\",\"dialogue_marker\":\"silver-fern\",\"dropped_holdout_seen\":false,\"ledger_active_color\": \"green-lantern\",\"ledger_corrected_color\": \"green-lantern\",\"ledger_pet_negated\":true,\"memory_marker\":\"silver-fern\"}",
+          "raw_response_sha256": "603da185aee6683e20cc890c6551d1c7254b0346b4c3118a9919cc1ee4f451cb",
+          "parsed_result": {
+            "card_marker": "violet-otter",
+            "dialogue_marker": "silver-fern",
+            "dropped_holdout_seen": false,
+            "ledger_active_color": "green-lantern",
+            "ledger_corrected_color": "green-lantern",
+            "ledger_pet_negated": true,
+            "memory_marker": "silver-fern"
+          },
+          "parsed_result_sha256": "247087614068dbe957f628dacabbe1dfb1b1f02a6497d9c65bbdb1061a3fa11e",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "card_marker": true,
+              "ledger_active_color": true,
+              "ledger_pet_negated": true,
+              "ledger_corrected_color": true,
+              "memory_marker": true,
+              "dialogue_marker": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "dialogue_marker"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1245,
+            "eval_count": 97,
+            "prompt_eval_duration_ms": 49.763,
+            "eval_duration_ms": 1531.481,
+            "total_duration_ms": 1729.98
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 54,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "f6fee3729e1bb566f4e5e967436fb89c2cf0ca9310ad545f1e041b91d4928165",
+            "native_messages_hash": "6d37ed2002f0f935e61440cc8059af0ce656a5053bba742f20f39e03be1afcb2",
+            "native_hash": "1f1c1eb39ca2c0d1036b45659f47069fcc623ec808ad9056ea04953a1ed404ec",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 1849,
+            "prepared_chars": 1626,
+            "native_chars": 1791,
+            "occurrence_counts": {
+              "card_marker": 1,
+              "memory_marker": 1,
+              "continuity_ledger": 1,
+              "ledger_corrected_color": 1,
+              "dialogue_marker": 4,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "dialogue_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "temperature": 0.0,
+                "seed": 42,
+                "num_predict": 128,
+                "num_gpu": 999
+              },
+              "format": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "card_marker",
+                  "ledger_active_color",
+                  "ledger_pet_negated",
+                  "ledger_corrected_color",
+                  "memory_marker",
+                  "dialogue_marker",
+                  "dropped_holdout_seen"
+                ],
+                "properties": {
+                  "card_marker": {
+                    "type": "string",
+                    "description": "보이는 Active Character Card의 표식 값"
+                  },
+                  "ledger_active_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 현재 favorite.color 값"
+                  },
+                  "ledger_pet_negated": {
+                    "type": "boolean",
+                    "description": "보이는 AIRI Continuity Data의 반려동물 negated polarity"
+                  },
+                  "ledger_corrected_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 수정된 favorite.color 값"
+                  },
+                  "memory_marker": {
+                    "type": "string",
+                    "description": "보이는 Character Memory 시스템 블록의 표식 값(user/assistant 제외)"
+                  },
+                  "dialogue_marker": {
+                    "type": "string",
+                    "description": "보존된 user/assistant 대화의 반복 표식 값(시스템 블록 제외)"
+                  },
+                  "dropped_holdout_seen": {
+                    "type": "boolean",
+                    "description": "보이는 현재 입력의 오래된 holdout 표식 여부"
+                  }
+                }
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"card_marker\":\"violet-otter\",\"dialogue_marker\":\"silver-fern\",\"dropped_holdout_seen\":false,\"ledger_active_color\": \"green-lantern\",\"ledger_corrected_color\": \"green-lantern\",\"ledger_pet_negated\":true,\"memory_marker\":\"silver-fern\"}",
+          "raw_response_sha256": "603da185aee6683e20cc890c6551d1c7254b0346b4c3118a9919cc1ee4f451cb",
+          "parsed_result": {
+            "card_marker": "violet-otter",
+            "dialogue_marker": "silver-fern",
+            "dropped_holdout_seen": false,
+            "ledger_active_color": "green-lantern",
+            "ledger_corrected_color": "green-lantern",
+            "ledger_pet_negated": true,
+            "memory_marker": "silver-fern"
+          },
+          "parsed_result_sha256": "247087614068dbe957f628dacabbe1dfb1b1f02a6497d9c65bbdb1061a3fa11e",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "card_marker": true,
+              "ledger_active_color": true,
+              "ledger_pet_negated": true,
+              "ledger_corrected_color": true,
+              "memory_marker": true,
+              "dialogue_marker": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "dialogue_marker"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1245,
+            "eval_count": 97,
+            "prompt_eval_duration_ms": 49.659,
+            "eval_duration_ms": 1504.536,
+            "total_duration_ms": 1698.713
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 54,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "f6fee3729e1bb566f4e5e967436fb89c2cf0ca9310ad545f1e041b91d4928165",
+            "native_messages_hash": "6d37ed2002f0f935e61440cc8059af0ce656a5053bba742f20f39e03be1afcb2",
+            "native_hash": "1f1c1eb39ca2c0d1036b45659f47069fcc623ec808ad9056ea04953a1ed404ec",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 1849,
+            "prepared_chars": 1626,
+            "native_chars": 1791,
+            "occurrence_counts": {
+              "card_marker": 1,
+              "memory_marker": 1,
+              "continuity_ledger": 1,
+              "ledger_corrected_color": 1,
+              "dialogue_marker": 4,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "dialogue_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "temperature": 0.0,
+                "seed": 42,
+                "num_predict": 128,
+                "num_gpu": 999
+              },
+              "format": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "card_marker",
+                  "ledger_active_color",
+                  "ledger_pet_negated",
+                  "ledger_corrected_color",
+                  "memory_marker",
+                  "dialogue_marker",
+                  "dropped_holdout_seen"
+                ],
+                "properties": {
+                  "card_marker": {
+                    "type": "string",
+                    "description": "보이는 Active Character Card의 표식 값"
+                  },
+                  "ledger_active_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 현재 favorite.color 값"
+                  },
+                  "ledger_pet_negated": {
+                    "type": "boolean",
+                    "description": "보이는 AIRI Continuity Data의 반려동물 negated polarity"
+                  },
+                  "ledger_corrected_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 수정된 favorite.color 값"
+                  },
+                  "memory_marker": {
+                    "type": "string",
+                    "description": "보이는 Character Memory 시스템 블록의 표식 값(user/assistant 제외)"
+                  },
+                  "dialogue_marker": {
+                    "type": "string",
+                    "description": "보존된 user/assistant 대화의 반복 표식 값(시스템 블록 제외)"
+                  },
+                  "dropped_holdout_seen": {
+                    "type": "boolean",
+                    "description": "보이는 현재 입력의 오래된 holdout 표식 여부"
+                  }
+                }
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"card_marker\":\"violet-otter\",\"dialogue_marker\":\"silver-fern\",\"dropped_holdout_seen\":false,\"ledger_active_color\": \"green-lantern\",\"ledger_corrected_color\": \"green-lantern\",\"ledger_pet_negated\":true,\"memory_marker\":\"silver-fern\"}",
+          "raw_response_sha256": "603da185aee6683e20cc890c6551d1c7254b0346b4c3118a9919cc1ee4f451cb",
+          "parsed_result": {
+            "card_marker": "violet-otter",
+            "dialogue_marker": "silver-fern",
+            "dropped_holdout_seen": false,
+            "ledger_active_color": "green-lantern",
+            "ledger_corrected_color": "green-lantern",
+            "ledger_pet_negated": true,
+            "memory_marker": "silver-fern"
+          },
+          "parsed_result_sha256": "247087614068dbe957f628dacabbe1dfb1b1f02a6497d9c65bbdb1061a3fa11e",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "card_marker": true,
+              "ledger_active_color": true,
+              "ledger_pet_negated": true,
+              "ledger_corrected_color": true,
+              "memory_marker": true,
+              "dialogue_marker": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "dialogue_marker"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1245,
+            "eval_count": 97,
+            "prompt_eval_duration_ms": 43.712,
+            "eval_duration_ms": 1522.699,
+            "total_duration_ms": 1714.961
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 54,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "f6fee3729e1bb566f4e5e967436fb89c2cf0ca9310ad545f1e041b91d4928165",
+            "native_messages_hash": "6d37ed2002f0f935e61440cc8059af0ce656a5053bba742f20f39e03be1afcb2",
+            "native_hash": "1f1c1eb39ca2c0d1036b45659f47069fcc623ec808ad9056ea04953a1ed404ec",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 1849,
+            "prepared_chars": 1626,
+            "native_chars": 1791,
+            "occurrence_counts": {
+              "card_marker": 1,
+              "memory_marker": 1,
+              "continuity_ledger": 1,
+              "ledger_corrected_color": 1,
+              "dialogue_marker": 4,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "dialogue_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "temperature": 0.0,
+                "seed": 42,
+                "num_predict": 128,
+                "num_gpu": 999
+              },
+              "format": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "card_marker",
+                  "ledger_active_color",
+                  "ledger_pet_negated",
+                  "ledger_corrected_color",
+                  "memory_marker",
+                  "dialogue_marker",
+                  "dropped_holdout_seen"
+                ],
+                "properties": {
+                  "card_marker": {
+                    "type": "string",
+                    "description": "보이는 Active Character Card의 표식 값"
+                  },
+                  "ledger_active_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 현재 favorite.color 값"
+                  },
+                  "ledger_pet_negated": {
+                    "type": "boolean",
+                    "description": "보이는 AIRI Continuity Data의 반려동물 negated polarity"
+                  },
+                  "ledger_corrected_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 수정된 favorite.color 값"
+                  },
+                  "memory_marker": {
+                    "type": "string",
+                    "description": "보이는 Character Memory 시스템 블록의 표식 값(user/assistant 제외)"
+                  },
+                  "dialogue_marker": {
+                    "type": "string",
+                    "description": "보존된 user/assistant 대화의 반복 표식 값(시스템 블록 제외)"
+                  },
+                  "dropped_holdout_seen": {
+                    "type": "boolean",
+                    "description": "보이는 현재 입력의 오래된 holdout 표식 여부"
+                  }
+                }
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "structural_pass": true,
+        "semantic_pass": false,
+        "gate_pass": false,
+        "complete": true,
+        "runs": 3,
+        "completed_runs": 3,
+        "retry_runs": 0,
+        "deterministic_raw_output": true,
+        "deterministic_parsed_output": true,
+        "prompt_eval_count_min": 1245,
+        "prompt_eval_count_max": 1245,
+        "total_duration_ms_p50": 1714.961,
+        "total_duration_ms_p95": 1729.98,
+        "field_pass_rates": {
+          "card_marker": 1.0,
+          "ledger_active_color": 1.0,
+          "ledger_pet_negated": 1.0,
+          "ledger_corrected_color": 1.0,
+          "memory_marker": 1.0,
+          "dialogue_marker": 0.0,
+          "dropped_holdout_seen": 1.0
+        }
+      }
+    },
+    {
+      "pressure": 48,
+      "runs": [
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"card_marker\":\"violet-otter\",\"dialogue_marker\":\"silver-fern\",\"dropped_holdout_seen\":false,\"ledger_active_color\": \"green-lantern\",\"ledger_corrected_color\": \"green-lantern\",\"ledger_pet_negated\":true,\"memory_marker\":\"silver-fern\"}",
+          "raw_response_sha256": "603da185aee6683e20cc890c6551d1c7254b0346b4c3118a9919cc1ee4f451cb",
+          "parsed_result": {
+            "card_marker": "violet-otter",
+            "dialogue_marker": "silver-fern",
+            "dropped_holdout_seen": false,
+            "ledger_active_color": "green-lantern",
+            "ledger_corrected_color": "green-lantern",
+            "ledger_pet_negated": true,
+            "memory_marker": "silver-fern"
+          },
+          "parsed_result_sha256": "247087614068dbe957f628dacabbe1dfb1b1f02a6497d9c65bbdb1061a3fa11e",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "card_marker": true,
+              "ledger_active_color": true,
+              "ledger_pet_negated": true,
+              "ledger_corrected_color": true,
+              "memory_marker": true,
+              "dialogue_marker": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "dialogue_marker"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1245,
+            "eval_count": 97,
+            "prompt_eval_duration_ms": 41.722,
+            "eval_duration_ms": 1506.441,
+            "total_duration_ms": 1697.43
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 110,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "f6fee3729e1bb566f4e5e967436fb89c2cf0ca9310ad545f1e041b91d4928165",
+            "native_messages_hash": "6d37ed2002f0f935e61440cc8059af0ce656a5053bba742f20f39e03be1afcb2",
+            "native_hash": "1f1c1eb39ca2c0d1036b45659f47069fcc623ec808ad9056ea04953a1ed404ec",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 3921,
+            "prepared_chars": 1626,
+            "native_chars": 1791,
+            "occurrence_counts": {
+              "card_marker": 1,
+              "memory_marker": 1,
+              "continuity_ledger": 1,
+              "ledger_corrected_color": 1,
+              "dialogue_marker": 4,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "dialogue_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "temperature": 0.0,
+                "seed": 42,
+                "num_predict": 128,
+                "num_gpu": 999
+              },
+              "format": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "card_marker",
+                  "ledger_active_color",
+                  "ledger_pet_negated",
+                  "ledger_corrected_color",
+                  "memory_marker",
+                  "dialogue_marker",
+                  "dropped_holdout_seen"
+                ],
+                "properties": {
+                  "card_marker": {
+                    "type": "string",
+                    "description": "보이는 Active Character Card의 표식 값"
+                  },
+                  "ledger_active_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 현재 favorite.color 값"
+                  },
+                  "ledger_pet_negated": {
+                    "type": "boolean",
+                    "description": "보이는 AIRI Continuity Data의 반려동물 negated polarity"
+                  },
+                  "ledger_corrected_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 수정된 favorite.color 값"
+                  },
+                  "memory_marker": {
+                    "type": "string",
+                    "description": "보이는 Character Memory 시스템 블록의 표식 값(user/assistant 제외)"
+                  },
+                  "dialogue_marker": {
+                    "type": "string",
+                    "description": "보존된 user/assistant 대화의 반복 표식 값(시스템 블록 제외)"
+                  },
+                  "dropped_holdout_seen": {
+                    "type": "boolean",
+                    "description": "보이는 현재 입력의 오래된 holdout 표식 여부"
+                  }
+                }
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"card_marker\":\"violet-otter\",\"dialogue_marker\":\"silver-fern\",\"dropped_holdout_seen\":false,\"ledger_active_color\": \"green-lantern\",\"ledger_corrected_color\": \"green-lantern\",\"ledger_pet_negated\":true,\"memory_marker\":\"silver-fern\"}",
+          "raw_response_sha256": "603da185aee6683e20cc890c6551d1c7254b0346b4c3118a9919cc1ee4f451cb",
+          "parsed_result": {
+            "card_marker": "violet-otter",
+            "dialogue_marker": "silver-fern",
+            "dropped_holdout_seen": false,
+            "ledger_active_color": "green-lantern",
+            "ledger_corrected_color": "green-lantern",
+            "ledger_pet_negated": true,
+            "memory_marker": "silver-fern"
+          },
+          "parsed_result_sha256": "247087614068dbe957f628dacabbe1dfb1b1f02a6497d9c65bbdb1061a3fa11e",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "card_marker": true,
+              "ledger_active_color": true,
+              "ledger_pet_negated": true,
+              "ledger_corrected_color": true,
+              "memory_marker": true,
+              "dialogue_marker": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "dialogue_marker"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1245,
+            "eval_count": 97,
+            "prompt_eval_duration_ms": 42.776,
+            "eval_duration_ms": 1511.098,
+            "total_duration_ms": 1701.453
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 110,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "f6fee3729e1bb566f4e5e967436fb89c2cf0ca9310ad545f1e041b91d4928165",
+            "native_messages_hash": "6d37ed2002f0f935e61440cc8059af0ce656a5053bba742f20f39e03be1afcb2",
+            "native_hash": "1f1c1eb39ca2c0d1036b45659f47069fcc623ec808ad9056ea04953a1ed404ec",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 3921,
+            "prepared_chars": 1626,
+            "native_chars": 1791,
+            "occurrence_counts": {
+              "card_marker": 1,
+              "memory_marker": 1,
+              "continuity_ledger": 1,
+              "ledger_corrected_color": 1,
+              "dialogue_marker": 4,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "dialogue_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "temperature": 0.0,
+                "seed": 42,
+                "num_predict": 128,
+                "num_gpu": 999
+              },
+              "format": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "card_marker",
+                  "ledger_active_color",
+                  "ledger_pet_negated",
+                  "ledger_corrected_color",
+                  "memory_marker",
+                  "dialogue_marker",
+                  "dropped_holdout_seen"
+                ],
+                "properties": {
+                  "card_marker": {
+                    "type": "string",
+                    "description": "보이는 Active Character Card의 표식 값"
+                  },
+                  "ledger_active_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 현재 favorite.color 값"
+                  },
+                  "ledger_pet_negated": {
+                    "type": "boolean",
+                    "description": "보이는 AIRI Continuity Data의 반려동물 negated polarity"
+                  },
+                  "ledger_corrected_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 수정된 favorite.color 값"
+                  },
+                  "memory_marker": {
+                    "type": "string",
+                    "description": "보이는 Character Memory 시스템 블록의 표식 값(user/assistant 제외)"
+                  },
+                  "dialogue_marker": {
+                    "type": "string",
+                    "description": "보존된 user/assistant 대화의 반복 표식 값(시스템 블록 제외)"
+                  },
+                  "dropped_holdout_seen": {
+                    "type": "boolean",
+                    "description": "보이는 현재 입력의 오래된 holdout 표식 여부"
+                  }
+                }
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        },
+        {
+          "complete": true,
+          "retry_used": false,
+          "attempts": [
+            {
+              "attempt": 1,
+              "valid": true
+            }
+          ],
+          "raw_response_content": "{\"card_marker\":\"violet-otter\",\"dialogue_marker\":\"silver-fern\",\"dropped_holdout_seen\":false,\"ledger_active_color\": \"green-lantern\",\"ledger_corrected_color\": \"green-lantern\",\"ledger_pet_negated\":true,\"memory_marker\":\"silver-fern\"}",
+          "raw_response_sha256": "603da185aee6683e20cc890c6551d1c7254b0346b4c3118a9919cc1ee4f451cb",
+          "parsed_result": {
+            "card_marker": "violet-otter",
+            "dialogue_marker": "silver-fern",
+            "dropped_holdout_seen": false,
+            "ledger_active_color": "green-lantern",
+            "ledger_corrected_color": "green-lantern",
+            "ledger_pet_negated": true,
+            "memory_marker": "silver-fern"
+          },
+          "parsed_result_sha256": "247087614068dbe957f628dacabbe1dfb1b1f02a6497d9c65bbdb1061a3fa11e",
+          "score": {
+            "passed": false,
+            "field_score": {
+              "card_marker": true,
+              "ledger_active_color": true,
+              "ledger_pet_negated": true,
+              "ledger_corrected_color": true,
+              "memory_marker": true,
+              "dialogue_marker": false,
+              "dropped_holdout_seen": true
+            },
+            "failures": [
+              "dialogue_marker"
+            ]
+          },
+          "metrics": {
+            "prompt_eval_count": 1245,
+            "eval_count": 97,
+            "prompt_eval_duration_ms": 42.533,
+            "eval_duration_ms": 1528.766,
+            "total_duration_ms": 1723.863
+          },
+          "structural_pass": true,
+          "transformation_ledger": {
+            "original_messages": 110,
+            "prepared_messages": 9,
+            "native_messages": 10,
+            "prepared_hash": "f6fee3729e1bb566f4e5e967436fb89c2cf0ca9310ad545f1e041b91d4928165",
+            "native_messages_hash": "6d37ed2002f0f935e61440cc8059af0ce656a5053bba742f20f39e03be1afcb2",
+            "native_hash": "1f1c1eb39ca2c0d1036b45659f47069fcc623ec808ad9056ea04953a1ed404ec",
+            "roles": [
+              "system",
+              "user",
+              "assistant",
+              "user",
+              "assistant",
+              "system",
+              "system",
+              "system",
+              "system",
+              "user"
+            ],
+            "input_chars": 3921,
+            "prepared_chars": 1626,
+            "native_chars": 1791,
+            "occurrence_counts": {
+              "card_marker": 1,
+              "memory_marker": 1,
+              "continuity_ledger": 1,
+              "ledger_corrected_color": 1,
+              "dialogue_marker": 4,
+              "holdout": 0
+            },
+            "canary_booleans": {
+              "original_unchanged": true,
+              "named_once": true,
+              "private_names_stripped": true,
+              "static_first": true,
+              "order": true,
+              "latest_user_last": true,
+              "projected_two_pairs": true,
+              "filler_absent": true,
+              "holdout_absent": true,
+              "required_once": true,
+              "dialogue_retained": true
+            },
+            "native_contract": {
+              "model": "midm-airi:2.0-mini",
+              "options": {
+                "num_ctx": 2048,
+                "temperature": 0.0,
+                "seed": 42,
+                "num_predict": 128,
+                "num_gpu": 999
+              },
+              "format": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "card_marker",
+                  "ledger_active_color",
+                  "ledger_pet_negated",
+                  "ledger_corrected_color",
+                  "memory_marker",
+                  "dialogue_marker",
+                  "dropped_holdout_seen"
+                ],
+                "properties": {
+                  "card_marker": {
+                    "type": "string",
+                    "description": "보이는 Active Character Card의 표식 값"
+                  },
+                  "ledger_active_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 현재 favorite.color 값"
+                  },
+                  "ledger_pet_negated": {
+                    "type": "boolean",
+                    "description": "보이는 AIRI Continuity Data의 반려동물 negated polarity"
+                  },
+                  "ledger_corrected_color": {
+                    "type": "string",
+                    "description": "보이는 AIRI Continuity Data의 수정된 favorite.color 값"
+                  },
+                  "memory_marker": {
+                    "type": "string",
+                    "description": "보이는 Character Memory 시스템 블록의 표식 값(user/assistant 제외)"
+                  },
+                  "dialogue_marker": {
+                    "type": "string",
+                    "description": "보존된 user/assistant 대화의 반복 표식 값(시스템 블록 제외)"
+                  },
+                  "dropped_holdout_seen": {
+                    "type": "boolean",
+                    "description": "보이는 현재 입력의 오래된 holdout 표식 여부"
+                  }
+                }
+              },
+              "think": false,
+              "stream": false,
+              "keep_alive": "5m"
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "structural_pass": true,
+        "semantic_pass": false,
+        "gate_pass": false,
+        "complete": true,
+        "runs": 3,
+        "completed_runs": 3,
+        "retry_runs": 0,
+        "deterministic_raw_output": true,
+        "deterministic_parsed_output": true,
+        "prompt_eval_count_min": 1245,
+        "prompt_eval_count_max": 1245,
+        "total_duration_ms_p50": 1701.453,
+        "total_duration_ms_p95": 1723.863,
+        "field_pass_rates": {
+          "card_marker": 1.0,
+          "ledger_active_color": 1.0,
+          "ledger_pet_negated": 1.0,
+          "ledger_corrected_color": 1.0,
+          "memory_marker": 1.0,
+          "dialogue_marker": 0.0,
+          "dropped_holdout_seen": 1.0
+        }
+      }
+    }
+  ],
+  "cross_pressure_native_hash_equal": true,
+  "aggregate": {
+    "structural_pass": true,
+    "semantic_pass": false,
+    "gate_pass": false,
+    "complete": true,
+    "runs": 12,
+    "completed_runs": 12,
+    "retry_runs": 0,
+    "deterministic_raw_output": true,
+    "deterministic_parsed_output": true,
+    "prompt_eval_count_min": 1245,
+    "prompt_eval_count_max": 1245,
+    "total_duration_ms_p50": 1714.961,
+    "total_duration_ms_p95": 3962.483,
+    "field_pass_rates": {
+      "card_marker": 1.0,
+      "ledger_active_color": 1.0,
+      "ledger_pet_negated": 1.0,
+      "ledger_corrected_color": 1.0,
+      "memory_marker": 1.0,
+      "dialogue_marker": 0.0,
+      "dropped_holdout_seen": 1.0
+    },
+    "authoritative_gate_pass": false
+  }
+}

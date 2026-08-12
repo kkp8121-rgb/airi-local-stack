@@ -1,0 +1,6 @@
+{
+  "schema": "airi-stt-corpus-v1",
+  "items": [
+    {"id": "synthetic-test-double", "reference": "AIRI", "proper_nouns": ["AIRI"]}
+  ]
+}

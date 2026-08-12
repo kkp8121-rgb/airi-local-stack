@@ -2,7 +2,9 @@ import json
 import hashlib
 import sqlite3
 import tempfile
+import threading
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from knowledge_ingest import main
@@ -162,6 +164,43 @@ class KnowledgeStoreTests(unittest.TestCase):
         db.execute("INSERT INTO chunks_fts VALUES ('legacy searchable','1')")
         db.commit(); db.close()
         self.assertEqual(KnowledgeStore(legacy, runtime_dir=self.runtime).retrieve("Legacy", max_chars=100)[0].title, "Legacy Title")
+
+    def test_initialize_is_process_local_once_for_repeated_retrieve(self):
+        self.store.ingest(record("repeatable knowledge", title="Repeat"))
+        calls = 0
+        original = self.store._initialize_database
+
+        def counted():
+            nonlocal calls
+            calls += 1
+            return original()
+
+        # This database was initialized during ingest; subsequent retrieval
+        # must use the process-local fast path rather than rerun migration.
+        self.store._initialize_database = counted
+        self.store.retrieve("Repeat", max_chars=100)
+        self.store.retrieve("Repeat", max_chars=100)
+        self.assertEqual(calls, 0)
+
+    def test_concurrent_first_use_initializes_once(self):
+        db_path = self.runtime / "concurrent.sqlite3"
+        stores = [KnowledgeStore(db_path, runtime_dir=self.runtime) for _ in range(8)]
+        calls = 0
+        guard = threading.Lock()
+        original = KnowledgeStore._initialize_database
+
+        def counted(instance):
+            nonlocal calls
+            with guard:
+                calls += 1
+            return original(instance)
+
+        with patch.object(KnowledgeStore, "_initialize_database", counted):
+            threads = [threading.Thread(target=store.initialize) for store in stores]
+            for thread in threads: thread.start()
+            for thread in threads: thread.join()
+        self.assertEqual(calls, 1)
+        self.assertEqual(stores[-1].retrieve("missing", max_chars=100), [])
 
     def test_answer_summary_validation_migration_and_metadata_refresh(self):
         with self.assertRaises(KnowledgeInputError):

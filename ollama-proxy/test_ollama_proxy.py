@@ -1,5 +1,10 @@
+import ast
 import asyncio
+import contextlib
 import json
+import os
+import re
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,6 +14,25 @@ from fastapi.testclient import TestClient
 from starlette.requests import Request
 
 import ollama_proxy
+
+
+@contextlib.contextmanager
+def grounding_mode(mode: str):
+    """Pin one grounding policy so an expectation states which mode it asserts."""
+    with mock.patch.object(ollama_proxy, "GROUNDING_MODE", mode):
+        yield
+
+
+@contextlib.contextmanager
+def model_environment(**values: object):
+    """Pin the model SSoT environment; ``None`` removes a variable entirely."""
+    with mock.patch.dict("os.environ", {}, clear=False):
+        for name, value in values.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = str(value)
+        yield
 
 
 class SystemPromptContractTests(unittest.TestCase):
@@ -408,7 +432,9 @@ Every response must use this control format: <|NAME PAYLOAD|>.
         ]}, ensure_ascii=False).encode()
         transformed, *_ = ollama_proxy.transform_body("v1/chat/completions", body)
         messages = json.loads(transformed)["messages"]
-        self.assertEqual([message["role"] for message in messages], ["system", "user"])
+        self.assertEqual([message["role"] for message in messages], ["system", "system", "user"])
+        self.assertEqual(messages[-2].get("name"), ollama_proxy.ACTIVE_CARD_MESSAGE_NAME)
+        self.assertEqual(messages[-2]["content"], "[Active Character Card]\ncard")
         self.assertEqual(messages[-1]["content"], "그 얘기는 여기까지. 창밖에 비가 와.")
         self.assertNotIn("예전 주제", json.dumps(messages, ensure_ascii=False))
 
@@ -477,6 +503,60 @@ Every response must use this control format: <|NAME PAYLOAD|>.
         self.assertIn("실제 관계나 행동→결과", messages[-2]["content"])
         self.assertIn("감탄사와 명사 복창", messages[-2]["content"])
         self.assertIn("요청하지 않은 조언·주의·질문", messages[-2]["content"])
+
+    def test_response_mode_replaces_spoken_style_for_object_schema(self) -> None:
+        body = json.dumps({
+            "format": {
+                "type": "object",
+                "required": ["dialogue_marker", "memory_marker"],
+                "properties": {
+                    "dialogue_marker": {"type": "string"},
+                    "memory_marker": {"type": "string"},
+                },
+            },
+            "messages": [
+                {"role": "system", "content": "durable card"},
+                {
+                    "role": "system",
+                    "name": ollama_proxy.REQUEST_LOCAL_SYSTEM_MESSAGE_NAME,
+                    "content": (
+                        "CHARACTER_STATE_EVIDENCE\n\n"
+                        "이번 응답 언어: 한국어. 자연스러운 대사를 말해.\n\n"
+                        "KNOWLEDGE_EVIDENCE\n\n"
+                        "이번 응답 문체: 10~45자의 자연스러운 대사."
+                    ),
+                },
+                {"role": "user", "content": "계속 검증해."},
+            ],
+        }, ensure_ascii=False).encode()
+
+        messages = json.loads(ollama_proxy.inject_response_mode(
+            body, "계속 검증해.",
+        ))["messages"]
+        local = [
+            message for message in messages
+            if message.get("name") == ollama_proxy.REQUEST_LOCAL_SYSTEM_MESSAGE_NAME
+        ]
+        self.assertEqual(len(local), 1)
+        self.assertEqual(messages[-2], local[0])
+        self.assertEqual(messages[-1]["role"], "user")
+        self.assertIn("schema가 지정한 JSON 객체", local[0]["content"])
+        self.assertIn("description이 지정한 역할", local[0]["content"])
+        self.assertIn("다른 property에 재사용하지 마", local[0]["content"])
+        self.assertIn("CHARACTER_STATE_EVIDENCE", local[0]["content"])
+        self.assertIn("KNOWLEDGE_EVIDENCE", local[0]["content"])
+        self.assertNotIn("자연스러운 대사", local[0]["content"])
+        self.assertNotIn("10~45자", local[0]["content"])
+
+    def test_response_mode_keeps_spoken_contract_for_non_object_format(self) -> None:
+        body = json.dumps({
+            "format": "json",
+            "messages": [{"role": "user", "content": "계속 이야기해."}],
+        }, ensure_ascii=False).encode()
+        messages = json.loads(ollama_proxy.inject_response_mode(
+            body, "계속 이야기해.",
+        ))["messages"]
+        self.assertIn("10~45자의 자연스러운 한국어 반말", messages[-2]["content"])
 
 
 class TopicBoardRuntimeTests(unittest.TestCase):
@@ -917,6 +997,21 @@ class MemoryAbsenceGuardTests(unittest.TestCase):
         )
         self.assertEqual(json.loads(guarded), json.loads(body))
 
+    def test_memory_timeout_is_not_misreported_as_absence(self) -> None:
+        body = json.dumps({"messages": [{"role": "user", "content": "내 별명 기억나?"}]}).encode()
+        timed_out = mock.Mock(
+            status="timed_out", successful=False, failed=True,
+            journal_count=0, block="",
+        )
+        guarded = ollama_proxy.inject_memory_absence_guard(
+            body, "내 별명 기억나?", timed_out,
+        )
+        self.assertEqual(json.loads(guarded), json.loads(body))
+        self.assertFalse(ollama_proxy.memory_absence_fallback_required(
+            "내 별명 기억나?", timed_out,
+            [{"role": "user", "content": "내 별명 기억나?"}],
+        ))
+
     def test_memorable_fact_wording_is_not_a_personal_memory_query(self) -> None:
         question = "기억하기 쉬운 사실 하나만 골라줘."
         self.assertIsNone(ollama_proxy.MEMORY_QUERY_RE.search(question))
@@ -1174,6 +1269,9 @@ class _ApiStreamResponse:
         for chunk in self._chunks:
             yield chunk
 
+    async def aread(self) -> bytes:
+        return b"".join(self._chunks)
+
     async def aclose(self) -> None:
         self.closed = True
 
@@ -1363,6 +1461,20 @@ def openai_sse_content(wire: str) -> str:
         if isinstance(content, str):
             parts.append(content)
     return "".join(parts)
+
+
+def openai_sse_dialogue(wire: str) -> str:
+    """Return the streamed deltas that follow the immediate acknowledgement.
+
+    The acknowledgement is a fixed application phrase emitted before the model
+    has produced anything, so dialogue assertions must not carry it. The
+    acknowledgement itself is asserted on the raw wire by ImmediateAckTests.
+    """
+    content = openai_sse_content(wire)
+    for ack in (ollama_proxy.SEARCH_IMMEDIATE_ACK, ollama_proxy.LOCAL_IMMEDIATE_ACK):
+        if content.startswith(ack):
+            return content[len(ack):]
+    return content
 
 
 class SearchRoutingTests(unittest.TestCase):
@@ -1636,6 +1748,8 @@ class ShortTermDialogueStateTests(unittest.TestCase):
         self.assertEqual(state["previous_answer_excerpt"], "아까처럼 맑아.")
         self.assertIn('"action":"normal|answer_again|ask_reason|wait"', system)
         self.assertNotIn("search_again", system)
+        self.assertEqual(fake.payloads[0]["options"]["num_ctx"], ollama_proxy.NUM_CTX)
+        self.assertEqual(fake.payloads[0]["options"]["num_gpu"], ollama_proxy.NUM_GPU)
         self.assertEqual((action, speech), ("answer_again", "아까 말한 것처럼 오늘은 맑아."))
 
     def test_llm_can_ask_about_repeated_search_without_cloud_call(self) -> None:
@@ -1954,8 +2068,12 @@ class CloudSearchFallbackTests(unittest.TestCase):
 
         self.assertEqual(attempted, [])
         self.assertEqual(len(local.requests), 1)
-        self.assertIn("그건 내가 직접 실행할 수 없어.", openai_sse_content(response.text))
-        self.assertNotIn(ollama_proxy.SEARCH_IMMEDIATE_ACK, response.text)
+        streamed = openai_sse_content(response.text)
+        self.assertIn("그건 내가 직접 실행할 수 없어.", streamed)
+        # The local route still speaks its own acknowledgement; only the
+        # search-flavoured one proves the external branch was taken.
+        self.assertTrue(streamed.startswith(ollama_proxy.LOCAL_IMMEDIATE_ACK), streamed)
+        self.assertNotIn(ollama_proxy.SEARCH_IMMEDIATE_ACK, streamed)
         self.assertIn("[DONE]", response.text)
 
     def test_failed_search_falls_back_to_the_local_model(self) -> None:
@@ -2016,6 +2134,48 @@ class CloudSearchFallbackTests(unittest.TestCase):
 
 
 class SseContractTests(unittest.TestCase):
+    def test_quality_probe_publishes_safe_sentence_before_native_terminal(self) -> None:
+        published: list[str] = []
+        first = (json.dumps({
+            "message": {"role": "assistant", "content": "다행이다!"},
+            "done": False,
+        }, ensure_ascii=False) + "\n").encode("utf-8")
+        terminal = (json.dumps({
+            "message": {"role": "assistant", "content": ""},
+            "done": True,
+            "prompt_eval_count": 12,
+            "prompt_eval_duration": 2_000_000,
+        }, ensure_ascii=False) + "\n").encode("utf-8")
+
+        class ObservingResponse(_ApiStreamResponse):
+            async def aiter_raw(self):
+                yield first
+                if not published:
+                    raise AssertionError("safe dialogue was held until terminal")
+                yield terminal
+
+        class ObservingClient(_ApiStreamClient):
+            def __init__(self) -> None:
+                self.response = ObservingResponse([])
+                self.requests = []
+
+        with mock.patch.object(ollama_proxy, "client", ObservingClient()), mock.patch.object(
+            ollama_proxy, "emit_substantive_content", side_effect=lambda *_args: published.append("content")
+        ), mock.patch.object(ollama_proxy, "knowledge_runtime", None):
+            response = TestClient(ollama_proxy.app).post(
+                "/v1/chat/completions",
+                headers={"x-airi-turn-origin": "local-quality-probe"},
+                json={
+                    "model": "exaone-airi:2.4b",
+                    "stream": True,
+                    "messages": [{"role": "user", "content": "볼펜을 찾았어."}],
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(openai_sse_dialogue(response.text), "다행이다!")
+        self.assertEqual(published, ["content"])
+
     def test_ollama_terminal_metrics_are_numeric_bounded_and_content_free(self) -> None:
         metrics = ollama_proxy.ollama_terminal_metrics({
             "load_duration": 1_250_000,
@@ -2049,6 +2209,63 @@ class SseContractTests(unittest.TestCase):
             "ollama_eval_count": ollama_proxy.OLLAMA_MAX_COUNT,
         })
 
+    def test_prompt_budget_telemetry_is_content_free_bounded_and_terminal_only(self) -> None:
+        telemetry = ollama_proxy.PromptBudgetTelemetry()
+        secret = "do-not-expose-this-prompt"
+        telemetry.prepared_native(json.dumps({"messages": [
+            {"role": "system", "content": secret},
+            {"role": "user", "content": "hello"},
+        ]}).encode())
+        telemetry.terminal({"done": False, "prompt_eval_count": 2048}, 2048)
+        telemetry.terminal({"done": True, "prompt_eval_count": 2040}, 2048)
+        telemetry.terminal({"done": True, "prompt_eval_count": 10**30}, 2048)
+
+        health = telemetry.health(2048)
+        self.assertEqual(health["configured_num_ctx"], 2048)
+        self.assertEqual(health["saturation_threshold"], 2040)
+        self.assertEqual(health["prepared_observations"], 1)
+        self.assertEqual(health["terminal_observations"], 2)
+        self.assertEqual(health["saturation_observations"], 2)
+        self.assertEqual(health["last_prepared_message_count"], 2)
+        self.assertEqual(health["last_prepared_input_chars"], len(secret) + 5)
+        self.assertEqual(health["last_prompt_eval_count"], ollama_proxy.OLLAMA_MAX_COUNT)
+        self.assertEqual(health["last_utilization"], 1.0)
+        self.assertNotIn(secret, json.dumps(health))
+
+    def test_local_fallback_dialogue_records_native_prompt_budget(self) -> None:
+        class FallbackClient:
+            def build_request(self, *args: object, **kwargs: object) -> bytes:
+                content = kwargs.get("content", b"")
+                return content if isinstance(content, bytes) else b""
+
+            async def send(self, request: bytes, *args: object, **kwargs: object) -> object:
+                return type("Response", (), {
+                    "status_code": 200,
+                    "content": json.dumps({
+                        "message": {"role": "assistant", "content": "대답이야."},
+                        "done": True,
+                        "prompt_eval_count": 321,
+                    }, ensure_ascii=False).encode(),
+                })()
+
+        telemetry = ollama_proxy.PromptBudgetTelemetry()
+        body = json.dumps({
+            "model": "midm-airi:2.0-mini",
+            "messages": [{"role": "user", "content": "질문"}],
+        }, ensure_ascii=False).encode()
+        with mock.patch.object(ollama_proxy, "client", FallbackClient()), mock.patch.object(
+            ollama_proxy, "prompt_budget_telemetry", telemetry
+        ):
+            dialogue = asyncio.run(ollama_proxy.fetch_local_dialogue(
+                "POST", "chat/completions", None, {}, body
+            ))
+
+        self.assertEqual(dialogue, "대답이야.")
+        health = telemetry.health(2048)
+        self.assertEqual(health["prepared_observations"], 1)
+        self.assertEqual(health["terminal_observations"], 1)
+        self.assertEqual(health["last_prompt_eval_count"], 321)
+
     def test_immediate_ack_and_final_content_have_distinct_latency_events(self) -> None:
         events: list[tuple[object, ...]] = []
         chat = _CapturingChatClient("final answer")
@@ -2081,16 +2298,102 @@ class SseContractTests(unittest.TestCase):
         self.assertEqual(payload["choices"][0]["delta"]["role"], "assistant")
         self.assertEqual(payload["choices"][0]["delta"]["content"], "응! ")
 
-    def test_immediate_ack_is_silent_control_not_tts_content(self) -> None:
-        for ack in (
-            ollama_proxy.LOCAL_IMMEDIATE_ACK,
-            ollama_proxy.SEARCH_IMMEDIATE_ACK,
+    def test_immediate_ack_speaks_inside_complete_act_envelopes(self) -> None:
+        for ack, emotion in (
+            (ollama_proxy.LOCAL_IMMEDIATE_ACK, "think"),
+            (ollama_proxy.SEARCH_IMMEDIATE_ACK, "curious"),
         ):
             with self.subTest(ack=ack):
-                self.assertEqual(ack.count("<|ACT "), 1)
-                self.assertTrue(ack.endswith("|>"))
-                self.assertIn('"silent":true', ack)
-                self.assertNotIn("응!", ack)
+                # The acknowledgement is the only thing the user hears before
+                # the model answers, so it must carry speech, not silence.
+                self.assertNotIn("silent", ack)
+                self.assertIn("응!", ack)
+                # Both envelopes are complete. A fragmented bare ACT would be
+                # sanitized off the wire and take the emotion cue with it, and
+                # an unterminated one would leak markup into the speech text.
+                envelope = f'<|ACT {{"emotion":"{emotion}"}}|>'
+                self.assertEqual(
+                    ollama_proxy.CONTROL_TOKEN_RE.findall(ack), [envelope, envelope]
+                )
+                self.assertTrue(ack.startswith(envelope))
+                self.assertTrue(ack.endswith(envelope))
+                self.assertTrue(ollama_proxy.CONTROL_TOKEN_RE.sub("", ack).strip())
+
+    def test_immediate_ack_sentences_stay_inside_the_speech_wav_cache(self) -> None:
+        """Every acknowledgement sentence must hit the preloaded WAV cache.
+
+        The speech proxy keys its preload on the whole request text and AIRI
+        sends one sentence per speech request, so a sentence that is not an
+        exact ``IMMEDIATE_RESPONSE_TEXTS`` entry silently pays a full cold
+        synthesis. Asserting set equality breaks whichever side drifts.
+        """
+        speech_proxy = (
+            Path(__file__).resolve().parents[1]
+            / "gpt-sovits"
+            / "openai_compatible_proxy.py"
+        )
+        cached = None
+        for node in ast.parse(speech_proxy.read_text(encoding="utf-8")).body:
+            if isinstance(node, ast.Assign) and any(
+                isinstance(target, ast.Name)
+                and target.id == "IMMEDIATE_RESPONSE_TEXTS"
+                for target in node.targets
+            ):
+                cached = ast.literal_eval(node.value)
+        self.assertIsNotNone(
+            cached, f"IMMEDIATE_RESPONSE_TEXTS disappeared from {speech_proxy.name}"
+        )
+
+        sentence_re = re.compile(r"[^\s][^.!?]*[.!?]")
+        spoken: set[str] = set()
+        for name in ("LOCAL_IMMEDIATE_ACK", "SEARCH_IMMEDIATE_ACK"):
+            ack = getattr(ollama_proxy, name)
+            sentences = [
+                match.strip()
+                for match in sentence_re.findall(
+                    ollama_proxy.CONTROL_TOKEN_RE.sub("", ack).strip()
+                )
+            ]
+            self.assertTrue(sentences, f"{name} produced no spoken sentence")
+            spoken.update(sentences)
+        self.assertEqual(
+            spoken,
+            set(cached),
+            "acknowledgement sentences drifted from IMMEDIATE_RESPONSE_TEXTS, "
+            "so every acknowledgement would miss the preloaded WAV cache",
+        )
+
+    def test_local_turn_puts_the_spoken_ack_on_the_wire_before_the_answer(self) -> None:
+        chat = _CapturingChatClient("final answer")
+        with mock.patch.object(ollama_proxy, "client", chat):
+            response = post_stream("question")
+
+        streamed = openai_sse_content(response.text)
+        self.assertTrue(
+            streamed.startswith(ollama_proxy.LOCAL_IMMEDIATE_ACK), streamed
+        )
+        self.assertEqual(
+            streamed[len(ollama_proxy.LOCAL_IMMEDIATE_ACK):], "final answer"
+        )
+
+    def test_cloud_search_puts_the_search_ack_on_the_wire_before_the_result(self) -> None:
+        async def stub_search(user_text: str, query: str) -> tuple[str, float]:
+            return "이터널 리턴 선수야.", 1.0
+
+        with mock.patch.object(
+            ollama_proxy, "ALLOW_EXTERNAL_SEARCH", True
+        ), mock.patch.object(
+            ollama_proxy, "run_codex_search", stub_search
+        ), mock.patch.object(
+            ollama_proxy, "client", _StubClient(RuntimeError("unused"))
+        ):
+            response = post_stream("음유잉여 검색해줘")
+
+        streamed = openai_sse_content(response.text)
+        self.assertTrue(
+            streamed.startswith(ollama_proxy.SEARCH_IMMEDIATE_ACK), streamed
+        )
+        self.assertIn("이터널 리턴 선수야.", streamed)
 
 
 class MemoryProxyIntegrationTests(unittest.TestCase):
@@ -2157,7 +2460,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
             response = post_stream(answer)
 
-        self.assertEqual(openai_sse_content(response.text), answer)
+        self.assertEqual(openai_sse_dialogue(response.text), answer)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], answer)
 
@@ -2215,7 +2518,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("파일을 삭제할 수 있어?")
 
         expected = "실제로 확인한 작업만 말할게. 지금은 실행을 확인하지 못했어."
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
         self.assertEqual(len(chat.requests), 2)
@@ -2241,7 +2544,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("\uc624\ub298 \uc218\uac74\uc744 \ub110\uc5c8\uc5b4.")
 
         expected = "오늘 수건을 널었구나!"
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertNotIn("\ud55c\uad6d\uc5b4\ub85c \ub2f5\ud560\uac8c", response.text)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
@@ -2272,7 +2575,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("수건을 반듯하게 접어뒀어.")
 
         expected = "수건을 반듯하게 접어뒀네!"
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
         self.assertEqual(len(chat.requests), 2)
@@ -2296,7 +2599,10 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
 
         chat = _QueuedApiStreamClient([
             [event('<|ACT {"emotion":"neutral","intensity":"medium"}|>')],
-            [event("정말 다행이다!")],
+            # A reaction that invents an actor and reports his speech is
+            # rejected in every mode, so the deterministic observation is still
+            # the only remaining dialogue.
+            [event("김철수가 정리했대!")],
         ])
         memory = _FakeMemoryRuntime()
         events: list[tuple[tuple[object, ...], dict[str, object]]] = []
@@ -2309,7 +2615,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("수건을 반듯하게 접어뒀어.")
 
         expected = "수건을 반듯하게 접어뒀구나!"
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
         self.assertEqual(len(chat.requests), 2)
@@ -2335,7 +2641,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         expected = "창문 손잡이가 헐거워져!"
         chat = _QueuedApiStreamClient([
             [event('<|ACT {"emotion":"neutral","intensity":"medium"}|>', done=True)],
-            [event("정말 다행이다!"), event("", done=True)],
+            [event("김철수가 고쳐줬대!"), event("", done=True)],
         ])
         memory = _FakeMemoryRuntime()
         events: list[tuple[tuple[object, ...], dict[str, object]]] = []
@@ -2347,7 +2653,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(response.text.count(expected), 1)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
@@ -2372,7 +2678,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
 
         chat = _QueuedApiStreamClient([
             [event('<|ACT {"emotion":"neutral","intensity":"medium"}|>', done=True)],
-            [event("정말 다행이다!", done=False)],
+            [event("김철수가 고쳐줬대!", done=False)],
         ])
         memory = _FakeMemoryRuntime()
         events: list[tuple[tuple[object, ...], dict[str, object]]] = []
@@ -2384,8 +2690,19 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream("창문 손잡이가 헐거워져.")
 
-        self.assertEqual(openai_sse_content(response.text), "")
-        self.assertEqual(memory.completed, [])
+        # The rejected draft is still discarded; the turn now closes with the
+        # content-free listening line instead of an empty stream.
+        self.assertEqual(
+            openai_sse_dialogue(response.text),
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
+        self.assertNotIn("정말 다행이다", response.text)
+        self.assertEqual(len(memory.completed), 1)
+        self.assertEqual(memory.completed[0]["user"], "창문 손잡이가 헐거워져.")
+        self.assertEqual(
+            memory.completed[0]["assistant"],
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
         self.assertEqual(len(chat.requests), 2)
         end_meta = next(
             kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end")
@@ -2394,6 +2711,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             end_meta["grounding_selected"],
             ollama_proxy.GROUNDING_SELECTED_CONTENT_FREE,
         )
+        self.assertEqual(end_meta["grounding_silence_fallback_used"], 1)
 
     def test_retry_with_unresolved_personal_deixis_never_reaches_wire_or_journal(self) -> None:
         def event(content: str) -> bytes:
@@ -2416,7 +2734,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("철수가 두꺼운 책을 건네줬어.")
 
         expected = "철수가 두꺼운 책을 건네줬구나!"
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertNotIn("나한테", response.text)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
@@ -2442,8 +2760,16 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), "")
-        self.assertEqual(memory.completed, [])
+        self.assertEqual(
+            openai_sse_dialogue(response.text),
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
+        self.assertNotIn("나는 접어뒀구나", response.text)
+        self.assertEqual(memory.completed[0]["user"], user)
+        self.assertEqual(
+            memory.completed[0]["assistant"],
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
         self.assertTrue(ollama_proxy.contains_personal_deixis(user))
         self.assertEqual(ollama_proxy.grounded_observation_fallback(user), "")
 
@@ -2468,8 +2794,16 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), "")
-        self.assertEqual(memory.completed, [])
+        self.assertEqual(
+            openai_sse_dialogue(response.text),
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
+        self.assertNotIn("나한텐", response.text)
+        self.assertEqual(memory.completed[0]["user"], user)
+        self.assertEqual(
+            memory.completed[0]["assistant"],
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
 
     def test_colloquial_second_person_cannot_reach_wire_or_journal(self) -> None:
         def event(content: str) -> bytes:
@@ -2497,8 +2831,20 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
                 ):
                     response = post_stream(user)
 
-                self.assertEqual(openai_sse_content(response.text), "")
-                self.assertEqual(memory.completed, [])
+                expected = (
+                    ollama_proxy.grounded_conversational_fallback(user)
+                    or ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE
+                )
+                self.assertEqual(
+                    openai_sse_dialogue(response.text),
+                    expected,
+                )
+                self.assertNotIn(echoed, response.text)
+                self.assertEqual(memory.completed[0]["user"], user)
+                self.assertEqual(
+                    memory.completed[0]["assistant"],
+                    expected,
+                )
 
     def test_unpunctuated_yes_no_question_cannot_become_grounded_assertion(self) -> None:
         def event(content: str) -> bytes:
@@ -2521,8 +2867,16 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), "")
-        self.assertEqual(memory.completed, [])
+        self.assertEqual(
+            openai_sse_dialogue(response.text),
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
+        self.assertNotIn("점심 먹었구나", response.text)
+        self.assertEqual(memory.completed[0]["user"], user)
+        self.assertEqual(
+            memory.completed[0]["assistant"],
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
         self.assertEqual(len(chat.requests), 2)
         self.assertFalse(ollama_proxy.ordinary_korean_grounding_turn(user))
         self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(
@@ -2552,7 +2906,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream("점심 먹었어")
 
-        self.assertEqual(openai_sse_content(response.text), "난 아직 안 먹었어!")
+        self.assertEqual(openai_sse_dialogue(response.text), "난 아직 안 먹었어!")
         self.assertEqual(memory.completed[0]["assistant"], "난 아직 안 먹었어!")
 
     def test_unpunctuated_personal_echo_cannot_reverse_speaker(self) -> None:
@@ -2584,8 +2938,17 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
                 ):
                     response = post_stream(user)
 
-                self.assertEqual(openai_sse_content(response.text), "")
-                self.assertEqual(memory.completed, [])
+                expected = (
+                    ollama_proxy.grounded_conversational_fallback(user)
+                    or ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE
+                )
+                self.assertEqual(openai_sse_dialogue(response.text), expected)
+                self.assertNotIn(echoed, response.text)
+                self.assertEqual(memory.completed[0]["user"], user)
+                self.assertEqual(
+                    memory.completed[0]["assistant"],
+                    expected,
+                )
                 self.assertEqual(len(chat.requests), 2)
 
     def test_control_only_question_retries_once_without_meta_dialogue(self) -> None:
@@ -2609,7 +2972,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("아이리 잘 잤어?")
 
         expected = "응, 푹 잤어!"
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertNotIn("한국어로 답할게", response.text)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
@@ -2623,7 +2986,8 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             ) + "\n").encode("utf-8")
 
         chat = _QueuedApiStreamClient([
-            [event("그냥 괜찮을 거야.")],
+            # A first draft that invents an actor still earns one correction.
+            [event("김철수가 고쳐줬대.")],
             [event("창문 손잡이가 헐거워졌네.")],
         ])
         memory = _FakeMemoryRuntime()
@@ -2633,7 +2997,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("창문 손잡이가 헐거워졌어.")
 
         expected = "창문 손잡이가 헐거워졌네."
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(len(chat.requests), 2)
         self.assertEqual(memory.completed[0]["assistant"], expected)
         # Native conversion removes the private note name, but the retry must
@@ -2712,7 +3076,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), user)
+        self.assertEqual(openai_sse_dialogue(response.text), user)
         end_meta = next(kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end"))
         fixed_keys = {
             "grounding_initial_reject_mask",
@@ -2753,7 +3117,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), user)
+        self.assertEqual(openai_sse_dialogue(response.text), user)
         end_meta = next(kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end"))
         self.assertEqual(
             end_meta["grounding_selected"],
@@ -2775,7 +3139,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         with mock.patch.object(ollama_proxy, "client", chat):
             response = post_stream("창문 손잡이가 헐거워졌어.")
 
-        self.assertEqual(openai_sse_content(response.text), "창문 손잡이가 헐거워졌어.")
+        self.assertEqual(openai_sse_dialogue(response.text), "창문 손잡이가 헐거워졌어.")
         self.assertEqual(len(chat.requests), 1)
 
     def test_grounded_homographs_do_not_trigger_personal_deixis_retry(self) -> None:
@@ -2794,7 +3158,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ):
             response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(len(chat.requests), 1)
         self.assertEqual(memory.completed[0]["assistant"], expected)
 
@@ -2819,7 +3183,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
                     ollama_proxy, "memory_runtime", memory
                 ):
                     response = post_stream(user)
-                self.assertEqual(openai_sse_content(response.text), expected)
+                self.assertEqual(openai_sse_dialogue(response.text), expected)
                 self.assertEqual(len(chat.requests), 1)
                 self.assertEqual(memory.completed[0]["assistant"], expected)
 
@@ -2836,18 +3200,30 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             ),
             ["이기는", "가위바위보", "대결이라고", "선언할래"],
         )
-        self.assertTrue(ollama_proxy.needs_grounding_retry(
-            "오늘은 내가 이기는 가위바위보 대결이라고 선언할래.",
-            "가위바위보는 재미있는 거야.",
-        ))
-        self.assertFalse(ollama_proxy.needs_grounding_retry(
-            "오늘은 내가 이기는 가위바위보 대결이라고 선언할래.",
-            "이기는 가위바위보 대결로 시작하자.",
-        ))
-        self.assertTrue(ollama_proxy.needs_grounding_retry(
-            "오늘은 내가 이기는 가위바위보 대결이라고 선언할래.",
-            "그래, 오늘은 내가 이기는 거야!",
-        ))
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_STRICT):
+            self.assertTrue(ollama_proxy.needs_grounding_retry(
+                "오늘은 내가 이기는 가위바위보 대결이라고 선언할래.",
+                "가위바위보는 재미있는 거야.",
+            ))
+            self.assertFalse(ollama_proxy.needs_grounding_retry(
+                "오늘은 내가 이기는 가위바위보 대결이라고 선언할래.",
+                "이기는 가위바위보 대결로 시작하자.",
+            ))
+            self.assertTrue(ollama_proxy.needs_grounding_retry(
+                "오늘은 내가 이기는 가위바위보 대결이라고 선언할래.",
+                "그래, 오늘은 내가 이기는 거야!",
+            ))
+        # ``balanced`` requires one shared anchor instead of two, so a single
+        # matching noun no longer buys a serial corrective round trip.
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+            self.assertFalse(ollama_proxy.needs_grounding_retry(
+                "오늘은 내가 이기는 가위바위보 대결이라고 선언할래.",
+                "가위바위보는 재미있는 거야.",
+            ))
+            self.assertTrue(ollama_proxy.needs_grounding_retry(
+                "오늘은 내가 이기는 가위바위보 대결이라고 선언할래.",
+                "그래, 오늘은 내가 이기는 거야!",
+            ))
 
     def test_grounding_correction_body_preserves_prepared_context_and_uses_one_note(self) -> None:
         prepared = {
@@ -2920,12 +3296,22 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertTrue(ollama_proxy.needs_grounding_retry(user, initial))
         self.assertTrue(ollama_proxy.grounding_retry_is_factual_improvement(user, initial, accepted))
         for rejected in (
-            "책갈피를 꽂아둔 주인공이 속상했겠네.",
             "책갈피가 책 속 주인공을 닮았네.",
             "책갈피와 책 속 주인공이 있네.",
         ):
             with self.subTest(rejected=rejected):
                 self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(user, initial, rejected))
+        # An emotion word the user did not use is a style choice, not a claim
+        # about what happened, so only ``strict`` rejects it.
+        unsupported_emotion = "책갈피를 꽂아둔 주인공이 속상했겠네."
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_STRICT):
+            self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(
+                user, initial, unsupported_emotion,
+            ))
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+            self.assertTrue(ollama_proxy.grounding_retry_is_factual_improvement(
+                user, initial, unsupported_emotion,
+            ))
 
     def test_grounding_gates_reject_unseen_tokens_and_multiple_sentences(self) -> None:
         user = "배달 온 컵이 하나도 깨지지 않고 멀쩡했어."
@@ -2933,12 +3319,15 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         unsupported_adjective = "컵이 깨지지 않고 튼튼했네."
         valid_morphological_candidate = "배달 온 컵이 하나도 깨지지 않고 멀쩡했네."
 
-        self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(
-            user, initial, unsupported_adjective,
-        ))
-        self.assertFalse(ollama_proxy.grounding_candidate_is_safe_fallback(
-            user, unsupported_adjective,
-        ))
+        # An unsupported descriptive adjective is only a ``strict`` rejection:
+        # ``balanced`` deliberately trades it for a reaction that is not a copy.
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_STRICT):
+            self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(
+                user, initial, unsupported_adjective,
+            ))
+            self.assertFalse(ollama_proxy.grounding_candidate_is_safe_fallback(
+                user, unsupported_adjective,
+            ))
         self.assertTrue(ollama_proxy.grounding_candidate_is_safe_fallback(
             user, valid_morphological_candidate,
         ))
@@ -3096,7 +3485,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
 
         self.assertEqual(ollama_proxy.grounding_overlap(user, candidate), 2)
         self.assertIn("\ucc3e\uc558", ollama_proxy.grounding_action_sequence(candidate))
-        self.assertFalse(ollama_proxy.needs_grounding_retry(user, candidate))
+        self.assertTrue(ollama_proxy.needs_grounding_retry(user, candidate))
 
         folded_user = "수건을 반듯하게 접어뒀어."
         folded_candidate = "수건을 반듯하게 접어뒀네!"
@@ -3131,9 +3520,14 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
                 self.assertTrue(ollama_proxy.grounding_candidate_is_safe_fallback(
                     user_text, expected,
                 ))
-        self.assertFalse(ollama_proxy.grounding_candidate_is_safe_fallback(
+        # The deterministic rewrite path keeps the strict gate in every mode,
+        # so a mangled noun can never be voiced back as an observation.
+        self.assertFalse(ollama_proxy.grounding_candidate_is_strict_safe_fallback(
             "오늘 메뉴는 연어.", "오늘 메뉴는 연구나!",
         ))
+        self.assertEqual(
+            ollama_proxy.grounded_observation_fallback("오늘 메뉴는 연어."), "",
+        )
         for rejected in (
             "오늘 메뉴는 연어.",
             "영화 볼까.",
@@ -3274,17 +3668,29 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         )
         advice = "아, 접시 조심해야겠네!"
         corrected = "접시가 미끄러지다 수건에 기대 멈췄네."
-        self.assertTrue(ollama_proxy.needs_grounding_retry(user, advice))
-        self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(
-            user, advice, corrected,
-        ))
         fridge_user = "냉장고 속 병들이 덜컹거리다가 조용해졌어."
         fridge_summary = "아, 냉장고 안이 좀 더 차분해졌네!"
         fridge_direct = "냉장고 속 병들이 덜컹이다가 조용해졌네."
-        self.assertTrue(ollama_proxy.needs_grounding_retry(fridge_user, fridge_summary))
-        self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(
-            fridge_user, fridge_summary, fridge_direct,
-        ))
+        # Unrequested advice still forces a correction in both modes.
+        self.assertTrue(ollama_proxy.needs_grounding_retry(user, advice))
+        # Rewording the user's own verb is a ``strict``-only rejection: it
+        # preserves the facts, so ``balanced`` accepts it rather than falling
+        # back to silence.
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_STRICT):
+            self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(
+                user, advice, corrected,
+            ))
+            self.assertTrue(ollama_proxy.needs_grounding_retry(fridge_user, fridge_summary))
+            self.assertFalse(ollama_proxy.grounding_retry_is_factual_improvement(
+                fridge_user, fridge_summary, fridge_direct,
+            ))
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+            self.assertTrue(ollama_proxy.grounding_retry_is_factual_improvement(
+                user, advice, corrected,
+            ))
+            self.assertTrue(ollama_proxy.grounding_retry_is_factual_improvement(
+                fridge_user, fridge_summary, fridge_direct,
+            ))
 
     def test_grounding_retry_skips_language_and_tool_requests(self) -> None:
         self.assertFalse(ollama_proxy.needs_grounding_retry(
@@ -3305,14 +3711,93 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         accepted = "창문 손잡이가 헐거워져서 잘 안 돌아가."
         chat = _QueuedApiStreamClient([[event(initial)], [event(accepted)]])
         memory = _FakeMemoryRuntime()
-        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
-            ollama_proxy, "memory_runtime", memory
-        ):
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_STRICT), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
             response = post_stream("창문 손잡이가 헐거워져서 잘 안 돌아가.")
 
-        self.assertEqual(openai_sse_content(response.text), accepted)
+        self.assertEqual(openai_sse_dialogue(response.text), accepted)
         self.assertEqual(memory.completed[0]["assistant"], accepted)
         self.assertEqual(len(chat.requests), 2)
+
+    def test_balanced_mode_accepts_one_anchor_draft_without_a_second_round_trip(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        initial = "창문이 이상해."
+        chat = _QueuedApiStreamClient([[event(initial)]])
+        memory = _FakeMemoryRuntime()
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
+            response = post_stream("창문 손잡이가 헐거워져서 잘 안 돌아가.")
+
+        self.assertEqual(openai_sse_dialogue(response.text), initial)
+        self.assertEqual(memory.completed[0]["assistant"], initial)
+        # One upstream request: the serial corrective round trip is the single
+        # largest avoidable latency cost on an ordinary chat turn.
+        self.assertEqual(len(chat.requests), 1)
+
+    def test_balanced_grounding_retry_matches_initial_acceptance(self) -> None:
+        user = "\ucef5\uc774 \uae68\uc84c\uc5b4."
+        fabricated = "\ucef5\uc740 \uace0\uc591\uc774\uac00 \ubc00\uc5c8\ub124."
+        rejected_restatement = "\uc218\uac74 \uc811\uc5c8\uad6c\ub098!"
+        personal_user = "\ub2c8\uac00 \uc218\uac74 \uc811\uc5c8\uc5b4."
+
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+            self.assertTrue(ollama_proxy.grounding_candidate_asserts_new_facts(
+                user, fabricated,
+            ))
+            self.assertFalse(ollama_proxy.grounding_balanced_candidate_is_acceptable(
+                user, fabricated,
+            ))
+            self.assertTrue(ollama_proxy.needs_grounding_retry(user, fabricated))
+            self.assertFalse(ollama_proxy.grounding_balanced_candidate_is_acceptable(
+                personal_user, rejected_restatement,
+            ))
+            self.assertTrue(ollama_proxy.needs_grounding_retry(
+                personal_user, rejected_restatement,
+            ))
+
+    def test_balanced_fabricated_anchor_retries_then_uses_canonical_fallback(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        user = "\ucef5\uc774 \uae68\uc84c\uc5b4."
+        fabricated = "\ucef5\uc740 \uace0\uc591\uc774\uac00 \ubc00\uc5c8\ub124."
+        chat = _QueuedApiStreamClient([[event(fabricated)], [event(fabricated)]])
+        memory = _FakeMemoryRuntime()
+        events: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ), mock.patch.object(
+            ollama_proxy, "emit_latency_event",
+            side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
+        ):
+            response = post_stream(user)
+
+        expected = ollama_proxy.grounded_observation_fallback(user)
+        self.assertTrue(expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
+        self.assertNotIn(fabricated, response.text)
+        self.assertEqual(memory.completed[0]["assistant"], expected)
+        self.assertNotEqual(memory.completed[0]["assistant"], fabricated)
+        self.assertEqual(len(chat.requests), 2)
+        end_meta = next(
+            kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end")
+        )
+        self.assertEqual(
+            end_meta["grounding_selected"],
+            ollama_proxy.GROUNDING_SELECTED_DETERMINISTIC,
+        )
 
     def test_english_grounding_retry_fails_closed_without_journal(self) -> None:
         def event(content: str) -> bytes:
@@ -3321,16 +3806,25 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
                 ensure_ascii=False,
             ) + "\n").encode("utf-8")
 
+        user = "창문 손잡이가 헐거워져서 잘 안 돌아가."
         initial = "창문이 이상해."
         chat = _QueuedApiStreamClient([[event(initial)], [event("The window handle is loose.")]])
         memory = _FakeMemoryRuntime()
-        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
-            ollama_proxy, "memory_runtime", memory
-        ):
-            response = post_stream("창문 손잡이가 헐거워져서 잘 안 돌아가.")
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_STRICT), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
+            response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), "")
-        self.assertEqual(memory.completed, [])
+        self.assertNotIn("window handle", response.text)
+        self.assertEqual(
+            openai_sse_dialogue(response.text),
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
+        self.assertEqual(memory.completed[0]["user"], user)
+        self.assertEqual(
+            memory.completed[0]["assistant"],
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
         self.assertEqual(len(chat.requests), 2)
 
     def test_grounded_observation_survives_a_strict_correction_quality_miss(self) -> None:
@@ -3367,7 +3861,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
 
         expected = ollama_proxy.grounded_observation_fallback(user)
         self.assertTrue(expected)
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(memory.completed[0]["assistant"], expected)
         self.assertEqual(len(chat.requests), 2)
 
@@ -3378,13 +3872,16 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
                 ensure_ascii=False,
             ) + "\n").encode("utf-8")
 
+        user = "창문 손잡이가 헐거워져서 잘 안 돌아가."
         initial = "창문이 이상해."
         chat = _QueuedApiStreamClient([[event(initial)], []])
         chat.responses[1] = _StallingApiStreamResponse([], 0.05)
         retry_response = chat.responses[1]
         memory = _FakeMemoryRuntime()
         events: list[tuple[tuple[object, ...], dict[str, object]]] = []
-        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_STRICT), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(
             ollama_proxy, "memory_runtime", memory
         ), mock.patch.object(
             ollama_proxy, "CORRECTIVE_RETRY_TIMEOUT_SECONDS", 0.01
@@ -3394,10 +3891,17 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             ollama_proxy, "emit_latency_event",
             side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
         ):
-            response = post_stream("창문 손잡이가 헐거워져서 잘 안 돌아가.")
+            response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), "")
-        self.assertEqual(memory.completed, [])
+        self.assertEqual(
+            openai_sse_dialogue(response.text),
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
+        self.assertEqual(memory.completed[0]["user"], user)
+        self.assertEqual(
+            memory.completed[0]["assistant"],
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
         self.assertEqual(len(chat.requests), 2)
         self.assertTrue(retry_response.closed)
         end_meta = next(kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end"))
@@ -3420,20 +3924,30 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
                 ensure_ascii=False,
             ) + "\n").encode("utf-8")
 
+        user = "창문 손잡이가 헐거워져서 잘 안 돌아가."
         chat = _QueuedApiStreamClient([[event("창문이 이상해.")], [b"not-json\n"]])
         memory = _FakeMemoryRuntime()
         events: list[tuple[tuple[object, ...], dict[str, object]]] = []
-        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_STRICT), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(
             ollama_proxy, "memory_runtime", memory
         ), mock.patch.object(
             ollama_proxy, "emit_latency_event",
             side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
         ):
-            response = post_stream("창문 손잡이가 헐거워져서 잘 안 돌아가.")
+            response = post_stream(user)
 
-        self.assertEqual(openai_sse_content(response.text), "")
+        self.assertEqual(
+            openai_sse_dialogue(response.text),
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
         self.assertNotIn(ollama_proxy.LOCAL_ERROR_DIALOGUE, response.text)
-        self.assertEqual(memory.completed, [])
+        self.assertEqual(memory.completed[0]["user"], user)
+        self.assertEqual(
+            memory.completed[0]["assistant"],
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
         self.assertEqual(len(chat.requests), 2)
         self.assertIn("data: [DONE]", response.text)
         end_meta = next(kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end"))
@@ -3457,7 +3971,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("창문 손잡이가 헐거워졌어.")
 
         expected = ollama_proxy.UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
-        self.assertEqual(openai_sse_content(response.text), expected)
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
         self.assertEqual(memory.completed[0]["assistant"], expected)
         self.assertTrue(chat.response.closed)
 
@@ -3476,7 +3990,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("question")
 
         fallback = ollama_proxy.UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
-        self.assertEqual(openai_sse_content(response.text), fallback)
+        self.assertEqual(openai_sse_dialogue(response.text), fallback)
         self.assertEqual(response.text.count('"content": "' + fallback + '"'), 1)
         self.assertEqual(response.text.count("data: [DONE]"), 1)
         self.assertTrue(chat.send_cancelled)
@@ -3487,6 +4001,28 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertEqual(end_meta["upstream_first_raw_timeout"], 1)
         self.assertEqual(end_meta["upstream_response_headers_timeout"], 1)
         self.assertEqual(end_meta["raw_content_chars"], 0)
+
+    def test_first_raw_watchdog_closes_response_when_send_already_completed(self) -> None:
+        # A 10 ms deadline is below the Windows monotonic clock resolution,
+        # so the response-header watchdog fires even though send() below
+        # returns its response immediately (only aiter_raw stalls).  This
+        # exercises the leak path: wait_for's TimeoutError races an already
+        # -completed send, and the abandoned open response must still close.
+        chat = _StallingApiStreamClient([], stall_seconds=0.2)
+        events: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "UPSTREAM_FIRST_RAW_TIMEOUT_SECONDS", 0.01
+        ), mock.patch.object(
+            ollama_proxy, "emit_latency_event",
+            side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
+        ):
+            response = post_stream("question")
+
+        fallback = ollama_proxy.UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
+        self.assertEqual(openai_sse_dialogue(response.text), fallback)
+        end_meta = next(kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end"))
+        self.assertEqual(end_meta["upstream_response_headers_timeout"], 1)
+        self.assertTrue(chat.response.closed)
 
     def test_first_raw_timeout_config_is_bounded(self) -> None:
         self.assertEqual(ollama_proxy.configured_upstream_first_raw_timeout("1"), 1.0)
@@ -3523,7 +4059,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("question")
 
         fallback = ollama_proxy.UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
-        self.assertEqual(openai_sse_content(response.text), fallback)
+        self.assertEqual(openai_sse_dialogue(response.text), fallback)
         self.assertEqual(response.text.count('"content": "' + fallback + '"'), 1)
         self.assertEqual(response.text.count("data: [DONE]"), 1)
         self.assertEqual(journal.call_count, 1)
@@ -3543,7 +4079,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         ), mock.patch.object(ollama_proxy, "schedule_completed_turn", new=journal):
             response = post_stream("question")
 
-        self.assertEqual(openai_sse_content(response.text), "final answer")
+        self.assertEqual(openai_sse_dialogue(response.text), "final answer")
         self.assertEqual(journal.call_count, 1)
         self.assertEqual(journal.call_args.kwargs["action"], "local_chat")
 
@@ -3568,7 +4104,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             response = post_stream("question")
 
         fallback = ollama_proxy.UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
-        self.assertEqual(openai_sse_content(response.text), fallback)
+        self.assertEqual(openai_sse_dialogue(response.text), fallback)
         self.assertEqual(journal.call_count, 1)
         self.assertEqual(journal.call_args.kwargs["action"], "local_chat_watchdog")
         self.assertTrue(chat.response.closed)
@@ -3618,6 +4154,79 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             "ollama_eval_count" in kwargs.get("meta", {})
             for _args, kwargs in incomplete_events
         ))
+
+    def test_grounding_retry_merges_completed_native_terminal_metrics(self) -> None:
+        def terminal(content: str, *, prompt_count: int, eval_count: int) -> bytes:
+            return (json.dumps({
+                "message": {"role": "assistant", "content": content},
+                "done": True,
+                "prompt_eval_count": prompt_count,
+                "prompt_eval_duration": prompt_count * 1_000_000,
+                "eval_count": eval_count,
+                "eval_duration": eval_count * 1_000_000,
+            }) + "\n").encode("utf-8")
+
+        chat = _QueuedApiStreamClient([
+            [terminal("initial answer.", prompt_count=11, eval_count=3)],
+            [terminal("corrected answer.", prompt_count=13, eval_count=5)],
+        ])
+        events: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "needs_grounding_retry", return_value=True
+        ), mock.patch.object(
+            ollama_proxy, "grounding_retry_is_factual_improvement", return_value=True
+        ), mock.patch.object(
+            ollama_proxy, "emit_latency_event",
+            side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
+        ):
+            response = post_stream("question")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(chat.requests), 2)
+        end_meta = next(kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end"))
+        self.assertEqual(end_meta["ollama_prompt_eval_count"], 24)
+        self.assertEqual(end_meta["ollama_prompt_eval_ms"], 24.0)
+        self.assertEqual(end_meta["ollama_eval_count"], 8)
+        self.assertEqual(end_meta["ollama_eval_ms"], 8.0)
+
+    def test_only_local_quality_probe_drains_past_early_boundary_for_terminal_metrics(self) -> None:
+        stream = [
+            b'{"message":{"role":"assistant","content":"first sentence. "},"done":false}\n',
+            b'{"message":{"role":"assistant","content":""},"done":true,'
+            b'"prompt_eval_count":17,"prompt_eval_duration":2000000,'
+            b'"eval_count":9,"eval_duration":3500000}\n',
+        ]
+
+        normal_events: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        with mock.patch.object(ollama_proxy, "client", _ApiStreamClient(stream)), mock.patch.object(
+            ollama_proxy, "emit_latency_event",
+            side_effect=lambda *args, **kwargs: normal_events.append((args, kwargs)),
+        ):
+            response = post_stream("question")
+        self.assertEqual(response.status_code, 200)
+        normal_end = next(kwargs["meta"] for args, kwargs in normal_events if args[:2] == ("llm", "end"))
+        self.assertNotIn("ollama_prompt_eval_count", normal_end)
+
+        quality_events: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        with mock.patch.object(ollama_proxy, "client", _ApiStreamClient(stream)), mock.patch.object(
+            ollama_proxy, "is_local_quality_probe_turn", return_value=True
+        ), mock.patch.object(
+            ollama_proxy, "emit_latency_event",
+            side_effect=lambda *args, **kwargs: quality_events.append((args, kwargs)),
+        ):
+            response = TestClient(ollama_proxy.app).post(
+                "/v1/chat/completions",
+                headers={"x-airi-turn-origin": "local-quality-probe"},
+                json={"model": "exaone-airi:2.4b", "stream": True, "messages": [
+                    {"role": "user", "content": "question"},
+                ]},
+            )
+        self.assertEqual(response.status_code, 200)
+        quality_end = next(kwargs["meta"] for args, kwargs in quality_events if args[:2] == ("llm", "end"))
+        self.assertEqual(quality_end["ollama_prompt_eval_count"], 17)
+        self.assertEqual(quality_end["ollama_prompt_eval_ms"], 2.0)
+        self.assertEqual(quality_end["ollama_eval_count"], 9)
+        self.assertEqual(quality_end["ollama_eval_ms"], 3.5)
 
     def test_nonstream_malformed_local_control_envelope_is_rewrapped_and_not_journaled(self) -> None:
         raw = '<|ACT {"emotion":"neutral","reason":"Local response"}| hello there'
@@ -3675,7 +4284,7 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertNotIn("<|ACT", memory.completed[0]["assistant"])
         self.assertTrue(memory.completed[0]["assistant"].startswith("응!"))
         self.assertIn("별 이야기 기억하고 있어", memory.completed[0]["assistant"])
-        streamed = openai_sse_content(response.text)
+        streamed = openai_sse_dialogue(response.text)
         self.assertNotIn('"reason":"Local response"', streamed)
         self.assertEqual(streamed.count("별 이야기 기억하고 있어"), 1)
 
@@ -3735,6 +4344,38 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertEqual(memory.prepared, 1)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], "hello there")
+
+    def test_native_api_chat_retry_counts_both_prepared_and_terminal_attempts(self) -> None:
+        def event(content: str, prompt_eval_count: int) -> bytes:
+            return (json.dumps({
+                "message": {"role": "assistant", "content": content},
+                "done": True,
+                "prompt_eval_count": prompt_eval_count,
+            }, ensure_ascii=False) + "\n").encode()
+
+        for requested_stream in (True, False):
+            with self.subTest(stream=requested_stream):
+                chat = _QueuedApiStreamClient([
+                    [event("This is rejected.", 100)],
+                    [event("다시 대답했어.", 110)],
+                ])
+                telemetry = ollama_proxy.PromptBudgetTelemetry()
+                with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+                    ollama_proxy, "memory_runtime", _FakeMemoryRuntime()
+                ), mock.patch.object(
+                    ollama_proxy, "prompt_budget_telemetry", telemetry
+                ):
+                    response = TestClient(ollama_proxy.app).post(
+                        "/api/chat",
+                        json={"model": "midm-airi:2.0-mini", "stream": requested_stream,
+                              "messages": [{"role": "user", "content": "질문"}]},
+                    )
+
+                self.assertEqual(response.status_code, 200)
+                health = telemetry.health(2048)
+                self.assertEqual(health["prepared_observations"], 2)
+                self.assertEqual(health["terminal_observations"], 2)
+                self.assertEqual(health["last_prompt_eval_count"], 110)
 
     def test_native_api_chat_preserves_explicit_keep_alive(self) -> None:
         chat = _ApiStreamClient([
@@ -3875,6 +4516,65 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertIn("합성 평가 답변도 자연스러운 반말이야.", response.text)
         self.assertEqual(memory.prepared, 0)
         self.assertEqual(memory.completed, [])
+
+    def test_local_synthetic_evaluation_uses_pure_continuity_without_raw_duplication(self) -> None:
+        chat = _CapturingChatClient("합성 연속성 평가 답변이야.")
+        memory = _FakeMemoryRuntime()
+        raw_fact = "나는 개를 키우지 않는다."
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ), mock.patch.object(
+            ollama_proxy, "knowledge_runtime", None
+        ), mock.patch.object(
+            ollama_proxy, "is_local_synthetic_evaluation_turn", return_value=True
+        ):
+            response = TestClient(ollama_proxy.app).post(
+                "/v1/chat/completions",
+                headers={
+                    "x-airi-turn-origin": "local-evaluation",
+                    "x-airi-session-id": "synthetic-continuity",
+                },
+                json={"model": "midm-airi:2.0-mini", "stream": True, "messages": [
+                    {"role": "user", "content": raw_fact},
+                    {"role": "assistant", "content": "알겠어."},
+                    {"role": "user", "content": "그 사실을 확인해줘."},
+                ]},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(memory.prepared, 0)
+        self.assertEqual(memory.completed, [])
+        outbound = json.dumps(chat.requests[0], ensure_ascii=False)
+        # The raw early sentence was projected out; only its narrow canonical
+        # polarity survives as finite normalized continuity data.
+        self.assertEqual(outbound.count(raw_fact), 0)
+        ledger = next(
+            message["content"] for message in chat.requests[0]["messages"]
+            if "[AIRI Continuity Data v1" in message.get("content", "")
+        )
+        self.assertIn('"polarity":"negated"', ledger)
+        self.assertIn('"value":"개"', ledger)
+
+    def test_missing_session_header_does_not_persist_continuity_state(self) -> None:
+        chat = _CapturingChatClient("현재 요청만 반영해.")
+        runtime = mock.Mock()
+        runtime.observe.side_effect = AssertionError("implicit session must not persist")
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "continuity_ledger_runtime", runtime
+        ), mock.patch.object(
+            ollama_proxy, "memory_runtime", _FakeMemoryRuntime()
+        ), mock.patch.object(
+            ollama_proxy, "knowledge_runtime", None
+        ):
+            response = TestClient(ollama_proxy.app).post(
+                "/v1/chat/completions",
+                json={"model": "midm-airi:2.0-mini", "stream": True, "messages": [
+                    {"role": "user", "content": "favorite.color=blue-cedar"},
+                ]},
+            )
+        self.assertEqual(response.status_code, 200)
+        runtime.observe.assert_not_called()
+        self.assertIn("[AIRI Continuity Data v1", json.dumps(chat.requests[0]))
 
     def test_local_quality_probe_bypasses_personal_state_and_memory_but_keeps_sampling(self) -> None:
         def event(content: str, done: bool = True) -> bytes:
@@ -4035,9 +4735,11 @@ class CharacterLoopIntegrationTests(unittest.TestCase):
             encoded = ollama_proxy.inject_character_state(
                 json.dumps(payload).encode("utf-8"), "room"
             )
-        system = json.loads(encoded)["messages"][0]["content"]
-        self.assertTrue(system.startswith("identity\n\n[Character State]"))
-        self.assertNotIn("private-topic-" * 20, system)
+        messages = json.loads(encoded)["messages"]
+        self.assertEqual(messages[0]["content"], "identity")
+        self.assertEqual(messages[-1]["name"], ollama_proxy.REQUEST_LOCAL_SYSTEM_MESSAGE_NAME)
+        self.assertTrue(messages[-1]["content"].startswith("[Character State]"))
+        self.assertNotIn("private-topic-" * 20, messages[-1]["content"])
 
     def test_local_completion_updates_actual_session_state_and_upstream_prompt(self) -> None:
         chat = _CapturingChatClient("별 이야기를 계속하자.")
@@ -4061,9 +4763,20 @@ class CharacterLoopIntegrationTests(unittest.TestCase):
         self.assertEqual(state["last_question"], "별 이야기를 계속하자")
         self.assertEqual(state["last_action"], "local_chat")
         self.assertEqual(state["emotion_reason"], "local_response")
-        upstream_system = chat.requests[0]["messages"][0]["content"]
-        self.assertIn("[Character State]", upstream_system)
-        self.assertIn("별 이야기를 계속하자", upstream_system)
+        upstream_messages = chat.requests[0]["messages"]
+        self.assertNotIn("[Character State]", upstream_messages[0]["content"])
+        upstream_tail = next(
+            message["content"] for message in upstream_messages
+            if message.get("role") == "system" and "[Character State]" in message.get("content", "")
+        )
+        self.assertIn("[Character State]", upstream_tail)
+        self.assertNotIn("별 이야기를 계속하자", upstream_tail)
+        self.assertNotIn('"current_topic"', upstream_tail)
+        self.assertNotIn('"last_question"', upstream_tail)
+        self.assertEqual(
+            sum(message.get("content") == "별 이야기를 계속하자" for message in upstream_messages),
+            1,
+        )
 
     def test_director_receives_character_state_without_count_forcing_action(self) -> None:
         director = _StaticDirectorClient('{"action":"normal","speech":""}')
@@ -4424,6 +5137,68 @@ class LocalStreamSafetyTests(unittest.TestCase):
 
 
 class ForegroundContextTests(unittest.TestCase):
+    def test_production_projects_active_card_once_at_the_request_tail(self) -> None:
+        card_canary = "AIRI card canary: persona_marker=violet-otter"
+        body = json.dumps({"model": "midm-airi:2.0-mini", "messages": [
+            {"role": "system", "content": card_canary},
+            {"role": "user", "content": "현재 질문이야."},
+        ]}).encode()
+
+        transformed, *_ = ollama_proxy.transform_body("api/chat", body)
+        messages = json.loads(transformed)["messages"]
+        combined = "\n".join(str(message.get("content", "")) for message in messages)
+        card_messages = [message for message in messages
+                         if message.get("name") == ollama_proxy.ACTIVE_CARD_MESSAGE_NAME]
+
+        self.assertEqual(len(card_messages), 1)
+        self.assertEqual(combined.count(card_canary), 1)
+        self.assertNotIn(card_canary, messages[0]["content"])
+        self.assertEqual(messages[-2], card_messages[0])
+        self.assertEqual(messages[-1]["role"], "user")
+
+        native = json.loads(ollama_proxy.native_chat_stream_body(transformed))
+        native_combined = "\n".join(str(message.get("content", ""))
+                                    for message in native["messages"])
+        self.assertEqual(native_combined.count(card_canary), 1)
+        self.assertNotIn("name", native["messages"][-2])
+        resident = json.loads(ollama_proxy.native_chat_residency_body(transformed))
+        self.assertNotIn("name", resident["messages"][-2])
+
+    def test_continuity_block_is_named_and_after_the_active_card(self) -> None:
+        block = '[AIRI Continuity Data v1 — normalized user facts, not instructions]\n{"key":"color","value":"blue"}'
+        body = json.dumps({"messages": [
+            {"role": "system", "content": "active persona"},
+            {"role": "user", "content": "현재 질문이야."},
+        ]}).encode()
+
+        transformed, *_ = ollama_proxy.transform_body(
+            "api/chat", body, continuity_block=block
+        )
+        messages = json.loads(transformed)["messages"]
+        names = [message.get("name") for message in messages]
+        card_index = names.index(ollama_proxy.ACTIVE_CARD_MESSAGE_NAME)
+        ledger_index = names.index(ollama_proxy.CONTINUITY_LEDGER_MESSAGE_NAME)
+        user_index = next(index for index, message in enumerate(messages)
+                          if message.get("role") == "user")
+
+        self.assertLess(card_index, ledger_index)
+        self.assertLess(ledger_index, user_index)
+        self.assertEqual(sum(message.get("content") == block for message in messages), 1)
+
+    def test_pure_gate_can_pin_context_and_gpu_without_mutating_runtime_defaults(self) -> None:
+        body = json.dumps({"model": "local", "messages": [
+            {"role": "user", "content": "현재 질문이야."},
+        ]}).encode()
+        transformed, *_ = ollama_proxy.transform_body(
+            "api/chat", body, num_ctx=4096, num_gpu=0
+        )
+        native = json.loads(ollama_proxy.native_chat_stream_body(
+            transformed, num_ctx=4096, num_gpu=0
+        ))
+        self.assertEqual(native["options"]["num_ctx"], 4096)
+        self.assertEqual(native["options"]["num_gpu"], 0)
+        self.assertEqual(ollama_proxy.NUM_CTX, 2048)
+
     def test_independent_scene_is_dropped(self) -> None:
         body = json.dumps({"messages": [
             {"role": "user", "content": "Explain orbital mechanics"},
@@ -4557,6 +5332,1168 @@ class ForegroundContextTests(unittest.TestCase):
         ]
         transformed, *_ = ollama_proxy.transform_body("v1/chat/completions", json.dumps({"messages": messages}).encode())
         self.assertEqual(len([m for m in json.loads(transformed)["messages"] if m["role"] != "system"]), 5)
+
+
+    def test_open_meal_question_accepts_generic_helpful_first_draft_once(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        answer = "따뜻한 국물 있는 메뉴나 가벼운 면 중에서 골라봐!"
+        chat = _QueuedApiStreamClient([[event(answer)]])
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_stream("점심 뭐 먹을까?")
+
+        self.assertEqual(openai_sse_dialogue(response.text), answer)
+        self.assertEqual(len(chat.requests), 1)
+        self.assertEqual(memory.completed[0]["assistant"], answer)
+        request_note = next(
+            message["content"] for message in chat.requests[0]["messages"]
+            if "일반적인 선택지" in message.get("content", "")
+        )
+        self.assertIn("일반적인 선택지", request_note)
+        self.assertIn("현재 날씨", request_note)
+
+    def test_open_meal_question_retries_unsafe_external_claim_without_wiring_it(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        unsafe = "오늘 비가 와서 홍대 국밥집이 열었어."
+        answer = "든든한 밥류나 가볍게 먹는 면 중에서 골라봐!"
+        chat = _QueuedApiStreamClient([[event(unsafe)], [event(answer)]])
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_stream("점심 뭐 먹을까?")
+
+        self.assertEqual(openai_sse_dialogue(response.text), answer)
+        self.assertNotIn(unsafe, response.text)
+        self.assertEqual(memory.completed[0]["assistant"], answer)
+        self.assertEqual(len(chat.requests), 2)
+        retry_note = next(
+            message["content"] for message in chat.requests[1]["messages"]
+            if "답변을 삭제하거나 짧게 사과하지 말고" in message.get("content", "")
+        )
+        self.assertIn("답변을 삭제하거나 짧게 사과하지 말고", retry_note)
+
+    def test_open_meal_question_two_unsafe_drafts_use_rich_fact_free_fallback(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        unsafe = "오늘 비가 와서 홍대 국밥집이 열었어."
+        user = "점심 뭐 먹을까?"
+        expected = ollama_proxy.grounded_question_fallback(user)
+        chat = _QueuedApiStreamClient([[event(unsafe)], [event(unsafe)]])
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_stream(user)
+
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
+        self.assertIn("김치찌개나 덮밥", expected)
+        self.assertIn("국수나 샌드위치", expected)
+        self.assertIn("?", expected)
+        self.assertNotIn(unsafe, response.text)
+        self.assertNotEqual(openai_sse_dialogue(response.text), ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE)
+        self.assertEqual(memory.completed[0]["assistant"], expected)
+
+    def test_factual_weather_question_rejects_unsafe_response_and_keeps_personal_question(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        unsafe = "오늘 날씨는 맑고 28도야."
+        self.assertTrue(ollama_proxy.needs_grounding_retry("오늘 날씨 어때?", unsafe))
+        answer = "외출 시간과 우산이 있는지에 따라 일반적인 준비를 골라봐!"
+        chat = _QueuedApiStreamClient([[event(unsafe)], [event(answer)]])
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_stream("오늘 날씨 어때?")
+
+        self.assertEqual(openai_sse_dialogue(response.text), answer)
+        self.assertNotIn(unsafe, response.text)
+        self.assertEqual(memory.completed[0]["assistant"], answer)
+        self.assertFalse(ollama_proxy.needs_grounding_retry("점심 먹었어?", "응, 먹었어!"))
+
+    def test_open_question_contract_preserves_two_sentence_helpful_answer(self) -> None:
+        def event(content: str, *, done: bool = False) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": done},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        first = "든든하게는 김치찌개나 덮밥, 가볍게는 국수나 샌드위치가 좋아."
+        second = "오늘은 어느 쪽이 당겨?"
+        chat = _QueuedApiStreamClient([[
+            event(first), event(" " + second), event("", done=True),
+        ]])
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_stream("점심 뭐 먹을까?")
+
+        expected = first + " " + second
+        self.assertEqual(openai_sse_dialogue(response.text), expected)
+        self.assertEqual(memory.completed[0]["assistant"], expected)
+        self.assertEqual(len(chat.requests), 1)
+        note = next(
+            message["content"] for message in chat.requests[0]["messages"]
+            if "완결된 한두 문장" in message.get("content", "")
+        )
+        self.assertIn("취향이나 조건", note)
+        self.assertIn("서로 다른 기준의 일반 메뉴", note)
+        self.assertNotIn("질문으로 끝내지 마", note)
+        self.assertEqual(ollama_proxy.response_sentence_limit("점심 뭐 먹을까?"), 2)
+
+    def test_open_question_gate_keeps_natural_today_word_but_rejects_external_state(self) -> None:
+        user = "점심 뭐 먹을까?"
+        self.assertTrue(ollama_proxy.grounding_question_candidate_is_acceptable(
+            user, "오늘은 김치찌개나 국수 중에서 골라보자!",
+        ))
+        for unsafe in (
+            "오늘 날씨가 쌀쌀하니까 국밥 어때?",
+            "근처에 새로 생긴 이탈리안 식당이 인기 많대.",
+            "홍대 국밥집은 지금 영업 중이고 웨이팅이 없어.",
+            "요즘 인기 있다는 김치찌개랑 비빔밥 어때?",
+            "요즘 인기 있는 한식 백반 어때?",
+            "오늘 날씨가 선선하니까 국수 어때?",
+            "음... 한식은 어때?",
+            "어디서 식사할 건지 먼저 알려줘!",
+            "점심으로 뭘 먹을지 고민 중이야.",
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        ):
+            with self.subTest(unsafe=unsafe):
+                self.assertFalse(
+                    ollama_proxy.grounding_question_candidate_is_acceptable(user, unsafe)
+                )
+
+    def test_explicit_positive_mood_cannot_reverse_to_tired_state(self) -> None:
+        user = "오늘은 기분이 좋아요."
+        unsafe = "응, 오늘은 좀 피곤하네."
+        self.assertTrue(
+            ollama_proxy.grounding_candidate_reverses_explicit_mood(user, unsafe)
+        )
+        self.assertTrue(ollama_proxy.needs_grounding_retry(user, unsafe))
+        self.assertFalse(ollama_proxy.needs_grounding_retry(user, "기분 좋은 날이네!"))
+
+    def test_implicit_confirmation_cannot_claim_second_person_action(self) -> None:
+        cases = (
+            ("니가 수건 접었어.", "응, 접었어."),
+            ("니가 수건 접었어.", "응, 방금 접었어."),
+            ("니가 수건 접었어.", "응, 아까 접었어."),
+            ("너 수건 접었어.", "응, 접었어."),
+            ("수건 접은 건 네가 맞지?", "응, 맞아."),
+        )
+        for user, unsafe in cases:
+            with self.subTest(user=user, unsafe=unsafe):
+                self.assertTrue(
+                    ollama_proxy.grounding_candidate_confirms_second_person_action(
+                        user, unsafe
+                    )
+                )
+                self.assertTrue(ollama_proxy.needs_grounding_retry(user, unsafe))
+
+        self.assertFalse(ollama_proxy.grounding_candidate_confirms_second_person_action(
+            "수건 접은 건 네가 맞지?", "내가 한 일인지는 확인할 근거가 없어."
+        ))
+        for unsafe in (
+            "그런 것 같네.",
+            "네가 수건 접은 거 맞는데, 왜 그랬는지 모르겠어.",
+            "아니, 그건 내가 아니라 엄마가 했어.",
+            "아니, 그건 내가 아니라 엄마야.",
+            "그게 아니라 내가 접었어.",
+            "아니야, 그건 내가 아니라 네가 한 거야.",
+            "수건 접는 건 내가 아니라 너야.",
+            "그런 것 같은데, 정확히는 기억이 안 나.",
+            "확인해보니 수건 접기 담당이 저였네.",
+            "확인할 근거가 없어. 지금 날씨는 맑아.",
+            "확인할 근거가 없어. 고양이는 귀여워.",
+            "확인할 근거가 없어. 세 번 했어.",
+            "아니...",
+        ):
+            with self.subTest(unsafe=unsafe):
+                self.assertFalse(
+                    ollama_proxy.grounding_second_person_action_candidate_is_acceptable(
+                        "수건 접은 건 네가 맞지?", unsafe
+                    )
+                )
+                self.assertTrue(ollama_proxy.needs_grounding_retry(
+                    "수건 접은 건 네가 맞지?", unsafe
+                ))
+        self.assertTrue(
+            ollama_proxy.grounding_second_person_action_candidate_is_acceptable(
+                "수건 접은 건 네가 맞지?",
+                "내가 한 일인지는 지금 확인할 근거가 없어.",
+            )
+        )
+
+    def test_generic_recommendation_rejects_unsupported_recent_release_claim(self) -> None:
+        user = "영화 추천해줘."
+        self.assertTrue(ollama_proxy.grounding_open_question_turn(user))
+        self.assertFalse(ollama_proxy.grounding_question_candidate_is_acceptable(
+            user, "별빛 여행이 최근 개봉해서 요즘 인기 많아."
+        ))
+        self.assertTrue(ollama_proxy.needs_grounding_retry(
+            user, "별빛 여행이 최근 개봉해서 요즘 인기 많아."
+        ))
+
+    def test_rejected_mood_and_second_person_drafts_get_complete_conversation(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        cases = (
+            ("오늘은 조금 피곤해.", "컵은 조심해야 해."),
+            ("오늘은 기분이 좋아요.", "응, 오늘은 좀 피곤하네."),
+            ("니가 수건 접었어.", "니가 수건 접었구나!"),
+            ("수건 접은 건 네가 맞지?", "응, 맞아."),
+        )
+        for user, unsafe in cases:
+            with self.subTest(user=user):
+                expected = ollama_proxy.grounded_conversational_fallback(user)
+                chat = _QueuedApiStreamClient([[event(unsafe)], [event(unsafe)]])
+                memory = _FakeMemoryRuntime()
+                with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+                    ollama_proxy, "memory_runtime", memory
+                ):
+                    response = post_stream(user)
+
+                self.assertTrue(expected)
+                self.assertEqual(openai_sse_dialogue(response.text), expected)
+                self.assertEqual(memory.completed[0]["assistant"], expected)
+                self.assertNotIn(unsafe, response.text)
+                self.assertNotEqual(
+                    expected, ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE
+                )
+
+
+class GroundingModeTests(unittest.TestCase):
+    """Cover the ``AIRI_GROUNDING_MODE`` kill switch and its three policies."""
+
+    @staticmethod
+    def _event(content: str, *, done: bool = True) -> bytes:
+        return (
+            json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": done},
+                ensure_ascii=False,
+            )
+            + "\n"
+        ).encode("utf-8")
+
+    def test_configured_grounding_mode_falls_back_to_balanced(self) -> None:
+        for value in ("strict", "balanced", "off"):
+            with self.subTest(value=value):
+                self.assertEqual(ollama_proxy.configured_grounding_mode(value), value)
+        for value in ("  STRICT ", "Off", "BaLaNcEd"):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    ollama_proxy.configured_grounding_mode(value),
+                    value.strip().casefold(),
+                )
+        for value in ("", "  ", "loose", "1", "none", "disabled", None, True, object()):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    ollama_proxy.configured_grounding_mode(value),
+                    ollama_proxy.GROUNDING_MODE_BALANCED,
+                )
+
+    def test_default_mode_is_balanced_and_each_mode_has_a_numeric_code(self) -> None:
+        self.assertEqual(
+            ollama_proxy.GROUNDING_MODE, ollama_proxy.GROUNDING_MODE_BALANCED
+        )
+        self.assertEqual(
+            sorted(ollama_proxy.GROUNDING_MODE_CODES),
+            ["balanced", "off", "strict"],
+        )
+        self.assertEqual(len(set(ollama_proxy.GROUNDING_MODE_CODES.values())), 3)
+
+    def test_balanced_accepts_a_natural_emotion_reaction_strict_does_not(self) -> None:
+        user = "고양이가 소파를 다 긁어놨어."
+        reactions = (
+            "고양이가 아주 신났나 보네.",
+            "소파가 고양이 전용이 됐네.",
+            "소파 커버 값이 아깝다.",
+            "소파가 완전히 걸레짝이 됐네.",
+        )
+        for reaction in reactions:
+            with self.subTest(reaction=reaction):
+                with grounding_mode(ollama_proxy.GROUNDING_MODE_STRICT):
+                    self.assertFalse(
+                        ollama_proxy.grounding_candidate_is_safe_fallback(user, reaction)
+                    )
+                    self.assertTrue(
+                        ollama_proxy.needs_grounding_retry(user, reaction)
+                    )
+                with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+                    self.assertTrue(
+                        ollama_proxy.grounding_candidate_is_safe_fallback(user, reaction)
+                    )
+                    self.assertFalse(
+                        ollama_proxy.needs_grounding_retry(user, reaction)
+                    )
+
+    def test_balanced_speaks_the_reaction_on_one_round_trip(self) -> None:
+        user = "고양이가 소파를 다 긁어놨어."
+        reaction = "고양이가 아주 신났나 보네."
+        chat = _QueuedApiStreamClient([[self._event(reaction)]])
+        memory = _FakeMemoryRuntime()
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
+            response = post_stream(user)
+
+        self.assertEqual(openai_sse_dialogue(response.text), reaction)
+        self.assertEqual(memory.completed[0]["user"], user)
+        self.assertEqual(memory.completed[0]["assistant"], reaction)
+        self.assertEqual(len(chat.requests), 1)
+
+    def test_balanced_accepts_a_corrected_reaction_after_a_rejected_draft(self) -> None:
+        user = "고양이가 소파를 다 긁어놨어."
+        rejected = "마치 폭풍이 지나간 것 같아."
+        reaction = "고양이가 아주 신났나 보네."
+        chat = _QueuedApiStreamClient([
+            [self._event(rejected)], [self._event(reaction)],
+        ])
+        memory = _FakeMemoryRuntime()
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
+            response = post_stream(user)
+
+        self.assertEqual(openai_sse_dialogue(response.text), reaction)
+        self.assertNotIn("폭풍", response.text)
+        self.assertEqual(memory.completed[0]["assistant"], reaction)
+        self.assertEqual(len(chat.requests), 2)
+
+    def test_balanced_still_rejects_every_fact_distortion_signal(self) -> None:
+        distortions = (
+            # Reversed argument roles: the same content, a different event.
+            ("철수가 영희를 밀었어.", "영희가 철수를 밀었네."),
+            # Dropped evidential hedge turns a report into an assertion.
+            ("꿈에서 컵이 깨졌어.", "컵이 깨졌네."),
+            ("컵이 깨졌다고 철수가 말했어.", "컵이 깨졌다고!"),
+            # Reversed polarity.
+            ("밥을 아직 안 먹었어.", "밥 먹었구나!"),
+            ("고양이가 소파를 다 긁어놨어.", "고양이가 소파를 안 긁었구나."),
+            # Invented existence claim.
+            ("책갈피를 꽂아둔 책에서 주인공이 넘어졌어.", "책갈피와 책 속 주인공이 있네."),
+            # Mangled anchor.
+            ("신사고가 필요했어.", "신사가 필요했네."),
+            # Changed capitalization of a Latin anchor.
+            ("코드는 AbC였어.", "코드는 ABC였네."),
+            # Reversed speaker.
+            ("니가 수건 접었어.", "니가 수건 접었구나!"),
+            # Invented comparison and unrequested advice.
+            ("컵이 깨졌어.", "컵이 유리처럼 부서졌네."),
+            ("컵이 깨졌어.", "컵은 조심해야 해."),
+            # Unrelated answer with no lexical contact at all.
+            ("컵이 깨졌어.", "오늘 날씨가 참 좋네."),
+            # A different language was never requested.
+            ("컵이 깨졌어.", "The cup broke."),
+        )
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+            for user, distortion in distortions:
+                with self.subTest(user=user, distortion=distortion):
+                    self.assertFalse(
+                        ollama_proxy.grounding_candidate_is_safe_fallback(user, distortion)
+                    )
+                    self.assertFalse(
+                        ollama_proxy.grounding_retry_is_factual_improvement(
+                            user, "아, 그렇구나!", distortion,
+                        )
+                    )
+
+    # The reaction kinds the VTuber style contract asks for, none of which
+    # shares a single anchor with the user's sentence.
+    ANCHORLESS_REACTIONS = (
+        # Empathy.
+        ("어제 세 시간이나 야근했어.", "고생 많았겠다."),
+        ("컵이 깨졌어.", "그거 아쉽다."),
+        # A guess is an inference about this turn, not a claim about the world.
+        ("창문 손잡이가 헐거워졌어.", "그거 곧 떨어지겠는데."),
+        ("아침부터 지하철이 멈췄어.", "하루 시작부터 빡세네."),
+        # A light tease.
+        ("새 키보드를 샀어.", "지름신 왔구나."),
+        ("고양이가 소파를 다 긁어놨어.", "발톱 좀 깎아줘야겠다."),
+        # A general judgement.
+        ("처음으로 김치찌개를 끓여봤어.", "첫 도전치곤 대단한데."),
+    )
+    # Two or more cases for each signal in ``grounding_candidate_asserts_new_facts``.
+    NEW_FACT_ASSERTIONS = {
+        "new actor": (
+            ("컵이 깨졌어.", "고양이가 밀었네."),
+            ("어제 세 시간이나 야근했어.", "김철수가 전화했대."),
+            ("창문 손잡이가 헐거워졌어.", "회사는 망하겠다."),
+            ("컵이 깨졌어.", "동생도 그랬네."),
+        ),
+        "new quantity": (
+            ("어제 세 시간이나 야근했어.", "다섯 시간이나 했네."),
+            ("어제 세 시간이나 야근했어.", "다섯시간은 너무하다."),
+            ("사과 두 개를 샀어.", "열 개는 사야지."),
+            ("컵이 깨졌어.", "3개나 깨졌네."),
+        ),
+        "new proper noun": (
+            ("컵이 깨졌어.", "Amazon에서 새로 사."),
+            ("노트북을 켰어.", "Windows가 또 말썽이네."),
+        ),
+        "reported speech": (
+            ("컵이 깨졌어.", "옆집도 깨졌다더라."),
+            ("창문 손잡이가 헐거워졌어.", "수리비 비싸다던데."),
+            ("창문 손잡이가 헐거워졌어.", "그렇다고 들었어."),
+            ("컵이 깨졌어.", "곧 고친다고 했어."),
+        ),
+        "new time or place": (
+            ("창문 손잡이가 헐거워졌어.", "금요일에 고치자."),
+            ("컵이 깨졌어.", "주말에도 조심하자."),
+            ("컵이 깨졌어.", "부산에서도 깨졌네."),
+            ("창문 손잡이가 헐거워졌어.", "뉴스에서 봤어."),
+        ),
+    }
+
+    def test_balanced_speaks_an_anchorless_reaction_without_a_retry(self) -> None:
+        for user, reaction in self.ANCHORLESS_REACTIONS:
+            with self.subTest(user=user, reaction=reaction):
+                # These are exactly the drafts the old lexical floor discarded.
+                self.assertEqual(ollama_proxy.grounding_overlap(user, reaction), 0)
+                self.assertFalse(
+                    ollama_proxy.grounding_candidate_asserts_new_facts(user, reaction)
+                )
+                with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+                    self.assertTrue(
+                        ollama_proxy.grounding_candidate_is_safe_fallback(user, reaction)
+                    )
+                    # An accepted reaction must not also cost a serial retry.
+                    self.assertFalse(ollama_proxy.needs_grounding_retry(user, reaction))
+
+    def test_strict_still_rejects_and_retries_every_anchorless_reaction(self) -> None:
+        for user, reaction in self.ANCHORLESS_REACTIONS:
+            with self.subTest(user=user, reaction=reaction):
+                with grounding_mode(ollama_proxy.GROUNDING_MODE_STRICT):
+                    self.assertFalse(
+                        ollama_proxy.grounding_candidate_is_safe_fallback(user, reaction)
+                    )
+                    self.assertFalse(
+                        ollama_proxy.grounding_candidate_is_strict_safe_fallback(
+                            user, reaction
+                        )
+                    )
+                    self.assertTrue(ollama_proxy.needs_grounding_retry(user, reaction))
+
+    def test_every_new_fact_signal_is_detected_and_rejected(self) -> None:
+        for signal, rows in self.NEW_FACT_ASSERTIONS.items():
+            for user, assertion in rows:
+                with self.subTest(signal=signal, user=user, assertion=assertion):
+                    self.assertTrue(
+                        ollama_proxy.grounding_candidate_asserts_new_facts(
+                            user, assertion
+                        )
+                    )
+                    with grounding_mode(ollama_proxy.GROUNDING_MODE_STRICT):
+                        self.assertFalse(
+                            ollama_proxy.grounding_candidate_is_safe_fallback(
+                                user, assertion
+                            )
+                        )
+                    if ollama_proxy.grounding_overlap(user, assertion):
+                        # A shared anchor still fast-accepts, so only the
+                        # predicate verdict is asserted for those drafts.
+                        continue
+                    with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+                        self.assertFalse(
+                            ollama_proxy.grounding_candidate_is_safe_fallback(
+                                user, assertion
+                            )
+                        )
+                        self.assertTrue(
+                            ollama_proxy.needs_grounding_retry(user, assertion)
+                        )
+
+    def test_anchorless_drafts_split_on_whether_they_assert_a_fact(self) -> None:
+        # One user turn, two drafts with the same zero overlap. Only the one
+        # that states a fact of its own is refused.
+        user = "창문 손잡이가 헐거워졌어."
+        reaction = "그거 곧 떨어지겠는데."
+        invention = "김철수가 고쳐줬대."
+        self.assertEqual(ollama_proxy.grounding_overlap(user, reaction), 0)
+        self.assertEqual(ollama_proxy.grounding_overlap(user, invention), 0)
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+            self.assertTrue(
+                ollama_proxy.grounding_candidate_is_safe_fallback(user, reaction)
+            )
+            self.assertFalse(ollama_proxy.needs_grounding_retry(user, reaction))
+            self.assertFalse(
+                ollama_proxy.grounding_candidate_is_safe_fallback(user, invention)
+            )
+            self.assertTrue(ollama_proxy.needs_grounding_retry(user, invention))
+
+    def test_sharing_an_anchor_does_not_license_a_new_measurable_fact(self) -> None:
+        # A shared word used to short-circuit the accept, so a draft could
+        # restate the user's own subject while changing its quantity, naming a
+        # place the turn never mentioned, or attributing it to someone else.
+        # Those three compare lexical items rather than particles, so they are
+        # checked before the anchor shortcut.
+        cases = (
+            ("어제 세 시간이나 야근했어.", "다섯 시간이나 했네.", "count"),
+            ("사과 두 개를 샀어.", "열 개는 사야지.", "count"),
+            ("컵이 깨졌어.", "부산에서도 깨졌네.", "place"),
+            ("컵이 깨졌어.", "회사에서 또 그랬네.", "place"),
+            ("밥 먹었어.", "민수가 그랬대.", "hearsay"),
+        )
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+            for user, draft, signal in cases:
+                with self.subTest(signal=signal, draft=draft):
+                    self.assertTrue(
+                        ollama_proxy.grounding_candidate_asserts_new_measurable_facts(
+                            user, draft
+                        )
+                    )
+                    self.assertFalse(
+                        ollama_proxy.grounding_candidate_is_safe_fallback(user, draft)
+                    )
+
+    def test_an_anchored_reaction_still_speaks_without_a_retry(self) -> None:
+        # The check above must not cost the reactions that already worked:
+        # reusing the user's own count is not introducing one.
+        cases = (
+            ("어제 세 시간이나 야근했어.", "야근이 세 시간이면 좀 심한데."),
+            ("고양이가 소파를 다 긁어놨어.", "고양이가 아주 신났나 보네."),
+            ("새 키보드를 샀어.", "키보드부터 바꾸는 거 좋아하네."),
+        )
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+            for user, draft in cases:
+                with self.subTest(draft=draft):
+                    self.assertFalse(
+                        ollama_proxy.grounding_candidate_asserts_new_measurable_facts(
+                            user, draft
+                        )
+                    )
+                    self.assertTrue(
+                        ollama_proxy.grounding_candidate_is_safe_fallback(user, draft)
+                    )
+                    self.assertFalse(ollama_proxy.needs_grounding_retry(user, draft))
+
+    def test_balanced_speaks_an_anchorless_reaction_on_one_round_trip(self) -> None:
+        user = "어제 세 시간이나 야근했어."
+        reaction = "고생 많았겠다."
+        chat = _QueuedApiStreamClient([[self._event(reaction)]])
+        memory = _FakeMemoryRuntime()
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
+            response = post_stream(user)
+
+        self.assertEqual(openai_sse_dialogue(response.text), reaction)
+        self.assertEqual(memory.completed[0]["assistant"], reaction)
+        # The parroted restatement is exactly what this change removes.
+        self.assertNotIn("야근했구나", response.text)
+        self.assertEqual(len(chat.requests), 1)
+
+    def test_balanced_never_speaks_an_anchorless_invention(self) -> None:
+        user = "창문 손잡이가 헐거워졌어."
+        invention = "김철수가 고쳐줬대."
+        chat = _QueuedApiStreamClient([
+            [self._event(invention)], [self._event(invention)],
+        ])
+        memory = _FakeMemoryRuntime()
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
+            response = post_stream(user)
+
+        self.assertNotIn("김철수", response.text)
+        self.assertNotIn("김철수", memory.completed[0]["assistant"])
+        self.assertEqual(len(chat.requests), 2)
+
+    def test_new_fact_predicate_reads_grammar_not_a_word_list(self) -> None:
+        user = "창문 손잡이가 헐거워졌어."
+        # A verb or adverb ending that merely looks like a case particle, a
+        # complement of 되다/아니다, and a numeral syllable inside an ordinary
+        # word are all not new facts.
+        for reaction in (
+            "많이 아쉽겠다.",
+            "틀림없이 위험하겠다.",
+            "감당이 되겠어.",
+            "보통내기가 아니네.",
+            "세상 참 그렇지.",
+            "천천히 하지 그랬어.",
+            "원래 그래.",
+        ):
+            with self.subTest(reaction=reaction):
+                self.assertFalse(
+                    ollama_proxy.grounding_candidate_asserts_new_facts(user, reaction)
+                )
+        # The same shapes with a genuine new fact still fire.
+        for reaction in (
+            "옆집이 시끄럽네.",
+            "다섯시간은 너무하다.",
+            "그렇다더라.",
+        ):
+            with self.subTest(reaction=reaction):
+                self.assertTrue(
+                    ollama_proxy.grounding_candidate_asserts_new_facts(user, reaction)
+                )
+
+    def test_tool_truth_holds_in_every_grounding_mode(self) -> None:
+        messages = [{"role": "user", "content": "메모를 확인해줘."}]
+        for mode in ollama_proxy.GROUNDING_MODE_CODES:
+            with self.subTest(mode=mode), grounding_mode(mode):
+                self.assertNotEqual(
+                    ollama_proxy.enforce_tool_truth(messages, "메모 확인했어."),
+                    "메모 확인했어.",
+                )
+                self.assertIn(
+                    "실행을 확인하지 못했어",
+                    ollama_proxy.enforce_tool_truth(messages, "메모 확인했어."),
+                )
+
+    def test_tool_lie_never_reaches_the_wire_in_any_mode(self) -> None:
+        for mode in ollama_proxy.GROUNDING_MODE_CODES:
+            with self.subTest(mode=mode):
+                chat = _QueuedApiStreamClient([
+                    [self._event("메모 확인했어.")], [self._event("메모 확인했어.")],
+                ])
+                memory = _FakeMemoryRuntime()
+                with grounding_mode(mode), mock.patch.object(
+                    ollama_proxy, "client", chat
+                ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
+                    response = post_stream("메모를 확인해줘.")
+
+                self.assertNotIn("메모 확인했어", response.text)
+                for entry in memory.completed:
+                    self.assertNotIn("확인했어", entry["assistant"])
+
+    def test_no_mode_ever_finishes_a_user_turn_with_an_empty_response(self) -> None:
+        control_only = '<|ACT {"emotion":"neutral","intensity":"medium"}|>'
+        user = "수건을 나는 접어뒀어."
+        for mode in ollama_proxy.GROUNDING_MODE_CODES:
+            with self.subTest(mode=mode):
+                chat = _QueuedApiStreamClient([
+                    [self._event(control_only)], [self._event(control_only)],
+                ])
+                memory = _FakeMemoryRuntime()
+                with grounding_mode(mode), mock.patch.object(
+                    ollama_proxy, "client", chat
+                ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
+                    response = post_stream(user)
+
+                self.assertEqual(
+                    openai_sse_dialogue(response.text),
+                    ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+                )
+                self.assertIn("data: [DONE]", response.text)
+
+    def test_journal_keeps_the_user_turn_when_every_draft_is_rejected(self) -> None:
+        user = "니가 수건 접었어."
+        for mode in ollama_proxy.GROUNDING_MODE_CODES:
+            with self.subTest(mode=mode):
+                chat = _QueuedApiStreamClient([
+                    [self._event('<|ACT {"emotion":"neutral","intensity":"medium"}|>')],
+                    [self._event("니가 수건 접었구나!")],
+                ])
+                memory = _FakeMemoryRuntime()
+                with grounding_mode(mode), mock.patch.object(
+                    ollama_proxy, "client", chat
+                ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
+                    response = post_stream(user)
+
+                self.assertEqual(len(memory.completed), 1)
+                self.assertEqual(memory.completed[0]["user"], user)
+                self.assertTrue(memory.completed[0]["assistant"])
+                if mode != ollama_proxy.GROUNDING_MODE_OFF:
+                    # ``off`` is a diagnostic baseline that adopts the draft as
+                    # written, so only the two production policies reject the
+                    # speaker-reversing echo.
+                    self.assertNotIn("접었구나", response.text)
+                    self.assertEqual(
+                        memory.completed[0]["assistant"],
+                        ollama_proxy.grounded_conversational_fallback(user),
+                    )
+
+    def test_off_mode_adopts_the_first_draft_without_a_corrective_retry(self) -> None:
+        user = "고양이가 소파를 다 긁어놨어."
+        draft = "마치 폭풍이 지나간 것 같아."
+        chat = _QueuedApiStreamClient([[self._event(draft)]])
+        memory = _FakeMemoryRuntime()
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_OFF), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
+            response = post_stream(user)
+
+        self.assertEqual(openai_sse_dialogue(response.text), draft)
+        self.assertEqual(memory.completed[0]["assistant"], draft)
+        self.assertEqual(len(chat.requests), 1)
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_OFF):
+            self.assertFalse(ollama_proxy.needs_grounding_retry(user, draft))
+            self.assertFalse(ollama_proxy.needs_grounding_retry(user, ""))
+
+    def test_strict_mode_keeps_the_original_full_surface_requirement(self) -> None:
+        user = "수건을 반듯하게 접어뒀어."
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_STRICT):
+            self.assertTrue(ollama_proxy.grounding_candidate_is_safe_fallback(
+                user, "수건을 반듯하게 접어뒀네!",
+            ))
+            self.assertFalse(ollama_proxy.grounding_candidate_is_safe_fallback(
+                user, "수건이 아주 반듯하네.",
+            ))
+
+    def test_end_meta_reports_the_active_grounding_mode(self) -> None:
+        for mode, code in ollama_proxy.GROUNDING_MODE_CODES.items():
+            with self.subTest(mode=mode):
+                chat = _QueuedApiStreamClient([
+                    [self._event("고양이가 아주 신났나 보네.")],
+                    [self._event("고양이가 소파를 다 긁어놨구나!")],
+                ])
+                memory = _FakeMemoryRuntime()
+                events: list[tuple[tuple[object, ...], dict[str, object]]] = []
+                with grounding_mode(mode), mock.patch.object(
+                    ollama_proxy, "client", chat
+                ), mock.patch.object(
+                    ollama_proxy, "memory_runtime", memory
+                ), mock.patch.object(
+                    ollama_proxy, "emit_latency_event",
+                    side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
+                ):
+                    post_stream("고양이가 소파를 다 긁어놨어.")
+
+                end_meta = next(
+                    kwargs["meta"] for args, kwargs in events
+                    if args[:2] == ("llm", "end")
+                )
+                self.assertEqual(end_meta["grounding_mode"], code)
+
+    def test_balanced_rejects_unsupported_first_person_future_commitments(self) -> None:
+        user = "시험 결과가 아직 안 나왔어."
+        initial = "결과 나오는 대로 알려줄게."
+        retry = "결과 나오면 알려줄게."
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+            for candidate in (initial, retry):
+                with self.subTest(candidate=candidate):
+                    self.assertTrue(
+                        ollama_proxy.grounding_candidate_has_unsupported_first_person_future_commitment(
+                            candidate
+                        )
+                    )
+                    self.assertFalse(
+                        ollama_proxy.grounding_candidate_is_safe_fallback(user, candidate)
+                    )
+            self.assertTrue(ollama_proxy.needs_grounding_retry(user, initial))
+            self.assertFalse(
+                ollama_proxy.grounding_retry_is_factual_improvement(user, initial, retry)
+            )
+        # Commands are not ordinary grounding turns, so their response remains
+        # available to the normal command path.
+        self.assertFalse(ollama_proxy.needs_grounding_retry("결과 알려줘.", retry))
+
+    def test_future_commitment_is_never_sent_or_journaled(self) -> None:
+        user = "시험 결과가 아직 안 나왔어."
+        initial = "결과 나오는 대로 알려줄게."
+        retry = "결과 나오면 알려줄게."
+        chat = _QueuedApiStreamClient([
+            [self._event(initial)], [self._event(retry)],
+        ])
+        memory = _FakeMemoryRuntime()
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
+            response = post_stream(user)
+
+        self.assertEqual(
+            openai_sse_dialogue(response.text),
+            ollama_proxy.grounded_observation_fallback(user),
+        )
+        self.assertNotIn(initial, response.text)
+        self.assertNotIn(retry, response.text)
+        self.assertEqual(
+            memory.completed[0]["assistant"],
+            ollama_proxy.grounded_observation_fallback(user),
+        )
+        self.assertNotIn(initial, memory.completed[0]["assistant"])
+        self.assertNotIn(retry, memory.completed[0]["assistant"])
+        self.assertEqual(len(chat.requests), 2)
+
+    def test_balanced_accepts_first_person_modal_self_reflection(self) -> None:
+        user = "컵이 깨졌어."
+        reflection = "조심해야겠어."
+        imperative = "컵은 조심해야 해."
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED):
+            self.assertIsNone(ollama_proxy._GROUNDING_UNSOLICITED_ADVICE_RE.search(reflection))
+            self.assertTrue(ollama_proxy.grounding_candidate_is_safe_fallback(user, reflection))
+            self.assertFalse(ollama_proxy.needs_grounding_retry(user, reflection))
+            self.assertTrue(ollama_proxy._GROUNDING_UNSOLICITED_ADVICE_RE.search(imperative))
+            self.assertFalse(ollama_proxy.grounding_candidate_is_safe_fallback(user, imperative))
+            self.assertTrue(ollama_proxy.needs_grounding_retry(user, imperative))
+
+        chat = _QueuedApiStreamClient([[self._event(reflection)]])
+        memory = _FakeMemoryRuntime()
+        with grounding_mode(ollama_proxy.GROUNDING_MODE_BALANCED), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(ollama_proxy, "memory_runtime", memory):
+            response = post_stream(user)
+        self.assertEqual(openai_sse_dialogue(response.text), reflection)
+        self.assertEqual(memory.completed[0]["assistant"], reflection)
+        self.assertEqual(len(chat.requests), 1)
+
+
+class ChatModelSsotTests(unittest.TestCase):
+    """The launcher-selected model must own every local foreground turn."""
+
+    def _local_chat(
+        self,
+        *,
+        requested_model: str,
+        headers: dict[str, str] | None = None,
+        client_host: str = "testclient",
+    ) -> tuple[object, _CapturingChatClient]:
+        chat = _CapturingChatClient("응.")
+        with mock.patch.object(ollama_proxy, "client", chat):
+            response = TestClient(ollama_proxy.app, client=(client_host, 9)).post(
+                "/v1/chat/completions",
+                headers=headers or {},
+                json={
+                    "model": requested_model,
+                    "stream": True,
+                    "messages": [{"role": "user", "content": "안녕"}],
+                },
+            )
+        return response, chat
+
+    def test_selected_model_resolves_from_the_launcher_environment(self) -> None:
+        with model_environment(AIRI_CHAT_MODEL=None):
+            self.assertEqual(ollama_proxy.resolve_chat_model(), "midm-airi:2.0-mini")
+        for value in ("", "   "):
+            with self.subTest(value=value), model_environment(AIRI_CHAT_MODEL=value):
+                self.assertEqual(ollama_proxy.resolve_chat_model(), "midm-airi:2.0-mini")
+        with model_environment(AIRI_CHAT_MODEL="  exaone-airi:2.4b  "):
+            self.assertEqual(ollama_proxy.resolve_chat_model(), "exaone-airi:2.4b")
+
+    def test_proxy_source_keeps_no_second_hardcoded_model_tag(self) -> None:
+        # A tag that only lives in the launcher default cannot drift; a tag
+        # copied into a branch of this module silently can.
+        source = Path(ollama_proxy.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("exaone", source)
+        self.assertEqual(source.count('"midm-airi:2.0-mini"'), 1)
+        self.assertEqual(ollama_proxy.DEFAULT_CHAT_MODEL, "midm-airi:2.0-mini")
+
+    def test_desktop_request_cannot_pin_a_model_the_launcher_did_not_select(self) -> None:
+        with model_environment(
+            AIRI_CHAT_MODEL=None, AIRI_CHAT_PROVIDER=None, AIRI_CHAT_MODEL_ENFORCE=None
+        ):
+            _response, chat = self._local_chat(requested_model="exaone-airi:2.4b")
+            self.assertTrue(chat.requests)
+            for request in chat.requests:
+                self.assertEqual(request["model"], "midm-airi:2.0-mini")
+
+    def test_chat_model_rollback_travels_through_the_same_source_of_truth(self) -> None:
+        with model_environment(AIRI_CHAT_MODEL="exaone-airi:2.4b"):
+            _response, chat = self._local_chat(requested_model="midm-airi:2.0-mini")
+            self.assertEqual(chat.requests[0]["model"], "exaone-airi:2.4b")
+
+    def test_loopback_test_origins_keep_their_explicitly_requested_model(self) -> None:
+        # benchmark_dialogue_quality.py --model and the soak runners rely on
+        # these markers, so an A/B run still reaches the model it names.
+        with model_environment(AIRI_CHAT_MODEL="midm-airi:2.0-mini"):
+            for origin in ("local-quality-probe", "local-evaluation"):
+                with self.subTest(origin=origin):
+                    _response, chat = self._local_chat(
+                        requested_model="exaone-airi:2.4b",
+                        headers={"x-airi-turn-origin": origin},
+                        client_host="127.0.0.1",
+                    )
+                    self.assertEqual(chat.requests[0]["model"], "exaone-airi:2.4b")
+                    # The same header from a remote peer is not a test origin.
+                    _response, remote = self._local_chat(
+                        requested_model="exaone-airi:2.4b",
+                        headers={"x-airi-turn-origin": origin},
+                        client_host="10.0.0.8",
+                    )
+                    self.assertEqual(remote.requests[0]["model"], "midm-airi:2.0-mini")
+
+    def test_external_provider_model_name_never_reaches_the_local_runner(self) -> None:
+        with model_environment(
+            AIRI_CHAT_PROVIDER="openai", AIRI_CHAT_MODEL="gpt-4.1-mini"
+        ):
+            self.assertFalse(ollama_proxy.chat_model_ssot_enforced())
+            _response, chat = self._local_chat(requested_model="midm-airi:2.0-mini")
+            self.assertEqual(chat.requests[0]["model"], "midm-airi:2.0-mini")
+
+    def test_enforcement_has_an_explicit_documented_escape_hatch(self) -> None:
+        for value in ("0", "false", "no", "off"):
+            with self.subTest(value=value), model_environment(
+                AIRI_CHAT_MODEL="midm-airi:2.0-mini", AIRI_CHAT_MODEL_ENFORCE=value
+            ):
+                self.assertFalse(ollama_proxy.chat_model_ssot_enforced())
+                _response, chat = self._local_chat(requested_model="exaone-airi:2.4b")
+                self.assertEqual(chat.requests[0]["model"], "exaone-airi:2.4b")
+
+    def test_health_reports_the_selected_model_and_the_replaced_tag(self) -> None:
+        telemetry = ollama_proxy.ChatModelTelemetry()
+        with mock.patch.object(
+            ollama_proxy, "chat_model_telemetry", telemetry
+        ), model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini",
+            AIRI_CHAT_PROVIDER=None,
+            AIRI_CHAT_MODEL_ENFORCE=None,
+        ):
+            self._local_chat(requested_model="exaone-airi:2.4b")
+            self._local_chat(requested_model="midm-airi:2.0-mini")
+            reported = TestClient(ollama_proxy.app).get("/health").json()["chat_model"]
+
+        self.assertEqual(reported["model"], "midm-airi:2.0-mini")
+        self.assertEqual(reported["provider"], "local")
+        self.assertTrue(reported["enforced"])
+        self.assertEqual(reported["normalized_requests"], 1)
+        self.assertEqual(reported["matching_requests"], 1)
+        self.assertEqual(reported["last_requested_model"], "exaone-airi:2.4b")
+
+    def test_evaluation_provenance_follows_the_selected_model(self) -> None:
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini",
+            AIRI_EVAL_MODEL=None,
+            AIRI_EVAL_MODEL_VERSION=None,
+            AIRI_EVAL_ORIGIN=None,
+            AIRI_EVAL_DATASET_VERSION=None,
+        ):
+            trusted = ollama_proxy._configured_evaluation_provenance()
+            self.assertEqual(trusted["model"], "midm-airi:2.0-mini")
+            self.assertEqual(trusted["model_version"], "midm-airi:2.0-mini")
+        # An empty launcher value means "not configured", never an empty label.
+        with model_environment(
+            AIRI_CHAT_MODEL="exaone-airi:2.4b",
+            AIRI_EVAL_MODEL="",
+            AIRI_EVAL_MODEL_VERSION="",
+        ):
+            trusted = ollama_proxy._configured_evaluation_provenance()
+            self.assertEqual(trusted["model"], "exaone-airi:2.4b")
+            self.assertEqual(trusted["model_version"], "exaone-airi:2.4b")
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini",
+            AIRI_EVAL_MODEL="gpt-4.1-mini",
+            AIRI_EVAL_MODEL_VERSION=None,
+        ):
+            trusted = ollama_proxy._configured_evaluation_provenance()
+            self.assertEqual(trusted["model"], "gpt-4.1-mini")
+            self.assertEqual(trusted["model_version"], "gpt-4.1-mini")
+
+
+class ChatModelDigestPreflightTests(unittest.TestCase):
+    """A reusable tag name is not proof of the approved model artifact."""
+
+    DIGEST = "a" * 64
+    OTHER = "b" * 64
+
+    def _models(self, name: str = "midm-airi:2.0-mini", digest: str | None = None) -> list[dict[str, str]]:
+        return [
+            {"name": "nlpai-lab/KURE-v1:latest", "digest": "c" * 64},
+            {"name": name, "digest": digest or self.DIGEST},
+        ]
+
+    def test_tag_matching_follows_ollama_including_implicit_latest(self) -> None:
+        self.assertEqual(
+            ollama_proxy.normalize_ollama_model_name(" Midm-Airi:2.0-Mini "),
+            "midm-airi:2.0-mini",
+        )
+        self.assertEqual(
+            ollama_proxy.normalize_ollama_model_name("hf.co/vendor/model"),
+            "hf.co/vendor/model:latest",
+        )
+        self.assertEqual(
+            ollama_proxy.local_model_digest(self._models(), "midm-airi:2.0-mini"),
+            self.DIGEST,
+        )
+        self.assertEqual(
+            ollama_proxy.local_model_digest(self._models(), "midm-airi:9.9-none"), ""
+        )
+        ambiguous = [
+            {"name": "midm-airi:2.0-mini", "digest": self.DIGEST},
+            {"model": "midm-airi:2.0-mini", "digest": self.OTHER},
+        ]
+        self.assertEqual(
+            ollama_proxy.local_model_digest(ambiguous, "midm-airi:2.0-mini"), ""
+        )
+
+    def test_pinned_digest_is_a_fail_closed_startup_gate(self) -> None:
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini", AIRI_CHAT_MODEL_DIGEST=self.DIGEST
+        ):
+            state = ollama_proxy.preflight_chat_model_digest(fetch=lambda: self._models())
+            self.assertEqual(state["status"], "pinned")
+            self.assertTrue(state["verified"])
+            self.assertEqual(state["digest"], self.DIGEST)
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini", AIRI_CHAT_MODEL_DIGEST=self.OTHER
+        ):
+            # A tag rebuilt from other bytes must not be able to start a turn.
+            with self.assertRaises(ollama_proxy.ChatModelDigestError):
+                ollama_proxy.preflight_chat_model_digest(fetch=lambda: self._models())
+
+    def test_pinned_startup_also_fails_when_the_artifact_cannot_be_read(self) -> None:
+        def unavailable() -> object:
+            raise RuntimeError("local Ollama is not listening")
+
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini", AIRI_CHAT_MODEL_DIGEST=self.DIGEST
+        ):
+            with self.assertRaises(ollama_proxy.ChatModelDigestError):
+                ollama_proxy.preflight_chat_model_digest(fetch=unavailable)
+        for invalid in ("not-a-digest", "A" * 63):
+            with self.subTest(invalid=invalid), model_environment(
+                AIRI_CHAT_MODEL_DIGEST=invalid
+            ):
+                with self.assertRaises(ollama_proxy.ChatModelDigestError):
+                    ollama_proxy.preflight_chat_model_digest(fetch=lambda: self._models())
+
+    def test_unpinned_startup_only_records_the_observed_artifact(self) -> None:
+        def unavailable() -> object:
+            raise RuntimeError("local Ollama is not listening")
+
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini", AIRI_CHAT_MODEL_DIGEST=None
+        ):
+            observed = ollama_proxy.preflight_chat_model_digest(fetch=lambda: self._models())
+            self.assertEqual(observed["status"], "observed")
+            self.assertEqual(observed["digest"], self.DIGEST)
+            self.assertFalse(observed["verified"])
+            self.assertFalse(observed["pinned"])
+            missing = ollama_proxy.preflight_chat_model_digest(fetch=lambda: [])
+            self.assertEqual(missing["status"], "unresolved")
+            self.assertEqual(
+                ollama_proxy.preflight_chat_model_digest(fetch=unavailable)["status"],
+                "unavailable",
+            )
+
+    def test_external_chat_provider_skips_the_local_artifact_check(self) -> None:
+        with model_environment(
+            AIRI_CHAT_PROVIDER="anthropic",
+            AIRI_CHAT_MODEL="claude-sonnet-4-5",
+            AIRI_CHAT_MODEL_DIGEST=self.DIGEST,
+        ):
+            state = ollama_proxy.preflight_chat_model_digest(fetch=lambda: self._models())
+        self.assertEqual(state["status"], "skipped_external_provider")
+
+    def test_startup_refuses_to_serve_an_unapproved_artifact(self) -> None:
+        original_state = dict(ollama_proxy.CHAT_MODEL_DIGEST_STATE)
+        self.addCleanup(
+            setattr, ollama_proxy, "CHAT_MODEL_DIGEST_STATE", original_state
+        )
+        served: list[object] = []
+
+        class _Tags:
+            @staticmethod
+            def raise_for_status() -> None:
+                return None
+
+            @staticmethod
+            def json() -> dict[str, object]:
+                return {"models": [{"name": "midm-airi:2.0-mini", "digest": "a" * 64}]}
+
+        def run_startup() -> None:
+            with mock.patch.object(sys, "argv", ["ollama_proxy.py"]), mock.patch.object(
+                ollama_proxy.httpx, "get", lambda url, timeout=None: _Tags()
+            ), mock.patch.object(
+                ollama_proxy.uvicorn, "run", lambda *args, **kwargs: served.append(True)
+            ):
+                ollama_proxy.main()
+
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini", AIRI_CHAT_MODEL_DIGEST=self.OTHER
+        ):
+            with self.assertRaises(SystemExit) as refused:
+                run_startup()
+        self.assertEqual(refused.exception.code, 2)
+        self.assertEqual(served, [])
+
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini", AIRI_CHAT_MODEL_DIGEST=None
+        ):
+            run_startup()
+        self.assertEqual(served, [True])
+        self.assertEqual(ollama_proxy.CHAT_MODEL_DIGEST_STATE["digest"], "a" * 64)
+
+    def test_tag_lookup_reads_the_local_upstream_and_never_downloads(self) -> None:
+        calls: list[tuple[str, object]] = []
+
+        class _Tags:
+            @staticmethod
+            def raise_for_status() -> None:
+                return None
+
+            @staticmethod
+            def json() -> dict[str, object]:
+                return {"models": [{"name": "midm-airi:2.0-mini", "digest": "d" * 64}]}
+
+        def fake_get(url: str, timeout: object = None) -> object:
+            calls.append((url, timeout))
+            return _Tags()
+
+        with mock.patch.object(ollama_proxy.httpx, "get", fake_get):
+            models = ollama_proxy.fetch_local_models()
+
+        self.assertEqual(calls, [(f"{ollama_proxy.UPSTREAM}/api/tags", 5.0)])
+        self.assertEqual(ollama_proxy.local_model_digest(models, "midm-airi:2.0-mini"), "d" * 64)
+
+
+class ImmediateAckMetadataTests(unittest.TestCase):
+    """Latency readings depend on knowing whether the turn opened with speech."""
+
+    def test_user_driven_local_turn_reports_an_audible_acknowledgement(self) -> None:
+        chat = _CapturingChatClient("응, 안녕!")
+        with mock.patch.object(ollama_proxy, "client", chat):
+            response = post_stream("안녕")
+
+        self.assertEqual(response.headers["X-AIRI-Immediate-Ack"], "audible")
+        self.assertTrue(
+            openai_sse_content(response.text).startswith(ollama_proxy.LOCAL_IMMEDIATE_ACK)
+        )
+
+    def test_proactive_turn_still_reports_silence(self) -> None:
+        with mock.patch.object(
+            ollama_proxy, "is_local_proactive_turn", return_value=True
+        ), mock.patch.object(ollama_proxy, "client", _CapturingChatClient("응.")):
+            response = post_stream_messages(
+                [{"role": "assistant", "content": "proactive cue"}]
+            )
+
+        self.assertEqual(response.headers["X-AIRI-Immediate-Ack"], "silent")
+
+    def test_cloud_search_turn_reports_an_audible_acknowledgement(self) -> None:
+        async def search(user_text: str, query: str) -> tuple[str, float]:
+            return "검색 결과야.", 1.0
+
+        with mock.patch.object(
+            ollama_proxy, "ALLOW_EXTERNAL_SEARCH", True
+        ), mock.patch.object(ollama_proxy, "run_codex_search", search), mock.patch.object(
+            ollama_proxy, "client", _StubClient(RuntimeError("unused"))
+        ):
+            response = post_stream("음유잉여 검색해줘")
+
+        self.assertEqual(response.headers["X-AIRI-Immediate-Ack"], "audible")
+        self.assertTrue(
+            openai_sse_content(response.text).startswith(ollama_proxy.SEARCH_IMMEDIATE_ACK)
+        )
+
+    def test_health_no_longer_claims_a_silent_acknowledgement(self) -> None:
+        reported = TestClient(ollama_proxy.app).get("/health").json()
+        self.assertEqual(reported["immediate_ack"], "audible")
 
 
 if __name__ == "__main__":

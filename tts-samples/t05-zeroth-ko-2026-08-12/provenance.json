@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-08-12",
+  "purpose": "T-05 Korean reference-speaker listening candidates; not approved for production",
+  "dataset": {
+    "name": "Zeroth-Korean (OpenSLR SLR40)",
+    "official_url": "https://www.openslr.org/40/",
+    "license": "CC BY 4.0",
+    "mirror": "https://huggingface.co/datasets/kresnik/zeroth_korean",
+    "mirror_revision": "1fe937899f828af822293d05e086200946088bdf",
+    "attribution": "Zeroth Project; Lucas Jo (Atlas Guide Inc.) and Wonkyum Lee (Gridspace Inc.)",
+    "identity_policy": "Speaker identifiers remain pseudonymous; do not attempt identification."
+  },
+  "synthesis": {
+    "engine": "GPT-SoVITS v2ProPlus through the local OpenAI-compatible proxy",
+    "text": "Hello 아이리, 음성 연결 테스트야.",
+    "raw_note": "All three raw outputs were below the existing self-test loudness gate.",
+    "listening_postprocess": "ffmpeg loudnorm=I=-20:LRA=7:TP=-1.5, mono 32000 Hz",
+    "production_status": "human listening review required; current Japanese reference remains operational"
+  },
+  "candidates": [
+    {
+      "speaker_id": 105,
+      "utterance_id": "105_003_2046",
+      "transcript": "아울러 미약하게나마 제가 할 수 있는 일을 찾아 실천하겠습니다",
+      "reference_file": "reference-105-105_003_2046.wav",
+      "reference_seconds": 6.950,
+      "reference_sha256": "92d90335e64246d9d7a5d836c8c61764d11e33db494f984c894c3467cd857539",
+      "raw_file": "candidate-105-105_003_2046-raw.wav",
+      "raw_seconds": 4.120,
+      "raw_sha256": "6203c6b523b695750fcfff0b588ccce122e99b65b9d8c46b09126d0eeb1742ac",
+      "listening_file": "candidate-105-105_003_2046-listen.wav",
+      "listening_seconds": 4.120,
+      "listening_rms": 0.099115,
+      "listening_peak": 0.841553,
+      "listening_sha256": "fac3967661f183dae269a80f1335a777a1afa71a0b8b9acbf3583ce4c18d5b23"
+    },
+    {
+      "speaker_id": 126,
+      "utterance_id": "126_003_2800",
+      "transcript": "크리스티의 청각 장애는 여전히 우리 모두에게 도전이 되는 것입니다",
+      "reference_file": "reference-126-126_003_2800.wav",
+      "reference_seconds": 6.675,
+      "reference_sha256": "2e1552fc0bcaa0f1988c2bfce217b54539db614e3143ccdc27cd246e57772521",
+      "raw_file": "candidate-126-126_003_2800-raw.wav",
+      "raw_seconds": 3.080,
+      "raw_sha256": "02b0f836dcfd2e99262b9bd2a14d064d833af24ca3ef0b9a08447e06713a1911",
+      "listening_file": "candidate-126-126_003_2800-listen.wav",
+      "listening_seconds": 3.080,
+      "listening_rms": 0.106720,
+      "listening_peak": 0.706207,
+      "listening_sha256": "74252d74987c779c9c694ca7ea62426c9a49f9d0c0adea89e9842d1cc6b4cd1b"
+    },
+    {
+      "speaker_id": 132,
+      "utterance_id": "132_003_1000",
+      "transcript": "어느 정도 비계가 붙어있는 게 맛있는 부위인 걸 모르는 사람이 어디 있습니까",
+      "reference_file": "reference-132-132_003_1000.wav",
+      "reference_seconds": 6.639,
+      "reference_sha256": "0295c313c542f98c298b590af37abca0ece0939902c6a1ba07c097f3f62b8317",
+      "raw_file": "candidate-132-132_003_1000-raw.wav",
+      "raw_seconds": 4.080,
+      "raw_sha256": "a92d83f20eb451a4bc6a48dc6ec05299f31c9208fed918c845cce6b8c033f3a3",
+      "listening_file": "candidate-132-132_003_1000-listen.wav",
+      "listening_seconds": 4.080,
+      "listening_rms": 0.114653,
+      "listening_peak": 0.656921,
+      "listening_sha256": "e21b38cafac4cc72cdc0a29c95710e8e4af30fa6b3b12db9a6f368b838656c64"
+    }
+  ]
+}

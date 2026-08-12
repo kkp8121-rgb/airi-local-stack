@@ -6,6 +6,7 @@ import json
 import math
 import re
 import sqlite3
+import threading
 import unicodedata
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -203,6 +204,12 @@ class KnowledgeHit:
 class KnowledgeStore:
     """Separate SQLite/FTS5 store for approved public/topic knowledge only."""
 
+    # Schema creation and the v1->v2 FTS reconstruction are process-local
+    # work.  Several request handlers may lazily create stores for the same
+    # database, so share this guard across instances as well as threads.
+    _initialized_paths: dict[Path, tuple[int, int]] = {}
+    _initialization_lock = threading.Lock()
+
     def __init__(self, db_path: str | Path, *, runtime_dir: str | Path, embedder: Embedder | None = None):
         self.runtime_dir = Path(runtime_dir).resolve()
         self.db_path = runtime_path(db_path, self.runtime_dir)
@@ -224,6 +231,26 @@ class KnowledgeStore:
             connection.close()
 
     def initialize(self) -> None:
+        identity = self._database_identity()
+        if identity is not None and self._initialized_paths.get(self.db_path) == identity:
+            return
+        with self._initialization_lock:
+            identity = self._database_identity()
+            if identity is not None and self._initialized_paths.get(self.db_path) == identity:
+                return
+            self._initialize_database()
+            identity = self._database_identity()
+            if identity is not None:
+                self._initialized_paths[self.db_path] = identity
+
+    def _database_identity(self) -> tuple[int, int] | None:
+        try:
+            stat = self.db_path.stat()
+            return int(stat.st_dev), int(stat.st_ino)
+        except FileNotFoundError:
+            return None
+
+    def _initialize_database(self) -> None:
         with self._db() as db:
             db.executescript("""
               CREATE TABLE IF NOT EXISTS documents (
@@ -251,12 +278,31 @@ class KnowledgeStore:
             # Keep the original content-only FTS table untouched: it may be
             # used by a previous runtime.  This table is reconstructible from
             # the authoritative documents/chunks tables and backfills v1 DBs.
-            missing = db.execute("""SELECT c.id,c.content,d.title,d.source,d.aliases,d.answer_summary FROM chunks c
-                JOIN documents d ON d.id=c.document_id
-                WHERE NOT EXISTS (SELECT 1 FROM chunks_fts_v2 f WHERE f.chunk_id=CAST(c.id AS TEXT))""").fetchall()
-            for row in missing:
-                db.execute("INSERT INTO chunks_fts_v2(title,source,content,search_text,chunk_id) VALUES (?,?,?,?,?)",
-                           (row["title"], row["source"], row["content"], _search_text(row["title"], row["source"], row["content"], _stored_aliases(row["aliases"]), row["answer_summary"]), str(row["id"])))
+            # ``chunk_id`` is UNINDEXED inside FTS5, so an SQL anti-join still
+            # degenerates into SCAN chunks x SCAN FTS. Read each side once and
+            # perform membership in a Python set: O(chunks + FTS rows), then a
+            # single executemany for only the missing rows.
+            indexed_ids = {
+                str(row[0]) for row in db.execute("SELECT chunk_id FROM chunks_fts_v2")
+            }
+            rows = db.execute("""SELECT c.id,c.content,d.title,d.source,d.aliases,d.answer_summary
+                FROM chunks c JOIN documents d ON d.id=c.document_id""")
+            missing = [
+                (
+                    row["title"], row["source"], row["content"],
+                    _search_text(
+                        row["title"], row["source"], row["content"],
+                        _stored_aliases(row["aliases"]), row["answer_summary"],
+                    ),
+                    str(row["id"]),
+                )
+                for row in rows
+                if str(row["id"]) not in indexed_ids
+            ]
+            db.executemany(
+                "INSERT INTO chunks_fts_v2(title,source,content,search_text,chunk_id) VALUES (?,?,?,?,?)",
+                missing,
+            )
 
     @staticmethod
     def _embedding(embedder: Embedder | None, text: str) -> list[float] | None:

@@ -1,0 +1,27 @@
+{
+  "suite_id": "airi-production-context-gate",
+  "suite_version": "2.0",
+  "synthetic_only": true,
+  "pressure_levels": [0, 8, 20, 48],
+  "runs": 3,
+  "filler_template": "SYNTHETIC_PRESSURE_{index}_DO_NOT_RETAIN",
+  "current_query": "계속: 스키마 설명에 적힌 각각의 보이는 출처에서만 값을 읽어 JSON 객체로 답해. 문자열은 값만 쓰고 설명은 하지 마.",
+  "canaries": {
+    "active_card": "ACTIVE_CARD_CANARY=violet-otter",
+    "continuity_fact": "favorite.color=blue-cedar",
+    "korean_pet_negation": "나는 고양이를 키우지 않아.",
+    "correction": "favorite.color=green-lantern",
+    "dropped_holdout": "DROPPED_HOLDOUT_CANARY_DO_NOT_RETAIN",
+    "bridge": "harbor-lantern",
+    "tail_memory": "[Character Memory] TAIL_MEMORY_CANARY=silver-fern"
+  },
+  "expected": {
+    "card_marker": "violet-otter",
+    "ledger_active_color": "green-lantern",
+    "ledger_pet_negated": true,
+    "ledger_corrected_color": "green-lantern",
+    "memory_marker": "silver-fern",
+    "dialogue_marker": "harbor-lantern",
+    "dropped_holdout_seen": false
+  }
+}

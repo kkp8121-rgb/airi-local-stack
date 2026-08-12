@@ -1,33 +1,102 @@
 param(
+    # Speech-to-text is opt-in so the chat and text input path do not reserve
+    # GPU memory for a service they do not use.
+    [ValidateSet('on', 'off')]
+    [string]$Stt = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_STT)) { 'off' } else { $env:AIRI_STT }),
     [string]$SttModel = 'mobiuslabsgmbh/faster-whisper-large-v3-turbo',
     [string]$SttComputeType = 'int8_float16',
     [ValidateRange(0, 999)]
     # Keep the local chat model on the GPU by default.  num_gpu=0 forces
     # CPU-only inference and makes first-token latency several seconds slower.
     [int]$OllamaNumGpu = 999,
+    # Foreground context is explicit so all local chat hops share one window.
+    # A null parameter permits a nonblank AIRI_NUM_CTX override to be resolved
+    # below with the same strict validation as an explicit invocation.
+    [object]$NumCtx = $null,
     # Keep the foreground Ollama runner loaded across normal chat gaps.
     [string]$OllamaKeepAlive = '30m',
     [bool]$EnableKnowledge = $true,
     [ValidateSet('ollama', 'openai', 'anthropic')]
     [string]$MemoryExtractionProvider = 'ollama',
     [bool]$AllowExternalMemoryExtraction = $false,
+    # Operational default: promote conversation to memory whenever an approved
+    # gate report exists. Pass $false to keep the extractor off entirely.
+    [bool]$EnableMemoryExtraction = $true,
     [string]$MemoryExtractionModel = '',
     [string]$MemoryExtractionGateReport = '',
+    # Gate thresholds used by verify_extraction_gate.py. 'balanced' keeps every
+    # structural metric at 1.0 and relaxes only the model-judgement metrics.
+    [ValidateSet('strict', 'balanced')]
+    [string]$MemoryExtractionGateProfile = 'balanced',
     [ValidateRange(1024, 65535)]
     [int]$MemoryExtractionPort = 11436,
     [ValidateSet('local', 'openai', 'anthropic')]
     [string]$ChatProvider = 'local',
     [bool]$AllowExternalChat = $false,
+    # For the local provider, an omitted value resolves to the stable runtime
+    # tag. Pass -ChatModel exaone-airi:2.4b to roll back without changing files.
     [string]$ChatModel = '',
+    # Optional approved artifact digest for the selected chat model. Supplying
+    # it (directly or through AIRI_CHAT_MODEL_DIGEST) makes startup fail closed
+    # when the tag was rebuilt from other bytes.
+    [string]$ChatModelDigest = $env:AIRI_CHAT_MODEL_DIGEST,
+    # The output gate remains opt-in. An explicit environment value is honored
+    # when callers do not provide a switch; invalid values fail parameter binding.
+    [ValidateSet('on', 'off')]
+    [string]$OutputModeration = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_OUTPUT_MODERATION)) { 'off' } else { $env:AIRI_OUTPUT_MODERATION }),
+    # Optional custom policy dictionary. Resolve it before the proxy child
+    # changes its working directory so relative paths cannot drift at launch.
+    [string]$OutputModerationTerms = $env:AIRI_OUTPUT_MODERATION_TERMS,
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
-    [bool]$EnableCharacterEvaluator = $true,
+    [bool]$EnableCharacterEvaluator = $false,
     [ValidateRange(1, 1000000)]
     [int]$EvaluationMaxRecords = 10000
 )
 
 $ErrorActionPreference = 'Stop'
+function Resolve-AiriNumCtx {
+    param([object]$Value)
+    $parsed = 0
+    if (-not [int]::TryParse([string]$Value, [Globalization.NumberStyles]::Integer,
+            [Globalization.CultureInfo]::InvariantCulture, [ref]$parsed) -or
+            $parsed -lt 512 -or $parsed -gt 32768) {
+        throw 'NumCtx must be an integer from 512 through 32768. Check -NumCtx or AIRI_NUM_CTX.'
+    }
+    return $parsed
+}
+$NumCtx = Resolve-AiriNumCtx $(if ($null -ne $NumCtx) { $NumCtx } elseif (-not [string]::IsNullOrWhiteSpace($env:AIRI_NUM_CTX)) { $env:AIRI_NUM_CTX } else { 2048 })
+if ($Stt -notin @('on', 'off')) {
+    throw 'Stt must be on or off. Check the -Stt parameter or AIRI_STT environment variable.'
+}
+$Stt = $Stt.ToLowerInvariant()
+$resolvedOutputModerationTerms = ''
+if (-not [string]::IsNullOrWhiteSpace($OutputModerationTerms)) {
+    $termsItem = Get-Item -LiteralPath $OutputModerationTerms -ErrorAction Stop
+    if ($termsItem.PSIsContainer -or $termsItem -isnot [IO.FileInfo] -or
+            ($termsItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'OutputModerationTerms must be a regular file.'
+    }
+    $resolvedOutputModerationTerms = [IO.Path]::GetFullPath($termsItem.FullName)
+}
+$effectiveChatModel = if ($ChatProvider -eq 'local' -and [string]::IsNullOrWhiteSpace($ChatModel)) {
+    'midm-airi:2.0-mini'
+} else {
+    $ChatModel
+}
+# The dev-PC verified Mi:dm artifact is the normal local runtime default.
+# Respect an explicit parameter or environment pin, and leave rollback tags
+# and external providers unpinned unless the caller supplied a digest.
+if ($ChatProvider -eq 'local' -and $effectiveChatModel -ceq 'midm-airi:2.0-mini' `
+        -and [string]::IsNullOrWhiteSpace($ChatModelDigest)) {
+    $ChatModelDigest = '92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f'
+}
+$effectiveEvaluatorModel = if ($ChatProvider -eq 'local') {
+    $effectiveChatModel
+} else {
+    'midm-airi:2.0-mini'
+}
 
 function Wait-LocalHealth {
     param(
@@ -49,6 +118,17 @@ function Wait-LocalHealth {
     throw "Local service did not become ready within $TimeoutSeconds seconds: $Uri"
 }
 
+if ($Stt -eq 'off') {
+    # Reclaim STT resources before starting or preflighting GPU-backed services.
+    # The stop helper requires the Python executable and this repository's
+    # exact STT server/host/port command signature. Never kill by port alone.
+    & (Join-Path $PSScriptRoot 'stt\stop-local-stt.ps1')
+    $remainingSttListener = Get-NetTCPConnection -LocalPort 8890 -State Listen -ErrorAction SilentlyContinue
+    if ($remainingSttListener) {
+        throw 'STT is disabled, but a listener remains on local port 8890. Refusing to continue.'
+    }
+}
+
 $ollamaListener = Get-NetTCPConnection -LocalPort 11434 -State Listen -ErrorAction SilentlyContinue
 if (-not $ollamaListener) {
     $ollama = Get-Command ollama -ErrorAction Stop
@@ -58,6 +138,27 @@ if (-not $ollamaListener) {
         -WindowStyle Hidden `
         -RedirectStandardOutput (Join-Path $PSScriptRoot 'ollama-proxy\ollama-serve.out.log') `
         -RedirectStandardError (Join-Path $PSScriptRoot 'ollama-proxy\ollama-serve.err.log')
+}
+
+# Do not let a missing model turn into a late first-chat failure after the
+# other local services have started.  This only reads Ollama's local tag list;
+# it never pulls a model or contacts Hugging Face.
+$requiredLocalModels = @()
+if ($ChatProvider -eq 'local') {
+    $requiredLocalModels += $effectiveChatModel
+}
+if ($EnableCharacterEvaluator) {
+    $requiredLocalModels += $effectiveEvaluatorModel
+}
+if ($requiredLocalModels.Count -gt 0) {
+    $null = Wait-LocalHealth -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSeconds 30
+    foreach ($model in @($requiredLocalModels | Sort-Object -Unique)) {
+        # The digest pin describes the chat model artifact only; an evaluator
+        # on a different tag keeps the plain name check.
+        $expectedDigest = if ($model -ceq $effectiveChatModel) { $ChatModelDigest } else { '' }
+        & (Join-Path $PSScriptRoot 'ollama-proxy\setup-midm-airi-model.ps1') `
+            -Model $model -PreflightOnly -ExpectedDigest $expectedDigest
+    }
 }
 
 function Resolve-LocalOllamaModelDigest {
@@ -94,12 +195,70 @@ if (-not [string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
     }
 }
 
+# Operational default for the conversation-to-memory promotion loop. The gate
+# report is the single source of truth for which model passed, so an approved
+# report at the conventional path activates extraction without any flag. This
+# resolution stays fail-open: a missing, unreadable or failing report leaves the
+# established OFF path untouched instead of blocking the whole stack. An
+# explicit -MemoryExtractionModel keeps the original fail-closed contract above.
+$memoryExtractionAutoEnabled = $false
+if ($EnableMemoryExtraction -and [string]::IsNullOrWhiteSpace($MemoryExtractionModel) `
+        -and $MemoryExtractionProvider -eq 'ollama') {
+    $autoGateReport = if ([string]::IsNullOrWhiteSpace($MemoryExtractionGateReport)) {
+        Join-Path $PSScriptRoot 'ollama-proxy\runtime\extraction-gate-report.json'
+    }
+    else {
+        $MemoryExtractionGateReport
+    }
+    $autoModel = ''
+    if (-not (Test-Path -LiteralPath $autoGateReport -PathType Leaf)) {
+        Write-Warning ("Memory extraction stays off: no extraction gate report at $autoGateReport. " +
+            "Produce one with benchmark_memory_track.py --mode extraction --model <tag> --model-digest <sha256> --report <path>.")
+    }
+    elseif (Get-NetTCPConnection -LocalPort 11435 -State Listen -ErrorAction SilentlyContinue) {
+        Write-Warning 'Memory extraction stays off: a proxy already listens on 11435. Stop it and rerun to enable extraction.'
+    }
+    else {
+        try {
+            $autoReport = Get-Content -LiteralPath $autoGateReport -Raw -Encoding utf8 | ConvertFrom-Json -ErrorAction Stop
+            $autoModel = [string]$autoReport.config.model
+        }
+        catch {
+            $autoModel = ''
+        }
+        if ([string]::IsNullOrWhiteSpace($autoModel)) {
+            Write-Warning 'Memory extraction stays off: the extraction gate report does not name a model.'
+        }
+        else {
+            # Read-only preflight of the same verifier the activation path runs.
+            # Doing it here means a failing report degrades to OFF rather than
+            # aborting startup for every other service.
+            try {
+                & (Join-Path $PSScriptRoot 'ollama-proxy\start-local-ollama-proxy.ps1') `
+                    -NumCtx $NumCtx `
+                    -MemoryExtractionProvider $MemoryExtractionProvider `
+                    -MemoryExtractionModel $autoModel `
+                    -MemoryExtractionGateReport $autoGateReport `
+                    -MemoryExtractionGateProfile $MemoryExtractionGateProfile `
+                    -VerifyExtractionGateOnly | Out-Null
+                $MemoryExtractionModel = $autoModel
+                $MemoryExtractionGateReport = $autoGateReport
+                $memoryExtractionAutoEnabled = $true
+            }
+            catch {
+                Write-Warning 'Memory extraction stays off: the extraction gate report did not verify.'
+            }
+        }
+    }
+}
+
 & (Join-Path $PSScriptRoot 'latency-monitor\start-latency-monitor.ps1')
 $latencyMonitor = Wait-LocalHealth -Uri 'http://127.0.0.1:8892/health' -TimeoutSeconds 15
 
 if ([string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
     # The established OFF path does not perform an extraction gate check.
     & (Join-Path $PSScriptRoot 'ollama-proxy\start-local-ollama-proxy.ps1') `
+        -NumCtx $NumCtx `
         -NumGpu $OllamaNumGpu `
         -OllamaKeepAlive $OllamaKeepAlive `
         -EnableKnowledge $EnableKnowledge `
@@ -107,10 +266,15 @@ if ([string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
         -AllowExternalMemoryExtraction $AllowExternalMemoryExtraction `
         -MemoryExtractionModel $MemoryExtractionModel `
         -MemoryExtractionGateReport $MemoryExtractionGateReport `
+        -MemoryExtractionGateProfile $MemoryExtractionGateProfile `
         -MemoryExtractionUpstream "http://127.0.0.1:$MemoryExtractionPort" `
         -ChatProvider $ChatProvider `
         -AllowExternalChat $AllowExternalChat `
-        -ChatModel $ChatModel `
+        -ChatModel $effectiveChatModel `
+        -ChatModelDigest $ChatModelDigest `
+        -OutputModeration $OutputModeration `
+        -OutputModerationTerms $resolvedOutputModerationTerms `
+        -ChatModelPreflighted `
         -AllowExternalSearch $AllowExternalSearch `
         -TopicBoardPath $TopicBoardPath `
         -EnableEvaluation $EnableEvaluation `
@@ -121,12 +285,15 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
     # Verify first without listening on 11435. A pending proxy request can
     # therefore never reach an unverified or mismatched isolated extractor.
     & (Join-Path $PSScriptRoot 'ollama-proxy\start-local-ollama-proxy.ps1') `
+        -NumCtx $NumCtx `
         -NumGpu $OllamaNumGpu -MemoryExtractionProvider $MemoryExtractionProvider `
         -OllamaKeepAlive $OllamaKeepAlive `
         -EnableKnowledge $EnableKnowledge `
         -AllowExternalMemoryExtraction $AllowExternalMemoryExtraction -MemoryExtractionModel $MemoryExtractionModel `
         -MemoryExtractionGateReport $MemoryExtractionGateReport -MemoryExtractionUpstream "http://127.0.0.1:$MemoryExtractionPort" `
-        -ChatProvider $ChatProvider -AllowExternalChat $AllowExternalChat -ChatModel $ChatModel `
+        -MemoryExtractionGateProfile $MemoryExtractionGateProfile `
+        -ChatProvider $ChatProvider -AllowExternalChat $AllowExternalChat -ChatModel $effectiveChatModel -ChatModelPreflighted `
+        -OutputModeration $OutputModeration -OutputModerationTerms $resolvedOutputModerationTerms `
         -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `
         -EnableCharacterEvaluator $EnableCharacterEvaluator -EvaluationMaxRecords $EvaluationMaxRecords `
         -VerifyExtractionGateOnly
@@ -152,12 +319,16 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
         }
         $null = Wait-LocalHealth -Uri "http://127.0.0.1:$MemoryExtractionPort/api/tags" -TimeoutSeconds 30
         & (Join-Path $PSScriptRoot 'ollama-proxy\start-local-ollama-proxy.ps1') `
+            -NumCtx $NumCtx `
             -NumGpu $OllamaNumGpu -MemoryExtractionProvider $MemoryExtractionProvider `
             -OllamaKeepAlive $OllamaKeepAlive `
             -EnableKnowledge $EnableKnowledge `
             -AllowExternalMemoryExtraction $AllowExternalMemoryExtraction -MemoryExtractionModel $MemoryExtractionModel `
             -MemoryExtractionGateReport $MemoryExtractionGateReport -MemoryExtractionUpstream "http://127.0.0.1:$MemoryExtractionPort" `
-            -ChatProvider $ChatProvider -AllowExternalChat $AllowExternalChat -ChatModel $ChatModel `
+            -MemoryExtractionGateProfile $MemoryExtractionGateProfile `
+            -ChatProvider $ChatProvider -AllowExternalChat $AllowExternalChat -ChatModel $effectiveChatModel -ChatModelPreflighted `
+            -ChatModelDigest $ChatModelDigest `
+            -OutputModeration $OutputModeration -OutputModerationTerms $resolvedOutputModerationTerms `
             -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `
             -EnableCharacterEvaluator $EnableCharacterEvaluator -EvaluationMaxRecords $EvaluationMaxRecords
         $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
@@ -182,48 +353,65 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
 else {
     throw 'Memory extraction gate requires the local ollama provider.'
 }
-& (Join-Path $PSScriptRoot 'gpt-sovits\start-local-stack.ps1')
-& (Join-Path $PSScriptRoot 'stt\start-local-stt.ps1') `
-    -Model $SttModel `
-    -ComputeType $SttComputeType
-
 $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
+$liveNumCtx = 0
+$liveNumCtxText = [Convert]::ToString(
+    $proxy.num_ctx, [Globalization.CultureInfo]::InvariantCulture)
+if (-not [int]::TryParse(
+        $liveNumCtxText, [Globalization.NumberStyles]::None,
+        [Globalization.CultureInfo]::InvariantCulture, [ref]$liveNumCtx) -or
+        $liveNumCtx -ne $NumCtx) {
+    throw 'Live proxy num_ctx differs from the requested NumCtx; refusing to start dependent services.'
+}
+& (Join-Path $PSScriptRoot 'gpt-sovits\start-local-stack.ps1')
+if ($Stt -eq 'on') {
+    & (Join-Path $PSScriptRoot 'stt\start-local-stt.ps1') `
+        -Model $SttModel `
+        -ComputeType $SttComputeType
+}
+
 $tts = Wait-LocalHealth -Uri 'http://127.0.0.1:8880/health'
-$stt = Wait-LocalHealth -Uri 'http://127.0.0.1:8890/health'
+$sttHealth = if ($Stt -eq 'on') {
+    Wait-LocalHealth -Uri 'http://127.0.0.1:8890/health'
+} else {
+    $null
+}
 if (-not [string]::IsNullOrWhiteSpace($TopicBoardPath) -and -not [bool]$proxy.topic_board.configured) {
     throw 'TopicBoardPath was requested but the live 11435 proxy did not confirm a configured local topic board.'
 }
 
-# Load Ollama's model before the first user turn. Warm the native loopback
-# endpoint directly so this synthetic probe can never enter AIRI's memory,
-# character-state, evaluation, or cloud-routing paths.
-$warmupJson = @{
-    model = 'exaone-airi:2.4b'
-    stream = $false
-    keep_alive = $OllamaKeepAlive
-    messages = @(@{ role = 'user'; content = '준비.' })
-    options = @{
-        num_ctx = 2048
-        num_gpu = $OllamaNumGpu
-        num_predict = 1
-        temperature = 0
-        seed = 42
+# Load the local foreground model before its first user turn.  External chat
+# providers must never have their model name sent to the local Ollama endpoint.
+$warmup = $null
+if ($ChatProvider -eq 'local') {
+    $warmupJson = @{
+        model = $effectiveChatModel
+        stream = $false
+        keep_alive = $OllamaKeepAlive
+        messages = @(@{ role = 'user'; content = '준비.' })
+        options = @{
+            num_ctx = $NumCtx
+            num_gpu = $OllamaNumGpu
+            num_predict = 1
+            temperature = 0
+            seed = 42
+        }
+    } | ConvertTo-Json -Depth 6 -Compress
+    $warmupBytes = [Text.Encoding]::UTF8.GetBytes($warmupJson)
+    $previousProgressPreference = $ProgressPreference
+    $ProgressPreference = 'SilentlyContinue'
+    try {
+        $warmup = Invoke-WebRequest `
+            -Uri 'http://127.0.0.1:11434/api/chat' `
+            -Method Post `
+            -ContentType 'application/json; charset=utf-8' `
+            -Body $warmupBytes `
+            -UseBasicParsing `
+            -TimeoutSec 120
     }
-} | ConvertTo-Json -Depth 6 -Compress
-$warmupBytes = [Text.Encoding]::UTF8.GetBytes($warmupJson)
-$previousProgressPreference = $ProgressPreference
-$ProgressPreference = 'SilentlyContinue'
-try {
-    $warmup = Invoke-WebRequest `
-        -Uri 'http://127.0.0.1:11434/api/chat' `
-        -Method Post `
-        -ContentType 'application/json; charset=utf-8' `
-        -Body $warmupBytes `
-        -UseBasicParsing `
-        -TimeoutSec 120
-}
-finally {
-    $ProgressPreference = $previousProgressPreference
+    finally {
+        $ProgressPreference = $previousProgressPreference
+    }
 }
 
 [pscustomobject]@{
@@ -233,19 +421,30 @@ finally {
     MemoryEnabled = $proxy.memory.enabled
     MemoryReady = $proxy.memory.ready
     MemoryEmbedder = $proxy.memory.embedder
+    MemoryExtractionAutoEnabled = $memoryExtractionAutoEnabled
+    MemoryExtractionGateProfile = $MemoryExtractionGateProfile
     MemoryExtractionEnabled = $proxy.memory.extraction_enabled
     MemoryExtractionIsolated = $proxy.memory.extraction_isolated
     MemoryExtractionReady = $proxy.memory.extraction_ready
     EvaluationEnabled = $proxy.evaluation.enabled
     CharacterEvaluatorEnabled = $proxy.character_state_evaluator.enabled
     CharacterEvaluatorReady = $proxy.character_state_evaluator.ready
-    LLMWarmup = $warmup.StatusCode
-    NumCtx = $proxy.num_ctx
+    OutputModerationEnabled = $proxy.output_moderation.enabled
+    OutputModerationReady = $proxy.output_moderation.ready
+    LLMWarmup = if ($warmup) { $warmup.StatusCode } else { $null }
+    ChatProvider = $ChatProvider
+    ChatModel = $effectiveChatModel
+    ChatModelEnforced = $proxy.chat_model.enforced
+    ChatModelDigest = $proxy.chat_model.digest.digest
+    ChatModelDigestStatus = $proxy.chat_model.digest.status
+    CharacterEvaluatorModel = if ($EnableCharacterEvaluator) { $effectiveEvaluatorModel } else { '' }
+    NumCtx = $NumCtx
     NumGpu = $proxy.num_gpu
     TTS = $tts.status
     TTSEngine = $tts.engine
     VoiceReferenceFound = $tts.reference_audio_found
-    STT = $stt.status
-    STTModel = $stt.model
-    STTDevice = $stt.device
+    STTMode = $Stt
+    STT = if ($Stt -eq 'on') { $sttHealth.status } else { 'disabled' }
+    STTModel = if ($Stt -eq 'on') { $sttHealth.model } else { '' }
+    STTDevice = if ($Stt -eq 'on') { $sttHealth.device } else { '' }
 }

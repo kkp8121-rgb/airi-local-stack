@@ -1,0 +1,994 @@
+{
+  "complete": true,
+  "created_at_utc": "2026-08-12T12:39:37.695064+00:00",
+  "suite": {
+    "id": "airi-context-gate",
+    "version": "1.0",
+    "fixture_sha256": "51dc16fb237ed79d65a6e8644854e7d605fad91e41a0a693c0bf0f216ee93ffe",
+    "runner_sha256": "60ce70b6617768380bbad07ca0542d284ca42e5e1a90e2625d997d6a14320eea",
+    "system_prompt_sha256": "ada96241cc8a1ac6db7358de74fd1cd6d86a3ab833945810f7e24d54ac96ac5e",
+    "final_contract_sha256": "87d7dca52b91b07e06707b35c5d41d256f76133ff699e316dc4dd49fc978b572",
+    "combined_prompt_sha256": "82c94ff686864e4d9d591aada40d638311fbc7a78b1db2ef38bc8bf37f83ea54"
+  },
+  "runtime": {
+    "endpoint": "http://127.0.0.1:11434/api/chat",
+    "model": "midm-airi:2.0-mini",
+    "num_ctx": 2048,
+    "num_gpu": 999,
+    "temperature": 0.0,
+    "seed": 42,
+    "runs": 3,
+    "max_retries": 1,
+    "timeout": 180.0,
+    "num_predict": 128
+  },
+  "metadata": {
+    "ollama_version": "0.32.6",
+    "model": {
+      "name": "midm-airi:2.0-mini",
+      "digest": "92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f",
+      "details": {
+        "parent_model": "hf.co/DevQuasar/K-intelligence.Midm-2.0-Mini-Instruct-GGUF:Q4_K_M",
+        "format": "gguf",
+        "family": "llama",
+        "families": [
+          "llama"
+        ],
+        "parameter_size": "2.3B",
+        "quantization_level": "Q4_K_M"
+      }
+    },
+    "runtime": {
+      "endpoint": "http://127.0.0.1:11434/api/chat",
+      "model": "midm-airi:2.0-mini",
+      "num_ctx": 2048,
+      "num_gpu": 999,
+      "temperature": 0.0,
+      "seed": 42,
+      "runs": 3,
+      "max_retries": 1,
+      "timeout": 180.0,
+      "num_predict": 128
+    },
+    "python": "3.14.3"
+  },
+  "evidence": [
+    {
+      "pressure": {
+        "id": "p0",
+        "filler_pairs": 0
+      },
+      "message_count": 7,
+      "input_char_count": 1451,
+      "runs": [
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "silver-fern",
+                "early_assistant": "blue-cedar",
+                "early_user": "red-comet",
+                "early_user_negated": false,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "active_card",
+                  "early_user_negated"
+                ],
+                "speaker_preserved": true,
+                "negation_preserved": false
+              },
+              "metrics": {
+                "prompt_eval_count": 1139,
+                "eval_count": 68,
+                "total_duration_ms": 3491.897,
+                "eval_duration_ms": 713.254
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "silver-fern",
+              "early_assistant": "blue-cedar",
+              "early_user": "red-comet",
+              "early_user_negated": false,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "active_card",
+                "early_user_negated"
+              ],
+              "speaker_preserved": true,
+              "negation_preserved": false
+            },
+            "metrics": {
+              "prompt_eval_count": 1139,
+              "eval_count": 68,
+              "total_duration_ms": 3491.897,
+              "eval_duration_ms": 713.254
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "silver-fern",
+                "early_assistant": "blue-cedar",
+                "early_user": "red-comet",
+                "early_user_negated": false,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "active_card",
+                  "early_user_negated"
+                ],
+                "speaker_preserved": true,
+                "negation_preserved": false
+              },
+              "metrics": {
+                "prompt_eval_count": 1139,
+                "eval_count": 68,
+                "total_duration_ms": 898.767,
+                "eval_duration_ms": 693.54
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "silver-fern",
+              "early_assistant": "blue-cedar",
+              "early_user": "red-comet",
+              "early_user_negated": false,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "active_card",
+                "early_user_negated"
+              ],
+              "speaker_preserved": true,
+              "negation_preserved": false
+            },
+            "metrics": {
+              "prompt_eval_count": 1139,
+              "eval_count": 68,
+              "total_duration_ms": 898.767,
+              "eval_duration_ms": 693.54
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "silver-fern",
+                "early_assistant": "blue-cedar",
+                "early_user": "red-comet",
+                "early_user_negated": false,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "active_card",
+                  "early_user_negated"
+                ],
+                "speaker_preserved": true,
+                "negation_preserved": false
+              },
+              "metrics": {
+                "prompt_eval_count": 1139,
+                "eval_count": 68,
+                "total_duration_ms": 887.472,
+                "eval_duration_ms": 689.958
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "silver-fern",
+              "early_assistant": "blue-cedar",
+              "early_user": "red-comet",
+              "early_user_negated": false,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "active_card",
+                "early_user_negated"
+              ],
+              "speaker_preserved": true,
+              "negation_preserved": false
+            },
+            "metrics": {
+              "prompt_eval_count": 1139,
+              "eval_count": 68,
+              "total_duration_ms": 887.472,
+              "eval_duration_ms": 689.958
+            },
+            "attempt": 1
+          }
+        }
+      ],
+      "aggregate": {
+        "complete": true,
+        "gate": "FAIL",
+        "retry_rate": 0.0,
+        "first_pass_valid_rate": 1.0,
+        "semantic_pass_rate": 0.0,
+        "retention_rates": {
+          "active_card": 0.0,
+          "early_user": 1.0,
+          "early_assistant": 1.0,
+          "latest_correction": 1.0,
+          "early_user_negated": 0.0,
+          "tail_memory": 1.0
+        },
+        "p50": {
+          "prompt_eval_count": 1139,
+          "eval_count": 68,
+          "total_duration_ms": 898.767,
+          "eval_duration_ms": 693.54
+        },
+        "p95": {
+          "prompt_eval_count": 1139,
+          "eval_count": 68,
+          "total_duration_ms": 3491.897,
+          "eval_duration_ms": 713.254
+        }
+      }
+    },
+    {
+      "pressure": {
+        "id": "p1",
+        "filler_pairs": 8
+      },
+      "message_count": 23,
+      "input_char_count": 2259,
+      "runs": [
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "silver-fern",
+                "early_assistant": "green-lantern",
+                "early_user": "red-comet",
+                "early_user_negated": false,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "active_card",
+                  "early_assistant",
+                  "early_user_negated"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": false
+              },
+              "metrics": {
+                "prompt_eval_count": 1547,
+                "eval_count": 67,
+                "total_duration_ms": 1030.726,
+                "eval_duration_ms": 713.148
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "silver-fern",
+              "early_assistant": "green-lantern",
+              "early_user": "red-comet",
+              "early_user_negated": false,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "active_card",
+                "early_assistant",
+                "early_user_negated"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": false
+            },
+            "metrics": {
+              "prompt_eval_count": 1547,
+              "eval_count": 67,
+              "total_duration_ms": 1030.726,
+              "eval_duration_ms": 713.148
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "silver-fern",
+                "early_assistant": "green-lantern",
+                "early_user": "red-comet",
+                "early_user_negated": false,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "active_card",
+                  "early_assistant",
+                  "early_user_negated"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": false
+              },
+              "metrics": {
+                "prompt_eval_count": 1547,
+                "eval_count": 67,
+                "total_duration_ms": 887.689,
+                "eval_duration_ms": 687.144
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "silver-fern",
+              "early_assistant": "green-lantern",
+              "early_user": "red-comet",
+              "early_user_negated": false,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "active_card",
+                "early_assistant",
+                "early_user_negated"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": false
+            },
+            "metrics": {
+              "prompt_eval_count": 1547,
+              "eval_count": 67,
+              "total_duration_ms": 887.689,
+              "eval_duration_ms": 687.144
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "silver-fern",
+                "early_assistant": "green-lantern",
+                "early_user": "red-comet",
+                "early_user_negated": false,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "active_card",
+                  "early_assistant",
+                  "early_user_negated"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": false
+              },
+              "metrics": {
+                "prompt_eval_count": 1547,
+                "eval_count": 67,
+                "total_duration_ms": 877.764,
+                "eval_duration_ms": 677.783
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "silver-fern",
+              "early_assistant": "green-lantern",
+              "early_user": "red-comet",
+              "early_user_negated": false,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "active_card",
+                "early_assistant",
+                "early_user_negated"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": false
+            },
+            "metrics": {
+              "prompt_eval_count": 1547,
+              "eval_count": 67,
+              "total_duration_ms": 877.764,
+              "eval_duration_ms": 677.783
+            },
+            "attempt": 1
+          }
+        }
+      ],
+      "aggregate": {
+        "complete": true,
+        "gate": "FAIL",
+        "retry_rate": 0.0,
+        "first_pass_valid_rate": 1.0,
+        "semantic_pass_rate": 0.0,
+        "retention_rates": {
+          "active_card": 0.0,
+          "early_user": 1.0,
+          "early_assistant": 0.0,
+          "latest_correction": 1.0,
+          "early_user_negated": 0.0,
+          "tail_memory": 1.0
+        },
+        "p50": {
+          "prompt_eval_count": 1547,
+          "eval_count": 67,
+          "total_duration_ms": 887.689,
+          "eval_duration_ms": 687.144
+        },
+        "p95": {
+          "prompt_eval_count": 1547,
+          "eval_count": 67,
+          "total_duration_ms": 1030.726,
+          "eval_duration_ms": 713.148
+        }
+      }
+    },
+    {
+      "pressure": {
+        "id": "p2",
+        "filler_pairs": 20
+      },
+      "message_count": 47,
+      "input_char_count": 3531,
+      "runs": [
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "silver-fern",
+                "early_assistant": "false",
+                "early_user": "false",
+                "early_user_negated": false,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "active_card",
+                  "early_user",
+                  "early_assistant",
+                  "early_user_negated"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": false
+              },
+              "metrics": {
+                "prompt_eval_count": 2042,
+                "eval_count": 64,
+                "total_duration_ms": 1304.925,
+                "eval_duration_ms": 797.851
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "silver-fern",
+              "early_assistant": "false",
+              "early_user": "false",
+              "early_user_negated": false,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "active_card",
+                "early_user",
+                "early_assistant",
+                "early_user_negated"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": false
+            },
+            "metrics": {
+              "prompt_eval_count": 2042,
+              "eval_count": 64,
+              "total_duration_ms": 1304.925,
+              "eval_duration_ms": 797.851
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "silver-fern",
+                "early_assistant": "false",
+                "early_user": "false",
+                "early_user_negated": false,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "active_card",
+                  "early_user",
+                  "early_assistant",
+                  "early_user_negated"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": false
+              },
+              "metrics": {
+                "prompt_eval_count": 2042,
+                "eval_count": 64,
+                "total_duration_ms": 1489.066,
+                "eval_duration_ms": 760.269
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "silver-fern",
+              "early_assistant": "false",
+              "early_user": "false",
+              "early_user_negated": false,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "active_card",
+                "early_user",
+                "early_assistant",
+                "early_user_negated"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": false
+            },
+            "metrics": {
+              "prompt_eval_count": 2042,
+              "eval_count": 64,
+              "total_duration_ms": 1489.066,
+              "eval_duration_ms": 760.269
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "silver-fern",
+                "early_assistant": "false",
+                "early_user": "false",
+                "early_user_negated": false,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "active_card",
+                  "early_user",
+                  "early_assistant",
+                  "early_user_negated"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": false
+              },
+              "metrics": {
+                "prompt_eval_count": 2042,
+                "eval_count": 64,
+                "total_duration_ms": 1438.249,
+                "eval_duration_ms": 768.895
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "silver-fern",
+              "early_assistant": "false",
+              "early_user": "false",
+              "early_user_negated": false,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "active_card",
+                "early_user",
+                "early_assistant",
+                "early_user_negated"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": false
+            },
+            "metrics": {
+              "prompt_eval_count": 2042,
+              "eval_count": 64,
+              "total_duration_ms": 1438.249,
+              "eval_duration_ms": 768.895
+            },
+            "attempt": 1
+          }
+        }
+      ],
+      "aggregate": {
+        "complete": true,
+        "gate": "FAIL",
+        "retry_rate": 0.0,
+        "first_pass_valid_rate": 1.0,
+        "semantic_pass_rate": 0.0,
+        "retention_rates": {
+          "active_card": 0.0,
+          "early_user": 0.0,
+          "early_assistant": 0.0,
+          "latest_correction": 1.0,
+          "early_user_negated": 0.0,
+          "tail_memory": 1.0
+        },
+        "p50": {
+          "prompt_eval_count": 2042,
+          "eval_count": 64,
+          "total_duration_ms": 1438.249,
+          "eval_duration_ms": 768.895
+        },
+        "p95": {
+          "prompt_eval_count": 2042,
+          "eval_count": 64,
+          "total_duration_ms": 1489.066,
+          "eval_duration_ms": 797.851
+        }
+      }
+    },
+    {
+      "pressure": {
+        "id": "p3",
+        "filler_pairs": 48
+      },
+      "message_count": 103,
+      "input_char_count": 6527,
+      "runs": [
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "silver-fern",
+                "early_assistant": "false",
+                "early_user": "false",
+                "early_user_negated": false,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "active_card",
+                  "early_user",
+                  "early_assistant",
+                  "early_user_negated"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": false
+              },
+              "metrics": {
+                "prompt_eval_count": 2042,
+                "eval_count": 64,
+                "total_duration_ms": 2567.163,
+                "eval_duration_ms": 770.543
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "silver-fern",
+              "early_assistant": "false",
+              "early_user": "false",
+              "early_user_negated": false,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "active_card",
+                "early_user",
+                "early_assistant",
+                "early_user_negated"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": false
+            },
+            "metrics": {
+              "prompt_eval_count": 2042,
+              "eval_count": 64,
+              "total_duration_ms": 2567.163,
+              "eval_duration_ms": 770.543
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "silver-fern",
+                "early_assistant": "false",
+                "early_user": "false",
+                "early_user_negated": false,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "active_card",
+                  "early_user",
+                  "early_assistant",
+                  "early_user_negated"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": false
+              },
+              "metrics": {
+                "prompt_eval_count": 2042,
+                "eval_count": 64,
+                "total_duration_ms": 2620.01,
+                "eval_duration_ms": 778.071
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "silver-fern",
+              "early_assistant": "false",
+              "early_user": "false",
+              "early_user_negated": false,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "active_card",
+                "early_user",
+                "early_assistant",
+                "early_user_negated"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": false
+            },
+            "metrics": {
+              "prompt_eval_count": 2042,
+              "eval_count": 64,
+              "total_duration_ms": 2620.01,
+              "eval_duration_ms": 778.071
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "silver-fern",
+                "early_assistant": "false",
+                "early_user": "false",
+                "early_user_negated": false,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "active_card",
+                  "early_user",
+                  "early_assistant",
+                  "early_user_negated"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": false
+              },
+              "metrics": {
+                "prompt_eval_count": 2042,
+                "eval_count": 64,
+                "total_duration_ms": 2911.25,
+                "eval_duration_ms": 796.893
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "silver-fern",
+              "early_assistant": "false",
+              "early_user": "false",
+              "early_user_negated": false,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "active_card",
+                "early_user",
+                "early_assistant",
+                "early_user_negated"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": false
+            },
+            "metrics": {
+              "prompt_eval_count": 2042,
+              "eval_count": 64,
+              "total_duration_ms": 2911.25,
+              "eval_duration_ms": 796.893
+            },
+            "attempt": 1
+          }
+        }
+      ],
+      "aggregate": {
+        "complete": true,
+        "gate": "FAIL",
+        "retry_rate": 0.0,
+        "first_pass_valid_rate": 1.0,
+        "semantic_pass_rate": 0.0,
+        "retention_rates": {
+          "active_card": 0.0,
+          "early_user": 0.0,
+          "early_assistant": 0.0,
+          "latest_correction": 1.0,
+          "early_user_negated": 0.0,
+          "tail_memory": 1.0
+        },
+        "p50": {
+          "prompt_eval_count": 2042,
+          "eval_count": 64,
+          "total_duration_ms": 2620.01,
+          "eval_duration_ms": 778.071
+        },
+        "p95": {
+          "prompt_eval_count": 2042,
+          "eval_count": 64,
+          "total_duration_ms": 2911.25,
+          "eval_duration_ms": 796.893
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "complete": true,
+    "gate": "FAIL",
+    "retry_rate": 0.0,
+    "first_pass_valid_rate": 1.0,
+    "semantic_pass_rate": 0.0,
+    "retention_rates": {
+      "active_card": 0.0,
+      "early_user": 0.5,
+      "early_assistant": 0.25,
+      "latest_correction": 1.0,
+      "early_user_negated": 0.0,
+      "tail_memory": 1.0
+    },
+    "p50": {
+      "prompt_eval_count": 2042,
+      "eval_count": 67,
+      "total_duration_ms": 1438.249,
+      "eval_duration_ms": 760.269
+    },
+    "p95": {
+      "prompt_eval_count": 2042,
+      "eval_count": 68,
+      "total_duration_ms": 2911.25,
+      "eval_duration_ms": 796.893
+    }
+  }
+}

@@ -1,4 +1,40 @@
+# AIRI evaluations
+
+## Production continuity/projection gate
+
+`run_airi_production_context_gate.py` is distinct from the raw capacity gate:
+it runs a frozen synthetic conversation through the current proxy projection,
+continuity-ledger, snapshot memory assembler, language/mode injection and
+native Ollama conversion. It does not start the proxy or access a memory
+runtime, store, or session. The live CLI calls only a literal loopback
+`/api/chat` endpoint by default; tests use a fake transport.
+
+```powershell
+cd <repo>\ollama-proxy\eval
+python -m unittest -v test_airi_production_context_gate.py
+python run_airi_production_context_gate.py --output airi-production-context-report.json --fail-on-gate
+```
+
+The raw capacity gate (`run_airi_context_gate.py`) measures model retention
+against a direct synthetic prompt. This production continuity/projection gate
+instead verifies that production shaping removes old pressure/holdout text,
+preserves the deterministic tail, and strips private message names before the
+native request. Three runs across pressures 0, 8, 20, and 48 are authoritative;
+other `--runs` values are marked non-authoritative in the report.
+
 # AIRI C0 baseline evaluation
+
+## Synthetic context gate
+
+The context gate is a synthetic-only, non-streaming raw Ollama `/api/chat` comparison at production `num_ctx=2048`. It records retention of an active card, early user/assistant facts, a late correction/negation, and a tail memory block. It does not exercise the Electron app, human quality, or production-proxy retry behavior.
+
+```powershell
+python -m unittest -v ollama-proxy/eval/test_airi_context_gate.py
+python ollama-proxy/eval/run_airi_context_gate.py --model exaone-airi:2.4b --output airi-context-exaone.json
+python ollama-proxy/eval/run_airi_context_gate.py --model midm-airi:2.0-mini --output airi-context-midm.json
+```
+
+Reports contain only public fixture canaries and local Ollama metadata; remote hosts require `--allow-host`.
 
 이 디렉터리는 **합성 텍스트 fixture만** 사용하는 로컬 Ollama baseline harness다. 학습 코드가 아니며, 실제 사용자 대화·음성·전사·API 키·환경 비밀을 읽거나 저장하지 않는다. 현재 v0.3 fixture는 16개이며, 성인 간 비노골적 관계 대화의 과잉 거부, 노골적·미성년 경계, active character-card 정체성, character-card보다 우선하는 도구 진실성 계약을 함께 평가한다.
 

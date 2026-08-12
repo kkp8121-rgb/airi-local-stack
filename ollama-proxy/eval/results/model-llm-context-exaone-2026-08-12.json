@@ -1,0 +1,938 @@
+{
+  "complete": true,
+  "created_at_utc": "2026-08-12T12:39:17.810924+00:00",
+  "suite": {
+    "id": "airi-context-gate",
+    "version": "1.0",
+    "fixture_sha256": "51dc16fb237ed79d65a6e8644854e7d605fad91e41a0a693c0bf0f216ee93ffe",
+    "runner_sha256": "60ce70b6617768380bbad07ca0542d284ca42e5e1a90e2625d997d6a14320eea",
+    "system_prompt_sha256": "ada96241cc8a1ac6db7358de74fd1cd6d86a3ab833945810f7e24d54ac96ac5e",
+    "final_contract_sha256": "87d7dca52b91b07e06707b35c5d41d256f76133ff699e316dc4dd49fc978b572",
+    "combined_prompt_sha256": "82c94ff686864e4d9d591aada40d638311fbc7a78b1db2ef38bc8bf37f83ea54"
+  },
+  "runtime": {
+    "endpoint": "http://127.0.0.1:11434/api/chat",
+    "model": "exaone-airi:2.4b",
+    "num_ctx": 2048,
+    "num_gpu": 999,
+    "temperature": 0.0,
+    "seed": 42,
+    "runs": 3,
+    "max_retries": 1,
+    "timeout": 180.0,
+    "num_predict": 128
+  },
+  "metadata": {
+    "ollama_version": "0.32.6",
+    "model": {
+      "name": "exaone-airi:2.4b",
+      "digest": "ec47936ec5439ea3c24bbdd069b3a7aeba5cd8100ab193367bd959fac679bde4",
+      "details": {
+        "parent_model": "exaone3.5:2.4b",
+        "format": "gguf",
+        "family": "exaone",
+        "families": [
+          "exaone"
+        ],
+        "parameter_size": "2.7B",
+        "quantization_level": "Q4_K_M"
+      }
+    },
+    "runtime": {
+      "endpoint": "http://127.0.0.1:11434/api/chat",
+      "model": "exaone-airi:2.4b",
+      "num_ctx": 2048,
+      "num_gpu": 999,
+      "temperature": 0.0,
+      "seed": 42,
+      "runs": 3,
+      "max_retries": 1,
+      "timeout": 180.0,
+      "num_predict": 128
+    },
+    "python": "3.14.3"
+  },
+  "evidence": [
+    {
+      "pressure": {
+        "id": "p0",
+        "filler_pairs": 0
+      },
+      "message_count": 7,
+      "input_char_count": 1451,
+      "runs": [
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "violet-otter",
+                "early_assistant": "blue-cedar",
+                "early_user": "true",
+                "early_user_negated": true,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "early_user"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": true
+              },
+              "metrics": {
+                "prompt_eval_count": 756,
+                "eval_count": 86,
+                "total_duration_ms": 2884.044,
+                "eval_duration_ms": 615.641
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "violet-otter",
+              "early_assistant": "blue-cedar",
+              "early_user": "true",
+              "early_user_negated": true,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "early_user"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": true
+            },
+            "metrics": {
+              "prompt_eval_count": 756,
+              "eval_count": 86,
+              "total_duration_ms": 2884.044,
+              "eval_duration_ms": 615.641
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "violet-otter",
+                "early_assistant": "blue-cedar",
+                "early_user": "true",
+                "early_user_negated": true,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "early_user"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": true
+              },
+              "metrics": {
+                "prompt_eval_count": 756,
+                "eval_count": 86,
+                "total_duration_ms": 754.942,
+                "eval_duration_ms": 619.274
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "violet-otter",
+              "early_assistant": "blue-cedar",
+              "early_user": "true",
+              "early_user_negated": true,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "early_user"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": true
+            },
+            "metrics": {
+              "prompt_eval_count": 756,
+              "eval_count": 86,
+              "total_duration_ms": 754.942,
+              "eval_duration_ms": 619.274
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "violet-otter",
+                "early_assistant": "blue-cedar",
+                "early_user": "true",
+                "early_user_negated": true,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "early_user"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": true
+              },
+              "metrics": {
+                "prompt_eval_count": 756,
+                "eval_count": 86,
+                "total_duration_ms": 779.539,
+                "eval_duration_ms": 643.277
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "violet-otter",
+              "early_assistant": "blue-cedar",
+              "early_user": "true",
+              "early_user_negated": true,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "early_user"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": true
+            },
+            "metrics": {
+              "prompt_eval_count": 756,
+              "eval_count": 86,
+              "total_duration_ms": 779.539,
+              "eval_duration_ms": 643.277
+            },
+            "attempt": 1
+          }
+        }
+      ],
+      "aggregate": {
+        "complete": true,
+        "gate": "FAIL",
+        "retry_rate": 0.0,
+        "first_pass_valid_rate": 1.0,
+        "semantic_pass_rate": 0.0,
+        "retention_rates": {
+          "active_card": 1.0,
+          "early_user": 0.0,
+          "early_assistant": 1.0,
+          "latest_correction": 1.0,
+          "early_user_negated": 1.0,
+          "tail_memory": 1.0
+        },
+        "p50": {
+          "prompt_eval_count": 756,
+          "eval_count": 86,
+          "total_duration_ms": 779.539,
+          "eval_duration_ms": 619.274
+        },
+        "p95": {
+          "prompt_eval_count": 756,
+          "eval_count": 86,
+          "total_duration_ms": 2884.044,
+          "eval_duration_ms": 643.277
+        }
+      }
+    },
+    {
+      "pressure": {
+        "id": "p1",
+        "filler_pairs": 8
+      },
+      "message_count": 23,
+      "input_char_count": 2259,
+      "runs": [
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "violet-otter",
+                "early_assistant": "blue-cedar",
+                "early_user": "true",
+                "early_user_negated": true,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "early_user"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": true
+              },
+              "metrics": {
+                "prompt_eval_count": 1188,
+                "eval_count": 86,
+                "total_duration_ms": 950.581,
+                "eval_duration_ms": 699.462
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "violet-otter",
+              "early_assistant": "blue-cedar",
+              "early_user": "true",
+              "early_user_negated": true,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "early_user"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": true
+            },
+            "metrics": {
+              "prompt_eval_count": 1188,
+              "eval_count": 86,
+              "total_duration_ms": 950.581,
+              "eval_duration_ms": 699.462
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "violet-otter",
+                "early_assistant": "blue-cedar",
+                "early_user": "true",
+                "early_user_negated": true,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "early_user"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": true
+              },
+              "metrics": {
+                "prompt_eval_count": 1188,
+                "eval_count": 86,
+                "total_duration_ms": 852.9,
+                "eval_duration_ms": 684.356
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "violet-otter",
+              "early_assistant": "blue-cedar",
+              "early_user": "true",
+              "early_user_negated": true,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "early_user"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": true
+            },
+            "metrics": {
+              "prompt_eval_count": 1188,
+              "eval_count": 86,
+              "total_duration_ms": 852.9,
+              "eval_duration_ms": 684.356
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "violet-otter",
+                "early_assistant": "blue-cedar",
+                "early_user": "true",
+                "early_user_negated": true,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "early_user"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": true
+              },
+              "metrics": {
+                "prompt_eval_count": 1188,
+                "eval_count": 86,
+                "total_duration_ms": 753.576,
+                "eval_duration_ms": 616.258
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "violet-otter",
+              "early_assistant": "blue-cedar",
+              "early_user": "true",
+              "early_user_negated": true,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "early_user"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": true
+            },
+            "metrics": {
+              "prompt_eval_count": 1188,
+              "eval_count": 86,
+              "total_duration_ms": 753.576,
+              "eval_duration_ms": 616.258
+            },
+            "attempt": 1
+          }
+        }
+      ],
+      "aggregate": {
+        "complete": true,
+        "gate": "FAIL",
+        "retry_rate": 0.0,
+        "first_pass_valid_rate": 1.0,
+        "semantic_pass_rate": 0.0,
+        "retention_rates": {
+          "active_card": 1.0,
+          "early_user": 0.0,
+          "early_assistant": 1.0,
+          "latest_correction": 1.0,
+          "early_user_negated": 1.0,
+          "tail_memory": 1.0
+        },
+        "p50": {
+          "prompt_eval_count": 1188,
+          "eval_count": 86,
+          "total_duration_ms": 852.9,
+          "eval_duration_ms": 684.356
+        },
+        "p95": {
+          "prompt_eval_count": 1188,
+          "eval_count": 86,
+          "total_duration_ms": 950.581,
+          "eval_duration_ms": 699.462
+        }
+      }
+    },
+    {
+      "pressure": {
+        "id": "p2",
+        "filler_pairs": 20
+      },
+      "message_count": 47,
+      "input_char_count": 3531,
+      "runs": [
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "violet-otter",
+                "early_assistant": "blue-cedar",
+                "early_user": "red-comet",
+                "early_user_negated": true,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": true,
+                "failures": [],
+                "speaker_preserved": true,
+                "negation_preserved": true
+              },
+              "metrics": {
+                "prompt_eval_count": 1896,
+                "eval_count": 89,
+                "total_duration_ms": 930.562,
+                "eval_duration_ms": 654.545
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "violet-otter",
+              "early_assistant": "blue-cedar",
+              "early_user": "red-comet",
+              "early_user_negated": true,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": true,
+              "failures": [],
+              "speaker_preserved": true,
+              "negation_preserved": true
+            },
+            "metrics": {
+              "prompt_eval_count": 1896,
+              "eval_count": 89,
+              "total_duration_ms": 930.562,
+              "eval_duration_ms": 654.545
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "violet-otter",
+                "early_assistant": "blue-cedar",
+                "early_user": "red-comet",
+                "early_user_negated": true,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": true,
+                "failures": [],
+                "speaker_preserved": true,
+                "negation_preserved": true
+              },
+              "metrics": {
+                "prompt_eval_count": 1896,
+                "eval_count": 89,
+                "total_duration_ms": 802.284,
+                "eval_duration_ms": 659.496
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "violet-otter",
+              "early_assistant": "blue-cedar",
+              "early_user": "red-comet",
+              "early_user_negated": true,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": true,
+              "failures": [],
+              "speaker_preserved": true,
+              "negation_preserved": true
+            },
+            "metrics": {
+              "prompt_eval_count": 1896,
+              "eval_count": 89,
+              "total_duration_ms": 802.284,
+              "eval_duration_ms": 659.496
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "violet-otter",
+                "early_assistant": "blue-cedar",
+                "early_user": "red-comet",
+                "early_user_negated": true,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": true,
+                "failures": [],
+                "speaker_preserved": true,
+                "negation_preserved": true
+              },
+              "metrics": {
+                "prompt_eval_count": 1896,
+                "eval_count": 89,
+                "total_duration_ms": 801.337,
+                "eval_duration_ms": 658.644
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "violet-otter",
+              "early_assistant": "blue-cedar",
+              "early_user": "red-comet",
+              "early_user_negated": true,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": true,
+              "failures": [],
+              "speaker_preserved": true,
+              "negation_preserved": true
+            },
+            "metrics": {
+              "prompt_eval_count": 1896,
+              "eval_count": 89,
+              "total_duration_ms": 801.337,
+              "eval_duration_ms": 658.644
+            },
+            "attempt": 1
+          }
+        }
+      ],
+      "aggregate": {
+        "complete": true,
+        "gate": "PASS",
+        "retry_rate": 0.0,
+        "first_pass_valid_rate": 1.0,
+        "semantic_pass_rate": 1.0,
+        "retention_rates": {
+          "active_card": 1.0,
+          "early_user": 1.0,
+          "early_assistant": 1.0,
+          "latest_correction": 1.0,
+          "early_user_negated": 1.0,
+          "tail_memory": 1.0
+        },
+        "p50": {
+          "prompt_eval_count": 1896,
+          "eval_count": 89,
+          "total_duration_ms": 802.284,
+          "eval_duration_ms": 658.644
+        },
+        "p95": {
+          "prompt_eval_count": 1896,
+          "eval_count": 89,
+          "total_duration_ms": 930.562,
+          "eval_duration_ms": 659.496
+        }
+      }
+    },
+    {
+      "pressure": {
+        "id": "p3",
+        "filler_pairs": 48
+      },
+      "message_count": 103,
+      "input_char_count": 6527,
+      "runs": [
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "violet-otter",
+                "early_assistant": "green-lantern",
+                "early_user": "true",
+                "early_user_negated": false,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "early_user",
+                  "early_assistant",
+                  "early_user_negated"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": false
+              },
+              "metrics": {
+                "prompt_eval_count": 2024,
+                "eval_count": 86,
+                "total_duration_ms": 1395.911,
+                "eval_duration_ms": 655.018
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "violet-otter",
+              "early_assistant": "green-lantern",
+              "early_user": "true",
+              "early_user_negated": false,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "early_user",
+                "early_assistant",
+                "early_user_negated"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": false
+            },
+            "metrics": {
+              "prompt_eval_count": 2024,
+              "eval_count": 86,
+              "total_duration_ms": 1395.911,
+              "eval_duration_ms": 655.018
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "violet-otter",
+                "early_assistant": "green-lantern",
+                "early_user": "true",
+                "early_user_negated": false,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "early_user",
+                  "early_assistant",
+                  "early_user_negated"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": false
+              },
+              "metrics": {
+                "prompt_eval_count": 2024,
+                "eval_count": 86,
+                "total_duration_ms": 1439.201,
+                "eval_duration_ms": 722.365
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "violet-otter",
+              "early_assistant": "green-lantern",
+              "early_user": "true",
+              "early_user_negated": false,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "early_user",
+                "early_assistant",
+                "early_user_negated"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": false
+            },
+            "metrics": {
+              "prompt_eval_count": 2024,
+              "eval_count": 86,
+              "total_duration_ms": 1439.201,
+              "eval_duration_ms": 722.365
+            },
+            "attempt": 1
+          }
+        },
+        {
+          "attempts": [
+            {
+              "valid": true,
+              "data": {
+                "active_card": "violet-otter",
+                "early_assistant": "green-lantern",
+                "early_user": "true",
+                "early_user_negated": true,
+                "latest_correction": "green-lantern",
+                "tail_memory": "silver-fern"
+              },
+              "score": {
+                "passed": false,
+                "failures": [
+                  "early_user",
+                  "early_assistant"
+                ],
+                "speaker_preserved": false,
+                "negation_preserved": true
+              },
+              "metrics": {
+                "prompt_eval_count": 2024,
+                "eval_count": 86,
+                "total_duration_ms": 1431.37,
+                "eval_duration_ms": 688.247
+              },
+              "attempt": 1
+            }
+          ],
+          "first_pass_valid": true,
+          "retry_used": false,
+          "complete": true,
+          "result": {
+            "valid": true,
+            "data": {
+              "active_card": "violet-otter",
+              "early_assistant": "green-lantern",
+              "early_user": "true",
+              "early_user_negated": true,
+              "latest_correction": "green-lantern",
+              "tail_memory": "silver-fern"
+            },
+            "score": {
+              "passed": false,
+              "failures": [
+                "early_user",
+                "early_assistant"
+              ],
+              "speaker_preserved": false,
+              "negation_preserved": true
+            },
+            "metrics": {
+              "prompt_eval_count": 2024,
+              "eval_count": 86,
+              "total_duration_ms": 1431.37,
+              "eval_duration_ms": 688.247
+            },
+            "attempt": 1
+          }
+        }
+      ],
+      "aggregate": {
+        "complete": true,
+        "gate": "FAIL",
+        "retry_rate": 0.0,
+        "first_pass_valid_rate": 1.0,
+        "semantic_pass_rate": 0.0,
+        "retention_rates": {
+          "active_card": 1.0,
+          "early_user": 0.0,
+          "early_assistant": 0.0,
+          "latest_correction": 1.0,
+          "early_user_negated": 0.3333333333333333,
+          "tail_memory": 1.0
+        },
+        "p50": {
+          "prompt_eval_count": 2024,
+          "eval_count": 86,
+          "total_duration_ms": 1431.37,
+          "eval_duration_ms": 688.247
+        },
+        "p95": {
+          "prompt_eval_count": 2024,
+          "eval_count": 86,
+          "total_duration_ms": 1439.201,
+          "eval_duration_ms": 722.365
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "complete": true,
+    "gate": "FAIL",
+    "retry_rate": 0.0,
+    "first_pass_valid_rate": 1.0,
+    "semantic_pass_rate": 0.25,
+    "retention_rates": {
+      "active_card": 1.0,
+      "early_user": 0.25,
+      "early_assistant": 0.75,
+      "latest_correction": 1.0,
+      "early_user_negated": 0.8333333333333334,
+      "tail_memory": 1.0
+    },
+    "p50": {
+      "prompt_eval_count": 1896,
+      "eval_count": 86,
+      "total_duration_ms": 930.562,
+      "eval_duration_ms": 658.644
+    },
+    "p95": {
+      "prompt_eval_count": 2024,
+      "eval_count": 89,
+      "total_duration_ms": 1439.201,
+      "eval_duration_ms": 699.462
+    }
+  }
+}

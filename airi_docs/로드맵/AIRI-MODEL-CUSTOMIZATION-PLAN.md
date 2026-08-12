@@ -1,19 +1,20 @@
-# AIRI EXAONE 3.5 모델 커스터마이징 기술 계획
+# AIRI 모델 커스터마이징 기술 계획
 
 - 작성일: 2026-08-07 (KST)
+- 개정일: 2026-08-12 — 모델 중립 개정. EXAONE 3.5 고유 전제를 현행 SSoT 모델 참조로 치환하고, 모델 고유 실측·라이선스 제약에 시점을 명시했다. 개정 전 원본은 `아카이브/AIRI-EXAONE-MODEL-CUSTOMIZATION-PLAN-2026-08-07.md`에 보존돼 있다.
 - 상태: 장기 연구 트랙, 즉시 구현 아님
-- 기준 모델: `LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct`
-- 현재 런타임 태그: `exaone-airi:2.4b`
-- 상위 전략: [AIRI-EXAONE-GROWTH-STRATEGY-2026-08-07.md](./AIRI-EXAONE-GROWTH-STRATEGY-2026-08-07.md)
+- 기준 모델: 현행 SSoT 모델의 Hugging Face 원본 가중치 — 2026-08-12 기준 `K-intelligence/Midm-2.0-Mini-Instruct`(MIT). 롤백 대상은 `LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct`.
+- 현재 런타임 태그: 프록시 `resolve_chat_model()`(env `AIRI_CHAT_MODEL`)이 결정 — 2026-08-12 기준 `midm-airi:2.0-mini`, 롤백 태그 `exaone-airi:2.4b`.
+- 상위 전략: [AIRI-GROWTH-STRATEGY.md](./AIRI-GROWTH-STRATEGY.md)
 
 ## 1. 목적
 
-EXAONE 3.5 2.4B를 AIRI의 빠른 한국어 언어 코어로 유지하면서 다음 두 방향의 모델 커스터마이징 가능성을 관리한다.
+현행 SSoT 모델을 AIRI의 빠른 한국어 언어 코어로 유지하면서 다음 두 방향의 모델 커스터마이징 가능성을 관리한다.
 
 1. **추가**: AIRI 말투, 감정, 행동, 도구 사용과 방송형 반응을 LoRA/QLoRA로 특화한다.
 2. **축소**: 실제 병목이 확인된 경우에만 레이어·MLP·Attention·어휘 구조를 실험적으로 줄인다.
 
-이 계획은 EXAONE 안에서 “불필요한 지식만 골라 삭제”하는 것을 목표로 하지 않는다. 밀집형 언어 모델의 지식과 언어 능력은 같은 가중치에 분산되어 있으므로, 특정 지식 영역을 잘라내면 한국어·추론·대화 품질까지 함께 손상될 수 있다.
+이 계획은 기반 모델 안에서 “불필요한 지식만 골라 삭제”하는 것을 목표로 하지 않는다. 밀집형 언어 모델의 지식과 언어 능력은 같은 가중치에 분산되어 있으므로, 특정 지식 영역을 잘라내면 한국어·추론·대화 품질까지 함께 손상될 수 있다.
 
 ## 2. 확정 결정
 
@@ -24,13 +25,13 @@ EXAONE 3.5 2.4B를 AIRI의 빠른 한국어 언어 코어로 유지하면서 다
 - 자동 온라인 학습은 하지 않는다.
 - 구조 축소는 속도 또는 메모리 병목이 평가로 확인된 경우에만 시작한다.
 - 모든 파생 모델은 원본과 나란히 보관하며 언제든 기준 모델로 되돌릴 수 있어야 한다.
-- 수정 모델은 `EXAONE-AIRI-3.5-2.4B-vN`처럼 `EXAONE`으로 시작하는 이름을 사용한다.
+- 수정 모델 이름은 그 시점 기반 모델의 라이선스 조건을 따른다. EXAONE 시절에는 `EXAONE-AIRI-3.5-2.4B-vN`처럼 `EXAONE` 접두가 의무였고, 현행 Mi:dm(MIT)에는 이름 제약이 없다 — 대신 기반 모델을 이름에 남기는 규칙만 유지한다.
 
 ## 3. 현재 모델과 실행 경로
 
-EXAONE 3.5 2.4B 공식 구성의 주요 값은 다음과 같다.
+아래 표는 EXAONE 시절(2026-08-07) 기준 구성값이다. **현행 SSoT 모델의 대응 값은 재측정 필요** — 블록 수·hidden size·어휘 크기가 다르면 §6 C4의 프루닝 시작 후보 숫자도 다시 잡아야 한다.
 
-| 항목 | 값 |
+| 항목 | 값 (EXAONE 3.5 2.4B, 2026-08-07 기준) |
 |---|---:|
 | Transformer 블록 | 30 |
 | hidden size | 2,560 |
@@ -42,7 +43,7 @@ EXAONE 3.5 2.4B 공식 구성의 주요 값은 다음과 같다.
 | 최대 context | 32,768 |
 | 입력·출력 embedding | 공유 |
 
-현재 `exaone-airi:2.4b`는 GGUF Q4_K_M 가중치를 Ollama가 llama.cpp 계열 런타임으로 실행한다. 이 경로에서는 Hugging Face의 `modeling_exaone.py`를 수정해도 현재 Ollama 실행 결과가 바뀌지 않는다.
+현행 런타임 태그는 GGUF Q4_K_M 가중치를 Ollama가 llama.cpp 계열 런타임으로 실행한다(모델 교체 전후 동일 — 바뀐 것은 모델·tokenizer/template이지 추론 엔진이 아니다). 이 경로에서는 Hugging Face 쪽 모델 구현 코드(EXAONE 시절 `modeling_exaone.py`에 해당)를 수정해도 현재 Ollama 실행 결과가 바뀌지 않는다.
 
 수정 종류별 실제 반영 경로는 다음과 같다.
 
@@ -168,7 +169,7 @@ EXAONE 3.5 2.4B 공식 구성의 주요 값은 다음과 같다.
 
 ### C3. 선택적 제어 토큰
 
-현재 텍스트 기반 `<|ACT ...|>` 계약은 이미 정상 동작하므로 기본 tokenizer를 유지한다.
+EXAONE 시절 실측 기준 텍스트 기반 `<|ACT ...|>` 계약은 정상 동작했으므로 기본 tokenizer를 유지한다. **현행 SSoT 모델에서의 ACT 계약 안정성은 재측정 필요** — 모델·tokenizer/template이 교체됐다.
 
 다음 문제가 반복적으로 평가될 때만 학습 토큰 추가를 검토한다.
 
@@ -215,16 +216,18 @@ MLP와 Attention 프루닝은 레이어 삭제보다 뒤에 둔다. 단순한 �
 3. 지원되는 변환기를 사용해 BF16 GGUF를 생성한다.
 4. Q5_K_M과 Q4_K_M을 우선 비교한다.
 5. 한국어 품질 때문에 Q3 이하를 기본 배포 후보로 사용하지 않는다.
-6. 별도 Ollama 태그로 등록하고 기존 `exaone-airi:2.4b`를 덮어쓰지 않는다.
+6. 별도 Ollama 태그로 등록하고 현행 SSoT 태그와 롤백 태그를 덮어쓰지 않는다.
 7. proxy와 AIRI 설정에서 명시적으로 후보 태그를 선택하여 A/B 시험한다.
 
-예시 이름:
+예시 이름 (기반 모델을 이름에 남긴다):
 
 ```text
-EXAONE-AIRI-3.5-2.4B-v1-lora
-EXAONE-AIRI-3.5-2.4B-v1-q4km
-EXAONE-AIRI-3.5-2.4B-v1-pruned28-q4km
+AIRI-MIDM-2.0-MINI-v1-lora
+AIRI-MIDM-2.0-MINI-v1-q4km
+AIRI-MIDM-2.0-MINI-v1-pruned28-q4km
 ```
+
+롤백 태그(EXAONE)에서 파생 모델을 만드는 경우에만 `EXAONE-AIRI-3.5-2.4B-vN` 접두 규칙이 다시 적용된다 (§10.1).
 
 ## 7. 하드웨어 원칙
 
@@ -271,7 +274,7 @@ EXAONE-AIRI-3.5-2.4B-v1-pruned28-q4km
 
 ## 9. 소스 코드 수정 원칙
 
-- 공개된 Transformers EXAONE 구현을 수정할 때 자동 생성 파일을 직접 고치지 않고 원본 modular 구현을 수정한다.
+- 공개된 Transformers 모델 구현을 수정할 때 자동 생성 파일을 직접 고치지 않고 원본 modular 구현을 수정한다.
 - 현재 Ollama에 영향을 주려면 llama.cpp/Ollama 실행 경로의 지원 여부를 별도로 확인한다.
 - 모델 구조를 바꿀 때 config 값만 수정하고 기존 가중치를 억지로 로드하지 않는다.
 - 구조, tokenizer와 weight mapping 변경은 변환 전용 시험을 둔다.
@@ -279,6 +282,15 @@ EXAONE-AIRI-3.5-2.4B-v1-pruned28-q4km
 - 각 실험은 별도 브랜치·체크포인트·모델 태그에서 진행하고 현재 운영 모델을 덮어쓰지 않는다.
 
 ## 10. 라이선스 경계
+
+**[2026-08-12 개정]** 현행 SSoT 모델 Mi:dm 2.0 Mini Instruct는 MIT다.
+
+- 연구·상업 목적 모두 모델 수정과 파생 모델 생성이 허용된다. 파생 모델 이름 제약도 없다.
+- 배포 시 MIT의 copyright·permission notice를 보존한다.
+- 증류나 학생 모델 개발도 MIT 범위에서는 별도 허가가 필요 없다. 다만 학습 데이터에 제3자 저작물이 섞이면 그 조건은 별도로 판정한다.
+- 기반 모델을 다시 교체하면 새 모델의 라이선스를 그 시점에 재검토한다. 외부 배포 시점에는 그 시점 기반 모델 기준으로 법률 검토를 다시 수행한다.
+
+### 10.1 옛 EXAONE 제약 (롤백 태그에서 파생 모델을 만들 때만 유효)
 
 EXAONE 3.5 모델 가중치는 `EXAONE AI Model License Agreement 1.1 - NC`의 적용을 받는다.
 
@@ -291,15 +303,16 @@ EXAONE 3.5 모델 가중치는 `EXAONE AI Model License Agreement 1.1 - NC`의 �
 
 공식 자료:
 
-- 모델: <https://huggingface.co/LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct>
-- 공식 저장소: <https://github.com/LG-AI-EXAONE/EXAONE-3.5>
-- 라이선스: <https://huggingface.co/LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct/blob/main/LICENSE>
-- 문의: `contact_us@lgresearch.ai`
+- 현행 모델 (MIT): <https://huggingface.co/K-intelligence/Midm-2.0-Mini-Instruct>
+- EXAONE 모델 (롤백 태그): <https://huggingface.co/LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct>
+- EXAONE 공식 저장소: <https://github.com/LG-AI-EXAONE/EXAONE-3.5>
+- EXAONE 라이선스: <https://huggingface.co/LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct/blob/main/LICENSE>
+- EXAONE 문의: `contact_us@lgresearch.ai`
 
 ## 11. 지금 하지 않을 일
 
 - 현재 memory와 character loop 구현을 중단하고 모델 수술부터 시작하지 않는다.
-- `exaone-airi:2.4b` 태그를 실험 모델로 덮어쓰지 않는다.
+- 현행 SSoT 태그와 롤백 태그(`exaone-airi:2.4b`)를 실험 모델로 덮어쓰지 않는다.
 - Q4 GGUF를 원본 학습 가중치로 간주하지 않는다.
 - 검수되지 않은 실제 채팅을 자동 학습하지 않는다.
 - 특정 지식 영역을 지우기 위해 임의의 레이어나 head를 삭제하지 않는다.
@@ -322,6 +335,6 @@ EXAONE 3.5 모델 가중치는 `EXAONE AI Model License Agreement 1.1 - NC`의 �
 
 ## 13. 결론
 
-EXAONE 3.5는 AIRI용으로 수정할 수 있다. 그러나 현재 가장 가치 있는 수정은 모델 내부를 잘라내는 것이 아니라, 원본을 보존하면서 AIRI 성격과 행동을 LoRA로 추가하는 것이다. 구조 프루닝은 캐릭터·기억·평가 체계가 안정되고 LLM 자체가 병목으로 입증된 뒤 진행한다.
+현행 SSoT 모델은 AIRI용으로 수정할 수 있다. 그러나 현재 가장 가치 있는 수정은 모델 내부를 잘라내는 것이 아니라, 원본을 보존하면서 AIRI 성격과 행동을 LoRA로 추가하는 것이다. 구조 프루닝은 캐릭터·기억·평가 체계가 안정되고 LLM 자체가 병목으로 입증된 뒤 진행한다.
 
 > **추가는 LoRA 우선, 기억은 외부 계층, 구조 삭제는 계측 후 연구, 원본 모델은 항상 보존한다.**

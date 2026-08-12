@@ -12,7 +12,7 @@
 2단 추출: Stage A가 대화/캐릭터 시트를 원자적 항목으로 분해하고, Stage B가 기존 기억 후보(top-5)와 대조해 적용 연산을 결정한다. 입력은 `<character>`(메타)/`<turns>`(본문) 블록, Stage B는 `<extracted>`/`<candidates>` 블록으로 감싼 user 메시지 1개.
 
 주의사항 (원본 운영 경험):
-- 원본은 gpt-5.4-mini 사용 — **"분해는 결정론적이라 nano급 충분" 가정은 품질 미달로 실패**했음. 로컬 EXAONE 적용 시 M0 게이트 실측 필수.
+- 원본은 gpt-5.4-mini 사용 — **"분해는 결정론적이라 nano급 충분" 가정은 품질 미달로 실패**했음. 로컬 소형 모델 적용 시 M0 게이트 실측 필수. (작성 당시 로컬 모델은 EXAONE이었고, 2026-08-11~12에 `midm-airi:2.0-mini`로 교체됐다. Mi:dm도 2026-08-12 balanced 게이트에서 품질 FAIL해 추출은 off다.)
 - 원본은 structured output 미사용(코드펜스 스트립+JSON 파싱, fail-soft). 소형 모델은 준수력이 낮으므로 **JSON schema/GBNF 강제 권장**.
 - 캐릭터 base(페르소나 시트) 추출은 Stage B 생략 fast-path (후보가 없으므로).
 - 트리거: 응답 완료 후 fire-and-forget, 미추출 메시지 ≥3 + 세션 종료 시 강제 flush. JSON/coverage 같은 품질 실패 5회 시 skip(dead-letter), 세션 재시작 시 리셋. worker/model/transport 일시 장애는 품질 실패에 포함하지 않고 pending을 보존해 bounded backoff한다.
@@ -410,7 +410,7 @@ naive `.Replace`는 모음 이름에 "세리은"처럼 조사를 깨뜨린다. �
 5. **프롬프트 캐싱 배치**: 정적 블록(가이드라인→페르소나→관계단계) 선두 고정 + `cache_control`, 변동 블록(메모리·최근 턴)은 뒤에. (talkain은 이걸 안 해서 캐시 활용 0 — 반면교사)
 6. **사용량 로깅**: 호출별 토큰·duration만 적재, 비용은 조회 시점 단가로 계산(단가 변경이 과거 집계에 자동 반영).
 7. **스트리밍 fallback 불가** — 토큰 전송 시작 후엔 모델 교체 불가. fallback 판정(429/5xx만)은 첫 토큰 전. SSE로 토큰을 보낼 땐 JSON 인코딩(멀티라인 델타 프레임 깨짐 방지).
-8. **소형 모델 추출은 미검증 가정** — talkain: nano 품질 미달로 mini 상향. rag_rnd: 처음부터 Opus. EXAONE 추출은 M0 게이트 실측 후 결정, 미달 시 추출만 클라우드 mini급(비실시간·배치).
+8. **소형 모델 추출은 검증 없이 채택할 수 없는 가정** — talkain: nano 품질 미달로 mini 상향. rag_rnd: 처음부터 Opus. 로컬 추출 후보의 채택은 M0 게이트 실측 후 결정하고, 미달 시 추출만 클라우드 mini급(비실시간·배치)으로 돌린다. 2026-08-13 기준 기존 후보(EXAONE 2.4B, Qwen3 4B/8B)와 현행 대화 모델 Mi:dm, 신규 Qwen3.5 4B Q4_K_M·Granite 4.0 3B·공식 Kanana 원본 기반 프로젝트 자체 Q4_K_M smoke, Gemma3 4B full 모두 완화된 `balanced` 프로파일에서도 불합격이다. Gemma는 smoke 한 행을 통과했지만 full에서 독립 verifier가 거부했다. Kanana는 schema/connectivity는 통과했지만 recall/coverage/op-alias가 0이라 첫 행에서 중단했다. 추출은 off이며 상세는 `완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`와 `완료/AIRI-KANANA-EXTRACTION-CANDIDATE-GATE-2026-08-13.md`를 따른다. 공개 방송 라이선스는 법률/Kakao 확인 전 미승인이고, 제3자 Kanana Q8_0 tag는 설치됐지만 load·측정하지 않았다.
 9. **로컬 추출 자원 격리** — 방송 응답용 Ollama(11434)와 CPU batch 추출용
    Ollama(기본 11436)를 별도 상주 프로세스/connection pool로 분리한다. 추출
    endpoint는 HTTP loopback만 허용하고 `num_gpu=0`, parallel=1,
@@ -528,11 +528,37 @@ prompt/schema와 current Stage-B factory probe hash, 11434 local tag의 live dig
 11436 model/digest 검증 → 11435 순서를 지키며, 실패 cleanup도 이번 실행이 소유한 exact PID에만
 적용한다. 따라서 실패 report나 다른 구성의 기존 proxy/extractor를 잘못 사용하거나 종료하지 않는다.
 
+### 게이트 임계 프로파일 (2026-08-12, 트랙 I1)
+
+전 지표 1.0 요구는 `GATE_PROFILES` 표(`verify_extraction_gate.py`)의 두 프로파일로 분리했다.
+선택은 `--profile` 또는 `AIRI_MEMORY_EXTRACTION_GATE_PROFILE`, 개별 임계는
+`AIRI_MEMORY_EXTRACTION_GATE_<KEY>`로 덮어쓴다. 기본값은 `balanced`다.
+
+- **구조 지표는 두 프로파일 모두 1.0 고정** — `schema_pass_rate`,
+  `stage_a/b_schema_pass_rate`, `connectivity_rate`, `stage_b_coverage_rate`.
+  이 지표들이 깨진 배치는 런타임에서도 `compile_decisions`/`_validate_extraction_coverage`가
+  다시 거부해 watermark가 전진하지 않는다. `temperature=0`이라 같은 배치가 매 재시도마다
+  동일하게 실패하고 5회 후 dead-letter로 굳으므로, 1.0 미만은 "품질 저하"가 아니라
+  "영구 정지한 추출기"를 뜻한다.
+- **모델 판단 지표만 완화** — 배치를 실패시키지 않고 저장되는 내용만 바꾸는 지표.
+  `balanced` 기준: `critical_recall ≥ 0.70`(누락은 저널 회상과 재언급으로 복구 가능),
+  `stage_b_op_alias_accuracy ≥ 0.80`(오연산 SUPERSEDE는 기존 기억을 파괴할 수 있어 recall보다 높게),
+  `placeholder_rate ≥ 0.85`(`{{user}}` 미보존은 실명이 DB에 영구 저장되지만 파괴적이지는 않음),
+  행당 `unexpected ≤ 0.25`(frozen 7-fixture 기준 과추출 최대 1건),
+  행당 `stage_a_unexpected ≤ 0.5`(Stage-B 허용 항목을 상쇄하지 않는 보수적 집계라 이중 페널티 회피).
+- 2026-08-08 실측(`exaone-airi:2.4b`: recall 55.56%, placeholder 83.33%, op/alias 66.67%,
+  unexpected 18)은 `balanced`에서도 4개 지표 전부 불합격이다. 완화는 활성화 조건을 만들 뿐
+  기존 후보를 통과시키지 않는다.
+- 검증기는 `gate_pass` boolean만 믿지 않고 fixture 행에서 aggregate를 재계산해 대조하며
+  (`AGGREGATE_MISMATCH`), report에 기록된 `gate_thresholds`가 운영자의 활성 임계보다
+  느슨하면 거부한다(`GATE_THRESHOLDS_TOO_LENIENT`).
+
 ---
 
 ## §9. Local extraction 후보의 bounded smoke (2026-08-08)
 
-기본 대화 모델은 `exaone-airi:2.4b`로 고정하고 extraction 전용 후보 `qwen3:4b`
+당시 기본 대화 모델은 `exaone-airi:2.4b`였고(2026-08-11~12에 `midm-airi:2.0-mini`로
+교체), 그 상태에서 extraction 전용 후보 `qwen3:4b`
 (Q4_K_M, digest `359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7`)
 하나만 CPU 격리 서버에서 시험했다. 첫 요청은 Ollama의 default thinking 때문에
 `moment_signal` Stage A가 180초 timeout/HTTP 500으로 끝났다. 공식 API의 `think=false`를

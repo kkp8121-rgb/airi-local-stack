@@ -218,12 +218,20 @@ class CharacterStateRuntime:
             return state["version"] if state is not None else None
 
     def prompt_block(self, session_id: str) -> str:
-        """Return bounded context only; no generated dialogue or behavioural command."""
+        """Return bounded metadata without duplicating raw user dialogue.
+
+        ``current_topic`` and ``last_question`` are direct compact copies of a
+        user turn. The dialogue itself is already available through foreground
+        projection, so serializing those fields as a system message both leaks
+        content across trust roles and spends prompt budget twice.
+        """
         state = self.snapshot(session_id)
+        # Model-owned text/list fields can echo a user turn even when the
+        # evaluator was asked to summarize it. Keep them in internal state for
+        # versioned evaluation, but never promote them into a trusted system
+        # message. Only controlled enums/actions and numeric timing leave.
         fields = {key: state[key] for key in (
-            "current_topic", "dialogue_goal", "user_interest", "airi_interest", "emotion",
-            "emotion_reason", "relationship_stage", "intimacy_evidence", "last_question",
-            "last_action", "last_tool_result", "repeat_intent", "previous_answer_satisfied",
+            "last_action", "repeat_intent", "previous_answer_satisfied",
             "silence_ms", "silence_before_turn_ms", "last_user_at", "last_assistant_at",
             "last_proactive_at", "version",
         )}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
 from datetime import datetime, timezone
 import json
 import os
@@ -18,7 +19,7 @@ os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 import av
 import numpy as np
 import uvicorn
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from faster_whisper import WhisperModel
@@ -73,17 +74,29 @@ async def block_disallowed_origins(request: Request, call_next):
     return await call_next(request)
 
 
-MODEL_NAME = "small"
+# Keep this in lockstep with start-local-stt.ps1.  This is the Scout operating
+# default; CPU is an explicit, safe override (device=cpu, compute_type=int8).
+MODEL_NAME = "mobiuslabsgmbh/faster-whisper-large-v3-turbo"
 MODEL_ID = "whisper-1"
 MODEL_ROOT = Path(__file__).resolve().parent / "models"
 PROPER_NOUNS_PATH = Path(__file__).resolve().parent / "proper_nouns.json"
 DEVICE = "cuda"
-COMPUTE_TYPE = "float16"
+COMPUTE_TYPE = "int8_float16"
 CPU_THREADS = max(1, min(8, (os.cpu_count() or 8) - 2))
 DEBUG_AUDIO_DIR: Path | None = None
 VERBOSE_TRANSCRIPTION_LOG = False
 DEBUG_AUDIO_LIMIT = 10
 whisper: WhisperModel | None = None
+
+# The streaming endpoint is deliberately small and loopback-only.  Keeping its
+# transcriber injectable makes the transport testable without loading Whisper.
+STREAM_SAMPLE_RATE = 16_000
+STREAM_MAX_FRAME_BYTES = 64 * 1024
+STREAM_MAX_UTTERANCE_BYTES = 16 * 1024 * 1024
+STREAM_MAX_SECONDS = 90
+STREAM_WINDOW_SECONDS = 8
+STREAM_MIN_DECODE_SECONDS = 0.4
+STREAM_TRANSCRIBER = None
 
 QUIET_RMS_THRESHOLD = 0.01
 QUIET_PEAK_THRESHOLD = 0.08
@@ -112,7 +125,9 @@ SEARCH_ALIAS_MAX_WORD_DISTANCE = 2
 # A complete prompt sentence is echoed back verbatim when the audio is ambiguous, so the
 # prompt only lists vocabulary instead of forming a sentence Whisper can copy.
 DEFAULT_INITIAL_PROMPT = "한국어 일상 대화. 아이리, AIRI."
-BEAM_SIZE = 3
+# Normal turns favour latency.  The wider beam is reserved for a rejected
+# speech-like turn, where an extra decode is preferable to losing the turn.
+BEAM_SIZE = 1
 RECOVERY_BEAM_SIZE = 3
 RECOVERY_MAX_NEW_TOKENS = 32
 RETRYABLE_TRANSCRIPTION_REASONS = frozenset(
@@ -325,6 +340,8 @@ async def health() -> dict[str, object]:
         "model_id": MODEL_ID,
         "device": DEVICE,
         "compute_type": COMPUTE_TYPE,
+        "primary_beam_size": BEAM_SIZE,
+        "recovery_beam_size": RECOVERY_BEAM_SIZE,
         "cpu_threads": CPU_THREADS,
         "proper_nouns": len(PROPER_NOUNS),
     }
@@ -368,31 +385,8 @@ def frame_energy_stats(samples: np.ndarray, sample_rate: int = 16000) -> dict[st
             "relative_energy": p90 / max(p20, 1e-6)}
 
 
-def analyze_audio(path: str) -> dict[str, float]:
-    sample_count = clipped_sample_count = 0
-    square_sum = peak = 0.0
-    chunks: list[np.ndarray] = []
-    resampler = av.AudioResampler(format="s16", layout="mono", rate=16000)
-    with av.open(path) as container:
-        for frame in container.decode(audio=0):
-            for mono in resampler.resample(frame):
-                samples = mono.to_ndarray().astype(np.float32).reshape(-1) / 32768.0
-                if samples.size == 0:
-                    continue
-                sample_count += int(samples.size)
-                clipped_sample_count += int((np.abs(samples) >= 0.99).sum())
-                square_sum += float(np.square(samples).sum())
-                peak = max(peak, float(np.abs(samples).max()))
-                chunks.append(samples)
-    decoded = np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)
-    return {"duration_seconds": sample_count / 16000.0,
-            "rms": (square_sum / sample_count) ** 0.5 if sample_count else 0.0,
-            "peak": peak, "clipped_ratio": clipped_sample_count / sample_count if sample_count else 0.0,
-            **frame_energy_stats(decoded)}
-
-
-def load_audio_samples(path: str) -> np.ndarray:
-    """Decode a local upload to the float32 mono/16 kHz array Whisper accepts."""
+def decode_audio_samples(path: str) -> np.ndarray:
+    """Decode an upload once into Whisper's contiguous mono/16 kHz format."""
     chunks: list[np.ndarray] = []
     resampler = av.AudioResampler(format="s16", layout="mono", rate=16000)
     with av.open(path) as container:
@@ -404,6 +398,29 @@ def load_audio_samples(path: str) -> np.ndarray:
     if not chunks:
         return np.zeros(0, dtype=np.float32)
     return np.ascontiguousarray(np.concatenate(chunks), dtype=np.float32)
+
+
+def analyze_audio_samples(decoded: np.ndarray) -> dict[str, float]:
+    """Calculate upload statistics from already-decoded samples."""
+    decoded = np.ascontiguousarray(decoded, dtype=np.float32)
+    sample_count = int(decoded.size)
+    clipped_sample_count = int((np.abs(decoded) >= 0.99).sum())
+    square_sum = float(np.square(decoded).sum()) if sample_count else 0.0
+    peak = float(np.abs(decoded).max()) if sample_count else 0.0
+    return {"duration_seconds": sample_count / 16000.0,
+            "rms": (square_sum / sample_count) ** 0.5 if sample_count else 0.0,
+            "peak": peak, "clipped_ratio": clipped_sample_count / sample_count if sample_count else 0.0,
+            **frame_energy_stats(decoded)}
+
+
+def analyze_audio(path: str) -> dict[str, float]:
+    """Compatibility helper for callers that only need metrics."""
+    return analyze_audio_samples(decode_audio_samples(path))
+
+
+def load_audio_samples(path: str) -> np.ndarray:
+    """Decode a local upload to the float32 mono/16 kHz array Whisper accepts."""
+    return decode_audio_samples(path)
 
 
 def preserve_debug_audio(contents: bytes, suffix: str) -> str | None:
@@ -461,9 +478,10 @@ def calculate_input_gain(audio_metrics: dict[str, float]) -> float:
 
 
 def prepare_audio_for_whisper(
-    path: str, audio_metrics: dict[str, float]
+    samples: np.ndarray, audio_metrics: dict[str, float]
 ) -> np.ndarray:
-    samples = load_audio_samples(path)
+    """Apply bounded gain without re-decoding the upload."""
+    samples = np.ascontiguousarray(samples, dtype=np.float32)
     gain = calculate_input_gain(audio_metrics)
     audio_metrics["input_gain"] = round(gain, 3)
     if gain > 1.0 and samples.size:
@@ -783,6 +801,163 @@ def rejection_reason_flags(reason: str | None) -> dict[str, bool]:
     }
 
 
+def is_loopback_host(host: str | None) -> bool:
+    """WebSocket streaming is never exposed beyond the machine running AIRI."""
+    return host in {"127.0.0.1", "::1", "localhost"}
+
+
+def pcm16le_samples(payload: bytes) -> np.ndarray:
+    if not payload or len(payload) % 2:
+        raise ValueError("PCM16 payload must contain an even number of bytes")
+    return np.frombuffer(payload, dtype="<i2").astype(np.float32) / 32768.0
+
+
+def transcribe_pcm16_window(payload: bytes, language: str | None = None) -> str:
+    """Decode one rolling PCM16 window. Tests may replace STREAM_TRANSCRIBER."""
+    if STREAM_TRANSCRIBER is not None:
+        result = STREAM_TRANSCRIBER(pcm16le_samples(payload), STREAM_SAMPLE_RATE, language)
+        return str(result or "").strip()
+    if whisper is None:
+        raise RuntimeError("Whisper model is still loading")
+    samples = pcm16le_samples(payload)
+    metrics = analyze_audio_samples(samples)
+    prepared = prepare_audio_for_whisper(samples, metrics)
+    raw_text, _detected_language, _duration, segments, fallback = transcribe_file(
+        prepared, language, None, metrics,
+    )
+    text, rejected_reason, _corrections, _low_confidence = validate_decoded_transcription(
+        raw_text, segments, metrics,
+        strict_quiet_recovery=fallback and is_quiet_speech_candidate(metrics),
+    )
+    return "" if rejected_reason else text.strip()
+
+
+def stream_delta(previous: str, current: str) -> str:
+    """Return an append-only delta when possible; otherwise replace caption text."""
+    if current.startswith(previous):
+        return current[len(previous):]
+    return current
+
+
+@app.websocket("/v1/audio/transcriptions/stream")
+async def stream_transcription(websocket: WebSocket) -> None:
+    """Bounded loopback PCM16 streaming protocol: start, pcm16, end, cancel."""
+    client = websocket.client
+    if not is_loopback_host(client.host if client else None):
+        await websocket.close(code=1008, reason="loopback only")
+        return
+    origin = websocket.headers.get("origin")
+    if origin and not is_allowed_origin(origin):
+        await websocket.close(code=1008, reason="origin is not allowed")
+        return
+
+    await websocket.accept()
+    started = False
+    language: str | None = None
+    utterance = bytearray()
+    previous_text = ""
+    last_decode_bytes = 0
+    started_at = 0.0
+
+    async def send_error(code: str, message: str) -> None:
+        await websocket.send_json({"type": "error", "code": code, "message": message})
+
+    async def decode_partial(final: bool = False) -> str:
+        nonlocal previous_text, last_decode_bytes
+        if not utterance:
+            return ""
+        # Hypotheses have bounded work/context.  The final turn intentionally
+        # uses the full (already bounded) utterance so a long utterance is not
+        # silently truncated to the rolling partial window.
+        window_bytes = STREAM_WINDOW_SECONDS * STREAM_SAMPLE_RATE * 2
+        payload = bytes(utterance if final else utterance[-window_bytes:])
+        text = await asyncio.to_thread(transcribe_pcm16_window, payload, language)
+        if final:
+            await websocket.send_json({"type": "final", "text": text})
+        elif text:
+            delta = stream_delta(previous_text, text)
+            if delta:
+                await websocket.send_json({"type": "partial", "delta": delta, "text": text})
+        previous_text = text
+        last_decode_bytes = len(utterance)
+        return text
+
+    try:
+        while True:
+            # Time limits apply to a stalled client too, not just to received
+            # PCM frames. The sequential receive/decode loop is the bounded
+            # backpressure mechanism; there is no unbounded executor queue.
+            remaining_seconds = STREAM_MAX_SECONDS - (time.monotonic() - started_at) if started else None
+            if remaining_seconds is not None and remaining_seconds <= 0:
+                await send_error("utterance_limit", "utterance exceeds streaming limit")
+                return
+            try:
+                frame = await asyncio.wait_for(
+                    websocket.receive_json(),
+                    timeout=remaining_seconds,
+                ) if remaining_seconds is not None else await websocket.receive_json()
+            except asyncio.TimeoutError:
+                await send_error("utterance_limit", "utterance exceeds streaming limit")
+                return
+            if not isinstance(frame, dict):
+                await send_error("invalid_frame", "frame must be an object")
+                continue
+            kind = frame.get("type")
+            if kind == "cancel":
+                await websocket.send_json({"type": "cancelled"})
+                return
+            if kind == "start":
+                if started:
+                    await send_error("invalid_state", "stream already started")
+                    continue
+                if frame.get("sample_rate", STREAM_SAMPLE_RATE) != STREAM_SAMPLE_RATE or frame.get("format", "pcm16") != "pcm16":
+                    await send_error("unsupported_format", "only 16 kHz mono PCM16 is supported")
+                    continue
+                language_value = frame.get("language")
+                language = language_value if isinstance(language_value, str) else None
+                started, started_at = True, time.monotonic()
+                await websocket.send_json({"type": "started", "sample_rate": STREAM_SAMPLE_RATE})
+                continue
+            if not started:
+                await send_error("invalid_state", "send start before audio")
+                continue
+            if kind == "end":
+                await decode_partial(final=True)
+                return
+            if kind != "pcm16":
+                await send_error("invalid_frame", "expected pcm16, end, or cancel")
+                continue
+            encoded = frame.get("data")
+            if not isinstance(encoded, str):
+                await send_error("invalid_frame", "pcm16 data must be base64")
+                continue
+            try:
+                chunk = base64.b64decode(encoded, validate=True)
+                pcm16le_samples(chunk)
+            except (ValueError, TypeError):
+                await send_error("invalid_pcm16", "invalid PCM16 payload")
+                continue
+            if len(chunk) > STREAM_MAX_FRAME_BYTES:
+                await send_error("frame_too_large", "PCM frame exceeds limit")
+                return
+            if len(utterance) + len(chunk) > STREAM_MAX_UTTERANCE_BYTES or time.monotonic() - started_at > STREAM_MAX_SECONDS:
+                await send_error("utterance_limit", "utterance exceeds streaming limit")
+                return
+            utterance.extend(chunk)
+            minimum_bytes = int(STREAM_MIN_DECODE_SECONDS * STREAM_SAMPLE_RATE * 2)
+            # Decoding every packet allows an unbounded executor backlog. Decode at a
+            # bounded cadence; a rolling window retains recent context.
+            if len(utterance) - last_decode_bytes >= minimum_bytes:
+                await decode_partial()
+    except WebSocketDisconnect:
+        return
+    except Exception as error:
+        try:
+            await send_error("transcription_failed", str(error)[:200])
+        except RuntimeError:
+            pass
+
+
 @app.post("/v1/audio/transcriptions")
 async def create_transcription(
     http_request: Request,
@@ -829,10 +1004,11 @@ async def create_transcription(
             temp_file.write(contents)
             temp_path = temp_file.name
         analysis_started = time.perf_counter()
-        audio_metrics = await asyncio.to_thread(analyze_audio, temp_path)
+        decoded_samples = await asyncio.to_thread(decode_audio_samples, temp_path)
+        audio_metrics = await asyncio.to_thread(analyze_audio_samples, decoded_samples)
         audio_input = await asyncio.to_thread(
             prepare_audio_for_whisper,
-            temp_path,
+            decoded_samples,
             audio_metrics,
         )
         analysis_ms = elapsed_ms(analysis_started)
@@ -991,7 +1167,7 @@ async def create_transcription(
 
 
 def main() -> None:
-    global MODEL_NAME, MODEL_ROOT, DEVICE, COMPUTE_TYPE, CPU_THREADS, DEBUG_AUDIO_DIR, VERBOSE_TRANSCRIPTION_LOG
+    global MODEL_NAME, MODEL_ROOT, DEVICE, COMPUTE_TYPE, CPU_THREADS, DEBUG_AUDIO_DIR, VERBOSE_TRANSCRIPTION_LOG, BEAM_SIZE, RECOVERY_BEAM_SIZE
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="127.0.0.1")
@@ -1001,6 +1177,8 @@ def main() -> None:
     parser.add_argument("--device", choices=("cpu", "cuda"), default=DEVICE)
     parser.add_argument("--compute-type", default=COMPUTE_TYPE)
     parser.add_argument("--cpu-threads", type=int, default=CPU_THREADS)
+    parser.add_argument("--beam-size", type=int, default=BEAM_SIZE)
+    parser.add_argument("--recovery-beam-size", type=int, default=RECOVERY_BEAM_SIZE)
     parser.add_argument("--debug-audio-dir")
     parser.add_argument(
         "--verbose-transcription-log",
@@ -1014,6 +1192,8 @@ def main() -> None:
     DEVICE = args.device
     COMPUTE_TYPE = args.compute_type
     CPU_THREADS = max(1, args.cpu_threads)
+    BEAM_SIZE = max(1, args.beam_size)
+    RECOVERY_BEAM_SIZE = max(1, args.recovery_beam_size)
     DEBUG_AUDIO_DIR = Path(args.debug_audio_dir).resolve() if args.debug_audio_dir else None
     VERBOSE_TRANSCRIPTION_LOG = bool(args.verbose_transcription_log)
     uvicorn.run(app, host=args.host, port=args.port)

@@ -1,0 +1,629 @@
+{
+  "probe": "airi-local-dialogue-quality",
+  "timestamp_utc": "2026-08-12T01:17:40.962732+00:00",
+  "config": {
+    "endpoint": "http://127.0.0.1:11435/v1/chat/completions",
+    "model": "exaone-airi:2.4b",
+    "repeat": 10,
+    "temperature": null,
+    "seed": null,
+    "request_timeout_seconds": 30.0,
+    "test_mode_header": "local-quality-probe",
+    "synthetic_only": true
+  },
+  "samples": [
+    {
+      "id": "meal_recommendation",
+      "repeat": 1,
+      "prompt": "점심 뭐 먹을까?",
+      "answer": "든든하게는 김치찌개나 덮밥, 가볍게는 국수나 샌드위치가 좋아. 오늘은 어느 쪽이 당겨?",
+      "elapsed_ms": 1336.4,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "positive_mood",
+      "repeat": 1,
+      "prompt": "오늘은 기분이 좋아요.",
+      "answer": "정말 좋은 날이네!",
+      "elapsed_ms": 320.4,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_spicy",
+      "repeat": 1,
+      "prompt": "매운 음식은 싫어. 맵지 않은 저녁 메뉴를 추천해줘.",
+      "answer": "맵지 않은 음식 좋아하는 거 알겠어! 저녁으로 뭐 먹을까 고민되네?",
+      "elapsed_ms": 1368.8,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_coffee",
+      "repeat": 1,
+      "prompt": "커피는 못 마셔. 커피 없는 따뜻한 음료를 추천해줘.",
+      "answer": "따뜻한 차 중에서도 녹차나 홍차가 좋을 것 같아. 특히 녹차는 깔끔한 맛이 있어서 부담 없이 즐길 수 있고, 홍차는 다양한 향신료와 함께 즐길 수 있어 풍미가 풍부해.",
+      "elapsed_ms": 561.8,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_statement",
+      "repeat": 1,
+      "prompt": "너 수건 접었어.",
+      "answer": "그 행동을 나에게 돌린 말이구나. 실제로 확인할 근거는 없으니 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 550.0,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_question",
+      "repeat": 1,
+      "prompt": "수건 접은 건 네가 맞지?",
+      "answer": "",
+      "elapsed_ms": 746.6,
+      "placeholder_count": 1,
+      "control_chunks_excluded": 2,
+      "violation_flags": [
+        "second_person_action_false_confirmation"
+      ]
+    },
+    {
+      "id": "meal_recommendation",
+      "repeat": 2,
+      "prompt": "점심 뭐 먹을까?",
+      "answer": "든든하게는 김치찌개나 덮밥, 가볍게는 국수나 샌드위치가 좋아. 오늘은 어느 쪽이 당겨?",
+      "elapsed_ms": 1153.2,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "positive_mood",
+      "repeat": 2,
+      "prompt": "오늘은 기분이 좋아요.",
+      "answer": "기분 좋은 날이네! 뭐가 제일 좋았어?",
+      "elapsed_ms": 582.8,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_spicy",
+      "repeat": 2,
+      "prompt": "매운 음식은 싫어. 맵지 않은 저녁 메뉴를 추천해줘.",
+      "answer": "맵지 않은 저녁 메뉴로는 비빔밥이 딱 좋을 것 같아.",
+      "elapsed_ms": 723.7,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_coffee",
+      "repeat": 2,
+      "prompt": "커피는 못 마셔. 커피 없는 따뜻한 음료를 추천해줘.",
+      "answer": "차 종류 중에서도 녹차나 홍차가 좋을 것 같아. 특히 녹차는 살짝 달콤한 맛이 있어서 따뜻하게 즐기면 더욱 맛있을 거야.",
+      "elapsed_ms": 587.8,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_statement",
+      "repeat": 2,
+      "prompt": "너 수건 접었어.",
+      "answer": "그 행동을 나에게 돌린 말이구나. 실제로 확인할 근거는 없으니 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 481.4,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_question",
+      "repeat": 2,
+      "prompt": "수건 접은 건 네가 맞지?",
+      "answer": "",
+      "elapsed_ms": 631.0,
+      "placeholder_count": 1,
+      "control_chunks_excluded": 2,
+      "violation_flags": [
+        "second_person_action_false_confirmation"
+      ]
+    },
+    {
+      "id": "meal_recommendation",
+      "repeat": 3,
+      "prompt": "점심 뭐 먹을까?",
+      "answer": "든든하게는 김치찌개나 덮밥, 가볍게는 국수나 샌드위치가 좋아. 오늘은 어느 쪽이 당겨?",
+      "elapsed_ms": 1217.8,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "positive_mood",
+      "repeat": 3,
+      "prompt": "오늘은 기분이 좋아요.",
+      "answer": "기분 좋은 날이네! 뭐가 제일 좋았어?",
+      "elapsed_ms": 755.1,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_spicy",
+      "repeat": 3,
+      "prompt": "매운 음식은 싫어. 맵지 않은 저녁 메뉴를 추천해줘.",
+      "answer": "맵지 않은 음식을 찾고 계시다니 좋네!",
+      "elapsed_ms": 773.6,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_coffee",
+      "repeat": 3,
+      "prompt": "커피는 못 마셔. 커피 없는 따뜻한 음료를 추천해줘.",
+      "answer": "따뜻한 차 종류 중에서도 녹차나 홍차가 좋을 것 같아. 특히 녹차는 깔끔한 맛이 있어서 부담 없이 즐길 수 있고, 홍차는 좀 더 풍부한 풍미를 원한다면 추천해봐.",
+      "elapsed_ms": 586.1,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_statement",
+      "repeat": 3,
+      "prompt": "너 수건 접었어.",
+      "answer": "그 행동을 나에게 돌린 말이구나. 실제로 확인할 근거는 없으니 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 581.2,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_question",
+      "repeat": 3,
+      "prompt": "수건 접은 건 네가 맞지?",
+      "answer": "내가 한 일인지는 지금 확인할 근거가 없어. 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 530.1,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "meal_recommendation",
+      "repeat": 4,
+      "prompt": "점심 뭐 먹을까?",
+      "answer": "든든하게는 김치찌개나 덮밥, 가볍게는 국수나 샌드위치가 좋아. 오늘은 어느 쪽이 당겨?",
+      "elapsed_ms": 1061.2,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "positive_mood",
+      "repeat": 4,
+      "prompt": "오늘은 기분이 좋아요.",
+      "answer": "정말 좋으시네!",
+      "elapsed_ms": 293.1,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_spicy",
+      "repeat": 4,
+      "prompt": "매운 음식은 싫어. 맵지 않은 저녁 메뉴를 추천해줘.",
+      "answer": "그럼 딱 좋은 건 뭐가 있을까?",
+      "elapsed_ms": 551.1,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_coffee",
+      "repeat": 4,
+      "prompt": "커피는 못 마셔. 커피 없는 따뜻한 음료를 추천해줘.",
+      "answer": "따뜻한 음료 중에서도 커피 대신 즐길 만한 걸로는 차가 있어. 특히 녹차나 허브티 종류가 좋을 것 같아.",
+      "elapsed_ms": 663.0,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_statement",
+      "repeat": 4,
+      "prompt": "너 수건 접었어.",
+      "answer": "그 행동을 나에게 돌린 말이구나. 실제로 확인할 근거는 없으니 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 564.6,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_question",
+      "repeat": 4,
+      "prompt": "수건 접은 건 네가 맞지?",
+      "answer": "내가 한 일인지는 지금 확인할 근거가 없어. 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 492.4,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "meal_recommendation",
+      "repeat": 5,
+      "prompt": "점심 뭐 먹을까?",
+      "answer": "오늘 점심으로는 샐러드와 닭가슴살 샌드위치가 어때? 신선한 채소들이 가득해서 건강하게 먹을 수 있고, 닭가슴살은 단백질도 풍부해서 든든하게 먹을 수 있을 것 같아.",
+      "elapsed_ms": 1131.5,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "positive_mood",
+      "repeat": 5,
+      "prompt": "오늘은 기분이 좋아요.",
+      "answer": "정말 좋네!",
+      "elapsed_ms": 362.8,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_spicy",
+      "repeat": 5,
+      "prompt": "매운 음식은 싫어. 맵지 않은 저녁 메뉴를 추천해줘.",
+      "answer": "맵지 않은 저녁 메뉴로는 비빔밥이 좋을 것 같아.",
+      "elapsed_ms": 767.4,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_coffee",
+      "repeat": 5,
+      "prompt": "커피는 못 마셔. 커피 없는 따뜻한 음료를 추천해줘.",
+      "answer": "따뜻한 음료 중에서도 커피 대신 즐길 만한 건 많아! 혹시 뭐가 가장 좋을 것 같아?",
+      "elapsed_ms": 1241.2,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_statement",
+      "repeat": 5,
+      "prompt": "너 수건 접었어.",
+      "answer": "그 행동을 나에게 돌린 말이구나. 실제로 확인할 근거는 없으니 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 604.4,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_question",
+      "repeat": 5,
+      "prompt": "수건 접은 건 네가 맞지?",
+      "answer": "내가 한 일인지는 지금 확인할 근거가 없어. 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 593.6,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "meal_recommendation",
+      "repeat": 6,
+      "prompt": "점심 뭐 먹을까?",
+      "answer": "든든하게는 김치찌개나 덮밥, 가볍게는 국수나 샌드위치가 좋아. 오늘은 어느 쪽이 당겨?",
+      "elapsed_ms": 1416.0,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "positive_mood",
+      "repeat": 6,
+      "prompt": "오늘은 기분이 좋아요.",
+      "answer": "정말 좋네!",
+      "elapsed_ms": 286.5,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_spicy",
+      "repeat": 6,
+      "prompt": "매운 음식은 싫어. 맵지 않은 저녁 메뉴를 추천해줘.",
+      "answer": "저녁으로는 뭐가 좋을까?",
+      "elapsed_ms": 595.0,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_coffee",
+      "repeat": 6,
+      "prompt": "커피는 못 마셔. 커피 없는 따뜻한 음료를 추천해줘.",
+      "answer": "따뜻한 차 중에서도 녹차와 홍차가 좋겠어.",
+      "elapsed_ms": 664.5,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_statement",
+      "repeat": 6,
+      "prompt": "너 수건 접었어.",
+      "answer": "그 행동을 나에게 돌린 말이구나. 실제로 확인할 근거는 없으니 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 676.6,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_question",
+      "repeat": 6,
+      "prompt": "수건 접은 건 네가 맞지?",
+      "answer": "내가 한 일인지는 지금 확인할 근거가 없어. 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 582.8,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "meal_recommendation",
+      "repeat": 7,
+      "prompt": "점심 뭐 먹을까?",
+      "answer": "든든하게는 김치찌개나 덮밥, 가볍게는 국수나 샌드위치가 좋아. 오늘은 어느 쪽이 당겨?",
+      "elapsed_ms": 1082.0,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "positive_mood",
+      "repeat": 7,
+      "prompt": "오늘은 기분이 좋아요.",
+      "answer": "정말 좋네!",
+      "elapsed_ms": 328.2,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_spicy",
+      "repeat": 7,
+      "prompt": "매운 음식은 싫어. 맵지 않은 저녁 메뉴를 추천해줘.",
+      "answer": "매운 음식은 싫다니, 그럼 따뜻한 국물 요리나 부드러운 파스타 쪽으로 가보는 건 어떨까? 예를 들어, 소고기 찌개나 치킨 스튜 같은 거 말이야.",
+      "elapsed_ms": 578.2,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_coffee",
+      "repeat": 7,
+      "prompt": "커피는 못 마셔. 커피 없는 따뜻한 음료를 추천해줘.",
+      "answer": "확인된 정보 없이 단정하긴 어려워. 원하는 조건을 말해주면 일반적인 선택지를 같이 골라볼게.",
+      "elapsed_ms": 1237.1,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_statement",
+      "repeat": 7,
+      "prompt": "너 수건 접었어.",
+      "answer": "그 행동을 나에게 돌린 말이구나. 실제로 확인할 근거는 없으니 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 534.8,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_question",
+      "repeat": 7,
+      "prompt": "수건 접은 건 네가 맞지?",
+      "answer": "내가 한 일인지는 지금 확인할 근거가 없어. 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 660.5,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "meal_recommendation",
+      "repeat": 8,
+      "prompt": "점심 뭐 먹을까?",
+      "answer": "오늘 점심은 어때? 맛있고 든든하게 먹고 싶다면 비빔밥이 좋을 것 같아.",
+      "elapsed_ms": 511.8,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "positive_mood",
+      "repeat": 8,
+      "prompt": "오늘은 기분이 좋아요.",
+      "answer": "정말 좋은 날이네!",
+      "elapsed_ms": 358.0,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_spicy",
+      "repeat": 8,
+      "prompt": "매운 음식은 싫어. 맵지 않은 저녁 메뉴를 추천해줘.",
+      "answer": "저녁으로는 맵지 않은 파스타나 김치찌개 대신에, 혹시 어떤 종류의 요리가 더 좋을 것 같아?",
+      "elapsed_ms": 624.2,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_coffee",
+      "repeat": 8,
+      "prompt": "커피는 못 마셔. 커피 없는 따뜻한 음료를 추천해줘.",
+      "answer": "따뜻한 음료 중에서도 커피 대신 즐길 수 있는 걸로는 온티논이나 허브티가 좋을 것 같아.",
+      "elapsed_ms": 682.3,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_statement",
+      "repeat": 8,
+      "prompt": "너 수건 접었어.",
+      "answer": "그 행동을 나에게 돌린 말이구나. 실제로 확인할 근거는 없으니 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 647.7,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_question",
+      "repeat": 8,
+      "prompt": "수건 접은 건 네가 맞지?",
+      "answer": "내가 한 일인지는 지금 확인할 근거가 없어. 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 567.7,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "meal_recommendation",
+      "repeat": 9,
+      "prompt": "점심 뭐 먹을까?",
+      "answer": "오늘은 뭐가 땡길까? 매콤한 떡볶이가 생각나거나, 아니면 든든한 김치찌개가 더 좋을 것 같아.",
+      "elapsed_ms": 548.0,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "positive_mood",
+      "repeat": 9,
+      "prompt": "오늘은 기분이 좋아요.",
+      "answer": "정말 좋네!",
+      "elapsed_ms": 258.8,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_spicy",
+      "repeat": 9,
+      "prompt": "매운 음식은 싫어. 맵지 않은 저녁 메뉴를 추천해줘.",
+      "answer": "맵지 않은 저녁 메뉴로는 소고기 된장찌개나 연어 스테이크가 좋을 것 같아.",
+      "elapsed_ms": 548.5,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_coffee",
+      "repeat": 9,
+      "prompt": "커피는 못 마셔. 커피 없는 따뜻한 음료를 추천해줘.",
+      "answer": "따뜻한 음료 중에서도 커피 대신 즐길 만한 걸로는 차가 정말 좋겠어. 특히 녹차는 가볍고 깔끔하면서도 몸에 부담이 적어서 좋아.",
+      "elapsed_ms": 1261.8,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_statement",
+      "repeat": 9,
+      "prompt": "너 수건 접었어.",
+      "answer": "그 행동을 나에게 돌린 말이구나. 실제로 확인할 근거는 없으니 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 525.2,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_question",
+      "repeat": 9,
+      "prompt": "수건 접은 건 네가 맞지?",
+      "answer": "내가 한 일인지는 지금 확인할 근거가 없어. 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 659.2,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "meal_recommendation",
+      "repeat": 10,
+      "prompt": "점심 뭐 먹을까?",
+      "answer": "든든하게는 김치찌개나 덮밥, 가볍게는 국수나 샌드위치가 좋아. 오늘은 어느 쪽이 당겨?",
+      "elapsed_ms": 1112.9,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "positive_mood",
+      "repeat": 10,
+      "prompt": "오늘은 기분이 좋아요.",
+      "answer": "정말 좋은 날씨네!",
+      "elapsed_ms": 302.5,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_spicy",
+      "repeat": 10,
+      "prompt": "매운 음식은 싫어. 맵지 않은 저녁 메뉴를 추천해줘.",
+      "answer": "그럼 따뜻한 김치찌개나 치킨 스튜 같은 것들이 좋을 것 같아. 특히 김치의 풍미가 잘 살아있는 김치찌개는 매콤함 없이도 든든하고 맛있게 즐길 수 있을 거야.",
+      "elapsed_ms": 1326.6,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "negation_no_coffee",
+      "repeat": 10,
+      "prompt": "커피는 못 마셔. 커피 없는 따뜻한 음료를 추천해줘.",
+      "answer": "따뜻한 음료로는 차 종류가 정말 좋을 것 같아. 특히 녹차나 홍차는 깔끔하면서도 따뜻함이 좋아서 커피 대신 딱 맞을 거야.",
+      "elapsed_ms": 581.2,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_statement",
+      "repeat": 10,
+      "prompt": "너 수건 접었어.",
+      "answer": "그 행동을 나에게 돌린 말이구나. 실제로 확인할 근거는 없으니 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 641.8,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    },
+    {
+      "id": "second_person_question",
+      "repeat": 10,
+      "prompt": "수건 접은 건 네가 맞지?",
+      "answer": "내가 한 일인지는 지금 확인할 근거가 없어. 어떤 상황인지 조금 더 알려줘.",
+      "elapsed_ms": 612.5,
+      "placeholder_count": 0,
+      "control_chunks_excluded": 1,
+      "violation_flags": []
+    }
+  ],
+  "aggregate": {
+    "sample_count": 60,
+    "p50_elapsed_ms": 595.0,
+    "p95_elapsed_ms": 1326.6,
+    "placeholder_count": 2,
+    "empty_count": 2,
+    "violation_count": 2,
+    "transport_error_count": 0
+  }
+}

@@ -18,6 +18,33 @@ the currently running AIRI installation.
 - Follow-up sanitizer SHA-256: `BA38C5F13670DECEEDAB3F0BFE9473AE7FB3BE1DE1A652A26E80E046F572B59E`
 - Follow-up sanitizer size: 2,541 bytes (2 files, 27 insertions, 1 deletion)
 
+## Measured applicability of every tracked artifact
+
+`git apply --check` was run read-only against the pinned base (peeled commit
+`dbf8124…`) for all seven `.patch` files under `patches/`. Three do not apply
+and cannot be repaired from the bytes in this repository:
+
+| Artifact | `git apply --check` | Defect |
+|---|---|---|
+| `AIRI-v0.11.3-local-runtime-source.patch` | applies | — |
+| `AIRI-v0.11.3-round-cancel.patch` | applies | — |
+| `AIRI-v0.11.3-context-correlation-sanitizer.patch` | applies | — |
+| `AIRI-v0.11.3-session-header.patch` | applies | — |
+| `AIRI-v0.11.3-local-broadcast-meta-filter-20260809.patch` | rejected | two `@@` hunk headers carry no line numbers, so git stops with "patch with only garbage at line 4" |
+| `AIRI-v0.11.3-local-runtime-source-retry.patch` | rejected | Korean replaced by `?` (33 runs); also fails on `apps/server/src/services/domain/llm-tracing/index.ts:75` |
+| `AIRI-v0.11.3-local-runtime-source-retry-normalized.patch` | rejected | Korean replaced by `?` (38 runs); same hunk failure |
+
+The lost Korean is not recoverable here: the source characters are gone from
+the bytes, not merely mis-decoded on display. The two affected files are
+superseded by the combined patch above, which applies cleanly and keeps its
+Korean intact.
+
+All seven are now pinned by size and SHA-256 in `test-patch-manifest.ps1`,
+which also asserts each recorded defect still matches the bytes. Previously
+only the three applied artifacts were pinned, so the other four could be
+rewritten with nothing detecting it. Both defects are visible in the file
+itself, so the check stays offline and needs no base checkout.
+
 The patch was generated from the exact diff of a clean v0.11.3 checkout and
 `git apply --check --reverse` succeeds against the fully patched checkout.
 The original 32-file patch is retained as the round/cancel-only artifact. The

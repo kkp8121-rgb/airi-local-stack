@@ -6,6 +6,7 @@ import {
   assistantMessageShape,
   assistantText,
   buildInputTextEvent,
+  createSendTiming,
   createAssistantEventTracker,
   decodeTextArgument,
   isCorrelatedOutputEvent,
@@ -13,6 +14,13 @@ import {
   resolveAssistantText,
   validateServerConfig,
 } from './send-airi-local-text.mjs'
+
+test('creates a content-free wall-clock send timestamp for cross-process meters', () => {
+  const timing = createSendTiming()
+  assert.equal(Number.isSafeInteger(timing.sentEpochMs), true)
+  assert.equal(typeof timing.startedAt, 'number')
+  assert.equal('text' in timing, false)
+})
 
 test('builds input payload with the opaque event id in metadata', () => {
   assert.deepEqual(buildInputTextEvent('same text', 'input-a'), {

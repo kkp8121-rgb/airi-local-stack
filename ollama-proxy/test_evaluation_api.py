@@ -55,8 +55,15 @@ class EvaluationApiTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(record["provenance"]["memory_schema_version"], 1)
                 self.assertEqual(len(record["provenance"]["system_prompt_sha256"]), 64)
                 self.assertEqual(record["provenance"]["origin"], "user_approved")
-                self.assertEqual(record["provenance"]["model"], "exaone-airi:2.4b")
-                self.assertEqual(record["provenance"]["model_version"], "exaone-airi:2.4b")
+                # Provenance follows the launcher-selected model, so an
+                # unconfigured build cannot label a record with a stale tag.
+                self.assertEqual(
+                    record["provenance"]["model"], ollama_proxy.resolve_chat_model()
+                )
+                self.assertEqual(
+                    record["provenance"]["model_version"],
+                    ollama_proxy.resolve_chat_model(),
+                )
                 self.assertEqual(record["provenance"]["dataset_version"], "airi-g3-v1")
                 deleted = await self.request(
                     "DELETE", f"/v1/airi/evaluations/{record_id}"

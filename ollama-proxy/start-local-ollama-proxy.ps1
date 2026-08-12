@@ -1,6 +1,5 @@
 param(
-    [ValidateRange(512, 32768)]
-    [int]$NumCtx = 2048,
+    [object]$NumCtx = 2048,
     [ValidateRange(0, 999)]
     # Ollama interprets num_gpu=0 as CPU-only. AIRI's local model is small
     # enough to fully offload on the supported local GPU; callers can still
@@ -26,27 +25,90 @@ param(
     [bool]$AllowExternalMemoryExtraction = $false,
     [string]$MemoryExtractionModel = '',
     [string]$MemoryExtractionGateReport = '',
+    # Gate threshold profile. 'balanced' keeps every structural metric at 1.0
+    # and only relaxes the model-judgement metrics; 'strict' restores the
+    # original all-1.0 contract.
+    [ValidateSet('strict', 'balanced')]
+    [string]$MemoryExtractionGateProfile = 'balanced',
     [switch]$VerifyExtractionGateOnly,
     [uri]$MemoryExtractionUpstream = 'http://127.0.0.1:11436',
     [string]$MemoryExtractionKeepAlive = '5m',
     [ValidateSet('local', 'openai', 'anthropic')]
     [string]$ChatProvider = 'local',
     [bool]$AllowExternalChat = $false,
+    # For the local provider, an omitted value resolves to the stable runtime
+    # tag. Specify -ChatModel exaone-airi:2.4b for a reversible rollback.
     [string]$ChatModel = '',
+    # Optional approved artifact digest for the selected chat model. Supplying
+    # it (directly or through AIRI_CHAT_MODEL_DIGEST) makes both this preflight
+    # and the proxy's own startup check fail closed on a rebuilt tag.
+    [string]$ChatModelDigest = $env:AIRI_CHAT_MODEL_DIGEST,
+    # The root stack launcher runs the same local-tag preflight before it
+    # starts any downstream service, then supplies this switch to avoid doing
+    # the identical checks a second time.
+    [switch]$ChatModelPreflighted,
+    [ValidateSet('on', 'off')]
+    [string]$OutputModeration = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_OUTPUT_MODERATION)) { 'off' } else { $env:AIRI_OUTPUT_MODERATION }),
+    [string]$OutputModerationTerms = $env:AIRI_OUTPUT_MODERATION_TERMS,
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
-    [bool]$EnableCharacterEvaluator = $true,
+    [bool]$EnableCharacterEvaluator = $false,
     [ValidateRange(1, 1000000)]
     [int]$EvaluationMaxRecords = 10000
 )
 
 $ErrorActionPreference = 'Stop'
+$parsedNumCtx = 0
+if (-not [int]::TryParse(
+        [string]$NumCtx, [Globalization.NumberStyles]::Integer,
+        [Globalization.CultureInfo]::InvariantCulture, [ref]$parsedNumCtx) -or
+        $parsedNumCtx -lt 512 -or $parsedNumCtx -gt 32768) {
+    throw 'NumCtx must be an integer from 512 through 32768.'
+}
+$NumCtx = $parsedNumCtx
+$effectiveChatModel = if ($ChatProvider -eq 'local' -and [string]::IsNullOrWhiteSpace($ChatModel)) {
+    'midm-airi:2.0-mini'
+} else {
+    $ChatModel
+}
+$effectiveEvaluatorModel = if ($ChatProvider -eq 'local') {
+    $effectiveChatModel
+} else {
+    'midm-airi:2.0-mini'
+}
 $repo = $PSScriptRoot
 $stackRoot = Split-Path -Parent $repo
 $server = Join-Path $repo 'ollama_proxy.py'
 $stdoutLog = Join-Path $repo 'ollama-proxy.out.log'
 $stderrLog = Join-Path $repo 'ollama-proxy.err.log'
+$resolvedOutputModerationTerms = ''
+if (-not [string]::IsNullOrWhiteSpace($OutputModerationTerms)) {
+    $termsItem = Get-Item -LiteralPath $OutputModerationTerms -ErrorAction Stop
+    if ($termsItem.PSIsContainer -or $termsItem -isnot [IO.FileInfo] -or
+            ($termsItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'OutputModerationTerms must be a regular file.'
+    }
+    $resolvedOutputModerationTerms = [IO.Path]::GetFullPath($termsItem.FullName)
+}
+
+$requiredLocalModels = @()
+if (-not $VerifyExtractionGateOnly) {
+    if ($ChatProvider -eq 'local') {
+        $requiredLocalModels += $effectiveChatModel
+    }
+    if ($EnableCharacterEvaluator) {
+        $requiredLocalModels += $effectiveEvaluatorModel
+    }
+}
+if (-not $ChatModelPreflighted) {
+    foreach ($model in @($requiredLocalModels | Sort-Object -Unique)) {
+        # The digest pin describes the chat model artifact only; an evaluator
+        # on a different tag keeps the plain name check.
+        $expectedDigest = if ($model -ceq $effectiveChatModel) { $ChatModelDigest } else { '' }
+        & (Join-Path $repo 'setup-midm-airi-model.ps1') -Model $model -PreflightOnly -ExpectedDigest $expectedDigest
+    }
+}
 $resolvedTopicBoardPath = ''
 if (-not [string]::IsNullOrWhiteSpace($TopicBoardPath)) {
     $topicItem = Get-Item -LiteralPath $TopicBoardPath -ErrorAction Stop
@@ -156,7 +218,7 @@ if (-not [string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
         throw 'Memory extraction benchmark fixtures are missing.'
     }
     $memoryExtractionModelDigest = Resolve-LocalOllamaModelDigest -Model $MemoryExtractionModel
-    & $python $extractionGateVerifier --report $MemoryExtractionGateReport --fixtures $extractionFixtures --model $MemoryExtractionModel --model-digest $memoryExtractionModelDigest
+    & $python $extractionGateVerifier --report $MemoryExtractionGateReport --fixtures $extractionFixtures --model $MemoryExtractionModel --model-digest $memoryExtractionModelDigest --profile $MemoryExtractionGateProfile
     if ($LASTEXITCODE -ne 0) {
         throw 'Memory extraction operational gate verification failed.'
     }
@@ -175,8 +237,35 @@ if ($listener) {
     if (-not [string]::IsNullOrWhiteSpace($resolvedTopicBoardPath)) {
         throw 'Existing proxy cannot be reused with TopicBoardPath; stop it and restart so the approved board is loaded.'
     }
+    if (-not [string]::IsNullOrWhiteSpace($resolvedOutputModerationTerms)) {
+        throw 'Existing proxy cannot be reused with OutputModerationTerms; stop it and restart so the policy identity is known.'
+    }
+    try {
+        $existingHealth = Invoke-RestMethod -Uri 'http://127.0.0.1:11435/health' -TimeoutSec 3 -ErrorAction Stop
+        if ($null -eq $existingHealth.output_moderation -or
+                $null -eq $existingHealth.output_moderation.PSObject.Properties['enabled']) {
+            throw 'Existing proxy health does not report output moderation state.'
+        }
+        $existingModerationEnabled = [bool]$existingHealth.output_moderation.enabled
+    }
+    catch {
+        throw 'Existing proxy output moderation state could not be verified; stop it and restart.'
+    }
+    $existingNumCtx = 0
+    $existingNumCtxText = [Convert]::ToString(
+        $existingHealth.num_ctx, [Globalization.CultureInfo]::InvariantCulture)
+    if (-not [int]::TryParse(
+            $existingNumCtxText, [Globalization.NumberStyles]::None,
+            [Globalization.CultureInfo]::InvariantCulture, [ref]$existingNumCtx) -or
+            $existingNumCtx -ne $NumCtx) {
+        throw 'Existing proxy num_ctx differs from the requested configuration; stop it and restart.'
+    }
+    $requestedModerationEnabled = $OutputModeration -eq 'on'
+    if ($existingModerationEnabled -ne $requestedModerationEnabled) {
+        throw 'Existing proxy output moderation state differs from the requested configuration; stop it and restart.'
+    }
     Write-Output 'A service is already listening on port 11435; it was not reconfigured.'
-    exit 0
+    return
 }
 
 $memoryEnvironment = @{
@@ -210,7 +299,12 @@ $memoryEnvironment = @{
     AIRI_MEMORY_EXTRACTION_BATCH_CHARS = '24000'
     AIRI_CHAT_PROVIDER = $ChatProvider
     AIRI_ALLOW_EXTERNAL_CHAT = if ($AllowExternalChat) { '1' } else { '0' }
-    AIRI_CHAT_MODEL = $ChatModel
+    AIRI_CHAT_MODEL = $effectiveChatModel
+    # Empty means "no pin": the proxy then records the digest it observed
+    # instead of refusing to start.
+    AIRI_CHAT_MODEL_DIGEST = $ChatModelDigest
+    AIRI_OUTPUT_MODERATION = $OutputModeration
+    AIRI_OUTPUT_MODERATION_TERMS = $resolvedOutputModerationTerms
     AIRI_OLLAMA_KEEP_ALIVE = $OllamaKeepAlive
     AIRI_OLLAMA_TEMPERATURE = $OllamaTemperature.ToString([Globalization.CultureInfo]::InvariantCulture)
     AIRI_OLLAMA_TOP_P = $OllamaTopP.ToString([Globalization.CultureInfo]::InvariantCulture)
@@ -220,11 +314,16 @@ $memoryEnvironment = @{
     # Evaluation retention is a separate explicit opt-in. Chat never writes
     # to this DB automatically; each record also requires consent=true.
     AIRI_EVAL_ENABLED = if ($EnableEvaluation) { 'true' } else { 'false' }
+    # Provenance must name the model that actually answered, including after a
+    # -ChatModel rollback or an approved external provider.
+    AIRI_EVAL_MODEL = $effectiveChatModel
     AIRI_EVAL_DB = Join-Path $repo 'runtime\airi-evaluations.sqlite3'
     AIRI_EVAL_MAX_RECORDS = $EvaluationMaxRecords.ToString([Globalization.CultureInfo]::InvariantCulture)
     AIRI_CHARACTER_EVALUATOR_ENABLED = if ($EnableCharacterEvaluator) { '1' } else { '0' }
     AIRI_CHARACTER_EVALUATOR_PROVIDER = 'ollama'
-    AIRI_CHARACTER_EVALUATOR_MODEL = 'exaone-airi:2.4b'
+    # For local chat, keep the evaluator on the same selected model so a
+    # -ChatModel rollback applies consistently to the entire local path.
+    AIRI_CHARACTER_EVALUATOR_MODEL = $effectiveEvaluatorModel
     AIRI_CHARACTER_EVALUATOR_UPSTREAM = 'http://127.0.0.1:11434'
     AIRI_CHARACTER_EVALUATOR_NUM_CTX = '2048'
     AIRI_CHARACTER_EVALUATOR_NUM_GPU = $NumGpu.ToString([Globalization.CultureInfo]::InvariantCulture)
@@ -261,4 +360,4 @@ finally {
     }
 }
 
-Write-Output "Started AIRI Ollama compatibility proxy (PID $($process.Id), memory=$EnableMemory, extraction=$MemoryExtractionProvider/$([bool]$MemoryExtractionModel), chat=$ChatProvider, externalSearch=$AllowExternalSearch, evaluation=$EnableEvaluation, characterEvaluator=$EnableCharacterEvaluator)."
+Write-Output "Started AIRI Ollama compatibility proxy (PID $($process.Id), memory=$EnableMemory, extraction=$MemoryExtractionProvider/$([bool]$MemoryExtractionModel), chat=$ChatProvider/$effectiveChatModel, externalSearch=$AllowExternalSearch, evaluation=$EnableEvaluation, characterEvaluator=$EnableCharacterEvaluator/$effectiveEvaluatorModel)."
