@@ -1,5 +1,17 @@
 # AIRI C0 baseline evaluation
 
+## Synthetic context gate
+
+The context gate is a synthetic-only, non-streaming raw Ollama `/api/chat` comparison at production `num_ctx=2048`. It records retention of an active card, early user/assistant facts, a late correction/negation, and a tail memory block. It does not exercise the Electron app, human quality, or production-proxy retry behavior.
+
+```powershell
+python -m unittest -v ollama-proxy/eval/test_airi_context_gate.py
+python ollama-proxy/eval/run_airi_context_gate.py --model exaone-airi:2.4b --output airi-context-exaone.json
+python ollama-proxy/eval/run_airi_context_gate.py --model midm-airi:2.0-mini --output airi-context-midm.json
+```
+
+Reports contain only public fixture canaries and local Ollama metadata; remote hosts require `--allow-host`.
+
 이 디렉터리는 **합성 텍스트 fixture만** 사용하는 로컬 Ollama baseline harness다. 학습 코드가 아니며, 실제 사용자 대화·음성·전사·API 키·환경 비밀을 읽거나 저장하지 않는다. 현재 v0.3 fixture는 16개이며, 성인 간 비노골적 관계 대화의 과잉 거부, 노골적·미성년 경계, active character-card 정체성, character-card보다 우선하는 도구 진실성 계약을 함께 평가한다.
 
 기본값은 `http://127.0.0.1:11434/api/chat`, `exaone-airi:2.4b`, `num_ctx=2048`, `num_gpu=0`, `temperature=0`, `seed=42`, `runs=1`이다. `--runs`는 1~10회 실제 반복 측정을 수행하고, 표의 시간은 중앙값이다. 외부 host는 `--allow-host` 없이는 거부된다.

@@ -47,6 +47,9 @@
   - [ ] I2 시청자 기억 시스템 (M2)
 - [~] **G3. 평가·데이터 플라이휠**
   - [x] 오프라인 eval 하네스·120턴 A/B — 2026-08-12 (`진행중/AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md`)
+  - [x] 장문 context·memory·card 합성 A/B 실측 — EXAONE exact 3/12,
+    Mi:dm 0/12로 양 모델 FAIL — 2026-08-12
+    (`완료/AIRI-LONG-CONTEXT-MEMORY-CARD-AB-2026-08-12.md`)
   - [x] eval provenance 해소 (수집 데이터를 승격 근거로 사용 가능) — 2026-08-12 (`932eae6`)
   - [ ] 인간 검수 100건 수집 (dev PC)
   - [ ] 16케이스 자동 게이트 PASS (현재 양 모델 FAIL)
@@ -116,11 +119,19 @@
 - [x] digest pin 코드 (opt-in) — 2026-08-12 (`932eae6`)
 - [x] SSoT 실기 검증 + digest 실값 pin 고정 — 2026-08-12
   (`완료/AIRI-DEV-PC-SSOT-VERIFICATION-2026-08-12.md`)
+- [x] 장문 context·memory·card 비교 측정 — 2026-08-12 (양 모델 FAIL,
+  개선 후 회귀 필요)
 - [ ] 인간 검수 100건 (G3와 공유)
 
 ---
 
 ## 갱신 로그 (최신이 위)
+
+- **2026-08-12** (dev PC): 공개 합성 장문 context·memory·card 하네스를
+  추가하고 `num_ctx=2048`에서 EXAONE/Mi:dm을 4압력×3회 실측했다. exact는
+  EXAONE 3/12, Mi:dm 0/12로 양 모델 FAIL. Mi:dm은 같은 무압력 입력도
+  1,139 token(EXAONE 756)을 사용했고 20 filler쌍에서 2,042 token으로
+  포화됐다. 최신 정정·tail memory는 양 모델 12/12 보존했다.
 
 - **2026-08-12** (dev PC, 사용자 청취·결정 반영): T-05는 126번을 한국어
   예비 후보로 보존하되 낭독조·감정 부족 때문에 운영 승격하지 않고 현행

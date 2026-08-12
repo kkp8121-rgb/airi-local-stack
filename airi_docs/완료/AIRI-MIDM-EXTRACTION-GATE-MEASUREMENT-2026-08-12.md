@@ -46,7 +46,7 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
 ## 판정과 후속
 
 Mi:dm 2.0-mini도 기존 EXAONE/Qwen 후보와 마찬가지로 I1 승격 후보가 아니다.
-실패 리포트가 있어도 root 런처의 fail-open 검증은 이를 거부하고
+실패 리포트가 있어도 root 런처의 fail-closed 검증은 이를 거부하고
 `memory.extraction_enabled=false`를 유지해야 한다. 다른 후보 모델을
 선정한 뒤 같은 digest-bound 절차를 반복한다. 기준을 낮추거나 실패
 리포트를 운영에 강제 주입하지 않는다.

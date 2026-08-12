@@ -1,0 +1,18 @@
+{
+  "suite_id": "airi-context-gate", "suite_version": "1.0", "synthetic_only": true,
+  "filler_template": "PUBLIC SYNTHETIC FILLER {index}: orbit-{index} amber-{index}.",
+  "pressure_levels": [
+    {"id": "p0", "filler_pairs": 0}, {"id": "p1", "filler_pairs": 8},
+    {"id": "p2", "filler_pairs": 20}, {"id": "p3", "filler_pairs": 48}
+  ],
+  "canaries": {
+    "active_card": "합성 카드 사실: active_card=violet-otter", "early_user": "나는 개를 키우지 않는다. 합성 사용자 사실: early_user=red-comet",
+    "early_assistant": "AIRI의 합성 배지 사실: early_assistant=blue-cedar",
+    "early_preference": "사용자의 이전 합성 선호: latest_correction=red-comet", "latest_correction": "정정: 사용자 선호는 red-comet이 아니라 green-lantern이다. 최신 합성 선호: latest_correction=green-lantern",
+    "tail_memory": "[Character Memory]\n사용자의 합성 메모: tail_memory=silver-fern"
+  },
+  "expected": {
+    "active_card": "violet-otter", "early_user": "red-comet", "early_assistant": "blue-cedar",
+    "latest_correction": "green-lantern", "early_user_negated": true, "tail_memory": "silver-fern"
+  }
+}

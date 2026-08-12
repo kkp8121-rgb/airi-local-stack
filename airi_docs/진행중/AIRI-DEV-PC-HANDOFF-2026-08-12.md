@@ -18,7 +18,8 @@
 | 트랙 | 내용 | 상태 |
 |---|---|---|
 | 모델 SSoT | `resolve_chat_model()` 단일화, Electron 정규화, foreground 단일 runner, 롤백·eval provenance, digest pin | **dev PC 실기 PASS**, Mi:dm 실측 digest 기본 pin 반영 (`완료/AIRI-DEV-PC-SSOT-VERIFICATION-2026-08-12.md`) |
-| I1 기억 추출 | 게이트 리포트 자동 해석 → 추출 자동 ON 배선(fail-open), 게이트 프로파일 strict/balanced | Mi:dm balanced **실측 FAIL**, 추출 off 유지 (`완료/AIRI-MIDM-EXTRACTION-GATE-MEASUREMENT-2026-08-12.md`) |
+| 장문 모델 A/B | `num_ctx=2048`의 card·초기 화자·최신 부정 정정·tail memory 합성 비교 | **실측 완료, 양 모델 FAIL**. EXAONE exact 3/12, Mi:dm 0/12; Mi:dm 20 filler쌍에서 token 포화 (`완료/AIRI-LONG-CONTEXT-MEMORY-CARD-AB-2026-08-12.md`) |
+| I1 기억 추출 | 게이트 리포트 자동 해석 → 검증 PASS 때만 추출 ON(fail-closed), 게이트 프로파일 strict/balanced | Mi:dm balanced **실측 FAIL**, 추출 off 유지 (`완료/AIRI-MIDM-EXTRACTION-GATE-MEASUREMENT-2026-08-12.md`) |
 | MEM-04 | SQLite WAL + busy_timeout=5000ms (당초 500ms → 저하된 CI runner에서 락 실패 재발해 sqlite3 기본 예산 복원) | 완료, 활성화 후 락 경합 실측만 남음 |
 | B3 모더레이션 | 한국어 금칙어 사전·SSE 문장 게이트·캐릭터 폴백 대사(C3) | **3종 배선·신규 3층 source test/typecheck/build·설치본 "필터당함" 배지 실기 완료** (`완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`) |
 | C1 헌법 | 캐릭터 헌법 초안 (`진행예정/AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md`) | 관계·인사·클로징 반영. 정식 팬덤명 유보·일반 호칭 “시청자들” 확정. T-05 126번 예비 후보 보존·현행 음성 유지. 인간 검수 대기 |
@@ -115,6 +116,11 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
   render P50/P95는 Mi:dm 1,501.5/2,597.2ms, EXAONE
   1,752.5/3,233.0ms였다
   (`완료/AIRI-INSTALLED-MODEL-RENDER-AB-2026-08-12.md`).
+- **장문 context·memory·card A/B 완료:** raw Ollama, `num_ctx=2048`,
+  4압력×3회에서 EXAONE exact 3/12, Mi:dm 0/12로 양 모델 FAIL. Mi:dm은 같은
+  무압력 입력도 1,139 token(EXAONE 756)을 사용했고 card·부정을 0/12 보존했다.
+  최신 정정·tail memory는 양 모델 12/12였다
+  (`완료/AIRI-LONG-CONTEXT-MEMORY-CARD-AB-2026-08-12.md`).
 - 실제 마이크 20+20, barge-in 200~500ms, speaker AEC, STT-06 마이크 품질은
   사용자 요청으로 추후 보류한다. 사용자가 “마이크 테스트 시작”을 요청하면
   현재 확인된 `마이크(USB Audio Device)`로 재개한다.
@@ -172,3 +178,6 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
    사용자 1차 청취 완료. 126번을 예비 후보로 선택했지만 낭독조·감정 부족
    때문에 운영 승격은 보류하고 현행 일본어 참조 교차클로닝을 유지한다.
    감정이 드러나는 대화체 조건으로 다시 A/B할 때 126번을 우선 사용한다.
+3. **장문 context·memory·card 비교** — 합성 전용 하네스·CI test와 모델별
+   4압력×3회 실측 완료. 양 모델 FAIL이므로 측정 항목은 닫되 품질 위험은
+   인간 검수와 문맥 예산/표현 개선 후 회귀 대상으로 유지한다.

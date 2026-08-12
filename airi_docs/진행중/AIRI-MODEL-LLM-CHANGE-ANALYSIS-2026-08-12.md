@@ -112,14 +112,15 @@ Mi:dm 기본 후보 유지에 모순되는 지연 증거는 없었다. 다만 n=
    copyright/permission notice 보존 의무는 배포 시 계속 지켜야 한다.
 6. `-ChatModel exaone-airi:2.4b` rollback tag와 원본 모델은 보존돼 있다.
 
-## 단점과 남은 위험
+## 단점과 남은 위험 (최초 분석 시점)
 
 1. raw TTFT는 26.9% 느리고 tok/s는 14.6% 낮다. 긴 답변에서는 불리할 수
    있다.
 2. 답변 중앙값이 69.2% 짧다. 간결함과 정보 손실을 구분하는 human review가
    필요하다. 자동 gate 9/16도 최종 FAIL이다.
-3. effective context는 여전히 2,048이며 tokenizer 차이를 반영한 장문
-   대화·memory/card truncation 비교가 없다.
+3. effective context는 여전히 2,048이다. tokenizer 차이를 반영한 장문
+   대화·memory/card 비교는 후속 dev PC 배치에서 완료했으나 양 모델 FAIL로
+   위험이 확인됐다(아래 후속 반영 참조).
 4. 과거 isolated runtime GPU 증분은 Mi:dm 1,946MiB, EXAONE 1,792MiB로
    Mi:dm이 154MiB 더 컸다. 작은 disk blob이 작은 runtime VRAM을 보장하지
    않는다. 현재 full stack의 약 842MiB 여유는 KURE fp16 절감과 함께 얻은
@@ -146,8 +147,9 @@ Mi:dm 기본 후보 유지에 모순되는 지연 증거는 없었다. 다만 n=
   품질·라이선스 이득이 크다.
 - model SSoT 강제, evaluation provenance, ACK metadata, model digest pin은
   코드와 dev PC 실기 검증을 완료했다.
-- 최소 100개 인간 검수 대화와 장문 context/memory/card corpus에서 정확성,
-  답변 완전성, 화자·부정 보존, retry율, 출력 token을 함께 측정한다.
+- 최소 100개 인간 검수 대화가 남았다. 장문 context/memory/card 합성 corpus는
+  정확성·답변 완전성·화자·부정·retry·출력 token 측정을 완료했지만 양 모델
+  FAIL이므로 개선 후 동일 fixture 회귀가 필요하다.
 - 같은 설치 Electron·TTS warm state의 교차 matched text→render A/B는
   모델별 n=10으로 완료했다. 이는 지연 checkpoint이며 인간 품질 검수를
   대신하지 않는다.
@@ -197,3 +199,18 @@ output moderation)에서 §단점 7~10이 코드 레벨로 해소됐고, 후속 
 
 관련 증거: `완료/AIRI-DEV-PC-SSOT-VERIFICATION-2026-08-12.md`,
 `완료/AIRI-INSTALLED-MODEL-RENDER-AB-2026-08-12.md`.
+
+## 장문 context·memory·card 후속 실측 (2026-08-12)
+
+공개 합성 fixture를 raw Ollama에 같은 `num_ctx=2048`·temperature 0·seed 42로
+모델별 4압력×3회 실행했다. 같은 1,451자 무압력 입력의 prompt token P50은
+EXAONE 756, Mi:dm 1,139였고, 20 filler쌍에서 EXAONE 1,896 대비 Mi:dm은
+2,042로 이미 포화됐다. exact case는 EXAONE 3/12, Mi:dm 0/12로 둘 다 FAIL,
+schema first-pass는 양쪽 12/12, retry는 0건이었다.
+
+Mi:dm은 최신 정정과 tail memory는 12/12 보존했지만 활성 card와 부정은
+0/12였다. 둘 다 무압력에서도 실패했으므로 전부를 물리 truncation으로
+설명할 수 없고, 근거 귀속·부정 이해 문제가 섞여 있다. 이 단일 합성
+gate만으로 롤백을 결정하지 않지만 Mi:dm의 장문/card 안전성을 주장하지도
+않는다. 상세 조건과
+원시 보고서는 `완료/AIRI-LONG-CONTEXT-MEMORY-CARD-AB-2026-08-12.md` 참조.

@@ -111,7 +111,7 @@ jobs:
             tests: >-
               ollama-proxy/test_dialogue_quality_benchmark.py
               ollama-proxy/eval/test_airi_baseline.py ollama-proxy/eval/test_airi_conversation_soak.py
-              ollama-proxy/eval/test_airi_proactive_soak.py
+              ollama-proxy/eval/test_airi_context_gate.py ollama-proxy/eval/test_airi_proactive_soak.py
           - shard: ollama-proxy-training
             tests: >-
               ollama-proxy/training/tests/test_audit_airi_style_fixture_readiness.py

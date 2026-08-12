@@ -26,8 +26,9 @@
 - `AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md` — EXAONE→Mi:dm 전환 분석.
   게이트 중 model SSoT 강제·eval provenance·ACK metadata·digest pin은
   2026-08-12 코드·dev PC 실기 해소 완료(commit `932eae6`). 설치 Electron
-  matched 모델 A/B도 완료했다. **남은 게이트**: 인간 검수 100건과 장문
-  context/memory/card corpus.
+  matched 모델 A/B와 장문 context/memory/card 합성 비교도 완료했다. 장문
+  exact는 EXAONE 3/12, Mi:dm 0/12로 양 모델 FAIL이다. **남은 게이트**:
+  인간 검수 100건과 장문 회귀 개선.
 - `AIRI-DEV-PC-HANDOFF-2026-08-12.md` — **검토 PC 선행 작업 배치의
   인수인계.** SSoT·I1 실측 및 B3 배선 3종은 완료; B0-1과 사람·자격증명
   게이트 등 잔여 dev PC 작업을 관리한다.
@@ -71,6 +72,9 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-LONG-CONTEXT-MEMORY-CARD-AB-2026-08-12.md` — `num_ctx=2048`의
+  활성 card·초기 화자·최신 부정 정정·tail memory를 EXAONE/Mi:dm 각
+  4압력×3회 비교한 실측과 양 모델 FAIL 판정.
 - `AIRI-DEV-PC-SSOT-VERIFICATION-2026-08-12.md` — 설치 Electron 정규화,
   Mi:dm 단일 runner, EXAONE 롤백, evaluator/eval provenance, digest pin
   일치·불일치와 운영 기본 pin의 dev PC 실기 증거.
