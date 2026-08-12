@@ -73,6 +73,8 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-B4A-CHAT-PRIORITY-POLICY-2026-08-13.md` — B1 screened event를 위한 순수·무상태 결정론적 우선순위 정책의 좁은 오프라인 완료 기록. 개인정보 비보존 문자열 매처, strict 입력 검증, Korean-first 휴리스틱 및 로컬 broadcast 집중 시험 24/24·독립 combined 검토 36/36을 다루며 B4a/G5/M4 전체 완료나 런타임 증거를 의미하지 않는다.
+
 - `AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md` — 기본 OFF/inert,
   Node 내장 모듈만 쓰는 B4a 오프라인 broadcast-director 기반. caller monotonic
   `nowMs`의 20분×6 블록·질문/침묵/후원/토픽 lease·pause/kill 계약과 집중 테스트

@@ -27,6 +27,12 @@ claims require their own recorded ASAR and live-turn verification.
 
 ## B4a handoff update (2026-08-13)
 
+### B4a chat priority policy update (2026-08-13)
+
+`broadcast-director/priority-policy.mjs`는 B1 screened event를 정확한 동결 `{priority}` 또는 invalid `null`로만 분류한다. precedence는 질문 > 화제 확장 > 진심 리액션 > 응원 > 긍정 fallback이며 strict B1 shape/ID/Unicode code point/timestamp와 descriptor snapshot을 검증한다. private data 매처는 V8 legacy RegExp 보존 위험 때문에 수동 문자열 처리만 사용하고 sentinel 회귀가 상태 비변경을 보장한다. Korean-first 휴리스틱의 오분류는 순서만 바꾸며 B3 모더레이션을 대체하지 않는다. B1 ChatIngress→policy→B4 director 로컬 broadcast 집중 시험은 24/24 PASS, 독립 combined 검토는 36/36 PASS다.
+
+**정확한 다음 단계와 차단 요인:** production-consumed 자율 오프라인 배치는 현 감사에서 추가 식별되지 않았다. 다음은 게이트된 B1b/B4b 또는 인간 주제·헌법 검토다. B1b/B4b의 차단 요인은 YouTube/OAuth 자격증명, quota 실측 및 운영 승인이고, 런타임/live adapter, AIRI sender/TTS/OBS, 비공개 2시간 리허설, 설치 ASAR은 아직 범위 밖이다. STT는 OFF/deferred를 유지한다. 상세: `완료/AIRI-B4A-CHAT-PRIORITY-POLICY-2026-08-13.md`.
+
 현재 source 경계는 `broadcast-director/core.mjs`와 README·집중 테스트의
 오프라인 결정론 코어다. 기본 OFF/inert, Node 내장 모듈만 사용하며 caller의
 단조 `nowMs` 외 시간·I/O·환경·로그·네트워크·파일·영속성을 사용하지 않는다.

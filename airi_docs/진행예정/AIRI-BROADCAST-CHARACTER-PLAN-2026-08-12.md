@@ -85,6 +85,8 @@
 
 ### B4. 방송 디렉터 (G5의 실체화)
 
+**우선순위 정책 보완 (2026-08-13):** B4a의 `priority-policy.mjs`는 B1 screened event만을 입력으로 받아 strict exact shape/ID/Unicode code point/timestamp와 descriptor snapshot을 검증한 뒤 동결된 정확한 `{priority}` 또는 `null`을 반환한다. 질문 > 화제 확장 > 진심 리액션 > 응원 > 긍정 fallback 순서다. 최대 1,000자 텍스트의 Korean-first 휴리스틱은 문장부호·선택된 종결 질문형, 부정·URL query punctuation 가드를 사용한다. 의도 증명이나 모더레이션이 아니므로 오분류는 순서만 바꾸고 이벤트를 제거하지 않으며 B3 책임을 대체하지 않는다. 결과는 eventId, viewerKey, 이름, 텍스트, 시간을 포함하지 않는다. V8 legacy RegExp 보존 위험 때문에 private data 매처는 RegExp 없이 수동 문자열 처리하고 sentinel 회귀로 비변경을 확인했다. B1 ChatIngress→policy→B4 director composition의 로컬 broadcast 집중 시험은 24/24 PASS, 독립 combined 검토는 36/36 PASS다. B4b/실제 리허설 등 기존 외부·인간 게이트는 그대로다. 상세: `완료/AIRI-B4A-CHAT-PRIORITY-POLICY-2026-08-13.md`.
+
 **구현 현황 (2026-08-13, 계획 원문은 아래와 같이 유지):** B4a
 `broadcast-director/` 오프라인 기반 코어·README·집중 테스트가 추가됐다. 기본
 OFF/inert, Node 내장 모듈만 사용, caller monotonic `nowMs`만 사용하며 I/O·시계·환경·로그·네트워크·파일·영속성은 없다. 20분×6 블록, 첫 블록 boolean

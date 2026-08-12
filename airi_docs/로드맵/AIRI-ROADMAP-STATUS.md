@@ -70,6 +70,7 @@
     독립 최종 검토 PASS — 2026-08-13
     (`완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`). 실제 런타임,
     AIRI/TTS/OBS, YouTube/OAuth·쿼터, 외부 killswitch·모더레이션 및 2시간 실기는 미증명.
+  - [x] B4a B1 screened event 우선순위 정책 — strict B1 shape/ID/Unicode code point/timestamp·descriptor snapshot 검증, 개인정보 비보존 수동 문자열 매처, 질문>화제 확장>진심 리액션>응원>긍정 fallback. 로컬 broadcast 집중 시험 24/24 PASS, 독립 combined ingress/policy/director 검토 36/36 PASS — 2026-08-13 (`완료/AIRI-B4A-CHAT-PRIORITY-POLICY-2026-08-13.md`). B4a/G5/M4는 partial이다.
   - [ ] B4b 어댑터·승인 비공개 리허설 (보류: B1b 외부 자격증명·쿼터 실측·운영 승인;
     STT OFF/deferred 유지)
 - [ ] **G6. 화면·게임·채팅 에이전트** (G5 이후)
@@ -151,6 +152,8 @@
 ---
 
 ## 갱신 로그 (최신이 위)
+
+- **2026-08-13** (B4a chat priority policy): `broadcast-director/priority-policy.mjs`에 B1 screened event를 동결된 `{priority}` 또는 invalid `null`로 분류하는 무상태 결정론적 정책을 추가했다. 질문 > 화제 확장 > 진심 리액션 > 응원 > 긍정 fallback 순서이며 strict shape/ID/Unicode code point/timestamp·descriptor snapshot을 검증한다. V8 legacy RegExp 보존 위험을 피하기 위해 개인정보 매처는 RegExp 없이 수동 문자열 처리만 사용하고 sentinel 회귀가 비변경을 확인한다. Korean-first 휴리스틱의 오분류는 순서만 바꾸며 B3 모더레이션을 대체하지 않는다. 로컬 broadcast 집중 시험은 24/24 PASS, 독립 combined ingress/policy/director 검토는 36/36 PASS다. B4a/G5/M4는 partial이며 B4b 런타임과 외부·인간 게이트는 남는다. 상세: `완료/AIRI-B4A-CHAT-PRIORITY-POLICY-2026-08-13.md`.
 
 - **2026-08-13** (B4a broadcast-director foundation): Node built-ins-only,
   default-OFF/inert 오프라인 코어를 추가했다. caller monotonic `nowMs`를 쓰는
