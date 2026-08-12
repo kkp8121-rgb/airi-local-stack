@@ -65,19 +65,12 @@
   <section id="turns" class="turns"><div class="empty">아직 수신한 대화가 없습니다.</div></section>
   <p class="note">큰 숫자의 발화 종료는 VAD 설정 450ms로 역산한 추정 시점이며, 재생 시작은 AIRI의 실제 source.start(0) 이벤트입니다. 재생 이벤트가 없는 turn만 TTS 완료 시점으로 추정합니다.</p>
 </main>
-<script>
+<script type="module">
+  import { summarizeAcceptance } from '/dashboard-metrics.mjs';
   const byId = id => document.getElementById(id);
   const ms = value => value == null || Number.isNaN(value) ? '—' : `${Math.round(value)} ms`;
   const delta = (end, start) => end != null && start != null ? end - start : null;
   const VAD_END_WAIT_MS = 450;
-  const TARGET_MS = 2000;
-  const ACCEPTANCE_TURNS = 5;
-
-  function percentile(values, ratio) {
-    if (!values.length) return null;
-    const sorted = [...values].sort((a, b) => a - b);
-    return sorted[Math.max(0, Math.ceil(sorted.length * ratio) - 1)];
-  }
 
   function stages(turn) {
     const stt = turn.stt || {}, memory = turn.memory || {}, llm = turn.llm || {}, tts = turn.tts || {}, playback = turn.playback || {}, kpi = turn.kpi || {};
@@ -121,23 +114,18 @@
     byId('updated').textContent = `갱신 ${new Date(data.now_ms).toLocaleTimeString()}`;
 
     const turns = data.turns || [];
-    const physicalSamples = turns
-      .filter(turn => !(turn.stt && turn.stt.meta && turn.stt.meta.synthetic))
-      .filter(turn => turn.llm && turn.llm.meta && turn.llm.meta.cloud_search)
-      .map(turn => stages(turn))
-      .filter(view => view.requestToPlayback != null)
-      .slice(0, ACCEPTANCE_TURNS)
-      .map(view => view.requestToPlayback + VAD_END_WAIT_MS);
-    const sampleCount = physicalSamples.length;
-    const worst = sampleCount ? Math.max(...physicalSamples) : null;
-    const passed = sampleCount >= ACCEPTANCE_TURNS && worst <= TARGET_MS;
-    const failed = sampleCount >= ACCEPTANCE_TURNS && worst > TARGET_MS;
+    const acceptance = summarizeAcceptance(turns, { vadEndWaitMs: VAD_END_WAIT_MS });
+    const physicalSamples = acceptance.samples;
+    const sampleCount = acceptance.count;
+    const worst = acceptance.worst;
+    const passed = acceptance.passed;
+    const failed = acceptance.failed;
     const targetClass = passed ? 'status-good' : failed ? 'status-bad' : '';
-    const targetText = passed ? '통과 · 5/5' : failed ? `초과 · 최악 ${ms(worst)}` : `${sampleCount}/${ACCEPTANCE_TURNS} 수집 중`;
+    const targetText = passed ? '통과 · 5/5' : failed ? `초과 · 최악 ${ms(worst)}` : `${sampleCount}/5 수집 중`;
     const acceptanceCards = [
-      ['실제 마이크 검색 재생 표본', `${sampleCount}/${ACCEPTANCE_TURNS}`],
+      ['실제 마이크 검색 재생 표본', `${sampleCount}/5`],
       ['최근 반응', sampleCount ? ms(physicalSamples[0]) : '—'],
-      ['P50 / P95', sampleCount ? `${ms(percentile(physicalSamples, .5))} / ${ms(percentile(physicalSamples, .95))}` : '—'],
+      ['P50 / P95', sampleCount ? `${ms(acceptance.p50)} / ${ms(acceptance.p95)}` : '—'],
       ['2초 목표 · 최근 5회 모두', targetText, targetClass],
     ];
     byId('acceptance').innerHTML = acceptanceCards.map(([label, value, valueClass = '']) =>

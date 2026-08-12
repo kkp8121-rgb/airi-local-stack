@@ -97,6 +97,32 @@ class CorrelationTests(unittest.TestCase):
         self.assertNotIn("memory.content", dashboard)
         self.assertNotIn("memory.raw", dashboard)
 
+    def test_dashboard_acceptance_uses_the_substantive_metrics_module(self):
+        dashboard = (Path(__file__).parent / "dashboard.html").read_text(encoding="utf-8")
+        self.assertIn("import { summarizeAcceptance } from '/dashboard-metrics.mjs'", dashboard)
+        acceptance = dashboard.split("const acceptance = summarizeAcceptance", 1)[1].split("if (!turns.length)", 1)[0]
+        self.assertNotIn("requestToPlayback", acceptance)
+
+    def test_dashboard_metrics_module_is_served_from_fixed_route(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=2)
+        try:
+            connection.request("GET", "/dashboard-metrics.mjs")
+            response = connection.getresponse()
+            body = response.read().decode("utf-8")
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.getheader("Content-Type"), "application/javascript; charset=utf-8")
+            self.assertIn("export function summarizeAcceptance", body)
+            connection.request("GET", "/dashboard-metrics.mjs/extra")
+            self.assertEqual(connection.getresponse().status, 404)
+        finally:
+            connection.close()
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
     def test_half_duplex_different_request_ids_join_one_turn(self):
         clock = Clock(); c = Correlator(reorder_ttl_ms=10, clock=clock)
         for e in [event("stt", "start", "s1", 100), event("stt", "end", "s1", 200), event("llm", "start", "l1", 220), event("llm", "first", "l1", 300), event("tts", "start", "t1", 310), event("tts", "first", "t1", 390), event("tts", "end", "t1", 480)]: self.assertTrue(c.add(e))

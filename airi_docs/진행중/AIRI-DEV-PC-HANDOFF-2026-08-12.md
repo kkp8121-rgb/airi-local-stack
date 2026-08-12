@@ -9,6 +9,20 @@
 - 현행 branch tip은 후속 승인 배치마다 전진할 수 있으므로, 이 문서의 고정
   해시에 의존하지 말고 `git log -1`로 확인한다.
 
+## Latency dashboard KPI handoff (2026-08-13)
+
+The dashboard top cards now use only `kpi.substantive_playback_start`, not raw
+`playback.start`. Eligible samples require non-synthetic STT, cloud-search LLM,
+explicit STT/LLM/playback correlation, finite `vadEndWaitMs >= 0`, ordered
+`stt.start <= llm.content <= substantive playback`, and a finite nonnegative
+result. Newest-five/P50/P95/worst/pass use that KPI; raw stage scalars remain
+diagnostics. `dashboard-metrics.mjs` is served at the fixed
+`/dashboard-metrics.mjs` route. Node 5/5, latency Python 32 passed + 15
+subtests, checkpoint PASS, and independent review PASS are offline evidence
+only: no live mic/runtime measurement occurred, STT remains OFF/deferred, no
+installed AIRI/service/model changed, and the physical 5-turn gate remains
+open. See `완료/AIRI-LATENCY-DASHBOARD-SUBSTANTIVE-KPI-2026-08-13.md`.
+
 ## I2a handoff update (2026-08-13)
 
 Viewer memory is foundation-only: default-inert, separate SQLite, strict HMAC

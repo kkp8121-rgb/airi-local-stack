@@ -21,4 +21,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Chat ingress contract tests failed.' }
 & node --test (Join-Path $PSScriptRoot 'broadcast-director\test-*.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Broadcast director contract tests failed.' }
 
+& node --test (Join-Path $PSScriptRoot 'latency-monitor\test-dashboard-metrics.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Latency dashboard metrics tests failed.' }
+
 Write-Output 'Current checkpoint contract: PASS (offline synthetic ASAR only; no installed archive/service/model access).'
