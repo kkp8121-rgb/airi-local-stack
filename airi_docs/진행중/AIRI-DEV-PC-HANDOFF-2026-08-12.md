@@ -21,7 +21,7 @@
 | I1 기억 추출 | 게이트 리포트 자동 해석 → 추출 자동 ON 배선(fail-open), 게이트 프로파일 strict/balanced | Mi:dm balanced **실측 FAIL**, 추출 off 유지 (`완료/AIRI-MIDM-EXTRACTION-GATE-MEASUREMENT-2026-08-12.md`) |
 | MEM-04 | SQLite WAL + busy_timeout=5000ms (당초 500ms → 저하된 CI runner에서 락 실패 재발해 sqlite3 기본 예산 복원) | 완료, 활성화 후 락 경합 실측만 남음 |
 | B3 모더레이션 | 한국어 금칙어 사전·SSE 문장 게이트·캐릭터 폴백 대사(C3) | **3종 배선·신규 3층 source test/typecheck/build·설치본 "필터당함" 배지 실기 완료** (`완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`) |
-| C1 헌법 | 캐릭터 헌법 초안 (`진행예정/AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md`) | 결정 1·3 문구 반영, T-05 청취·인간 검수 대기 |
+| C1 헌법 | 캐릭터 헌법 초안 (`진행예정/AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md`) | 관계·인사·클로징 반영. 팬덤명 “아이리스” 충돌 FAIL로 재선정, T-05 청취·인간 검수 대기 |
 | 문서 | TECH-SPECS 현행화, 색인 갱신 | 완료 |
 
 ## 2. dev PC 필수 작업 — SSoT 실기 검증
@@ -145,9 +145,10 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
 
 방송 계획 §4의 4건 처리됨: ① 관계 축 — AI 단독형 + 메타 서사("사장님")
 확정 ② 방송 중 클라우드 LLM — 조건부(즉시 승인 아님, dev PC 실측 2종 후
-재결정) ③ 캐릭터 확정 — 이름 AIRI·호칭 "사장님" 확정, 시그니처 인사·
-팬덤명 "아이리스"·클로징은 확정, T-05는 라이선스 확인된
-한국어 후보 3개 샘플 생성 완료 후 사용자 청취 검토 대기
+재결정) ③ 캐릭터 확정 — 이름 AIRI·호칭 "사장님"·시그니처 인사·클로징은
+확정. 팬덤명 “아이리스”는 공개 충돌 FAIL로 사용자 재선정이 필요하다
+(`완료/AIRI-FANDOM-NAME-COLLISION-CHECK-2026-08-12.md`). T-05는 라이선스
+확인된 한국어 후보 3개 샘플 생성 완료 후 사용자 청취 검토 대기
 (`완료/AIRI-T05-KOREAN-SPEAKER-CANDIDATES-2026-08-12.md`) ④ 첫 방송 목표 시점 — 조건 기반
 확정(M3 → 비공개 리허설 → 데뷔, 날짜 고정 없음). 헌법 초안 §5(관계
 규정)·§6(인사·팬덤명)이 이 결과를 반영했다

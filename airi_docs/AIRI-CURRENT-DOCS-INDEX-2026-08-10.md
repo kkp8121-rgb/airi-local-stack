@@ -40,14 +40,14 @@
 ## 진행예정 — 계획
 
 - `AIRI-BROADCAST-CHARACTER-PLAN-2026-08-12.md` — 지능·캐릭터성·방송 통합
-  계획. **사용자 결정 4건 처리 완료(2026-08-12)** — 결정 1·3·4 확정,
-  결정 2는 조건부(dev PC 실측 후 재결정). 근거는
+  계획. 사용자 결정 중 1·4 확정, 2 조건부, 3은 팬덤명 충돌 FAIL과 T-05
+  청취 때문에 부분 완료 상태다. 근거는
   `참조/AIRI-BROADCAST-RESEARCH-2026-08-12.md`.
 - `AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md` — C1 캐릭터 헌법
-  초안 v2. **결정 1·3 반영(2026-08-12), 코드 미반영**. 정체성(이름 AIRI
+  초안 v4. **결정 1·3 반영(2026-08-12), 코드 미반영**. 정체성(이름 AIRI
   확정)·가치관·말버릇 후보·관계 규정(안 B 채택 + 메타 서사 "사장님"
   절)·리액션 톤 3단계를 포함하며, `AIRI_SYSTEM_PROMPT`를 대체하지 않고
-  확장한다. 남은 확정: T-05 후보 청취 검토·인간 검수.
+  확장한다. 남은 확정: 팬덤명 재선정·T-05 후보 청취 검토·인간 검수.
 
 ## 로드맵 — 지도와 현황판 (상태 폴더와 별개 관리)
 
@@ -82,6 +82,8 @@
   TTS에서 Mi:dm/EXAONE 교차 matched text→render A/B(모델별 n=10).
 - `AIRI-T05-KOREAN-SPEAKER-CANDIDATES-2026-08-12.md` — 라이선스 확인 한국어
   화자 후보 3종 샘플(사용자 청취 검토 대기).
+- `AIRI-FANDOM-NAME-COLLISION-CHECK-2026-08-12.md` — “아이리스”의 VTuber·
+  방송인·K-pop·과거 팬클럽 충돌 확인과 공개 사용 FAIL 판정.
 
 - `AIRI-ELECTRON-TEXT-TTS-MEASUREMENT-2026-08-12.md` — Electron 실기
   text→render 실측 (P50 1,963ms / P95 2,720ms) + 스트리밍 WAV 결함 수정.
