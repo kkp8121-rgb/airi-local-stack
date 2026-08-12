@@ -28,7 +28,8 @@ rate를 실제 `AudioContext.sampleRate`로 변환한다. 이 배치는 **source
   `ff71039caa507c5676c2cee31125374c5cc37d35`
 - focused Stage UI: 6 files, 28 tests PASS
 - Stage UI·Stage Tamagotchi typecheck PASS
-- Stage Tamagotchi Electron production build PASS
+- Stage Tamagotchi `electron-vite` production build PASS (outer
+  `electron-builder` packaging은 이 source 구현 배치의 PASS 주장에 포함하지 않음)
 - clean `dbf8124` base에서 layer 1→2→3 apply/reverse PASS, 최종 tree 재계산 일치
 - patch manifest와 checkpoint contract PASS
 
@@ -36,7 +37,10 @@ rate를 실제 `AudioContext.sampleRate`로 변환한다. 이 배치는 **source
 
 현재 설치 `app.asar` SHA-256
 `1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0`는
-변경하지 않았다. 따라서 설치본의 sample-rate 보정, 실제 음성 duration/pitch,
-text→render 지연은 아직 증명되지 않았다. 다음 운영 단계는 AIRI가 정지된 상태에서
-이 source tree로 rebuild·백업·교체한 뒤 32 kHz fixture duration과 text-only 실기
-회귀를 확인하는 것이다. STT·마이크·참조 음성 선택은 이 배치 범위가 아니다.
+변경하지 않았다. 후속 배치에서 이 source tree의 ASAR 후보를 생성·정적 검증했지만
+설치본의 sample-rate 보정, 실제 음성 duration/pitch, text→render 지연은 아직
+증명되지 않았다. 상세 후보 provenance는
+`AIRI-TTS-ASAR-CANDIDATE-BUILD-2026-08-13.md`에 있다. 다음 운영 단계는 명시적
+설치 권한 뒤 AIRI를 정지하고 안전 백업·교체한 다음 32 kHz fixture duration과
+text-only 실기 회귀를 확인하는 것이다. STT·마이크·참조 음성 선택은 이 배치
+범위가 아니다.

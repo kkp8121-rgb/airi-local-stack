@@ -1,0 +1,127 @@
+{
+  "schema": "airi.source-asar-build-provenance.v1",
+  "generated_at": "2026-08-13T06:34:17.3594844+09:00",
+  "tracking_issue": "https://github.com/kkp8121-rgb/airi-local-stack/issues/2",
+  "source": {
+    "checkout": "<source-checkout>",
+    "base_commit": "dbf812488829a61cc2e95909e021b215704d066c",
+    "commit": "bf173f2de870e3f779db02548d691c7b51bb290f",
+    "tree": "ff71039caa507c5676c2cee31125374c5cc37d35",
+    "tracked_clean_after_build": true,
+    "patch_layers": [
+      {
+        "path": "airi_docs/patches/AIRI-v0.11.3-local-runtime-source.patch",
+        "bytes": 414208,
+        "sha256": "2077D440481D64BD08B9A890C318D3CDFABADFE0E1398C28CAF3A3AB8B76CD86"
+      },
+      {
+        "path": "airi_docs/patches/AIRI-v0.11.3-context-correlation-sanitizer.patch",
+        "bytes": 2541,
+        "sha256": "BA38C5F13670DECEEDAB3F0BFE9473AE7FB3BE1DE1A652A26E80E046F572B59E"
+      },
+      {
+        "path": "airi_docs/patches/AIRI-v0.11.3-upgrade-scout-runtime-20260811.patch",
+        "bytes": 130974,
+        "sha256": "CC172A16281E56DC03E6A6F261B5531367711C0393D57E171C932EA8544C5E3E"
+      }
+    ]
+  },
+  "toolchain": {
+    "os": "Windows",
+    "node_observed": "24.14.0",
+    "node_repository_pin": "24.13.0",
+    "pnpm": "10.33.0",
+    "electron": "41.2.1",
+    "electron_vite": "5.0.0",
+    "electron_builder": "26.8.1",
+    "electron_fuses": "1.8.0"
+  },
+  "build": {
+    "source_build": {
+      "command": "corepack pnpm --filter @proj-airi/stage-tamagotchi run build",
+      "passed": true
+    },
+    "packaging": {
+      "command": "corepack pnpm --filter @proj-airi/stage-tamagotchi exec electron-builder --dir",
+      "candidate_asar_created": true,
+      "full_win_unpacked_build_passed": false,
+      "failure_stage": "winCodeSign-2.6.0.7z extraction",
+      "failure_reason": "Windows host could not create macOS dylib symbolic links without the required privilege",
+      "asar_content_affected_by_failure": false
+    }
+  },
+  "candidate": {
+    "path": "<source-checkout>\\apps\\stage-tamagotchi\\dist\\win-unpacked\\resources\\app.asar",
+    "bytes": 1131077260,
+    "sha256": "6767625E9B5C0A01625A6ADA59544480EA4FE4235AAA117A16471A1718C9BCED",
+    "last_write_time_utc": "2026-08-12T21:29:14.8368484Z",
+    "validator_passed": true,
+    "entry_count": 28167,
+    "package": {
+      "name": "ai.moeru.airi",
+      "version": "0.11.3"
+    },
+    "fresh_output_matches": {
+      "out/main/index.js": true,
+      "out/preload/index.mjs": true,
+      "out/renderer/index.html": true,
+      "renderer_pages_bundle": true
+    },
+    "markers": {
+      "PcmStreamResampler": 514526346,
+      "unsupported_fallback_limit": 514525341,
+      "airi-moderation": 1549426,
+      "필터당함": 1105712188,
+      "pcm_ack_write_tail_contract": true
+    }
+  },
+  "unpacked_compatibility": {
+    "candidate_files": 135,
+    "candidate_bytes": 240017777,
+    "installed_files": 135,
+    "installed_bytes": 240017777,
+    "manifest_algorithm": "relative path with forward slashes, TAB, decimal byte size, TAB, uppercase file SHA-256, LF; ordinal path sort; final LF; UTF-8; then SHA-256",
+    "candidate_manifest_sha256": "21CA46DC634D24657B02843DB855B48BDFD246BC36DB1C933A6A2FFEC714079D",
+    "installed_manifest_sha256": "21CA46DC634D24657B02843DB855B48BDFD246BC36DB1C933A6A2FFEC714079D",
+    "all_relative_paths_sizes_and_hashes_equal": true
+  },
+  "executable_compatibility": {
+    "candidate": {
+      "path": "<source-checkout>\\apps\\stage-tamagotchi\\dist\\win-unpacked\\airi.exe",
+      "bytes": 222962176,
+      "sha256": "EB733E8C73DD7C6446AE06F7CBCBE53FB9FF7972F147A489F699860AB054D20C"
+    },
+    "installed": {
+      "path": "<airi-install>\\airi.exe",
+      "bytes": 222966272,
+      "sha256": "99A8EACE7DB05BD6D7CEA9C505FDFD1177ED5DF9D1779B37EEEB0476D06E93DD"
+    },
+    "fuses_equal": true,
+    "enable_embedded_asar_integrity_validation": "Disabled",
+    "only_load_app_from_asar": "Disabled"
+  },
+  "installed_baseline": {
+    "path": "<airi-install>\\resources\\app.asar",
+    "bytes": 1356257019,
+    "sha256": "1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0",
+    "last_write_time_utc": "2026-08-12T10:53:17.4777676Z",
+    "read_only_validation_passed": true,
+    "modified_by_this_batch": false
+  },
+  "deployment_gate": {
+    "asar_candidate_validated": true,
+    "full_portable_distribution_validated": false,
+    "install_performed": false,
+    "runtime_tts_duration_pitch_verified": false,
+    "requires_explicit_installed_app_authorization": true,
+    "install_dir": "<airi-install>",
+    "expected_artifact_sha256": "6767625E9B5C0A01625A6ADA59544480EA4FE4235AAA117A16471A1718C9BCED",
+    "expected_current_sha256": "1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0"
+  },
+  "known_risks": [
+    "The candidate app.asar is 225179759 bytes smaller than the installed archive; critical payload and unpacked compatibility checks pass, but runtime behavior is not yet proven.",
+    "The active Node version is one patch release newer than the repository pin, so byte-for-byte rebuild reproducibility is not claimed.",
+    "The generated win-unpacked tree is not a validated portable distribution: outer packaging failed and the configured Godot extraResources source was absent.",
+    "An app.asar does not embed the Git commit; this sidecar binds its digest to the audited source commit and tree."
+  ]
+}

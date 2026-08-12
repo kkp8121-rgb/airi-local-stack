@@ -99,8 +99,9 @@
   (`완료/AIRI-ELECTRON-TEXT-TTS-MEASUREMENT-2026-08-12.md`), 실제 마이크
   음성 전체 체인은 미실측. TTS progressive chunk 재생은 이미 설치본에서 증명됐고,
   32 kHz source→AudioContext output-rate 보정과 lossless bounded backpressure도
-  source 구현·빌드 검증을 완료했다. 남은 활성 목표는 이 새 source의 설치본
-  rebuild·백업·채택 및 실제 duration/pitch·text→render 회귀다.
+  source 구현·빌드 검증을 완료했다. 고정 source의 설치 후보 ASAR 생성과
+  digest·구조·unpacked 호환성 검증도 완료했다. 남은 활성 목표는 issue #2의
+  명시적 설치 권한 뒤 안전 백업·채택 및 실제 duration/pitch·text→render 회귀다.
 - [x] matched Electron 모델 A/B — 같은 설치 ASAR·TTS warm, 교차 블록
   모델별 n=10. Mi:dm first substantive render P50/P95 1,501.5/2,597.2ms,
   EXAONE 1,752.5/3,233.0ms — 2026-08-12
@@ -152,6 +153,17 @@
 ---
 
 ## 갱신 로그 (최신이 위)
+
+- **2026-08-13** (TTS source ASAR candidate): 고정 source `bf173f2` / tree
+  `ff71039c`에서 1,131,077,260-byte 후보 ASAR를 생성했다. SHA-256
+  `6767625E...9BCED`, package 0.11.3, 28,167 entries와 critical payload를
+  검증했고, 후보/설치본의 135-file unpacked path·size·hash가 모두 일치한다.
+  candidate/installed executable의 ASAR 관련 fuse도 동일·disabled다. outer
+  electron-builder는 후보 생성 뒤 winCodeSign symlink 권한에서 실패했으므로 full
+  portable build PASS를 주장하지 않는다. 설치본은 `1B68AE...B0`로 그대로이며
+  install/runtime duration/pitch는 issue #2 승인 게이트 뒤 남는다. 상세:
+  `완료/AIRI-TTS-ASAR-CANDIDATE-BUILD-2026-08-13.md` 및
+  `evidence/AIRI-TTS-ASAR-CANDIDATE-BUILD-2026-08-13.json`.
 
 - **2026-08-13** (source ASAR deployment safety): source-built-ASAR install,
   automatic rollback, and explicit restore scripts completed their synthetic
