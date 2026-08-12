@@ -51,7 +51,11 @@ blob** 기준이다. 원래 runtime CRLF 파일과 JSON 의미는 같다.
 
 ## 다음 후보와 provenance 경계
 
-Kanana-2-3B는 한국어 후보 중 유망하지만 실행은 보류한다. Kakao 공식 배포는
+아래 내용은 **2026-08-12 측정 종료 당시의 경계**다. 2026-08-13에는 공식
+원본 직접 변환과 격리 CPU smoke까지 완료했지만 품질 FAIL했다. 현행 판정은
+`완료/AIRI-KANANA-EXTRACTION-CANDIDATE-GATE-2026-08-13.md`를 따른다.
+
+당시 Kanana-2-3B는 한국어 후보 중 유망하지만 실행을 보류했다. Kakao 공식 배포는
 BF16 Safetensors만 제공한다. Ollama 호환 GGUF는 제3자 산출물이므로, 공식 원본의
 직접 변환 provenance 및 Kanana Open License의 broadcast/attribution 검토가 먼저
 필요하다. 제3자 pull CLI는 의도적으로 중단했지만 Ollama 서비스가 백그라운드에서

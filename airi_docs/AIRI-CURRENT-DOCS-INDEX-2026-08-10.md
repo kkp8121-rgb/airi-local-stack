@@ -30,8 +30,9 @@
   exact는 EXAONE 3/12, Mi:dm 0/12로 양 모델 FAIL이다. **남은 게이트**:
   인간 검수 100건과 장문 회귀 개선.
 - `AIRI-DEV-PC-HANDOFF-2026-08-12.md` — **검토 PC 선행 작업 배치의
-  인수인계.** SSoT·I1 실측 및 B3 배선 3종은 완료; B0-1과 사람·자격증명
-  게이트 등 잔여 dev PC 작업을 관리한다.
+  인수인계.** SSoT·I1 후보 실측 및 B3 배선 3종은 완료했지만 extraction은
+  통과 후보 부재로 off다. B0-1, 활성 추출 MEM-04, 사람·자격증명 게이트 등
+  잔여 dev PC 작업을 관리한다.
 - `AIRI-CLOUD-CHAT-LATENCY-MEASUREMENT-2026-08-12.md` — cloud streaming
   latency 하네스·테스트와 live TTFT 보류(API key·외부 승인) 현황.
 - `AIRI-LOCAL-TECH-SPECS.md` — 현행 스펙 문서. 2026-08-12 갱신 완료
@@ -72,10 +73,14 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-KANANA-EXTRACTION-CANDIDATE-GATE-2026-08-13.md` — Kakao 공식
+  Kanana-2-3B commit/shard 기반 프로젝트 자체 Q4_K_M 변환 provenance와
+  11436 격리 CPU smoke FAIL 증적. full은 생략했고 extraction은 off이며,
+  공개 방송 라이선스는 법률/Kakao 확인 전 미승인이다.
 - `AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md` — 11436 격리 CPU의
   Qwen3.5·Granite 4.0 smoke FAIL 및 Gemma3 smoke PASS/full 7-row FAIL 고정
-  증적. 독립 verifier 거부로 extraction은 off이며, Kanana-2-3B는 공식 변환
-  provenance·라이선스 검토 전 미시험이다.
+  증적. 문서의 Kanana 미시험 경계는 당시 기록이며 2026-08-13 후속 문서로
+  대체됐다.
 - `AIRI-LONG-CONTEXT-MEMORY-CARD-AB-2026-08-12.md` — `num_ctx=2048`의
   활성 card·초기 화자·최신 부정 정정·tail memory를 EXAONE/Mi:dm 각
   4압력×3회 비교한 실측과 양 모델 FAIL 판정.
@@ -163,15 +168,15 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 전송, 원시 ID·대화 노출, default-render 신호를 물리 음압·자연 재생 종료로
 확대 해석하는 것은 금지한다.
 
-## 최신 검증 증거 (2026-08-12)
+## 최신 검증 증거 (2026-08-13)
 
 - `완료/AIRI-STT-OFF-BROADCAST-PROFILE-2026-08-12.md` — 기본 방송 프로파일
   chat/text 입력 + STT OFF, Electron 마이크 OFF 결정 및 런처 OFF 실기 기록.
   `-Stt on`/`AIRI_STT=on`은 명시적 opt-in이며, GPU 1044 MiB는 동시 무관 작업이
   있는 paired observation으로 formal clean B0 capacity proof가 아니다.
 
-- 통합 Python: 825 passed / 1 skipped / 706 subtests (현재 tip의 CI
-  `python-core-tests` matrix 41개 추적 경로를 dev PC에서 재실측,
+- 통합 Python: **829 passed / 1 skipped / 706 subtests** (`aef5300`의 CI
+  `python-core-tests` matrix 41개 추적 경로를 Python 3.12 dev PC에서 재실측,
   SSoT·I1 게이트·MEM-04·B3 모더레이션·cloud latency 하네스 포함).
 - `node --test test-send-airi-local-text.mjs`: 27/27.
 - `test-current-checkpoint.ps1`: PASS(기본 실행의 applicability는 의도적

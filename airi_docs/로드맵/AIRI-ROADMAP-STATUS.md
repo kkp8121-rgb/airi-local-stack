@@ -42,15 +42,20 @@
   - [x] 저장·검색·저널 회상 운영 — 2026-08-09 라이브 스모크, KURE fp16 2026-08-11
   - [x] 추출 승격 루프 코드 + 게이트 프로파일 strict/balanced — 2026-08-12 (`932eae6`)
   - [x] MEM-04 SQLite WAL·busy_timeout — 2026-08-12 (`932eae6`)
-  - [~] 게이트 리포트 생산 → 추출 발효 (Mi:dm balanced, Qwen3.5·Granite 4.0
-    smoke, Gemma3 full 모두 FAIL; 독립 verifier 거부, 추출 off 유지 — 통과 후보 모델
-    미확정, `완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`)
+  - [~] 게이트 리포트 생산 → 추출 발효 (Mi:dm balanced, Qwen3.5·Granite 4.0·
+    Kanana smoke, Gemma3 full 모두 FAIL; 독립 verifier 거부, 추출 off 유지 — 통과
+    후보 미확정, `완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`,
+    `완료/AIRI-KANANA-EXTRACTION-CANDIDATE-GATE-2026-08-13.md`)
+  - [ ] MEM-04 활성 추출 락 경합 실측 (코드 완료; 통과 extractor와
+    `extraction_enabled=true` 이후 Stage B commit↔foreground 겹침 증거 필요)
   - [ ] I2 시청자 기억 시스템 (M2)
 - [~] **G3. 평가·데이터 플라이휠**
   - [x] 오프라인 eval 하네스·120턴 A/B — 2026-08-12 (`진행중/AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md`)
   - [x] 장문 context·memory·card 합성 A/B 실측 — EXAONE exact 3/12,
     Mi:dm 0/12로 양 모델 FAIL — 2026-08-12
     (`완료/AIRI-LONG-CONTEXT-MEMORY-CARD-AB-2026-08-12.md`)
+  - [ ] 장문 context budget·card/정정 표현 개선 후 고정 4압력×3회 회귀
+    (측정 구현은 완료, 품질 gate는 FAIL)
   - [x] eval provenance 해소 (수집 데이터를 승격 근거로 사용 가능) — 2026-08-12 (`932eae6`)
   - [ ] 인간 검수 100건 수집 (dev PC)
   - [ ] 16케이스 자동 게이트 PASS (현재 양 모델 FAIL)
@@ -129,6 +134,21 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-13** (dev PC, I1 Kanana 공식 원본 후보): Kakao 공식 commit
+  `6a5d7889964c4c590299d16e309eabab1f73f8a9`의 BF16 shard 해시를 검증하고,
+  llama.cpp `b10375` 고정 source/tool로 프로젝트 자체 BF16→Q4_K_M GGUF를
+  생성하고 manifest→model blob 해시까지 고정했다. 격리
+  11436 CPU의 `kanana-airi-extraction:3b-q4_k_m` smoke는 schema/connectivity
+  PASS지만 recall 0, coverage 0, unexpected 1, op/alias 0, total 24,715.938 ms로
+  fail-fast FAIL해 full을 생략했다. extraction은 off, MEM-04 활성 추출 실측은
+  계속 대기한다. 상세:
+  `완료/AIRI-KANANA-EXTRACTION-CANDIDATE-GATE-2026-08-13.md`.
+  공개 방송은 Kanana License §2.2/§3.1/§4.1/§4.2의 법률/Kakao 확인 전
+  미승격이며 표시·Notice만으로 충분하다고 보지 않는다.
+  같은 배치에서 `aef5300`의 CI 41경로를 Python 3.12 고정 환경으로 재실행해
+  **829 passed / 1 skipped / 706 subtests**를 확인했고 checkpoint·Node 27/27·
+  patch manifest도 PASS했다.
+
 - **2026-08-12** (dev PC, 사용자 결정): 기본 방송 프로파일을 chat/text 입력 +
   STT OFF로 고정했고 Electron 마이크 토글도 OFF로 둔다. `-Stt off` 런처 재실행은
   `STTMode=off`, `STT=disabled`, 빈 STT model/device, `8890` 부재와
@@ -137,15 +157,16 @@
   (관측 차이 1044 MiB)였으나, 동시 무관 GPU 작업이 있어 formal clean B0 capacity
   proof는 아니다. 상세: `완료/AIRI-STT-OFF-BROADCAST-PROFILE-2026-08-12.md`.
 
-- **2026-08-12** (dev PC, I1 신규 후보): 11436 격리 CPU에서 Qwen3.5 4B
+- **2026-08-12** (dev PC, I1 신규 후보, 당시 상태): 11436 격리 CPU에서 Qwen3.5 4B
   Q4_K_M과 Granite 4.0 3B smoke는 첫 행 fail-fast FAIL, Gemma3 4B는 smoke
   PASS 뒤 full 7-row balanced FAIL(독립 verifier 거부)했다. 셋 다 설치된 로컬
-  후보일 뿐 운영 모델이 아니며 extraction은 off다. Kanana-2-3B는 공식 BF16 원본 직접 변환
+  후보일 뿐 운영 모델이 아니며 extraction은 off다. 당시 Kanana-2-3B는 공식 BF16 원본 직접 변환
   provenance 및 Kanana Open License broadcast/attribution 검토 전 보류했고,
   제3자 pull CLI 중단 뒤 설치가 완료된 tag도 load·측정하지 않았다. 상태값은 변하지 않는다.
-- **2026-08-12** (dev PC): 현재 tip의 CI `python-core-tests` matrix 41개
+- **2026-08-12** (dev PC): 당시 tip의 CI `python-core-tests` matrix 41개
   추적 경로를 같은 `requirements-ci.txt` 환경에서 재실행해
-  **825 passed / 1 skipped / 706 subtests**를 확인했다. 기억 기술 레퍼런스의
+  **825 passed / 1 skipped / 706 subtests**를 확인했다(2026-08-13 `aef5300`
+  재검증은 829/1/706). 기억 기술 레퍼런스의
   “Mi:dm 추출 미측정”을 실측 balanced FAIL로 고치고, C1 사용자 방향 결정과
   헌법 최종 인간 승인을 분리했다. 로드맵 상태값은 변하지 않는다.
 - **2026-08-12** (dev PC): 공개 합성 장문 context·memory·card 하네스를

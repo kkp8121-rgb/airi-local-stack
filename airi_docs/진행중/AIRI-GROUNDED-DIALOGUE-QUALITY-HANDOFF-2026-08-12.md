@@ -86,8 +86,8 @@ Final recorded results:
 - `test-current-checkpoint.ps1`: PASS; the explicitly offline applicability
   step remained an expected SKIP
 - Python suite: 733 passed, 1 skipped, 504 subtests passed in 36.62 seconds.
-  Later work grew the CI-tracked suite. The current 2026-08-12 tip reports
-  **825 passed / 1 skipped / 706 subtests only for the current-tip CI
+  Later work grew the CI-tracked suite. The 2026-08-13 `aef5300` verification reports
+  **829 passed / 1 skipped / 706 subtests only for that tip's CI
   `python-core-tests` matrix's 41 tracked paths**; superseded intermediate
   totals are not current acceptance evidence.
 - `git diff --check`: PASS

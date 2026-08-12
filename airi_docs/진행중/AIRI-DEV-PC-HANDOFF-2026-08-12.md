@@ -4,9 +4,10 @@
 이 문서는 그 결과와, **dev PC에서만 가능한 잔여 검증·후속 작업**의 전체
 목록이다. 착수 전 이 문서와 아래 근거 문서를 정독하라.
 
-- 완료 커밋: `7dc4e76`(문서), `932eae6`(코드) — 기반 `294c4e6`
-- 오프라인 검증: **현재 tip CI `python-core-tests` matrix의 41개 추적 경로만**
-  **825 passed / 1 skipped / 706 subtests**
+- 현행 완료 tip: `aef5300`(STT OFF 방송 프로필; 기반 배치
+  `7dc4e76` 문서, `932eae6` 코드)
+- 오프라인 검증: **`aef5300`의 CI `python-core-tests` matrix 41개 추적 경로**
+  **829 passed / 1 skipped / 706 subtests**
   (기준 733/1/504), `test-patch-manifest.ps1` PASS, 소스·문서
   `git diff --check` 클린(생성된 runtime patch 내부 source whitespace 제외)
 - 계획 근거: `진행예정/AIRI-BROADCAST-CHARACTER-PLAN-2026-08-12.md` (M1
@@ -20,7 +21,7 @@
 |---|---|---|
 | 모델 SSoT | `resolve_chat_model()` 단일화, Electron 정규화, foreground 단일 runner, 롤백·eval provenance, digest pin | **dev PC 실기 PASS**, Mi:dm 실측 digest 기본 pin 반영 (`완료/AIRI-DEV-PC-SSOT-VERIFICATION-2026-08-12.md`) |
 | 장문 모델 A/B | `num_ctx=2048`의 card·초기 화자·최신 부정 정정·tail memory 합성 비교 | **실측 완료, 양 모델 FAIL**. EXAONE exact 3/12, Mi:dm 0/12; Mi:dm 20 filler쌍에서 token 포화 (`완료/AIRI-LONG-CONTEXT-MEMORY-CARD-AB-2026-08-12.md`) |
-| I1 기억 추출 | 게이트 리포트 자동 해석 → 검증 PASS 때만 추출 ON(fail-closed), 게이트 프로파일 strict/balanced | Mi:dm·Qwen3.5 smoke·Gemma full·Granite 4.0 smoke 모두 FAIL, 추출 off 유지 (`완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`) |
+| I1 기억 추출 | 게이트 리포트 자동 해석 → 검증 PASS 때만 추출 ON(fail-closed), 게이트 프로파일 strict/balanced | Mi:dm·Qwen3.5·Granite 4.0·Kanana smoke 및 Gemma full 모두 FAIL, 추출 off 유지 (`완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`, `완료/AIRI-KANANA-EXTRACTION-CANDIDATE-GATE-2026-08-13.md`) |
 | MEM-04 | SQLite WAL + busy_timeout=5000ms (당초 500ms → 저하된 CI runner에서 락 실패 재발해 sqlite3 기본 예산 복원) | 완료, 활성화 후 락 경합 실측만 남음 |
 | B3 모더레이션 | 한국어 금칙어 사전·SSE 문장 게이트·캐릭터 폴백 대사(C3) | **3종 배선·신규 3층 source test/typecheck/build·설치본 "필터당함" 배지 실기 완료** (`완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`) |
 | C1 헌법 | 캐릭터 헌법 초안 (`진행예정/AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md`) | 관계·인사·클로징 반영. 정식 팬덤명 유보·일반 호칭 “시청자들” 확정. T-05 126번 예비 후보 보존·현행 음성 유지. 인간 검수 대기 |
@@ -63,6 +64,15 @@ connectivity 0.8571428571, coverage 0.7142857143으로 FAIL했고 독립 verifie
 거부했다. 마지막 공식 후보 `granite4:3b`도 smoke에서 schema/connectivity/coverage는
 통과했지만 recall 0/alias 0으로 20,067.440 ms에 fail-fast FAIL했다. 상세 증적은
 `완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`다.
+2026-08-13에는 Kanana 공식 commit
+`6a5d7889964c4c590299d16e309eabab1f73f8a9`의 BF16 shard를 직접 검증하고,
+llama.cpp `b10375`로 Q4_K_M을 생성했다. Ollama tag
+`kanana-airi-extraction:3b-q4_k_m` digest
+`4a1d0b3322b50ffe5b16990129ab14f46abe1835e9b871e2b42a5ed144f65b9a`의
+`persistent_trait` smoke도 schema/connectivity는 통과했지만 recall 0,
+coverage 0, unexpected 1, op/alias 0, total 24,715.938 ms로 fail-fast FAIL했다.
+full은 생략했다. 상세는
+`완료/AIRI-KANANA-EXTRACTION-CANDIDATE-GATE-2026-08-13.md`다.
 Mi:dm은 11436 격리 CPU 서버의 balanced 7 fixtures에서
 구조 schema는 1.0이었지만 critical recall 0.2619, Stage B coverage 0.4286,
 op alias accuracy 0.1429로 불합격했다. total latency P50/P95는
@@ -73,10 +83,11 @@ op alias accuracy 0.1429로 불합격했다. total latency P50/P95는
 추출 자동 ON은 **게이트 리포트가 존재하고 검증을 통과할 때만** 발효된다.
 현재 모든 candidate report가 FAIL이며, `/health`도 `extraction_enabled=false`,
 `extraction_ready=false`, external extraction=false다. 다음 통과 후보 선정·재측정이
-필요하다. Kanana-2-3B는 유망한 한국어 후보이나 공식 BF16 Safetensors의 직접 변환
-provenance와 Kanana Open License broadcast/attribution 검토 전에는 실행하지 않는다.
-제3자 GGUF pull CLI는 중단했지만 Ollama 서비스가 tag 설치를 마쳤다. 다만 해당
-tag는 load·측정하지 않았으며 공식 변환/라이선스 전에는 사용하지 않는다.
+필요하다. Kanana 공식 원본 기반 자체 변환 provenance와 로컬 smoke는 완료했지만
+품질 FAIL이다. 공개·수익 방송의 Kanana Open License §4.1/4.2 분류는 법률 검토
+또는 Kakao 서면 확인 전 미승인이고, §2.2·§3.1 준수도 별도다. 표시·Notice만으로
+충분하다고 해석하지 않는다. 제3자 Q8_0 tag는 load·측정하지 않았고 운영 근거로
+쓰지 않는다.
 
 ```powershell
 # 11436 격리 Ollama 서버 필요 (기존 절차)
@@ -91,6 +102,10 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
   2B·60메시지 배치가 초과하면 전용 타임아웃 분리 필요), 활성 상태
   SQLite 락 경합(MEM-04 재평가), 실제 대화→다음 세션 콜백 스모크
   (`eval/proxy_memory_smoke.py` 확장).
+- **MEM-04 잔여 경계:** WAL·busy_timeout 코드는 완료됐지만 통과 extractor가
+  없어 `extraction_enabled=true`의 실제 Stage B commit과 foreground
+  append/retrieve를 겹치는 락 경합 실측은 아직 닫을 수 없다. 합성 store-level
+  시험은 조기 위험 자료일 뿐 이 활성화 후 실측을 대체하지 않는다.
 
 ## 4. dev PC 필수 작업 — B3 배선 3종
 
