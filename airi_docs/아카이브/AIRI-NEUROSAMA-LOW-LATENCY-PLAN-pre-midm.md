@@ -1,11 +1,11 @@
+> 2026-08-12 모델 중립 개정 전 원본 보존본 — 현재 상태 검증에 사용 금지
+
 # AIRI 저지연 한국어 AI 버튜버 개발 계획 (v2.1)
 
 - 작성 기준일: 2026-08-06 (v2 코드 실측 반영 → v2.1 후보 D·기억 계층 추가)
-- 개정일: 2026-08-12 — 모델 중립 개정. 로컬 LLM을 EXAONE 고유명으로 고정하던 표기를 현행 SSoT 모델 참조로 치환했다(지연 예산 산술·Phase 정의·게이트 구조는 원문 유지). 개정 전 원본은 `아카이브/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-pre-midm.md`에 보존돼 있다.
-- 기반 LLM 표기 원칙: 로컬 LLM은 프록시 `resolve_chat_model()`(env `AIRI_CHAT_MODEL`)이 결정하는 **현행 SSoT 모델**로 참조한다 — 2026-08-12 기준 `midm-airi:2.0-mini`, 롤백 태그 `exaone-airi:2.4b`.
 - 프로젝트 위치: `C:\Projects\airi`
 - 기반 문서: `AIRI-LOCAL-TECH-SPECS.md`, `AIRI-CODE-AUDIT-2026-08-06.md`(AIRI 본체 실측), **`AIRI-RAG-REPOS-AUDIT-2026-08-06.md`**(RAG 레포 3종 실측 — 기억 계층 설계 결정표 §4)
-- 이전 판: `AIRI-NEUROSAMA-LOW-LATENCY-PLAN-v1-2026-08-06.md`, `AIRI-NEUROSAMA-LOW-LATENCY-PLAN-v2-2026-08-06.md` (이 레포에는 미보관 — `C:\Projects\airi` 레포의 `archive/`에 있음)
+- 이전 판: `archive/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-v1-2026-08-06.md`, `archive/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-v2-2026-08-06.md`
 - 목표 플랫폼: Windows 단일 PC (Ryzen 5 5600X / RTX 3060 Ti 8GB)
 - 기준 애플리케이션: AIRI 0.11.3 (소스: `external/airi`, v0.11.3 태그 = 설치본 동일)
 
@@ -76,7 +76,7 @@
 
 ### 파이프라인과 하드웨어
 
-v1과 동일 (스펙 문서 참조): 마이크 → VAD → faster-whisper small(CPU INT8) → Ollama/로컬 LLM(Q4, num_gpu=20) → Chatterbox(GPU) → Web Audio/Live2D. RTX 3060 Ti 8GB, Ryzen 5 5600X. 이 기준선은 2026-08-06 시점이며 당시 로컬 LLM은 `exaone-airi:2.4b`였다 — 현행 구성은 `진행중/AIRI-LOCAL-TECH-SPECS.md` 참조.
+v1과 동일 (스펙 문서 참조): 마이크 → VAD → faster-whisper small(CPU INT8) → Ollama/EXAONE 2.4b(Q4, num_gpu=20) → Chatterbox(GPU) → Web Audio/Live2D. RTX 3060 Ti 8GB, Ryzen 5 5600X.
 
 ### AIRI v0.11.3 내부 구현 현황 (코드 실측 — 감사 문서 §1)
 
@@ -318,7 +318,7 @@ v1의 "취소 배선"에서 **"half-duplex 구조 해체"로 재정의**한다. 
 
 작업: v1 실험 항목 유지 (num_gpu 스윕, LLM CPU 비중, 모델 상시 로드, 참조 임베딩 캐시) + v2 추가:
 
-- **VRAM 예산표 작성** (실측 기입): 현행 SSoT 모델 Q4 num_gpu별 / GPT-SoVITS v2ProPlus fp16 / Electron·Live2D 렌더링 / 여유분 — 합계 8GB 이내 검증
+- **VRAM 예산표 작성** (실측 기입): EXAONE Q4 num_gpu별 / GPT-SoVITS v2ProPlus fp16 / Electron·Live2D 렌더링 / 여유분 — 합계 8GB 이내 검증
 - **CPU 코어 배분표**: STT(현행 6 threads) + LLM CPU 레이어 + (후보 B 시) MOSS TTS의 동시 실행 경합 측정 — 6코어 12스레드 내 배분
 - GPT-SoVITS는 fp16 자동(sm 8.6) 확인됨 — 추가로 RVC 채택 시 `RVC_CUDA_GRAPH=1` 실험
 
@@ -337,7 +337,7 @@ v1의 "취소 배선"에서 **"half-duplex 구조 해체"로 재정의**한다. 
 
 **M0. 게이트 벤치 (셋 다 통과해야 M1 진행)**
 
-1. **추출 품질**: 로컬 SSoT 모델로 Stage A/B 추출(기술 레퍼런스 §1 프롬프트, JSON schema 강제) 실측 — 클라우드 mini급과 품질 비교. *주의: talkain·rag_rnd 모두 소형 모델 추출은 미검증 — 실패한 가정의 재검증이다.* 미달 시 추출만 클라우드 mini급 폴백(비실시간·배치라 저비용).
+1. **추출 품질**: 로컬 EXAONE 2.4b로 Stage A/B 추출(기술 레퍼런스 §1 프롬프트, JSON schema 강제) 실측 — 클라우드 mini급과 품질 비교. *주의: talkain·rag_rnd 모두 소형 모델 추출은 미검증 — 실패한 가정의 재검증이다.* 미달 시 추출만 클라우드 mini급 폴백(비실시간·배치라 저비용).
 2. **임베딩**: KURE-v1 vs BGE-M3 한국어 대화 검색 정확도 + 지연 (RTX 3060 Ti, 목표 ≤80ms). API 임베딩 금지(200~400ms 실측 — 예산 초과).
 3. **클라우드 TTFT**: Haiku급 스트리밍 첫 토큰 실측 (프록시 경유, 상주 프로세스+직접 API — CLI 경유는 TTFT 2s+ 실측으로 금지).
 
@@ -347,7 +347,7 @@ v1의 "취소 배선"에서 **"half-duplex 구조 해체"로 재정의**한다. 
 - **워터마크 히스토리 절삭**: `extracted_up_to_msg` 이하 raw 턴 제거 → 메모리 블록 대체, 인트로 보존, 추출 지연 시 last-N cap으로 degrade (요약 LLM 0회)
 - 프롬프트 조립: 정적 블록(가이드라인·페르소나) 선두 고정 + `cache_control`(prompt caching), 변동 블록(기억·최근 턴)은 뒤에
 - fail-soft 3원칙: 임베딩 실패 행만 제외, 검색 실패 시 빈 블록, 파싱 실패 시 워터마크 미갱신→자연 재시도 — **기억이 발화를 절대 막지 않는다**
-- 로컬 LLM 폴백 (현행 SSoT 모델 — 클라우드 장애 시)
+- 로컬 EXAONE 폴백 (클라우드 장애 시)
 
 **M2. 기억 파이프라인**
 
@@ -373,7 +373,7 @@ v1의 "취소 배선"에서 **"half-duplex 구조 해체"로 재정의**한다. 
 1. M1 요건 추가 — 프록시는 API 서버와 **keep-alive 커넥션 풀(HTTP/2) 상시 유지** (턴당 TLS 핸드셰이크 100~300ms 제거)
 2. M1 요건 추가 — **캐시 워밍**: 연속 대화는 직전 턴이 캐시를 데워두므로(TTL 5분) 별도 조치 불요. 방송 시작 직후·5분+ 휴지 후에만 `max_tokens=0` 프리워밍 요청으로 첫 턴 prefill 선지불
 3. M0 게이트 ③ 확장 — **리전 비교**: Bedrock 서울(ap-northeast-2)에 대상 모델 가용 여부 확인 필요 → 가용 시 "Anthropic 직접 vs Bedrock 서울" TTFT 비교 축 추가
-4. M3 선택 항목 승격 — **로컬 반사 응답**: 고정 대기 멘트 대신 상주 로컬 LLM이 300ms 내 맥락 리액션(짧은 감탄·응수)을 먼저 발화하고 클라우드 본답변이 이어받는 2단 구조. 체감 첫 반응 1초 미만 고정이 목표
+4. M3 선택 항목 승격 — **로컬 반사 응답**: 고정 대기 멘트 대신 상주 EXAONE이 300ms 내 맥락 리액션(짧은 감탄·응수)을 먼저 발화하고 클라우드 본답변이 이어받는 2단 구조. 체감 첫 반응 1초 미만 고정이 목표
 
 도입 후 R&D 백로그 (효과 크나 복잡도·리스크 높음 — 파이프라인 안정화 후):
 
@@ -443,7 +443,7 @@ MOSS 게이트(한국어 TN 우회 품질 + Ryzen RTF<1 + Windows 설치) 통과
 - 종단(T0→첫 음절) P50이 후보 A 대비 동등 이하 — STT GPU화 이득 ≥ LLM 네트워크·TTFT 증가분
 - 월 예상 API 비용이 허용 한도 내 (캐싱 적용 후 실사용량 기준 — Haiku급 추정 턴당 3~5원, 실측 확정)
 - 대화 텍스트의 외부 전송을 사용자가 명시 승인 (§12 개정 조항)
-- 클라우드 장애 시 로컬 LLM 폴백 동작 확인 (방송 중 무중단)
+- 클라우드 장애 시 로컬 EXAONE 폴백 동작 확인 (방송 중 무중단)
 
 ## 11. 예상 최종 구성 후보
 
@@ -451,7 +451,7 @@ MOSS 게이트(한국어 TN 우회 품질 + Ryzen RTF<1 + Windows 설치) 통과
 
 ```text
 Silero VAD [기존] → 부분 faster-whisper [기존 경로 배선]
-→ 로컬 LLM 스트리밍 (현행 SSoT 모델) [기존] → tts-chunker [기존]
+→ EXAONE 2.4b 스트리밍 [기존] → tts-chunker [기존]
 → GPT-SoVITS v2ProPlus GPU (streaming_mode=2) [신규]
 → Web Audio / Live2D [기존]
 ```
@@ -475,10 +475,10 @@ Silero VAD [기존] → 부분 faster-whisper [기존 경로 배선]
 Silero VAD [기존]
 → faster-whisper GPU (일괄, 부분 전사 불요 기대) [개조 — 서버 설정]
 → 메모리 프록시 127.0.0.1 (기억 검색·워터마크 절삭·캐싱·폴백) [신규 — 트랙 M]
-→ 클라우드 LLM 스트리밍 (Haiku급, prompt caching, 로컬 LLM 폴백) [신규]
+→ 클라우드 LLM 스트리밍 (Haiku급, prompt caching, 로컬 EXAONE 폴백) [신규]
 → tts-chunker [기존] → GPT-SoVITS v2ProPlus (8GB VRAM 전유) [신규]
 → Web Audio / Live2D [기존]
-＋ 백그라운드: 기억 추출 (로컬 SSoT 모델 — M0 게이트 통과 시, 미달 시 클라우드 mini급)
+＋ 백그라운드: 기억 추출 (EXAONE — M0 게이트 통과 시, 미달 시 클라우드 mini급)
 ```
 
 초기 권장안은 후보 A. RVC(후보 C)는 §10 조건 전부 통과 시만. **후보 D는 트랙 M을 병행 진행해 §10 게이트에서 후보 A와 실측 대결로 결정**한다 — 채택 시 응답 품질(기억·캐릭터성)과 STT 지연에서 이득, LLM 구간과 프라이버시에서 트레이드오프.
@@ -508,7 +508,7 @@ Silero VAD [기존]
 6. 채택 확정 시 Phase 2(취소 3개소) 착수 — LLM abort 주입이 가장 저비용·고효과
 7. ~~Chatterbox 8초의 TTFA/총시간 분리 측정~~ → **해소됨** (스트리밍 없음 = TTFA≈총시간, 코드 확인)
 8. ~~AIRI가 전체 WAV를 기다리는지 확인~~ → **해소됨** (전체 ArrayBuffer 수신 후 재생, 코드 확인)
-9. **[트랙 M — 병행 가능] M0 게이트 벤치 착수** — 로컬 SSoT 모델 Stage A/B 추출 품질, KURE-v1/BGE-M3 임베딩 지연, 클라우드 TTFT (기술 레퍼런스 §1·§2의 프롬프트·공식으로 즉시 실행 가능)
+9. **[트랙 M — 병행 가능] M0 게이트 벤치 착수** — EXAONE Stage A/B 추출 품질, KURE-v1/BGE-M3 임베딩 지연, 클라우드 TTFT (기술 레퍼런스 §1·§2의 프롬프트·공식으로 즉시 실행 가능)
 10. **[트랙 M] LLM GPU 철수 상태에서 faster-whisper CUDA 실측** — 후보 D의 STT 이득 크기를 조기 확인 (Phase 3 GPU 우선 실험과 동일 항목)
 
 ## 14. 개발 우선순위 요약

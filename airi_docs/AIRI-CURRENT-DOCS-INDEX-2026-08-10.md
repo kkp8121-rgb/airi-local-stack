@@ -49,14 +49,19 @@
 - `AIRI-ROADMAP-STATUS.md` — **살아있는 현황판.** G0~G6·C0~C5·지연·M1~M5
   전 축의 상태와 근거, 사용자 결정 차단 지점, 배치별 갱신 로그.
   **매 작업 배치 커밋마다 갱신 의무** (검토 PC·dev PC 공통).
-- `AIRI-EXAONE-GROWTH-STRATEGY-2026-08-07.md` — **사용자 승인 방향.**
+- `AIRI-GROWTH-STRATEGY.md` — **사용자 승인 방향.**
   G0~G6 성장 로드맵 정의 (G1 캐릭터 루프 → G2 장기 기억 → G3 평가
   플라이휠 → G4 파인튜닝 → G5 자발 행동·방송 디렉터 → G6 게임 에이전트).
-- `AIRI-EXAONE-MODEL-CUSTOMIZATION-PLAN-2026-08-07.md` — C0~C5 모델
-  커스터마이징 게이트 정의. (모델이 Mi:dm으로 바뀌어도 게이트 구조는 유효)
+  (옛 이름 `AIRI-EXAONE-GROWTH-STRATEGY-2026-08-07.md` — 2026-08-12 모델
+  중립 개정으로 개명. 개정 전 원본은 `아카이브/`에 옛 이름으로 보존.)
+- `AIRI-MODEL-CUSTOMIZATION-PLAN.md` — C0~C5 모델 커스터마이징 게이트 정의.
+  (옛 이름 `AIRI-EXAONE-MODEL-CUSTOMIZATION-PLAN-2026-08-07.md` — 2026-08-12
+  모델 중립 개정으로 개명. 모델이 Mi:dm으로 바뀌어도 게이트 구조는 유효)
 - `AIRI-NEUROSAMA-LOW-LATENCY-PLAN.md` (v2.1) — 지연 마스터 계획. §6 지연
   예산·§12 완료 기준은 실측 후 재정의 제안(첫 반응 ≤1.5s / 본답변
-  ≤2.5s)과 공존 중 — 공식 개정은 사용자 결정 사항.
+  ≤2.5s)과 공존 중 — 공식 개정은 사용자 결정 사항. 2026-08-12 모델 중립
+  개정(파일명 유지), 개정 전 원본은
+  `아카이브/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-pre-midm.md`.
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
