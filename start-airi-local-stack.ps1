@@ -11,8 +11,15 @@ param(
     [ValidateSet('ollama', 'openai', 'anthropic')]
     [string]$MemoryExtractionProvider = 'ollama',
     [bool]$AllowExternalMemoryExtraction = $false,
+    # Operational default: promote conversation to memory whenever an approved
+    # gate report exists. Pass $false to keep the extractor off entirely.
+    [bool]$EnableMemoryExtraction = $true,
     [string]$MemoryExtractionModel = '',
     [string]$MemoryExtractionGateReport = '',
+    # Gate thresholds used by verify_extraction_gate.py. 'balanced' keeps every
+    # structural metric at 1.0 and relaxes only the model-judgement metrics.
+    [ValidateSet('strict', 'balanced')]
+    [string]$MemoryExtractionGateProfile = 'balanced',
     [ValidateRange(1024, 65535)]
     [int]$MemoryExtractionPort = 11436,
     [ValidateSet('local', 'openai', 'anthropic')]
@@ -21,6 +28,10 @@ param(
     # For the local provider, an omitted value resolves to the stable runtime
     # tag. Pass -ChatModel exaone-airi:2.4b to roll back without changing files.
     [string]$ChatModel = '',
+    # Optional approved artifact digest for the selected chat model. Supplying
+    # it (directly or through AIRI_CHAT_MODEL_DIGEST) makes startup fail closed
+    # when the tag was rebuilt from other bytes.
+    [string]$ChatModelDigest = $env:AIRI_CHAT_MODEL_DIGEST,
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
@@ -85,8 +96,11 @@ if ($EnableCharacterEvaluator) {
 if ($requiredLocalModels.Count -gt 0) {
     $null = Wait-LocalHealth -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSeconds 30
     foreach ($model in @($requiredLocalModels | Sort-Object -Unique)) {
+        # The digest pin describes the chat model artifact only; an evaluator
+        # on a different tag keeps the plain name check.
+        $expectedDigest = if ($model -ceq $effectiveChatModel) { $ChatModelDigest } else { '' }
         & (Join-Path $PSScriptRoot 'ollama-proxy\setup-midm-airi-model.ps1') `
-            -Model $model -PreflightOnly
+            -Model $model -PreflightOnly -ExpectedDigest $expectedDigest
     }
 }
 
@@ -124,6 +138,62 @@ if (-not [string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
     }
 }
 
+# Operational default for the conversation-to-memory promotion loop. The gate
+# report is the single source of truth for which model passed, so an approved
+# report at the conventional path activates extraction without any flag. This
+# resolution stays fail-open: a missing, unreadable or failing report leaves the
+# established OFF path untouched instead of blocking the whole stack. An
+# explicit -MemoryExtractionModel keeps the original fail-closed contract above.
+$memoryExtractionAutoEnabled = $false
+if ($EnableMemoryExtraction -and [string]::IsNullOrWhiteSpace($MemoryExtractionModel) `
+        -and $MemoryExtractionProvider -eq 'ollama') {
+    $autoGateReport = if ([string]::IsNullOrWhiteSpace($MemoryExtractionGateReport)) {
+        Join-Path $PSScriptRoot 'ollama-proxy\runtime\extraction-gate-report.json'
+    }
+    else {
+        $MemoryExtractionGateReport
+    }
+    $autoModel = ''
+    if (-not (Test-Path -LiteralPath $autoGateReport -PathType Leaf)) {
+        Write-Warning ("Memory extraction stays off: no extraction gate report at $autoGateReport. " +
+            "Produce one with benchmark_memory_track.py --mode extraction --model <tag> --model-digest <sha256> --report <path>.")
+    }
+    elseif (Get-NetTCPConnection -LocalPort 11435 -State Listen -ErrorAction SilentlyContinue) {
+        Write-Warning 'Memory extraction stays off: a proxy already listens on 11435. Stop it and rerun to enable extraction.'
+    }
+    else {
+        try {
+            $autoReport = Get-Content -LiteralPath $autoGateReport -Raw -Encoding utf8 | ConvertFrom-Json -ErrorAction Stop
+            $autoModel = [string]$autoReport.config.model
+        }
+        catch {
+            $autoModel = ''
+        }
+        if ([string]::IsNullOrWhiteSpace($autoModel)) {
+            Write-Warning 'Memory extraction stays off: the extraction gate report does not name a model.'
+        }
+        else {
+            # Read-only preflight of the same verifier the activation path runs.
+            # Doing it here means a failing report degrades to OFF rather than
+            # aborting startup for every other service.
+            try {
+                & (Join-Path $PSScriptRoot 'ollama-proxy\start-local-ollama-proxy.ps1') `
+                    -MemoryExtractionProvider $MemoryExtractionProvider `
+                    -MemoryExtractionModel $autoModel `
+                    -MemoryExtractionGateReport $autoGateReport `
+                    -MemoryExtractionGateProfile $MemoryExtractionGateProfile `
+                    -VerifyExtractionGateOnly | Out-Null
+                $MemoryExtractionModel = $autoModel
+                $MemoryExtractionGateReport = $autoGateReport
+                $memoryExtractionAutoEnabled = $true
+            }
+            catch {
+                Write-Warning 'Memory extraction stays off: the extraction gate report did not verify.'
+            }
+        }
+    }
+}
+
 & (Join-Path $PSScriptRoot 'latency-monitor\start-latency-monitor.ps1')
 $latencyMonitor = Wait-LocalHealth -Uri 'http://127.0.0.1:8892/health' -TimeoutSeconds 15
 
@@ -137,10 +207,12 @@ if ([string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
         -AllowExternalMemoryExtraction $AllowExternalMemoryExtraction `
         -MemoryExtractionModel $MemoryExtractionModel `
         -MemoryExtractionGateReport $MemoryExtractionGateReport `
+        -MemoryExtractionGateProfile $MemoryExtractionGateProfile `
         -MemoryExtractionUpstream "http://127.0.0.1:$MemoryExtractionPort" `
         -ChatProvider $ChatProvider `
         -AllowExternalChat $AllowExternalChat `
         -ChatModel $effectiveChatModel `
+        -ChatModelDigest $ChatModelDigest `
         -ChatModelPreflighted `
         -AllowExternalSearch $AllowExternalSearch `
         -TopicBoardPath $TopicBoardPath `
@@ -157,6 +229,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
         -EnableKnowledge $EnableKnowledge `
         -AllowExternalMemoryExtraction $AllowExternalMemoryExtraction -MemoryExtractionModel $MemoryExtractionModel `
         -MemoryExtractionGateReport $MemoryExtractionGateReport -MemoryExtractionUpstream "http://127.0.0.1:$MemoryExtractionPort" `
+        -MemoryExtractionGateProfile $MemoryExtractionGateProfile `
         -ChatProvider $ChatProvider -AllowExternalChat $AllowExternalChat -ChatModel $effectiveChatModel -ChatModelPreflighted `
         -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `
         -EnableCharacterEvaluator $EnableCharacterEvaluator -EvaluationMaxRecords $EvaluationMaxRecords `
@@ -188,7 +261,9 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
             -EnableKnowledge $EnableKnowledge `
             -AllowExternalMemoryExtraction $AllowExternalMemoryExtraction -MemoryExtractionModel $MemoryExtractionModel `
             -MemoryExtractionGateReport $MemoryExtractionGateReport -MemoryExtractionUpstream "http://127.0.0.1:$MemoryExtractionPort" `
+            -MemoryExtractionGateProfile $MemoryExtractionGateProfile `
             -ChatProvider $ChatProvider -AllowExternalChat $AllowExternalChat -ChatModel $effectiveChatModel -ChatModelPreflighted `
+            -ChatModelDigest $ChatModelDigest `
             -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `
             -EnableCharacterEvaluator $EnableCharacterEvaluator -EvaluationMaxRecords $EvaluationMaxRecords
         $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
@@ -266,6 +341,8 @@ if ($ChatProvider -eq 'local') {
     MemoryEnabled = $proxy.memory.enabled
     MemoryReady = $proxy.memory.ready
     MemoryEmbedder = $proxy.memory.embedder
+    MemoryExtractionAutoEnabled = $memoryExtractionAutoEnabled
+    MemoryExtractionGateProfile = $MemoryExtractionGateProfile
     MemoryExtractionEnabled = $proxy.memory.extraction_enabled
     MemoryExtractionIsolated = $proxy.memory.extraction_isolated
     MemoryExtractionReady = $proxy.memory.extraction_ready
@@ -275,6 +352,9 @@ if ($ChatProvider -eq 'local') {
     LLMWarmup = if ($warmup) { $warmup.StatusCode } else { $null }
     ChatProvider = $ChatProvider
     ChatModel = $effectiveChatModel
+    ChatModelEnforced = $proxy.chat_model.enforced
+    ChatModelDigest = $proxy.chat_model.digest.digest
+    ChatModelDigestStatus = $proxy.chat_model.digest.status
     CharacterEvaluatorModel = if ($EnableCharacterEvaluator) { $effectiveEvaluatorModel } else { '' }
     NumCtx = $proxy.num_ctx
     NumGpu = $proxy.num_gpu

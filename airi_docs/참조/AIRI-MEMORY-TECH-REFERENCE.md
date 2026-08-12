@@ -528,6 +528,31 @@ prompt/schema와 current Stage-B factory probe hash, 11434 local tag의 live dig
 11436 model/digest 검증 → 11435 순서를 지키며, 실패 cleanup도 이번 실행이 소유한 exact PID에만
 적용한다. 따라서 실패 report나 다른 구성의 기존 proxy/extractor를 잘못 사용하거나 종료하지 않는다.
 
+### 게이트 임계 프로파일 (2026-08-12, 트랙 I1)
+
+전 지표 1.0 요구는 `GATE_PROFILES` 표(`verify_extraction_gate.py`)의 두 프로파일로 분리했다.
+선택은 `--profile` 또는 `AIRI_MEMORY_EXTRACTION_GATE_PROFILE`, 개별 임계는
+`AIRI_MEMORY_EXTRACTION_GATE_<KEY>`로 덮어쓴다. 기본값은 `balanced`다.
+
+- **구조 지표는 두 프로파일 모두 1.0 고정** — `schema_pass_rate`,
+  `stage_a/b_schema_pass_rate`, `connectivity_rate`, `stage_b_coverage_rate`.
+  이 지표들이 깨진 배치는 런타임에서도 `compile_decisions`/`_validate_extraction_coverage`가
+  다시 거부해 watermark가 전진하지 않는다. `temperature=0`이라 같은 배치가 매 재시도마다
+  동일하게 실패하고 5회 후 dead-letter로 굳으므로, 1.0 미만은 "품질 저하"가 아니라
+  "영구 정지한 추출기"를 뜻한다.
+- **모델 판단 지표만 완화** — 배치를 실패시키지 않고 저장되는 내용만 바꾸는 지표.
+  `balanced` 기준: `critical_recall ≥ 0.70`(누락은 저널 회상과 재언급으로 복구 가능),
+  `stage_b_op_alias_accuracy ≥ 0.80`(오연산 SUPERSEDE는 기존 기억을 파괴할 수 있어 recall보다 높게),
+  `placeholder_rate ≥ 0.85`(`{{user}}` 미보존은 실명이 DB에 영구 저장되지만 파괴적이지는 않음),
+  행당 `unexpected ≤ 0.25`(frozen 7-fixture 기준 과추출 최대 1건),
+  행당 `stage_a_unexpected ≤ 0.5`(Stage-B 허용 항목을 상쇄하지 않는 보수적 집계라 이중 페널티 회피).
+- 2026-08-08 실측(`exaone-airi:2.4b`: recall 55.56%, placeholder 83.33%, op/alias 66.67%,
+  unexpected 18)은 `balanced`에서도 4개 지표 전부 불합격이다. 완화는 활성화 조건을 만들 뿐
+  기존 후보를 통과시키지 않는다.
+- 검증기는 `gate_pass` boolean만 믿지 않고 fixture 행에서 aggregate를 재계산해 대조하며
+  (`AGGREGATE_MISMATCH`), report에 기록된 `gate_thresholds`가 운영자의 활성 임계보다
+  느슨하면 거부한다(`GATE_THRESHOLDS_TOO_LENIENT`).
+
 ---
 
 ## §9. Local extraction 후보의 bounded smoke (2026-08-08)

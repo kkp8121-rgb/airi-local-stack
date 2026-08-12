@@ -26,6 +26,11 @@ param(
     [bool]$AllowExternalMemoryExtraction = $false,
     [string]$MemoryExtractionModel = '',
     [string]$MemoryExtractionGateReport = '',
+    # Gate threshold profile. 'balanced' keeps every structural metric at 1.0
+    # and only relaxes the model-judgement metrics; 'strict' restores the
+    # original all-1.0 contract.
+    [ValidateSet('strict', 'balanced')]
+    [string]$MemoryExtractionGateProfile = 'balanced',
     [switch]$VerifyExtractionGateOnly,
     [uri]$MemoryExtractionUpstream = 'http://127.0.0.1:11436',
     [string]$MemoryExtractionKeepAlive = '5m',
@@ -35,6 +40,10 @@ param(
     # For the local provider, an omitted value resolves to the stable runtime
     # tag. Specify -ChatModel exaone-airi:2.4b for a reversible rollback.
     [string]$ChatModel = '',
+    # Optional approved artifact digest for the selected chat model. Supplying
+    # it (directly or through AIRI_CHAT_MODEL_DIGEST) makes both this preflight
+    # and the proxy's own startup check fail closed on a rebuilt tag.
+    [string]$ChatModelDigest = $env:AIRI_CHAT_MODEL_DIGEST,
     # The root stack launcher runs the same local-tag preflight before it
     # starts any downstream service, then supplies this switch to avoid doing
     # the identical checks a second time.
@@ -75,7 +84,10 @@ if (-not $VerifyExtractionGateOnly) {
 }
 if (-not $ChatModelPreflighted) {
     foreach ($model in @($requiredLocalModels | Sort-Object -Unique)) {
-        & (Join-Path $repo 'setup-midm-airi-model.ps1') -Model $model -PreflightOnly
+        # The digest pin describes the chat model artifact only; an evaluator
+        # on a different tag keeps the plain name check.
+        $expectedDigest = if ($model -ceq $effectiveChatModel) { $ChatModelDigest } else { '' }
+        & (Join-Path $repo 'setup-midm-airi-model.ps1') -Model $model -PreflightOnly -ExpectedDigest $expectedDigest
     }
 }
 $resolvedTopicBoardPath = ''
@@ -187,7 +199,7 @@ if (-not [string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
         throw 'Memory extraction benchmark fixtures are missing.'
     }
     $memoryExtractionModelDigest = Resolve-LocalOllamaModelDigest -Model $MemoryExtractionModel
-    & $python $extractionGateVerifier --report $MemoryExtractionGateReport --fixtures $extractionFixtures --model $MemoryExtractionModel --model-digest $memoryExtractionModelDigest
+    & $python $extractionGateVerifier --report $MemoryExtractionGateReport --fixtures $extractionFixtures --model $MemoryExtractionModel --model-digest $memoryExtractionModelDigest --profile $MemoryExtractionGateProfile
     if ($LASTEXITCODE -ne 0) {
         throw 'Memory extraction operational gate verification failed.'
     }
@@ -242,6 +254,9 @@ $memoryEnvironment = @{
     AIRI_CHAT_PROVIDER = $ChatProvider
     AIRI_ALLOW_EXTERNAL_CHAT = if ($AllowExternalChat) { '1' } else { '0' }
     AIRI_CHAT_MODEL = $effectiveChatModel
+    # Empty means "no pin": the proxy then records the digest it observed
+    # instead of refusing to start.
+    AIRI_CHAT_MODEL_DIGEST = $ChatModelDigest
     AIRI_OLLAMA_KEEP_ALIVE = $OllamaKeepAlive
     AIRI_OLLAMA_TEMPERATURE = $OllamaTemperature.ToString([Globalization.CultureInfo]::InvariantCulture)
     AIRI_OLLAMA_TOP_P = $OllamaTopP.ToString([Globalization.CultureInfo]::InvariantCulture)
@@ -251,6 +266,9 @@ $memoryEnvironment = @{
     # Evaluation retention is a separate explicit opt-in. Chat never writes
     # to this DB automatically; each record also requires consent=true.
     AIRI_EVAL_ENABLED = if ($EnableEvaluation) { 'true' } else { 'false' }
+    # Provenance must name the model that actually answered, including after a
+    # -ChatModel rollback or an approved external provider.
+    AIRI_EVAL_MODEL = $effectiveChatModel
     AIRI_EVAL_DB = Join-Path $repo 'runtime\airi-evaluations.sqlite3'
     AIRI_EVAL_MAX_RECORDS = $EvaluationMaxRecords.ToString([Globalization.CultureInfo]::InvariantCulture)
     AIRI_CHARACTER_EVALUATOR_ENABLED = if ($EnableCharacterEvaluator) { '1' } else { '0' }

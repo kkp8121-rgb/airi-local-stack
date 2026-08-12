@@ -49,6 +49,7 @@ from evaluation_store import (
 )
 from topic_board import load_approved_topics, render_topic_context
 from knowledge_store import KnowledgeStore
+from output_moderation import OutputModerationRuntime, load_moderation_policy
 
 
 def emit_substantive_content(trace_id: str, request_started: float) -> None:
@@ -336,6 +337,239 @@ class ProactiveOutputTelemetry:
 
 
 proactive_output_telemetry = ProactiveOutputTelemetry()
+
+
+# The launcher selects the foreground chat model and exports it as
+# ``AIRI_CHAT_MODEL``.  Every local default, streamed label, evaluation
+# provenance record and startup digest check resolves through this one
+# function, so a ``-ChatModel`` rollback moves the whole local path together
+# instead of leaving a stale tag hardcoded inside a single branch.
+DEFAULT_CHAT_MODEL = "midm-airi:2.0-mini"
+CHAT_MODEL_MAX_CHARS = 256
+MODEL_DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def resolve_chat_model() -> str:
+    """Return the launcher-selected foreground chat model tag."""
+    value = os.environ.get("AIRI_CHAT_MODEL", "").strip()[:CHAT_MODEL_MAX_CHARS]
+    return value or DEFAULT_CHAT_MODEL
+
+
+def configured_chat_provider() -> str:
+    return os.environ.get("AIRI_CHAT_PROVIDER", "local").strip().lower() or "local"
+
+
+def chat_model_ssot_enforced() -> bool:
+    """Report whether local chat requests are normalized to the selected tag.
+
+    An external provider keeps its own remote model name in ``AIRI_CHAT_MODEL``
+    and that name must never be written into a local Ollama request, so
+    enforcement is limited to the local provider.  ``AIRI_CHAT_MODEL_ENFORCE=0``
+    is the documented escape hatch for diagnosing a client-supplied tag.
+    """
+    if configured_chat_provider() != "local":
+        return False
+    return os.environ.get("AIRI_CHAT_MODEL_ENFORCE", "1").strip().lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+
+
+class ChatModelTelemetry:
+    """Content-free counters proving which model actually served a turn.
+
+    Only model tag names are retained.  They are configuration identifiers,
+    never conversation content, and the requested name is kept so a client
+    that still asks for a rolled-back tag stays visible after normalization.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._normalized = 0
+        self._matching = 0
+        self._exempt = 0
+        self._last_requested = ""
+
+    def matched(self) -> None:
+        with self._lock:
+            self._matching += 1
+
+    def exempt(self) -> None:
+        with self._lock:
+            self._exempt += 1
+
+    def normalized(self, requested: str) -> bool:
+        """Count one rewrite and report whether the source tag is new."""
+        with self._lock:
+            self._normalized += 1
+            value = requested[:CHAT_MODEL_MAX_CHARS]
+            changed = value != self._last_requested
+            self._last_requested = value
+            return changed
+
+    def health(self) -> dict[str, object]:
+        with self._lock:
+            normalized = self._normalized
+            matching = self._matching
+            exempt = self._exempt
+            last_requested = self._last_requested
+        return {
+            "model": resolve_chat_model(),
+            "provider": configured_chat_provider(),
+            "enforced": chat_model_ssot_enforced(),
+            "normalized_requests": normalized,
+            "matching_requests": matching,
+            "exempt_requests": exempt,
+            "last_requested_model": last_requested or None,
+            "digest": dict(CHAT_MODEL_DIGEST_STATE),
+        }
+
+
+chat_model_telemetry = ChatModelTelemetry()
+
+
+def apply_chat_model_ssot(body: bytes, *, exempt: bool) -> bytes:
+    """Rewrite a foreground chat request's model field to the selected tag.
+
+    ``exempt`` carries the loopback-verified test origins (quality probe and
+    synthetic evaluation) so an explicit ``--model`` A/B run still reaches the
+    model it names.  Ordinary desktop traffic cannot set that origin, so it
+    can no longer pin the local runner to a stale tag of its own.
+    """
+    if not chat_model_ssot_enforced():
+        return body
+    if exempt:
+        chat_model_telemetry.exempt()
+        return body
+    try:
+        payload = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return body
+    if not isinstance(payload, dict):
+        return body
+    model = resolve_chat_model()
+    requested = str(payload.get("model") or "").strip()
+    if requested == model:
+        chat_model_telemetry.matched()
+        return body
+    payload["model"] = model
+    if chat_model_telemetry.normalized(requested):
+        # One line per newly observed client tag: enough to prove provenance
+        # without writing a record for every foreground turn.
+        print(
+            json.dumps(
+                {
+                    "event": "chat_model_ssot",
+                    "status": "normalized",
+                    "requested_model": requested[:CHAT_MODEL_MAX_CHARS] or None,
+                    "model": model,
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+    return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
+
+class ChatModelDigestError(RuntimeError):
+    """The local model artifact is not the one this startup approved."""
+
+
+CHAT_MODEL_DIGEST_STATE: dict[str, object] = {
+    "model": "",
+    "pinned": False,
+    "digest": "",
+    "verified": False,
+    "status": "unverified",
+}
+
+
+def normalize_ollama_model_name(name: str) -> str:
+    """Match Ollama's own tag comparison, including the implicit ``latest``."""
+    value = name.strip().lower()
+    if ":" not in value.rsplit("/", 1)[-1]:
+        value += ":latest"
+    return value
+
+
+def configured_chat_model_digest() -> str:
+    """Return the approved artifact digest, or '' when no pin was supplied."""
+    value = os.environ.get("AIRI_CHAT_MODEL_DIGEST", "").strip().lower()
+    if not value:
+        return ""
+    if not MODEL_DIGEST_RE.fullmatch(value):
+        raise ChatModelDigestError("AIRI_CHAT_MODEL_DIGEST is not a 64 character hex digest")
+    return value
+
+
+def local_model_digest(models: object, model: str) -> str:
+    """Return the one local digest for a tag, or '' when it is not unique."""
+    wanted = normalize_ollama_model_name(model)
+    found: set[str] = set()
+    for entry in models if isinstance(models, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name") or entry.get("model") or "").strip()
+        if not name or normalize_ollama_model_name(name) != wanted:
+            continue
+        digest = str(entry.get("digest") or "").strip().lower()
+        if MODEL_DIGEST_RE.fullmatch(digest):
+            found.add(digest)
+    return next(iter(found)) if len(found) == 1 else ""
+
+
+def fetch_local_models(timeout: float = 5.0) -> object:
+    """Read the local tag list; this never downloads or creates a model."""
+    response = httpx.get(f"{UPSTREAM}/api/tags", timeout=timeout)
+    response.raise_for_status()
+    payload = response.json()
+    return payload.get("models") if isinstance(payload, dict) else None
+
+
+def preflight_chat_model_digest(fetch: object = None) -> dict[str, object]:
+    """Bind startup to a model artifact, not only to a reusable tag name.
+
+    A local tag can be rebuilt from different bytes, so the name alone proves
+    nothing.  With ``AIRI_CHAT_MODEL_DIGEST`` set this is a fail-closed gate;
+    without it the observed digest is only recorded so a silent artifact swap
+    stays visible in the startup transcript.
+    """
+    model = resolve_chat_model()
+    pinned = configured_chat_model_digest()
+    state: dict[str, object] = {
+        "model": model,
+        "pinned": bool(pinned),
+        "digest": "",
+        "verified": False,
+        "status": "unverified",
+    }
+    if configured_chat_provider() != "local":
+        state["status"] = "skipped_external_provider"
+        return state
+    reader = fetch if callable(fetch) else fetch_local_models
+    try:
+        models = reader()
+    except Exception as exc:
+        if pinned:
+            raise ChatModelDigestError(
+                "local model digest lookup failed while a digest pin was set"
+            ) from exc
+        state["status"] = "unavailable"
+        return state
+    digest = local_model_digest(models, model)
+    state["digest"] = digest
+    if pinned:
+        if digest != pinned:
+            raise ChatModelDigestError(
+                f"local model '{model}' digest does not match AIRI_CHAT_MODEL_DIGEST"
+            )
+        state["verified"] = True
+        state["status"] = "pinned"
+    else:
+        state["status"] = "observed" if digest else "unresolved"
+    return state
 
 
 KNOWLEDGE_INTERROGATIVE_RE = re.compile(
@@ -3959,7 +4193,7 @@ async def run_dialogue_director(
     """Ask the already-loaded local model for a conversational policy decision."""
     if client is None:
         raise RuntimeError("proxy client is not ready")
-    model = str(transformed_payload.get("model") or "exaone-airi:2.4b")
+    model = str(transformed_payload.get("model") or resolve_chat_model())
     messages = transformed_payload.get("messages")
     recent_messages = (
         [
@@ -4825,6 +5059,87 @@ async def run_codex_search(user_text: str, query: str) -> tuple[str, float]:
     return normalize_cloud_result(result), duration_ms
 
 
+# Korean output moderation (broadcast track B3).  No off-the-shelf Korean guard
+# model exists, so the dictionary lives in a data file and only the switch and
+# the insertion point live here.  ``off`` is the default: the gate is a
+# broadcast precondition, not a desktop-session behaviour, and the existing
+# dialogue path is pinned by exact-string regression tests that must not move
+# until the launcher opts in.
+OUTPUT_MODERATION_ON = "on"
+OUTPUT_MODERATION_OFF = "off"
+_OUTPUT_MODERATION_TRUE = {"on", "1", "true", "yes", "enabled"}
+_OUTPUT_MODERATION_FALSE = {"off", "0", "false", "no", "disabled"}
+
+
+def configured_output_moderation(value: object) -> str:
+    """Return ``on``/``off``.  An unreadable override never turns the gate on."""
+    try:
+        mode = unicodedata.normalize("NFKC", str(value)).strip().casefold()
+    except (TypeError, ValueError):
+        return OUTPUT_MODERATION_OFF
+    if mode in _OUTPUT_MODERATION_TRUE:
+        return OUTPUT_MODERATION_ON
+    if mode in _OUTPUT_MODERATION_FALSE:
+        return OUTPUT_MODERATION_OFF
+    return OUTPUT_MODERATION_OFF
+
+
+OUTPUT_MODERATION_MODE = configured_output_moderation(
+    os.environ.get("AIRI_OUTPUT_MODERATION", OUTPUT_MODERATION_OFF)
+)
+OUTPUT_MODERATION_TERMS_PATH = os.environ.get("AIRI_OUTPUT_MODERATION_TERMS", "").strip()
+
+
+def build_output_moderation_runtime() -> OutputModerationRuntime:
+    """Load the dictionary only when the gate is requested.
+
+    A requested-but-broken safety gate must not start silently disabled: an
+    operator who exported the switch expects filtering, so a bad dictionary
+    fails the process at import instead of going live unfiltered.  With the
+    gate off nothing is read at all, so the default path keeps its startup
+    cost and behaviour unchanged.
+    """
+    if OUTPUT_MODERATION_MODE != OUTPUT_MODERATION_ON:
+        return OutputModerationRuntime(enabled=False)
+    policy = load_moderation_policy(OUTPUT_MODERATION_TERMS_PATH or None)
+    return OutputModerationRuntime(enabled=True, policy=policy)
+
+
+output_moderation_runtime = build_output_moderation_runtime()
+
+
+def output_moderation_enabled() -> bool:
+    """Read the module-level switch at call time so tests can patch it."""
+    return OUTPUT_MODERATION_MODE == OUTPUT_MODERATION_ON
+
+
+def apply_output_moderation(content: str) -> tuple[str, dict[str, object] | None]:
+    """Replace a blocked sentence with a character line and report the block.
+
+    Silence is not an option: a withheld sentence would leave an audio gap
+    that the broadcast plan forbids, and the viewer could not tell it apart
+    from a dead pipeline.  The transport envelope is preserved so the
+    replacement keeps the same emotion frame as the sentence it replaces.
+    """
+    envelope = ""
+    spoken = content
+    envelope_match = LEADING_CONTROL_ENVELOPE_RE.match(content) or (
+        BARE_LEADING_CONTROL_ENVELOPE_RE.match(content)
+    )
+    if envelope_match:
+        envelope = content[: envelope_match.end()]
+        spoken = content[envelope_match.end():]
+    verdict = output_moderation_runtime.inspect(CONTROL_TOKEN_RE.sub("", spoken))
+    if not verdict.blocked:
+        return content, None
+    replacement = output_moderation_runtime.next_blocked_dialogue()
+    if not replacement:
+        return content, None
+    signal = verdict.as_signal()
+    signal["replaced"] = True
+    return f"{envelope}{replacement}", signal
+
+
 def openai_sse_delta(
     completion_id: str,
     model: str,
@@ -4832,16 +5147,27 @@ def openai_sse_delta(
     *,
     include_role: bool = False,
 ) -> bytes:
+    # Every dialogue chunk on the public OpenAI-compatible stream is framed
+    # here, and AIRI speaks one sentence per delta, so this is the sentence
+    # level TTS gate: no branch can bypass it.  With moderation off the only
+    # added work is the boolean below and the payload stays byte-identical.
+    moderation: dict[str, object] | None = None
+    if content and output_moderation_enabled():
+        content, moderation = apply_output_moderation(content)
     delta: dict[str, str] = {"content": content}
     if include_role:
         delta["role"] = "assistant"
-    payload = {
+    payload: dict[str, object] = {
         "id": completion_id,
         "object": "chat.completion.chunk",
         "created": int(time.time()),
         "model": model,
         "choices": [{"index": 0, "delta": delta, "finish_reason": None}],
     }
+    if moderation is not None:
+        # Out-of-band for OpenAI clients, in-band for AIRI: the desktop client
+        # can render "필터당함" from this without a second channel.
+        payload["airi_moderation"] = moderation
     return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n".encode("utf-8")
 
 
@@ -4869,7 +5195,7 @@ def to_openai_sse(payload: dict[str, object], content: str) -> bytes:
         "id": payload.get("id", "chatcmpl-airi-local"),
         "object": "chat.completion.chunk",
         "created": payload.get("created", 0),
-        "model": payload.get("model", "exaone-airi:2.4b"),
+        "model": payload.get("model", resolve_chat_model()),
     }
     content_chunk = {
         **common,
@@ -5169,7 +5495,12 @@ async def health() -> dict[str, object]:
             else "unavailable"
         ),
         "cloud_search_external_approved": ALLOW_EXTERNAL_SEARCH,
-        "immediate_ack": "silent",
+        # A user-driven turn opens with a spoken acknowledgement, so latency
+        # readings must not be interpreted as silence.  Only the branches that
+        # answer nobody stay silent, and each response reports its own value
+        # in ``X-AIRI-Immediate-Ack``.
+        "immediate_ack": "audible",
+        "chat_model": chat_model_telemetry.health(),
         "system_prompt_overridden": False,
         "active_character_card_merge": True,
         "system_prompt_mode": "merge",
@@ -5177,6 +5508,7 @@ async def health() -> dict[str, object]:
         "journal_completion": memory_journal_telemetry.health(),
         "proactive_output": proactive_output_telemetry.health(),
         "topic_board": topic_board_runtime.health(),
+        "output_moderation": output_moderation_runtime.health(),
         "num_ctx": NUM_CTX,
         "num_gpu": NUM_GPU,
         "ollama_keep_alive": OLLAMA_KEEP_ALIVE,
@@ -5331,8 +5663,10 @@ async def _evaluation_payload(request: Request) -> dict[str, object]:
 def _configured_evaluation_provenance() -> dict[str, str]:
     """Return trusted provenance; request JSON is never an authority for it."""
     origin = os.environ.get("AIRI_EVAL_ORIGIN", "user_approved").strip()
-    model = os.environ.get("AIRI_EVAL_MODEL", "exaone-airi:2.4b").strip()
-    model_version = os.environ.get("AIRI_EVAL_MODEL_VERSION", model).strip()
+    # An unset or empty override must label the record with the model that
+    # actually answered, not with a tag this build was once shipped with.
+    model = os.environ.get("AIRI_EVAL_MODEL", "").strip() or resolve_chat_model()
+    model_version = os.environ.get("AIRI_EVAL_MODEL_VERSION", "").strip() or model
     dataset_version = os.environ.get("AIRI_EVAL_DATASET_VERSION", "airi-g3-v1").strip()
     if (
         origin not in {"synthetic", "user_approved"}
@@ -6530,6 +6864,12 @@ async def proxy(path: str, request: Request):
         repeat_count,
         repeat_candidate,
     ) = transform_body(path, original_body)
+    if is_chat_request:
+        # The launcher owns the foreground model. A desktop build or provider
+        # that still sends a rolled-back tag must not silently load a second
+        # runner behind a startup that preflighted, warmed and reported
+        # another one.
+        body = apply_chat_model_ssot(body, exempt=nonmutating_turn)
     memory_question = last_user_text
     if proactive_turn:
         # Historical user turns remain context only. They cannot activate
@@ -6593,11 +6933,15 @@ async def proxy(path: str, request: Request):
             transformed_payload = json.loads(body)
         except json.JSONDecodeError:
             transformed_payload = {}
-        model = str(transformed_payload.get("model") or "exaone-airi:2.4b")
+        model = str(transformed_payload.get("model") or resolve_chat_model())
         completion_id = f"chatcmpl-airi-{uuid4().hex}"
         immediate_headers = {
             "X-AIRI-Tools-Stripped": "true" if stripped else "false",
             "X-AIRI-Num-Ctx": str(NUM_CTX),
+            # Default for the branches that open with an empty delta. The two
+            # branches that speak first override this, because a latency
+            # reading of an audible ACK means something different from the
+            # first token of a silent stream.
             "X-AIRI-Immediate-Ack": "silent",
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
@@ -7041,7 +7385,7 @@ async def proxy(path: str, request: Request):
             return StreamingResponse(
                 stream_cloud_search(),
                 status_code=200,
-                headers=immediate_headers,
+                headers={**immediate_headers, "X-AIRI-Immediate-Ack": "audible"},
                 media_type="text/event-stream",
             )
 
@@ -7151,7 +7495,12 @@ async def proxy(path: str, request: Request):
         return StreamingResponse(
             stream_local_with_ack(local_stream_context),
             status_code=200,
-            headers=immediate_headers,
+            headers={
+                **immediate_headers,
+                # A proactive broadcast answers nobody and opens silently;
+                # every user-driven local turn speaks the acknowledgement.
+                "X-AIRI-Immediate-Ack": "silent" if proactive_turn else "audible",
+            },
             media_type="text/event-stream",
         )
 
@@ -7164,7 +7513,7 @@ async def proxy(path: str, request: Request):
             )
             if selected_topic_id is None:
                 proactive_output_telemetry.completion("")
-                model = "exaone-airi:2.4b"
+                model = resolve_chat_model()
                 try:
                     parsed_body = json.loads(body)
                     if isinstance(parsed_body, dict):
@@ -7229,7 +7578,7 @@ async def proxy(path: str, request: Request):
                 topic_board_runtime.completion(selected_topic_id, False)
                 if path.endswith("api/chat"):
                     empty_payload = {
-                        "model": str(json.loads(body).get("model") or "exaone-airi:2.4b"),
+                        "model": str(json.loads(body).get("model") or resolve_chat_model()),
                         "message": {"role": "assistant", "content": ""},
                         "done": True,
                         "done_reason": "stop",
@@ -7244,14 +7593,14 @@ async def proxy(path: str, request: Request):
                 return JSONResponse({
                     "id": f"chatcmpl-airi-{uuid4().hex}",
                     "object": "chat.completion",
-                    "model": str(json.loads(body).get("model") or "exaone-airi:2.4b"),
+                    "model": str(json.loads(body).get("model") or resolve_chat_model()),
                     "choices": [{
                         "index": 0,
                         "message": {"role": "assistant", "content": ""},
                         "finish_reason": "stop",
                     }],
                 })
-            model = str(json.loads(body).get("model") or "exaone-airi:2.4b")
+            model = str(json.loads(body).get("model") or resolve_chat_model())
             if path.endswith("api/chat"):
                 direct_native = {
                     "model": model,
@@ -7492,6 +7841,11 @@ async def proxy(path: str, request: Request):
             emitted_content = False
 
             def native_row(source: dict[str, object], content: str, *, done: bool) -> bytes:
+                # The native NDJSON contract has no field for a moderation
+                # signal, so this path only substitutes the character line and
+                # lets the /health counter carry the block.
+                if content and output_moderation_enabled():
+                    content, _moderation_signal = apply_output_moderation(content)
                 item = dict(source)
                 message = item.get("message")
                 out_message = dict(message) if isinstance(message, dict) else {"role": "assistant"}
@@ -7867,7 +8221,7 @@ async def proxy(path: str, request: Request):
 
 
 def main() -> None:
-    global UPSTREAM, NUM_CTX, NUM_GPU
+    global UPSTREAM, NUM_CTX, NUM_GPU, CHAT_MODEL_DIGEST_STATE
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="127.0.0.1")
@@ -7880,6 +8234,17 @@ def main() -> None:
     UPSTREAM = args.upstream.rstrip("/")
     NUM_CTX = args.num_ctx
     NUM_GPU = args.num_gpu
+    # Verify the model artifact before the port opens: a pinned mismatch must
+    # stop this process instead of serving a turn from an unapproved build.
+    try:
+        CHAT_MODEL_DIGEST_STATE = preflight_chat_model_digest()
+    except ChatModelDigestError as exc:
+        print(
+            json.dumps({"event": "chat_model_digest", "status": "error", "reason": str(exc)}),
+            flush=True,
+        )
+        raise SystemExit(2)
+    print(json.dumps({"event": "chat_model_digest", **CHAT_MODEL_DIGEST_STATE}), flush=True)
     uvicorn.run(app, host=args.host, port=args.port)
 
 

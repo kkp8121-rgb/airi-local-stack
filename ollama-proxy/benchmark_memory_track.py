@@ -20,6 +20,7 @@ from airi_memory import MemoryStore, pack_vector
 
 from memory_prompts import STAGE_A_SCHEMA, STAGE_A_CONVERSATION_SYSTEM_PROMPT, STAGE_A_SYSTEM_PROMPT, STAGE_B_DECISION_SYSTEM_PROMPT
 from memory_stage_b import DECISION_SCHEMA_TEMPLATE, DecisionContractError, compile_decisions, decision_factory_probe_sha256, decision_schema_for_items, format_stage_b_input, parse_stage_b_decisions
+from verify_extraction_gate import GATE_PROFILES, gate_metrics_pass, resolve_gate_thresholds
 
 HERE = Path(__file__).resolve().parent
 FIXTURES = HERE / "memory_benchmark_fixtures.json"
@@ -365,6 +366,9 @@ def _benchmark_chat(chat: Callable[..., str], args: argparse.Namespace, system: 
 
 
 def run_extraction(args: argparse.Namespace, fixtures: dict[str, Any], chat: Callable[..., str] = ollama_chat) -> dict[str, Any]:
+    # Resolve the gate before measuring so a misconfigured profile fails in
+    # milliseconds instead of after a full multi-minute extraction run.
+    gate_profile, gate_thresholds = resolve_gate_thresholds(getattr(args, "gate_profile", None))
     rows, stage_a_latencies, stage_b_latencies, total_latencies = [], [], [], []
     stopped_early = False
     stop_reason: str | None = None
@@ -429,7 +433,12 @@ def run_extraction(args: argparse.Namespace, fixtures: dict[str, Any], chat: Cal
         for code in row["failure_codes"]: failure_code_counts[code] = failure_code_counts.get(code, 0) + 1
     attempted_fixture_ids = [row["id"] for row in rows]
     result = {"status": "measured", "stage_a_contract": args.stage_a_contract, "stage_b_contract": "decision-v2.1", "comparison_contract": comparison_contract_for_stage_a(args.stage_a_contract), "model": args.model, "runs":args.runs, "seed":args.seed, "max_tokens":args.max_tokens, "fail_fast":args.fail_fast, "stopped_early":stopped_early, "stop_reason":stop_reason, "attempted_fixture_ids":attempted_fixture_ids, "attempted_row_count":len(rows), "fixture_ids": sorted(set(attempted_fixture_ids)), "fixtures": rows, "latency":{"stage_a":latency_summary(stage_a_latencies), "stage_b":latency_summary(stage_b_latencies), "total":latency_summary(total_latencies)}, "schema_pass_rate": sum(x["schema_pass"] for x in rows)/n, "stage_a_schema_pass_rate":sum(x["stage_a_schema_pass"] for x in rows)/n,"stage_b_schema_pass_rate":sum(x["stage_b_schema_pass"] for x in rows)/n,"connectivity_rate": sum(x["connectivity"] for x in rows)/n, "stage_b_coverage_rate": sum(x["stage_b_coverage"] for x in rows)/n, "critical_recall": sum(x["critical_recall"] for x in rows)/n, "unexpected": sum(x["unexpected"] for x in rows), "placeholder_rate": sum(x["placeholder_preserved"] for x in rows)/n, "stage_a_critical_recall":sum(x.get("stage_a_critical_recall",0.0) for x in rows)/n,"stage_a_unexpected":sum(x.get("stage_a_unexpected",0) for x in rows),"stage_a_placeholder_rate":sum(x.get("stage_a_placeholder_preserved",False) for x in rows)/n,"stage_b_op_alias_accuracy": sum(x["stage_b_op_alias_accuracy"] for x in rows)/n, "failure_code_counts":dict(sorted(failure_code_counts.items()))}
-    result["gate_pass"] = result["schema_pass_rate"] == result["connectivity_rate"] == result["stage_b_coverage_rate"] == result["critical_recall"] == result["placeholder_rate"] == result["stage_b_op_alias_accuracy"] == 1 and result["unexpected"] == 0
+    # The verifier owns the gate formula; the report only records which
+    # thresholds produced this verdict so an operator cannot silently activate
+    # a model that was measured under a looser profile.
+    result["gate_profile"] = gate_profile
+    result["gate_thresholds"] = gate_thresholds
+    result["gate_pass"] = bool(rows) and gate_metrics_pass(result, len(rows), gate_thresholds)
     return result
 
 
@@ -664,6 +673,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--fixture-id", action="append", default=[], help="Run only the named extraction fixture; repeat to select more than one.")
     p.add_argument("--fail-fast", action="store_true", help="Stop extraction after the first row that fails a gate condition.")
     p.add_argument("--stage-a-contract", choices=["legacy", "conversation-v2b"], default="conversation-v2b")
+    p.add_argument("--gate-profile", choices=sorted(GATE_PROFILES), default=None,
+                   help="Extraction gate thresholds; defaults to $AIRI_MEMORY_EXTRACTION_GATE_PROFILE.")
     p.add_argument("--embedding-model", action="append", default=[]); p.add_argument("--embedding-device", choices=["auto","cpu","cuda"], default="auto"); p.add_argument("--embedding-dtype", choices=["float32","float16"], default="float32"); p.add_argument("--local-files-only", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--allow-cloud", action="store_true"); p.add_argument("--cloud-provider", choices=["openai","anthropic"], default="anthropic"); p.add_argument("--cloud-model", default="claude-3-5-haiku-latest")
     p.add_argument("--retrieval-rows", type=int, default=10000); p.add_argument("--retrieval-runs", type=int, default=20); p.add_argument("--journal-rows", type=int, default=10000)

@@ -1,4 +1,5 @@
 import pathlib
+import re
 import unittest
 
 
@@ -70,6 +71,43 @@ class MidmModelConfigurationTests(unittest.TestCase):
         self.assertIn("& $ollama.Source create $DefaultModel -f $Modelfile", SETUP)
         self.assertIn("[switch]$Recreate", SETUP)
         self.assertIn("Required local Mi:dm source model", SETUP)
+
+    def test_launcher_labels_evaluation_records_with_the_selected_model(self) -> None:
+        # Without this the proxy would fall back to its own default and an
+        # evaluation of the selected model could be filed under another name.
+        self.assertIn("AIRI_EVAL_MODEL = $effectiveChatModel", PROXY)
+
+    def test_model_digest_pin_reaches_preflight_and_the_running_proxy(self) -> None:
+        for script in (STACK, PROXY):
+            self.assertIn("[string]$ChatModelDigest = $env:AIRI_CHAT_MODEL_DIGEST", script)
+            self.assertIn(
+                "$expectedDigest = if ($model -ceq $effectiveChatModel) "
+                "{ $ChatModelDigest } else { '' }",
+                script,
+            )
+            self.assertIn("-Model $model -PreflightOnly -ExpectedDigest $expectedDigest", script)
+        self.assertIn("AIRI_CHAT_MODEL_DIGEST = $ChatModelDigest", PROXY)
+        # Preflight fails closed on a mismatch and otherwise records the digest
+        # it observed, so a locally rebuilt tag cannot pass unnoticed.
+        self.assertIn("[string]$ExpectedDigest = ''", SETUP)
+        self.assertIn("'^[0-9a-f]{64}$'", SETUP)
+        self.assertIn("does not match the expected artifact digest", SETUP)
+        self.assertIn("$digests = Get-LocalOllamaModelDigests", SETUP)
+        self.assertNotIn("Get-LocalOllamaModelNames", SETUP)
+
+    def test_every_proxy_start_forwards_the_digest_pin(self) -> None:
+        # A gate-only invocation verifies memory extraction and returns before
+        # any chat traffic; every invocation that actually starts the proxy
+        # must carry the selected model and its optional artifact pin.
+        commands = re.findall(
+            r"start-local-ollama-proxy\.ps1'\)(?:[^\n]*`\r?\n)*[^\n]*", STACK
+        )
+        starting = [command for command in commands if "-VerifyExtractionGateOnly" not in command]
+        self.assertGreaterEqual(len(starting), 2)
+        self.assertLess(len(starting), len(commands))
+        for command in starting:
+            self.assertIn("-ChatModel $effectiveChatModel", command)
+            self.assertIn("-ChatModelDigest $ChatModelDigest", command)
 
     def test_proxy_health_is_a_fail_fast_gate_before_gpu_speech_services(self) -> None:
         proxy_ready = STACK.rindex(

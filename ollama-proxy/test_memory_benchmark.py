@@ -310,6 +310,39 @@ class MemoryBenchmarkTests(unittest.TestCase):
         self.assertEqual(success_then_failure["fixture_ids"], ["bad","later"])
         self.assertEqual(success_then_failure["failure_code_counts"], {})
 
+    def test_gate_profile_is_recorded_and_bounds_gate_pass(self):
+        def fixture(identifier, expected_stage_a):
+            return {"id":identifier,"character":"c","turns":"t","candidates":[],
+                    "expected_stage_a":expected_stage_a,"expected_stage_b":[]}
+        fixtures={"extraction":[
+            fixture("full",[{"kind":"entity","name":"Ada"}]),
+            fixture("partial",[{"kind":"entity","name":"Ada"},{"kind":"entity","name":"Missing"}]),
+        ]}
+        def chat(*call):
+            if "extract atomic" in call[2]:
+                return '{"extracted":[{"turnNumber":1,"kind":"entity","subtype":"person","name":"Ada","content":"a"}]}'
+            return '{"decisions":[{"sourceItemIndex":0,"action":"add","candidateAlias":null,"reason":null}]}'
+
+        with patch.dict(os.environ, {}, clear=True):
+            balanced=bench.run_extraction(bench.build_parser().parse_args([]),fixtures,chat)
+        self.assertEqual(balanced["gate_profile"], bench.resolve_gate_thresholds()[0])
+        self.assertEqual(balanced["gate_thresholds"], bench.GATE_PROFILES[balanced["gate_profile"]])
+        # Structural rates stay perfect; only recall degrades to 0.75.
+        self.assertEqual(balanced["schema_pass_rate"],1.0)
+        self.assertEqual(balanced["connectivity_rate"],1.0)
+        self.assertEqual(balanced["stage_b_coverage_rate"],1.0)
+        self.assertEqual(balanced["critical_recall"],0.75)
+        self.assertTrue(balanced["gate_pass"])
+
+        strict=bench.run_extraction(bench.build_parser().parse_args(["--gate-profile","strict"]),fixtures,chat)
+        self.assertEqual(strict["gate_profile"],"strict")
+        self.assertFalse(strict["gate_pass"])
+
+        with patch.dict(os.environ, {"AIRI_MEMORY_EXTRACTION_GATE_MIN_CRITICAL_RECALL":"0.8"}, clear=True):
+            tightened=bench.run_extraction(bench.build_parser().parse_args([]),fixtures,chat)
+        self.assertEqual(tightened["gate_thresholds"]["min_critical_recall"],0.8)
+        self.assertFalse(tightened["gate_pass"])
+
     def test_report_config_records_fail_fast(self):
         with tempfile.TemporaryDirectory() as directory:
             report = Path(directory) / "report.json"

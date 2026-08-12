@@ -1,9 +1,10 @@
-import os, sqlite3, tempfile, time, unittest
+import os, sqlite3, tempfile, threading, time, unittest
 from unittest.mock import patch
 from concurrent.futures import ThreadPoolExecutor
 from airi_memory import (
     MemoryStore,
     NameScanner,
+    SQLITE_BUSY_TIMEOUT_MS,
     assemble_context,
     pack_vector,
     render_memory_placeholders,
@@ -17,7 +18,13 @@ class E:
 class MemoryTests(unittest.TestCase):
     def setUp(self):
         fd, self.db = tempfile.mkstemp(suffix='.db'); os.close(fd); self.e=E(); self.s=MemoryStore(self.db,self.e)
-    def tearDown(self): os.unlink(self.db)
+    def tearDown(self):
+        os.unlink(self.db)
+        # WAL mode leaves -wal/-shm sidecars until the last connection closes
+        # cleanly; clean up defensively so temp files never leak across runs.
+        for suffix in ('-wal', '-shm'):
+            sidecar = self.db + suffix
+            if os.path.exists(sidecar): os.unlink(sidecar)
     def test_schema_and_null_vector(self):
         self.s.embedder=None; x=self.s.add_item(kind='entity',subtype='person',name='Ada',content='person'); self.assertIsNone(self.s.active_rows(None)[0]['vector']); self.assertTrue(self.s.health()['ok'])
 
@@ -738,5 +745,62 @@ class MemoryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.s.apply_extraction_batch('s',reversed_op,{'e0':ada,'e1':bob},[user_id,assistant_id],1,extracted_items=relation)
         self.assertEqual(len(self.s.unextracted_messages('s')),2)
+
+    # -- MEM-04: WAL + busy_timeout (background extraction commits and
+    # response-path writes now share this DB; see _connect in airi_memory.py) --
+
+    def test_connect_enables_wal_journal_mode(self):
+        with self.s._session() as c:
+            self.assertEqual(c.execute('PRAGMA journal_mode').fetchone()[0].lower(), 'wal')
+
+    def test_connect_applies_configured_busy_timeout(self):
+        with self.s._session() as c:
+            self.assertEqual(c.execute('PRAGMA busy_timeout').fetchone()[0], SQLITE_BUSY_TIMEOUT_MS)
+
+    def test_concurrent_write_is_bounded_by_busy_timeout_not_instant_or_infinite(self):
+        """One connection holds an open write transaction well past busy_timeout;
+        a second connection's write must retry (not fail instantly) and then
+        give up with a clear error (not hang) once busy_timeout elapses."""
+        hold_seconds = (SQLITE_BUSY_TIMEOUT_MS / 1000) * 6  # generous margin over busy_timeout
+        ready, release = threading.Event(), threading.Event()
+        holder_errors: list[Exception] = []
+
+        def hold_write_lock():
+            # A sqlite3 connection must be created and used from the same
+            # thread (check_same_thread defaults to True), so open it here
+            # rather than sharing one created on the main thread.
+            holder = self.s._connect()
+            try:
+                holder.execute('BEGIN IMMEDIATE')
+                holder.execute("INSERT INTO metadata(key,value) VALUES ('mem04_smoke','1')")
+                ready.set()
+                release.wait(hold_seconds)
+                holder.commit()
+            except Exception as exc:  # pragma: no cover - surfaced via holder_errors
+                holder_errors.append(exc)
+            finally:
+                holder.close()
+
+        t = threading.Thread(target=hold_write_lock)
+        t.start()
+        try:
+            self.assertTrue(ready.wait(2), 'holder never acquired the write lock')
+            other = self.s._connect()
+            start = time.monotonic()
+            try:
+                with self.assertRaises(sqlite3.OperationalError) as ctx:
+                    other.execute('BEGIN IMMEDIATE')
+                elapsed = time.monotonic() - start
+                self.assertIn('locked', str(ctx.exception).lower())
+                # Not an instant failure: busy_timeout was actually honoured.
+                self.assertGreaterEqual(elapsed, (SQLITE_BUSY_TIMEOUT_MS / 1000) * 0.5)
+                # Not an unbounded hang: it gave up well before the holder released.
+                self.assertLess(elapsed, hold_seconds)
+            finally:
+                other.close()
+        finally:
+            release.set()
+            t.join(2)
+        self.assertEqual(holder_errors, [])
 
 if __name__=='__main__': unittest.main()

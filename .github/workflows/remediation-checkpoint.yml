@@ -95,7 +95,8 @@ jobs:
               ollama-proxy/test_memory_runtime.py
           - shard: ollama-proxy-api
             tests: >-
-              ollama-proxy/test_ollama_proxy.py ollama-proxy/test_provider_usage.py
+              ollama-proxy/test_ollama_proxy.py ollama-proxy/test_output_moderation.py
+              ollama-proxy/test_provider_usage.py
           - shard: ollama-proxy-topic-workflows
             tests: >-
               ollama-proxy/test_topic_board.py ollama-proxy/test_topic_discovery_workflow.py

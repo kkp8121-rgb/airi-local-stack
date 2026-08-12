@@ -673,6 +673,47 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r.store.job_state("s")["pending_msgs"], 0)
         await r.shutdown()
 
+    async def test_completed_turn_promotes_to_memory_off_the_dialogue_path(self):
+        from dataclasses import replace
+        stage_a = ('{"extracted":['
+                   '{"turnNumber":1,"kind":"entity","subtype":"person","name":"{{user}}","content":"아이리의 대화 상대"},'
+                   '{"turnNumber":1,"kind":"fact","subtype":"trait","subjectNames":["{{user}}"],'
+                   '"content":"{{user}}는 민트초코를 좋아한다.","turnRange":[1,1]}]}')
+        stage_b = ('{"decisions":[{"sourceItemIndex":0,"action":"add","candidateAlias":null,"reason":null},'
+                   '{"sourceItemIndex":1,"action":"add","candidateAlias":null,"reason":null}]}')
+        released = asyncio.Event()
+
+        class GatedClient(FakeClient):
+            async def post(self, url, json):
+                await released.wait()
+                return await FakeClient.post(self, url, json)
+
+        config = replace(self.config, extraction_threshold=2, user_display_name="민석")
+        r = MemoryRuntime(config, http_client=GatedClient((stage_a, stage_b)))
+        await r.startup()
+        outcome = await r.schedule_completed_turn("s", "나는 민트초코를 좋아해.", "기억할게.", 1, "trace")
+        self.assertEqual(outcome, "appended")
+        # Scheduling hands the extractor to a background task: the caller never
+        # waits for the two Stage A/B round trips.
+        task = r._extract_tasks["s"]
+        self.assertFalse(task.done())
+        self.assertEqual(len(r.http_client.calls), 0)
+        released.set()
+        await task
+        self.assertEqual(len(r.http_client.calls), 2)
+        self.assertEqual((await asyncio.to_thread(r.store.job_state, "s"))["extracted_up_to_msg"], 1)
+        self.assertEqual(len(await asyncio.to_thread(r.store.active_rows, "s", "fact")), 1)
+        # The promoted fact reaches the prompt through the [Character Memory]
+        # injection path that viewer memory will reuse.
+        payload = {"messages": [{"role": "system", "content": "AIRI"},
+                                {"role": "user", "content": "내가 뭘 좋아한다고 했지?"}]}
+        prepared, _result = await r.prepare_payload_context(
+            payload, payload["messages"], session="s", question="내가 뭘 좋아한다고 했지?", trace_id="recall")
+        memory = next(item["content"] for item in prepared["messages"]
+                      if item["role"] == "system" and item["content"].startswith("[Character Memory]"))
+        self.assertIn("민석은 민트초코를 좋아한다.", memory)
+        await r.shutdown()
+
     async def test_odd_message_batch_never_splits_a_completed_turn(self):
         config = MemoryConfig(enabled=True, db_path=self.db, extraction_threshold=2,
                               extraction_batch_messages=3, shutdown_flush_timeout_ms=1000,

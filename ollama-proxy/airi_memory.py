@@ -39,6 +39,24 @@ RETENTION_MAX_MEMORY_ROWS_PER_SESSION = 2048
 RETENTION_MAINTENANCE_INTERVAL_MESSAGES = 64
 RETENTION_INCREMENTAL_VACUUM_PAGES = 128
 JOURNAL_FTS_CANDIDATE_MESSAGES = 256
+# MEM-04: background Stage A/B extraction commits and response-path writes
+# (append_turn, bootstrap_turns_if_empty, ...) now share this DB, so a writer
+# can hold a RESERVED lock while another connection wants to write too.
+# retrieve() is unaffected regardless of this value: memory_runtime.py wraps
+# it in asyncio.wait_for(..., retrieve_timeout_ms=150ms), so it is cut off at
+# the asyncio layer even if the underlying call is still blocked in SQLite.
+# Every other store call (append_turn, extraction commits, ...) instead runs
+# via plain asyncio.to_thread with no wrapping timeout, so whatever this
+# connection blocks on lands directly on request latency — it must stay a
+# fast-fail bound, not Python sqlite3's implicit 5000ms default.  100ms (the
+# initial guess, sized off the single-digit-ms cost of one INSERT/UPDATE
+# transaction) measurably regressed test_concurrent_completed_turns_are_
+# serialized_in_sqlite (8 threads racing append_turn on one session): queuing
+# behind 7 other writers' lock handoffs — not any one commit — is what needs
+# covering. 500ms passed that test 10/10 with no failures where 100ms failed
+# ~2/3 runs; it stays far below Python's old 5s default while giving genuine
+# contention room to resolve instead of surfacing as "database is locked".
+SQLITE_BUSY_TIMEOUT_MS = 500
 
 
 _PLACEHOLDER_PARTICLE_RE = re.compile(
@@ -294,6 +312,19 @@ class MemoryStore:
         c = sqlite3.connect(self.path)
         c.row_factory = sqlite3.Row
         c.execute("PRAGMA foreign_keys=ON")
+        # Set before journal_mode so the WAL switch itself (first connection
+        # only; later connections see it already applied) also retries on a
+        # busy database instead of failing immediately.
+        c.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}")
+        try:
+            # ":memory:" (and other in-memory URIs) cannot use WAL; SQLite
+            # silently keeps journal_mode="memory" instead of raising, but
+            # some filesystems (e.g. network shares) reject WAL outright —
+            # fall back to the default journal mode rather than breaking the
+            # connection either way.
+            c.execute("PRAGMA journal_mode=WAL")
+        except sqlite3.Error:
+            pass
         return c
 
     @contextmanager

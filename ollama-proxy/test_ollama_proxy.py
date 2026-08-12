@@ -2,7 +2,9 @@ import ast
 import asyncio
 import contextlib
 import json
+import os
 import re
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -18,6 +20,18 @@ import ollama_proxy
 def grounding_mode(mode: str):
     """Pin one grounding policy so an expectation states which mode it asserts."""
     with mock.patch.object(ollama_proxy, "GROUNDING_MODE", mode):
+        yield
+
+
+@contextlib.contextmanager
+def model_environment(**values: object):
+    """Pin the model SSoT environment; ``None`` removes a variable entirely."""
+    with mock.patch.dict("os.environ", {}, clear=False):
+        for name, value in values.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = str(value)
         yield
 
 
@@ -5863,6 +5877,348 @@ class GroundingModeTests(unittest.TestCase):
         self.assertEqual(openai_sse_dialogue(response.text), reflection)
         self.assertEqual(memory.completed[0]["assistant"], reflection)
         self.assertEqual(len(chat.requests), 1)
+
+
+class ChatModelSsotTests(unittest.TestCase):
+    """The launcher-selected model must own every local foreground turn."""
+
+    def _local_chat(
+        self,
+        *,
+        requested_model: str,
+        headers: dict[str, str] | None = None,
+        client_host: str = "testclient",
+    ) -> tuple[object, _CapturingChatClient]:
+        chat = _CapturingChatClient("응.")
+        with mock.patch.object(ollama_proxy, "client", chat):
+            response = TestClient(ollama_proxy.app, client=(client_host, 9)).post(
+                "/v1/chat/completions",
+                headers=headers or {},
+                json={
+                    "model": requested_model,
+                    "stream": True,
+                    "messages": [{"role": "user", "content": "안녕"}],
+                },
+            )
+        return response, chat
+
+    def test_selected_model_resolves_from_the_launcher_environment(self) -> None:
+        with model_environment(AIRI_CHAT_MODEL=None):
+            self.assertEqual(ollama_proxy.resolve_chat_model(), "midm-airi:2.0-mini")
+        for value in ("", "   "):
+            with self.subTest(value=value), model_environment(AIRI_CHAT_MODEL=value):
+                self.assertEqual(ollama_proxy.resolve_chat_model(), "midm-airi:2.0-mini")
+        with model_environment(AIRI_CHAT_MODEL="  exaone-airi:2.4b  "):
+            self.assertEqual(ollama_proxy.resolve_chat_model(), "exaone-airi:2.4b")
+
+    def test_proxy_source_keeps_no_second_hardcoded_model_tag(self) -> None:
+        # A tag that only lives in the launcher default cannot drift; a tag
+        # copied into a branch of this module silently can.
+        source = Path(ollama_proxy.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("exaone", source)
+        self.assertEqual(source.count('"midm-airi:2.0-mini"'), 1)
+        self.assertEqual(ollama_proxy.DEFAULT_CHAT_MODEL, "midm-airi:2.0-mini")
+
+    def test_desktop_request_cannot_pin_a_model_the_launcher_did_not_select(self) -> None:
+        with model_environment(
+            AIRI_CHAT_MODEL=None, AIRI_CHAT_PROVIDER=None, AIRI_CHAT_MODEL_ENFORCE=None
+        ):
+            _response, chat = self._local_chat(requested_model="exaone-airi:2.4b")
+            self.assertTrue(chat.requests)
+            for request in chat.requests:
+                self.assertEqual(request["model"], "midm-airi:2.0-mini")
+
+    def test_chat_model_rollback_travels_through_the_same_source_of_truth(self) -> None:
+        with model_environment(AIRI_CHAT_MODEL="exaone-airi:2.4b"):
+            _response, chat = self._local_chat(requested_model="midm-airi:2.0-mini")
+            self.assertEqual(chat.requests[0]["model"], "exaone-airi:2.4b")
+
+    def test_loopback_test_origins_keep_their_explicitly_requested_model(self) -> None:
+        # benchmark_dialogue_quality.py --model and the soak runners rely on
+        # these markers, so an A/B run still reaches the model it names.
+        with model_environment(AIRI_CHAT_MODEL="midm-airi:2.0-mini"):
+            for origin in ("local-quality-probe", "local-evaluation"):
+                with self.subTest(origin=origin):
+                    _response, chat = self._local_chat(
+                        requested_model="exaone-airi:2.4b",
+                        headers={"x-airi-turn-origin": origin},
+                        client_host="127.0.0.1",
+                    )
+                    self.assertEqual(chat.requests[0]["model"], "exaone-airi:2.4b")
+                    # The same header from a remote peer is not a test origin.
+                    _response, remote = self._local_chat(
+                        requested_model="exaone-airi:2.4b",
+                        headers={"x-airi-turn-origin": origin},
+                        client_host="10.0.0.8",
+                    )
+                    self.assertEqual(remote.requests[0]["model"], "midm-airi:2.0-mini")
+
+    def test_external_provider_model_name_never_reaches_the_local_runner(self) -> None:
+        with model_environment(
+            AIRI_CHAT_PROVIDER="openai", AIRI_CHAT_MODEL="gpt-4.1-mini"
+        ):
+            self.assertFalse(ollama_proxy.chat_model_ssot_enforced())
+            _response, chat = self._local_chat(requested_model="midm-airi:2.0-mini")
+            self.assertEqual(chat.requests[0]["model"], "midm-airi:2.0-mini")
+
+    def test_enforcement_has_an_explicit_documented_escape_hatch(self) -> None:
+        for value in ("0", "false", "no", "off"):
+            with self.subTest(value=value), model_environment(
+                AIRI_CHAT_MODEL="midm-airi:2.0-mini", AIRI_CHAT_MODEL_ENFORCE=value
+            ):
+                self.assertFalse(ollama_proxy.chat_model_ssot_enforced())
+                _response, chat = self._local_chat(requested_model="exaone-airi:2.4b")
+                self.assertEqual(chat.requests[0]["model"], "exaone-airi:2.4b")
+
+    def test_health_reports_the_selected_model_and_the_replaced_tag(self) -> None:
+        telemetry = ollama_proxy.ChatModelTelemetry()
+        with mock.patch.object(
+            ollama_proxy, "chat_model_telemetry", telemetry
+        ), model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini",
+            AIRI_CHAT_PROVIDER=None,
+            AIRI_CHAT_MODEL_ENFORCE=None,
+        ):
+            self._local_chat(requested_model="exaone-airi:2.4b")
+            self._local_chat(requested_model="midm-airi:2.0-mini")
+            reported = TestClient(ollama_proxy.app).get("/health").json()["chat_model"]
+
+        self.assertEqual(reported["model"], "midm-airi:2.0-mini")
+        self.assertEqual(reported["provider"], "local")
+        self.assertTrue(reported["enforced"])
+        self.assertEqual(reported["normalized_requests"], 1)
+        self.assertEqual(reported["matching_requests"], 1)
+        self.assertEqual(reported["last_requested_model"], "exaone-airi:2.4b")
+
+    def test_evaluation_provenance_follows_the_selected_model(self) -> None:
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini",
+            AIRI_EVAL_MODEL=None,
+            AIRI_EVAL_MODEL_VERSION=None,
+            AIRI_EVAL_ORIGIN=None,
+            AIRI_EVAL_DATASET_VERSION=None,
+        ):
+            trusted = ollama_proxy._configured_evaluation_provenance()
+            self.assertEqual(trusted["model"], "midm-airi:2.0-mini")
+            self.assertEqual(trusted["model_version"], "midm-airi:2.0-mini")
+        # An empty launcher value means "not configured", never an empty label.
+        with model_environment(
+            AIRI_CHAT_MODEL="exaone-airi:2.4b",
+            AIRI_EVAL_MODEL="",
+            AIRI_EVAL_MODEL_VERSION="",
+        ):
+            trusted = ollama_proxy._configured_evaluation_provenance()
+            self.assertEqual(trusted["model"], "exaone-airi:2.4b")
+            self.assertEqual(trusted["model_version"], "exaone-airi:2.4b")
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini",
+            AIRI_EVAL_MODEL="gpt-4.1-mini",
+            AIRI_EVAL_MODEL_VERSION=None,
+        ):
+            trusted = ollama_proxy._configured_evaluation_provenance()
+            self.assertEqual(trusted["model"], "gpt-4.1-mini")
+            self.assertEqual(trusted["model_version"], "gpt-4.1-mini")
+
+
+class ChatModelDigestPreflightTests(unittest.TestCase):
+    """A reusable tag name is not proof of the approved model artifact."""
+
+    DIGEST = "a" * 64
+    OTHER = "b" * 64
+
+    def _models(self, name: str = "midm-airi:2.0-mini", digest: str | None = None) -> list[dict[str, str]]:
+        return [
+            {"name": "nlpai-lab/KURE-v1:latest", "digest": "c" * 64},
+            {"name": name, "digest": digest or self.DIGEST},
+        ]
+
+    def test_tag_matching_follows_ollama_including_implicit_latest(self) -> None:
+        self.assertEqual(
+            ollama_proxy.normalize_ollama_model_name(" Midm-Airi:2.0-Mini "),
+            "midm-airi:2.0-mini",
+        )
+        self.assertEqual(
+            ollama_proxy.normalize_ollama_model_name("hf.co/vendor/model"),
+            "hf.co/vendor/model:latest",
+        )
+        self.assertEqual(
+            ollama_proxy.local_model_digest(self._models(), "midm-airi:2.0-mini"),
+            self.DIGEST,
+        )
+        self.assertEqual(
+            ollama_proxy.local_model_digest(self._models(), "midm-airi:9.9-none"), ""
+        )
+        ambiguous = [
+            {"name": "midm-airi:2.0-mini", "digest": self.DIGEST},
+            {"model": "midm-airi:2.0-mini", "digest": self.OTHER},
+        ]
+        self.assertEqual(
+            ollama_proxy.local_model_digest(ambiguous, "midm-airi:2.0-mini"), ""
+        )
+
+    def test_pinned_digest_is_a_fail_closed_startup_gate(self) -> None:
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini", AIRI_CHAT_MODEL_DIGEST=self.DIGEST
+        ):
+            state = ollama_proxy.preflight_chat_model_digest(fetch=lambda: self._models())
+            self.assertEqual(state["status"], "pinned")
+            self.assertTrue(state["verified"])
+            self.assertEqual(state["digest"], self.DIGEST)
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini", AIRI_CHAT_MODEL_DIGEST=self.OTHER
+        ):
+            # A tag rebuilt from other bytes must not be able to start a turn.
+            with self.assertRaises(ollama_proxy.ChatModelDigestError):
+                ollama_proxy.preflight_chat_model_digest(fetch=lambda: self._models())
+
+    def test_pinned_startup_also_fails_when_the_artifact_cannot_be_read(self) -> None:
+        def unavailable() -> object:
+            raise RuntimeError("local Ollama is not listening")
+
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini", AIRI_CHAT_MODEL_DIGEST=self.DIGEST
+        ):
+            with self.assertRaises(ollama_proxy.ChatModelDigestError):
+                ollama_proxy.preflight_chat_model_digest(fetch=unavailable)
+        for invalid in ("not-a-digest", "A" * 63):
+            with self.subTest(invalid=invalid), model_environment(
+                AIRI_CHAT_MODEL_DIGEST=invalid
+            ):
+                with self.assertRaises(ollama_proxy.ChatModelDigestError):
+                    ollama_proxy.preflight_chat_model_digest(fetch=lambda: self._models())
+
+    def test_unpinned_startup_only_records_the_observed_artifact(self) -> None:
+        def unavailable() -> object:
+            raise RuntimeError("local Ollama is not listening")
+
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini", AIRI_CHAT_MODEL_DIGEST=None
+        ):
+            observed = ollama_proxy.preflight_chat_model_digest(fetch=lambda: self._models())
+            self.assertEqual(observed["status"], "observed")
+            self.assertEqual(observed["digest"], self.DIGEST)
+            self.assertFalse(observed["verified"])
+            self.assertFalse(observed["pinned"])
+            missing = ollama_proxy.preflight_chat_model_digest(fetch=lambda: [])
+            self.assertEqual(missing["status"], "unresolved")
+            self.assertEqual(
+                ollama_proxy.preflight_chat_model_digest(fetch=unavailable)["status"],
+                "unavailable",
+            )
+
+    def test_external_chat_provider_skips_the_local_artifact_check(self) -> None:
+        with model_environment(
+            AIRI_CHAT_PROVIDER="anthropic",
+            AIRI_CHAT_MODEL="claude-sonnet-4-5",
+            AIRI_CHAT_MODEL_DIGEST=self.DIGEST,
+        ):
+            state = ollama_proxy.preflight_chat_model_digest(fetch=lambda: self._models())
+        self.assertEqual(state["status"], "skipped_external_provider")
+
+    def test_startup_refuses_to_serve_an_unapproved_artifact(self) -> None:
+        original_state = dict(ollama_proxy.CHAT_MODEL_DIGEST_STATE)
+        self.addCleanup(
+            setattr, ollama_proxy, "CHAT_MODEL_DIGEST_STATE", original_state
+        )
+        served: list[object] = []
+
+        class _Tags:
+            @staticmethod
+            def raise_for_status() -> None:
+                return None
+
+            @staticmethod
+            def json() -> dict[str, object]:
+                return {"models": [{"name": "midm-airi:2.0-mini", "digest": "a" * 64}]}
+
+        def run_startup() -> None:
+            with mock.patch.object(sys, "argv", ["ollama_proxy.py"]), mock.patch.object(
+                ollama_proxy.httpx, "get", lambda url, timeout=None: _Tags()
+            ), mock.patch.object(
+                ollama_proxy.uvicorn, "run", lambda *args, **kwargs: served.append(True)
+            ):
+                ollama_proxy.main()
+
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini", AIRI_CHAT_MODEL_DIGEST=self.OTHER
+        ):
+            with self.assertRaises(SystemExit) as refused:
+                run_startup()
+        self.assertEqual(refused.exception.code, 2)
+        self.assertEqual(served, [])
+
+        with model_environment(
+            AIRI_CHAT_MODEL="midm-airi:2.0-mini", AIRI_CHAT_MODEL_DIGEST=None
+        ):
+            run_startup()
+        self.assertEqual(served, [True])
+        self.assertEqual(ollama_proxy.CHAT_MODEL_DIGEST_STATE["digest"], "a" * 64)
+
+    def test_tag_lookup_reads_the_local_upstream_and_never_downloads(self) -> None:
+        calls: list[tuple[str, object]] = []
+
+        class _Tags:
+            @staticmethod
+            def raise_for_status() -> None:
+                return None
+
+            @staticmethod
+            def json() -> dict[str, object]:
+                return {"models": [{"name": "midm-airi:2.0-mini", "digest": "d" * 64}]}
+
+        def fake_get(url: str, timeout: object = None) -> object:
+            calls.append((url, timeout))
+            return _Tags()
+
+        with mock.patch.object(ollama_proxy.httpx, "get", fake_get):
+            models = ollama_proxy.fetch_local_models()
+
+        self.assertEqual(calls, [(f"{ollama_proxy.UPSTREAM}/api/tags", 5.0)])
+        self.assertEqual(ollama_proxy.local_model_digest(models, "midm-airi:2.0-mini"), "d" * 64)
+
+
+class ImmediateAckMetadataTests(unittest.TestCase):
+    """Latency readings depend on knowing whether the turn opened with speech."""
+
+    def test_user_driven_local_turn_reports_an_audible_acknowledgement(self) -> None:
+        chat = _CapturingChatClient("응, 안녕!")
+        with mock.patch.object(ollama_proxy, "client", chat):
+            response = post_stream("안녕")
+
+        self.assertEqual(response.headers["X-AIRI-Immediate-Ack"], "audible")
+        self.assertTrue(
+            openai_sse_content(response.text).startswith(ollama_proxy.LOCAL_IMMEDIATE_ACK)
+        )
+
+    def test_proactive_turn_still_reports_silence(self) -> None:
+        with mock.patch.object(
+            ollama_proxy, "is_local_proactive_turn", return_value=True
+        ), mock.patch.object(ollama_proxy, "client", _CapturingChatClient("응.")):
+            response = post_stream_messages(
+                [{"role": "assistant", "content": "proactive cue"}]
+            )
+
+        self.assertEqual(response.headers["X-AIRI-Immediate-Ack"], "silent")
+
+    def test_cloud_search_turn_reports_an_audible_acknowledgement(self) -> None:
+        async def search(user_text: str, query: str) -> tuple[str, float]:
+            return "검색 결과야.", 1.0
+
+        with mock.patch.object(
+            ollama_proxy, "ALLOW_EXTERNAL_SEARCH", True
+        ), mock.patch.object(ollama_proxy, "run_codex_search", search), mock.patch.object(
+            ollama_proxy, "client", _StubClient(RuntimeError("unused"))
+        ):
+            response = post_stream("음유잉여 검색해줘")
+
+        self.assertEqual(response.headers["X-AIRI-Immediate-Ack"], "audible")
+        self.assertTrue(
+            openai_sse_content(response.text).startswith(ollama_proxy.SEARCH_IMMEDIATE_ACK)
+        )
+
+    def test_health_no_longer_claims_a_silent_acknowledgement(self) -> None:
+        reported = TestClient(ollama_proxy.app).get("/health").json()
+        self.assertEqual(reported["immediate_ack"], "audible")
 
 
 if __name__ == "__main__":
