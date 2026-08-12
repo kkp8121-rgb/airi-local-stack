@@ -53,6 +53,10 @@ runtime observations.
   Electron text→Mi:dm→GPT-SoVITS→Windows render measurement, the zero-length
   streaming-WAV fallback fix, P50/P95 results, and the remaining correlation
   and physical-audibility limits. STT is intentionally excluded.
+- `AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md` separates the EXAONE→Mi:dm
+  raw-model effect from the current proxy/grounding effect, records the
+  counterbalanced 120-turn-per-model comparison, and lists verified benefits,
+  regressions, and unresolved model-identity/provenance risks.
 - `AIRI-WORK-CHECKPOINT-2026-08-10.md` is listed as historical above, but its
   lines 88-105 are the only record of the completed source build and the
   installed archive hash. Read that section before planning any client-side
