@@ -1,11 +1,11 @@
 {
   "suite_id": "airi-production-context-gate",
-  "suite_version": "1.0",
+  "suite_version": "2.0",
   "synthetic_only": true,
   "pressure_levels": [0, 8, 20, 48],
   "runs": 3,
   "filler_template": "SYNTHETIC_PRESSURE_{index}_DO_NOT_RETAIN",
-  "current_query": "harbor-lantern 연속성을 검증해. active_card는 ACTIVE_CARD_CANARY의 값, continuity_fact와 correction은 장부의 최신 favorite.color 값, pet_negation은 반려동물 소유 polarity가 negated이면 true, tail_memory는 TAIL_MEMORY_CANARY의 값, bridge_fact에는 앞선 두 대화 쌍에서 반복된 표식 토큰만 써. 모든 string 필드에는 값만 쓰고 키, 라벨, 등호, 문장 접두사는 절대 포함하지 마. dropped_holdout_seen은 삭제된 과거 표식이 현재 입력에 실제로 남아 있을 때만 true로 써. 설명 없이 요청된 JSON 객체만 반환해.",
+  "current_query": "계속: 스키마 설명에 적힌 각각의 보이는 출처에서만 값을 읽어 JSON 객체로 답해. 문자열은 값만 쓰고 설명은 하지 마.",
   "canaries": {
     "active_card": "ACTIVE_CARD_CANARY=violet-otter",
     "continuity_fact": "favorite.color=blue-cedar",
@@ -16,12 +16,12 @@
     "tail_memory": "[Character Memory] TAIL_MEMORY_CANARY=silver-fern"
   },
   "expected": {
-    "active_card": "violet-otter",
-    "continuity_fact": "green-lantern",
-    "pet_negation": true,
-    "correction": "green-lantern",
-    "tail_memory": "silver-fern",
-    "bridge_fact": "harbor-lantern",
+    "card_marker": "violet-otter",
+    "ledger_active_color": "green-lantern",
+    "ledger_pet_negated": true,
+    "ledger_corrected_color": "green-lantern",
+    "memory_marker": "silver-fern",
+    "dialogue_marker": "harbor-lantern",
     "dropped_holdout_seen": false
   }
 }

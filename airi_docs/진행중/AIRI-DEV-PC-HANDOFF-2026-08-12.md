@@ -4,9 +4,11 @@
 이 문서는 그 결과와, **dev PC에서만 가능한 잔여 검증·후속 작업**의 전체
 목록이다. 착수 전 이 문서와 아래 근거 문서를 정독하라.
 
-- 현행 완료 tip: `aef5300`(STT OFF 방송 프로필; 기반 배치
-  `7dc4e76` 문서, `932eae6` 코드)
-- 오프라인 검증: **`aef5300`의 CI `python-core-tests` matrix 41개 추적 경로**
+- historical base: `aef5300`(STT OFF 방송 프로필; 기반 배치
+  `7dc4e76` 문서, `932eae6` 코드). 이는 현행 branch tip이 아니다.
+- 현재 branch는 `0db431c`의 continuity hardening 이후 production-context v2
+  source-binding batch까지 포함한다. exact tip은 `git log -1`로 확인한다.
+- 오프라인 historical 검증: **`aef5300`의 CI `python-core-tests` matrix 41개 추적 경로**
   **829 passed / 1 skipped / 706 subtests**
   (기준 733/1/504), `test-patch-manifest.ps1` PASS, 소스·문서
   `git diff --check` 클린(생성된 runtime patch 내부 source whitespace 제외)
@@ -226,9 +228,9 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
    historical 829는 base `aef5300`만의 수치다. 상세:
    `완료/AIRI-CONTEXT-WINDOW-SSOT-AND-4096-TRIAGE-2026-08-13.md`.
 
-3. **production context·continuity gate (2026-08-13)** — 실제 proxy 경로의 budget/card/정정 표현과 고정 0/8/20/48 압력×3회 측정은 완료했다. 구조·privacy·ordering은 PASS지만 `bridge_fact` 0/12, continuity fact/latest correction 각 11/12로 semantic 전체는 FAIL이다. raw capacity A/B를 대체하지 않으며 default 2048, extraction OFF를 유지한다. 다음은 bridge-vs-memory field binding 개선 후 같은 게이트 재실행이다. CI-equivalent Python 3.12.13 exact matrix는 855 passed / 1 skipped / 7 warnings / 708 subtests (44.67s) PASS; CI push는 아직 pending이다. 상세: `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md`.
+4. **production context·continuity gate (2026-08-13, v2)** — 실제 proxy 경로의 budget/card/정정 표현과 고정 0/8/20/48 압력×3회 측정은 완료했다. generic structured-output 계약으로 spoken style 충돌을 제거하고 source-oriented fields·답 canary가 없는 질문·swapped/reordered anti-overfit test를 추가했다. 7개 필드 중 6개는 12/12이고 두 continuity color 필드는 v1의 11/12에서 개선됐으나, `dialogue_marker` 0/12가 memory marker `silver-fern`을 결정적으로 복사해 semantic/gate/authoritative 전체는 FAIL이다. dialogue-vs-memory는 모델 한계로 결론냈으므로 prompt tuning을 계속하지 않는다. raw capacity A/B를 대체하지 않으며 default 2048, extraction OFF를 유지한다. v2 전체 CI-equivalent Python 3.12.13 matrix는 858 passed / 1 skipped / 7 warnings / 708 subtests (45.04s) PASS다. 상세: `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md`.
 
-4. **STT/실제 마이크** — 기본 방송은 chat/text 입력 + STT OFF이며 Electron
+5. **STT/실제 마이크** — 기본 방송은 chat/text 입력 + STT OFF이며 Electron
    마이크 토글도 OFF다. 기본 런처는 `-Stt off`; 명시적인 `-Stt on` 또는
    `AIRI_STT=on`만 opt-in이다. 사용자가 STT/마이크 개발 재개를 요청하면
    `-Stt on`으로 시작해 실제 mic 20+20, AEC, barge-in 시험을 수행한다.

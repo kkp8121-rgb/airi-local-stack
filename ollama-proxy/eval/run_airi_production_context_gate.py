@@ -17,23 +17,21 @@ from continuity_ledger import CONTINUITY_LEDGER_MESSAGE_NAME, ContinuityLedgerRu
 from memory_runtime import assemble_payload_context_from_snapshot
 from ollama_proxy import ACTIVE_CARD_MESSAGE_NAME, inject_response_language, inject_response_mode, native_chat_stream_body, transform_body
 
-RUNNER_VERSION = "1.0"
+RUNNER_VERSION = "2.0"
 DEFAULT_ENDPOINT = "http://127.0.0.1:11434/api/chat"
-FIELDS = ("active_card", "continuity_fact", "pet_negation", "correction", "tail_memory", "bridge_fact", "dropped_holdout_seen")
-SCHEMA = {
-    "type": "object",
-    "additionalProperties": False,
-    "required": list(FIELDS),
-    "properties": {
-        "active_card": {"type": "string", "description": "Bare value after ACTIVE_CARD_CANARY=; never include key or equals sign"},
-        "continuity_fact": {"type": "string", "description": "Bare latest active favorite.color value; never include key or equals sign"},
-        "pet_negation": {"type": "boolean", "description": "True exactly when the pet ownership ledger entry has negated polarity"},
-        "correction": {"type": "string", "description": "Bare corrected favorite.color value; never include key or equals sign"},
-        "tail_memory": {"type": "string", "description": "Bare value after TAIL_MEMORY_CANARY=; never include key or equals sign"},
-        "bridge_fact": {"type": "string", "description": "Exact repeated bridge marker token only; never include surrounding words"},
-        "dropped_holdout_seen": {"type": "boolean", "description": "True only if a dropped old holdout marker is actually visible"},
-    },
+FIELDS = ("card_marker", "ledger_active_color", "ledger_pet_negated", "ledger_corrected_color", "memory_marker", "dialogue_marker", "dropped_holdout_seen")
+FIELD_SCHEMAS = {
+    "card_marker": {"type": "string", "description": "보이는 Active Character Card의 표식 값"},
+    "ledger_active_color": {"type": "string", "description": "보이는 AIRI Continuity Data의 현재 favorite.color 값"},
+    "ledger_pet_negated": {"type": "boolean", "description": "보이는 AIRI Continuity Data의 반려동물 negated polarity"},
+    "ledger_corrected_color": {"type": "string", "description": "보이는 AIRI Continuity Data의 수정된 favorite.color 값"},
+    "memory_marker": {"type": "string", "description": "보이는 Character Memory 시스템 블록의 표식 값(user/assistant 제외)"},
+    "dialogue_marker": {"type": "string", "description": "보존된 user/assistant 대화의 반복 표식 값(시스템 블록 제외)"},
+    "dropped_holdout_seen": {"type": "boolean", "description": "보이는 현재 입력의 오래된 holdout 표식 여부"},
 }
+def ordered_schema(field_order=FIELDS):
+    return {"type": "object", "additionalProperties": False, "required": list(field_order), "properties": {field: FIELD_SCHEMAS[field] for field in field_order}}
+SCHEMA = ordered_schema()
 
 class EvalError(RuntimeError): pass
 class TransportError(EvalError): pass
@@ -46,7 +44,7 @@ def load_fixture(path=None):
     except (OSError, json.JSONDecodeError) as exc: raise EvalError("invalid fixture") from exc
     return validate_fixture(value)
 def validate_fixture(value):
-    if not isinstance(value, dict) or value.get("synthetic_only") is not True or value.get("pressure_levels") != [0, 8, 20, 48] or value.get("runs") != 3:
+    if not isinstance(value, dict) or value.get("suite_version") != RUNNER_VERSION or value.get("synthetic_only") is not True or value.get("pressure_levels") != [0, 8, 20, 48] or value.get("runs") != 3:
         raise EvalError("fixture requires exactly pressures 0,8,20,48 and three runs")
     if (not isinstance(value.get("canaries"), dict)
             or not isinstance(value.get("current_query"), str)
@@ -102,15 +100,15 @@ def build_original(fixture, pressure):
         {"role":"user", "content":fixture["current_query"]},
     ))
     return messages
-def base_payload(messages, args):
-    return {"model":args.model, "messages":messages, "stream":False, "format":SCHEMA, "think":False, "keep_alive":args.keep_alive, "options":{"num_ctx":args.num_ctx, "temperature":args.temperature, "seed":args.seed, "num_predict":args.num_predict}}
-def pipeline(fixture, pressure, args):
+def base_payload(messages, args, schema=SCHEMA):
+    return {"model":args.model, "messages":messages, "stream":False, "format":schema, "think":False, "keep_alive":args.keep_alive, "options":{"num_ctx":args.num_ctx, "temperature":args.temperature, "seed":args.seed, "num_predict":args.num_predict}}
+def pipeline(fixture, pressure, args, *, field_order=FIELDS, schema=None):
     original = build_original(fixture, pressure); before = copy.deepcopy(original)
     # Use the same stateful runtime as an explicit production session, but a
     # fresh bounded instance per synthetic case so the gate has no cross-run
     # state and never touches the memory runtime, store, DB, or user data.
     ledger = ContinuityLedgerRuntime(max_sessions=1).observe("synthetic-production-gate", original)
-    body = canonical(base_payload(original, args)).encode()
+    body = json.dumps(base_payload(original, args, schema or ordered_schema(field_order)), ensure_ascii=False, separators=(",", ":")).encode()
     transformed, *_ = transform_body(
         "/api/chat", body, continuity_block=ledger,
         num_ctx=args.num_ctx, num_gpu=args.num_gpu,
@@ -127,7 +125,7 @@ def pipeline(fixture, pressure, args):
         projected_message_count=projected_message_count,
         memory_block=fixture["canaries"]["tail_memory"],
     )
-    localized = inject_response_language(canonical(assembled).encode(), "한국어")
+    localized = inject_response_language(json.dumps(assembled, ensure_ascii=False, separators=(",", ":")).encode(), "한국어")
     localized = inject_response_mode(localized, fixture["current_query"])
     native = json.loads(native_chat_stream_body(
         localized, apply_sampling_defaults=False,
@@ -142,11 +140,11 @@ def pipeline(fixture, pressure, args):
     named = [m.get("name") for m in messages if isinstance(m, dict) and m.get("name")]
     native_text = "\n".join(str(m.get("content", "")) for m in native_messages if isinstance(m, dict))
     occurrence_counts = {
-        "active_card": native_text.count(fixture["canaries"]["active_card"]),
-        "tail_memory": native_text.count(fixture["canaries"]["tail_memory"]),
+        "card_marker": native_text.count(fixture["canaries"]["active_card"]),
+        "memory_marker": native_text.count(fixture["canaries"]["tail_memory"]),
         "continuity_ledger": native_text.count("[AIRI Continuity Data v1"),
-        "correction": native_text.count(fixture["expected"]["correction"]),
-        "bridge": native_text.count(fixture["expected"]["bridge_fact"]),
+        "ledger_corrected_color": native_text.count(fixture["expected"]["ledger_corrected_color"]),
+        "dialogue_marker": native_text.count(fixture["expected"]["dialogue_marker"]),
         "holdout": native_text.count(fixture["canaries"]["dropped_holdout"]),
     }
     structural = {
@@ -159,8 +157,8 @@ def pipeline(fixture, pressure, args):
         "projected_two_pairs": [m.get("role") for m in messages[1:6]] == ["user", "assistant", "user", "assistant", "system"],
         "filler_absent": "SYNTHETIC_PRESSURE_" not in native_text,
         "holdout_absent": occurrence_counts["holdout"] == 0,
-        "required_once": all(occurrence_counts[key] == 1 for key in ("active_card", "tail_memory", "continuity_ledger", "correction")),
-        "bridge_retained": occurrence_counts["bridge"] >= 5,
+        "required_once": all(occurrence_counts[key] == 1 for key in ("card_marker", "memory_marker", "continuity_ledger", "ledger_corrected_color")),
+        "dialogue_retained": occurrence_counts["dialogue_marker"] == 4,
     }
     return {
         "original": original,
@@ -175,12 +173,12 @@ def pipeline(fixture, pressure, args):
     }
 def _ordered(messages):
     text = [str(m.get("content", "")) for m in messages if isinstance(m, dict)]
-    memory = next((i for i,x in enumerate(text) if "TAIL_MEMORY_CANARY" in x), -1); card = next((i for i,x in enumerate(text) if "Active Character Card" in x), -1); ledger = next((i for i,x in enumerate(text) if "AIRI Continuity Data v1" in x), -1)
+    memory = next((i for i,x in enumerate(text) if "[Character Memory]" in x), -1); card = next((i for i,x in enumerate(text) if "Active Character Card" in x), -1); ledger = next((i for i,x in enumerate(text) if "AIRI Continuity Data v1" in x), -1)
     return 0 <= memory < card < ledger
 def valid_response(response):
     try: data = json.loads(response["message"]["content"])
     except (KeyError, TypeError, json.JSONDecodeError) as exc: raise SchemaError("malformed schema response") from exc
-    if not isinstance(data, dict) or response.get("done") is not True or set(data) != set(FIELDS) or not isinstance(data.get("pet_negation"), bool) or not isinstance(data.get("dropped_holdout_seen"), bool) or any(not isinstance(data.get(k), str) for k in FIELDS if k not in {"pet_negation", "dropped_holdout_seen"}): raise SchemaError("response schema mismatch")
+    if not isinstance(data, dict) or response.get("done") is not True or set(data) != set(FIELDS) or not isinstance(data.get("ledger_pet_negated"), bool) or not isinstance(data.get("dropped_holdout_seen"), bool) or any(not isinstance(data.get(k), str) for k in FIELDS if k not in {"ledger_pet_negated", "dropped_holdout_seen"}): raise SchemaError("response schema mismatch")
     return data
 def score(data, expected):
     failures = [field for field in FIELDS if data.get(field) != expected[field]]
@@ -193,7 +191,8 @@ def percentile(values, fraction):
 def chat_once(endpoint, body, timeout):
     p = urlparse(endpoint); conn = (http.client.HTTPSConnection if p.scheme == "https" else http.client.HTTPConnection)(p.hostname, p.port, timeout=timeout)
     try:
-        conn.request("POST", p.path or "/api/chat", body=canonical(body).encode(), headers={"Content-Type":"application/json"}); response = conn.getresponse(); raw = response.read()
+        wire_body = json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode()
+        conn.request("POST", p.path or "/api/chat", body=wire_body, headers={"Content-Type":"application/json"}); response = conn.getresponse(); raw = response.read()
         if response.status >= 400: raise TransportError("HTTP %s" % response.status)
         return json.loads(raw.decode())
     except OSError as exc: raise TransportError("transport failure") from exc

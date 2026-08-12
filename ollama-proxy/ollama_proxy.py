@@ -4670,7 +4670,73 @@ def response_sentence_limit(user_text: str) -> int:
     ) else 1
 
 
+STRUCTURED_OUTPUT_CONTRACT = (
+    "이번 응답은 대사가 아니라 schema가 지정한 JSON 객체다. "
+    "각 property는 description이 지정한 역할 또는 [] system 블록에서만 읽어라. "
+    "문자열에는 key·label·등호 없이 값만 쓰고, "
+    "한 property의 source 값을 다른 property에 재사용하지 마."
+)
+_SPOKEN_REQUEST_LOCAL_PREFIXES = (
+    "이번 응답 언어:",
+    "이번 응답 문체:",
+)
+
+
+def inject_structured_output_contract(body: bytes) -> bytes:
+    """Replace spoken-style paragraphs while preserving request evidence."""
+    try:
+        payload = json.loads(body)
+        messages = payload.get("messages") if isinstance(payload, dict) else None
+        if not isinstance(messages, list):
+            return body
+        retained: list[str] = []
+        kept_messages: list[object] = []
+        for message in messages:
+            if (
+                isinstance(message, dict)
+                and message.get("role") == "system"
+                and message.get("name") == REQUEST_LOCAL_SYSTEM_MESSAGE_NAME
+                and isinstance(message.get("content"), str)
+            ):
+                retained.extend(
+                    paragraph.strip()
+                    for paragraph in message["content"].split("\n\n")
+                    if paragraph.strip()
+                    and not paragraph.strip().startswith(_SPOKEN_REQUEST_LOCAL_PREFIXES)
+                )
+                continue
+            kept_messages.append(message)
+        insert_at = next(
+            (
+                index
+                for index in range(len(kept_messages) - 1, -1, -1)
+                if isinstance(kept_messages[index], dict)
+                and kept_messages[index].get("role") == "user"
+            ),
+            len(kept_messages),
+        )
+        kept_messages.insert(
+            insert_at,
+            {
+                "role": "system",
+                "name": REQUEST_LOCAL_SYSTEM_MESSAGE_NAME,
+                "content": "\n\n".join((*retained, STRUCTURED_OUTPUT_CONTRACT)),
+            },
+        )
+        payload["messages"] = kept_messages
+        return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    except Exception:
+        return body
+
+
 def inject_response_mode(body: bytes, user_text: str) -> bytes:
+    try:
+        payload = json.loads(body)
+        output_format = payload.get("format") if isinstance(payload, dict) else None
+    except Exception:
+        output_format = None
+    if isinstance(output_format, dict) and output_format.get("type") == "object":
+        return inject_structured_output_contract(body)
     note = response_mode_note(user_text)
     open_question = grounding_open_question_turn(user_text)
     combined_note = (

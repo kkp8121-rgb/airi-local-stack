@@ -504,6 +504,60 @@ Every response must use this control format: <|NAME PAYLOAD|>.
         self.assertIn("감탄사와 명사 복창", messages[-2]["content"])
         self.assertIn("요청하지 않은 조언·주의·질문", messages[-2]["content"])
 
+    def test_response_mode_replaces_spoken_style_for_object_schema(self) -> None:
+        body = json.dumps({
+            "format": {
+                "type": "object",
+                "required": ["dialogue_marker", "memory_marker"],
+                "properties": {
+                    "dialogue_marker": {"type": "string"},
+                    "memory_marker": {"type": "string"},
+                },
+            },
+            "messages": [
+                {"role": "system", "content": "durable card"},
+                {
+                    "role": "system",
+                    "name": ollama_proxy.REQUEST_LOCAL_SYSTEM_MESSAGE_NAME,
+                    "content": (
+                        "CHARACTER_STATE_EVIDENCE\n\n"
+                        "이번 응답 언어: 한국어. 자연스러운 대사를 말해.\n\n"
+                        "KNOWLEDGE_EVIDENCE\n\n"
+                        "이번 응답 문체: 10~45자의 자연스러운 대사."
+                    ),
+                },
+                {"role": "user", "content": "계속 검증해."},
+            ],
+        }, ensure_ascii=False).encode()
+
+        messages = json.loads(ollama_proxy.inject_response_mode(
+            body, "계속 검증해.",
+        ))["messages"]
+        local = [
+            message for message in messages
+            if message.get("name") == ollama_proxy.REQUEST_LOCAL_SYSTEM_MESSAGE_NAME
+        ]
+        self.assertEqual(len(local), 1)
+        self.assertEqual(messages[-2], local[0])
+        self.assertEqual(messages[-1]["role"], "user")
+        self.assertIn("schema가 지정한 JSON 객체", local[0]["content"])
+        self.assertIn("description이 지정한 역할", local[0]["content"])
+        self.assertIn("다른 property에 재사용하지 마", local[0]["content"])
+        self.assertIn("CHARACTER_STATE_EVIDENCE", local[0]["content"])
+        self.assertIn("KNOWLEDGE_EVIDENCE", local[0]["content"])
+        self.assertNotIn("자연스러운 대사", local[0]["content"])
+        self.assertNotIn("10~45자", local[0]["content"])
+
+    def test_response_mode_keeps_spoken_contract_for_non_object_format(self) -> None:
+        body = json.dumps({
+            "format": "json",
+            "messages": [{"role": "user", "content": "계속 이야기해."}],
+        }, ensure_ascii=False).encode()
+        messages = json.loads(ollama_proxy.inject_response_mode(
+            body, "계속 이야기해.",
+        ))["messages"]
+        self.assertIn("10~45자의 자연스러운 한국어 반말", messages[-2]["content"])
+
 
 class TopicBoardRuntimeTests(unittest.TestCase):
     def write_board(

@@ -25,21 +25,21 @@ python ollama-proxy\eval\run_airi_production_context_gate.py `
   --fail-on-gate
 ```
 
-보고서: 72,402 B, SHA-256 `FDACB97B8DD2F383B7EDDB56FCDCCB32C5093A104B665190ADD4F76981D81F30`. Ollama `0.32.6`, model `midm-airi:2.0-mini`, digest `92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f`이다.
+보고서 version 2.0: 73,737 B, SHA-256 `2D1F3B03DA5A704F01E279AF000B19D798DCB91B3EFBE750243CD094F1B2AEC2`. Ollama와 Mi:dm digest pin은 v1과 동일하다.
 
 | provenance | SHA-256 |
 |---|---|
-| fixture | `92fd7d0eb190b59cef2da8ccc947a05ce0c34a73494cca86f620aff7c2cc67ab` |
-| fixture file | `15628cf32deb737a9d3aac1e86924efe37d9ea3e76c47fda7148ee325e79a251` |
-| runner | `dafe904292c0042bb2de3b765e0bbd806821aeb86401e87186b42d8b885eca03` |
-| `ollama_proxy.py` | `5ead00816546dddf8af8c6f945887195df742bb95f9cf5fad034bb9a650cf32d` |
+| canonical fixture | `543e581b19d6b35f4116a5d984f3b72552e83a2505c9519057529ea5dc1950ab` |
+| fixture file | `73e3a63d920c6b495e648425571221704477a5622263f2b4181c1560628d661d` |
+| runner | `bb52b9b41a470308b162b9db076f67cf7e028950aa657e93459b0f3bc869c297` |
+| `ollama_proxy.py` | `af67b573c71792c24aca096956d2c3c36486edffb9fbd2f0c4bab6bcced96a22` |
 | `memory_runtime.py` | `6bee09e886aac7d6609f3e96413aaaee71da40c9e685ac590b8b59bae54f9531` |
 | `airi_memory.py` | `1d2f4ca6301e0ed0e41020dcc22c03fda27cca8f8de3ae964e1e591f87aef965` |
 | `foreground_context.py` | `455f50cbbaf786b83da57edd4f3c15293977667529300da4d2dd8c593b6dde5c` |
 | `continuity_ledger.py` | `b1129d01dd0aaf98db90d2a99dd7790cbc6d303e836f27f77f937c8b963fc4f1` |
 | `character_state.py` | `a5d5e933dbf510f03fed451e448a840ee166550c58cc9608ff5aae525d0541e1` |
 
-정확히 압력 `0/8/20/48` filler pair 각각 3회(총 12회), `num_ctx=2048`, `num_gpu=999`, temperature `0`, seed `42`, `think=false`로 실행했다. 관측상 재시도는 0회이며 모든 호출의 `prompt_eval_count`는 정확히 1435였다.
+정확히 압력 `0/8/20/48` filler pair 각각 3회(총 12회), `num_ctx=2048`, `num_gpu=999`, temperature `0`, seed `42`, `think=false`로 실행했다. 관측상 재시도는 0회이며 모든 호출의 `prompt_eval_count`는 정확히 1245였다.
 
 ## 결과
 
@@ -47,15 +47,15 @@ python ollama-proxy\eval\run_airi_production_context_gate.py `
 |---|---|
 | 구조 | PASS — 모든 pressure의 최종 full native payload hash가 동일, 원본 입력 불변 |
 | 제거·순서 | PASS — 0..48 old filler pair와 dropped holdout 부재, prepared/native role·순서, private-name strip, active card 1회, latest user 최후 모두 통과 |
-| 의미 | FAIL — `bridge_fact` 0/12; 모델이 주로 bridge marker가 아니라 `silver-fern`을 복사 |
-| 나머지 의미 필드 | active card, Korean pet negation, tail memory, dropped holdout은 각 12/12. continuity fact/latest correction은 각 11/12 |
-| 결정성 | raw/parsed output 모두 비결정적 — 첫 0-pressure run에서 두 continuity 필드에 key prefix를 붙임 |
-| 시간 | total P50 `869.495 ms`, P95 `3339.170 ms` |
+| 의미 | FAIL — 7개 필드 중 `dialogue_marker`만 0/12; 모델이 memory marker `silver-fern`을 결정적으로 복사 |
+| 나머지 의미 필드 | 나머지 6개 필드는 각 12/12; 두 continuity color 필드는 v1의 11/12에서 개선 |
+| 결정성 | raw/parsed output 모두 결정적 |
+| 시간 | total P50 `1714.961 ms`, P95 `3962.483 ms` |
 
-구조 PASS는 prompt 조립의 증거일 뿐 답변 품질 PASS가 아니다. `bridge_fact` 0/12에 더해 continuity fact/latest correction도 각 11/12이므로 전체 semantic/gate 결과는 엄격하게 FAIL이다. 따라서 full quality pass라고 부르지 않으며, context/`num_ctx`를 승격하지 않는다. 운영 기본값은 **2048**로 유지한다.
+v2는 spoken style 충돌을 제거한 generic structured-output 계약, source-oriented fields, 답 canary가 없는 현재 질문, swapped/reordered offline anti-overfit test를 사용한다. structured-output 전환은 언어·문체 문단만 제거하고 character-state·knowledge 근거는 보존한다. 구조 PASS는 prompt 조립의 증거일 뿐 답변 품질 PASS가 아니다. 두 continuity color 필드는 v1의 11/12에서 12/12로 개선됐고 parsed output도 결정적으로 안정됐지만, `dialogue_marker` 0/12가 memory marker `silver-fern`을 복사하므로 semantic/gate/authoritative 결과는 엄격하게 FAIL이다. 이는 dialogue-vs-memory 구분의 모델 한계다. prompt tuning을 계속하거나 full quality pass라고 부르지 않으며, context/`num_ctx`를 승격하지 않는다. 운영 기본값은 **2048**로 유지한다.
 
 ## 검증 한계와 후속
 
-- authoritative CI-equivalent Python 3.12.13 exact workflow path matrix(신규 `test_continuity_ledger.py`와 `eval/test_airi_production_context_gate.py` 포함)는 **855 passed / 1 skipped / 7 warnings / 708 subtests, 44.67s PASS**다. 최종 continuity hardening 뒤 focused 테스트도 29건 PASS했고 독립 재검토는 blocker 0으로 끝났다. 별도로 Python 3.14 unittest discovery에서는 이미 알려진 환경/타이밍 오류 `test_first_raw_watchdog_closes_response_when_send_already_completed`가 남아 682개 중 681개만 통과했으므로, 이 환경 결과를 전체 검증 실패 원인으로 확대 해석하지 않는다.
-- CI는 push 전이므로 pending이다. extraction은 설치 후보가 모두 gate FAIL이라 OFF를 유지한다. STT/실제 mic은 사용자 재개 요청까지 보류다.
-- 다음 remediation은 모델이 bridge와 memory 필드를 구별해 binding하도록 prompt/schema·표현을 좁히고, 동일 고정 4×3 production gate를 다시 실행하는 것이다.
+- v2 전체 CI-equivalent Python 3.12.13 matrix는 **858 passed / 1 skipped / 7 warnings / 708 subtests, 45.04s PASS**다.
+- 첫 커밋과 CI는 성공했다. 이 v2 batch는 아직 커밋/CI 실행 전이다. extraction과 설치본 STT는 OFF를 유지하며, 실제 mic은 사용자 재개 요청까지 보류한다.
+- `dialogue_marker`는 현 prompt/schema 개선의 범위를 넘는 모델 한계로 결론냈다. 추가 prompt tuning은 하지 않는다.

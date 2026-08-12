@@ -70,4 +70,4 @@ PASS가 아니며 운영 기본값은 2048을 유지한다.**
 
 ## 2026-08-13 production-context 후속 (별도 권위 결과)
 
-위 raw capacity A/B와 4096 triage는 계속 유효하며 대체되지 않는다. 실제 proxy의 projection·typed card·continuity data 경로는 별도 `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md`에서 2048, 4압력×3회로 측정했다. 구조·privacy·ordering은 PASS였지만 `bridge_fact` 0/12, continuity/latest correction 각 11/12로 semantic 전체는 FAIL이다. 따라서 운영 context 승격은 없고 기본값 2048을 유지한다.
+위 raw capacity A/B와 4096 triage는 계속 유효하며 대체되지 않는다. 실제 proxy의 projection·typed card·continuity data 경로는 별도 `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md`의 version 2.0에서 2048, 4압력×3회로 측정했다. 구조·privacy·ordering은 PASS이고 7개 필드 중 6개는 12/12이나, `dialogue_marker` 0/12가 memory marker `silver-fern`을 결정적으로 복사해 semantic 전체는 FAIL이다. 두 continuity color 필드는 v1보다 개선됐지만 dialogue-vs-memory는 모델 한계로 결론냈다. 따라서 운영 context 승격은 없고 기본값 2048·extraction OFF를 유지한다.

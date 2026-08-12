@@ -37,7 +37,8 @@
 - [x] **G0. 작업 트리 재조정** — 2026-08-10 (`완료/AIRI-INDEPENDENT-REVIEW-2026-08-10.md`, `완료/AIRI-STABILITY-CHECKPOINT-2026-08-10.md`)
 - [~] **G1. 캐릭터 루프**
   - [x] 세션 상태 필드 구현 (`character_state.py`, G1 최소 상태와 ≈1:1 — 2026-08-10 검토 확인)
-  - [ ] 상태의 프롬프트 실주입 + 평가자 재활성 (방송 계획 C2로 이관)
+  - [x] 상태 프롬프트 주입의 prompt-injection/privacy hardening — 2026-08-13
+  - [ ] evaluator 재활성 (보류: 품질 평가 재개 조건 확정 후; 방송 계획 C2)
 - [~] **G2. 장기 기억**
   - [x] 저장·검색·저널 회상 운영 — 2026-08-09 라이브 스모크, KURE fp16 2026-08-11
   - [x] 추출 승격 루프 코드 + 게이트 프로파일 strict/balanced — 2026-08-12 (`932eae6`)
@@ -55,7 +56,7 @@
     Mi:dm 0/12로 양 모델 FAIL — 2026-08-12
     (`완료/AIRI-LONG-CONTEXT-MEMORY-CARD-AB-2026-08-12.md`)
   - [x] 장문 context budget·card/정정 표현 및 고정 4압력×3회 production 회귀 측정 완료 — **FAIL**
-    (`bridge_fact` 0/12, continuity/latest correction 각 11/12의 field binding 후속 필요; 운영 기본값 2048 유지)
+    (v2: 7개 필드 중 6개 12/12, `dialogue_marker` 0/12가 `silver-fern` 복사; 두 continuity color는 v1보다 개선됐으나 dialogue-vs-memory 모델 한계. 운영 기본값 2048·extraction OFF 유지)
   - [x] eval provenance 해소 (수집 데이터를 승격 근거로 사용 가능) — 2026-08-12 (`932eae6`)
   - [ ] 인간 검수 100건 수집 (dev PC)
   - [ ] 16케이스 자동 게이트 PASS (현재 양 모델 FAIL)
@@ -89,8 +90,9 @@
 - [~] 본답변 지연 — §12 원문 목표(뉴로사마급) 기준으로 계속 추구(결정 5,
   2026-08-12 재정의 제안 기각 확정). 텍스트 경로 P50 1,963ms 달성
   (`완료/AIRI-ELECTRON-TEXT-TTS-MEASUREMENT-2026-08-12.md`), 실제 마이크
-  음성 전체 체인은 미실측. 후속 최적화(소스 빌드 전환·TTS 청크 스트리밍)가
-  활성 목표로 남음
+  음성 전체 체인은 미실측. 후속 최적화(운영 설치본의 source rebuild·채택 검증,
+  TTS 청크 스트리밍)가 활성 목표로 남음. 여기서 source build 전환은 개발 측정의
+  즉시 운영 채택이 아니라 설치본 rebuild와 실기 검증을 뜻한다.
 - [x] matched Electron 모델 A/B — 같은 설치 ASAR·TTS warm, 교차 블록
   모델별 n=10. Mi:dm first substantive render P50/P95 1,501.5/2,597.2ms,
   EXAONE 1,752.5/3,233.0ms — 2026-08-12
@@ -271,4 +273,4 @@
 - **2026-08-12** (`41b1c20`, 검토 PC): 현황판 신설. 검토 PC 선행 배치
   반영 — 모델 SSoT 게이트 4종 코드 해소, I1 추출 배선(발효 대기),
   MEM-04 WAL, B3 모더레이션 코드 완료(M3 일부 선행), C1 헌법 초안.
-- **2026-08-13** (production context): budget/card/정정 표현과 고정 4압력×3회 production 회귀 구현·측정을 완료했다. 구조 변환은 PASS이나 `bridge_fact` 0/12, continuity/latest correction 각 11/12로 semantic gate는 FAIL이다. default `num_ctx=2048`·extraction OFF를 유지하며, 다음 작업은 모델의 bridge-vs-memory field binding 개선 후 같은 게이트 재실행이다.
+- **2026-08-13** (production context v2): generic structured-output 계약으로 spoken style 충돌을 제거하고 source-oriented fields, 답 canary가 없는 질문, swapped/reordered anti-overfit test를 적용했다. 구조 변환 PASS, 7개 필드 중 6개 12/12이며 두 continuity color는 v1보다 개선됐지만 `dialogue_marker` 0/12가 memory marker `silver-fern`을 결정적으로 복사해 semantic/gate/authoritative는 FAIL이다. dialogue-vs-memory는 모델 한계로 결론냈고 prompt tuning을 계속하지 않는다. default `num_ctx=2048`·extraction OFF를 유지한다.

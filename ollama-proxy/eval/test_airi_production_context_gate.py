@@ -1,4 +1,5 @@
 import argparse
+import copy
 import importlib.util
 import json
 import tempfile
@@ -38,10 +39,46 @@ class ProductionContextGateTests(unittest.TestCase):
             self.assertNotIn(gate.CONTINUITY_LEDGER_MESSAGE_NAME, joined)
             self.assertEqual(2048, state["native"]["options"]["num_ctx"])
             self.assertEqual(999, state["native"]["options"]["num_gpu"])
+    def test_source_binding_resists_canary_and_wire_order_overfit(self):
+        swapped = copy.deepcopy(self.fixture)
+        dialogue_value = swapped["expected"]["dialogue_marker"]
+        memory_value = swapped["expected"]["memory_marker"]
+        swapped["canaries"]["bridge"] = memory_value
+        swapped["canaries"]["tail_memory"] = (
+            "[Character Memory] TAIL_MEMORY_CANARY=" + dialogue_value
+        )
+        swapped["expected"]["dialogue_marker"], swapped["expected"]["memory_marker"] = (
+            swapped["expected"]["memory_marker"], swapped["expected"]["dialogue_marker"]
+        )
+        variants = (self.fixture, swapped)
+        for fixture in variants:
+            states = [gate.pipeline(fixture, pressure, args()) for pressure in fixture["pressure_levels"]]
+            self.assertEqual(1, len({state["native_hash"] for state in states}))
+            for state in states:
+                self.assertTrue(all(state["structural"].values()))
+                self.assertEqual(4, state["occurrence_counts"]["dialogue_marker"])
+                self.assertEqual(1, state["occurrence_counts"]["memory_marker"])
+                self.assertNotIn(fixture["expected"]["dialogue_marker"], fixture["current_query"])
+                self.assertNotIn(fixture["expected"]["memory_marker"], fixture["current_query"])
+                self.assertTrue(state["structural"]["private_names_stripped"])
+        self.assertFalse(gate.score(self.fixture["expected"], swapped["expected"])["passed"])
+        self.assertFalse(gate.score(swapped["expected"], self.fixture["expected"])["passed"])
+        reverse_order = tuple(reversed(gate.FIELDS))
+        reversed_state = gate.pipeline(self.fixture, 0, args(), field_order=reverse_order)
+        self.assertEqual(list(reverse_order), list(reversed_state["native"]["format"]["properties"]))
+        reversed_response = {field: self.fixture["expected"][field] for field in reverse_order}
+        response = {"done": True, "message": {"content": json.dumps(reversed_response)}}
+        reversed_result = gate.run_one("ignored", reversed_state["native"], args(), self.fixture["expected"], lambda *_: response)
+        self.assertTrue(reversed_result["complete"])
+        self.assertTrue(reversed_result["score"]["passed"])
+        runner_source = Path(gate.__file__).read_text(encoding="utf-8")
+        for literal in (*self.fixture["canaries"].values(), *self.fixture["expected"].values()):
+            if isinstance(literal, str):
+                self.assertNotIn(literal, runner_source)
     def test_score_and_aggregate(self):
         good = gate.score(self.fixture["expected"], self.fixture["expected"])
         self.assertTrue(good["passed"])
-        bad = gate.score(dict(self.fixture["expected"], bridge_fact="wrong"), self.fixture["expected"])
+        bad = gate.score(dict(self.fixture["expected"], dialogue_marker="wrong"), self.fixture["expected"])
         self.assertFalse(bad["passed"])
         summary = gate.aggregate([
             {"complete":True,"structural_pass":True,"retry_used":False,"score":good,

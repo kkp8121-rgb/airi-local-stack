@@ -89,7 +89,7 @@ retry 횟수를 이 보고서가 직접 집계하지 않았으므로 인과 확�
 
 ## 3. 전체 Electron 체인과의 관계
 
-소스 build의 Mi:dm Electron text→default-render 20회는 substantive output
+소스 build의 Mi:dm Electron text→default-render 20회는 개발용 source 측정이며, 운영 채택 또는 설치본 전환을 뜻하지 않는다. 운영 채택에는 설치본을 별도로 source에서 rebuild·검증해야 한다. 이 source 측정의 substantive output은
 P50 1,963ms, P95 2,720ms였고 20/20이 완료·출력됐다. 이후 dev PC에서 동일
 설치 ASAR·warm TTS를 고정하고 Mi:dm→EXAONE→Mi:dm→EXAONE 교차 블록으로
 모델별 n=10의 matched control을 추가했다. first substantive render
@@ -219,4 +219,4 @@ gate만으로 롤백을 결정하지 않지만 Mi:dm의 장문/card 안전성을
 
 이 문서의 최초 분석에 남은 model SSoT/eval provenance/ACK/digest 미구현 지적은 **당시의 역사적 상태이며 해소됨**이다. production proxy에는 이어서 typed active card, bounded canonical continuity ledger, 순수 snapshot seam 및 명시 session만의 persistence가 들어갔다. 이는 raw Ollama A/B와 구분해야 한다.
 
-권위 production-context gate는 `num_ctx=2048`, 0/8/20/48 압력×3회에서 구조·privacy·ordering PASS를 확인했으나, `bridge_fact`가 0/12이고 continuity/latest correction도 각 11/12라 semantic 전체는 FAIL이다. active card·한국어 pet negation·tail memory·dropped holdout은 모두 12/12였다. 이 결과는 raw capacity 2048/4096 근거를 바꾸지 않으며 default 2048과 extraction OFF를 유지한다. 다음은 모델의 bridge-vs-memory field binding을 좁힌 뒤 같은 production gate를 재실행하는 일이다. 상세는 `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md` 참조.
+권위 production-context gate version 2.0는 `num_ctx=2048`, 0/8/20/48 압력×3회에서 구조·privacy·ordering PASS를 확인했다. generic structured-output 계약으로 spoken style 충돌을 제거하고 source-oriented fields·답 canary가 없는 질문·swapped/reordered anti-overfit test를 더한 결과, 7개 필드 중 6개는 12/12가 됐고 두 continuity color 필드는 v1의 11/12에서 개선됐다. 그러나 `dialogue_marker`는 0/12로 memory marker `silver-fern`을 결정적으로 복사해 semantic/gate/authoritative 전체는 FAIL이다. 이는 dialogue-vs-memory 구분의 모델 한계이므로 추가 prompt tuning이나 quality PASS 주장을 하지 않는다. raw capacity 2048/4096 근거를 바꾸지 않으며 default 2048과 extraction OFF를 유지한다. 상세는 `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md` 참조.

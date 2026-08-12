@@ -170,7 +170,7 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 
 ## 최신 검증 증거 (2026-08-13)
 
-- `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md` — 실제 proxy context shaping의 0/8/20/48 압력×3회 권위 결과. 구조·privacy·ordering PASS, 그러나 Mi:dm의 `bridge_fact` 0/12, continuity/latest correction 각 11/12로 semantic/gate FAIL이다. 구현·측정 체크는 완료했지만 default 2048을 유지하고 field binding 개선이 다음 작업이다. extraction OFF, STT/mic은 사용자 보류 상태다.
+- `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md` — version 2.0 실제 proxy context shaping의 0/8/20/48 압력×3회 권위 결과. generic structured-output 계약으로 spoken style 충돌을 제거하고 source-oriented fields·답 canary가 없는 질문·swapped/reordered anti-overfit test를 적용했다. 구조·privacy·ordering PASS, 7개 필드 중 6개 12/12이며 두 continuity color는 v1보다 개선됐지만 `dialogue_marker` 0/12가 memory marker `silver-fern`을 결정적으로 복사해 semantic/gate/authoritative FAIL이다. dialogue-vs-memory는 모델 한계이므로 prompt tuning을 계속하지 않는다. default 2048·extraction OFF, STT/mic은 사용자 보류 상태다.
 
 - `완료/AIRI-CONTEXT-WINDOW-SSOT-AND-4096-TRIAGE-2026-08-13.md` — root context
   window SSoT(512..32768, 기본 2048), health mismatch fail-closed와 content-free
