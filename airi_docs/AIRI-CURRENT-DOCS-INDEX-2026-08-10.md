@@ -73,6 +73,13 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-TTS-ASAR-CANDIDATE-BUILD-2026-08-13.md` — 고정 source commit/tree에서
+  설치 후보 ASAR를 생성해 digest·28,167 entries·핵심 payload·설치본과 동일한
+  135-file unpacked manifest를 검증한 기록. outer `electron-builder`는 후보 생성
+  뒤 winCodeSign symlink 권한에서 실패했으므로 full portable build PASS는 아니며,
+  설치와 runtime duration/pitch는 issue #2 승인 뒤 남는다. 기계 판독 sidecar는
+  `evidence/AIRI-TTS-ASAR-CANDIDATE-BUILD-2026-08-13.json`이다.
+
 - `AIRI-SOURCE-ASAR-DEPLOY-SAFETY-2026-08-13.md` — source-built ASAR의
   fail-closed install/restore 안전 도구와 >1 MiB synthetic PASS, 실제 설치
   ASAR의 read-only full-validator PASS 기록. 실제 설치 AIRI는 변경하지

@@ -41,6 +41,25 @@ backup/current hashes and a separate installed-runtime verification in a new
 evidence file.
 See `완료/AIRI-SOURCE-ASAR-DEPLOY-SAFETY-2026-08-13.md`.
 
+## TTS source ASAR candidate handoff (2026-08-13)
+
+The pinned `bf173f2` / `ff71039c` source produced a separately validated
+`app.asar`: 1,131,077,260 bytes, SHA-256 `6767625E...9BCED`, package
+`ai.moeru.airi` 0.11.3, and 28,167 entries. Its critical packed outputs match
+fresh source output, while all 135 `app.asar.unpacked` paths, sizes, and file
+hashes match the installed unpacked tree. Candidate and installed executables
+also have equal fuse settings; embedded-ASAR integrity validation is disabled.
+
+This does not make the generated `win-unpacked` a validated portable build:
+outer electron-builder failed after ASAR creation while extracting macOS dylib
+symlinks from winCodeSign, and the configured Godot extraResources source was
+absent. Do not claim install or runtime TTS PASS. The installed ASAR remains
+unchanged at `1B68AE...B0`. After issue #2 explicitly authorizes installed-app
+mutation, use the safe installer with exact artifact/current hashes, retain its
+backup, and measure 32 kHz duration/pitch plus text-to-render. STT/mic stays
+OFF/deferred. See `완료/AIRI-TTS-ASAR-CANDIDATE-BUILD-2026-08-13.md` and its
+`airi_docs/evidence/` JSON sidecar.
+
 ## B4a handoff update (2026-08-13)
 
 ### B4a chat priority policy update (2026-08-13)
