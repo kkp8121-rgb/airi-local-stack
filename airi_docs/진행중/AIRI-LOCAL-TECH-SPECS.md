@@ -1,4 +1,4 @@
-# AIRI 로컬 음성 대화 기술 사양
+# AIRI 로컬 방송·음성 대화 기술 사양
 
 최종 확인일: 2026-08-12 (Upgrade Scout 적용 반영 갱신 — 이전 버전은
 2026-08-07 코드 감사 기준이며 STT=CPU/small, LLM=EXAONE, TTS=Chatterbox
@@ -8,14 +8,16 @@
 ## 전체 구성
 
 ```text
-마이크
-  -> AIRI 네이티브 MediaRecorder (Opus/WebM)
-  -> Silero VAD
-  -> 로컬 STT (faster-whisper large-v3-turbo, CUDA GPU)
+기본 방송: 방송 채팅 / Electron 텍스트 입력
   -> AIRI 채팅 세션
   -> Ollama 프록시(11435, SSE) -> midm-airi:2.0-mini
   -> 로컬 TTS (GPT-SoVITS v2ProPlus GPU, streaming_mode=2)
   -> AIRI Web Audio API / Live2D 립싱크
+
+보류된 마이크 입력(opt-in):
+마이크 -> AIRI MediaRecorder -> Silero VAD
+  -> 로컬 STT(faster-whisper large-v3-turbo, CUDA GPU)
+  -> AIRI 채팅 세션 이후 공통 경로
 ```
 
 모든 음성·LLM 서버는 외부 공개 없이 PC의 `127.0.0.1`에서 실행된다.
@@ -72,6 +74,15 @@ ACK metadata는 분기별 실측값(`audible`/`silent`)으로 교정됐다. 증�
 런타임은 moderation off, Mi:dm pin, TTS cache 7/7로 복원했다.
 
 ## STT
+
+> **운영 기본값 (2026-08-12 사용자 결정):** 방송 프로파일은 채팅/텍스트 입력이며
+> STT는 OFF, Electron 마이크 토글도 OFF다. `start-airi-local-stack.ps1`은 검증된
+> 기본 `-Stt off`로 시작하며, `-Stt on` 또는 `AIRI_STT=on`만 명시적 opt-in이다.
+> OFF 모드는 Python 실행 파일·repo server path·loopback host·port 서명이 모두
+> 일치하는 STT만 종료하고, local port `8890` listener가 남으면 기동을 거부한다.
+> 재개는 사용자가 STT/마이크 개발을 요청한 뒤 `-Stt on` 및
+> 실제 마이크 20+20·AEC·barge-in 시험으로 한다. 상세 증거:
+> `완료/AIRI-STT-OFF-BROADCAST-PROFILE-2026-08-12.md`.
 
 | 항목 | 사양 |
 |---|---|

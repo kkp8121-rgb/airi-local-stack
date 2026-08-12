@@ -1,4 +1,8 @@
 param(
+    # Speech-to-text is opt-in so the chat and text input path do not reserve
+    # GPU memory for a service they do not use.
+    [ValidateSet('on', 'off')]
+    [string]$Stt = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_STT)) { 'off' } else { $env:AIRI_STT }),
     [string]$SttModel = 'mobiuslabsgmbh/faster-whisper-large-v3-turbo',
     [string]$SttComputeType = 'int8_float16',
     [ValidateRange(0, 999)]
@@ -48,6 +52,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ($Stt -notin @('on', 'off')) {
+    throw 'Stt must be on or off. Check the -Stt parameter or AIRI_STT environment variable.'
+}
+$Stt = $Stt.ToLowerInvariant()
 $resolvedOutputModerationTerms = ''
 if (-not [string]::IsNullOrWhiteSpace($OutputModerationTerms)) {
     $termsItem = Get-Item -LiteralPath $OutputModerationTerms -ErrorAction Stop
@@ -93,6 +101,17 @@ function Wait-LocalHealth {
     } while ((Get-Date) -lt $deadline)
 
     throw "Local service did not become ready within $TimeoutSeconds seconds: $Uri"
+}
+
+if ($Stt -eq 'off') {
+    # Reclaim STT resources before starting or preflighting GPU-backed services.
+    # The stop helper requires the Python executable and this repository's
+    # exact STT server/host/port command signature. Never kill by port alone.
+    & (Join-Path $PSScriptRoot 'stt\stop-local-stt.ps1')
+    $remainingSttListener = Get-NetTCPConnection -LocalPort 8890 -State Listen -ErrorAction SilentlyContinue
+    if ($remainingSttListener) {
+        throw 'STT is disabled, but a listener remains on local port 8890. Refusing to continue.'
+    }
 }
 
 $ollamaListener = Get-NetTCPConnection -LocalPort 11434 -State Listen -ErrorAction SilentlyContinue
@@ -317,12 +336,18 @@ else {
 }
 $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
 & (Join-Path $PSScriptRoot 'gpt-sovits\start-local-stack.ps1')
-& (Join-Path $PSScriptRoot 'stt\start-local-stt.ps1') `
-    -Model $SttModel `
-    -ComputeType $SttComputeType
+if ($Stt -eq 'on') {
+    & (Join-Path $PSScriptRoot 'stt\start-local-stt.ps1') `
+        -Model $SttModel `
+        -ComputeType $SttComputeType
+}
 
 $tts = Wait-LocalHealth -Uri 'http://127.0.0.1:8880/health'
-$stt = Wait-LocalHealth -Uri 'http://127.0.0.1:8890/health'
+$sttHealth = if ($Stt -eq 'on') {
+    Wait-LocalHealth -Uri 'http://127.0.0.1:8890/health'
+} else {
+    $null
+}
 if (-not [string]::IsNullOrWhiteSpace($TopicBoardPath) -and -not [bool]$proxy.topic_board.configured) {
     throw 'TopicBoardPath was requested but the live 11435 proxy did not confirm a configured local topic board.'
 }
@@ -390,7 +415,8 @@ if ($ChatProvider -eq 'local') {
     TTS = $tts.status
     TTSEngine = $tts.engine
     VoiceReferenceFound = $tts.reference_audio_found
-    STT = $stt.status
-    STTModel = $stt.model
-    STTDevice = $stt.device
+    STTMode = $Stt
+    STT = if ($Stt -eq 'on') { $sttHealth.status } else { 'disabled' }
+    STTModel = if ($Stt -eq 'on') { $sttHealth.model } else { '' }
+    STTDevice = if ($Stt -eq 'on') { $sttHealth.device } else { '' }
 }

@@ -165,6 +165,11 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 
 ## 최신 검증 증거 (2026-08-12)
 
+- `완료/AIRI-STT-OFF-BROADCAST-PROFILE-2026-08-12.md` — 기본 방송 프로파일
+  chat/text 입력 + STT OFF, Electron 마이크 OFF 결정 및 런처 OFF 실기 기록.
+  `-Stt on`/`AIRI_STT=on`은 명시적 opt-in이며, GPU 1044 MiB는 동시 무관 작업이
+  있는 paired observation으로 formal clean B0 capacity proof가 아니다.
+
 - 통합 Python: 825 passed / 1 skipped / 706 subtests (현재 tip의 CI
   `python-core-tests` matrix 41개 추적 경로를 dev PC에서 재실측,
   SSoT·I1 게이트·MEM-04·B3 모더레이션·cloud latency 하네스 포함).

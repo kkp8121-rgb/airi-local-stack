@@ -129,6 +129,14 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-12** (dev PC, 사용자 결정): 기본 방송 프로파일을 chat/text 입력 +
+  STT OFF로 고정했고 Electron 마이크 토글도 OFF로 둔다. `-Stt off` 런처 재실행은
+  `STTMode=off`, `STT=disabled`, 빈 STT model/device, `8890` 부재와
+  `8880/11434/11435` listener 및 proxy health `ok`를 확인했다. repo-path 일치
+  STT PID 16220/26220 종료 뒤 GPU paired average는 7786.4→6742.4 MiB
+  (관측 차이 1044 MiB)였으나, 동시 무관 GPU 작업이 있어 formal clean B0 capacity
+  proof는 아니다. 상세: `완료/AIRI-STT-OFF-BROADCAST-PROFILE-2026-08-12.md`.
+
 - **2026-08-12** (dev PC, I1 신규 후보): 11436 격리 CPU에서 Qwen3.5 4B
   Q4_K_M과 Granite 4.0 3B smoke는 첫 행 fail-fast FAIL, Gemma3 4B는 smoke
   PASS 뒤 full 7-row balanced FAIL(독립 verifier 거부)했다. 셋 다 설치된 로컬

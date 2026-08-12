@@ -8,6 +8,7 @@ STACK = (ROOT / "start-airi-local-stack.ps1").read_text(encoding="utf-8")
 PROXY = (ROOT / "ollama-proxy" / "start-local-ollama-proxy.ps1").read_text(encoding="utf-8")
 SETUP = (ROOT / "ollama-proxy" / "setup-midm-airi-model.ps1").read_text(encoding="utf-8")
 MODELFILE = (ROOT / "ollama-proxy" / "Modelfile.midm-airi").read_text(encoding="utf-8")
+STT_STOP = (ROOT / "stt" / "stop-local-stt.ps1").read_text(encoding="utf-8")
 
 
 class MidmModelConfigurationTests(unittest.TestCase):
@@ -157,6 +158,54 @@ class MidmModelConfigurationTests(unittest.TestCase):
         stt_start = STACK.index("'stt\\start-local-stt.ps1'")
         self.assertLess(proxy_ready, tts_start)
         self.assertLess(proxy_ready, stt_start)
+
+    def test_stt_defaults_off_and_honors_a_nonblank_environment_override(self) -> None:
+        self.assertIn("[ValidateSet('on', 'off')]", STACK)
+        self.assertIn("[string]$Stt = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_STT)) { 'off' } else { $env:AIRI_STT })", STACK)
+        validation = "if ($Stt -notin @('on', 'off')) {"
+        self.assertIn(validation, STACK)
+        self.assertIn("throw 'Stt must be on or off. Check the -Stt parameter or AIRI_STT environment variable.'", STACK)
+        self.assertIn("$Stt = $Stt.ToLowerInvariant()", STACK)
+        self.assertLess(STACK.index(validation), STACK.index("$resolvedOutputModerationTerms = ''"))
+        self.assertIn("[string]$SttModel = 'mobiuslabsgmbh/faster-whisper-large-v3-turbo'", STACK)
+        self.assertIn("[string]$SttComputeType = 'int8_float16'", STACK)
+
+    def test_stt_start_and_health_wait_are_conditional_on_opt_in_mode(self) -> None:
+        start = "& (Join-Path $PSScriptRoot 'stt\\start-local-stt.ps1') `"
+        self.assertIn("if ($Stt -eq 'on') {\n    " + start, STACK)
+        self.assertIn("-Model $SttModel", STACK)
+        self.assertIn("-ComputeType $SttComputeType", STACK)
+        self.assertIn("$sttHealth = if ($Stt -eq 'on') {\n    Wait-LocalHealth -Uri 'http://127.0.0.1:8890/health'", STACK)
+        stt_assignments = [line.strip() for line in re.findall(r"(?im)^\s*\$stt\s*=.*$", STACK)]
+        self.assertEqual(stt_assignments, ["$Stt = $Stt.ToLowerInvariant()"])
+
+    def test_stt_off_stops_only_matching_server_signature_and_fails_closed_for_remaining_listener(self) -> None:
+        stop = "& (Join-Path $PSScriptRoot 'stt\\stop-local-stt.ps1')"
+        self.assertIn("if ($Stt -eq 'off') {", STACK)
+        self.assertIn(stop, STACK)
+        self.assertIn(
+            "Get-NetTCPConnection -LocalPort 8890 -State Listen",
+            STACK,
+        )
+        self.assertIn("throw 'STT is disabled, but a listener remains on local port 8890. Refusing to continue.'", STACK)
+        self.assertNotIn("Stop-Process", STACK[STACK.index(stop):STACK.index("'gpt-sovits\\start-local-stack.ps1'")])
+        self.assertLess(STACK.index(stop), STACK.index("$ollamaListener = Get-NetTCPConnection"))
+        self.assertLess(STACK.index(stop), STACK.index("'gpt-sovits\\start-local-stack.ps1'"))
+        for signature in (
+            "$pythonExecutablePattern",
+            "$serverTokenPattern",
+            "$hostTokenPattern",
+            "$portTokenPattern",
+            "[IO.Path]::GetFileName($_.ExecutablePath)",
+        ):
+            self.assertIn(signature, STT_STOP)
+        self.assertNotIn("Get-NetTCPConnection", STT_STOP)
+
+    def test_stt_summary_is_unambiguous_when_disabled(self) -> None:
+        self.assertIn("STTMode = $Stt", STACK)
+        self.assertIn("STT = if ($Stt -eq 'on') { $sttHealth.status } else { 'disabled' }", STACK)
+        self.assertIn("STTModel = if ($Stt -eq 'on') { $sttHealth.model } else { '' }", STACK)
+        self.assertIn("STTDevice = if ($Stt -eq 'on') { $sttHealth.device } else { '' }", STACK)
 
 
 if __name__ == "__main__":

@@ -25,6 +25,7 @@
 | B3 모더레이션 | 한국어 금칙어 사전·SSE 문장 게이트·캐릭터 폴백 대사(C3) | **3종 배선·신규 3층 source test/typecheck/build·설치본 "필터당함" 배지 실기 완료** (`완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`) |
 | C1 헌법 | 캐릭터 헌법 초안 (`진행예정/AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md`) | 관계·인사·클로징 반영. 정식 팬덤명 유보·일반 호칭 “시청자들” 확정. T-05 126번 예비 후보 보존·현행 음성 유지. 인간 검수 대기 |
 | 문서 | TECH-SPECS 현행화, 색인 갱신 | 완료 |
+| STT/마이크 | 기본 방송 프로파일을 chat/text + STT OFF로 고정, 런처 OFF 경로 실기 확인 | **완료** (`완료/AIRI-STT-OFF-BROADCAST-PROFILE-2026-08-12.md`); 실제 mic/AEC/barge-in은 사용자 재개 요청까지 보류 |
 
 ## 2. dev PC 필수 작업 — SSoT 실기 검증
 
@@ -196,3 +197,9 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
 3. **장문 context·memory·card 비교** — 합성 전용 하네스·CI test와 모델별
    4압력×3회 실측 완료. 양 모델 FAIL이므로 측정 항목은 닫되 품질 위험은
    인간 검수와 문맥 예산/표현 개선 후 회귀 대상으로 유지한다.
+
+4. **STT/실제 마이크** — 기본 방송은 chat/text 입력 + STT OFF이며 Electron
+   마이크 토글도 OFF다. 기본 런처는 `-Stt off`; 명시적인 `-Stt on` 또는
+   `AIRI_STT=on`만 opt-in이다. 사용자가 STT/마이크 개발 재개를 요청하면
+   `-Stt on`으로 시작해 실제 mic 20+20, AEC, barge-in 시험을 수행한다.
+   TTS 참조 음성 관련 경고는 이 결정과 별개다.
