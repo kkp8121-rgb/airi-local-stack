@@ -25,6 +25,22 @@ Source-only TTS work is distinct from installed-ASAR evidence: source
 test/typecheck/build do not modify or prove an installed ASAR. Installed-runtime
 claims require their own recorded ASAR and live-turn verification.
 
+## Source ASAR deployment-safety handoff (2026-08-13)
+
+The new source-built-ASAR install/restore scripts have passed only their
+synthetic >1 MiB fixture tests. They fail closed on digest, bounded critical
+ASAR payloads, reparse/hard-link aliases, AIRI process/launch races, and
+concurrent-operation violations. `File.Replace` retains exact displaced bytes;
+install and restore both verify automatic rollback and idempotency. The shared
+full validator passed the real installed ASAR read-only at SHA-256
+`1B68AE...B0`. Do not stop or modify the installed AIRI, and do not claim TTS
+duration/pitch or installation verification.
+[GitHub issue #2](https://github.com/kkp8121-rgb/airi-local-stack/issues/2) is
+the required authorization and tracking gate; after it is cleared, record the
+backup/current hashes and a separate installed-runtime verification in a new
+evidence file.
+See `완료/AIRI-SOURCE-ASAR-DEPLOY-SAFETY-2026-08-13.md`.
+
 ## B4a handoff update (2026-08-13)
 
 ### B4a chat priority policy update (2026-08-13)
