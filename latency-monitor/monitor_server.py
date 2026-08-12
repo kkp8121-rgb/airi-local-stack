@@ -2,6 +2,7 @@
 import ctypes
 from ctypes import wintypes
 import json
+import math
 import os
 import subprocess
 import sys
@@ -55,11 +56,42 @@ def now_ms():
 
 class Correlator:
     """Half-duplex 이벤트를 최근 20개 turn으로 결합한다. 디스크 기록은 하지 않는다."""
-    def __init__(self, limit=20):
+    def __init__(self, limit=20, reorder_ttl_ms=1000, pending_request_limit=32,
+                 pending_event_limit=128, pending_per_request_limit=8, clock=None):
+        capacities = (limit, pending_request_limit, pending_event_limit,
+                      pending_per_request_limit)
+        if any(isinstance(value, bool) or not isinstance(value, int)
+               or value <= 0 or value > 100_000 for value in capacities):
+            raise ValueError("correlator capacity limits must be integers from 1 to 100000")
+        if isinstance(reorder_ttl_ms, bool) or not isinstance(reorder_ttl_ms, (int, float)) \
+                or (isinstance(reorder_ttl_ms, float) and not math.isfinite(reorder_ttl_ms)) \
+                or reorder_ttl_ms <= 0 or reorder_ttl_ms > 60_000:
+            raise ValueError("reorder TTL must be a finite number from 1 to 60000 ms")
+        if clock is not None and not callable(clock):
+            raise ValueError("clock must be callable")
         self.turns = deque(maxlen=limit)
         self.by_request = {}
         self.request_correlation = {}
+        self.reorder_ttl_ms = reorder_ttl_ms
+        self.pending_request_limit = pending_request_limit
+        self.pending_event_limit = pending_event_limit
+        self.pending_per_request_limit = pending_per_request_limit
+        self.clock = clock or time.monotonic
+        self.pending_audio = {}
+        self.pending_event_count = 0
+        self.pending_sequence = 0
+        self.last_clock = None
         self.lock = threading.Lock()
+
+    def _read_clock(self):
+        value = self.clock()
+        if isinstance(value, bool) or not isinstance(value, (int, float)) \
+                or (isinstance(value, float) and not math.isfinite(value)):
+            raise ValueError("clock must return a finite number")
+        if self.last_clock is not None and value < self.last_clock:
+            raise ValueError("clock must be monotonic")
+        self.last_clock = value
+        return value
 
     @staticmethod
     def _clean_meta(meta):
@@ -93,7 +125,8 @@ class Correlator:
                     self.request_correlation.pop(request_id, None)
         turn = {"turn_id": event["request_id"], "created_ms": event["timestamp_ms"],
                 "stt": {}, "memory": {}, "llm": {}, "tts": {"segments": 0},
-                "playback": {}, "kpi": {}, "correlation": {}}
+                "playback": {}, "kpi": {}, "correlation": {},
+                "_kpi_events": {"tts": [], "playback": []}, "_kpi_overflow": []}
         self.turns.append(turn)
         self.by_request[event["request_id"]] = turn
         self.request_correlation[event["request_id"]] = "explicit"
@@ -105,8 +138,7 @@ class Correlator:
                 return turn
         return None
 
-    def add(self, event):
-        with self.lock:
+    def _apply(self, event):
             source, request_id = event["source"], event["request_id"]
             turn = self.by_request.get(request_id)
             correlation = self.request_correlation.get(request_id, "unmatched") if turn else "unmatched"
@@ -143,6 +175,7 @@ class Correlator:
             stage = turn[source]
             phase = event["phase"]
             stamp = event["timestamp_ms"]
+            first_content = source == "llm" and phase == "content" and "content" not in stage
             # TTS start는 새 세그먼트/요청 수를 의미한다.
             if source == "tts" and phase == "start":
                 stage["segments"] = stage.get("segments", 0) + 1
@@ -184,25 +217,172 @@ class Correlator:
             # half-duplex heuristic.  Preserve it for the waterfall, but do
             # not let it create substantive-content KPIs: overlapping turns
             # would otherwise be silently attributed to the wrong response.
-            turn["correlation"][source] = correlation
-            content_at = turn["llm"].get("content")
-            if correlation == "explicit":
-                if source == "tts" and phase == "first":
-                    if content_at is not None and stamp >= content_at:
-                        turn["kpi"].setdefault("substantive_tts_first", stamp)
-                    else:
-                        turn["kpi"].setdefault("ack_tts_first", stamp)
-                elif source == "playback" and phase == "start":
-                    if content_at is not None and stamp >= content_at:
-                        turn["kpi"].setdefault("substantive_playback_start", stamp)
-                    else:
-                        turn["kpi"].setdefault("ack_playback_start", stamp)
+            prior_correlation = turn["correlation"].get(source)
+            if prior_correlation is None or prior_correlation == correlation:
+                turn["correlation"][source] = correlation
+            else:
+                turn["correlation"][source] = "mixed"
+            if first_content:
+                self._recompute_audio_kpis(turn)
+            elif source in {"tts", "playback"}:
+                self._record_audio_kpi(turn, source, phase, stamp, correlation)
             return True
+
+    @staticmethod
+    def _record_audio_kpi(turn, source, phase, stamp, correlation):
+        if correlation != "explicit":
+            return
+        if source == "tts" and phase == "first":
+            ack_key, substantive_key = "ack_tts_first", "substantive_tts_first"
+        elif source == "playback" and phase == "start":
+            ack_key, substantive_key = "ack_playback_start", "substantive_playback_start"
+        else:
+            return
+        if source in turn["_kpi_overflow"]:
+            return
+        candidates = turn["_kpi_events"][source]
+        if len(candidates) >= 64:
+            candidates.clear()
+            turn["_kpi_overflow"].append(source)
+            turn["kpi"].pop(ack_key, None)
+            turn["kpi"].pop(substantive_key, None)
+            return
+        candidates.append(stamp)
+        content_at = turn["llm"].get("content")
+        key = substantive_key if content_at is not None and stamp >= content_at else ack_key
+        turn["kpi"][key] = min(stamp, turn["kpi"].get(key, stamp))
+
+    @staticmethod
+    def _recompute_audio_kpis(turn):
+        """Classify exact audio from timestamps, independent of arrival order."""
+        content_at = turn["llm"].get("content")
+        for stage_name, phase, ack_key, substantive_key in (
+            ("tts", "first", "ack_tts_first", "substantive_tts_first"),
+            ("playback", "start", "ack_playback_start", "substantive_playback_start"),
+        ):
+            turn["kpi"].pop(ack_key, None)
+            turn["kpi"].pop(substantive_key, None)
+            if stage_name in turn["_kpi_overflow"]:
+                continue
+            stamps = list(turn["_kpi_events"][stage_name])
+            if not stamps:
+                continue
+            if content_at is None:
+                turn["kpi"][ack_key] = min(stamps)
+                continue
+            before = [stamp for stamp in stamps if stamp < content_at]
+            after = [stamp for stamp in stamps if stamp >= content_at]
+            if before:
+                turn["kpi"][ack_key] = min(before)
+            if after:
+                turn["kpi"][substantive_key] = min(after)
+
+    def _copy_pending_event(self, event):
+        """Retain only fixed-shape numeric fields while audio is reordered."""
+        saved = {
+            "source": event["source"], "phase": event["phase"],
+            "request_id": event["request_id"], "timestamp_ms": event["timestamp_ms"],
+        }
+        if event.get("duration_ms") is not None:
+            saved["duration_ms"] = event["duration_ms"]
+        return saved
+
+    def _drop_pending(self, request_id):
+        bucket = self.pending_audio.pop(request_id, None)
+        if bucket:
+            self.pending_event_count -= len(bucket["events"])
+        return bucket
+
+    def _expire_pending(self, ingested_at):
+        if not any(
+                ingested_at - bucket["received_at"] >= self.reorder_ttl_ms / 1000
+                for bucket in self.pending_audio.values()):
+            return
+        expired = []
+        # Once the oldest reorder window closes, flush the whole bounded set.
+        # This can shorten a later bucket's window, but never reorders events.
+        for request_id in list(self.pending_audio):
+            expired.extend(self._drop_pending(request_id)["events"])
+        # No matching LLM boundary arrived in time: preserve the old
+        # half-duplex behavior and the original cross-request arrival order.
+        for pending in sorted(expired, key=lambda item: item["sequence"]):
+            request_id = pending["event"]["request_id"]
+            mapped = self.by_request.get(request_id)
+            if mapped and self.request_correlation.get(request_id) == "explicit" \
+                    and ({"end", "error"} & mapped["llm"].keys()):
+                # A reused completed ID has no safe legacy target. If no new
+                # explicit anchor arrived within the window, discard it.
+                continue
+            self._apply(pending["event"])
+
+    def _buffer_audio(self, event, ingested_at):
+        request_id = event["request_id"]
+        bucket = self.pending_audio.get(request_id)
+        if bucket is None:
+            while len(self.pending_audio) >= self.pending_request_limit:
+                self._drop_pending(next(iter(self.pending_audio)))
+            bucket = {"received_at": ingested_at, "events": []}
+            self.pending_audio[request_id] = bucket
+        if len(bucket["events"]) >= self.pending_per_request_limit:
+            return
+        while self.pending_event_count >= self.pending_event_limit and self.pending_audio:
+            self._drop_pending(next(iter(self.pending_audio)))
+            bucket = self.pending_audio.get(request_id)
+            if bucket is None:
+                bucket = {"received_at": ingested_at, "events": []}
+                self.pending_audio[request_id] = bucket
+        self.pending_sequence += 1
+        bucket["events"].append({
+            "sequence": self.pending_sequence,
+            "event": self._copy_pending_event(event),
+        })
+        self.pending_event_count += 1
+
+    def add(self, event):
+        with self.lock:
+            ingested_at = self._read_clock()
+            self._expire_pending(ingested_at)
+            source, request_id = event["source"], event["request_id"]
+            mapped = self.by_request.get(request_id)
+            if source in {"tts", "playback"} and mapped is None:
+                self._buffer_audio(event, ingested_at)
+                return True
+            if source == "llm" and event["phase"] == "start":
+                bucket = self._drop_pending(request_id)
+                existing = self.by_request.get(request_id)
+                completed_reuse = bool(
+                    existing and self.request_correlation.get(request_id) == "explicit"
+                    and ({"end", "error"} & existing["llm"].keys())
+                )
+                if bucket and existing and not completed_reuse:
+                    # Cross-process delivery can put audio ahead of the LLM
+                    # event even after the same-ID STT anchor has arrived.
+                    # Complete that voice turn instead of creating a text row.
+                    self._apply(event)
+                    for pending in sorted(bucket["events"], key=lambda item: item["sequence"]):
+                        self._apply(pending["event"])
+                    return True
+                if bucket or completed_reuse:
+                    # A same-ID LLM start is an explicit text-only boundary;
+                    # do not mutate the preceding completed turn.
+                    self._new_turn(event)
+                    self._apply(event)
+                    for pending in sorted(
+                            bucket["events"] if bucket else [],
+                            key=lambda item: item["sequence"]):
+                        self._apply(pending["event"])
+                    return True
+            return self._apply(event)
 
     def snapshot(self):
         with self.lock:
+            self._expire_pending(self._read_clock())
             # JSON roundtrip is a compact deep-copy; no user raw content exists in this structure.
-            return json.loads(json.dumps(list(reversed(self.turns))))
+            turns = json.loads(json.dumps(list(reversed(self.turns))))
+            for turn in turns:
+                turn.pop("_kpi_events", None)
+                turn.pop("_kpi_overflow", None)
+            return turns
 
 
 class LocalBroadcastProofs:
@@ -331,9 +511,10 @@ def validate(payload):
     if set(payload) - {"source", "phase", "request_id", "timestamp_ms", "duration_ms", "meta"}: return None
     if payload["source"] not in SOURCES or payload["phase"] not in PHASES or not isinstance(payload["request_id"], str) or not payload["request_id"] or len(payload["request_id"]) > 128: return None
     if payload["phase"] == "content" and payload["source"] != "llm": return None
-    if "timestamp_ms" in payload and (not isinstance(payload["timestamp_ms"], (int, float)) or isinstance(payload["timestamp_ms"], bool)): return None
-    if "duration_ms" in payload and (not isinstance(payload["duration_ms"], (int, float)) or isinstance(payload["duration_ms"], bool)): return None
+    if "timestamp_ms" in payload and (not isinstance(payload["timestamp_ms"], (int, float)) or isinstance(payload["timestamp_ms"], bool) or (isinstance(payload["timestamp_ms"], float) and not math.isfinite(payload["timestamp_ms"]))): return None
+    if "duration_ms" in payload and (not isinstance(payload["duration_ms"], (int, float)) or isinstance(payload["duration_ms"], bool) or (isinstance(payload["duration_ms"], float) and not math.isfinite(payload["duration_ms"]))): return None
     if "meta" in payload and not isinstance(payload["meta"], dict): return None
+    if "meta" in payload and any(isinstance(value, float) and not math.isfinite(value) for value in payload["meta"].values()): return None
     # Whitelist fields only. 텍스트/audio 등의 어떤 추가 원문 필드도 수용하지 않는다.
     event = {k: payload[k] for k in ("source", "phase", "request_id", "duration_ms", "meta") if k in payload}
     event["timestamp_ms"] = int(payload.get("timestamp_ms", now_ms()))
@@ -374,7 +555,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(202, {"accepted": True})
             event = validate(payload)
             if not event: raise ValueError()
-        except (ValueError, UnicodeDecodeError, json.JSONDecodeError): return self.send_json(400, {"error": "유효하지 않은 계측 이벤트"})
+        except (ValueError, OverflowError, UnicodeDecodeError, json.JSONDecodeError): return self.send_json(400, {"error": "유효하지 않은 계측 이벤트"})
         if not CORRELATOR.add(event): return self.send_json(409, {"error": "연결할 STT/LLM turn이 없습니다"})
         self.send_json(202, {"accepted": True})
 
