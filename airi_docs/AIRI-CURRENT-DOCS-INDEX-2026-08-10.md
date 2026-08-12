@@ -1,173 +1,124 @@
-# AIRI Current Documentation Index - 2026-08-10
+# AIRI Documentation Index
 
-Use this file to distinguish current source-based handoff material from older
-runtime observations.
+문서는 상태별 폴더로 분류한다 (2026-08-12 재구성). 파일명은 유지했으므로
+과거 문서가 언급하는 파일은 이름으로 검색하면 찾을 수 있다.
 
-## Current
+## 폴더 구조
 
-- `AIRI-FINAL-HANDOFF-2026-08-10.md` is the concise end-of-session handoff for
-  the next reviewer. It records the current contracts, verification boundary,
-  and copy/paste review request.
-- `AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md` is the authoritative
-  handoff for cancellation, parent correlation, playback-start proof, sender
-  behavior, and current verification.
-- `patches/AIRI-v0.11.3-round-cancel-source-replacement.md` is the authoritative
-  manifest for the combined runtime patch and its current SHA-256/size/scope.
-- `patches/AIRI-v0.11.3-context-correlation-sanitizer.patch` is an additional
-  patch for the generic `context:update` occurrence. Apply it after the
-  combined patch; it is intentionally separate from the input `contextUpdates`
-  sanitizer already present in the combined patch.
-- `patches/AIRI-v0.11.3-upgrade-scout-runtime-20260811.md` is the manifest for
-  the Upgrade Scout client layer. Apply its `.patch` artifact third, after the
-  combined patch and the generic-context sanitizer.
-- The other tracked files under `patches/` are retained historical snapshots
-  from superseded iterations. Do not apply them or mix them with the current
-  manifest; use only the three ordered runtime layers above.
-- `AIRI-INDEPENDENT-REVIEW-2026-08-10.md` is an external read-only review of the
-  weekend delta (`1d8a720..HEAD`). It records measured gate results, 20
-  CRITICAL/HIGH findings with adversarial verdicts, the 149 goals added this
-  weekend, six goal conflicts that need a user decision, and a remediation
-  order. It is a review record, not a branch contract.
-- `AIRI-INDEPENDENT-REVIEW-DATA-2026-08-10.md` is that review's raw data
-  appendix: all extracted goals with source quotes, the 61 MED/LOW findings,
-  and per-axis summaries.
-- `AIRI-UPGRADE-SCOUT-2026-08-11.md` is a read-only survey of upgrade paths
-  across TTS, STT, LLM, barge-in, upstream, proxy, runtime, GitHub and Hugging
-  Face, with feasibility verdicts against the 8GB budget, Korean support,
-  commercial licensing and native Windows. It reverses three earlier premises:
-  the 6.9s TTS cold start is not user-facing on the standard launch path, the
-  half-duplex cause is mic teardown rather than `echoCancellation:false`, and
-  the source build transition recorded in `AIRI-WORK-CHECKPOINT-2026-08-10.md`
-  is already complete, which unblocks client chunk playback.
-  `AIRI-UPGRADE-SCOUT-DATA-2026-08-11.md` holds its per-axis candidates.
-- `AIRI-UPGRADE-SCOUT-MEASUREMENT-2026-08-11.md` records the implemented
-  Upgrade Scout scope, isolated and full-stack measurements, regression
-  results, and the physical-device gates that remain conditional. It does not
-  promote approved test knowledge into an operational deployment contract.
-- `AIRI-GROUNDED-DIALOGUE-QUALITY-HANDOFF-2026-08-12.md` records the grounded
-  dialogue quality follow-up: useful answers are preserved instead of cut,
-  unsupported external facts and speaker/fact reversals are rewritten, and a
-  reproducible loopback probe reports per-answer quality and latency. Read it
-  after the two Upgrade Scout documents above.
-- `AIRI-ELECTRON-TEXT-TTS-MEASUREMENT-2026-08-12.md` records the actual
-  Electron text→Mi:dm→GPT-SoVITS→Windows render measurement, the zero-length
-  streaming-WAV fallback fix, P50/P95 results, and the remaining correlation
-  and physical-audibility limits. STT is intentionally excluded.
-- `AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md` separates the EXAONE→Mi:dm
-  raw-model effect from the current proxy/grounding effect, records the
-  counterbalanced 120-turn-per-model comparison, and lists verified benefits,
-  regressions, and unresolved model-identity/provenance risks.
-- `AIRI-WORK-CHECKPOINT-2026-08-10.md` is listed as historical above, but its
-  lines 88-105 are the only record of the completed source build and the
-  installed archive hash. Read that section before planning any client-side
-  work; the 2026-08-11 survey needed it and the index had hidden it.
-- `AIRI-EXAONE-GROWTH-STRATEGY-2026-08-07.md` and
-  `AIRI-EXAONE-MODEL-CUSTOMIZATION-PLAN-2026-08-07.md` are current
-  user-approved direction (G0–G6 roadmap, C0–C5 gates), not historical working
-  material. The `AIRI-VTUBER-JUST-CHATTING-REFERENCE-2026-08-08.md` style
-  contract and `ollama-proxy/eval/README.md` baseline rules are likewise
-  current. Reading only the four entries above misses the approved roadmap;
-  the 2026-08-10 review documents that this exact omission happened.
+| 폴더 | 의미 | 규칙 |
+|---|---|---|
+| `진행중/` | 현행 계약·미해결 게이트가 남은 문서 | 여기 있는 문서의 주장은 현재 브랜치 상태로 취급한다 |
+| `진행예정/` | 승인됐거나 제안된 계획 (미실행 분량 존재) | 착수 전 반드시 정독 |
+| `완료/` | 완료된 작업의 유효한 증거 기록 (실측·감사·구현 설계) | 수치 인용 가능. 단 이후 변경으로 stale해질 수 있으니 날짜 확인 |
+| `보류/` | 명시적으로 보류된 작업 흐름의 기록 | 재개 조건이 각 문서 또는 아래에 명시됨 |
+| `아카이브/` | 대체·과거 기록 | 현재 상태 검증에 사용 금지 (과거 해시·테스트 총계 포함) |
+| `참조/` | 시점 무관 참고 자료 (스타일 계약·기술 레퍼런스·리서치) | |
+| `patches/` | 패치 아티팩트 + 매니페스트 | **이동 금지** — `test-patch-manifest.ps1`과 CI가 경로를 핀함 |
 
-## Historical
+## 진행중 — 현행 계약
 
-Unless a document is listed under **Current** above, treat it as historical
-working material rather than a current branch contract. The filenames below
-call out the most likely sources of confusion, but the rule applies to every
-other older handoff, experiment, audit, and patch snapshot in this directory.
+- `AIRI-FINAL-HANDOFF-2026-08-10.md` — 패치·sender 계약과 검증 경계.
+- `AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md` — 취소·상관·
+  재생 시작 증명의 권위 문서.
+- `AIRI-GROUNDED-DIALOGUE-QUALITY-HANDOFF-2026-08-12.md` — 그라운딩 품질
+  후속 계약.
+- `AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md` — EXAONE→Mi:dm 전환 분석.
+  **미해결 게이트**: model SSoT 강제(프록시에 EXAONE 하드코딩 폴백 3곳),
+  eval provenance, ACK metadata, digest pin, 인간 검수 100건.
+- `AIRI-LOCAL-TECH-SPECS.md` — 현행 스펙 문서. ⚠️ **stale** (STT=CPU·
+  EXAONE·Chatterbox 기재 — 실제는 GPU STT·Mi:dm·GPT-SoVITS). 갱신 대상.
 
-`AIRI-HANDOFF-2026-08-07.md` and `AIRI-TRACK-M-CHECKPOINT-2026-08-08.md`
-preserve earlier test totals, listener observations, archive hashes, and
-installation procedures. Those values are not current branch status. Do not
-use their old patch hashes or test counts to validate the current checkout.
-`AIRI-WORK-CHECKPOINT-2026-08-10.md` is also historical: it predates the
-current branch handoff and records the superseded `b234abe` baseline and
-82-path patch hash. Use the current patch manifest below instead.
-The same historical rule applies to command examples in other documents dated
-2026-08-07 or 2026-08-08: in particular, do not invoke individual
-`patch-airi-*.ps1` steps from those pages. Use the current orchestrator contract
-below instead.
+## 진행예정 — 계획
 
-The installed-artifact section in
-`patches/AIRI-v0.11.3-round-cancel-source-replacement.md` is likewise a
-historical checkpoint. For the current server-channel runtime observation,
-use the 2026-08-10 server-channel checkpoint instead.
+- `AIRI-BROADCAST-CHARACTER-PLAN-2026-08-12.md` — 지능·캐릭터성·방송 통합
+  계획. **사용자 결정 4건 대기** (관계 축·방송 중 클라우드 LLM·캐릭터
+  확정·목표 시점). 근거는 `참조/AIRI-BROADCAST-RESEARCH-2026-08-12.md`.
+- `AIRI-NEUROSAMA-LOW-LATENCY-PLAN.md` (v2.1) — 마스터 계획. §6 지연 예산·
+  §12 완료 기준은 실측 후 재정의 제안(첫 반응 ≤1.5s / 본답변 ≤2.5s)과
+  공존 중 — 공식 개정은 사용자 결정 사항.
+- `AIRI-EXAONE-GROWTH-STRATEGY-2026-08-07.md` — **사용자 승인 방향.**
+  G0~G6 성장 로드맵 (G1 캐릭터 루프 → G2 장기 기억 → G3 평가 플라이휠 →
+  G4 파인튜닝 → G5 자발 행동·방송 디렉터 → G6 게임 에이전트).
+- `AIRI-EXAONE-MODEL-CUSTOMIZATION-PLAN-2026-08-07.md` — C0~C5 모델
+  커스터마이징 게이트. (모델이 Mi:dm으로 바뀌어도 게이트 구조는 유효)
 
-## Verification boundary
+## 완료 — 유효한 증거 기록 (최신순)
 
-The current branch is source/patch work only. Do not create governed topic
-boards, send real microphone text, expose raw IDs or dialogue, or infer natural
-playback completion from playback-start evidence.
+- `AIRI-ELECTRON-TEXT-TTS-MEASUREMENT-2026-08-12.md` — Electron 실기
+  text→render 실측 (P50 1,963ms / P95 2,720ms) + 스트리밍 WAV 결함 수정.
+- `AIRI-UPGRADE-SCOUT-MEASUREMENT-2026-08-11.md` — Upgrade Scout 구현·실측
+  (KURE fp16 −1,083MiB, prefix 캐시 235.6→12.7ms 등) + 실기 게이트 목록.
+- `AIRI-UPGRADE-SCOUT-2026-08-11.md` / `-DATA-` — 업그레이드 경로 조사와
+  타당성 판정. 기존 전제 3건 정정 (TTS cold 비노출·half-duplex 원인·
+  소스 빌드 완료).
+- `AIRI-INDEPENDENT-REVIEW-2026-08-10.md` / `-DATA-` — 주말 델타 독립 검토
+  (발견 81건 + 신설 목표 149건 + 충돌 6건).
+- `AIRI-STABILITY-CHECKPOINT-2026-08-10.md` — 재현성·검증 안정화 기록.
+- `AIRI-LATENCY-ACCEPTANCE-2026-08-09.md` — 지연 실측 기준선 (저장 WAV).
+- `AIRI-MEMORY-LIVE-SMOKE-2026-08-09.md` — 기억 라이브 스모크.
+- `AIRI-VTUBER-STYLE-REVIEW-2026-08-09.md` — 스타일 게이트 기준선 실측.
+- `AIRI-KNOWLEDGE-RAG-DESIGN-2026-08-09.md` — 지식 저장소 설계 (구현됨).
+- `AIRI-LOCAL-STACK-REVIEW-2026-08-07.md` — 기준선 감사 (이후 CRITICAL
+  다수 해소됨 — 현재 상태 판정에는 이후 문서 사용).
 
-## Latest audit evidence
+## 보류 — 재개 조건 명시
 
-- `node --test test-send-airi-local-text.mjs`: 27/27 passed.
-- The canonical patch, generic-context sanitizer, and Upgrade Scout runtime
-  layer apply cleanly in order in the pinned v0.11.3 verification checkout.
-- The explicit pinned-checkout applicability run was re-executed after the
-  latest sender changes with `-BaseCheckout` at `dbf8124`; all three runtime
-  layers apply/reverse checks passed and the AIRI installation was not touched.
-- The Upgrade Scout client source builds, Stage UI and Tamagotchi typechecks
-  pass, and the focused playback/speech/interaction suite passes 42/42.
-- The focused browser contract suite with the sanitizer applied passed 25/25
-  in the dependency-equipped source checkout.
-- The latest privacy/correlation audit found no HIGH or MED issue in the
-  current patch boundary.
-- `apply-airi-patches.ps1` now verifies all 10 active in-place patch sites,
-  including the reaction-latency speech pre-roll marker, plus the required
-  absence of the superseded segmentation marker.
-- The orchestrator also rejects residual stock markers and child-script
-  idempotence now returns to the orchestrator instead of terminating its host
-  PowerShell process.
-- Existing `app.asar.backup-pristine` files are now SHA-256 checked against the
-  pinned pristine 0.11.3 archive before patching continues.
-- `restore-airi-original.ps1` uses the same pristine hash contract, stages the
-  backup in the target directory, verifies the staged bytes, and publishes via
-  an atomic file replacement instead of truncating `app.asar` in place.
-- Restore also rejects a container or reparse-point `app.asar` before resolving
-  the path, preventing an archive symlink from redirecting replacement outside
-  the installation.
-- The apply orchestrator applies the same non-reparse checks to the install
-  directory and archive before scanning or creating a pristine backup.
-- The intermediate `resources` directory is also required to be a regular
-  non-reparse directory, closing junction redirection between install root and
-  `app.asar`.
-- The apply orchestrator serializes its complete run with a named local mutex;
-  concurrent invocations fail fast before touching the installation.
-- If an internal patch step throws, the orchestrator stops the remaining patch
-  sequence before final verification; restore from the verified pristine backup
-  before investigating or retrying.
-- `test-patch-entrypoints.ps1` is an offline regression check for the internal
-  child-script guard and does not inspect or modify an AIRI installation.
-- `test-patch-manifest.ps1` is an offline regression check for every tracked
-  patch artifact size, SHA-256 value, defect classification, and the exact
-  three-layer runtime support set; it does not inspect or modify an AIRI
-  installation. The workflow separately checks committed
-  source whitespace over push/PR ranges with `git diff --check` (and uses a
-  `git diff-tree --check` fallback for other events) while excluding
-  byte-addressed patch artifacts, whose whitespace is covered by the manifest
-  hashes.
-- `test-current-checkpoint.ps1` runs the manifest, entrypoint, and sender
-  contract checks together as one offline checkpoint command; it also invokes
-  `test-patch-applicability.ps1` in its inert/default-off mode.
-- `test-patch-applicability.ps1` can optionally validate all three ordered
-  runtime patches against an explicitly supplied local pinned-base checkout;
-  it never accesses the installed AIRI archive.
-- `.github/workflows/remediation-checkpoint.yml` runs that same checkpoint on
-  Windows for every push, pull request, or manual dispatch; it does not install
-  or start AIRI.
-- Restore uses the same mutex, so apply and restore cannot modify the archive
-  concurrently.
-- The six active `patch-airi-*.ps1` child files are implementation steps for
-  the orchestrator; the seventh matching file,
-  `patch-airi-transcript-latency.ps1`, is a deprecated stub. None are
-  concurrent standalone entry points; use
-  `apply-airi-patches.ps1` or `restore-airi-original.ps1` for supported
-  operations. Each step now requires the orchestrator-only
-  `-InternalOrchestrator` switch and refuses direct invocation before touching
-  the archive.
-- New pristine backups are hash-gated before and after staging, then published
-  with no-clobber atomic move; concurrent runs may only reuse an independently
-  verified backup.
-- Existing backup reuse also rejects container or reparse-point backup paths
-  before hashing.
+**토픽 거버넌스 운영 배포** (재개 조건: G5 방송 디렉터 착수 — 방송 계획
+B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
+-IMPLEMENTATION-2026-08-09.md`, `AIRI-APPROVED-TOPICS/-KNOWLEDGE-2026-08-09.md`,
+`AIRI-TOPIC-CURATION/-WORKFLOW-STATUS-CHECKPOINT-2026-08-10.md`,
+`AIRI-WIKIMEDIA-*-CHECKPOINT-2026-08-10.md` 3종.
+승인 지식 fixture는 테스트 재현성만 보장하며 운영 배포는 별도 승인 과제.
+
+**스타일 데이터셋 승격** (재개 조건: G4 파인튜닝 착수 — 현 단계 LoRA 보류):
+`AIRI-STYLE-PROMOTION-CHECKPOINT-2026-08-10.md`.
+
+## 참조
+
+- `AIRI-BROADCAST-RESEARCH-2026-08-12.md` — 저스트챗 방송 구조·뉴로사마
+  벤치마크·한국 씬 + 채팅 API·OBS·안전장치 기술 조사 (출처 포함).
+- `AIRI-VTUBER-JUST-CHATTING-REFERENCE-2026-08-08.md` — **현행 스타일 계약**
+  (한국어 1~2문장·직접 반응·상담식 금지·실존 창작자 모방 금지).
+- `AIRI-MEMORY-TECH-REFERENCE.md` — 기억 계층 기술 레퍼런스.
+- `rtk-setup-guide.md` — rtk 토큰 절감 설치 가이드.
+
+## 아카이브 이용 시 주의
+
+- 과거 해시·테스트 총계·설치 절차로 현재 체크아웃을 검증하지 말 것.
+- `patch-airi-*.ps1` 개별 호출 예시를 따르지 말 것 — 지원 진입점은
+  `apply-airi-patches.ps1` / `restore-airi-original.ps1`뿐.
+- **예외적으로 여전히 유일한 정보원인 것**:
+  - `아카이브/AIRI-WORK-CHECKPOINT-2026-08-10.md` **:88-105** — 완료된
+    소스 빌드와 설치본 SHA-256의 유일한 기록. 클라이언트 작업 계획 전
+    반드시 읽을 것.
+  - `아카이브/AIRI-NARRATIVE-CHECKPOINT-2026-08-09.md` — AIRI 고유 서사
+    (signal garden 등) 결정 기록. 캐릭터 헌법(C1) 작업 시 참조.
+
+## patches/ — 런타임 패치 계약 (이동 금지)
+
+- `patches/AIRI-v0.11.3-round-cancel-source-replacement.md` — 통합 런타임
+  패치 매니페스트 (SHA-256·크기·범위).
+- `patches/AIRI-v0.11.3-upgrade-scout-runtime-20260811.md` — Upgrade Scout
+  클라이언트 레이어 매니페스트.
+- 적용 순서: **통합 패치 → context sanitizer → Upgrade Scout 레이어** 3층.
+  그 외 `.patch`는 보존된 과거 스냅샷 — 적용 금지 (3종은 적용 불가 결함이
+  기록돼 있으며 `test-patch-manifest.ps1`이 결함 존속을 검사한다).
+
+## 검증 경계
+
+현재 브랜치 검증은 소스·패치·오프라인 테스트 한정. 거버넌스 토픽 보드
+생성, 실제 마이크 텍스트 전송, 원시 ID·대화 노출, 재생 시작 증거의 자연
+종료 해석 금지.
+
+## 최신 검증 증거 (2026-08-12)
+
+- 통합 Python: 733 passed / 1 skipped / 504 subtests (검토 PC 실측).
+- `node --test test-send-airi-local-text.mjs`: 27/27.
+- `test-current-checkpoint.ps1`: PASS. 3층 런타임 패치가 핀 checkout에서
+  정방향·역방향 적용 통과.
+- Upgrade Scout 클라이언트: Stage UI·Tamagotchi 타입검사 + 집중 42 테스트
+  통과. 최신 `main` 포팅 브랜치: 25/25 빌드 + 집중 168 테스트.
+- CI: `offline-contracts` + `python-core-tests` 두 job green
+  (tip `a231ab0` 기준; 이후 커밋은 push 시 재검증).
+- 실기 게이트 미통과 항목은 `완료/AIRI-UPGRADE-SCOUT-MEASUREMENT-2026-08-11.md`
+  §판정 참조 (Mi:dm first-audible, 실제 마이크 20+20, barge-in 등).
