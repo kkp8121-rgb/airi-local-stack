@@ -5,7 +5,9 @@
 This handoff records the source/patch remediation state at the end of the
 current work session.
 
-- Branch: `fix/code-audit-remediation-2026-08-07`
+- Branch at the time of this handoff: `fix/code-audit-remediation-2026-08-07`.
+  Work continued on `feat/upgrade-scout-full-2026-08-11`, which is the current
+  branch; the contracts below still apply there.
 - The branch is source and patch work only. It does not contain a production
   topic board, review decisions, raw discovery data, model output, or personal
   microphone content.
@@ -43,8 +45,8 @@ The current patch set covers:
 
 - `airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md` — current-vs-historical
   document map and safety boundary.
-- `airi_docs/AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md` — detailed
-  correlation, cancellation, playback-start, and sender contract.
+- `airi_docs/진행중/AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md` —
+  detailed correlation, cancellation, playback-start, and sender contract.
 - `airi_docs/patches/AIRI-v0.11.3-round-cancel-source-replacement.md` — pinned
   base, combined patch manifest, sizes, hashes, and scope.
 - `airi_docs/patches/AIRI-v0.11.3-context-correlation-sanitizer.patch` — the
@@ -81,8 +83,10 @@ For the next Claude session, paste the request in the final section below
 verbatim. It intentionally asks for an audit before any mutation and forbids
 network/model/service or real-microphone actions.
 
-The sender contract currently passes 26 Node tests. The combined checkpoint
-also verifies all three documented patch artifact sizes and hashes and the
+The sender contract passes 27 Node tests as of 2026-08-12; it passed 26 when
+this handoff was written. The combined checkpoint also verifies every
+documented patch artifact size and hash (three at handoff time, eight pinned in
+`test-patch-manifest.ps1` as of 2026-08-12) and the
 orchestrator-only child-script contract, and invokes the applicability verifier
 in its inert/default-off mode. The pinned v0.11.3 patch applies
 cleanly in the dedicated pristine verification checkout; the current branch
@@ -90,8 +94,11 @@ does not require that checkout to be present. The GitHub job intentionally
 does not clone or apply a v0.11.3 fixture: patch applicability is a separately
 recorded pristine-checkout result, while CI stays offline and artifact-free.
 That explicit applicability command was re-run against the local checkout at
-`dbf8124` after the latest sender changes; both patch apply/reverse checks
-passed and the installed AIRI archive was not accessed or modified.
+`dbf8124` after the sender changes of that session; both patch apply/reverse
+checks passed and the installed AIRI archive was not accessed or modified.
+That commit is no longer reachable in this repository (the branch was
+reworked), so treat it as a historical record and re-run the command to obtain
+a current result — 확인 필요.
 The workflow's committed-whitespace check inspects the full push/PR range with
 `git diff --check` (falling back to `git diff-tree --check` for other event
 types) and excludes the byte-addressed patch files; those files are checked by
@@ -144,8 +151,8 @@ manual restore rather than automatically rolled back.
 You are reviewing the AIRI remediation branch after its latest handoff.
 
 Read README.md, airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md,
-airi_docs/AIRI-FINAL-HANDOFF-2026-08-10.md, and
-airi_docs/AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md first.
+airi_docs/진행중/AIRI-FINAL-HANDOFF-2026-08-10.md, and
+airi_docs/진행중/AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md first.
 
 Audit only the current source patch and sender/bridge protocol. Verify:
 1) playback-start is emitted only after successful source.start(0);

@@ -5,9 +5,13 @@
 공통 의무이며, 배치 커밋에 이 문서 갱신이 없으면 배치가 완결되지 않은
 것으로 본다.
 
-- 축 정의(원 문서, 이 폴더): G0~G6 = `AIRI-EXAONE-GROWTH-STRATEGY-2026-08-07.md`
-  §6 / C0~C5 = `AIRI-EXAONE-MODEL-CUSTOMIZATION-PLAN-2026-08-07.md` §6 /
+- 축 정의(원 문서, 이 폴더): G0~G6 = `AIRI-GROWTH-STRATEGY.md` §6 /
+  C0~C5 = `AIRI-MODEL-CUSTOMIZATION-PLAN.md` §6 /
   지연 = `AIRI-NEUROSAMA-LOW-LATENCY-PLAN.md` (v2.1)
+  — 앞 2종은 2026-08-12 모델 중립 개정으로 개명됐다(옛 이름
+  `AIRI-EXAONE-GROWTH-STRATEGY-2026-08-07.md` /
+  `AIRI-EXAONE-MODEL-CUSTOMIZATION-PLAN-2026-08-07.md`). 개정 전 원본 3종은
+  `아카이브/`에 보존.
 - 실행 계획(M1~M5·트랙 I/C/B): `진행예정/AIRI-BROADCAST-CHARACTER-PLAN-2026-08-12.md`
   — 구체 실행 계획이라 진행예정에 둔다. 이 현황판은 지도, 계획서는 경로.
 - 상태 어휘: **완료 / 진행중 / 부분 / 대기 / 보류(조건) / 미착수**.
@@ -71,6 +75,18 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-12** (검토 PC): 현행성 문서 12종 전수 실측 검토 —
+  stale 주장 20여 건 수정(인수인계의 사전 키 오기 `replacement_lines`→
+  `blocked_dialogue`, 시스템 프롬프트 751자/949자 혼동, 방송 계획의
+  `AIRI_LLM_MODE`(현행 코드 미존재)→`AIRI_CHAT_PROVIDER`+
+  `AIRI_ALLOW_EXTERNAL_CHAT` 교정, 테스트 총계·라인 참조 정렬 등).
+  정확 확인 39건. 축 상태값 변화 없음.
+- **2026-08-12** (검토 PC): 로드맵 방향 문서 3종 모델 중립 개정 +
+  2종 개명(`AIRI-GROWTH-STRATEGY.md` / `AIRI-MODEL-CUSTOMIZATION-PLAN.md`).
+  8/7 원문의 EXAONE 전제를 현행 SSoT 모델(`resolve_chat_model()`, 현재
+  `midm-airi:2.0-mini`) 참조로 치환했고, 성장 전략 결정 1(모델 유지)은
+  Mi:dm 전환으로 대체·결정 5(상업 라이선스)는 Mi:dm(MIT)으로 해소 표기.
+  개정 전 원본 3종은 `아카이브/`에 보존. 축 상태값 변화 없음.
 - **2026-08-12** (`41b1c20`, 검토 PC): 현황판 신설. 검토 PC 선행 배치
   반영 — 모델 SSoT 게이트 4종 코드 해소, I1 추출 배선(발효 대기),
   MEM-04 WAL, B3 모더레이션 코드 완료(M3 일부 선행), C1 헌법 초안.

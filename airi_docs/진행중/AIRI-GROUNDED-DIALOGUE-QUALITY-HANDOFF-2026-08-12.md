@@ -2,8 +2,8 @@
 
 Read these documents first, in order:
 
-1. `AIRI-UPGRADE-SCOUT-2026-08-11.md`
-2. `AIRI-UPGRADE-SCOUT-DATA-2026-08-11.md`
+1. `완료/AIRI-UPGRADE-SCOUT-2026-08-11.md`
+2. `완료/AIRI-UPGRADE-SCOUT-DATA-2026-08-11.md`
 3. this handoff
 
 This change continues from parent `1fc36ce` on
@@ -85,7 +85,10 @@ Final recorded results:
   0 flagged violation, 0 transport error
 - `test-current-checkpoint.ps1`: PASS; the explicitly offline applicability
   step remained an expected SKIP
-- Python suite: 733 passed, 1 skipped, 504 subtests passed in 36.62 seconds
+- Python suite: 733 passed, 1 skipped, 504 subtests passed in 36.62 seconds.
+  Later work grew the suite, so the same command reports 800 passed, 1 skipped,
+  706 subtests as of 2026-08-12; add root `test_midm_model_configuration.py`
+  for the 809-test total quoted by the current handoffs.
 - `git diff --check`: PASS
 
 The probe accepts only a loopback endpoint and uses `midm-airi:2.0-mini` by

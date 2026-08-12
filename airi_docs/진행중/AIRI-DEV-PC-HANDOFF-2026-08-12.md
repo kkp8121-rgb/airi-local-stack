@@ -65,7 +65,7 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
 
 1. **TTS 캐시 프리로드 (오디오 공백 금지의 실제 성립 조건)**:
    모더레이션 폴백 대사 5종(`ollama-proxy/moderation_terms_ko.json`의
-   `replacement_lines`)은 GPT-SoVITS 프리로드 캐시에 없어 현재 cold
+   `blocked_dialogue`)은 GPT-SoVITS 프리로드 캐시에 없어 현재 cold
    synthesis다. `gpt-sovits/openai_compatible_proxy.py`의
    `IMMEDIATE_RESPONSE_TEXTS`와 동일한 mirror 계약으로 추가하라 —
    프록시 데이터 파일과 문자열이 1자라도 다르면 조용히 캐시 미스가 난다.

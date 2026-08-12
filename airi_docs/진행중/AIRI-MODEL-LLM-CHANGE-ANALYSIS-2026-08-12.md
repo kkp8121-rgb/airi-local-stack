@@ -178,3 +178,21 @@ python ollama-proxy\benchmark_dialogue_quality.py `
 
 - <https://huggingface.co/K-intelligence/Midm-2.0-Mini-Instruct>
 - <https://huggingface.co/LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct/blob/main/LICENSE>
+
+## 후속 반영 (2026-08-12)
+
+위 본문은 2026-08-12 분석 시점의 기록이며 수정하지 않는다. 그 시점 이후
+`932eae6`(feat: close model SSoT gates, arm memory extraction, add Korean
+output moderation)에서 §단점 7~10이 **코드 레벨로 해소**됐다. 네 항목 모두
+**실기(dev PC) 검증 대기** 상태이므로 "운영 전환 고정" 선언은 아직 성립하지
+않는다.
+
+| 항목 | 원 지적 | 해소 내용 | 남은 것 |
+|---|---|---|---|
+| 7. model SSoT | 런처 `ChatModel`이 local request의 `model` 필드를 강제하지 않음 | `resolve_chat_model()`(env `AIRI_CHAT_MODEL` → 기본 `midm-airi:2.0-mini`) 단일 경유로 통일하고 프록시 소스의 EXAONE 하드코딩 8곳을 제거(소스 0건을 테스트로 고정). local provider의 foreground `model` 필드를 SSoT로 정규화하며, loopback 검증 마커(`local-quality-probe`/`local-evaluation`, 127.0.0.1 한정)만 면제하고 `AIRI_CHAT_MODEL_ENFORCE=0`이 진단용 escape hatch다. 외부 provider는 비강제 | 실제 Electron→11435 턴에서 `/health`의 `chat_model.normalized_requests > 0` 확인 |
+| 8. eval provenance | fallback이 EXAONE이고 launcher가 `AIRI_EVAL_MODEL`을 설정하지 않음 | `AIRI_EVAL_MODEL` 미설정 시 SSoT 폴백으로 전환하고 런처가 값을 설정 | 수집 평가 데이터의 모델 표기 실기 확인 |
+| 9. ACK 표기 | audible ACK인데 header/health가 `silent`로 보고 | `X-AIRI-Immediate-Ack`를 분기별 실측값으로 교정(발화 분기 `audible`, 무음 분기 `silent`, 네이티브 `api/chat` 통과 경로 `false`). `/health`의 `immediate_ack`는 사용자 턴 기준 `audible`로 정정하고 `chat_model` 텔레메트리 섹션을 신설 | 실기 latency 해석 재확인 |
+| 10. digest pin | preflight가 tag 이름만 보고 digest를 pin하지 않음 | `AIRI_CHAT_MODEL_DIGEST` 설정 시 불일치를 fail-closed로 기동 차단, 미설정 시 관측 digest만 기록(opt-in). PS preflight도 `-ExpectedDigest` 지원 | 실측 digest를 복사해 pin 고정 — 그 전까지는 완전한 fail-closed가 아님 |
+
+관련 문서: `진행중/AIRI-DEV-PC-HANDOFF-2026-08-12.md` §2(실기 검증 절차),
+`진행중/AIRI-LOCAL-TECH-SPECS.md` "SSoT 갭" 절.

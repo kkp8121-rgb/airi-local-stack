@@ -28,7 +28,7 @@
 
 | # | 작업 | 내용 | 기반 자산 (이미 있음) |
 |---|---|---|---|
-| **I1** | 기억 추출 활성화 | Stage A/B 추출기를 켜서 대화→기억 승격 루프 완성. 현재 "검색만 되고 쌓이지 않는" 반쪽 상태. 추출 게이트(전 지표 1.0 요구)의 완화 판정 포함 | `airi_memory.py`, `memory_extraction_provider.py`, `verify_extraction_gate.py` |
+| **I1** | 기억 추출 활성화 | Stage A/B 추출기를 켜서 대화→기억 승격 루프 완성. 현재 "검색만 되고 쌓이지 않는" 반쪽 상태. **게이트 완화 판정은 2026-08-12(`932eae6`) 완료** — `GATE_PROFILES`의 `strict`/`balanced` 2프로파일로 분리했고 기본은 `balanced`(구조 지표는 두 프로파일 모두 1.0 고정, 모델 판단 지표만 완화). 자동 ON 배선도 완료(게이트 리포트 통과 시 fail-open). **남은 것은 게이트 리포트 생산** — 완화 후에도 기존 후보는 전부 불합격이고 Mi:dm은 추출기로 미측정 | `airi_memory.py`, `memory_extraction_provider.py`, `verify_extraction_gate.py` |
 | **I2** | 시청자 기억 시스템 | 실무 표준 등급제(1등급 10~20명: 이름·관심사·근황 / 2등급 30~50명: 닉·특징)를 트랙 M 스키마로 구현. 닉네임별 첫 방문·후원 이력·관심사에서 **콜백 자동 생성**("지난번에 말한 그 게임 해봤어?") | SQLite+KURE 검색(1만 행 P50 78~110ms), `[Character Memory]` 주입 경로 |
 | **I3** | 주제 풀 확장 | 토픽 보드를 "승인 문장 6개 낭독"에서 **방송 시간 1.5배 분량의 주제 풀**로 확장. 블록당 주제 1개 + 예비 2~3개. 지식 RAG(`knowledge_store.py`)와 연결해 주제별 근거 제공 | topic board 승인 파이프라인, knowledge_store |
 | **I4** | 평가 플라이휠 (G3) | 방송 트랜스크립트 → 사람 큐레이션 → 오프라인 개선 → 회귀 시험 (뉴로사마와 동일 구조: 방송→수동 큐레이션→파인튜닝). 우선 **인간 검수 100건**으로 16케이스 게이트 FAIL 해소 | eval 하네스(120턴 A/B), `training/` 승인 파이프라인 |
@@ -39,7 +39,7 @@
 |---|---|---|
 | **C1** | 캐릭터 헌법 | 949자 시스템 프롬프트 → 캐릭터 카드 확장: 정체성·가치관·**말버릇 3~5개**(밈 시드)·좋아하는 것/약점(갭 요소)·관계 규정. 기존 signal garden 서사 활용. 시청자 해석이 정본이 되는 경로(Evil Neuro "사랑받지 못한 아이" = 팬 해석의 정본화)를 의도적으로 열어둔다 |
 | **C2** | G1 캐릭터 루프 배선 | `character_state.py`에 이미 있는 상태(current_topic·dialogue_goal·emotion·relationship_stage·repeat_intent·silence_ms)를 **프롬프트에 실제 주입** + 평가자 재활성화(방송 중은 클라우드 LLM이라 VRAM 경합 없음). 리액션 톤 3단계(평상 1 / 감탄 1.5 / 큰 사건 2)를 상태 파라미터로 노출 |
-| **C3** | 결함의 콘텐츠화 | 모더레이션 차단 시 침묵 대신 화면에 "필터당함" 표시 + 캐릭터 반응 대사("방금 그건 말하면 안 된대"). 기존 grounding 폴백 문장을 캐릭터 대사로 승격 |
+| **C3** | 결함의 콘텐츠화 | 모더레이션 차단 시 침묵 대신 화면에 "필터당함" 표시 + 캐릭터 반응 대사("방금 그건 말하면 안 된대"). 기존 grounding 폴백 문장을 캐릭터 대사로 승격. **프록시 측은 2026-08-12 완료** — 차단 문장을 `moderation_terms_ko.json`의 `blocked_dialogue` 5종 순환으로 대체하고 SSE 최상위 `airi_moderation` 시그널을 실어 보낸다(오디오 공백 금지). **남은 것은 Electron 화면 표시 배선**과 대사 문구 확정(사용자 결정 ③ 연동) |
 | **C4** | 관계 장치 | 시그니처 인사(10~30초, 한국 관례) · 팬덤명(시청자 공모 = 공동 창작 경로) · 고정 클로징(감사 + 다음 방송 예고) |
 | **C5** | 일관성 게이트 | 배포 전 회귀: 16케이스 + 스타일 계약 + 인간 검수. "성격이 바뀌었다"가 최대 리스크(83% 근거) — 캐릭터 카드 변경도 코드와 동일한 회귀 게이트를 거친다 |
 
@@ -65,13 +65,13 @@
 - **OBS Browser Source로 `stage-web` 직접 렌더** (Electron 창 캡처 대신) — 투명 배경 네이티브 해결, WGC·크로마키·Spout 문제 소멸
 - 오디오: OBS 28+ 내장 **Application Audio Capture**로 AIRI 프로세스만 분리 캡처 — 가상 케이블 불필요
 - 자막: 프록시 TTS 문장 분기 → obs-websocket `SetInputSettings` → Text(GDI+) 소스
-- **VRAM 판정: 여유 842MiB로 NVENC 상주는 권고 불가** (인코더 풀만 195~340MiB, 운영 마진 0). 해법: **방송 중 `AIRI_LLM_MODE=cloud` 전환**으로 Mi:dm VRAM(~1.9GB) 반납. 대안: x264 CPU 인코딩(B0-3 실측 후)
+- **VRAM 판정: 여유 842MiB로 NVENC 상주는 권고 불가** (인코더 풀만 195~340MiB, 운영 마진 0). 해법: **방송 중 클라우드 LLM 전환**으로 Mi:dm VRAM(~1.9GB) 반납 — 실제 스위치는 `AIRI_CHAT_PROVIDER` + `AIRI_ALLOW_EXTERNAL_CHAT`(레포 실측. 과거 표기 `AIRI_LLM_MODE`는 현행 코드에 없음), 전환 절차는 실기 확인 필요. 대안: x264 CPU 인코딩(B0-3 실측 후)
 
 ### B3. 안전 (상업 방송의 전제)
 
 | 장치 | 내용 | 비용 |
 |---|---|---|
-| 한국어 출력 모더레이션 | **한국어 지원 기성 가드 모델 전무 확정**(Llama Guard·ShieldGemma·Detoxify 전부 미지원). 금칙어 사전 + 정규식 필터 자체 구축, 삽입 지점은 문장 단위 TTS 게이트 | 신규 구축 (유일한 진짜 신규 안전 작업) |
+| 한국어 출력 모더레이션 | **한국어 지원 기성 가드 모델 전무 확정**(Llama Guard·ShieldGemma·Detoxify 전부 미지원). 금칙어 사전 + 정규식 필터 자체 구축, 삽입 지점은 문장 단위 TTS 게이트 | **코드 구축 완료** (2026-08-12 `932eae6` — `output_moderation.py` + `moderation_terms_ko.json`, SSE 문장 게이트 `openai_sse_delta`에 삽입, **기본 off**). 남은 것은 배선 3종(런처 env `AIRI_OUTPUT_MODERATION`, TTS 폴백 대사 프리로드, Electron 표시) |
 | 지연 버퍼 30~60초 | OBS 소스 코드로 확정: RAM만 사용(60초 ≈ 60MB), VRAM 0. 이상 발화 개입 시간 확보 | 설정 1개 |
 | Killswitch 3중 | L1 obs-websocket 대기씬+뮤트(즉시) / L2 프록시 취소 경로 재사용(ASGI finally 실측 검증됨) / L3 방송 종료 API | 배선 |
 | 입력 방어 | comment-intelligence 인젝션 차단 + `liveChatBans` API | 채택 |

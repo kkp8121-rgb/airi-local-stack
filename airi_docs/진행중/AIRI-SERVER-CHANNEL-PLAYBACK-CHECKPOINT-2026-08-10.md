@@ -27,8 +27,9 @@ event carries no text, audio, round ID, session ID, or model output.
 
 ## Verification
 
-- Root sender tests: 26/26 passed; Node syntax checks passed, including the
-  completion-first/playback-later metadata path.
+- Root sender tests: 26/26 passed at this checkpoint; Node syntax checks
+  passed, including the completion-first/playback-later metadata path. Later
+  work added one case, so the same command reports 27/27 as of 2026-08-12.
 - Stage UI typecheck passed.
 - Playback latency tests: 4/4 passed.
 - Protocol typecheck passed.
@@ -36,8 +37,9 @@ event carries no text, audio, round ID, session ID, or model output.
   contract suite.
 - Runtime source patch applies cleanly to the pinned v0.11.3 base with
   `git apply --check --whitespace=nowarn`.
-- `test-patch-manifest.ps1` verifies all three documented patch artifact
-  sizes and SHA-256 values offline; it passed on the current branch.
+- `test-patch-manifest.ps1` verifies every documented patch artifact size and
+  SHA-256 value offline; it passed on the branch of this checkpoint. It pinned
+  three artifacts then and eight as of 2026-08-12.
 - Browser contract suite: 24/24 passed after installing the local Playwright
   Chromium executable. It covers exact parent correlation, content-free
   playback output, remote-mirror rejection, completion-before-playback, and
@@ -106,7 +108,7 @@ report counts/statuses without text or identifiers.
 You are the next Claude reviewer for the AIRI remediation branch.
 
 Read README.md, airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md, and
-airi_docs/AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md first.
+airi_docs/진행중/AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md first.
 Review only the current source patch and sender/bridge protocol for:
 1) playback-start emitted only after successful source.start(0);
 2) exact parent correlation with no round/session/text leakage;
@@ -129,7 +131,7 @@ above because it is ASCII/UTF-8 safe.
 ```text
 이 저장소의 현재 브랜치와 원격 HEAD를 먼저 확인한 뒤, README.md와
 airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md,
-airi_docs/AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md를 읽어라.
+airi_docs/진행중/AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md를 읽어라.
 현재 작업은 server-channel 입력의 parent correlation, superseded cancellation,
 playback-start proof, sender의 --wait-playback-start를 검토하는 것이다.
 

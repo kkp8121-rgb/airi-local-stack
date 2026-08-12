@@ -108,7 +108,7 @@ fallback 자동 전환은 없다. Chatterbox는 legacy 설치 후보로만 남�
 |---|---|
 | 파일 | `ollama-proxy/ollama_proxy.py` |
 | 포트 | `11435` |
-| 스트리밍 | SSE (`media_type="text/event-stream"`, `ollama_proxy.py:6667`) |
+| 스트리밍 | SSE (`media_type="text/event-stream"` — `ollama_proxy.py:7011,7234,7389,7480,7504`) |
 | 로컬 스코프 강제 | `enforce_local_scope` 미들웨어 — Origin 검증 + 허용 경로 검증. CORS 미들웨어 뒤(바깥쪽)에 등록되어 거부된 Origin은 프록시 본문에 도달하지 않는다 |
 
 ## 클라이언트
@@ -126,7 +126,8 @@ fallback 자동 전환은 없다. Chatterbox는 legacy 설치 후보로만 남�
 
 | 항목 | 사양 |
 |---|---|
-| 저장소 | SQLite. 대화/기억은 `runtime/airi-memory.sqlite3`, 승인 지식은 별도 파일 `runtime/airi-knowledge.sqlite3` (`ollama-proxy/start-local-ollama-proxy.ps1:220-221`) |
+| 저장소 | SQLite. 대화/기억은 `runtime/airi-memory.sqlite3`, 승인 지식은 별도 파일 `runtime/airi-knowledge.sqlite3` (`ollama-proxy/start-local-ollama-proxy.ps1:232-233`) |
+| 동시성 | `_connect`에서 `PRAGMA busy_timeout=500` 후 `PRAGMA journal_mode=WAL` (MEM-04, `airi_memory.py:59,315-325`). 500ms는 8-thread 동시 쓰기 실측으로 확정(100ms는 락 실패, 500ms 10/10 안정). 추출 활성 상태의 락 경합 재평가는 실기 대기 |
 | 임베딩 | KURE-v1, CUDA 상주, fp16 (`memory_runtime.py:156-174`의 `torch_dtype=torch.float16` 명시 캐스팅) |
 | fp16 절감 실측 | CUDA allocated 2,165.938MiB(fp32) → 1,083.032MiB(fp16), 회수 약 1,082.9MiB (`AIRI-UPGRADE-SCOUT-MEASUREMENT-2026-08-11.md`). 검색 품질(MRR·Recall@1·Recall@3)은 fp32/fp16 양쪽 모두 1.0으로 동일 |
 | journal 검색 | FTS5 인덱스(KM-08) — 기존 O(N) 파이썬 재토큰화를 대체. 실측 0.060ms/메시지, 미추출 4,096건 기준 247.4ms (`AIRI-UPGRADE-SCOUT-2026-08-11.md`) |
@@ -196,8 +197,10 @@ T0~T3 기준):
 
 최신 스냅샷은 `airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md`의 "최신
 검증 증거(2026-08-12)" 절이 단일 출처다. 이 문서에 수치를 중복 기재하지
-않고 인용만 남긴다 — 통합 Python 733 passed / 1 skipped, node 27/27,
-`test-current-checkpoint.ps1` PASS, CI 2-job green(tip `a231ab0` 기준).
+않고 인용만 남긴다 — 통합 Python 809 passed / 1 skipped / 706 subtests,
+node 27/27, `test-current-checkpoint.ps1`·`test-patch-manifest.ps1` PASS
+(tip `932eae6` 기준). CI 2-job green은 `294c4e6` 기준이며 이후 커밋은 push
+시 재검증.
 
 ## 다음 게이트 (확인 필요 항목 포함)
 
@@ -205,7 +208,8 @@ T0~T3 기준):
 인용:
 
 1. model SSoT 강제(하드코딩 폴백 제거), evaluation provenance 정정,
-   ACK metadata, model digest pin을 먼저 해소한다.
+   ACK metadata, model digest pin을 먼저 해소한다. — **코드 해소 완료
+   (2026-08-12, `932eae6`). 위 "SSoT 갭" 절 참조. 남은 것은 실기 검증뿐.**
 2. 최소 100개 인간 검수 대화 + 장문 context/memory/card corpus에서
    정확성·답변 완전성·화자 보존·retry율을 함께 측정한다.
 3. 같은 Electron build·TTS warm state에서 모델 순서를 교차한 matched
