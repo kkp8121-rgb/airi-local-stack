@@ -337,6 +337,93 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             elif not shutdown.done():
                 await shutdown
 
+    async def test_cancelled_turn_journal_worker_is_drained_before_db_unlink(self):
+        # The proxy cancels its background journal tasks just before shutting
+        # the runtime down.  Cancellation reaches only the asyncio wrapper, so
+        # the store thread must still be drained before the database file is
+        # closed or removed.
+        r = await self.runtime()
+        opened = threading.Event(); release = threading.Event(); closed = threading.Event()
+
+        def sqlite_append_turn(*_args, **_kwargs):
+            connection = sqlite3.connect(self.db)
+            opened.set()
+            try:
+                release.wait(10)
+            finally:
+                connection.close()
+                closed.set()
+
+        r.store.append_turn = sqlite_append_turn
+        shutdown = None
+        try:
+            journal = asyncio.create_task(r.schedule_completed_turn("s", "u", "a", 1))
+            self.assertTrue(await asyncio.to_thread(opened.wait, 5))
+            journal.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await journal
+            shutdown = asyncio.create_task(r.shutdown())
+            await asyncio.sleep(0.02)
+            self.assertFalse(shutdown.done())
+            self.assertTrue(r._store_workers)
+            release.set()
+            await shutdown
+            self.assertTrue(closed.is_set())
+            self.assertFalse(r._store_workers)
+            os.unlink(self.db)
+        finally:
+            release.set()
+            if shutdown is None:
+                await r.shutdown()
+            elif not shutdown.done():
+                await shutdown
+
+    async def test_shutdown_drains_extractor_store_worker_it_cancelled(self):
+        # shutdown() cancels a still-running extractor when its flush deadline
+        # expires.  That cancellation stops the coroutine only: the extractor's
+        # store thread still owns an open SQLite handle and must be drained
+        # before shutdown returns, or teardown races it on Windows.
+        from dataclasses import replace
+        config = replace(self.config, extraction_threshold=2)
+        r = MemoryRuntime(config, http_client=FakeClient(('{"extracted":[]}',))); await r.startup()
+        opened = threading.Event(); release = threading.Event(); closed = threading.Event()
+        original_job_state = r.store.job_state
+
+        def sqlite_job_state(session_id):
+            connection = sqlite3.connect(self.db)
+            opened.set()
+            try:
+                release.wait(10)
+                return original_job_state(session_id)
+            finally:
+                connection.close()
+                closed.set()
+
+        shutdown = None
+        try:
+            self.assertEqual(await r.schedule_completed_turn("s", "u", "a", 1), "appended")
+            extractor = r._extract_tasks["s"]
+            r.store.job_state = sqlite_job_state
+            self.assertTrue(await asyncio.to_thread(opened.wait, 5))
+            shutdown = asyncio.create_task(r.shutdown())
+            # The extractor is cancelled once the flush deadline expires; its
+            # physical store thread is still inside SQLite at that moment.
+            await asyncio.gather(extractor, return_exceptions=True)
+            await asyncio.sleep(0.02)
+            self.assertFalse(shutdown.done())
+            self.assertTrue(r._store_workers)
+            release.set()
+            await shutdown
+            self.assertTrue(closed.is_set())
+            self.assertFalse(r._store_workers)
+            os.unlink(self.db)
+        finally:
+            release.set()
+            if shutdown is None:
+                await r.shutdown()
+            elif not shutdown.done():
+                await shutdown
+
     async def test_context_does_not_mutate_original(self):
         r = await self.runtime(); original = [{"id": 1, "role": "user", "content": "old"}, {"id": 2, "role": "user", "content": "new"}]
         p = {"messages": [{"role": "system", "content": "AIRI"}, {"role": "system", "name": "airi-request-local", "content": "state"}]}
@@ -431,6 +518,10 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await asyncio.to_thread(r.store.job_state, "s"))["pending_msgs"], 2)
         await r.schedule_completed_turn("s", "u2", "a2", 2)
         self.assertEqual((await asyncio.to_thread(r.store.job_state, "s"))["pending_msgs"], 4); await r.shutdown()
+        # Shutdown flushes and then cancels this session's extractor.  No store
+        # thread may still own the database once shutdown returns, or teardown
+        # races an open handle when it removes the file.
+        self.assertFalse(r._store_workers)
 
     async def test_distinct_requests_with_truncated_turn_count_append_atomically(self):
         r = await self.runtime()

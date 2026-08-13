@@ -169,6 +169,13 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-13** (검토 PC): dev PC 인수분(`b369195` retrieval lifecycle)
+  검토 승인 + 잔여 갭 2건 보완 — ① store/extraction `to_thread` 26지점
+  `_store_call` 추적·drain(재현 테스트 수정 전 실패→후 통과 실측) ② ASAR
+  preflight 계약 시험의 실제 프로세스 조회 0회화(운영 fail-closed 무변경).
+  전체 900/1/738 green. G2 장기 기억의 런타임 안정성 기반 강화 —
+  축 상태값 변화 없음.
+
 - **2026-08-13** (dev PC, memory retrieval shutdown drain): PR #7 push CI의
   첫 memory shard는 159 passed 뒤 `memory.db` teardown에서 `WinError 32`로
   실패했고, 같은 PR shard retry와 main CI는 PASS했다. timeout된

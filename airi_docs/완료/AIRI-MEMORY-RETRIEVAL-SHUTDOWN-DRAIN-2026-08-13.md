@@ -71,3 +71,30 @@ Fetch `fix/memory-retrieval-shutdown-drain-2026-08-13` and inspect its branch
 tip plus run `31653832303`. Audit and deterministically test physical executor
 work from extraction/background store calls before opening a PR; then rerun the
 full workflow and require every job to pass. Do not alter the installed ASAR.
+
+## 후속 반영 (검토 PC, 2026-08-13)
+
+위 next action을 수행해 두 실패를 모두 근본 해소했다.
+
+1. **store/extraction lifecycle**: `to_thread` 사용 30지점 전수 감사 —
+   retrieval(기추적)·embedder 로드(DB 핸들 없음, 의도적 미추적)를 제외한
+   26지점을 `_store_call()`(추적 task + shield + done callback 해제 + 늦은
+   예외 소비)로 통일하고, shutdown이 `_store_workers`를 별도 window
+   (`shutdown_flush_timeout_ms` 크기, 새 env 없음) 안에서 drain하도록 했다.
+   재현 테스트 2종을 수정 전 상태에서 먼저 실행해 실패를 확인(타이밍 운이
+   아닌 동작 단언 실패)한 뒤 수정 후 통과를 실측했다. WinError 32의 재발은
+   이제 assertion(`_store_workers` 불변식)으로 드러난다.
+2. **ASAR preflight 계약 시험**: 실패 메커니즘은 계약 스위트가 실제
+   프로세스 테이블을 14회 조회하던 것 — CI의 수명 짧은/열람 불가
+   프로세스가 drift 단언 앞에서 fail-closed를 발동시켰다. 운영 스크립트는
+   무변경으로 두고 계약 시험이 `EnableTestHooks` 게이트 하의 통제된
+   프로세스 테이블(실재 non-AIRI 이미지 — identity 비교 경로 실행 유지)을
+   주입하도록 해 실제 조회를 0회로 만들었다. 훅이 운영 경로에서 활성화될
+   수 없음(스위치 opt-in·`$env:` 부재)을 정적 단언으로 고정했다.
+
+검증(검토 PC 실측): 전체 스위트 900 passed / 1 skipped / 738 subtests,
+`test-current-checkpoint.ps1` PASS, `test-patch-manifest.ps1` PASS,
+lifecycle 테스트 세트 10회 반복 안정. 남은 한계: store 호출에는 협력 취소
+지점이 없어 drain은 순수 대기이며(최악 shutdown 2×flush window ≈ 6초),
+`SQLITE_BUSY` 장기 점유 시 여전히 추적된 worker를 남기고 반환할 수 있다.
+이 시점부터 본 브랜치는 PR/merge ready로 판정한다.

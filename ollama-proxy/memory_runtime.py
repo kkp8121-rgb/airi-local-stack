@@ -297,6 +297,10 @@ class MemoryRuntime:
         # Keep its task and cooperative cancellation handle together until the
         # physical worker has actually returned, so shutdown can drain it.
         self._retrieval_tasks: dict[asyncio.Task[RetrievalResult], threading.Event] = {}
+        # Every other store call reaches SQLite through the same executor and
+        # has no cooperative cancellation.  Track those workers until their
+        # threads return, so shutdown can drain the handles they still own.
+        self._store_workers: set[asyncio.Task[Any]] = set()
         self._scheduled: set[str] = set()
         self._scheduled_order: list[str] = []
         self._sessions: set[str] = set()
@@ -323,6 +327,30 @@ class MemoryRuntime:
         config = MemoryConfig.from_env()
         return cls(config, **kwargs) if config.enabled else NullMemoryRuntime()
 
+    async def _store_call(self, func: Any, /, *args: Any, **kwargs: Any) -> Any:
+        """Await a blocking store call through a tracked, cancel-proof worker.
+
+        Cancelling the awaiting coroutine drops only the asyncio wrapper around
+        ``to_thread``: the executor thread keeps running and keeps its SQLite
+        handle open.  Shielding the worker keeps it tracked until that thread
+        actually returns, so shutdown can drain the handle instead of leaving
+        it for whatever closes or removes the database next.
+        """
+        worker = asyncio.create_task(asyncio.to_thread(func, *args, **kwargs))
+        self._store_workers.add(worker)
+
+        def release(done: asyncio.Task[Any]) -> None:
+            self._store_workers.discard(done)
+            # An abandoned caller never awaits this worker.  Consume a late
+            # error so it cannot become an unobserved task exception.
+            try:
+                done.exception()
+            except (asyncio.CancelledError, Exception):
+                pass
+
+        worker.add_done_callback(release)
+        return await asyncio.shield(worker)
+
     async def startup(self) -> None:
         if self._started:
             return
@@ -340,9 +368,9 @@ class MemoryRuntime:
                 embedder = await asyncio.to_thread(SentenceTransformerEmbedder, self.config.embed_model, self.config.embed_device)
             except Exception:
                 embedder = None
-        self.store = await asyncio.to_thread(MemoryStore, self.config.db_path, embedder, self.config.cache)
+        self.store = await self._store_call(MemoryStore, self.config.db_path, embedder, self.config.cache)
         if embedder is not None:
-            await asyncio.to_thread(
+            await self._store_call(
                 self.store.ensure_embedding_contract,
                 embedder.fingerprint,
                 embedder.dimension,
@@ -352,13 +380,13 @@ class MemoryRuntime:
             if not bundle_path.is_file():
                 raise ValueError("AIRI_MEMORY_CANON_BUNDLE must point to a JSON file")
             bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
-            await asyncio.to_thread(self.store.ingest_canon_bundle, bundle)
-        await asyncio.to_thread(self.store.reset_extraction_failures)
+            await self._store_call(self.store.ingest_canon_bundle, bundle)
+        await self._store_call(self.store.reset_extraction_failures)
         await self._ensure_session(self.config.session_id)
         self._started = True
         if self.extraction_provider.can_extract:
             available = await self.extraction_provider.preflight(force=True)
-            pending_sessions = await asyncio.to_thread(
+            pending_sessions = await self._store_call(
                 self.store.pending_extraction_sessions
             )
             for sid in pending_sessions:
@@ -374,7 +402,7 @@ class MemoryRuntime:
         async with self._snapshot_lock:
             if session_id in self._snapshotted:
                 return
-            await asyncio.to_thread(self.store.canon_snapshot, session_id)
+            await self._store_call(self.store.canon_snapshot, session_id)
             self._snapshotted.add(session_id)
             self._sessions.add(session_id)
 
@@ -404,7 +432,7 @@ class MemoryRuntime:
                 # A mismatch is deliberately fail-closed inside the store;
                 # context preparation remains fail-soft for the proxy.
                 try:
-                    await asyncio.to_thread(self.store.adopt_explicit_turn_tail, sid, completed, 60)
+                    await self._store_call(self.store.adopt_explicit_turn_tail, sid, completed, 60)
                 except ValueError:
                     pass
             if trace_id:
@@ -434,28 +462,28 @@ class MemoryRuntime:
         incoming_user_hashes = [pair[0] for pair in incoming_turn_hashes]
         async with self._session_resolution_lock:
             sid = self._implicit_session
-            latest = await asyncio.to_thread(self.store.latest_turn, sid) if self.store else 0
+            latest = await self._store_call(self.store.latest_turn, sid) if self.store else 0
             recovered = None
             # 1) Exact current-session pair tail (same process only).
             if latest and self._implicit_claimed:
-                recent = await asyncio.to_thread(self.store.recent_turn_hashes, sid)
+                recent = await self._store_call(self.store.recent_turn_hashes, sid)
                 width = min(len(recent), len(incoming_turn_hashes))
                 if width and recent[-width:] == incoming_turn_hashes[-width:]:
                     recovered = sid
             # 2) Current-session user-only suffix, guarded by global ambiguity.
             if (not recovered and latest and self._implicit_claimed
                     and len(incoming_user_hashes) >= 3 and len(set(incoming_user_hashes)) >= 2):
-                candidate = await asyncio.to_thread(self.store.find_session_by_user_tail, incoming_user_hashes,
-                                                    min_turns=3, min_distinct=2)
+                candidate = await self._store_call(self.store.find_session_by_user_tail, incoming_user_hashes,
+                                                   min_turns=3, min_distinct=2)
                 if candidate == sid:
                     recovered = sid
             # 3) Cold/global exact pair tail.
             if not recovered and len(incoming_turn_hashes) >= 2:
-                recovered = await asyncio.to_thread(self.store.find_session_by_turn_tail, incoming_turn_hashes, min_turns=2)
+                recovered = await self._store_call(self.store.find_session_by_turn_tail, incoming_turn_hashes, min_turns=2)
             # 4) Cold/global canonical-user suffix.
             if not recovered and len(incoming_user_hashes) >= 4 and len(set(incoming_user_hashes)) >= 3:
-                recovered = await asyncio.to_thread(self.store.find_session_by_user_tail, incoming_user_hashes,
-                                                    min_turns=4, min_distinct=3)
+                recovered = await self._store_call(self.store.find_session_by_user_tail, incoming_user_hashes,
+                                                   min_turns=4, min_distinct=3)
             if recovered:
                 sid = recovered
             else:
@@ -464,7 +492,7 @@ class MemoryRuntime:
                 sid = (self._implicit_session if not completed and not latest and not self._implicit_claimed
                        else f"{self.config.session_id}-{uuid.uuid4().hex}")
                 if self.store and completed:
-                    await asyncio.to_thread(self.store.bootstrap_turns_if_empty, sid, completed, 60)
+                    await self._store_call(self.store.bootstrap_turns_if_empty, sid, completed, 60)
             self._implicit_session = sid
             self._implicit_claimed = True
         if trace_id:
@@ -576,10 +604,10 @@ class MemoryRuntime:
         raw_messages = [message for message in original_messages if isinstance(message, dict)]
         sid = await self._resolve_session(session, raw_messages, trace_id)
         await self._ensure_session(sid)
-        latest_turn = await asyncio.to_thread(self.store.latest_turn, sid)
+        latest_turn = await self._store_call(self.store.latest_turn, sid)
         original = _decorate_snapshot_messages(raw_messages, latest_turn)
         try:
-            state = await asyncio.to_thread(self.store.job_state_readonly, sid)
+            state = await self._store_call(self.store.job_state_readonly, sid)
             eligible = [item for item in original if int(item.get("id", 0)) > int(state["extracted_up_to_msg"])]
             # Always tell journal recall which turns are already forwarded.
             # A client can legitimately send only the current turn while this
@@ -626,8 +654,8 @@ class MemoryRuntime:
         if len(self._scheduled_order) > 2048:
             self._scheduled.discard(self._scheduled_order.pop(0))
         try:
-            await asyncio.to_thread(self.store.append_turn, sid, user, assistant, turn_no)
-            state = await asyncio.to_thread(self.store.job_state, sid)
+            await self._store_call(self.store.append_turn, sid, user, assistant, turn_no)
+            state = await self._store_call(self.store.job_state, sid)
             if self.extraction_provider.can_extract and state["pending_msgs"] >= self.config.extraction_threshold and state["fail_count"] < 5:
                 self._schedule_extraction(sid, trace_id)
             return "appended"
@@ -738,12 +766,12 @@ class MemoryRuntime:
         """Serialize the local extractor and drain bounded message batches."""
         async with self._extraction_semaphore:
             while self.store:
-                before = await asyncio.to_thread(self.store.job_state, sid)
+                before = await self._store_call(self.store.job_state, sid)
                 eligible = before["pending_msgs"] > 0 if force else before["pending_msgs"] >= self.config.extraction_threshold
                 if before["fail_count"] >= 5 or not eligible:
                     return
                 await self._extract_batch(sid, trace_id, force=force)
-                after = await asyncio.to_thread(self.store.job_state, sid)
+                after = await self._store_call(self.store.job_state, sid)
                 if after["pending_msgs"] >= before["pending_msgs"]:
                     return
 
@@ -756,10 +784,10 @@ class MemoryRuntime:
         started = time.perf_counter()
         self._emit("extract_start", trace_id, session_default=bool(sid == self.config.session_id), force=force)
         try:
-            state = await asyncio.to_thread(self.store.job_state, sid)
+            state = await self._store_call(self.store.job_state, sid)
             if state["fail_count"] >= 5 or (not force and state["pending_msgs"] < self.config.extraction_threshold):
                 return
-            rows = await asyncio.to_thread(
+            rows = await self._store_call(
                 self.store.unextracted_complete_turns,
                 sid,
                 self.config.extraction_batch_messages,
@@ -774,17 +802,17 @@ class MemoryRuntime:
             ids, watermark = [r["id"] for r in rows], rows[-1]["turn_no"]
             extracted = parsed_a["extracted"]
             if not extracted:
-                await asyncio.to_thread(self.store.extraction_success, sid, ids, watermark, 0)
+                await self._store_call(self.store.extraction_success, sid, ids, watermark, 0)
                 self._extraction_retry_sessions.pop(sid, None)
                 self._extraction_retry_delay = 1.0
                 self._emit("extract_end", trace_id, (time.perf_counter()-started)*1000, extracted=0, operations=0)
                 return
-            candidates, aliases = await asyncio.to_thread(self.store.build_stage_b_candidates, sid, extracted, 5)
+            candidates, aliases = await self._store_call(self.store.build_stage_b_candidates, sid, extracted, 5)
             prompt = format_stage_b_input(extracted, candidates)
             parsed_b = parse_stage_b_decisions(await self._chat_json(
                 STAGE_B_DECISION_SYSTEM_PROMPT, prompt, decision_schema_for_items(extracted, candidates)))
             operations = compile_decisions(extracted, candidates, parsed_b["decisions"])
-            await asyncio.to_thread(
+            await self._store_call(
                 self.store.apply_extraction_batch,
                 sid,
                 operations,
@@ -805,7 +833,7 @@ class MemoryRuntime:
         except Exception:
             self._emit("error", trace_id, (time.perf_counter()-started)*1000, extraction=True, force=force)
             try:
-                await asyncio.to_thread(self.store.job_failure, sid, "extraction failure")
+                await self._store_call(self.store.job_failure, sid, "extraction failure")
             except Exception:
                 pass
         finally:
@@ -820,17 +848,15 @@ class MemoryRuntime:
         for cancel_event in self._retrieval_tasks.values():
             cancel_event.set()
 
-        async def drain_retrievals() -> bool:
+        async def drain(workers: Any, until: float) -> bool:
             # Do not cancel these tasks: that only cancels the asyncio wrapper,
-            # not the SQLite-owning executor thread.  Their workers cooperate
-            # through the event and are awaited until the shared deadline.
-            while self._retrieval_tasks:
-                remaining = deadline - time.monotonic()
+            # not the SQLite-owning executor thread.  They are awaited instead,
+            # until the given deadline.
+            while workers:
+                remaining = until - time.monotonic()
                 if remaining <= 0:
                     return False
-                _done, pending = await asyncio.wait(
-                    list(self._retrieval_tasks), timeout=remaining
-                )
+                _done, pending = await asyncio.wait(list(workers), timeout=remaining)
                 if pending:
                     return False
                 await asyncio.sleep(0)
@@ -865,7 +891,7 @@ class MemoryRuntime:
             # Force flush handles the final 1--2 pending journal messages too.
             for sid in self._sessions | {self.config.session_id}:
                 try:
-                    state = await asyncio.to_thread(self.store.job_state, sid)
+                    state = await self._store_call(self.store.job_state, sid)
                     if self.extraction_provider.can_extract and state["pending_msgs"] and state["fail_count"] < 5:
                         self._schedule_extraction(sid, "shutdown", force=True)
                 except Exception:
@@ -881,7 +907,15 @@ class MemoryRuntime:
         self._extract_force.clear()
         self._extraction_retry_sessions.clear()
         self._extraction_retry_task = None
-        await drain_retrievals()
+        # Executor work can only be awaited, never cancelled: the cancellations
+        # above stop coroutines while their threads keep an open SQLite handle,
+        # and by then the flush budget is spent by definition.  Handle release
+        # therefore gets its own window of the same configured size, so a still
+        # busy database is waited for instead of being left locked, and
+        # shutdown still returns after a bounded time.
+        handle_deadline = time.monotonic() + self.config.shutdown_flush_timeout_ms / 1000
+        await drain(self._retrieval_tasks, handle_deadline)
+        await drain(self._store_workers, handle_deadline)
         self._started = False
 
     async def health(self, session: str | None = None) -> dict[str, Any]:
@@ -916,8 +950,8 @@ class MemoryRuntime:
         if not self.store:
             return {"enabled": True, "ready": False, "embedder": False, "extraction_enabled": self.extraction_provider.can_extract, "extraction_isolated": extraction_isolated, "extraction_ready": extraction_ready, "schema": 1, "data_version": 0, "pending": 0, "pending_total": 0, "pending_sessions": 0, "journal_recall_window_messages": JOURNAL_RECALL_WINDOW_MESSAGES, **provider_health, **retry_health}
         try:
-            journal_health = await asyncio.to_thread(self.store.journal_health, session or self._implicit_session)
-            store_health = await asyncio.to_thread(self.store.health)
+            journal_health = await self._store_call(self.store.journal_health, session or self._implicit_session)
+            store_health = await self._store_call(self.store.health)
             embedder = self.store.embedder
             return {"enabled": True, "ready": bool(store_health["ok"]), "embedder": bool(embedder), "embedder_dtype": getattr(embedder, "dtype", "disabled") if embedder else "disabled", "embedder_device": getattr(embedder, "device", "disabled") if embedder else "disabled", "embedder_cuda_allocated_mib": getattr(embedder, "cuda_allocated_mib", 0.0) if embedder else 0.0, "embedder_cuda_reserved_mib": getattr(embedder, "cuda_reserved_mib", 0.0) if embedder else 0.0, "extraction_enabled": self.extraction_provider.can_extract, "extraction_isolated": extraction_isolated, "extraction_ready": extraction_ready, "schema": 1, "data_version": int(store_health["data_version"]), "journal_recall_window_messages": JOURNAL_RECALL_WINDOW_MESSAGES, **journal_health, **provider_health, **retry_health}
         except Exception:
