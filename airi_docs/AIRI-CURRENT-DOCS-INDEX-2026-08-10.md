@@ -80,8 +80,9 @@
   baseline 복원을 기록한다. PR #8
   문맥 run `31671561496`, 병합 `main` push run `31671652918`, branch 최종 run
   `31668787730`은 모두 13/13 green이다. 재검증 commit `e694b4f`의 run
-  `31673311636`은 runner 배정 전 GitHub Actions billing 오류로 실패해 배치 완결은
-  보류한다. 2026-08-12 증거는 역사 기록으로 보존한다.
+  `31673311636`과 마이크 OFF 복원 commit `a42b5e9`의 run `31673428754`는 runner
+  배정 전 GitHub Actions billing 오류로 실패했다. 최신 사용자 결정에 따라 이 원격 실패는
+  역사 기록일 뿐 로컬 실기 배치 완료를 막지 않는다. 2026-08-12 증거도 역사 기록으로 보존한다.
 
 - `AIRI-MEMORY-RETRIEVAL-SHUTDOWN-DRAIN-2026-08-13.md` — PR #7 push CI의
   memory shard가 159 passed 뒤 `memory.db` teardown `WinError 32`로 실패한
@@ -237,6 +238,18 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 확대 해석하는 것은 금지한다.
 
 ## 최신 검증 증거 (2026-08-13)
+
+- **현재 결정/후속 읽기 전용 점검** — §2 로컬 실기 배치는 완료이며 push/CI green은 더 이상
+  완료 조건이 아니다. 저장소는 private 유지·public visibility 변경 없음이고, 사용자가 요청할
+  때까지 push하지 않는다. historical Actions billing 실패(run `31673311636`,
+  `31673428754`: 각각 13 jobs, 모두 `runner_id=0`/steps 0)는 사실대로 보존한다.
+  §3은 Mi:dm을 포함한 승인된 기존 후보가 모두 FAIL이고,
+  verifier `EXTRACTION_GATE_GATE_NOT_PASSED`, 11436/runner 없음/extraction OFF 상태이며 새
+  full balanced PASS 전 failed weight 재실행·활성화 금지다. §4는 설치 ASAR
+  `1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0`, live TTS cache
+  7/7, 기본 moderation OFF로 완료·중복 재시작 불필요다. §9-b는 126번 예비 보존, 현행 일본어
+  음성 유지, STT/mic 보류로 완료다. cloud call은 명시적 전송·지출·모델 승인, B0-1은 YouTube
+  OAuth/quota가 필요하다.
 
 - `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md` — version 2.0 실제 proxy context shaping의 0/8/20/48 압력×3회 권위 결과. generic structured-output 계약으로 spoken style 충돌을 제거하고 source-oriented fields·답 canary가 없는 질문·swapped/reordered anti-overfit test를 적용했다. 구조·privacy·ordering PASS, 7개 필드 중 6개 12/12이며 두 continuity color는 v1보다 개선됐지만 `dialogue_marker` 0/12가 memory marker `silver-fern`을 결정적으로 복사해 semantic/gate/authoritative FAIL이다. dialogue-vs-memory는 모델 한계이므로 prompt tuning을 계속하지 않는다. default 2048·extraction OFF, STT/mic은 사용자 보류 상태다.
 

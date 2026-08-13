@@ -76,19 +76,26 @@ inputEnabled가 모두 false였다. Electron 설정 복원에 사용한 임시 C
 - 구조화 증거 JSON parse·고정 SHA 재검증, patch 변경 0, `git diff --check`:
   PASS.
 
-## 원격 CI 차단
+## 후속 상태 결정 (2026-08-13)
+
+사용자 결정으로 이 배치의 완료 조건은 **로컬 실기 배치 완료**이며, push/CI green은
+더 이상 요구하지 않는다. 저장소는 계속 private이고 public visibility 변경도 하지 않는다.
+아래 Actions 실행 사실은 역사 기록으로 그대로 보존한다.
+
+## 원격 CI 차단 (역사 기록)
 
 증거 커밋 `e694b4f651a57fa2a2b138c85910b5f5a664607b`의 push run
-`31673311636`은 13개 job 모두 runner를 배정받기 전에 실패했다. 각 job은
-`runner_id=0`, steps 0이고 annotation은 최근 계정 결제 실패 또는 spending limit
-증액이 필요하다는 동일한 GitHub Actions billing 오류다. 코드나 테스트 assertion
-실패가 아니지만 full-green 규칙을 충족하지 못했으므로 이 문서 배치는 아직 미완결이다.
-Billing & plans 복구 뒤 같은 commit의 전체 workflow를 재실행해 13/13 green을
-확인하기 전에는 다음 dev-PC 실기 배치로 넘어가지 않는다.
+`31673311636`과 마이크 OFF 복원 커밋
+`a42b5e9439c39bffda1abab7f61e37453032f0c4`의 push run `31673428754`는 각각
+13개 job 모두 runner를 배정받기 전에 실패했다. 모든 job은 `runner_id=0`, steps 0이고
+annotation은 최근 계정 결제 실패 또는 spending limit 증액이 필요하다는 동일한
+GitHub Actions billing 오류다. 이는 코드나 테스트 assertion 실패가 아니다. 현 사용자
+결정에서는 이 billing 차단을
+해소하거나 workflow를 재실행할 필요가 없으며, push도 사용자가 요청할 때까지 하지 않는다.
 
 ## 결론
 
 설치 Electron 정규화, 단일 foreground runner, Mi:dm pin, EXAONE unpinned rollback,
 evaluator·export provenance 및 불일치 digest fail-closed가 현 `main`에서 다시
 성립한다. 이는 2026-08-12 증거를 대체하지 않고 그 후속 재검증이다. 실기 gate는
-PASS지만 배치 완결은 위 원격 CI billing 차단 해소까지 보류한다.
+PASS이며, 후속 읽기 전용 점검에서도 설치 ASAR와 런타임 기본값은 변경하지 않는다.

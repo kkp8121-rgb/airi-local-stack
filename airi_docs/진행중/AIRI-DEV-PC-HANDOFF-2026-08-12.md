@@ -175,6 +175,11 @@ runtime adapter, AIRI sender/TTS/OBS, 외부 killswitch, 실제 moderation, 설�
 
 ## 2. dev PC 필수 작업 — SSoT 실기 검증
 
+**후속 결정 (2026-08-13): 완료.** §2 로컬 실기 배치는 완료로 닫는다. push/CI green은
+더 이상 완료 조건이 아니며, 저장소는 private 유지·public visibility 변경 없음이다. historical
+Actions billing 실패의 run/runner 사실은 증거로 보존하되 재실행하지 않는다. 사용자가 요청할
+때까지 push하지 않는다.
+
 **2026-08-13 재검증 완료 (`main` `c916f485565d29396e1580f16a4d72236bb724f5`).**
 아래 2026-08-12 기록은 당시 증거로 보존한다. 후속 재검증은 설치 ASAR
 `1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0`와 Mi:dm
@@ -186,10 +191,11 @@ Python STT 8890과 Electron voice input/VAD 모두 OFF, 기본 `num_ctx=2048`, �
 `31671652918`, branch 최종 run `31668787730`은 모두 13/13 green이다. 상세:
 `완료/AIRI-DEV-PC-SSOT-REVERIFICATION-2026-08-13.md`.
 
-단, 재검증 증거 commit `e694b4f`의 push run `31673311636`은 13개 job 모두
-runner 배정 전(`runner_id=0`, steps 0) GitHub Actions billing/spending-limit
-annotation으로 실패했다. 실기 gate는 PASS지만 배치는 full-green 전까지 미완결이며,
-Billing & plans 복구 후 해당 workflow 재실행이 다음 작업의 전제다.
+재검증 증거 commit `e694b4f`의 push run `31673311636`과 마이크 OFF 복원 commit
+`a42b5e9`의 run `31673428754`는 각각 13개 job 모두 runner 배정 전
+(`runner_id=0`, steps 0) GitHub Actions billing/spending-limit annotation으로
+실패했다. 실기 gate는 PASS이며, 최신 사용자 결정에 따라 이 billing 실패는 역사 기록일
+뿐 배치 완료나 다음 작업의 전제가 아니다.
 
 **2026-08-12 완료.** 아래 1~4를 실제 설치 Electron 턴으로 검증했다. Mi:dm은
 stale EXAONE tag 1회를 정규화했고 GPU runner는 단일이었다. EXAONE 롤백은
@@ -215,6 +221,11 @@ warmup·evaluator·provenance가 모두 일치했다. Mi:dm digest
    없다.
 
 ## 3. dev PC 필수 작업 — I1 게이트 리포트 생산
+
+**후속 읽기 전용 점검 (2026-08-13): 전 승인 후보를 포함해 Mi:dm까지 모두 FAIL.** verifier는
+현재 `EXTRACTION_GATE_GATE_NOT_PASSED`를 반환한다. 11436은 사용하지 않고 runner도 없으며
+extraction은 OFF다. 실패한 weight를 재실행하거나 활성화하지 말고, 새 full balanced PASS가
+기록될 때까지 이 상태를 유지한다.
 
 **Mi:dm 및 신규 로컬 후보 측정 완료, 모두 FAIL.** Mi:dm의 11436 격리 CPU
 balanced 7 fixtures 결과는 기존과 같고,
@@ -269,6 +280,10 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
   시험은 조기 위험 자료일 뿐 이 활성화 후 실측을 대체하지 않는다.
 
 ## 4. dev PC 필수 작업 — B3 배선 3종
+
+**후속 읽기 전용 점검 (2026-08-13): 구현은 완료 상태다.** 설치 `app.asar`의 정확한
+SHA-256은 `1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0`,
+live TTS cache는 7/7, 기본 moderation은 OFF다. 재시작은 중복이므로 하지 않는다.
 
 1. **TTS 캐시 프리로드 (오디오 공백 금지의 실제 성립 조건)**:
    모더레이션 폴백 대사 5종(`ollama-proxy/moderation_terms_ko.json`의
@@ -358,6 +373,9 @@ python ollama-proxy\benchmark_memory_track.py --mode extraction `
 폴백 대사 5종은 B3 실기까지 완료했으며, 향후 문구 재승인은 선택적 조정이다.
 
 ## 9. dev PC 신규 작업 상태 (2026-08-12 사용자 결정 반영)
+
+**9-b 사용자 결정 완료 (2026-08-13):** 126번은 예비 후보로 보존하고 현행 일본어 음성을
+유지한다. STT/마이크는 계속 보류한다.
 
 1. **cloud_chat_provider 스트리밍 지연 실측** (결정 2의 전제) —
    `ollama-proxy/benchmark_cloud_chat_latency.py` 하네스와 테스트는 완료.

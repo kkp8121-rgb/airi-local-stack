@@ -179,9 +179,10 @@
   green으로 종료됐고, 병합 `main` push run `31671652918` 및 branch 최종 run
   `31668787730`도 각각 13/13 green이다.
   실행 전 검증된 orphan `llama-server` 5개를 정리한 것은 선행 정리이며 제품 PASS 근거가
-  아니다. 증거 commit `e694b4f`의 run `31673311636`은 13개 job 모두 runner 배정
-  전 GitHub Actions billing/spending-limit 오류로 실패했다. 실기 gate는 PASS지만
-  full-green 전까지 배치는 미완결이다. 상세:
+  아니다. 증거 commit `e694b4f`의 run `31673311636`과 마이크 OFF 복원 commit
+  `a42b5e9`의 run `31673428754`는 각각 13개 job 모두 runner 배정 전 GitHub Actions
+  billing/spending-limit 오류로 실패했다. 실기 gate는 PASS이며, 최신 사용자 결정에 따라
+  이 원격 실패는 역사 기록일 뿐 완료 차단이 아니다. 상세:
   `완료/AIRI-DEV-PC-SSOT-REVERIFICATION-2026-08-13.md`.
 
 - **2026-08-13** (검토 PC): dev PC 인수분(`b369195` retrieval lifecycle)
@@ -427,6 +428,8 @@
 - **2026-08-12** (`41b1c20`, 검토 PC): 현황판 신설. 검토 PC 선행 배치
   반영 — 모델 SSoT 게이트 4종 코드 해소, I1 추출 배선(발효 대기),
   MEM-04 WAL, B3 모더레이션 코드 완료(M3 일부 선행), C1 헌법 초안.
+- **2026-08-13** (최신 사용자 결정·읽기 전용 continuation audit): §2 로컬 실기 배치는 완료다. push/CI green은 완료 조건이 아니며 저장소는 private 유지·public visibility 변경 없음, 사용자가 요청할 때까지 push하지 않는다. historical Actions billing run `31673311636`과 `31673428754`는 각각 13 jobs 모두 `runner_id=0`/steps 0으로 runner 배정 전 실패한 사실을 보존한다. §3의 승인된 기존 후보(Mi:dm 포함)는 모두 FAIL이고 verifier는 `EXTRACTION_GATE_GATE_NOT_PASSED`; 11436·runner 없음·extraction OFF를 유지하며 새 full balanced PASS 전에는 failed weight 재실행/활성화 금지다. §4 구현은 완료: 설치 ASAR SHA-256 `1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0`, live TTS cache 7/7, 기본 moderation OFF이며 중복 재시작은 하지 않는다. §9-b는 126번 예비 보존·현행 일본어 음성 유지·STT/mic 보류로 완료다. cloud call은 명시적 전송·지출·모델 승인이 필요하고, B0-1은 YouTube OAuth/quota가 필요하다.
+
 - **2026-08-13** (production context v2): generic structured-output 계약으로 spoken style 충돌을 제거하고 source-oriented fields, 답 canary가 없는 질문, swapped/reordered anti-overfit test를 적용했다. 구조 변환 PASS, 7개 필드 중 6개 12/12이며 두 continuity color는 v1보다 개선됐지만 `dialogue_marker` 0/12가 memory marker `silver-fern`을 결정적으로 복사해 semantic/gate/authoritative는 FAIL이다. dialogue-vs-memory는 모델 한계로 결론냈고 prompt tuning을 계속하지 않는다. default `num_ctx=2048`·extraction OFF를 유지한다.
 
 - **2026-08-13** (latency dashboard KPI): 상단 대시보드의 기존 raw
