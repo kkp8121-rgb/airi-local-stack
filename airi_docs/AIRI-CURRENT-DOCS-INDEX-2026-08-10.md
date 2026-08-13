@@ -31,8 +31,9 @@
   인간 검수 100건과 장문 회귀 개선.
 - `AIRI-DEV-PC-HANDOFF-2026-08-12.md` — **검토 PC 선행 작업 배치의
   인수인계.** SSoT·I1 후보 실측 및 B3 배선 3종은 완료했지만 extraction은
-  통과 후보 부재로 off다. B0-1, 활성 추출 MEM-04, 사람·자격증명 게이트 등
-  잔여 dev PC 작업을 관리한다.
+  통과 후보 부재로 off다. B0-1 offline 측정 코어는 완료됐으나 live quota 판정은
+  API key/OAuth/quota/project/test-broadcast 승인 및 수동 Cloud Console 실측 전
+  NOT COMPLETE다. 활성 추출 MEM-04, 사람·자격증명 게이트 등 잔여 작업을 관리한다.
 - `AIRI-CLOUD-CHAT-LATENCY-MEASUREMENT-2026-08-12.md` — cloud streaming
   latency 하네스·테스트와 live TTFT 보류(API key·외부 승인) 현황.
 - `AIRI-LOCAL-TECH-SPECS.md` — 현행 스펙 문서. 2026-08-12 갱신 완료
@@ -72,6 +73,13 @@
   `아카이브/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-pre-midm.md`.
 
 ## 완료 — 유효한 증거 기록 (최신순)
+
+- `AIRI-B0-1-STREAMLIST-QUOTA-MEASUREMENT-CORE-2026-08-13.md` — streamList의
+  injected-transport-only·content-free 오프라인 quota measurement core. focused 15,
+  all chat-ingress 32, checkpoint, independent review PASS; B1b/AIRI 주입/영속성은
+  범위 밖이다. 공식 quota 문서는 exact streamList charging을 명시하지 않으므로 live
+  B0-1은 승인된 API/OAuth/project/test broadcast와 idle/message/reconnect 수동
+  before/after Cloud Console 실측 전 NOT COMPLETE다.
 
 - `AIRI-DEV-PC-SSOT-REVERIFICATION-2026-08-13.md` — `main`
   `c916f485565d29396e1580f16a4d72236bb724f5`의 설치 Electron SSoT 후속 재검증.
@@ -248,8 +256,9 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
   full balanced PASS 전 failed weight 재실행·활성화 금지다. §4는 설치 ASAR
   `1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0`, live TTS cache
   7/7, 기본 moderation OFF로 완료·중복 재시작 불필요다. §9-b는 126번 예비 보존, 현행 일본어
-  음성 유지, STT/mic 보류로 완료다. cloud call은 명시적 전송·지출·모델 승인, B0-1은 YouTube
-  OAuth/quota가 필요하다.
+  음성 유지, STT/mic 보류로 완료다. cloud call은 명시적 전송·지출·모델 승인, B0-1 live는
+  YouTube API/OAuth/quota/project/test-broadcast 승인과 수동 Cloud Console
+  idle/message/reconnect before/after 실측이 필요하다.
 
 - `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md` — version 2.0 실제 proxy context shaping의 0/8/20/48 압력×3회 권위 결과. generic structured-output 계약으로 spoken style 충돌을 제거하고 source-oriented fields·답 canary가 없는 질문·swapped/reordered anti-overfit test를 적용했다. 구조·privacy·ordering PASS, 7개 필드 중 6개 12/12이며 두 continuity color는 v1보다 개선됐지만 `dialogue_marker` 0/12가 memory marker `silver-fern`을 결정적으로 복사해 semantic/gate/authoritative FAIL이다. dialogue-vs-memory는 모델 한계이므로 prompt tuning을 계속하지 않는다. default 2048·extraction OFF, STT/mic은 사용자 보류 상태다.
 

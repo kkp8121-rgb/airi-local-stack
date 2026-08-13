@@ -74,6 +74,25 @@ next-broadcast callback smoke. See `완료/AIRI-I2A-VIEWER-MEMORY-FOUNDATION-202
 The current CI-equivalent 44-path Python 3.12 matrix passed 877 tests, skipped
 1, and passed 723 subtests with 7 warnings.
 
+## B0-1 streamList quota measurement core (2026-08-13)
+
+`chat-ingress/streamlist-quota.mjs` now provides an offline, injected-transport-only,
+content-free measurement core: exact shape, bounded duration/messages/responses/
+connections, actual batch overshoot count, monotonic timings, transient resume token,
+deadline/caller abort, and best-effort cleanup. It never calls ChatIngress/AIRI, is not
+B1b, and does not persist provider content or IDs. Focused 15 PASS, all chat-ingress 32
+PASS, full checkpoint PASS, and independent final review PASS; the existing checkpoint
+glob already registers its test file, so no workflow change was needed.
+
+**B0-1 live verdict remains NOT COMPLETE.** Official streamList is TLS gRPC at
+`youtube.googleapis.com:443`, requires `liveChatId`/`part`, and resumes with
+`nextPageToken`; see `완료/AIRI-B0-1-STREAMLIST-QUOTA-MEASUREMENT-CORE-2026-08-13.md`.
+The official quota page says every request costs at least one point and live APIs incur
+quota, but does not state exact streamList charging. Do not infer per-connection,
+per-response, or time-based cost. Resume only after explicit YouTube API key/OAuth/
+quota/project/test-broadcast approval and isolated manual Cloud Console before/after
+snapshots for idle, message, and reconnect.
+
 Source-only TTS work is distinct from installed-ASAR evidence: source
 test/typecheck/build do not modify or prove an installed ASAR. Installed-runtime
 claims require their own recorded ASAR and live-turn verification.
@@ -315,8 +334,10 @@ live TTS cache는 7/7, 기본 moderation은 OFF다. 재시작은 중복이므로
   델타 +47/+158MiB(+205MiB), 최소 여유 1,736MiB, 실제 NVENC H.264 1080p60.
   B0-3 완료 — 설치 Electron 실제 턴 중 x264 1080p30 veryfast CPU 평균
   44.8%, 최대 70%, 최소 headroom 30%, 정상 5,346 frames
-  (`완료/AIRI-B0-RESOURCE-MEASUREMENT-2026-08-12.md`). B0-1만 자격증명·
-  외부 YouTube 실측 대기.
+  (`완료/AIRI-B0-RESOURCE-MEASUREMENT-2026-08-12.md`). B0-1 offline 측정 코어는
+  완료지만, 자격증명·승인된 test broadcast·Cloud Console idle/message/reconnect
+  before/after 실측 전 라이브 판정은 NOT COMPLETE다
+  (`완료/AIRI-B0-1-STREAMLIST-QUOTA-MEASUREMENT-CORE-2026-08-13.md`).
 - **설치 Electron matched 모델 A/B 완료:** 같은 ASAR·TTS warm 상태에서
   Mi:dm→EXAONE→Mi:dm→EXAONE 교차 블록, 모델별 n=10. first substantive
   render P50/P95는 Mi:dm 1,501.5/2,597.2ms, EXAONE

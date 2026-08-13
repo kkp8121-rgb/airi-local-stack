@@ -9,3 +9,13 @@ When enabled, supply an identity key of at least 32 bytes and a screening callba
 `toViewerObservation(ingress, { broadcastKey })` in `viewer-observation.mjs` is a separate, pure local-memory boundary for a screened ingress event. It accepts only the frozen ingress shape and a caller-supplied `broadcast:v1:` HMAC pseudonym, then returns a frozen observation containing only versioned HMAC event/viewer/broadcast keys, normalized display name, kind, and timestamp. It never includes chat text, raw YouTube IDs, or parsed `[YouTube]` envelope data. A future live adapter must derive the broadcast key with the same secret under a separate domain; it must never pass the provider's raw stream ID.
 
 Future B1b persistence must write this observation separately before the unchanged `toAiriEvent` delivery. Identity-key rotation deliberately resets viewer identity unless an explicit migration is designed and approved.
+
+## Offline streamList quota measurement (B0-1)
+
+`streamlist-quota.mjs` is a pure, offline measurement core for a future caller-owned streamList transport. It does not implement or live-call the official transport, use the filesystem, invoke AIRI ingress, or handle OAuth, API keys, SDKs, or networking. Any future live measurement requires explicit OAuth/API-key/quota approval.
+
+The official transport is gRPC at `youtube.googleapis.com:443`. Official `streamList` uses `liveChatId` and `part`, and supplies `nextPageToken`; this module can pass a token transiently to an injected reconnect callback but never retains or emits it. Provider data and identifiers are never retained.
+
+An injected future transport must honor the transient `AbortSignal` passed to `openStream`. A final already-received response batch can cross the configured message threshold; its actual bounded count is retained as measurement evidence.
+
+Take manual Cloud Console quota snapshots before and after a bounded trial, then pass only their numeric values and the fixed source label `manual_google_cloud_console_snapshot` to `assembleQuotaReport`. The official quota table currently does not publish a streamList cost, so the observed manual delta is evidence only; this module never infers undocumented pricing.

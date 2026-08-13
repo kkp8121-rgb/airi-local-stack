@@ -129,7 +129,13 @@
 ## 방송 실행 (M1~M5)
 
 - [~] **M1** (B0 실측 ∥ I1 추출 ∥ C1 헌법)
-  - [ ] B0-1 `liveChatMessages.streamList` 쿼터 과금 실측 (보류: 자격증명·외부 YouTube)
+  - [~] B0-1 `liveChatMessages.streamList` offline quota measurement core — injected
+    transport-only, content-free, bounded duration/messages/responses/connections,
+    monotonic timings, transient resume token, abort/cleanup; focused 15 PASS, all
+    chat-ingress 32 PASS, checkpoint/review PASS. **Live is NOT COMPLETE** pending
+    explicit API key/OAuth/quota/project/test-broadcast approval and isolated manual
+    Cloud Console before/after snapshots for idle/message/reconnect. Official quota docs
+    do not state exact streamList charging; no cost inference (`완료/AIRI-B0-1-STREAMLIST-QUOTA-MEASUREMENT-CORE-2026-08-13.md`)
   - [x] B0-2 VRAM 3단계 델타 — 6,084/6,131/6,289MiB, +47/+158MiB(+205), 최소 여유 1,736MiB, NVENC H.264 1080p60 — 2026-08-12
   - [x] B0-3 5600X x264 1080p30 veryfast — 설치 Electron 실제 턴 CPU 평균 44.8%/최대 70%/최소 headroom 30%, 정상 5,346 frames — 2026-08-12 (`완료/AIRI-B0-RESOURCE-MEASUREMENT-2026-08-12.md`)
   - [x] I1 추출 활성화 코드 — 2026-08-12 (`932eae6`, 발효는 G2 리포트 대기)
@@ -168,6 +174,16 @@
 ---
 
 ## 갱신 로그 (최신이 위)
+
+- **2026-08-13** (B0-1 streamList): offline injected-transport measurement core를
+  완료했다. 실제 내용·provider ID·AIRI 주입 없이 bounded duration/messages/responses/
+  connections, actual overshoot count, monotonic timings, transient resume token,
+  deadline/caller abort 및 best-effort cleanup을 검증했다 (focused 15, all chat-ingress
+  32, checkpoint, independent review PASS). 기존 checkpoint glob이 시험을 이미
+  등록하므로 workflow 변경은 없다. 공식 quota 문서는 streamList의 정확한 연결/응답/시간
+  과금을 공개하지 않으므로 추론하지 않는다. API key/OAuth/quota/project/test-broadcast
+  명시 승인 및 idle/message/reconnect Cloud Console 수동 before/after 실측 전 B0-1
+  라이브 판정은 NOT COMPLETE이며 B1b가 아니다.
 
 - **2026-08-13** (dev PC, SSoT 재검증): `main`
   `c916f485565d29396e1580f16a4d72236bb724f5`에서 설치 Electron의 Mi:dm pin·단일
