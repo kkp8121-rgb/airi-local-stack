@@ -50,8 +50,24 @@ service, model, or runtime database was mutated. STT and microphone work remain
 OFF/deferred. This evidence does not enable extraction, demonstrate active
 extractor lock contention, or change any installed ASAR.
 
+## Post-push CI status
+
+Push run `31653832303` for commit `b369195` completed **FAIL** with 11 jobs
+successful and 2 failed. `offline-contracts` failed because the ASAR preflight
+synthetic drift case encountered an accessible-process identity refusal before
+its expected drift assertion. The memory shard reached **165 passed** and then
+`test_threshold_and_idempotency` teardown again hit Windows `WinError 32` on
+`memory.db`.
+
+The second failure is outside the retrieval-task set fixed in this batch: that
+test schedules extraction/background store work. It proves that the broader
+`asyncio.to_thread` store/extraction shutdown lifecycle still needs review.
+Therefore this branch is a handoff checkpoint, **not PR/merge ready evidence**,
+despite the green local suites and retrieval-specific independent review.
+
 ## Review-PC next action
 
-Fetch `fix/memory-retrieval-shutdown-drain-2026-08-13`, inspect its branch tip
-and test results, then let CI run. If satisfied, open and merge the PR. Do not
-alter the installed ASAR.
+Fetch `fix/memory-retrieval-shutdown-drain-2026-08-13` and inspect its branch
+tip plus run `31653832303`. Audit and deterministically test physical executor
+work from extraction/background store calls before opening a PR; then rerun the
+full workflow and require every job to pass. Do not alter the installed ASAR.

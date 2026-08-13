@@ -37,8 +37,15 @@ it cannot cooperate by the existing deadline.
 
 Only offline synthetic temporary databases were used. No installed AIRI,
 service, model, or runtime DB changed; STT/mic remains OFF/deferred. Next:
-fetch the branch, inspect the tip and results, let CI run, then open/merge the
-PR if satisfied. Do not alter the installed ASAR. See
+fetch the branch and inspect push run `31653832303`. It finished with 11 jobs
+successful and 2 failed: the ASAR preflight synthetic drift case was preempted
+by an accessible-process identity refusal, and the memory shard reached 165
+passed before `test_threshold_and_idempotency` teardown hit `WinError 32` on
+`memory.db`. The latter schedules extraction/background store work outside the
+retrieval-task tracking fixed here, so the branch is not PR/merge ready. Audit
+the broader physical `asyncio.to_thread` store/extraction shutdown lifecycle,
+add deterministic coverage, and require a fully green rerun before PR. Do not
+alter the installed ASAR. See
 `완료/AIRI-MEMORY-RETRIEVAL-SHUTDOWN-DRAIN-2026-08-13.md`.
 
 ## Latency dashboard KPI handoff (2026-08-13)

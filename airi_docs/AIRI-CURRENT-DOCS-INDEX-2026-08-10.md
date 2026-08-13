@@ -81,7 +81,10 @@
   4 warnings다. native SQLite 호출은 즉시 중단할 수 없고 deadline 뒤에도 tracked
   worker가 남을 수 있으며, 설치 AIRI·서비스·모델·runtime DB 변경이나 STT/mic
   실기는 포함하지 않는다. 최종 Python 3.12 전체 회귀는 881 passed / 1 skipped /
-  738 subtests / 7 warnings이며 offline checkpoint와 독립 최종 검토도 PASS다.
+  738 subtests / 7 warnings이며 offline checkpoint와 독립 retrieval 검토도
+  PASS다. 그러나 post-push run `31653832303`은 11 jobs PASS / 2 FAIL:
+  extraction/background store teardown `WinError 32`와 ASAR preflight
+  process-identity 선행 거부가 남아 있어 PR/merge ready가 아니다.
 
 - `AIRI-LATENCY-DASHBOARD-SUBSTANTIVE-KPI-2026-08-13.md` — 상단 대시보드가
   raw `playback.start`가 아니라 strict substantive playback KPI만으로
