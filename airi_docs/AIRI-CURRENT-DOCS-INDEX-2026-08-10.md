@@ -74,6 +74,12 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-NEW-LOCAL-EXTRACTION-CANDIDATE-SMOKES-2026-08-13.md` — Ministral 3
+  3B·Phi-4-mini 3.8B·Granite 3.3 2B의 공식 원본/라이선스와 local isolated
+  `persistent_trait` smoke를 tracked JSON으로 고정한 evidence. 세 후보 모두
+  FAIL이며 full balanced gate가 아니므로 extraction OFF, 11436 stopped,
+  active Stage-B contention test 없음, production 11434/11435 불변이다.
+
 - `AIRI-B0-1-STREAMLIST-QUOTA-MEASUREMENT-CORE-2026-08-13.md` — streamList의
   injected-transport-only·content-free 오프라인 quota measurement core. focused 15,
   all chat-ingress 32, checkpoint, independent review PASS; B1b/AIRI 주입/영속성은

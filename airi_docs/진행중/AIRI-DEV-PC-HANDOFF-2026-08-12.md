@@ -9,6 +9,17 @@
 - 현행 branch tip은 후속 승인 배치마다 전진할 수 있으므로, 이 문서의 고정
   해시에 의존하지 말고 `git log -1`로 확인한다.
 
+## 신규 local extraction 후보 smoke 동기화 (2026-08-13)
+
+`완료/AIRI-NEW-LOCAL-EXTRACTION-CANDIDATE-SMOKES-2026-08-13.md`는 공식 원본
+(Ministral Apache-2.0, Phi MIT, Granite Apache-2.0) 기반 신규 로컬 후보 3종의
+tracked single-fixture smoke evidence다. Ministral 3B(6,279.349 ms), Phi-4-mini
+(19,143.804 ms), Granite 3.3 2B(13,894.634 ms)는 모두 `persistent_trait`
+FAIL로 full balanced gate가 아니다. 세 tag는 로컬 Ollama 인벤토리에 추가됐지만
+11436은 중지했고 active runner는 없다. production 11434/11435의 실행 설정과
+요청 경로는 유지했으며 extraction OFF 및 활성 Stage-B contention test 미실행을
+유지한다.
+
 ## Memory retrieval shutdown-drain handoff (2026-08-13)
 
 Review branch `fix/memory-retrieval-shutdown-drain-2026-08-13`; do not invent a

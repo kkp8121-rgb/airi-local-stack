@@ -1,0 +1,126 @@
+{
+  "config": {
+    "mode": "extraction",
+    "runs": 1,
+    "retrieval_rows": 10000,
+    "retrieval_runs": 20,
+    "model": "ministral-3:3b-instruct-2512-q4_K_M",
+    "model_digest": "f04aa1c738f64e13c625b82ae92504fc0260fa6723b509ed1ece0fa188179b1d",
+    "timeout_seconds": 120.0,
+    "temperature": 0,
+    "num_ctx": 8192,
+    "num_gpu": 0,
+    "seed": 42,
+    "max_tokens": 2048,
+    "think": false,
+    "fail_fast": true,
+    "stage_a_contract": "conversation-v2b",
+    "stage_b_contract": "decision-v2.1",
+    "comparison_contract": "v2.1_stage_a_legacy_to_conversation_v2b_same_options",
+    "embedding_batch_size": 16,
+    "normalize_embeddings": true,
+    "embedding_device": "auto",
+    "embedding_dtype": "float32",
+    "local_files_only": true,
+    "allow_cloud": false,
+    "reproducibility": {
+      "fixture_sha256": "4879e86a972f87e28eef806d4e96fbf9cde7dc882c62dfdb5ab43f5183de0e49",
+      "stage_a_active_prompt_sha256": "d035faa531a8b70f3496801509efc95f480070bd8cded2eb6a93e3a18edaa0f5",
+      "stage_a_prompt_sha256": "8e982f8e6015908e661732a2fdb4ebd09905a66948a7029983cd6e1b55b26cab",
+      "stage_a_conversation_prompt_sha256": "d035faa531a8b70f3496801509efc95f480070bd8cded2eb6a93e3a18edaa0f5",
+      "stage_b_decision_prompt_sha256": "8eeb8082447e05a2579c15cbddb69aa889aa8f643f826d0a235ca3063885c89a",
+      "stage_a_schema_sha256": "0a00bb9a47414f4ac06da1fc7520c7f59da9a4acb7c5e41ebbf98c715eafba7b",
+      "stage_b_decision_schema_template_sha256": "84369146c71b8340c1787199882c11a8227f7afba7255c4a95a6107f69d0a0fc",
+      "stage_b_decision_factory_probe_sha256": "5199f3efec3c8b35331489aa0ce8db802da6e85789a13114d7ab89329386394a"
+    }
+  },
+  "results": {
+    "extraction": {
+      "status": "measured",
+      "stage_a_contract": "conversation-v2b",
+      "stage_b_contract": "decision-v2.1",
+      "comparison_contract": "v2.1_stage_a_legacy_to_conversation_v2b_same_options",
+      "model": "ministral-3:3b-instruct-2512-q4_K_M",
+      "runs": 1,
+      "seed": 42,
+      "max_tokens": 2048,
+      "fail_fast": true,
+      "stopped_early": true,
+      "stop_reason": "gate_row_failed",
+      "attempted_fixture_ids": [
+        "persistent_trait"
+      ],
+      "attempted_row_count": 1,
+      "fixture_ids": [
+        "persistent_trait"
+      ],
+      "fixtures": [
+        {
+          "critical_total": 2,
+          "critical_found": 0,
+          "critical_recall": 0.0,
+          "unexpected": 0,
+          "placeholder_preserved": true,
+          "stage_b_op_alias_accuracy": 0.0,
+          "alias_ok": false,
+          "id": "persistent_trait",
+          "schema_pass": true,
+          "stage_a_schema_pass": true,
+          "stage_b_schema_pass": true,
+          "stage_a_count": 0,
+          "decision_count": 0,
+          "stage_b_count": 0,
+          "stage_a_critical_recall": 0.0,
+          "stage_a_unexpected": 0,
+          "stage_a_placeholder_preserved": true,
+          "connectivity": true,
+          "stage_b_coverage": true,
+          "failure_codes": [],
+          "stage_b_decision_schema_sha256": "dc24f7baa706a73ec7be1196831bfbe7f96c9392450d6612aa78ca7203481514"
+        }
+      ],
+      "latency": {
+        "stage_a": {
+          "count": 1,
+          "p50_ms": 6279.254,
+          "p90_ms": 6279.254,
+          "p95_ms": 6279.254
+        },
+        "stage_b": {
+          "count": 1,
+          "p50_ms": 0.0,
+          "p90_ms": 0.0,
+          "p95_ms": 0.0
+        },
+        "total": {
+          "count": 1,
+          "p50_ms": 6279.349,
+          "p90_ms": 6279.349,
+          "p95_ms": 6279.349
+        }
+      },
+      "schema_pass_rate": 1.0,
+      "stage_a_schema_pass_rate": 1.0,
+      "stage_b_schema_pass_rate": 1.0,
+      "connectivity_rate": 1.0,
+      "stage_b_coverage_rate": 1.0,
+      "critical_recall": 0.0,
+      "unexpected": 0,
+      "placeholder_rate": 1.0,
+      "stage_a_critical_recall": 0.0,
+      "stage_a_unexpected": 0,
+      "stage_a_placeholder_rate": 1.0,
+      "stage_b_op_alias_accuracy": 0.0,
+      "failure_code_counts": {},
+      "gate_profile": "balanced",
+      "gate_thresholds": {
+        "min_critical_recall": 0.7,
+        "min_placeholder_rate": 0.85,
+        "min_stage_b_op_alias_accuracy": 0.8,
+        "max_unexpected_rate": 0.25,
+        "max_stage_a_unexpected_rate": 0.5
+      },
+      "gate_pass": false
+    }
+  }
+}

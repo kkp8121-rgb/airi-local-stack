@@ -15,6 +15,15 @@
 
 최종 갱신: 2026-08-13
 
+- **2026-08-13** (신규 로컬 extraction 후보 smoke 동기화): Ministral 3 3B,
+  Phi-4-mini 3.8B, Granite 3.3 2B의 격리 CPU `persistent_trait` fail-fast
+  스모크를 tracked evidence로 고정했다. 각각 recall 0.0/0.0/0.5로 모두
+  FAIL이며 full balanced gate가 아니다. 세 tag는 로컬 Ollama 인벤토리에
+  추가됐지만 11436은 중지했고 active runner는 없다. production 11434/11435의
+  실행 설정·요청 경로는 유지했으며 extraction OFF 및 MEM-04 활성 Stage-B 락
+  경합 미실행을 유지한다. 상세:
+  `완료/AIRI-NEW-LOCAL-EXTRACTION-CANDIDATE-SMOKES-2026-08-13.md`.
+
 ---
 
 ## 사용자 결정 (2026-08-12 5건 처리)
