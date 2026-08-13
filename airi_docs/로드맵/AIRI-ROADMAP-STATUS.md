@@ -169,6 +169,18 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-13** (dev PC, SSoT 재검증): `main`
+  `c916f485565d29396e1580f16a4d72236bb724f5`에서 설치 Electron의 Mi:dm pin·단일
+  100% GPU/context 2048 runner·EXAONE unpinned rollback·evaluator/export provenance와
+  고의 digest 불일치 fail-closed를 재확인하고 Mi:dm baseline으로 복원했다. 설치 ASAR는
+  1,356,257,019 bytes, SHA-256 `1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0`다.
+  Python STT 8890과 Electron voice input/VAD도 모두 OFF로 복원했다.
+  PR #8 병합 순간 run `31671561496`은 memory-store 완료 중이었으나 이후 13/13
+  green으로 종료됐고, 병합 `main` push run `31671652918` 및 branch 최종 run
+  `31668787730`도 각각 13/13 green이다.
+  실행 전 검증된 orphan `llama-server` 5개를 정리한 것은 선행 정리이며 제품 PASS 근거가
+  아니다. 상세: `완료/AIRI-DEV-PC-SSOT-REVERIFICATION-2026-08-13.md`.
+
 - **2026-08-13** (검토 PC): dev PC 인수분(`b369195` retrieval lifecycle)
   검토 승인 + 잔여 갭 2건 보완 — ① store/extraction `to_thread` 26지점
   `_store_call` 추적·drain(재현 테스트 수정 전 실패→후 통과 실측) ② ASAR

@@ -175,6 +175,17 @@ runtime adapter, AIRI sender/TTS/OBS, 외부 killswitch, 실제 moderation, 설�
 
 ## 2. dev PC 필수 작업 — SSoT 실기 검증
 
+**2026-08-13 재검증 완료 (`main` `c916f485565d29396e1580f16a4d72236bb724f5`).**
+아래 2026-08-12 기록은 당시 증거로 보존한다. 후속 재검증은 설치 ASAR
+`1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0`와 Mi:dm
+정확한 digest를 다시 확인하고, 실제 Electron Mi:dm 경로·EXAONE unpinned rollback·
+provenance·고의 digest 불일치 fail-closed 및 Mi:dm 운영 baseline 복원을 완료했다.
+Python STT 8890과 Electron voice input/VAD 모두 OFF, 기본 `num_ctx=2048`, 단일
+100% GPU runner, AIRI 7개/loopback 6121도 복원 상태에서 확인했다. PR #8 문맥 run
+`31671561496`, 병합 `main` push run
+`31671652918`, branch 최종 run `31668787730`은 모두 13/13 green이다. 상세:
+`완료/AIRI-DEV-PC-SSOT-REVERIFICATION-2026-08-13.md`.
+
 **2026-08-12 완료.** 아래 1~4를 실제 설치 Electron 턴으로 검증했다. Mi:dm은
 stale EXAONE tag 1회를 정규화했고 GPU runner는 단일이었다. EXAONE 롤백은
 warmup·evaluator·provenance가 모두 일치했다. Mi:dm digest

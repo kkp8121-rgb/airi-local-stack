@@ -73,6 +73,14 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-DEV-PC-SSOT-REVERIFICATION-2026-08-13.md` — `main`
+  `c916f485565d29396e1580f16a4d72236bb724f5`의 설치 Electron SSoT 후속 재검증.
+  Mi:dm exact pin·단일 GPU runner, EXAONE unpinned rollback, evaluator/export
+  provenance, 불일치 digest fail-closed, Python STT·Electron voice input OFF 및 Mi:dm
+  baseline 복원을 기록한다. PR #8
+  문맥 run `31671561496`, 병합 `main` push run `31671652918`, branch 최종 run
+  `31668787730`은 모두 13/13 green이다. 2026-08-12 증거는 역사 기록으로 보존한다.
+
 - `AIRI-MEMORY-RETRIEVAL-SHUTDOWN-DRAIN-2026-08-13.md` — PR #7 push CI의
   memory shard가 159 passed 뒤 `memory.db` teardown `WinError 32`로 실패한
   실제 lifecycle race를 기록하고, tracked/shielded retrieval task·협력 취소·기존

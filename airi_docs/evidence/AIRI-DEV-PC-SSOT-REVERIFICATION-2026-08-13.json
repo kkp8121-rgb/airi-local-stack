@@ -1,0 +1,174 @@
+{
+  "schema": "airi.dev-pc-ssot-reverification.v1",
+  "recorded_at": "2026-08-13T15:04:58.9140490+09:00",
+  "repository": {
+    "base_commit": "c916f485565d29396e1580f16a4d72236bb724f5",
+    "accepted_review_tip": "22a6add3f04fce44a8c9dc7eed9c0693eac67bab",
+    "accepted_tip_is_ancestor": true
+  },
+  "installed_airi": {
+    "package_version": "0.11.3",
+    "app_asar_bytes": 1356257019,
+    "app_asar_sha256": "1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0",
+    "background_processes": 7,
+    "server_channel_loopback": true,
+    "server_channel_port": 6121,
+    "stage_mounted": true,
+    "source_checkout_commit": "bf173f2de870e3f779db02548d691c7b51bb290f",
+    "source_checkout_tree": "ff71039caa507c5676c2cee31125374c5cc37d35",
+    "source_checkout_clean": true
+  },
+  "models": {
+    "midm": {
+      "tag": "midm-airi:2.0-mini",
+      "digest": "92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f"
+    },
+    "rollback": {
+      "tag": "exaone-airi:2.4b",
+      "digest": "ec47936ec5439ea3c24bbdd069b3a7aeba5cd8100ab193367bd959fac679bde4"
+    }
+  },
+  "preflight_cleanup": {
+    "ollama_registry_runner_count_before": 0,
+    "orphan_runners_stopped": 5,
+    "all_executables_matched_ollama_llama_server": true,
+    "all_parent_processes_absent": true,
+    "ollama_registry_runner_count_after": 0
+  },
+  "midm_live_gate": {
+    "launcher": {
+      "warmup_http_status": 200,
+      "stt_mode": "off",
+      "memory_extraction_enabled": false,
+      "evaluation_enabled": true,
+      "character_evaluator_enabled": true,
+      "character_evaluator_model": "midm-airi:2.0-mini",
+      "output_moderation_enabled": false,
+      "num_ctx": 2048,
+      "num_gpu": 999,
+      "tts_status": "ok",
+      "voice_reference_found": true
+    },
+    "electron_turn": {
+      "transport": "loopback-server-channel",
+      "input_chars": 27,
+      "completed": true,
+      "completed_ms": 1079,
+      "assistant_chars": 11
+    },
+    "health": {
+      "model": "midm-airi:2.0-mini",
+      "provider": "local",
+      "enforced": true,
+      "normalized_requests": 1,
+      "matching_requests": 0,
+      "last_requested_model": "exaone-airi:2.4b",
+      "digest_pinned": true,
+      "digest_verified": true,
+      "digest_status": "pinned",
+      "character_evaluator_terminal_status": "ok"
+    },
+    "runner": {
+      "count": 1,
+      "model": "midm-airi:2.0-mini",
+      "processor": "100% GPU",
+      "context": 2048
+    },
+    "provenance": {
+      "model": "midm-airi:2.0-mini",
+      "model_version": "midm-airi:2.0-mini",
+      "temporary_record_deleted": true
+    }
+  },
+  "rollback_live_gate": {
+    "launcher": {
+      "warmup_http_status": 200,
+      "chat_model": "exaone-airi:2.4b",
+      "digest_status": "observed",
+      "character_evaluator_model": "exaone-airi:2.4b",
+      "num_ctx": 2048,
+      "num_gpu": 999
+    },
+    "electron_turn": {
+      "transport": "loopback-server-channel",
+      "input_chars": 30,
+      "completed": true,
+      "completed_ms": 1103,
+      "assistant_chars": 11
+    },
+    "health": {
+      "model": "exaone-airi:2.4b",
+      "enforced": true,
+      "matching_requests": 2,
+      "digest_pinned": false,
+      "digest_status": "observed",
+      "character_evaluator_terminal_status": "ok"
+    },
+    "runner": {
+      "count": 1,
+      "model": "exaone-airi:2.4b",
+      "processor": "100% GPU",
+      "context": 2048
+    },
+    "provenance": {
+      "model": "exaone-airi:2.4b",
+      "model_version": "exaone-airi:2.4b",
+      "temporary_record_deleted": true
+    }
+  },
+  "mismatched_digest_gate": {
+    "tested_digest": "92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485e",
+    "failure_stage": "root_model_preflight",
+    "error": "Local chat model 'midm-airi:2.0-mini' does not match the expected artifact digest.",
+    "startup_blocked": true,
+    "proxy_port_11435_listening": false,
+    "tts_port_8880_listening": false,
+    "runner_count": 0,
+    "airi_processes_preserved": 7
+  },
+  "restored_baseline": {
+    "chat_model": "midm-airi:2.0-mini",
+    "digest_pinned": true,
+    "digest_verified": true,
+    "digest_status": "pinned",
+    "runner_count": 1,
+    "runner_vram_bytes": 1869464206,
+    "runner_context": 2048,
+    "character_evaluator_enabled": false,
+    "evaluation_enabled": false,
+    "memory_extraction_enabled": false,
+    "output_moderation_enabled": false,
+    "stt_port_8890_listening": false,
+    "electron_voice_input_enabled": false,
+    "electron_provider_configured": true,
+    "electron_recording": false,
+    "electron_transcribing": false,
+    "electron_vad_active": false,
+    "electron_vad_listening": false,
+    "electron_vad_input_live": false,
+    "electron_vad_input_enabled": false,
+    "electron_vad_input_muted": false,
+    "electron_microphone_permission": "granted",
+    "electron_last_capture_outcome": "none",
+    "microphone_setting_before_restoration": true,
+    "microphone_setting_after_restoration": false,
+    "temporary_cdp_loopback_only": true,
+    "temporary_cdp_closed": true,
+    "cdp_port_9223_listening": false,
+    "tts_status": "ok",
+    "voice_reference_found": true,
+    "immediate_response_cache_ready": 7,
+    "immediate_response_cache_total": 7,
+    "airi_processes": 7,
+    "server_channel_loopback": true
+  },
+  "privacy": {
+    "external_providers_enabled": false,
+    "raw_prompt_retained": false,
+    "raw_response_retained": false,
+    "server_token_retained": false,
+    "session_or_trace_ids_retained": false,
+    "audio_retained": false
+  },
+  "gate_pass": true
+}
