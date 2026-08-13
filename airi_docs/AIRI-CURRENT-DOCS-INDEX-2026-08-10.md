@@ -73,6 +73,19 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-MEMORY-RETRIEVAL-SHUTDOWN-DRAIN-2026-08-13.md` — PR #7 push CI의
+  memory shard가 159 passed 뒤 `memory.db` teardown `WinError 32`로 실패한
+  실제 lifecycle race를 기록하고, tracked/shielded retrieval task·협력 취소·기존
+  deadline 내 shutdown drain·stopping fail·기본 8의 bounded admission을 검증한
+  오프라인 증거. focused 62 passed, CI-equivalent shard 166 passed + 27 subtests /
+  4 warnings다. native SQLite 호출은 즉시 중단할 수 없고 deadline 뒤에도 tracked
+  worker가 남을 수 있으며, 설치 AIRI·서비스·모델·runtime DB 변경이나 STT/mic
+  실기는 포함하지 않는다. 최종 Python 3.12 전체 회귀는 881 passed / 1 skipped /
+  738 subtests / 7 warnings이며 offline checkpoint와 독립 retrieval 검토도
+  PASS다. 그러나 post-push run `31653832303`은 11 jobs PASS / 2 FAIL:
+  extraction/background store teardown `WinError 32`와 ASAR preflight
+  process-identity 선행 거부가 남아 있어 PR/merge ready가 아니다.
+
 - `AIRI-LATENCY-DASHBOARD-SUBSTANTIVE-KPI-2026-08-13.md` — 상단 대시보드가
   raw `playback.start`가 아니라 strict substantive playback KPI만으로
   newest-five/P50/P95/worst/pass를 계산하도록 정합성을 고정한 오프라인 증거.

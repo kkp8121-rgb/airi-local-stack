@@ -1,12 +1,14 @@
 import asyncio
 import os
+import sqlite3
 import sys
 import tempfile
+import threading
 import types
 import unittest
 from unittest.mock import patch
 
-from airi_memory import MemoryStore
+from airi_memory import MemoryStore, RetrievalResult
 from continuity_ledger import CONTINUITY_LEDGER_MESSAGE_NAME
 from memory_runtime import (
     MemoryConfig, MemoryRuntime, NullMemoryRuntime, SentenceTransformerEmbedder,
@@ -54,6 +56,13 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(c.enabled)
         self.assertEqual(c.upstream_url,"http://127.0.0.1:11434")
         self.assertIsInstance(MemoryRuntime.from_env(), NullMemoryRuntime)
+
+    def test_max_concurrent_retrievals_env_is_positive(self):
+        with patch.dict(os.environ, {"AIRI_MEMORY_MAX_CONCURRENT_RETRIEVALS": "0"}, clear=True):
+            with self.assertRaises(ValueError):
+                MemoryConfig.from_env()
+        with patch.dict(os.environ, {"AIRI_MEMORY_MAX_CONCURRENT_RETRIEVALS": "2"}, clear=True):
+            self.assertEqual(MemoryConfig.from_env().max_concurrent_retrievals, 2)
 
     def test_sentence_transformer_uses_fp16_only_for_explicit_cuda(self):
         captured = []
@@ -191,6 +200,230 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(isinstance(v, (int, float, bool)) for c in emit.call_args_list for v in c.kwargs.get("meta", {}).values()))
         await r.shutdown()
 
+    async def test_stopping_retrieval_is_failed_without_worker_admission(self):
+        r = await self.runtime()
+        r._stopping = True
+        out = await r.retrieve("s", "during shutdown")
+        self.assertEqual(out.status, "failed")
+        self.assertFalse(r._retrieval_tasks)
+        await r.shutdown()
+
+    async def test_retrieval_admission_is_bounded_without_executor_queueing(self):
+        from dataclasses import replace
+        config = replace(self.config, max_concurrent_retrievals=2, retrieve_timeout_ms=5000)
+        r = MemoryRuntime(config, http_client=FakeClient(())); await r.startup()
+        started = threading.Event(); release = threading.Event(); started_count = [0]; count_lock = threading.Lock()
+
+        def blocking_retrieve(*_args, cancel_event, **_kwargs):
+            with count_lock:
+                started_count[0] += 1
+                if started_count[0] == 2:
+                    started.set()
+            while not cancel_event.is_set() and not release.wait(.01):
+                pass
+            return RetrievalResult()
+
+        r.store.retrieve = blocking_retrieve
+        first = asyncio.create_task(r.retrieve("s", "first"))
+        second = asyncio.create_task(r.retrieve("s", "second"))
+        try:
+            self.assertTrue(await asyncio.to_thread(started.wait, 5))
+            saturated = await asyncio.wait_for(r.retrieve("s", "third"), .25)
+            self.assertEqual(saturated.status, "timed_out")
+            self.assertEqual(len(r._retrieval_tasks), 2)
+            self.assertEqual(started_count[0], 2)
+        finally:
+            release.set()
+            await asyncio.gather(first, second, return_exceptions=True)
+            await r.shutdown()
+
+    async def test_shutdown_signals_inflight_retrieval_before_its_timeout(self):
+        from dataclasses import replace
+        config = replace(self.config, retrieve_timeout_ms=5000, shutdown_flush_timeout_ms=1000)
+        r = MemoryRuntime(config, http_client=FakeClient(())); await r.startup()
+        opened = threading.Event(); cancelled = threading.Event(); closed = threading.Event()
+
+        def blocking_retrieve(*_args, cancel_event, **_kwargs):
+            opened.set()
+            try:
+                cancel_event.wait(5)
+                cancelled.set()
+                return RetrievalResult()
+            finally:
+                closed.set()
+
+        r.store.retrieve = blocking_retrieve
+        retrieval = asyncio.create_task(r.retrieve("s", "in flight"))
+        self.assertTrue(await asyncio.to_thread(opened.wait, 5))
+        await r.shutdown()
+        self.assertTrue(cancelled.is_set())
+        self.assertTrue(closed.is_set())
+        self.assertIsInstance(await retrieval, RetrievalResult)
+
+    async def test_shutdown_drains_timed_out_retrieval_before_windows_db_unlink(self):
+        from dataclasses import replace
+        config = replace(self.config, retrieve_timeout_ms=250, shutdown_flush_timeout_ms=1000)
+        r = MemoryRuntime(config, http_client=FakeClient(())); await r.startup()
+        await asyncio.to_thread(lambda: None)
+        opened = threading.Event(); cancelled = threading.Event(); release = threading.Event(); closed = threading.Event()
+
+        def sqlite_retrieve(*_args, cancel_event, **_kwargs):
+            connection = sqlite3.connect(self.db)
+            opened.set()
+            try:
+                cancel_event.wait(1)
+                cancelled.set()
+                release.wait(1)
+                return RetrievalResult()
+            finally:
+                connection.close()
+                closed.set()
+
+        r.store.retrieve = sqlite_retrieve
+        shutdown = None
+        try:
+            out = await r.retrieve("s", "slow retrieval")
+            self.assertEqual(out.status, "timed_out")
+            self.assertTrue(await asyncio.to_thread(opened.wait, 5))
+            self.assertTrue(await asyncio.to_thread(cancelled.wait, 5))
+            shutdown = asyncio.create_task(r.shutdown())
+            await asyncio.sleep(0.02)
+            self.assertFalse(shutdown.done())
+            release.set()
+            await shutdown
+            self.assertTrue(closed.is_set())
+            os.unlink(self.db)
+        finally:
+            release.set()
+            if shutdown is None:
+                await r.shutdown()
+            elif not shutdown.done():
+                await shutdown
+
+    async def test_cancelled_retrieval_remains_tracked_until_worker_exits(self):
+        r = await self.runtime()
+        opened = threading.Event(); release = threading.Event(); closed = threading.Event()
+
+        def sqlite_retrieve(*_args, cancel_event, **_kwargs):
+            connection = sqlite3.connect(self.db)
+            opened.set()
+            try:
+                cancel_event.wait(1)
+                release.wait(1)
+                return RetrievalResult()
+            finally:
+                connection.close()
+                closed.set()
+
+        r.store.retrieve = sqlite_retrieve
+        shutdown = None
+        try:
+            retrieval = asyncio.create_task(r.retrieve("s", "cancelled retrieval"))
+            self.assertTrue(await asyncio.to_thread(opened.wait, 1))
+            retrieval.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await retrieval
+            self.assertEqual(len(r._retrieval_tasks), 1)
+            shutdown = asyncio.create_task(r.shutdown())
+            await asyncio.sleep(0.02)
+            self.assertFalse(shutdown.done())
+            release.set()
+            await shutdown
+            self.assertTrue(closed.is_set())
+        finally:
+            release.set()
+            if shutdown is None:
+                await r.shutdown()
+            elif not shutdown.done():
+                await shutdown
+
+    async def test_cancelled_turn_journal_worker_is_drained_before_db_unlink(self):
+        # The proxy cancels its background journal tasks just before shutting
+        # the runtime down.  Cancellation reaches only the asyncio wrapper, so
+        # the store thread must still be drained before the database file is
+        # closed or removed.
+        r = await self.runtime()
+        opened = threading.Event(); release = threading.Event(); closed = threading.Event()
+
+        def sqlite_append_turn(*_args, **_kwargs):
+            connection = sqlite3.connect(self.db)
+            opened.set()
+            try:
+                release.wait(10)
+            finally:
+                connection.close()
+                closed.set()
+
+        r.store.append_turn = sqlite_append_turn
+        shutdown = None
+        try:
+            journal = asyncio.create_task(r.schedule_completed_turn("s", "u", "a", 1))
+            self.assertTrue(await asyncio.to_thread(opened.wait, 5))
+            journal.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await journal
+            shutdown = asyncio.create_task(r.shutdown())
+            await asyncio.sleep(0.02)
+            self.assertFalse(shutdown.done())
+            self.assertTrue(r._store_workers)
+            release.set()
+            await shutdown
+            self.assertTrue(closed.is_set())
+            self.assertFalse(r._store_workers)
+            os.unlink(self.db)
+        finally:
+            release.set()
+            if shutdown is None:
+                await r.shutdown()
+            elif not shutdown.done():
+                await shutdown
+
+    async def test_shutdown_drains_extractor_store_worker_it_cancelled(self):
+        # shutdown() cancels a still-running extractor when its flush deadline
+        # expires.  That cancellation stops the coroutine only: the extractor's
+        # store thread still owns an open SQLite handle and must be drained
+        # before shutdown returns, or teardown races it on Windows.
+        from dataclasses import replace
+        config = replace(self.config, extraction_threshold=2)
+        r = MemoryRuntime(config, http_client=FakeClient(('{"extracted":[]}',))); await r.startup()
+        opened = threading.Event(); release = threading.Event(); closed = threading.Event()
+        original_job_state = r.store.job_state
+
+        def sqlite_job_state(session_id):
+            connection = sqlite3.connect(self.db)
+            opened.set()
+            try:
+                release.wait(10)
+                return original_job_state(session_id)
+            finally:
+                connection.close()
+                closed.set()
+
+        shutdown = None
+        try:
+            self.assertEqual(await r.schedule_completed_turn("s", "u", "a", 1), "appended")
+            extractor = r._extract_tasks["s"]
+            r.store.job_state = sqlite_job_state
+            self.assertTrue(await asyncio.to_thread(opened.wait, 5))
+            shutdown = asyncio.create_task(r.shutdown())
+            # The extractor is cancelled once the flush deadline expires; its
+            # physical store thread is still inside SQLite at that moment.
+            await asyncio.gather(extractor, return_exceptions=True)
+            await asyncio.sleep(0.02)
+            self.assertFalse(shutdown.done())
+            self.assertTrue(r._store_workers)
+            release.set()
+            await shutdown
+            self.assertTrue(closed.is_set())
+            self.assertFalse(r._store_workers)
+            os.unlink(self.db)
+        finally:
+            release.set()
+            if shutdown is None:
+                await r.shutdown()
+            elif not shutdown.done():
+                await shutdown
+
     async def test_context_does_not_mutate_original(self):
         r = await self.runtime(); original = [{"id": 1, "role": "user", "content": "old"}, {"id": 2, "role": "user", "content": "new"}]
         p = {"messages": [{"role": "system", "content": "AIRI"}, {"role": "system", "name": "airi-request-local", "content": "state"}]}
@@ -285,6 +518,10 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await asyncio.to_thread(r.store.job_state, "s"))["pending_msgs"], 2)
         await r.schedule_completed_turn("s", "u2", "a2", 2)
         self.assertEqual((await asyncio.to_thread(r.store.job_state, "s"))["pending_msgs"], 4); await r.shutdown()
+        # Shutdown flushes and then cancels this session's extractor.  No store
+        # thread may still own the database once shutdown returns, or teardown
+        # races an open handle when it removes the file.
+        self.assertFalse(r._store_workers)
 
     async def test_distinct_requests_with_truncated_turn_count_append_atomically(self):
         r = await self.runtime()
