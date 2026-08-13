@@ -186,6 +186,11 @@ Python STT 8890과 Electron voice input/VAD 모두 OFF, 기본 `num_ctx=2048`, �
 `31671652918`, branch 최종 run `31668787730`은 모두 13/13 green이다. 상세:
 `완료/AIRI-DEV-PC-SSOT-REVERIFICATION-2026-08-13.md`.
 
+단, 재검증 증거 commit `e694b4f`의 push run `31673311636`은 13개 job 모두
+runner 배정 전(`runner_id=0`, steps 0) GitHub Actions billing/spending-limit
+annotation으로 실패했다. 실기 gate는 PASS지만 배치는 full-green 전까지 미완결이며,
+Billing & plans 복구 후 해당 workflow 재실행이 다음 작업의 전제다.
+
 **2026-08-12 완료.** 아래 1~4를 실제 설치 Electron 턴으로 검증했다. Mi:dm은
 stale EXAONE tag 1회를 정규화했고 GPU runner는 단일이었다. EXAONE 롤백은
 warmup·evaluator·provenance가 모두 일치했다. Mi:dm digest

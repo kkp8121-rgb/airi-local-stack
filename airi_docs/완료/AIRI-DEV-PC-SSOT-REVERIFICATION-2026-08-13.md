@@ -76,8 +76,19 @@ inputEnabled가 모두 false였다. Electron 설정 복원에 사용한 임시 C
 - 구조화 증거 JSON parse·고정 SHA 재검증, patch 변경 0, `git diff --check`:
   PASS.
 
+## 원격 CI 차단
+
+증거 커밋 `e694b4f651a57fa2a2b138c85910b5f5a664607b`의 push run
+`31673311636`은 13개 job 모두 runner를 배정받기 전에 실패했다. 각 job은
+`runner_id=0`, steps 0이고 annotation은 최근 계정 결제 실패 또는 spending limit
+증액이 필요하다는 동일한 GitHub Actions billing 오류다. 코드나 테스트 assertion
+실패가 아니지만 full-green 규칙을 충족하지 못했으므로 이 문서 배치는 아직 미완결이다.
+Billing & plans 복구 뒤 같은 commit의 전체 workflow를 재실행해 13/13 green을
+확인하기 전에는 다음 dev-PC 실기 배치로 넘어가지 않는다.
+
 ## 결론
 
 설치 Electron 정규화, 단일 foreground runner, Mi:dm pin, EXAONE unpinned rollback,
 evaluator·export provenance 및 불일치 digest fail-closed가 현 `main`에서 다시
-성립한다. 이는 2026-08-12 증거를 대체하지 않고 그 후속 재검증이다.
+성립한다. 이는 2026-08-12 증거를 대체하지 않고 그 후속 재검증이다. 실기 gate는
+PASS지만 배치 완결은 위 원격 CI billing 차단 해소까지 보류한다.

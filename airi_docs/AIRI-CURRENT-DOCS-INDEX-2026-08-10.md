@@ -79,7 +79,9 @@
   provenance, 불일치 digest fail-closed, Python STT·Electron voice input OFF 및 Mi:dm
   baseline 복원을 기록한다. PR #8
   문맥 run `31671561496`, 병합 `main` push run `31671652918`, branch 최종 run
-  `31668787730`은 모두 13/13 green이다. 2026-08-12 증거는 역사 기록으로 보존한다.
+  `31668787730`은 모두 13/13 green이다. 재검증 commit `e694b4f`의 run
+  `31673311636`은 runner 배정 전 GitHub Actions billing 오류로 실패해 배치 완결은
+  보류한다. 2026-08-12 증거는 역사 기록으로 보존한다.
 
 - `AIRI-MEMORY-RETRIEVAL-SHUTDOWN-DRAIN-2026-08-13.md` — PR #7 push CI의
   memory shard가 159 passed 뒤 `memory.db` teardown `WinError 32`로 실패한

@@ -179,7 +179,10 @@
   green으로 종료됐고, 병합 `main` push run `31671652918` 및 branch 최종 run
   `31668787730`도 각각 13/13 green이다.
   실행 전 검증된 orphan `llama-server` 5개를 정리한 것은 선행 정리이며 제품 PASS 근거가
-  아니다. 상세: `완료/AIRI-DEV-PC-SSOT-REVERIFICATION-2026-08-13.md`.
+  아니다. 증거 commit `e694b4f`의 run `31673311636`은 13개 job 모두 runner 배정
+  전 GitHub Actions billing/spending-limit 오류로 실패했다. 실기 gate는 PASS지만
+  full-green 전까지 배치는 미완결이다. 상세:
+  `완료/AIRI-DEV-PC-SSOT-REVERIFICATION-2026-08-13.md`.
 
 - **2026-08-13** (검토 PC): dev PC 인수분(`b369195` retrieval lifecycle)
   검토 승인 + 잔여 갭 2건 보완 — ① store/extraction `to_thread` 26지점
