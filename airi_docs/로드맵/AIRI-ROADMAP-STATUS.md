@@ -15,6 +15,16 @@
 
 최종 갱신: 2026-08-13
 
+- **2026-08-13** (검토 PC): dev PC 브랜치 독립 검토 — 코드·증거 차단 사유
+  없음(승격 오인·실기/합성 혼동·개인정보 전건 반증 실패). blocker 보완 3건:
+  streamlist-quota의 ① provider발 에러 sanitize 우회 차단(module-private
+  brand) ② reconnect 자연 종료의 connection_cap 오분류 수정 ③ 발생한
+  연결·폐기 응답 카운트 누락 수정(discardedResponses 신설 — 쿼터 귀속
+  과대평가 편향 제거). 신규 테스트 5종(수정 전 재현 FAIL 실측), chat-ingress
+  32→37, checkpoint에 최소 테스트 수 가드 추가(빈 glob 조용한 초록 방지).
+  문서 정합 6건(smoke 기록 복원·B3-c/d/e 미완료 게이트 등록·push 시점
+  한정). 전체 900/1/738 + checkpoint/manifest PASS. CI는 Actions 결제 차단
+  으로 실행 불가 — 로컬 전체 검증으로 대체(사용자 결제 확인 대기).
 - **2026-08-13** (review PC handoff): 검토 브랜치
   `chore/dev-pc-live-gates-2026-08-13`의 완료·미완료와 실제 설치 AIRI 시험 경계를
   `진행중/AIRI-REVIEW-PC-HANDOFF-2026-08-13.md`에 고정했다. 실제 송출을 빼도
@@ -38,8 +48,15 @@
   trees, Python 3.12 audit venv, runtime DB/logs, patches/evidence JSON, installed AIRI, and
   production services. Deleted data is not recycle-bin recoverable; models,
   dependencies, builds, and worktrees are reproducible, and evidence reports
-  remain. No push. Details:
+  remain. No push at the time of this batch (the branch was pushed afterwards
+  for review handoff). Details:
   `완료/AIRI-LOCAL-TEMP-AND-FAILED-MODEL-CLEANUP-2026-08-13.md`.
+
+- **2026-08-13** (dev PC, 복원된 기록 — `31ff0e6`이 실수로 삭제한 항목):
+  신규 공개 라이선스 추출 후보 3종 단일 fixture smoke — Ministral 3 3B
+  recall 0.0 / Phi-4-mini 3.8B recall 0.0 / Granite 3.3 2B critical_recall
+  0.5, 전부 FAIL(fail-fast, full gate 미실행). 추출 OFF 유지.
+  (`완료/AIRI-NEW-LOCAL-EXTRACTION-CANDIDATE-SMOKES-2026-08-13.md`)
 
 ---
 
@@ -78,9 +95,12 @@
     native store 호출은 협력 취소 지점이 없어 최악 2×flush window 순수 대기 및
     장기 `SQLITE_BUSY`에서 deadline 뒤 tracked worker 잔류 가능성이 알려진 한계다.
   - [~] 게이트 리포트 생산 → 추출 발효 (Mi:dm balanced, Qwen3.5·Granite 4.0·
-    Kanana smoke, Gemma3 full 모두 FAIL; 독립 verifier 거부, 추출 off 유지 — 통과
-    후보 미확정, `완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`,
-    `완료/AIRI-KANANA-EXTRACTION-CANDIDATE-GATE-2026-08-13.md`)
+    Kanana smoke, Gemma3 full 모두 FAIL; Ministral 3 3B·Phi-4-mini 3.8B·
+    Granite 3.3 2B 단일 fixture smoke도 전부 FAIL; 독립 verifier 거부, 추출
+    off 유지 — 통과 후보 미확정,
+    `완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`,
+    `완료/AIRI-KANANA-EXTRACTION-CANDIDATE-GATE-2026-08-13.md`,
+    `완료/AIRI-NEW-LOCAL-EXTRACTION-CANDIDATE-SMOKES-2026-08-13.md`)
   - [ ] MEM-04 활성 추출 락 경합 실측 (코드 완료; 통과 extractor와
     `extraction_enabled=true` 이후 Stage B commit↔foreground 겹침 증거 필요)
   - [ ] I2 시청자 기억 시스템 (M2)
@@ -174,6 +194,13 @@
   - [x] B3 모더레이션 게이트 코드 (사전 113항목+패턴 7, 기본 off) — 2026-08-12 (`932eae6`)
   - [x] B3 배선 3종 — TTS 폴백 7/7·런처 env·Electron "필터당함" 배지,
     신규 3층 source test/typecheck/build 및 설치본 실제 차단 턴 확인 — 2026-08-12 (`완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`)
+  - [ ] B3-c 자연어 입력 semantic screener (prompt injection·욕설·성적 발언·
+    괴롭힘 판별) — 미착수. 현재 입력 방어는 형식 검증(shape/ID/Unicode/
+    timestamp)뿐
+  - [ ] B3-d 설치 Electron 대상 persona-jailbreak corpus·red-team — 현재는
+    direct-model 한정 hostile-card fixture만 존재
+  - [ ] B3-e category별(욕설·음란성 등) 설치 UI/TTS 차단 반응 실기 — 현재는
+    dictionary/unit + generic match-all 배선 확인만. output moderation 기본 OFF
   - [ ] B2 송출 (OBS Browser Source + App Audio Capture — 결정 2 이후)
 - [~] **M4** (B4 방송 디렉터 + C3/C4 ∥ I3 주제 풀)
   - [~] B4a 기반 구현 — 기본 OFF/inert; simulation-only 집중 테스트 17 PASS·독립 최종 검토 PASS.

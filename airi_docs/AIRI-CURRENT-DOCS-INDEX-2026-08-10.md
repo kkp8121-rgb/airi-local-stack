@@ -263,6 +263,11 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 
 ## 최신 검증 증거 (2026-08-13)
 
+- **명시적 미완료 안전 게이트 3종** (검토 PC 감사 반영, 로드맵 M3
+  B3-c/d/e로 등록): 자연어 입력 semantic screener 미착수(현재 형식 검증만) /
+  설치 Electron 대상 persona-jailbreak red-team 부재(direct-model fixture만) /
+  category별 설치 UI·TTS 차단 반응 실기 부재(generic match-all 확인만,
+  output moderation 기본 OFF). 이 3종 전 방송 안전 완료 선언 금지.
 - **현재 결정/후속 읽기 전용 점검** — §2 로컬 실기 배치는 완료이며 push/CI green은 더 이상
   완료 조건이 아니다. 저장소는 private 유지·public visibility 변경 없음이고, 사용자가 요청할
   때까지 push하지 않는다. historical Actions billing 실패(run `31673311636`,

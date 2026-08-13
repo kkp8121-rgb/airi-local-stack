@@ -43,7 +43,8 @@ unexpected rate 0.25 이하, Stage-B alias 0.8 이상을 충족하지 못했다.
 `phi4-mini:3.8b-q4_K_M`, `granite3.3:2b`. 제거량은 공유되지 않은 고유 blob
 13개, 6.511 GiB다. tracked JSON evidence는 보존한다. production 11434 서비스의
 프로세스·설정과 11435 proxy 설정/트래픽은 변경하지 않았고, active model runner도
-남기지 않았다. push도 하지 않았다.
+남기지 않았다. push도 하지 않았다(이 배치 시점 기준 — 이후 검토 인수를 위해
+브랜치가 push됐다).
 
 ## 운영 경계
 

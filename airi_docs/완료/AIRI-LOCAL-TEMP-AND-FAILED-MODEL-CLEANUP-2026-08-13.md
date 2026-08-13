@@ -6,7 +6,8 @@ The related goal was blocked because explicit authorization for Cloud and
 YouTube transmission/spend was absent and every extraction candidate failed its
 gate. It was not blocked by context exhaustion. The user then requested local
 cleanup. No implementation code, patch, installed AIRI, or production service
-was changed; nothing was pushed. This evidence update is committed locally only.
+was changed; nothing was pushed at the time of this batch. The branch was
+pushed afterwards for review handoff (run `31683115216`).
 
 ## Removed
 

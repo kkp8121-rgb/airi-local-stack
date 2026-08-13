@@ -91,7 +91,8 @@ inputEnabled가 모두 false였다. Electron 설정 복원에 사용한 임시 C
 annotation은 최근 계정 결제 실패 또는 spending limit 증액이 필요하다는 동일한
 GitHub Actions billing 오류다. 이는 코드나 테스트 assertion 실패가 아니다. 현 사용자
 결정에서는 이 billing 차단을
-해소하거나 workflow를 재실행할 필요가 없으며, push도 사용자가 요청할 때까지 하지 않는다.
+해소하거나 workflow를 재실행할 필요가 없으며, push도 사용자가 요청할 때까지 하지
+않는다(이 배치 시점 기준 — 이후 검토 인수를 위해 브랜치가 push됐다).
 
 ## 결론
 

@@ -18,4 +18,8 @@ The official transport is gRPC at `youtube.googleapis.com:443`. Official `stream
 
 An injected future transport must honor the transient `AbortSignal` passed to `openStream`. A final already-received response batch can cross the configured message threshold; its actual bounded count is retained as measurement evidence.
 
+A connection is counted as soon as the transport returns a stream, because anything discarded afterwards — a deadline that lands just past the open, a rejected iterator shape, or a batch received just past the deadline — has already consumed live quota. A batch discarded that way is recorded as `discardedResponses` instead of disappearing, so the served-response denominator for a manual quota delta is `responses + discardedResponses`. A reconnect trial that ends because the provider stopped supplying a page token reports `normal_close` at any configured connection count; `connection_cap` means only that the configured connection count was actually reached.
+
+`StreamListQuotaError` stays exported so a caller can catch by type, but only errors this module raised itself are ever propagated. An error a transport constructs from that same class carries provider content, so it is sanitized into a stop reason like any other transport failure.
+
 Take manual Cloud Console quota snapshots before and after a bounded trial, then pass only their numeric values and the fixed source label `manual_google_cloud_console_snapshot` to `assembleQuotaReport`. The official quota table currently does not publish a streamList cost, so the observed manual delta is evidence only; this module never infers undocumented pricing.

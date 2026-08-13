@@ -15,8 +15,22 @@ $senderTest = Join-Path $PSScriptRoot 'test-send-airi-local-text.mjs'
 & node --test $senderTest
 if ($LASTEXITCODE -ne 0) { throw 'Sender contract tests failed.' }
 
-& node --test (Join-Path $PSScriptRoot 'chat-ingress\test-*.mjs')
-if ($LASTEXITCODE -ne 0) { throw 'Chat ingress contract tests failed.' }
+# `node --test` exits zero when its glob matches no file, so a green run alone
+# does not prove the suite ran. Read the reported pass count and hold it to a
+# floor; raise the floor whenever chat-ingress tests are added.
+$chatIngressMinimumTests = 37
+$chatIngressOutput = @(& node --test (Join-Path $PSScriptRoot 'chat-ingress\test-*.mjs') 2>&1 | ForEach-Object { $_.ToString() })
+$chatIngressExit = $LASTEXITCODE
+$chatIngressOutput | Write-Output
+if ($chatIngressExit -ne 0) { throw 'Chat ingress contract tests failed.' }
+$chatIngressPass = [regex]::Match(($chatIngressOutput -join "`n"), '(?m)^.{0,4}pass\s+(?<count>\d+)\s*$')
+if (-not $chatIngressPass.Success) {
+    throw 'Could not read the chat ingress passing test count.'
+}
+$chatIngressCount = [int]$chatIngressPass.Groups['count'].Value
+if ($chatIngressCount -lt $chatIngressMinimumTests) {
+    throw "Chat ingress suite reported $chatIngressCount passing tests; expected at least $chatIngressMinimumTests."
+}
 
 & node --test (Join-Path $PSScriptRoot 'broadcast-director\test-*.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Broadcast director contract tests failed.' }

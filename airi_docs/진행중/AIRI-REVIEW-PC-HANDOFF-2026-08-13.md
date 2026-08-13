@@ -69,8 +69,8 @@ B1/B4는 default OFF이며 live adapter가 없다. malicious metadata·BIDI·잘
 1. `c916f48..HEAD`의 변경 범위와 roadmap/evidence 정합성을 확인한다.
 2. streamList 코어가 network/OAuth/raw content를 보존하지 않고 bounded
    cancellation·cleanup·manual quota snapshot 계약을 지키는지 검토한다.
-3. 신규 extraction smoke가 partial FAIL임을 유지하고 운영 report로 승격되지
-   않았는지 확인한다.
+3. 신규 extraction smoke가 단일 fixture fail-fast FAIL임을 유지하고 운영
+   report로 승격되지 않았는지 확인한다.
 4. 설치본 실기와 offline simulation의 주장이 섞이지 않았는지 확인한다.
 5. 다음 구현 제안 시 input semantic screener, persona-jailbreak corpus,
    category별 installed UI/TTS 시험을 별도 gate로 정의한다.

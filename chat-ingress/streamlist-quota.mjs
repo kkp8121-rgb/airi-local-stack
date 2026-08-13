@@ -16,6 +16,12 @@ const QUOTA_SOURCE = 'manual_google_cloud_console_snapshot'
 const TIMEOUT = Object.freeze(Object.create(null))
 const ABORTED = Object.freeze(Object.create(null))
 
+// Module-private brand. The class stays exported so a caller can catch by type,
+// but only errors this module itself raised are ever allowed to propagate; a
+// provider-constructed StreamListQuotaError carries provider content and is
+// sanitized like any other transport failure.
+const INTERNAL = new WeakSet()
+
 export class StreamListQuotaError extends Error {
   constructor(code) {
     super('streamList quota probe failed')
@@ -25,7 +31,13 @@ export class StreamListQuotaError extends Error {
 }
 
 function fail(code) {
-  throw new StreamListQuotaError(code)
+  const error = new StreamListQuotaError(code)
+  INTERNAL.add(error)
+  throw error
+}
+
+function isInternal(error) {
+  return INTERNAL.has(error)
 }
 
 function snapshotExact(record, keys) {
@@ -94,7 +106,7 @@ function parseOptions(options) {
       maxConnections: configValue(snapshot, 'maxConnections', 1, 1, MAX_CONNECTIONS)
     }
   } catch (error) {
-    if (error instanceof StreamListQuotaError) throw error
+    if (isInternal(error)) throw error
     fail('invalid_options')
   }
 }
@@ -122,6 +134,7 @@ function trialResult(kind, status, stopReason, elapsed, counts, cap) {
     durationMs: Math.min(elapsed, cap),
     messages: counts.messages,
     responses: counts.responses,
+    discardedResponses: counts.discardedResponses,
     connections: counts.connections,
     resumes: counts.resumes,
     firstResponseMs: counts.firstResponseMs,
@@ -180,7 +193,7 @@ export async function runStreamListTrial(options) {
   if (!safeInteger(start, 0, Number.MAX_SAFE_INTEGER)) fail('invalid_clock')
   let previousClock = start
   const elapsed = () => { previousClock = readClock(config.now, start, previousClock); return previousClock - start }
-  const counts = { messages: 0, responses: 0, connections: 0, resumes: 0, firstResponseMs: null, firstMessageMs: null }
+  const counts = { messages: 0, responses: 0, discardedResponses: 0, connections: 0, resumes: 0, firstResponseMs: null, firstMessageMs: null }
   if (config.durationMs === 0) return trialResult(config.kind, 'completed', 'duration_cap', 0, counts, config.durationMs)
   if (config.maxMessages === 0) return trialResult(config.kind, 'completed', 'message_cap', 0, counts, config.durationMs)
   if (config.maxResponses === 0) return trialResult(config.kind, 'completed', 'response_cap', 0, counts, config.durationMs)
@@ -192,6 +205,9 @@ export async function runStreamListTrial(options) {
   let stopReason = 'normal_close'
   try {
     while (counts.connections < config.maxConnections) {
+      // Every round starts from a natural close. Only an explicit cap, failure,
+      // or abort below may name a stop reason, and each of those breaks out.
+      stopReason = 'normal_close'
       try { if (config.signal && config.signal.aborted) { status = 'aborted'; stopReason = 'aborted'; break } } catch { status = 'failed'; stopReason = 'read_failure'; break }
       let stream
       const streamCleanup = { closed: false }
@@ -215,9 +231,14 @@ export async function runStreamListTrial(options) {
         if (opened === ABORTED) { status = 'aborted'; stopReason = 'aborted'; abortLocal(); break }
         if (opened === TIMEOUT) { stopReason = 'duration_cap'; break }
         stream = opened
+        // A returned stream is a connection the provider already served, so it
+        // is counted here rather than after the shape checks below. Anything
+        // discarded past this point still consumed live quota.
+        counts.connections += 1
+        if (pageToken !== null) counts.resumes += 1
         if (elapsed() >= config.durationMs) { abortLocal(); closeStream(stream, config, streamCleanup); stopReason = 'duration_cap'; break }
       } catch (error) {
-        if (error instanceof StreamListQuotaError) throw error
+        if (isInternal(error)) throw error
         status = 'failed'; stopReason = 'open_failure'; break
       } finally {
         try { if (openTimer !== null && openTimer !== undefined) config.clearTimeoutFn(openTimer) } catch { /* ignored */ }
@@ -228,8 +249,6 @@ export async function runStreamListTrial(options) {
       if (typeof asyncIterator !== 'function') { status = 'failed'; stopReason = 'open_failure'; break }
       try { iterator = asyncIterator.call(stream) } catch { status = 'failed'; stopReason = 'open_failure'; break }
       try { if (!iterator || typeof iterator.next !== 'function') { status = 'failed'; stopReason = 'open_failure'; break } } catch { status = 'failed'; stopReason = 'open_failure'; break }
-      counts.connections += 1
-      if (pageToken !== null) counts.resumes += 1
       let reconnect = false
       while (true) {
         try { if (config.signal && config.signal.aborted) { status = 'aborted'; stopReason = 'aborted'; break } } catch { status = 'failed'; stopReason = 'read_failure'; break }
@@ -244,7 +263,7 @@ export async function runStreamListTrial(options) {
         const readAbort = abortRace(config.signal)
         let step
         try { step = await Promise.race([Promise.resolve(iterator.next()), timeout, readAbort.promise]) } catch (error) {
-          if (error instanceof StreamListQuotaError) throw error
+          if (isInternal(error)) throw error
           status = 'failed'; stopReason = 'read_failure'; break
         }
         finally {
@@ -257,9 +276,13 @@ export async function runStreamListTrial(options) {
         if (!stepSnapshot || typeof stepSnapshot.done !== 'boolean') { status = 'failed'; stopReason = 'read_failure'; break }
         if (stepSnapshot.done) break
         let response
-        try { response = summarize(stepSnapshot.value) } catch (error) { if (error instanceof StreamListQuotaError) { status = 'failed'; stopReason = 'invalid_summary'; break } throw error }
+        // Summarizing only ever rejects the provider's own batch shape, so no
+        // failure from it is allowed to reach the caller unsanitized.
+        try { response = summarize(stepSnapshot.value) } catch { status = 'failed'; stopReason = 'invalid_summary'; break }
         const responseMs = elapsed()
-        if (responseMs >= config.durationMs) { stopReason = 'duration_cap'; break }
+        // The batch arrived and was already paid for upstream, so it is
+        // recorded separately instead of vanishing from the measurement.
+        if (responseMs >= config.durationMs) { counts.discardedResponses += 1; stopReason = 'duration_cap'; break }
         counts.responses += 1
         if (counts.firstResponseMs === null) counts.firstResponseMs = responseMs
         if (response.messageCount > 0 && counts.firstMessageMs === null) counts.firstMessageMs = responseMs
@@ -275,16 +298,17 @@ export async function runStreamListTrial(options) {
         if (config.kind === 'reconnect' && response.nextPageToken !== null) {
           pageToken = response.nextPageToken
           reconnect = true
-          stopReason = 'reconnect'
           break
         }
       }
       closeIterator(iterator, config)
       iterator = null
-      if (status !== 'completed' || stopReason !== 'reconnect') break
-      if (!reconnect || counts.connections >= config.maxConnections) { stopReason = 'connection_cap'; break }
+      // Reconnect intent is a local flag, never a stop reason: naming it would
+      // leave a value that is not a stop reason behind for the next round.
+      if (status !== 'completed' || !reconnect) break
+      if (counts.connections >= config.maxConnections) { stopReason = 'connection_cap'; break }
     }
-    // A natural close is not a cap merely because the configured cap equals one.
+    // A natural close is not a cap at any configured connection count.
   } finally {
     abortLocal()
     closeIterator(iterator, config)
@@ -302,10 +326,12 @@ export function assembleQuotaReport(input) {
   const inputSnapshot = snapshotExact(input, ['trial', 'quotaBefore', 'quotaAfter', 'quotaSource'])
   if (!inputSnapshot) fail('invalid_report_input')
   const { trial, quotaBefore, quotaAfter, quotaSource } = inputSnapshot
-  const trialSnapshot = snapshotExact(trial, ['schema', 'kind', 'status', 'stopReason', 'durationMs', 'messages', 'responses', 'connections', 'resumes', 'firstResponseMs', 'firstMessageMs'])
+  const trialSnapshot = snapshotExact(trial, ['schema', 'kind', 'status', 'stopReason', 'durationMs', 'messages', 'responses', 'discardedResponses', 'connections', 'resumes', 'firstResponseMs', 'firstMessageMs'])
   if (!trialSnapshot || trialSnapshot.schema !== 'airi.streamlist-quota-trial.v1') fail('invalid_report_input')
-  for (const key of ['durationMs', 'messages', 'responses', 'connections', 'resumes']) quotaNumber(trialSnapshot[key])
-  if (trialSnapshot.durationMs > MAX_DURATION_MS || trialSnapshot.messages > MAX_MESSAGES + 1_999 || trialSnapshot.responses > MAX_RESPONSES || trialSnapshot.connections > MAX_CONNECTIONS || trialSnapshot.resumes > Math.max(0, trialSnapshot.connections - 1) || trialSnapshot.messages > trialSnapshot.responses * 2_000) fail('invalid_report_input')
+  for (const key of ['durationMs', 'messages', 'responses', 'discardedResponses', 'connections', 'resumes']) quotaNumber(trialSnapshot[key])
+  // At most one already-received batch can be discarded per connection, so the
+  // served-response denominator is responses plus discardedResponses.
+  if (trialSnapshot.durationMs > MAX_DURATION_MS || trialSnapshot.messages > MAX_MESSAGES + 1_999 || trialSnapshot.responses > MAX_RESPONSES || trialSnapshot.discardedResponses > trialSnapshot.connections || trialSnapshot.connections > MAX_CONNECTIONS || trialSnapshot.resumes > Math.max(0, trialSnapshot.connections - 1) || trialSnapshot.messages > trialSnapshot.responses * 2_000) fail('invalid_report_input')
   for (const key of ['firstResponseMs', 'firstMessageMs']) {
     const value = trialSnapshot[key]
     if (value !== null && (!safeInteger(value, 0, trialSnapshot.durationMs))) fail('invalid_report_input')
@@ -326,6 +352,7 @@ export function assembleQuotaReport(input) {
     durationMs: trialSnapshot.durationMs,
     messages: trialSnapshot.messages,
     responses: trialSnapshot.responses,
+    discardedResponses: trialSnapshot.discardedResponses,
     connections: trialSnapshot.connections,
     resumes: trialSnapshot.resumes,
     firstResponseMs: trialSnapshot.firstResponseMs,
