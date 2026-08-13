@@ -50,6 +50,9 @@ param(
     [ValidateSet('on', 'off')]
     [string]$OutputModeration = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_OUTPUT_MODERATION)) { 'off' } else { $env:AIRI_OUTPUT_MODERATION }),
     [string]$OutputModerationTerms = $env:AIRI_OUTPUT_MODERATION_TERMS,
+    [ValidateSet('on', 'off')]
+    [string]$InputScreening = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_INPUT_SCREENING)) { 'off' } else { $env:AIRI_INPUT_SCREENING }),
+    [string]$InputScreeningPolicy = $env:AIRI_INPUT_SCREENING_POLICY,
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
@@ -59,6 +62,22 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+function Get-AiriHealthBoolean {
+    param([object]$Container, [string]$Name, [string]$Description)
+    $property = if ($null -ne $Container) { $Container.PSObject.Properties[$Name] } else { $null }
+    if ($null -eq $property -or $property.Value -isnot [bool]) {
+        throw "$Description must be a JSON Boolean."
+    }
+    return $property.Value
+}
+$OutputModeration = $OutputModeration.ToLowerInvariant()
+if ($OutputModeration -notin @('on', 'off')) {
+    throw 'OutputModeration must be on or off. Check the parameter or AIRI_OUTPUT_MODERATION.'
+}
+$InputScreening = $InputScreening.ToLowerInvariant()
+if ($InputScreening -notin @('on', 'off')) {
+    throw 'InputScreening must be on or off. Check the parameter or AIRI_INPUT_SCREENING.'
+}
 $parsedNumCtx = 0
 if (-not [int]::TryParse(
         [string]$NumCtx, [Globalization.NumberStyles]::Integer,
@@ -91,6 +110,27 @@ if (-not [string]::IsNullOrWhiteSpace($OutputModerationTerms)) {
     }
     $resolvedOutputModerationTerms = [IO.Path]::GetFullPath($termsItem.FullName)
 }
+$resolvedInputScreeningPolicy = ''
+if (-not [string]::IsNullOrWhiteSpace($InputScreeningPolicy)) {
+    $policyItem = Get-Item -LiteralPath $InputScreeningPolicy -ErrorAction Stop
+    if ($policyItem.PSIsContainer -or $policyItem -isnot [IO.FileInfo] -or
+            ($policyItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'InputScreeningPolicy must be a regular file.'
+    }
+    $resolvedInputScreeningPolicy = [IO.Path]::GetFullPath($policyItem.FullName)
+}
+$effectiveInputScreeningPolicy = if ($InputScreening -eq 'on') {
+    if ($resolvedInputScreeningPolicy) { $resolvedInputScreeningPolicy }
+    else { Join-Path $repo 'input_screening_policy_ko.json' }
+} else { '' }
+$expectedInputScreeningPolicySha256 = if ($effectiveInputScreeningPolicy) {
+    $policyDigestItem = Get-Item -LiteralPath $effectiveInputScreeningPolicy -ErrorAction Stop
+    if ($policyDigestItem.PSIsContainer -or $policyDigestItem -isnot [IO.FileInfo] -or
+            ($policyDigestItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'Effective input screening policy must be a regular file.'
+    }
+    (Get-FileHash -LiteralPath $policyDigestItem.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+} else { '' }
 
 $requiredLocalModels = @()
 if (-not $VerifyExtractionGateOnly) {
@@ -247,9 +287,23 @@ if ($listener) {
             throw 'Existing proxy health does not report output moderation state.'
         }
         $existingModerationEnabled = [bool]$existingHealth.output_moderation.enabled
+        if ($null -eq $existingHealth.input_screening) {
+            throw 'Existing proxy health does not report input screening state.'
+        }
+        $existingInputScreeningEnabled = Get-AiriHealthBoolean `
+            $existingHealth.input_screening 'enabled' 'Existing proxy input screening enabled'
+        $existingInputScreeningReady = Get-AiriHealthBoolean `
+            $existingHealth.input_screening 'ready' 'Existing proxy input screening ready'
+        $policyProperty = $existingHealth.input_screening.PSObject.Properties['policy_sha256']
+        if ($InputScreening -eq 'on' -and ($null -eq $policyProperty -or
+                $policyProperty.Value -isnot [string] -or
+                $policyProperty.Value -notmatch '^[0-9a-f]{64}$')) {
+            throw 'Existing proxy input screening policy digest is malformed.'
+        }
+        $existingInputScreeningPolicySha256 = if ($null -ne $policyProperty) { $policyProperty.Value } else { '' }
     }
     catch {
-        throw 'Existing proxy output moderation state could not be verified; stop it and restart.'
+        throw 'Existing proxy safety state could not be verified; stop it and restart.'
     }
     $existingNumCtx = 0
     $existingNumCtxText = [Convert]::ToString(
@@ -263,6 +317,16 @@ if ($listener) {
     $requestedModerationEnabled = $OutputModeration -eq 'on'
     if ($existingModerationEnabled -ne $requestedModerationEnabled) {
         throw 'Existing proxy output moderation state differs from the requested configuration; stop it and restart.'
+    }
+    if ($existingInputScreeningEnabled -ne ($InputScreening -eq 'on')) {
+        throw 'Existing proxy input screening state differs from the requested configuration; stop it and restart.'
+    }
+    if ($InputScreening -eq 'on' -and -not $existingInputScreeningReady) {
+        throw 'Existing proxy input screening is enabled but not ready; stop it and restart.'
+    }
+    if ($InputScreening -eq 'on' -and
+            $existingInputScreeningPolicySha256 -cne $expectedInputScreeningPolicySha256) {
+        throw 'Existing proxy input screening policy digest differs from the requested policy; stop it and restart.'
     }
     Write-Output 'A service is already listening on port 11435; it was not reconfigured.'
     return
@@ -305,6 +369,8 @@ $memoryEnvironment = @{
     AIRI_CHAT_MODEL_DIGEST = $ChatModelDigest
     AIRI_OUTPUT_MODERATION = $OutputModeration
     AIRI_OUTPUT_MODERATION_TERMS = $resolvedOutputModerationTerms
+    AIRI_INPUT_SCREENING = $InputScreening
+    AIRI_INPUT_SCREENING_POLICY = $resolvedInputScreeningPolicy
     AIRI_OLLAMA_KEEP_ALIVE = $OllamaKeepAlive
     AIRI_OLLAMA_TEMPERATURE = $OllamaTemperature.ToString([Globalization.CultureInfo]::InvariantCulture)
     AIRI_OLLAMA_TOP_P = $OllamaTopP.ToString([Globalization.CultureInfo]::InvariantCulture)

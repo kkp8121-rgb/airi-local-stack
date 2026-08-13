@@ -18,7 +18,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Sender contract tests failed.' }
 # `node --test` exits zero when its glob matches no file, so a green run alone
 # does not prove the suite ran. Read the reported pass count and hold it to a
 # floor; raise the floor whenever chat-ingress tests are added.
-$chatIngressMinimumTests = 37
+$chatIngressMinimumTests = 47
 $chatIngressOutput = @(& node --test (Join-Path $PSScriptRoot 'chat-ingress\test-*.mjs') 2>&1 | ForEach-Object { $_.ToString() })
 $chatIngressExit = $LASTEXITCODE
 $chatIngressOutput | Write-Output

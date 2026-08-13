@@ -12,6 +12,8 @@ import {
   isCorrelatedOutputEvent,
   resolveAssistantShape,
   resolveAssistantText,
+  sendAiriLocalEvent,
+  validateInputTextEvent,
   validateServerConfig,
 } from './send-airi-local-text.mjs'
 
@@ -442,4 +444,85 @@ test('accepts only the authenticated plaintext loopback channel', () => {
   assert.throws(() => validateServerConfig({ hostname: '0.0.0.0', authToken: 'x', tlsConfig: null }))
   assert.throws(() => validateServerConfig({ hostname: '127.0.0.1', authToken: '', tlsConfig: null }))
   assert.throws(() => validateServerConfig({ hostname: '127.0.0.1', authToken: 'x', tlsConfig: {} }))
+})
+
+test('validates and snapshots only the exact input event envelope', () => {
+  const original = buildInputTextEvent('[YouTube] viewer: hello', `yt:v1:${'a'.repeat(43)}`)
+  const snapshot = validateInputTextEvent(original)
+  original.data.text = 'mutated after validation'
+  assert.equal(snapshot.data.text, '[YouTube] viewer: hello')
+  assert.equal(Object.isFrozen(snapshot), true)
+  assert.throws(() => validateInputTextEvent({ ...snapshot, viewerKey: `viewer:v1:${'b'.repeat(43)}` }))
+  assert.throws(() => validateInputTextEvent({ ...snapshot, data: { text: 'hello', role: 'system' } }))
+  assert.throws(() => validateInputTextEvent({ ...snapshot, metadata: { event: { id: 'bad id' } } }))
+})
+
+test('reusable local sender preserves the admitted HMAC event and never emits viewer identity', async () => {
+  const instances = []
+  class FakeClient {
+    constructor(options) { this.options = options; this.sent = []; instances.push(this) }
+    async connect() {}
+    sendOrThrow(event) { this.sent.push(event) }
+    onEvent() { return () => {} }
+    close(code, reason) { this.closed = { code, reason } }
+  }
+  const event = buildInputTextEvent('[YouTube] viewer: allowed', `yt:v1:${'c'.repeat(43)}`)
+  const result = await sendAiriLocalEvent(event, {
+    serverConfig: { hostname: '127.0.0.1', authToken: 'local-token', tlsConfig: null },
+    ClientClass: FakeClient,
+    settleDelayMs: 0,
+  })
+  assert.deepEqual(instances[0].sent, [event])
+  assert.deepEqual(instances[0].closed, { code: 1000, reason: 'local input sent' })
+  assert.deepEqual(result, {
+    sent: true,
+    transport: 'loopback-server-channel',
+    chars: Array.from(event.data.text).length,
+  })
+  assert.equal(JSON.stringify(result).includes('viewer:v1:'), false)
+})
+
+test('reusable local sender closes after delivery failure and does not claim sent', async () => {
+  let instance
+  class FailingClient {
+    constructor() { instance = this }
+    async connect() {}
+    sendOrThrow() { throw new Error('delivery failed') }
+    onEvent() { return () => {} }
+    close() { this.closed = true }
+  }
+  await assert.rejects(() => sendAiriLocalEvent(
+    buildInputTextEvent('allowed', 'event-a'),
+    {
+      serverConfig: { hostname: '127.0.0.1', authToken: 'local-token', tlsConfig: null },
+      ClientClass: FailingClient,
+      settleDelayMs: 0,
+    },
+  ), /delivery failed/)
+  assert.equal(instance.closed, true)
+})
+
+test('reusable local sender bounds a hung connection and closes for retry', async () => {
+  let instance
+  class HungClient {
+    constructor() { instance = this }
+    async connect() { return new Promise(() => {}) }
+    onEvent() { return () => {} }
+    close() { this.closed = true }
+  }
+  await assert.rejects(() => sendAiriLocalEvent(
+    buildInputTextEvent('allowed', 'event-hung'),
+    {
+      serverConfig: { hostname: '127.0.0.1', authToken: 'local-token', tlsConfig: null },
+      ClientClass: HungClient,
+      timeoutMs: 10,
+    },
+  ), /Timed out connecting/)
+  assert.equal(instance.closed, true)
+})
+
+test('accepts the maximum B1 mapped envelope but rejects a larger event', () => {
+  const maximum = buildInputTextEvent(`[YouTube] ${'n'.repeat(80)}: ${'x'.repeat(1000)}`, 'event-max')
+  assert.equal(Array.from(validateInputTextEvent(maximum).data.text).length, 1092)
+  assert.throws(() => validateInputTextEvent(buildInputTextEvent('x'.repeat(1101), 'event-too-long')))
 })

@@ -9,7 +9,7 @@ export function toAiriEvent(ingress) {
   }
   return {
     type: 'input:text',
-    data: { text: `[YouTube] ${ingress.displayName}: ${ingress.text}` },
+    data: { text: `[YouTube] ${ingress.text}` },
     route: { delivery: { required: true } },
     metadata: { event: { id: ingress.eventId } },
   }

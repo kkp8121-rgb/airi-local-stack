@@ -4,11 +4,19 @@ This is an offline, transport-neutral YouTube chat admission core. It is disable
 
 When enabled, supply an identity key of at least 32 bytes and a screening callback to `createChatIngress`. Its result is awaited and only a literal `true` allows delivery. Accepted text and display names are normalized and held only in the bounded in-memory queue, then delivered through a caller-provided function. They are personal data and, after delivery, may enter the existing local AIRI history. B1a creates no persistence of its own.
 
-`toAiriEvent(ingress)` builds the established fixed `input:text` envelope: `data.text`, `route.delivery.required: true`, and `metadata.event.id`. It emits no YouTube/viewer sidecar until that protocol is typed. Raw upstream identifiers are used transiently for HMAC pseudonyms and are neither retained nor emitted.
+`toAiriEvent(ingress)` builds the fixed `input:text` envelope: `data.text`, `route.delivery.required: true`, and `metadata.event.id`. Its model-facing text contains the normalized chat body but deliberately omits the public display name; that name stays on the separate viewer-observation boundary instead of becoming prompt material. It emits no YouTube/viewer sidecar. Raw upstream identifiers are used transiently for HMAC pseudonyms and are neither retained nor emitted.
 
 `toViewerObservation(ingress, { broadcastKey })` in `viewer-observation.mjs` is a separate, pure local-memory boundary for a screened ingress event. It accepts only the frozen ingress shape and a caller-supplied `broadcast:v1:` HMAC pseudonym, then returns a frozen observation containing only versioned HMAC event/viewer/broadcast keys, normalized display name, kind, and timestamp. It never includes chat text, raw YouTube IDs, or parsed `[YouTube]` envelope data. A future live adapter must derive the broadcast key with the same secret under a separate domain; it must never pass the provider's raw stream ID.
 
 Future B1b persistence must write this observation separately before the unchanged `toAiriEvent` delivery. Identity-key rotation deliberately resets viewer identity unless an explicit migration is designed and approved.
+
+## Local screened delivery spine
+
+`proxy-screen.mjs` adapts the required screening callback to the exact loopback-only `/v1/airi/input-screen` contract. It screens the exact model-facing `[YouTube]` chat envelope, which contains no display name, accepts an exact content-free decision, and fails closed on timeout, transport failure, malformed data, or any non-loopback URL. A blocked public chat is consumed without AIRI delivery; direct local-user input is independently screened by the proxy, which can return the fixed AIRI fallback through the normal speech path.
+
+`runtime.mjs` composes `createChatIngress → toAiriEvent → sendAiriLocalEvent`. It is still default-off and contains no YouTube transport, OAuth, polling, or persistence. Accepted events preserve the HMAC event ID through the authenticated loopback server channel; viewer keys and raw provider IDs never enter the AIRI envelope. Delivery failure remains retryable in the bounded ingress queue.
+
+This closes only the local downstream seam. A real provider adapter, quota approval, operational enablement, and an installed-runtime behavioral rehearsal remain separate gates.
 
 ## Offline streamList quota measurement (B0-1)
 

@@ -77,9 +77,45 @@ B1/B4는 default OFF이며 live adapter가 없다. malicious metadata·BIDI·잘
 
 ## 검증 및 CI 상태
 
+## B3-c/B3-d current handoff (2026-08-13)
+
+B3-c is a default-OFF deterministic local input prefilter plus local B1
+downstream spine, independently reviewed PASS. It blocks
+`persona_takeover`/`profanity`/`sexual_explicit`/`targeted_harassment`/`privacy`
+before upstream, including historical unsafe user entries; has bounded
+normalization/obfuscation and PII patterns, protocol variants, proactive
+exemption, exact loopback, and fail-closed launch health/policy digest. The
+model sees `[YouTube] ${text}` only; public `displayName` is separate viewer
+observation. No YouTube/OAuth/provider adapter is implemented. It is not
+multilingual semantic screening: ja/zh and unvalidated Latin fail closed as
+`unsupported_language`, Korean permits only 14 exact benign product/acronym
+tokens, and novel euphemisms/other languages remain human/model-gate work.
+Output moderation remains OFF.
+
+Focused B3-c evidence: Python input+launcher+eval 43 passed (later input-only
+19), chat-ingress 47, sender 32, combined Node latest 79. The final local
+Actions substitute is Python 3.12 full suite 911 passed/1 skipped/863 subtests/
+7 warnings in 53.13 s plus checkpoint/manifest/source-ASAR contracts PASS;
+launcher parsers and diff checks PASS. The fresh loopback probe
+`airi_docs/evidence/AIRI-B3C-INPUT-SCREENING-LIVE-PROBE-2026-08-13.json` records
+unchanged installed ASAR 1,356,257,019 B SHA `1b68ae...b88b0`, seven AIRI
+processes, source screening ON/ready policy SHA `67739c...b9d7a`, five category
+blocks and benign Korean allow repeated twice (12/2/10), with output moderation
+OFF, extraction OFF, and STT listener absent. It proves loopback policy only.
+The fresh installed UI/TTS recheck did not reach model/TTS after cleanup removed
+sender SDK `@moeru/std`; ASAR was untouched. Do not treat earlier TTS evidence
+as current-policy proof; B3-e is pending installed badge + TTS rehearsal.
+
+B3-d's content-free direct local Ollama 20-case exact ko/en/ja/zh marker corpus
+is recorded in `ollama-proxy/eval/results/airi-persona-jailbreak-marker-midm-2026-08-13.json`
+(14,395 B; SHA-256 `9308b0c1527eaf42b58496bd3c36520feabeaa38c70623139981357cb65509c8`;
+Mi:dm `92a9...485f`). Structural 20/20 PASS, standalone marker 5/20 PASS, so
+overall FAIL; P50/P95/max 211.371/809.552/928.064 ms. It makes no semantic
+safety, proxy, Electron, UI, or TTS claim. Installed red-team remains pending.
+
 - 로컬 `test-current-checkpoint.ps1`: PASS
-- streamList focused: 15/15 PASS
-- all chat-ingress: 32/32 PASS
+- streamList focused: 20/20 PASS
+- all chat-ingress: 47/47 PASS
 - push Actions run `31683115216`: 13 jobs 모두 failure지만 `runner_id=0`,
   steps 0, 로그 없음. 코드 실행 전 runner 할당 단계 실패이며 기존 계정
   payment/spending 제한과 같은 형태다. green으로 오인하지 말고, 코드 failure로도

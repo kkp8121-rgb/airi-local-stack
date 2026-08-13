@@ -47,6 +47,9 @@ param(
     # Optional custom policy dictionary. Resolve it before the proxy child
     # changes its working directory so relative paths cannot drift at launch.
     [string]$OutputModerationTerms = $env:AIRI_OUTPUT_MODERATION_TERMS,
+    [ValidateSet('on', 'off')]
+    [string]$InputScreening = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_INPUT_SCREENING)) { 'off' } else { $env:AIRI_INPUT_SCREENING }),
+    [string]$InputScreeningPolicy = $env:AIRI_INPUT_SCREENING_POLICY,
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
@@ -56,6 +59,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+function Get-AiriHealthBoolean {
+    param([object]$Container, [string]$Name, [string]$Description)
+    $property = if ($null -ne $Container) { $Container.PSObject.Properties[$Name] } else { $null }
+    if ($null -eq $property -or $property.Value -isnot [bool]) {
+        throw "$Description must be a JSON Boolean."
+    }
+    return $property.Value
+}
 function Resolve-AiriNumCtx {
     param([object]$Value)
     $parsed = 0
@@ -67,6 +78,14 @@ function Resolve-AiriNumCtx {
     return $parsed
 }
 $NumCtx = Resolve-AiriNumCtx $(if ($null -ne $NumCtx) { $NumCtx } elseif (-not [string]::IsNullOrWhiteSpace($env:AIRI_NUM_CTX)) { $env:AIRI_NUM_CTX } else { 2048 })
+$OutputModeration = $OutputModeration.ToLowerInvariant()
+if ($OutputModeration -notin @('on', 'off')) {
+    throw 'OutputModeration must be on or off. Check the parameter or AIRI_OUTPUT_MODERATION.'
+}
+$InputScreening = $InputScreening.ToLowerInvariant()
+if ($InputScreening -notin @('on', 'off')) {
+    throw 'InputScreening must be on or off. Check the parameter or AIRI_INPUT_SCREENING.'
+}
 if ($Stt -notin @('on', 'off')) {
     throw 'Stt must be on or off. Check the -Stt parameter or AIRI_STT environment variable.'
 }
@@ -80,6 +99,24 @@ if (-not [string]::IsNullOrWhiteSpace($OutputModerationTerms)) {
     }
     $resolvedOutputModerationTerms = [IO.Path]::GetFullPath($termsItem.FullName)
 }
+$resolvedInputScreeningPolicy = ''
+if (-not [string]::IsNullOrWhiteSpace($InputScreeningPolicy)) {
+    $policyItem = Get-Item -LiteralPath $InputScreeningPolicy -ErrorAction Stop
+    if ($policyItem.PSIsContainer -or $policyItem -isnot [IO.FileInfo] -or ($policyItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'InputScreeningPolicy must be a regular file.' }
+    $resolvedInputScreeningPolicy = [IO.Path]::GetFullPath($policyItem.FullName)
+}
+$effectiveInputScreeningPolicy = if ($InputScreening -eq 'on') {
+    if ($resolvedInputScreeningPolicy) { $resolvedInputScreeningPolicy }
+    else { Join-Path $PSScriptRoot 'ollama-proxy\input_screening_policy_ko.json' }
+} else { '' }
+$expectedInputScreeningPolicySha256 = if ($effectiveInputScreeningPolicy) {
+    $policyDigestItem = Get-Item -LiteralPath $effectiveInputScreeningPolicy -ErrorAction Stop
+    if ($policyDigestItem.PSIsContainer -or $policyDigestItem -isnot [IO.FileInfo] -or
+            ($policyDigestItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'Effective input screening policy must be a regular file.'
+    }
+    (Get-FileHash -LiteralPath $policyDigestItem.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+} else { '' }
 $effectiveChatModel = if ($ChatProvider -eq 'local' -and [string]::IsNullOrWhiteSpace($ChatModel)) {
     'midm-airi:2.0-mini'
 } else {
@@ -274,6 +311,8 @@ if ([string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
         -ChatModelDigest $ChatModelDigest `
         -OutputModeration $OutputModeration `
         -OutputModerationTerms $resolvedOutputModerationTerms `
+        -InputScreening $InputScreening `
+        -InputScreeningPolicy $resolvedInputScreeningPolicy `
         -ChatModelPreflighted `
         -AllowExternalSearch $AllowExternalSearch `
         -TopicBoardPath $TopicBoardPath `
@@ -294,6 +333,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
         -MemoryExtractionGateProfile $MemoryExtractionGateProfile `
         -ChatProvider $ChatProvider -AllowExternalChat $AllowExternalChat -ChatModel $effectiveChatModel -ChatModelPreflighted `
         -OutputModeration $OutputModeration -OutputModerationTerms $resolvedOutputModerationTerms `
+        -InputScreening $InputScreening -InputScreeningPolicy $resolvedInputScreeningPolicy `
         -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `
         -EnableCharacterEvaluator $EnableCharacterEvaluator -EvaluationMaxRecords $EvaluationMaxRecords `
         -VerifyExtractionGateOnly
@@ -329,6 +369,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
             -ChatProvider $ChatProvider -AllowExternalChat $AllowExternalChat -ChatModel $effectiveChatModel -ChatModelPreflighted `
             -ChatModelDigest $ChatModelDigest `
             -OutputModeration $OutputModeration -OutputModerationTerms $resolvedOutputModerationTerms `
+            -InputScreening $InputScreening -InputScreeningPolicy $resolvedInputScreeningPolicy `
             -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `
             -EnableCharacterEvaluator $EnableCharacterEvaluator -EvaluationMaxRecords $EvaluationMaxRecords
         $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
@@ -354,6 +395,25 @@ else {
     throw 'Memory extraction gate requires the local ollama provider.'
 }
 $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
+$requestedInputScreening = $InputScreening -eq 'on'
+if ($null -eq $proxy.input_screening) {
+    throw 'Live proxy input screening state is missing, unready, or differs from the requested configuration.'
+}
+$liveInputScreeningEnabled = Get-AiriHealthBoolean `
+    $proxy.input_screening 'enabled' 'Live proxy input screening enabled'
+$liveInputScreeningReady = Get-AiriHealthBoolean `
+    $proxy.input_screening 'ready' 'Live proxy input screening ready'
+if ($liveInputScreeningEnabled -ne $requestedInputScreening -or
+        ($requestedInputScreening -and -not $liveInputScreeningReady)) {
+    throw 'Live proxy input screening state is missing, unready, or differs from the requested configuration.'
+}
+$livePolicyProperty = $proxy.input_screening.PSObject.Properties['policy_sha256']
+if ($requestedInputScreening -and ($null -eq $livePolicyProperty -or
+        $livePolicyProperty.Value -isnot [string] -or
+        $livePolicyProperty.Value -notmatch '^[0-9a-f]{64}$' -or
+        $livePolicyProperty.Value -cne $expectedInputScreeningPolicySha256)) {
+    throw 'Live proxy input screening policy digest differs from the requested policy.'
+}
 $liveNumCtx = 0
 $liveNumCtxText = [Convert]::ToString(
     $proxy.num_ctx, [Globalization.CultureInfo]::InvariantCulture)
@@ -431,6 +491,8 @@ if ($ChatProvider -eq 'local') {
     CharacterEvaluatorReady = $proxy.character_state_evaluator.ready
     OutputModerationEnabled = $proxy.output_moderation.enabled
     OutputModerationReady = $proxy.output_moderation.ready
+    InputScreeningEnabled = $proxy.input_screening.enabled
+    InputScreeningReady = $proxy.input_screening.ready
     LLMWarmup = if ($warmup) { $warmup.StatusCode } else { $null }
     ChatProvider = $ChatProvider
     ChatModel = $effectiveChatModel

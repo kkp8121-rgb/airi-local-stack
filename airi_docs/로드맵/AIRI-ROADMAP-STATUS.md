@@ -15,6 +15,49 @@
 
 최종 갱신: 2026-08-13
 
+- **2026-08-13 (B3-c/B3-d evidence completion):** B3-c's local deterministic
+  input prefilter and local B1 downstream spine are implemented, default OFF,
+  and independently reviewed PASS. It blocks the categories
+  `persona_takeover`, `profanity`, `sexual_explicit`, `targeted_harassment`, and
+  `privacy` before upstream; it has bounded normalization/obfuscation and PII
+  patterns, protocol variants, proactive exemption, exact loopback endpoint,
+  and fail-closed launch health/policy-digest checks. Model-facing Node text is
+  deliberately `[YouTube] ${text}`: public `displayName` stays only in the
+  separate viewer observation. This is not a live YouTube/OAuth/provider
+  adapter, nor a multilingual semantic classifier. Japanese/Chinese and
+  unvalidated Latin spans fail closed as `unsupported_language`; only 14 exact
+  benign product/acronym tokens are accepted inside Korean. Novel euphemisms
+  and other languages remain rehearsal/human/model-gate work. Output moderation
+  remains default OFF. Focused evidence: Python input+launcher+eval 43 passed
+  (later input-only 19), chat-ingress 47, sender 32; latest combined Node 79.
+  Final local substitute for billing-blocked Actions: Python 3.12 full suite
+  911 passed/1 skipped/863 subtests/7 warnings in 53.13 s; checkpoint (including
+  manifest and source-ASAR deployment/preflight contracts) PASS; both launcher
+  parsers and diff checks PASS.
+- **2026-08-13 (B3-c loopback probe):**
+  `evidence/AIRI-B3C-INPUT-SCREENING-LIVE-PROBE-2026-08-13.json` records an
+  unchanged installed ASAR (1,356,257,019 B, `1b68ae...b88b0`) and seven AIRI
+  processes. The current proxy source was ON and ready with policy SHA
+  `67739c...b9d7a`; all five categories blocked and a benign Korean YouTube
+  message was allowed twice, with counters inspected=12/allowed=2/blocked=10.
+  Output moderation and extraction were OFF and the STT listener was absent.
+  This proves loopback policy only. A fresh installed UI/TTS recheck stopped
+  before model/TTS because cleanup had removed sender SDK `@moeru/std`; the
+  installed ASAR remained untouched. Earlier five-category TTS proof is
+  historical, not current-policy proof; B3-e remains pending installed UI badge
+  + TTS/current-policy rehearsal.
+- **2026-08-13 (B3-d corpus/direct prefilter):** the content-free direct local
+  Ollama 20-case exact ko/en/ja/zh corpus covers benign, direct jailbreak,
+  indirect injection, profanity-harassment, and sexual explicit cases. Report
+  `ollama-proxy/eval/results/airi-persona-jailbreak-marker-midm-2026-08-13.json`
+  is 14,395 B SHA-256
+  `9308b0c1527eaf42b58496bd3c36520feabeaa38c70623139981357cb65509c8`, with
+  Mi:dm digest `92a9...485f`: structural 20/20 PASS, exact standalone marker
+  contract 5/20 PASS -> overall FAIL. P50/P95/max 211.371/809.552/928.064 ms.
+  It makes no semantic safety, proxy, Electron, UI, or TTS claim. B3-d
+  corpus/direct-prefilter evidence is complete, but installed red-team execution
+  remains pending, so the broadcast safety gate is not complete.
+
 - **2026-08-13** (검토 PC): dev PC 브랜치 독립 검토 — 코드·증거 차단 사유
   없음(승격 오인·실기/합성 혼동·개인정보 전건 반증 실패). blocker 보완 3건:
   streamlist-quota의 ① provider발 에러 sanitize 우회 차단(module-private
@@ -176,8 +219,8 @@
 - [~] **M1** (B0 실측 ∥ I1 추출 ∥ C1 헌법)
   - [~] B0-1 `liveChatMessages.streamList` offline quota measurement core — injected
     transport-only, content-free, bounded duration/messages/responses/connections,
-    monotonic timings, transient resume token, abort/cleanup; focused 15 PASS, all
-    chat-ingress 32 PASS, checkpoint/review PASS. **Live is NOT COMPLETE** pending
+    monotonic timings, transient resume token, abort/cleanup; focused 20 PASS, all
+    chat-ingress 47 PASS, checkpoint/review PASS. **Live is NOT COMPLETE** pending
     explicit API key/OAuth/quota/project/test-broadcast approval and isolated manual
     Cloud Console before/after snapshots for idle/message/reconnect. Official quota docs
     do not state exact streamList charging; no cost inference (`완료/AIRI-B0-1-STREAMLIST-QUOTA-MEASUREMENT-CORE-2026-08-13.md`)
@@ -194,11 +237,17 @@
   - [x] B3 모더레이션 게이트 코드 (사전 113항목+패턴 7, 기본 off) — 2026-08-12 (`932eae6`)
   - [x] B3 배선 3종 — TTS 폴백 7/7·런처 env·Electron "필터당함" 배지,
     신규 3층 source test/typecheck/build 및 설치본 실제 차단 턴 확인 — 2026-08-12 (`완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`)
-  - [ ] B3-c 자연어 입력 semantic screener (prompt injection·욕설·성적 발언·
-    괴롭힘 판별) — 미착수. 현재 입력 방어는 형식 검증(shape/ID/Unicode/
-    timestamp)뿐
-  - [ ] B3-d 설치 Electron 대상 persona-jailbreak corpus·red-team — 현재는
-    direct-model 한정 hostile-card fixture만 존재
+  - [x] B3-c deterministic local input prefilter + local B1 downstream spine —
+    default OFF; five fixed categories, bounded normalization/obfuscation·PII,
+    loopback/protocol variants/proactive exemption, pre-upstream historical-entry
+    block, fail-closed health/policy digest; independent review PASS. This is not
+    multilingual semantic classification: ja/zh and unvalidated Latin fail closed
+    as `unsupported_language`, and only 14 exact benign Korean-embedded tokens
+    are permitted. No live YouTube/OAuth/provider adapter; output moderation OFF.
+  - [~] B3-d exact marker corpus + direct local prefilter evidence — 20-case
+    ko/en/ja/zh content-free report structural 20/20 PASS, standalone marker 5/20
+    PASS -> overall FAIL; installed Electron red-team remains pending and this is
+    not semantic-safety/proxy/UI/TTS proof
   - [ ] B3-e category별(욕설·음란성 등) 설치 UI/TTS 차단 반응 실기 — 현재는
     dictionary/unit + generic match-all 배선 확인만. output moderation 기본 OFF
   - [ ] B2 송출 (OBS Browser Source + App Audio Capture — 결정 2 이후)
@@ -230,8 +279,8 @@
 - **2026-08-13** (B0-1 streamList): offline injected-transport measurement core를
   완료했다. 실제 내용·provider ID·AIRI 주입 없이 bounded duration/messages/responses/
   connections, actual overshoot count, monotonic timings, transient resume token,
-  deadline/caller abort 및 best-effort cleanup을 검증했다 (focused 15, all chat-ingress
-  32, checkpoint, independent review PASS). 기존 checkpoint glob이 시험을 이미
+  deadline/caller abort 및 best-effort cleanup을 검증했다 (현재 focused 20, all chat-ingress
+  47, checkpoint, independent review PASS). 기존 checkpoint glob이 시험을 이미
   등록하므로 workflow 변경은 없다. 공식 quota 문서는 streamList의 정확한 연결/응답/시간
   과금을 공개하지 않으므로 추론하지 않는다. API key/OAuth/quota/project/test-broadcast
   명시 승인 및 idle/message/reconnect Cloud Console 수동 before/after 실측 전 B0-1

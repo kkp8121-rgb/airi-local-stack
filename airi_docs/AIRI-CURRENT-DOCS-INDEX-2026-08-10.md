@@ -90,8 +90,8 @@
   active Stage-B contention test 없음, production 11434/11435 불변이다.
 
 - `AIRI-B0-1-STREAMLIST-QUOTA-MEASUREMENT-CORE-2026-08-13.md` — streamList의
-  injected-transport-only·content-free 오프라인 quota measurement core. focused 15,
-  all chat-ingress 32, checkpoint, independent review PASS; B1b/AIRI 주입/영속성은
+  injected-transport-only·content-free 오프라인 quota measurement core. focused 20,
+  all chat-ingress 47, checkpoint, independent review PASS; provider B1b/OAuth/live polling은
   범위 밖이다. 공식 quota 문서는 exact streamList charging을 명시하지 않으므로 live
   B0-1은 승인된 API/OAuth/project/test broadcast와 idle/message/reconnect 수동
   before/after Cloud Console 실측 전 NOT COMPLETE다.
@@ -263,11 +263,35 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 
 ## 최신 검증 증거 (2026-08-13)
 
-- **명시적 미완료 안전 게이트 3종** (검토 PC 감사 반영, 로드맵 M3
-  B3-c/d/e로 등록): 자연어 입력 semantic screener 미착수(현재 형식 검증만) /
-  설치 Electron 대상 persona-jailbreak red-team 부재(direct-model fixture만) /
-  category별 설치 UI·TTS 차단 반응 실기 부재(generic match-all 확인만,
-  output moderation 기본 OFF). 이 3종 전 방송 안전 완료 선언 금지.
+- `완료/AIRI-B3C-INPUT-SCREENING-AND-LOCAL-CHAT-SPINE-2026-08-13.md` —
+  default-OFF deterministic prefilter와 local screened delivery spine의 구현,
+  loopback proof, 언어·UI/TTS·provider 비주장 경계.
+- `완료/AIRI-B3D-PERSONA-JAILBREAK-MARKER-CORPUS-2026-08-13.md` —
+  exact 4×5 multilingual corpus와 direct Mi:dm marker-contract FAIL 증거.
+- `evidence/AIRI-B3C-INPUT-SCREENING-LIVE-PROBE-2026-08-13.json` — fresh
+  loopback-only B3-c policy probe: unchanged installed ASAR and seven AIRI
+  processes; source screening ON/ready; five category blocks, benign Korean
+  allow twice (12 inspected/2 allowed/10 blocked); output moderation/extraction
+  OFF and STT listener absent. It is not installed UI/TTS proof.
+- `ollama-proxy/eval/results/airi-persona-jailbreak-marker-midm-2026-08-13.json`
+  — B3-d exact 20-case ko/en/ja/zh content-free direct local Ollama corpus,
+  fixed provenance and latency. Structural 20/20 PASS but standalone marker
+  contract 5/20 PASS, so overall FAIL; it makes no semantic-safety, proxy,
+  Electron, UI, or TTS claim and installed red-team remains pending.
+- Current B3 scope: B3-c deterministic local prefilter + local B1 downstream
+  spine is default OFF and independently reviewed PASS; B3-d corpus/direct
+  prefilter evidence is complete but its marker contract is FAIL; B3-e installed
+  UI badge + TTS/current-policy rehearsal remains pending. The latter recheck
+  stopped before model/TTS because cleanup removed `@moeru/std`; installed ASAR
+  was untouched. Provider streamList/OAuth/quota/live AIRI integration also
+  remains unimplemented, and actions billing is blocked.
+
+- **현재 안전 게이트 상태** (로드맵 M3 B3-c/d/e): B3-c의 default-OFF
+  결정론적 로컬 prefilter와 screened downstream spine은 구현·독립 검토 PASS지만
+  다국어 semantic classifier는 아니며 미검증 언어는 hold한다. B3-d의 20-case
+  direct marker corpus는 실행됐으나 5/20로 FAIL이고 설치 Electron red-team은
+  미완료다. B3-e category별 설치 UI·TTS 차단 반응 실기는 여전히 미완료이며
+  output moderation 기본값도 OFF다. 따라서 방송 안전 완료 선언은 금지한다.
 - **현재 결정/후속 읽기 전용 점검** — §2 로컬 실기 배치는 완료이며 push/CI green은 더 이상
   완료 조건이 아니다. 저장소는 private 유지·public visibility 변경 없음이고, 사용자가 요청할
   때까지 push하지 않는다. historical Actions billing 실패(run `31673311636`,

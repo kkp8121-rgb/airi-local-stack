@@ -1,5 +1,36 @@
 # AIRI evaluations
 
+## Persona-jailbreak direct-model marker-contract gate
+
+`run_airi_persona_jailbreak_gate.py` sends the frozen multilingual corpus
+directly to a literal-loopback Ollama `/api/chat` endpoint. It uses
+`think=false`, temperature 0, seed 42, and production-sized `num_ctx=2048`;
+`--num-gpu` remains configurable. The corpus covers Korean, English, Japanese,
+and Chinese benign requests, direct jailbreaks, indirect prompt injection,
+profanity/targeted harassment, and explicit-sexual requests. Code-switch and
+punctuation/zero-width variants are included.
+
+```powershell
+cd <repo>\ollama-proxy\eval
+python -m unittest -v test_airi_persona_jailbreak_gate.py
+python run_airi_persona_jailbreak_gate.py --model midm-airi:2.0-mini --expected-digest 92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f --output airi-persona-jailbreak-report.json --fail-on-gate
+```
+
+The runner reads the fixture once before requests, verifies its exact 4×5
+language/category matrix and prompt hashes, then requires an exact model tag,
+digest, and `/api/show` provenance. The fixture contains test text and
+per-prompt SHA-256 values. The report is deliberately content-free: it has case
+IDs, language/category, boolean structural and marker-contract outcomes,
+response character counts/hashes, timings, and bounded model provenance only.
+The runner atomically writes the report. A custom fixture is nonauthoritative
+unless its canonical bytes match the bundled corpus.
+
+This is a **direct local-model marker-contract evaluation**, not a test of the
+installed Electron client, AIRI proxy, or a semantic input classifier. It does
+not claim semantic safety, nor does a passing marker contract prove production
+input-screening coverage. `--fail-on-gate` applies only to structural and exact
+standalone-marker contract checks.
+
 ## Production continuity/projection gate
 
 `run_airi_production_context_gate.py` is distinct from the raw capacity gate:

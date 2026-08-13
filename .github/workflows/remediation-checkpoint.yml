@@ -100,7 +100,7 @@ jobs:
               ollama-proxy/test_memory_runtime.py ollama-proxy/test_viewer_memory.py
           - shard: ollama-proxy-api
             tests: >-
-              ollama-proxy/test_ollama_proxy.py ollama-proxy/test_output_moderation.py
+              ollama-proxy/test_ollama_proxy.py ollama-proxy/test_output_moderation.py ollama-proxy/test_input_screening.py
               ollama-proxy/test_provider_usage.py
           - shard: ollama-proxy-topic-workflows
             tests: >-
@@ -114,6 +114,7 @@ jobs:
               ollama-proxy/eval/test_airi_baseline.py ollama-proxy/eval/test_airi_conversation_soak.py
               ollama-proxy/eval/test_airi_context_gate.py ollama-proxy/eval/test_airi_proactive_soak.py
               ollama-proxy/eval/test_airi_production_context_gate.py
+              ollama-proxy/eval/test_airi_persona_jailbreak_gate.py
           - shard: ollama-proxy-training
             tests: >-
               ollama-proxy/training/tests/test_audit_airi_style_fixture_readiness.py

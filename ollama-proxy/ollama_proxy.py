@@ -56,6 +56,14 @@ from evaluation_store import (
 )
 from topic_board import load_approved_topics, render_topic_context
 from knowledge_store import KnowledgeStore
+from input_screening import (
+    MAX_ADMISSION_CODEPOINTS,
+    MAX_SCREEN_TEXT_CODEPOINTS,
+    InputScreenVerdict,
+    build_input_screening_runtime,
+    screen_chat_payload,
+    validate_input_text,
+)
 from output_moderation import OutputModerationRuntime, load_moderation_policy
 
 
@@ -308,6 +316,7 @@ knowledge_runtime = None
 character_state_runtime = CharacterStateRuntime()
 character_state_evaluator = CharacterStateEvaluator(character_state_runtime)
 evaluation_runtime: EvaluationStore | NullEvaluationStore = NullEvaluationStore()
+input_screening_runtime = build_input_screening_runtime()
 memory_journal_tasks: set[asyncio.Task[None]] = set()
 EVALUATION_REQUEST_MAX_BYTES = 128_000
 TOPIC_BOARD_PATH = os.environ.get("AIRI_TOPIC_BOARD_PATH", "").strip()
@@ -5741,6 +5750,7 @@ async def health() -> dict[str, object]:
             "accepted_chunks": 0, "errors": 0,
         },
         "evaluation": evaluation_health,
+        "input_screening": input_screening_runtime.health(),
     }
 
 
@@ -7066,13 +7076,131 @@ async def stream_local_with_ack(
         if upstream_response is not None:
             await upstream_response.aclose()
 
+def _input_screening_response(
+    path: str, body: bytes, requested_stream: bool,
+    verdict: InputScreenVerdict, trace_id: str, request_started: float,
+) -> Response:
+    """Return a complete local protocol response without recording its content."""
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        payload = {}
+    model = resolve_chat_model()
+    dialogue = input_screening_runtime.next_blocked_dialogue(verdict.category)
+    if not dialogue:
+        raise RuntimeError("input screening category has no fallback dialogue")
+    headers = {
+        "X-AIRI-Input-Screened": "blocked",
+        "X-AIRI-Input-Screen-Category": verdict.category,
+        "Cache-Control": "no-cache",
+    }
+    emit_latency_event(
+        "llm", "first", trace_id, duration_ms=elapsed_ms(request_started),
+        meta={"input_screened": 1},
+    )
+    emit_substantive_content(trace_id, request_started)
+    emit_latency_event(
+        "llm", "end", trace_id, duration_ms=elapsed_ms(request_started),
+        meta={"input_screened": 1},
+    )
+    if path.endswith("chat/completions"):
+        completion_id = f"chatcmpl-airi-{uuid4().hex}"
+        if requested_stream:
+            async def blocked_sse() -> AsyncIterator[bytes]:
+                yield openai_sse_delta(completion_id, model, "", include_role=True)
+                yield openai_sse_delta(completion_id, model, dialogue)
+                yield openai_sse_finish(completion_id, model)
+            return StreamingResponse(blocked_sse(), media_type="text/event-stream", headers=headers)
+        return JSONResponse({
+            "id": completion_id, "object": "chat.completion", "created": int(time.time()),
+            "model": model,
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": dialogue}, "finish_reason": "stop"}],
+        }, headers=headers)
+    if path.endswith("v1/completions"):
+        completion_id = f"cmpl-airi-{uuid4().hex}"
+        if requested_stream:
+            async def blocked_completion() -> AsyncIterator[bytes]:
+                first = {
+                    "id": completion_id, "object": "text_completion", "created": int(time.time()),
+                    "model": model,
+                    "choices": [{"text": dialogue, "index": 0, "logprobs": None, "finish_reason": None}],
+                }
+                finish = {
+                    "id": completion_id, "object": "text_completion", "created": int(time.time()),
+                    "model": model,
+                    "choices": [{"text": "", "index": 0, "logprobs": None, "finish_reason": "stop"}],
+                }
+                yield f"data: {json.dumps(first, ensure_ascii=False)}\n\n".encode("utf-8")
+                yield f"data: {json.dumps(finish, ensure_ascii=False)}\n\n".encode("utf-8")
+                yield b"data: [DONE]\n\n"
+            return StreamingResponse(blocked_completion(), media_type="text/event-stream", headers=headers)
+        return JSONResponse({
+            "id": completion_id, "object": "text_completion", "created": int(time.time()),
+            "model": model,
+            "choices": [{"text": dialogue, "index": 0, "logprobs": None, "finish_reason": "stop"}],
+        }, headers=headers)
+    if path.endswith("api/generate"):
+        native_generate = {
+            "model": model, "response": dialogue, "done": True, "done_reason": "stop",
+        }
+        if requested_stream:
+            async def blocked_generate() -> AsyncIterator[bytes]:
+                yield (json.dumps(native_generate, ensure_ascii=False) + "\n").encode("utf-8")
+            return StreamingResponse(
+                blocked_generate(), media_type="application/x-ndjson", headers=headers,
+            )
+        return JSONResponse(native_generate, headers=headers)
+    native = {"model": model, "message": {"role": "assistant", "content": dialogue}, "done": True, "done_reason": "stop"}
+    if requested_stream:
+        async def blocked_native() -> AsyncIterator[bytes]:
+            yield (json.dumps(native, ensure_ascii=False) + "\n").encode("utf-8")
+        return StreamingResponse(blocked_native(), media_type="application/x-ndjson", headers=headers)
+    return JSONResponse(native, headers=headers)
+
+
+@app.post("/v1/airi/input-screen")
+async def input_screen_endpoint(request: Request):
+    if request.client is None or request.client.host not in {"127.0.0.1", "::1"}:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    if not input_screening_runtime.enabled:
+        return JSONResponse({"error": "input screening unavailable"}, status_code=503)
+    try:
+        body = await request.body()
+        if len(body) > 8_192:
+            raise ValueError("oversized")
+        payload = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
+        return JSONResponse({"error": "invalid input screen request"}, status_code=400)
+    if (not isinstance(payload, dict) or set(payload) != {"version", "source", "text"}
+            or type(payload.get("version")) is not int or payload.get("version") != 1
+            or payload.get("source") not in {"local_user", "youtube_chat"}
+            or not isinstance(payload.get("text"), str)):
+        return JSONResponse({"error": "invalid input screen request"}, status_code=400)
+    try:
+        text = validate_input_text(payload["text"])
+    except ValueError:
+        return JSONResponse({"error": "invalid input screen request"}, status_code=400)
+    maximum = MAX_SCREEN_TEXT_CODEPOINTS if payload["source"] == "youtube_chat" else MAX_ADMISSION_CODEPOINTS
+    if len(text) > maximum:
+        return JSONResponse({"error": "invalid input screen request"}, status_code=400)
+    verdict = input_screening_runtime.inspect(text)
+    return {
+        "version": 1,
+        "allowed": verdict.allowed,
+        "category": verdict.category,
+        "rule": verdict.rule,
+    }
+
+
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 async def proxy(path: str, request: Request):
-    if client is None:
-        return JSONResponse({"error": "proxy client is not ready"}, status_code=503)
-
     is_chat_request = request.method == "POST" and (
         path.endswith("chat/completions") or path.endswith("api/chat")
+    )
+    is_screenable_request = is_chat_request or (
+        request.method == "POST" and (
+            path.endswith("api/generate") or path.endswith("v1/completions")
+        )
     )
     synthetic_evaluation_turn = is_local_synthetic_evaluation_turn(request)
     quality_probe_turn = is_local_quality_probe_turn(request)
@@ -7085,7 +7213,7 @@ async def proxy(path: str, request: Request):
         else request_id(request.headers, uuid4().hex)
     )
     request_started = time.perf_counter()
-    if is_chat_request:
+    if is_screenable_request:
         emit_latency_event(
             "llm",
             "start",
@@ -7094,9 +7222,32 @@ async def proxy(path: str, request: Request):
         )
 
     original_body = await request.body()
+    proactive_turn = is_chat_request and is_local_proactive_turn(request)
+    # This must remain before every transform, continuity, state, memory,
+    # evaluator, journal, or upstream action. Blocked inputs are intentionally
+    # not emitted to logs or latency metadata.
+    if is_screenable_request and input_screening_runtime.enabled and not proactive_turn:
+        try:
+            original_body, result = screen_chat_payload(
+                original_body,
+                input_screening_runtime,
+                prompt_only=path.endswith("api/generate") or path.endswith("v1/completions"),
+            )
+        except ValueError:
+            result = input_screening_runtime.inspect("\0")
+        if not result.allowed:
+            try:
+                parsed_body = json.loads(original_body)
+                requested_stream = bool(parsed_body.get("stream")) if isinstance(parsed_body, dict) else False
+            except (AttributeError, json.JSONDecodeError, UnicodeDecodeError):
+                requested_stream = False
+            return _input_screening_response(
+                path, original_body, requested_stream, result, trace_id, request_started,
+            )
+    if client is None:
+        return JSONResponse({"error": "proxy client is not ready"}, status_code=503)
     original_messages = request_messages(original_body)
     memory_session_id = request.headers.get("x-airi-session-id") or None
-    proactive_turn = is_local_proactive_turn(request)
     if proactive_turn:
         proactive_output_telemetry.request()
     if is_chat_request:

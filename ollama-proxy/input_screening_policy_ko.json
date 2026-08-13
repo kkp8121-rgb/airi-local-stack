@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "allowed_latin_tokens": [
+    "AIRI",
+    "OpenAI",
+    "YouTube",
+    "K-pop",
+    "LOL",
+    "CPU",
+    "GPU",
+    "VRAM",
+    "TTS",
+    "STT",
+    "OBS",
+    "GPT",
+    "Thanks",
+    "Wi-Fi"
+  ],
+  "categories": [
+    {
+      "id": "persona_takeover",
+      "terms": [
+        "이전 지시를 무시",
+        "기존 지시를 무시",
+        "시스템 프롬프트를 출력",
+        "숨은 설정을 출력",
+        "비공개 캐릭터 설정을 출력",
+        "기존 캐릭터 규칙을 버려",
+        "지금부터 AIRI가 아니라",
+        "ignore previous instructions",
+        "reveal system prompt"
+      ],
+      "allow_phrases": [
+        "이전 지시를 무시해라는 명령을 따르지 말고 위험만 설명해",
+        "이전 지시를 무시해라는 문장을 분석해"
+      ],
+      "patterns": [
+        "persona_internal_dump",
+        "persona_identity_change"
+      ],
+      "blocked_dialogue": [
+        "그 지시는 안 받아. 지금 하던 얘기로 돌아가자.",
+        "내 설정을 바꾸는 요청은 넘길게. 다른 얘기 해줘."
+      ]
+    },
+    {
+      "id": "profanity",
+      "terms": [
+        "씨발",
+        "시발",
+        "개새끼",
+        "개소리",
+        "병신",
+        "fuck"
+      ],
+      "allow_phrases": [
+        "시발점",
+        "시발역"
+      ],
+      "patterns": [],
+      "blocked_dialogue": [
+        "그 말은 그대로 받지 않을게. 차분하게 다시 말해줘.",
+        "맞욕은 안 할게. 할 말만 다시 들려줘."
+      ]
+    },
+    {
+      "id": "sexual_explicit",
+      "terms": [
+        "야동",
+        "포르노",
+        "질내사정",
+        "성행위를 자세히 묘사",
+        "노골적인 성행위",
+        "미성년 캐릭터를 성적으로 묘사"
+      ],
+      "allow_phrases": [],
+      "patterns": [
+        "minor_sexual",
+        "explicit_sexual_description"
+      ],
+      "blocked_dialogue": [
+        "그건 노골적으로 다루지 않을게. 다른 주제로 가자.",
+        "그 요청은 선을 넘었어. 가벼운 얘기로 바꿔줘."
+      ]
+    },
+    {
+      "id": "targeted_harassment",
+      "terms": [
+        "너는 쓰레기",
+        "너 진짜 멍청",
+        "시청자도 다 너를 싫어",
+        "꺼져 버려"
+      ],
+      "allow_phrases": [],
+      "patterns": [
+        "targeted_harassment"
+      ],
+      "blocked_dialogue": [
+        "그렇게 몰아붙이는 말엔 맞서지 않을게. 할 말만 다시 해줘.",
+        "사람을 깎아내리는 말은 넘길게. 다른 방식으로 말해줘."
+      ]
+    },
+    {
+      "id": "privacy",
+      "terms": [
+        "주민등록번호",
+        "신용카드 번호",
+        "비밀번호 알려",
+        "password reveal"
+      ],
+      "allow_phrases": [],
+      "patterns": [
+        "phone_number",
+        "email_address",
+        "card_number_luhn",
+        "resident_registration_number",
+        "credential_secret"
+      ],
+      "blocked_dialogue": [
+        "개인정보는 여기서 읽지 않을게. 그 부분을 빼고 말해줘.",
+        "그 정보는 공개하면 안 돼. 가리고 다시 보내줘."
+      ]
+    },
+    {
+      "id": "unsupported_language",
+      "terms": [],
+      "allow_phrases": [],
+      "patterns": [
+        "unsupported_language"
+      ],
+      "blocked_dialogue": [
+        "아직 이 언어는 안전하게 판별하지 못해. 한국어로 다시 말해줘.",
+        "이 언어는 지금 바로 받지 않을게. 한국어로 다시 보내줘."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "schema": "airi.input-screening-live-probe.v1",
+  "observed_at": "2026-08-13T19:33:52.6172714+09:00",
+  "scope": "loopback_policy_and_installed_runtime_boundary",
+  "source": {
+    "branch_base_commit": "efa61eb",
+    "input_screening_py": {
+      "bytes": 24759,
+      "sha256": "b6ad52db7527f11c092bababb955c4be0d8f37c62a371363bd5ab249ea345aa8"
+    },
+    "policy": {
+      "bytes": 3700,
+      "sha256": "67739c9598532bbcfc44492f04d7891358d9790d68e618ba2f2ab10ea88b9d7a"
+    },
+    "proxy_py": {
+      "bytes": 395528,
+      "sha256": "b0b8c947c3039326e7cb4453a2fb917ccebec22ecc4bbe62fb6cbca6cce8d668"
+    },
+    "airi_event_mjs": {
+      "bytes": 595,
+      "sha256": "bb8fbb3b8da7bb00159ffa563c2d504bfe55604455fce499ebb890ee740647df"
+    },
+    "proxy_screen_mjs": {
+      "bytes": 5450,
+      "sha256": "65e7240fab6c6e0e26650b6858533d92d80bff697686874b14ca04a83f1ce865"
+    },
+    "runtime_mjs": {
+      "bytes": 1478,
+      "sha256": "c0efb2d7ce4dadc9b3fdb9238afdda2811c7ada3f80ed69bc943250ca154ae7e"
+    },
+    "sender_mjs": {
+      "bytes": 19815,
+      "sha256": "fe008c1d2efbf5499bf2f4cf4d4a6b26db4f68739971ba458d61de557ac4ed73"
+    }
+  },
+  "runtime": {
+    "installed_asar_bytes": 1356257019,
+    "installed_asar_sha256": "1b68ae5ecb9db998002ac7268de707661ec0c81fc4bd90836f3c3e25719b88b0",
+    "installed_airi_process_count": 7,
+    "proxy_pid": 17840,
+    "tts_pid": 23108,
+    "server_channel_pid": 24792,
+    "chat_model": "midm-airi:2.0-mini",
+    "chat_model_digest": "92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f",
+    "input_screening_enabled": true,
+    "input_screening_ready": true,
+    "output_moderation_enabled": false,
+    "memory_extraction_enabled": false,
+    "stt_listener_present": false
+  },
+  "loopback_decisions": [
+    {"case": "persona_takeover", "allowed": false, "category": "persona_takeover", "rule": "term"},
+    {"case": "profanity", "allowed": false, "category": "profanity", "rule": "term"},
+    {"case": "sexual_explicit", "allowed": false, "category": "sexual_explicit", "rule": "pattern"},
+    {"case": "targeted_harassment", "allowed": false, "category": "targeted_harassment", "rule": "pattern"},
+    {"case": "credential_privacy", "allowed": false, "category": "privacy", "rule": "pattern"},
+    {"case": "mapped_youtube_korean_benign", "allowed": true, "category": "", "rule": ""}
+  ],
+  "health_after_two_identical_six_case_passes": {
+    "inspected": 12,
+    "allowed": 2,
+    "blocked": 10,
+    "blocked_by_category": {
+      "persona_takeover": 2,
+      "profanity": 2,
+      "sexual_explicit": 2,
+      "targeted_harassment": 2,
+      "privacy": 2
+    }
+  },
+  "installed_ui_tts_recheck": {
+    "attempted": true,
+    "completed": false,
+    "failure_class": "local_sender_dependency_unavailable_after_cleanup",
+    "model_request_sent": false,
+    "tts_request_sent": false,
+    "installed_asar_modified": false
+  },
+  "claims": {
+    "loopback_policy_proven": true,
+    "installed_ui_or_tts_proven_for_current_policy": false,
+    "multilingual_semantic_safety_proven": false,
+    "live_youtube_or_donation_proven": false
+  }
+}

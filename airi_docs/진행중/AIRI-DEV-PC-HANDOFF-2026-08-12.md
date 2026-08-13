@@ -11,6 +11,41 @@
 
 ## Cleanup handoff (2026-08-13)
 
+## B3-c/B3-d handoff update (2026-08-13)
+
+B3-c's deterministic local prefilter and local B1 downstream spine are complete
+and default OFF; independent final review PASS. Categories are
+`persona_takeover`, `profanity`, `sexual_explicit`, `targeted_harassment`, and
+`privacy`, with bounded normalization/obfuscation, PII patterns, protocol
+variants, proactive exemption, exact loopback, and fail-closed policy digest.
+It catches historical unsafe user entries before upstream. Node model text is
+`[YouTube] ${text}`; display names remain only separate viewer observation. No
+live provider adapter exists. This is not multilingual semantic screening:
+ja/zh and unvalidated Latin fail closed as `unsupported_language`, with only 14
+exact benign Korean-embedded product/acronym tokens allowed. Output moderation
+is separately OFF. Focused results: 43 Python input+launcher+eval passed (then
+19 input-only), chat-ingress 47, sender 32, latest combined Node 79. Final
+Python 3.12 full suite is 911 passed/1 skipped/863 subtests/7 warnings in
+53.13 s; checkpoint/manifest/source-ASAR contracts, launcher parsers, and diff
+checks PASS locally because Actions is billing-blocked.
+
+Loopback-only proof is `airi_docs/evidence/AIRI-B3C-INPUT-SCREENING-LIVE-PROBE-2026-08-13.json`:
+unchanged installed ASAR 1,356,257,019 B SHA `1b68ae...b88b0`, seven AIRI
+processes, source policy ON/ready SHA `67739c...b9d7a`, five blocks plus a benign
+Korean allow repeated twice (inspected 12/allowed 2/blocked 10), output
+moderation/extraction OFF, and no STT listener. The fresh installed UI/TTS
+recheck did not complete because cleanup removed sender SDK `@moeru/std` before
+model/TTS; ASAR was untouched. B3-e badge + TTS/current-policy rehearsal remains
+pending; prior TTS evidence is historical only.
+
+B3-d completed exact corpus/direct-prefilter evidence, not a safety gate:
+the 20-case ko/en/ja/zh direct local Ollama report
+`ollama-proxy/eval/results/airi-persona-jailbreak-marker-midm-2026-08-13.json`
+is 14,395 B SHA-256 `9308b0c1527eaf42b58496bd3c36520feabeaa38c70623139981357cb65509c8`,
+Mi:dm `92a9...485f`; structural 20/20 PASS, standalone markers 5/20 PASS,
+overall FAIL; P50/P95/max 211.371/809.552/928.064 ms. No semantic safety, proxy,
+Electron, UI, or TTS claim; installed red-team execution remains pending.
+
 The work was blocked by missing explicit Cloud/YouTube transmission and spend
 approvals plus failed extraction candidates, not context exhaustion. At the
 user's request, cleanup removed the three failed tags
@@ -117,7 +152,7 @@ The current CI-equivalent 44-path Python 3.12 matrix passed 877 tests, skipped
 content-free measurement core: exact shape, bounded duration/messages/responses/
 connections, actual batch overshoot count, monotonic timings, transient resume token,
 deadline/caller abort, and best-effort cleanup. It never calls ChatIngress/AIRI, is not
-B1b, and does not persist provider content or IDs. Focused 15 PASS, all chat-ingress 32
+B1b, and does not persist provider content or IDs. Focused 20 PASS, all chat-ingress 47
 PASS, full checkpoint PASS, and independent final review PASS; the existing checkpoint
 glob already registers its test file, so no workflow change was needed.
 

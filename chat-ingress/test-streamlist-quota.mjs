@@ -185,6 +185,7 @@ test('connections and discarded batches count what the provider already served',
   assert.deepEqual([discarded.stopReason, discarded.connections], ['duration_cap', 1])
   assert.deepEqual([discarded.responses, discarded.discardedResponses, discarded.messages], [0, 1, 0])
   assert.equal(assembleQuotaReport({ trial: discarded, quotaBefore: 0, quotaAfter: 1, quotaSource: 'manual_google_cloud_console_snapshot' }).discardedResponses, 1)
+  assert.throws(() => assembleQuotaReport({ trial: { ...discarded, stopReason: 'normal_close' }, quotaBefore: 0, quotaAfter: 1, quotaSource: 'manual_google_cloud_console_snapshot' }), StreamListQuotaError)
 })
 
 test('a caller abort signal stops opening and reading trials', async () => {

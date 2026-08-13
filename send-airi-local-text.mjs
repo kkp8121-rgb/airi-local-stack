@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url'
 const DEFAULT_SOURCE_ROOT = join(tmpdir(), 'airi-v0113-source-codex-20260808')
 const MAX_CONFIG_BYTES = 16 * 1024
 const MAX_TEXT_CODEPOINTS = 1000
+const MAX_EVENT_TEXT_CODEPOINTS = 1100
 export const CLIENT_POSSIBLE_EVENTS = [
   'input:text',
   'output:gen-ai:chat:message',
@@ -284,71 +285,125 @@ export function validateServerConfig(value) {
   return { hostname: value.hostname, token }
 }
 
-async function loadServerConfig(configPath) {
+export async function loadServerConfig(configPath) {
   const info = await stat(configPath)
   if (!info.isFile() || info.size <= 0 || info.size > MAX_CONFIG_BYTES)
     throw new Error('AIRI server channel config file is invalid.')
   return validateServerConfig(JSON.parse(await readFile(configPath, 'utf8')))
 }
 
-async function main() {
-  const args = process.argv.slice(2)
-  const text = decodeTextArgument(args)
-  const printAssistant = args.includes('--print-assistant')
-  const printAssistantShape = args.includes('--print-assistant-shape')
-  const printWallClockTiming = args.includes('--print-wall-clock-timing')
-  const waitComplete = args.includes('--wait-complete') || printAssistant || printAssistantShape
-  const waitPlaybackStart = args.includes('--wait-playback-start')
+function exactDataObject(value, expectedKeys) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || ![Object.prototype, null].includes(Object.getPrototypeOf(value)))
+    return undefined
+  const keys = Reflect.ownKeys(value)
+  if (keys.some(key => typeof key !== 'string') || keys.length !== expectedKeys.length
+    || expectedKeys.some(key => !keys.includes(key)))
+    return undefined
+  const copy = Object.create(null)
+  for (const key of expectedKeys) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)
+    if (!descriptor || !descriptor.enumerable || !('value' in descriptor))
+      return undefined
+    copy[key] = descriptor.value
+  }
+  return copy
+}
+
+export function validateInputTextEvent(value) {
+  const event = exactDataObject(value, ['type', 'data', 'route', 'metadata'])
+  const data = exactDataObject(event?.data, ['text'])
+  const route = exactDataObject(event?.route, ['delivery'])
+  const delivery = exactDataObject(route?.delivery, ['required'])
+  const metadata = exactDataObject(event?.metadata, ['event'])
+  const metadataEvent = exactDataObject(metadata?.event, ['id'])
+  const text = data?.text
+  const id = metadataEvent?.id
+  if (event?.type !== 'input:text' || delivery?.required !== true
+    || typeof text !== 'string' || !Array.from(text).length
+    || Array.from(text).length > MAX_EVENT_TEXT_CODEPOINTS || text.includes('\0')
+    || typeof id !== 'string' || id.length < 1 || id.length > 256
+    || /[\u0000-\u0020\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(id))
+    throw new TypeError('AIRI input event must be the exact bounded input:text envelope.')
+  return Object.freeze({
+    type: 'input:text',
+    data: Object.freeze({ text }),
+    route: Object.freeze({ delivery: Object.freeze({ required: true }) }),
+    metadata: Object.freeze({ event: Object.freeze({ id }) }),
+  })
+}
+
+export async function sendAiriLocalEvent(inputEvent, {
+  configPath,
+  sourceRoot,
+  serverConfig,
+  ClientClass,
+  waitComplete = false,
+  waitPlaybackStart = false,
+  timeoutMs = 90_000,
+  settleDelayMs = 300,
+  includeAssistant = false,
+  includeAssistantShape = false,
+  includeWallClockTiming = false,
+} = {}) {
+  const event = validateInputTextEvent(inputEvent)
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1
+    || !Number.isSafeInteger(settleDelayMs) || settleDelayMs < 0)
+    throw new TypeError('Sender timing bounds must be non-negative safe integers.')
   const waitForTerminal = waitComplete || waitPlaybackStart
-  const appData = process.env.APPDATA
-  if (!appData)
-    throw new Error('APPDATA is unavailable.')
+  let normalizedConfig
+  if (serverConfig === undefined) {
+    const appData = process.env.APPDATA
+    if (!configPath && !appData)
+      throw new Error('APPDATA is unavailable.')
+    const resolvedConfigPath = resolve(configPath
+      || process.env.AIRI_SERVER_CHANNEL_CONFIG
+      || join(appData, 'ai.moeru.airi', 'server-channel-config.json'))
+    normalizedConfig = await loadServerConfig(resolvedConfigPath)
+  }
+  else {
+    normalizedConfig = validateServerConfig(serverConfig)
+  }
+  const { hostname, token } = normalizedConfig
+  let ResolvedClient = ClientClass
+  if (!ResolvedClient) {
+    const resolvedSourceRoot = resolve(sourceRoot || process.env.AIRI_SOURCE_ROOT || DEFAULT_SOURCE_ROOT)
+    const sdkEntry = join(resolvedSourceRoot, 'packages', 'server-sdk', 'dist', 'index.mjs')
+    ;({ Client: ResolvedClient } = await import(pathToFileURL(sdkEntry).href))
+  }
+  if (typeof ResolvedClient !== 'function')
+    throw new TypeError('AIRI server SDK Client is unavailable.')
 
-  const configPath = resolve(
-    process.env.AIRI_SERVER_CHANNEL_CONFIG
-      || join(appData, 'ai.moeru.airi', 'server-channel-config.json'),
-  )
-  const sourceRoot = resolve(process.env.AIRI_SOURCE_ROOT || DEFAULT_SOURCE_ROOT)
-  const sdkEntry = join(sourceRoot, 'packages', 'server-sdk', 'dist', 'index.mjs')
-  const { hostname, token } = await loadServerConfig(configPath)
-  const { Client } = await import(pathToFileURL(sdkEntry).href)
-
-  let tracker
-  let inputEventId
-  const client = new Client({
+  const inputEventId = event.metadata.event.id
+  let tracker = createAssistantEventTracker(inputEventId)
+  const client = new ResolvedClient({
     name: 'local-codex-chat-ingress',
     url: `ws://${hostname}:6121/ws`,
     token,
     autoConnect: false,
     autoReconnect: false,
     possibleEvents: CLIENT_POSSIBLE_EVENTS,
-    onError: () => {
-      if (tracker)
-        tracker.eventStats.errors++
-    },
-    onAnyMessage: (event) => {
-      tracker?.observe(event)
-    },
+    onError: () => { tracker.eventStats.errors++ },
+    onAnyMessage: observed => { tracker.observe(observed) },
   })
 
   let startedAt
   let sentEpochMs
   let completeResolve
   let completeReject
-  const completion = new Promise((resolvePromise, rejectPromise) => {
+  const completion = new Promise((resolvePromise) => {
     completeResolve = resolvePromise
-    completeReject = rejectPromise
   })
   let completionTimeout
-  const settleTerminal = (event) => {
+  const settleTerminal = observed => {
     const terminal = waitPlaybackStart
-      ? tracker?.waitTerminal(event, Math.round(performance.now() - startedAt))
-      : tracker?.terminal(event, Math.round(performance.now() - startedAt))
+      ? tracker.waitTerminal(observed, Math.round(performance.now() - startedAt))
+      : tracker.terminal(observed, Math.round(performance.now() - startedAt))
     if (terminal)
       completeResolve(terminal)
   }
-  const settlePlaybackStart = (event) => {
-    const outcome = tracker?.waitPlaybackStart(event, Math.round(performance.now() - startedAt))
+  const settlePlaybackStart = observed => {
+    const outcome = tracker.waitPlaybackStart(observed, Math.round(performance.now() - startedAt))
     if (outcome?.terminal)
       completeResolve({ ...outcome.terminal, ...outcome.playback })
   }
@@ -362,24 +417,23 @@ async function main() {
 
   let completed
   try {
-    await client.connect()
-    inputEventId = randomUUID()
-    tracker = createAssistantEventTracker(inputEventId)
-    // Start the delay budget only once the WebSocket is ready.  This makes
-    // both elapsed fields and sent_epoch_ms describe the actual input send,
-    // not connection setup or module loading.
+    completionTimeout = setTimeout(() => completeReject(new Error(
+      `Timed out connecting or waiting for AIRI delivery (assistant_events=${tracker.eventStats.assistantMessages}, matching_assistant_events=${tracker.eventStats.matchingAssistantMessages}, completion_events=${tracker.eventStats.completions}, matching_completion_events=${tracker.eventStats.matchingCompletions}, cancellation_events=${tracker.eventStats.cancellations}, matching_cancellation_events=${tracker.eventStats.matchingCancellations}, playback_start_events=${tracker.eventStats.playbackStarts}, matching_playback_start_events=${tracker.eventStats.matchingPlaybackStarts}, errors=${tracker.eventStats.errors}).`,
+    )), timeoutMs)
+    const timeout = new Promise((_, rejectPromise) => {
+      completeReject = rejectPromise
+    })
+    await Promise.race([client.connect(), timeout])
     const sendTiming = createSendTiming()
     sentEpochMs = sendTiming.sentEpochMs
     startedAt = sendTiming.startedAt
-    if (waitForTerminal) {
-      completionTimeout = setTimeout(() => completeReject(new Error(
-        `Timed out waiting for matching AIRI ${waitPlaybackStart ? 'completion and playback start' : 'completion'} (assistant_events=${tracker?.eventStats.assistantMessages ?? 0}, matching_assistant_events=${tracker?.eventStats.matchingAssistantMessages ?? 0}, completion_events=${tracker?.eventStats.completions ?? 0}, matching_completion_events=${tracker?.eventStats.matchingCompletions ?? 0}, cancellation_events=${tracker?.eventStats.cancellations ?? 0}, matching_cancellation_events=${tracker?.eventStats.matchingCancellations ?? 0}, playback_start_events=${tracker?.eventStats.playbackStarts ?? 0}, matching_playback_start_events=${tracker?.eventStats.matchingPlaybackStarts ?? 0}, errors=${tracker?.eventStats.errors ?? 0}).`,
-      )), 90_000)
-    }
-    client.sendOrThrow(buildInputTextEvent(text, inputEventId))
-    completed = waitForTerminal
-      ? await completion
-      : (await new Promise(resolvePromise => setTimeout(resolvePromise, 300)), undefined)
+    client.sendOrThrow(event)
+    completed = await Promise.race([
+      waitForTerminal
+        ? completion
+        : new Promise(resolvePromise => setTimeout(resolvePromise, settleDelayMs)),
+      timeout,
+    ])
   }
   finally {
     if (completionTimeout)
@@ -389,17 +443,13 @@ async function main() {
     client.close(1000, 'local input sent')
   }
 
-  const output = {
+  return Object.freeze({
     sent: true,
     transport: 'loopback-server-channel',
-    chars: Array.from(text).length,
-    ...(printWallClockTiming ? { sent_epoch_ms: sentEpochMs } : {}),
+    chars: Array.from(event.data.text).length,
+    ...(includeWallClockTiming ? { sent_epoch_ms: sentEpochMs } : {}),
     ...(completed?.cancelled
-      ? {
-          cancelled: true,
-          cancel_reason: 'superseded',
-          cancelled_ms: completed.elapsedMs,
-        }
+      ? { cancelled: true, cancel_reason: 'superseded', cancelled_ms: completed.elapsedMs }
       : completed
       ? {
           completed: true,
@@ -408,13 +458,43 @@ async function main() {
             ? { playback_started: true, playback_started_ms: completed.playbackStartedMs }
             : {}),
           assistant_chars: Array.from(completed.assistant).length,
-          ...(printAssistant ? { assistant: completed.assistant } : {}),
-          ...(printAssistantShape
+          ...(includeAssistant ? { assistant: completed.assistant } : {}),
+          ...(includeAssistantShape
             ? { assistant_source: completed.assistantSource, assistant_shape: completed.assistantShape }
             : {}),
         }
       : {}),
-  }
+  })
+}
+
+async function main() {
+  const args = process.argv.slice(2)
+  const text = decodeTextArgument(args)
+  const printAssistant = args.includes('--print-assistant')
+  const printAssistantShape = args.includes('--print-assistant-shape')
+  const printWallClockTiming = args.includes('--print-wall-clock-timing')
+  const waitComplete = args.includes('--wait-complete') || printAssistant || printAssistantShape
+  const waitPlaybackStart = args.includes('--wait-playback-start')
+  const appData = process.env.APPDATA
+  if (!appData)
+    throw new Error('APPDATA is unavailable.')
+
+  const configPath = resolve(
+    process.env.AIRI_SERVER_CHANNEL_CONFIG
+      || join(appData, 'ai.moeru.airi', 'server-channel-config.json'),
+  )
+  const output = await sendAiriLocalEvent(
+    buildInputTextEvent(text, randomUUID()),
+    {
+      configPath,
+      sourceRoot: resolve(process.env.AIRI_SOURCE_ROOT || DEFAULT_SOURCE_ROOT),
+      waitComplete,
+      waitPlaybackStart,
+      includeAssistant: printAssistant,
+      includeAssistantShape: printAssistantShape,
+      includeWallClockTiming: printWallClockTiming,
+    },
+  )
   process.stdout.write(`${JSON.stringify(output)}\n`)
 }
 

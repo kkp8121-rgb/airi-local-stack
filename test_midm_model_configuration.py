@@ -12,6 +12,32 @@ STT_STOP = (ROOT / "stt" / "stop-local-stt.ps1").read_text(encoding="utf-8")
 
 
 class MidmModelConfigurationTests(unittest.TestCase):
+    def test_input_screening_launcher_contract_is_validated_and_forwarded(self) -> None:
+        for script in (STACK, PROXY):
+            self.assertIn("[string]$InputScreening =", script)
+            self.assertIn("[string]$InputScreeningPolicy = $env:AIRI_INPUT_SCREENING_POLICY", script)
+            self.assertIn("throw 'InputScreeningPolicy must be a regular file.'", script)
+        self.assertEqual(STACK.count("-InputScreening $InputScreening"), 3)
+        self.assertEqual(STACK.count("-InputScreeningPolicy $resolvedInputScreeningPolicy"), 3)
+        self.assertIn("AIRI_INPUT_SCREENING = $InputScreening", PROXY)
+        self.assertIn("AIRI_INPUT_SCREENING_POLICY = $resolvedInputScreeningPolicy", PROXY)
+        self.assertIn("Existing proxy input screening state differs", PROXY)
+        self.assertIn("InputScreeningEnabled = $proxy.input_screening.enabled", STACK)
+        self.assertIn("InputScreeningReady = $proxy.input_screening.ready", STACK)
+        self.assertIn("Live proxy input screening state is missing, unready, or differs", STACK)
+        self.assertIn("Live proxy input screening policy digest differs", STACK)
+        self.assertIn("Existing proxy input screening policy digest differs", PROXY)
+        self.assertIn("function Get-AiriHealthBoolean", PROXY)
+        self.assertIn("function Get-AiriHealthBoolean", STACK)
+        self.assertNotRegex(PROXY, r"\[bool\]\$existingHealth\.input_screening")
+        self.assertNotRegex(STACK, r"\[bool\]\$proxy\.input_screening")
+        self.assertIn("must be a JSON Boolean", PROXY)
+        for script in (STACK, PROXY):
+            self.assertIn("expectedInputScreeningPolicySha256", script)
+            self.assertIn("Get-FileHash -LiteralPath $policyDigestItem.FullName -Algorithm SHA256", script)
+        for script in (STACK, PROXY):
+            self.assertIn("InputScreening must be on or off", script)
+
     def test_output_moderation_launcher_contract_is_validated_and_forwarded(self) -> None:
         for script in (STACK, PROXY):
             self.assertIn("[ValidateSet('on', 'off')]", script)
@@ -25,7 +51,7 @@ class MidmModelConfigurationTests(unittest.TestCase):
 
     def test_existing_proxy_moderation_reuse_fails_closed(self) -> None:
         self.assertIn("Existing proxy cannot be reused with OutputModerationTerms", PROXY)
-        self.assertIn("Existing proxy output moderation state could not be verified", PROXY)
+        self.assertIn("Existing proxy safety state could not be verified", PROXY)
         self.assertIn("Existing proxy health does not report output moderation state.", PROXY)
         self.assertIn("$existingHealth.output_moderation.enabled", PROXY)
         self.assertIn("$existingModerationEnabled -ne $requestedModerationEnabled", PROXY)

@@ -340,6 +340,7 @@ export function assembleQuotaReport(input) {
   if (!KINDS.includes(trialSnapshot.kind) || !STATUSES.includes(trialSnapshot.status) || !STOP_REASONS.includes(trialSnapshot.stopReason)) fail('invalid_report_input')
   if ((trialSnapshot.kind !== 'reconnect' && (trialSnapshot.connections > 1 || trialSnapshot.resumes !== 0)) || (trialSnapshot.stopReason === 'aborted') !== (trialSnapshot.status === 'aborted') || (['open_failure', 'read_failure', 'invalid_summary'].includes(trialSnapshot.stopReason) && trialSnapshot.status !== 'failed') || (trialSnapshot.status === 'failed' && !['open_failure', 'read_failure', 'invalid_summary'].includes(trialSnapshot.stopReason)) || (trialSnapshot.status === 'completed' && !['normal_close', 'duration_cap', 'message_cap', 'response_cap', 'connection_cap', 'offline'].includes(trialSnapshot.stopReason)) || (trialSnapshot.stopReason === 'connection_cap' && (trialSnapshot.kind !== 'reconnect' || trialSnapshot.status !== 'completed'))) fail('invalid_report_input')
   if ((trialSnapshot.stopReason === 'normal_close' && trialSnapshot.connections < 1) || (trialSnapshot.stopReason === 'offline' && (trialSnapshot.responses < 1 || trialSnapshot.connections < 1))) fail('invalid_report_input')
+  if (trialSnapshot.discardedResponses > 0 && (trialSnapshot.status !== 'completed' || trialSnapshot.stopReason !== 'duration_cap')) fail('invalid_report_input')
   const before = quotaNumber(quotaBefore)
   const after = quotaNumber(quotaAfter)
   if (after < before || quotaSource !== QUOTA_SOURCE) fail('invalid_quota')

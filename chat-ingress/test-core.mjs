@@ -168,7 +168,7 @@ test('AIRI mapper emits the established envelope and rejects malformed IDs', asy
   ingress.submit(candidate({ scopeId: 'scope-secret', messageId: 'message-secret', authorId: 'author-secret' }))
   const event = await deliveredEvent(ingress)
   const output = toAiriEvent(event)
-  assert.deepEqual(output, { type: 'input:text', data: { text: '[YouTube] Á viewer: hello world' }, route: { delivery: { required: true } }, metadata: { event: { id: event.eventId } } })
+  assert.deepEqual(output, { type: 'input:text', data: { text: '[YouTube] hello world' }, route: { delivery: { required: true } }, metadata: { event: { id: event.eventId } } })
   const serialized = JSON.stringify(output)
   for (const forbidden of ['viewerKey', 'youtube', 'source', 'textRaw', 'contextUpdates', 'overrides', 'metadata.source', 'scope-secret', 'message-secret', 'author-secret']) assert.ok(!serialized.includes(forbidden))
   for (const eventId of ['raw-message-id', 'yt:v1:abc', `viewer:v1:${'a'.repeat(43)}`, `yt:v1:${'a'.repeat(42)}`]) {
