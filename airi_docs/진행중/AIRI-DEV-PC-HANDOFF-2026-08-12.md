@@ -44,8 +44,10 @@ FAIL로 full balanced gate가 아니다. 세 tag는 로컬 Ollama 인벤토리�
 
 ## Memory retrieval shutdown-drain handoff (2026-08-13)
 
-Review branch `fix/memory-retrieval-shutdown-drain-2026-08-13`; do not invent a
-commit hash—use `git log -1` after fetching it. During PR #7 push CI, the first
+**Superseded review instruction:** the branch review and follow-up below are
+historical. Review PC commit `22a6add` fixed both failures and main merge
+`c916f485565d29396e1580f16a4d72236bb724f5` contains it. Do not fetch the old
+branch or repeat the completed audit as an open task. During PR #7 push CI, the first
 memory shard reached 159 passed and then its teardown hit `WinError 32` on
 `memory.db`. The same PR's shard retry and main CI passed. Treat this as a real
 timing-sensitive lifecycle gap.
@@ -69,16 +71,18 @@ a native SQLite call, and shutdown may return with a still-tracked worker when
 it cannot cooperate by the existing deadline.
 
 Only offline synthetic temporary databases were used. No installed AIRI,
-service, model, or runtime DB changed; STT/mic remains OFF/deferred. Next:
-fetch the branch and inspect push run `31653832303`. It finished with 11 jobs
+service, model, or runtime DB changed; STT/mic remains OFF/deferred. Historical
+push run `31653832303` finished with 11 jobs
 successful and 2 failed: the ASAR preflight synthetic drift case was preempted
 by an accessible-process identity refusal, and the memory shard reached 165
 passed before `test_threshold_and_idempotency` teardown hit `WinError 32` on
 `memory.db`. The latter schedules extraction/background store work outside the
-retrieval-task tracking fixed here, so the branch is not PR/merge ready. Audit
-the broader physical `asyncio.to_thread` store/extraction shutdown lifecycle,
-add deterministic coverage, and require a fully green rerun before PR. Do not
-alter the installed ASAR. See
+retrieval-task tracking fixed in the first revision. Review PC commit `22a6add`
+then tracked/drained store and extraction workers, added deterministic
+before-fix-failing regressions, and made ASAR preflight tests use a controlled
+`ProcessProvider`; the final evidence records 900 passed, checkpoint PASS and
+10 stable lifecycle repetitions. The native-store non-cooperative cancellation
+limit remains. Do not alter the installed ASAR. See
 `완료/AIRI-MEMORY-RETRIEVAL-SHUTDOWN-DRAIN-2026-08-13.md`.
 
 ## Latency dashboard KPI handoff (2026-08-13)

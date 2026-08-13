@@ -18,6 +18,9 @@
 
 ## 진행중 — 현행 계약
 
+- `AIRI-REVIEW-PC-HANDOFF-2026-08-13.md` — 검토 브랜치의 정확한 완료·미완료,
+  설치 AIRI 실기와 offline simulation의 경계, CI runner-allocation 실패, 검토
+  우선순위를 한곳에 고정한 review PC 인수 문서.
 - `AIRI-FINAL-HANDOFF-2026-08-10.md` — 패치·sender 계약과 검증 경계.
 - `AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md` — 취소·상관·
   재생 시작 증명의 권위 문서.
@@ -113,9 +116,10 @@
   worker가 남을 수 있으며, 설치 AIRI·서비스·모델·runtime DB 변경이나 STT/mic
   실기는 포함하지 않는다. 최종 Python 3.12 전체 회귀는 881 passed / 1 skipped /
   738 subtests / 7 warnings이며 offline checkpoint와 독립 retrieval 검토도
-  PASS다. 그러나 post-push run `31653832303`은 11 jobs PASS / 2 FAIL:
-  extraction/background store teardown `WinError 32`와 ASAR preflight
-  process-identity 선행 거부가 남아 있어 PR/merge ready가 아니다.
+  PASS다. post-push run `31653832303`의 2 FAIL은 검토 PC `22a6add`에서
+  store/extraction worker 추적·drain과 deterministic ProcessProvider로 해소됐고,
+  main `c916f48`에 병합됐다. 후속 전체 900 passed, checkpoint PASS, lifecycle
+  10회 안정이다. native store 호출의 비협력 취소 한계는 문서대로 유지한다.
 
 - `AIRI-LATENCY-DASHBOARD-SUBSTANTIVE-KPI-2026-08-13.md` — 상단 대시보드가
   raw `playback.start`가 아니라 strict substantive playback KPI만으로

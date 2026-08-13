@@ -15,6 +15,13 @@
 
 최종 갱신: 2026-08-13
 
+- **2026-08-13** (review PC handoff): 검토 브랜치
+  `chore/dev-pc-live-gates-2026-08-13`의 완료·미완료와 실제 설치 AIRI 시험 경계를
+  `진행중/AIRI-REVIEW-PC-HANDOFF-2026-08-13.md`에 고정했다. 실제 송출을 빼도
+  extraction 품질/활성 락, 인간 검수, runtime wiring, ASAR 설치 검증 등이 남는다.
+  push run `31683115216`은 13 jobs 모두 runner_id 0/steps 0으로 코드 실행 전
+  실패했다.
+
 - **2026-08-13** (local cleanup after blocked extraction/broadcast work): The goal
   was blocked by absent explicit Cloud/YouTube transmission and spend approvals,
   and by all extraction candidates failing; it was not blocked by context
@@ -62,15 +69,14 @@
   - [x] 저장·검색·저널 회상 운영 — 2026-08-09 라이브 스모크, KURE fp16 2026-08-11
   - [x] 추출 승격 루프 코드 + 게이트 프로파일 strict/balanced — 2026-08-12 (`932eae6`)
   - [x] MEM-04 SQLite WAL·busy_timeout — 2026-08-12 (`932eae6`)
-  - [~] 검색 shutdown drain·bounded admission — PR #7 CI teardown `WinError 32`
-    lifecycle race를 tracked/shielded task·협력 취소·기존 deadline drain·stopping
-    fail 및 기본 8 cap으로 보완. focused 62 passed, CI-equivalent memory shard
-    166 passed + 27 subtests / 4 warnings — 2026-08-13
-    (`완료/AIRI-MEMORY-RETRIEVAL-SHUTDOWN-DRAIN-2026-08-13.md`)
-    - post-push run `31653832303`은 11 jobs PASS / 2 FAIL. memory shard는 165
-      passed 뒤 extraction/background 경로의 `test_threshold_and_idempotency`
-      teardown에서 동일 `WinError 32`가 재현되어 전체 store-thread lifecycle은
-      미완료. ASAR preflight synthetic drift도 process-identity 선행 거부로 FAIL.
+  - [x] 검색 bounded admission + retrieval/store/extraction shutdown drain —
+    retrieval에는 기본 8의 bounded admission을 적용했고, retrieval 및
+    store/extraction `to_thread`를 추적해 shutdown drain에 포함했다. 검토 PC
+    `22a6add`, main `c916f48`; 전체 900 passed / checkpoint PASS / lifecycle
+    10회 안정 — 2026-08-13
+    (`완료/AIRI-MEMORY-RETRIEVAL-SHUTDOWN-DRAIN-2026-08-13.md` §후속 반영).
+    native store 호출은 협력 취소 지점이 없어 최악 2×flush window 순수 대기 및
+    장기 `SQLITE_BUSY`에서 deadline 뒤 tracked worker 잔류 가능성이 알려진 한계다.
   - [~] 게이트 리포트 생산 → 추출 발효 (Mi:dm balanced, Qwen3.5·Granite 4.0·
     Kanana smoke, Gemma3 full 모두 FAIL; 독립 verifier 거부, 추출 off 유지 — 통과
     후보 미확정, `완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`,
