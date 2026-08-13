@@ -9,6 +9,28 @@
 - 현행 branch tip은 후속 승인 배치마다 전진할 수 있으므로, 이 문서의 고정
   해시에 의존하지 말고 `git log -1`로 확인한다.
 
+## Cleanup handoff (2026-08-13)
+
+The work was blocked by missing explicit Cloud/YouTube transmission and spend
+approvals plus failed extraction candidates, not context exhaustion. At the
+user's request, cleanup removed the three failed tags
+`ministral-3:3b-instruct-2512-q4_K_M`, `phi4-mini:3.8b-q4_K_M`, and
+`granite3.3:2b` (13 unique unshared blobs / 6.511 GiB); ignored generated
+ASAR/runtime-package/patch-check directories and three obsolete `airi_docs`
+ASARs (37.882 GiB); generated staging `node_modules`/`.cache`/`.turbo`/`dist`/
+`out` (2.167 GiB; empty `node_modules` directories may remain); Python
+caches/egg-info (20.07 MiB); and a clean registered feature-audit worktree
+(18.43 MiB). Approximate C: free space increased from 12.41 to 58.99 GiB
+(~46.58 GiB).
+
+Authoritative/current worktrees, staging source (clean `bf173f2d`), `verify`
+and `verify2` trees, and the Python 3.12 audit venv were explicitly preserved,
+along with runtime DB/logs, patches/evidence JSON, installed AIRI, and production
+services. Nothing was pushed. These deletes are not recoverable from the recycle
+bin, but models, dependencies, builds, and worktrees are reproducible; the
+evidence reports remain. See
+`완료/AIRI-LOCAL-TEMP-AND-FAILED-MODEL-CLEANUP-2026-08-13.md`.
+
 ## 신규 local extraction 후보 smoke 동기화 (2026-08-13)
 
 `완료/AIRI-NEW-LOCAL-EXTRACTION-CANDIDATE-SMOKES-2026-08-13.md`는 공식 원본

@@ -74,6 +74,12 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-LOCAL-TEMP-AND-FAILED-MODEL-CLEANUP-2026-08-13.md` records the completed
+  user-requested local cleanup after the approval/candidate-failure block (not
+  context exhaustion): removed temporary/reproducible data, preserved
+  authoritative state, precise measured space, and the no-recycle-bin recovery
+  boundary.
+
 - `AIRI-NEW-LOCAL-EXTRACTION-CANDIDATE-SMOKES-2026-08-13.md` — Ministral 3
   3B·Phi-4-mini 3.8B·Granite 3.3 2B의 공식 원본/라이선스와 local isolated
   `persistent_trait` smoke를 tracked JSON으로 고정한 evidence. 세 후보 모두

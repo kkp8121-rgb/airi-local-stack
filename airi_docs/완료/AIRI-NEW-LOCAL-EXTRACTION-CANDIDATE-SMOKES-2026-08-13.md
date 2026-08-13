@@ -38,10 +38,12 @@ unexpected rate 0.25 이하, Stage-B alias 0.8 이상을 충족하지 못했다.
 - [IBM Granite-3.3-2B-Instruct](https://huggingface.co/ibm-granite/granite-3.3-2b-instruct)는 공식 `ibm-granite` 원본이며 Apache-2.0이다.
 
 이는 후보를 로컬 기술 검증에 포함할 수 있는 provenance/licence 근거일 뿐,
-추출 품질·운영 승격·공개 사용 승인이 아니다. 세 tag는 이번 측정으로 로컬
-Ollama 인벤토리에 추가해 그대로 보존했다. production 11434 서비스의 프로세스·
-설정과 11435 proxy 설정/트래픽은 변경하지 않았고, active model runner도 남기지
-않았다. push도 하지 않았다.
+추출 품질·운영 승격·공개 사용 승인이 아니다. 사용자 요청에 따른 후속 정리에서
+실패한 세 tag는 제거했다: `ministral-3:3b-instruct-2512-q4_K_M`,
+`phi4-mini:3.8b-q4_K_M`, `granite3.3:2b`. 제거량은 공유되지 않은 고유 blob
+13개, 6.511 GiB다. tracked JSON evidence는 보존한다. production 11434 서비스의
+프로세스·설정과 11435 proxy 설정/트래픽은 변경하지 않았고, active model runner도
+남기지 않았다. push도 하지 않았다.
 
 ## 운영 경계
 

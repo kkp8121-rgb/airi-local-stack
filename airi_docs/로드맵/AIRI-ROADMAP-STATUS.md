@@ -15,14 +15,24 @@
 
 최종 갱신: 2026-08-13
 
-- **2026-08-13** (신규 로컬 extraction 후보 smoke 동기화): Ministral 3 3B,
-  Phi-4-mini 3.8B, Granite 3.3 2B의 격리 CPU `persistent_trait` fail-fast
-  스모크를 tracked evidence로 고정했다. 각각 recall 0.0/0.0/0.5로 모두
-  FAIL이며 full balanced gate가 아니다. 세 tag는 로컬 Ollama 인벤토리에
-  추가됐지만 11436은 중지했고 active runner는 없다. production 11434/11435의
-  실행 설정·요청 경로는 유지했으며 extraction OFF 및 MEM-04 활성 Stage-B 락
-  경합 미실행을 유지한다. 상세:
-  `완료/AIRI-NEW-LOCAL-EXTRACTION-CANDIDATE-SMOKES-2026-08-13.md`.
+- **2026-08-13** (local cleanup after blocked extraction/broadcast work): The goal
+  was blocked by absent explicit Cloud/YouTube transmission and spend approvals,
+  and by all extraction candidates failing; it was not blocked by context
+  exhaustion. On the user's cleanup request, removed failed Ollama tags
+  `ministral-3:3b-instruct-2512-q4_K_M`, `phi4-mini:3.8b-q4_K_M`, and
+  `granite3.3:2b`: 13 unique unshared blobs / 6.511 GiB. Also removed old ignored
+  `.codex` generated ASAR/runtime-package/patch-check directories and three
+  obsolete ignored `airi_docs` ASARs (37.882 GiB), generated staging
+  `node_modules`/`.cache`/`.turbo`/`dist`/`out` (2.167 GiB; empty `node_modules`
+  directories may remain), Python caches/egg-info
+  (20.07 MiB), and a clean registered audit worktree (18.43 MiB). Approximate C:
+  free space changed 12.41 -> 58.99 GiB (~46.58 GiB). Preserved authoritative git
+  worktrees, staging source at clean HEAD `bf173f2d`, `verify` and `verify2`
+  trees, Python 3.12 audit venv, runtime DB/logs, patches/evidence JSON, installed AIRI, and
+  production services. Deleted data is not recycle-bin recoverable; models,
+  dependencies, builds, and worktrees are reproducible, and evidence reports
+  remain. No push. Details:
+  `완료/AIRI-LOCAL-TEMP-AND-FAILED-MODEL-CLEANUP-2026-08-13.md`.
 
 ---
 
