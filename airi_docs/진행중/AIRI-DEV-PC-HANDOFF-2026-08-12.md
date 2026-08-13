@@ -9,6 +9,38 @@
 - 현행 branch tip은 후속 승인 배치마다 전진할 수 있으므로, 이 문서의 고정
   해시에 의존하지 말고 `git log -1`로 확인한다.
 
+## Memory retrieval shutdown-drain handoff (2026-08-13)
+
+Review branch `fix/memory-retrieval-shutdown-drain-2026-08-13`; do not invent a
+commit hash—use `git log -1` after fetching it. During PR #7 push CI, the first
+memory shard reached 159 passed and then its teardown hit `WinError 32` on
+`memory.db`. The same PR's shard retry and main CI passed. Treat this as a real
+timing-sensitive lifecycle gap.
+
+The cause was `wait_for(to_thread(...))` timing out while the physical SQLite
+thread survived untracked. The branch tracks a shielded task, uses a cooperative
+cancel event for timeout and caller cancellation, consumes task errors during
+done cleanup, signals/awaits retrievals early within the existing shutdown
+deadline, and rejects retrieval while stopping as failed. Admission is bounded
+by positive `AIRI_MEMORY_MAX_CONCURRENT_RETRIEVALS` (default 8); saturation
+fails soft without creating an executor queue.
+
+Focused `memory_runtime` is 62 passed; the CI-equivalent memory shard is 166
+passed + 27 subtests with 4 warnings; `py_compile` and scoped diff-check passed.
+The final Python 3.12 regression is 881 passed / 1 skipped / 738 subtests /
+7 warnings (45.92s); the offline checkpoint and independent final review also
+passed.
+Earlier 10x new lifecycle regressions ran before the cap and do not verify the
+final admission behavior. Cooperative cancellation cannot instantly interrupt
+a native SQLite call, and shutdown may return with a still-tracked worker when
+it cannot cooperate by the existing deadline.
+
+Only offline synthetic temporary databases were used. No installed AIRI,
+service, model, or runtime DB changed; STT/mic remains OFF/deferred. Next:
+fetch the branch, inspect the tip and results, let CI run, then open/merge the
+PR if satisfied. Do not alter the installed ASAR. See
+`완료/AIRI-MEMORY-RETRIEVAL-SHUTDOWN-DRAIN-2026-08-13.md`.
+
 ## Latency dashboard KPI handoff (2026-08-13)
 
 The dashboard top cards now use only `kpi.substantive_playback_start`, not raw

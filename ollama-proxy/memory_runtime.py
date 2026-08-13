@@ -153,6 +153,7 @@ class MemoryConfig:
     extraction_batch_messages: int = 60
     extraction_batch_chars: int = 24000
     retrieve_timeout_ms: int = 150
+    max_concurrent_retrievals: int = 8
     shutdown_flush_timeout_ms: int = 3000
     upstream_url: str = "http://127.0.0.1:11434"
     extraction_model: str = ""
@@ -200,6 +201,7 @@ class MemoryConfig:
             extraction_batch_messages=_positive("AIRI_MEMORY_EXTRACTION_BATCH_MESSAGES", 60, minimum=2),
             extraction_batch_chars=_positive("AIRI_MEMORY_EXTRACTION_BATCH_CHARS", 24000, minimum=1000),
             retrieve_timeout_ms=_positive("AIRI_MEMORY_RETRIEVE_TIMEOUT_MS", 150),
+            max_concurrent_retrievals=_positive("AIRI_MEMORY_MAX_CONCURRENT_RETRIEVALS", 8),
             shutdown_flush_timeout_ms=_positive("AIRI_MEMORY_SHUTDOWN_FLUSH_TIMEOUT_MS", 3000),
             upstream_url=(
                 os.getenv("AIRI_MEMORY_EXTRACTION_UPSTREAM")
@@ -291,6 +293,10 @@ class MemoryRuntime:
         self.http_client, self.store = http_client, None
         self.extraction_provider = MemoryExtractionProvider(self.config, http_client)
         self._tasks: set[asyncio.Task[Any]] = set()
+        # A timed-out ``to_thread`` call keeps running in its executor thread.
+        # Keep its task and cooperative cancellation handle together until the
+        # physical worker has actually returned, so shutdown can drain it.
+        self._retrieval_tasks: dict[asyncio.Task[RetrievalResult], threading.Event] = {}
         self._scheduled: set[str] = set()
         self._scheduled_order: list[str] = []
         self._sessions: set[str] = set()
@@ -480,20 +486,54 @@ class MemoryRuntime:
                        journal_recall_allowed: bool = True) -> RetrievalResult:
         if not self.store:
             return RetrievalResult()
+        if self._stopping:
+            return RetrievalResult(status="failed")
         sid = session or self._implicit_session
         await self._ensure_session(sid)
+        # ``_ensure_session`` may yield while shutdown begins.  There is no
+        # yield between this admission check and task registration, preventing
+        # a retrieval worker from being admitted after shutdown's task scan.
+        if self._stopping:
+            return RetrievalResult(status="failed")
         start = time.perf_counter(); self._emit("retrieve_start", trace_id, session_default=bool(not session))
+        # The tracked set includes timed-out physical workers until their
+        # threads return.  Checking and registering without an intervening
+        # await makes this a bounded, queue-free admission gate.
+        if len(self._retrieval_tasks) >= self.config.max_concurrent_retrievals:
+            duration = (time.perf_counter() - start) * 1000
+            self._emit("error", trace_id, duration, retrieval=True, saturated=True)
+            return RetrievalResult(duration_ms=duration, status="timed_out")
+        if self._stopping:
+            return RetrievalResult(status="failed")
         deadline = time.monotonic() + self.config.retrieve_timeout_ms / 1000
         cancel_event = threading.Event()
+        worker = asyncio.create_task(asyncio.to_thread(
+            self.store.retrieve, sid, question, current_turn, attendees,
+            journal_retained_turns, journal_recall_allowed,
+            deadline=deadline, cancel_event=cancel_event,
+        ))
+        self._retrieval_tasks[worker] = cancel_event
+
+        def release(done: asyncio.Task[RetrievalResult]) -> None:
+            self._retrieval_tasks.pop(done, None)
+            # A timed-out caller will not await the worker.  Consume a late
+            # worker error so it cannot become an unobserved task exception.
+            try:
+                done.exception()
+            except (asyncio.CancelledError, Exception):
+                pass
+
+        worker.add_done_callback(release)
         try:
             result = await asyncio.wait_for(
-                asyncio.to_thread(self.store.retrieve, sid, question, current_turn, attendees,
-                                  journal_retained_turns, journal_recall_allowed,
-                                  deadline=deadline, cancel_event=cancel_event),
+                asyncio.shield(worker),
                 self.config.retrieve_timeout_ms / 1000,
             )
             self._emit("retrieve_end", trace_id, (time.perf_counter()-start)*1000, gate=result.gate, cache_hit=result.cache_hit)
             return result
+        except asyncio.CancelledError:
+            cancel_event.set()
+            raise
         except Exception as exc:
             cancel_event.set()
             self._emit("error", trace_id, (time.perf_counter()-start)*1000, timeout=isinstance(exc, asyncio.TimeoutError), retrieval=True)
@@ -774,6 +814,28 @@ class MemoryRuntime:
     async def shutdown(self) -> None:
         self._stopping = True
         deadline = time.monotonic() + self.config.shutdown_flush_timeout_ms / 1000
+
+        # Signal physical retrieval workers before draining extractors, so they
+        # can release SQLite handles while the rest of shutdown is in flight.
+        for cancel_event in self._retrieval_tasks.values():
+            cancel_event.set()
+
+        async def drain_retrievals() -> bool:
+            # Do not cancel these tasks: that only cancels the asyncio wrapper,
+            # not the SQLite-owning executor thread.  Their workers cooperate
+            # through the event and are awaited until the shared deadline.
+            while self._retrieval_tasks:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+                _done, pending = await asyncio.wait(
+                    list(self._retrieval_tasks), timeout=remaining
+                )
+                if pending:
+                    return False
+                await asyncio.sleep(0)
+            return True
+
         async def finish_tasks() -> bool:
             while self._tasks:
                 tasks = list(self._tasks)
@@ -819,6 +881,7 @@ class MemoryRuntime:
         self._extract_force.clear()
         self._extraction_retry_sessions.clear()
         self._extraction_retry_task = None
+        await drain_retrievals()
         self._started = False
 
     async def health(self, session: str | None = None) -> dict[str, Any]:

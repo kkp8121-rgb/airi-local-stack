@@ -43,6 +43,11 @@
   - [x] 저장·검색·저널 회상 운영 — 2026-08-09 라이브 스모크, KURE fp16 2026-08-11
   - [x] 추출 승격 루프 코드 + 게이트 프로파일 strict/balanced — 2026-08-12 (`932eae6`)
   - [x] MEM-04 SQLite WAL·busy_timeout — 2026-08-12 (`932eae6`)
+  - [x] 검색 shutdown drain·bounded admission — PR #7 CI teardown `WinError 32`
+    lifecycle race를 tracked/shielded task·협력 취소·기존 deadline drain·stopping
+    fail 및 기본 8 cap으로 보완. focused 62 passed, CI-equivalent memory shard
+    166 passed + 27 subtests / 4 warnings — 2026-08-13
+    (`완료/AIRI-MEMORY-RETRIEVAL-SHUTDOWN-DRAIN-2026-08-13.md`)
   - [~] 게이트 리포트 생산 → 추출 발효 (Mi:dm balanced, Qwen3.5·Granite 4.0·
     Kanana smoke, Gemma3 full 모두 FAIL; 독립 verifier 거부, 추출 off 유지 — 통과
     후보 미확정, `완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`,
@@ -159,6 +164,22 @@
 ---
 
 ## 갱신 로그 (최신이 위)
+
+- **2026-08-13** (dev PC, memory retrieval shutdown drain): PR #7 push CI의
+  첫 memory shard는 159 passed 뒤 `memory.db` teardown에서 `WinError 32`로
+  실패했고, 같은 PR shard retry와 main CI는 PASS했다. timeout된
+  `to_thread` SQLite worker가 물리적으로 계속 실행되지만 추적되지 않았던 timing
+  race를 보완했다. shielded tracked task와 협력 cancel event, timeout/caller cancel
+  signal, done cleanup/error consumption, 기존 shutdown deadline 안의 early
+  signal/await, stopping 시 failed rejection, 기본 8(`AIRI_MEMORY_MAX_CONCURRENT_RETRIEVALS`)
+  bounded admission과 saturation fail-soft를 적용했다. focused 62 passed,
+  CI-equivalent memory shard 166 passed + 27 subtests / 4 warnings, py_compile와
+  scoped diff-check PASS다. 최종 Python 3.12 전체 회귀는 881 passed / 1 skipped /
+  738 subtests / 7 warnings (45.92s), offline checkpoint와 독립 최종 검토도
+  PASS다. native SQLite call은 즉시 interrupt되지 않으며 deadline
+  뒤 tracked worker가 남을 수 있다. offline synthetic temp DB만 사용했고 설치
+  AIRI·서비스·모델·runtime DB 변경은 없으며 STT/mic은 OFF/deferred다. 상세:
+  `완료/AIRI-MEMORY-RETRIEVAL-SHUTDOWN-DRAIN-2026-08-13.md`.
 
 - **2026-08-13** (dev PC, source ASAR read-only preflight): 고정 evidence
   SHA와 후보/current ASAR·설치 exe·fuse·unpacked manifest·3개 patch layer를
