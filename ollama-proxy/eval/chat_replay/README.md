@@ -112,7 +112,7 @@ capture profile.
 
 ## Flow and pattern report
 
-The content-free report v2 includes duration, inter-arrival p50/p95/max and
+The content-free report v3 includes duration, inter-arrival p50/p95/max and
 rate, active fixed 5-second bins, the maximum count in a rolling half-open
 5-second window, burst starts, duplicate/noise/eligible rates, and source-text
 repeat clusters. Repeat detection happens before redaction in memory, so two
@@ -128,6 +128,24 @@ labels. Proxy response headers are reduced to a closed outcome enum for normal,
 epistemic fallback, serious-safety, or input-screened behavior. Response text
 is represented only by length and a local-key HMAC-SHA256 in the normal report,
 so short responses do not leave a plain dictionary-testable fingerprint.
+
+Before any model call, `offline_fixed_5s_response_sampler_v1` considers only
+eligible events in fixed half-open `[k*5000,(k+1)*5000)` windows and sends at
+most one event from each non-empty candidate window. Donation callouts and
+question marks have priority; correction/emphasis/laughter and recent-selected
+chat lexical overlap/novelty are deliberately narrow signals, so neutral
+windows receive no reply. The v3 `response_sampling` summary is content-free
+(no selected sequence IDs) and must match exactly between OFF/ON paired runs.
+For model runs it is also covered by the run binding and report HMAC. It is an
+offline sampling policy, not a live selector or a claim of semantic accuracy.
+
+Actual campaign artifacts (unlike synthetic structure-only smoke tests) require
+each anonymous source phase to be a contiguous 30–120 minute segment with
+300–20,000 events. Each source needs at least two distinct qualifying phases;
+in practice this means hundreds to thousands of chats. If a full VOD is longer,
+split it into contiguous qualifying segments rather than treating a short
+excerpt as campaign evidence. The response-sampling summary is HMAC-bound only
+for model-run reports, where a run binding exists.
 
 An offline structure-only run performs no network request:
 

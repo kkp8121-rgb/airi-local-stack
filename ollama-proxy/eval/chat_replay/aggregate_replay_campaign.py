@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import json
+import math
 from pathlib import Path
 import re
 from typing import Any
@@ -19,7 +20,7 @@ from replay_local_io import _secure_inside, write_atomic_json
 
 HERE = Path(__file__).resolve().parent
 MANIFEST_SCHEMA = "airi.chat-replay-campaign-manifest.v1"
-REPLAY_SCHEMA = "airi.chat-replay-report.v2"
+REPLAY_SCHEMA = "airi.chat-replay-report.v3"
 SCORE_SCHEMA = "airi.chat-replay-human-score.v2"
 CAMPAIGN_SCHEMA = "airi.chat-replay-campaign-report.v1"
 REPORT_HMAC_DOMAIN = b"airi.chat-replay-report.v1\0"
@@ -57,6 +58,9 @@ EXPECTED_RUNTIME = {
 }
 RUNTIME_FIELDS = tuple(EXPECTED_RUNTIME)
 MAX_ARTIFACT_BYTES = 32 * 1024 * 1024
+MIN_CAPTURE_DURATION_MS = 30 * 60 * 1000
+MAX_CAPTURE_DURATION_MS = 120 * 60 * 1000
+MIN_CAPTURE_EVENTS = 300
 _BASENAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\.json")
 _OPAQUE_ID = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}")
 _HEX = re.compile(r"[0-9a-f]{64}")
@@ -64,7 +68,7 @@ _UTC = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 _REPLAY_KEYS = frozenset({
     "schema_version", "event_count", "event_kinds", "timing_buckets",
     "duplicate_count", "noise_count", "delivered_count", "response_count",
-    "response_rows", "response_outcome_counts", "outcome_by_surface_signal",
+    "response_rows", "response_sampling", "response_outcome_counts", "outcome_by_surface_signal",
     "surface_signal_counts", "adjacent_event_count",
     "adjacent_signal_pair_counts", "max_events_in_rolling_5s",
     "capture_profile", "flow", "structural_sha256", "runtime_profile",
@@ -188,6 +192,18 @@ def _outcomes_by_signal(value: object) -> None:
         _int_map(counts, "outcomes by signal", allowed=OUTCOMES)
 
 
+def _response_sampling(value: object) -> dict[str, Any]:
+    reasons = {"donation_callout", "question", "lexical_signal", "lexical_novelty", "lexical_overlap", "no_reply"}
+    keys = {"policy_id", "fixed_window_ms", "fixed_5s_batch_count", "candidate_batch_count", "no_reply_batch_count", "baseline_eligible_count", "selected_event_count", "eligible_not_selected_count", "per_batch_limit", "selection_rate", "reason_counts"}
+    if not isinstance(value, dict) or set(value) != keys or value.get("policy_id") != "offline_fixed_5s_response_sampler_v1" or value.get("fixed_window_ms") != 5000 or value.get("per_batch_limit") != 1 or not isinstance(value.get("reason_counts"), dict):
+        raise CampaignFormatError("response sampling summary is invalid")
+    for name in keys - {"policy_id", "fixed_window_ms", "per_batch_limit", "selection_rate", "reason_counts"}:
+        _nonnegative(value.get(name), "response sampling count")
+    if type(value["selection_rate"]) not in (int, float) or isinstance(value["selection_rate"], bool) or not math.isfinite(value["selection_rate"]) or any(name not in reasons or type(count) is not int or count < 0 for name, count in value["reason_counts"].items()) or sum(value["reason_counts"].values()) != value["candidate_batch_count"] or value["reason_counts"].get("no_reply", 0) != value["no_reply_batch_count"] or value["candidate_batch_count"] > value["fixed_5s_batch_count"] or value["no_reply_batch_count"] != value["candidate_batch_count"] - value["selected_event_count"] or value["baseline_eligible_count"] != value["selected_event_count"] + value["eligible_not_selected_count"] or value["selected_event_count"] > value["candidate_batch_count"] or not 0 <= value["selection_rate"] <= 1 or value["selection_rate"] != (round(value["selected_event_count"] / value["baseline_eligible_count"], 6) if value["baseline_eligible_count"] else 0.0):
+        raise CampaignFormatError("response sampling summary is inconsistent")
+    return value
+
+
 def _flow(value: object, event_count: int) -> dict[str, Any]:
     keys = {
         "duration_ms", "gap_p50_ms", "gap_p95_ms", "gap_max_ms",
@@ -259,8 +275,8 @@ def _validate_replay(report: dict[str, Any], key: bytes) -> dict[str, Any]:
         raise CampaignFormatError("replay report HMAC is invalid")
 
     event_count = _nonnegative(report["event_count"], "event count")
-    if event_count < 1:
-        raise CampaignFormatError("replay report has no events")
+    if not MIN_CAPTURE_EVENTS <= event_count <= 20_000:
+        raise CampaignFormatError("replay report is outside long-stream event bounds")
     event_kinds = _int_map(report["event_kinds"], "event kinds", allowed=EVENT_KINDS)
     timing = _int_map(report["timing_buckets"], "timing buckets", allowed=TIMING_BUCKETS)
     duplicate_count = _nonnegative(report["duplicate_count"], "duplicate count")
@@ -302,17 +318,58 @@ def _validate_replay(report: dict[str, Any], key: bytes) -> dict[str, Any]:
     if sum(outcome_counts.values()) != response_count:
         raise CampaignFormatError("response outcome counts are inconsistent")
     _outcomes_by_signal(report["outcome_by_surface_signal"])
-    _int_map(
+    surface_counts = _int_map(
         report["surface_signal_counts"], "surface signal counts",
         allowed=SURFACE_SIGNALS,
     )
+    sampling = _response_sampling(report["response_sampling"])
+    flow = _flow(report["flow"], event_count)
+    if (
+        sampling["selected_event_count"] != response_count
+        or sampling["fixed_5s_batch_count"] != flow["active_fixed_5s_bins"]
+        or sampling["fixed_5s_batch_count"] > event_count
+        or sampling["candidate_batch_count"] > sampling["baseline_eligible_count"]
+        or sampling["baseline_eligible_count"] > event_count
+        or sampling["baseline_eligible_count"] < max(
+            event_count - noise_count - duplicate_count, 0,
+        )
+        or sampling["baseline_eligible_count"] > (
+            event_count - max(noise_count, duplicate_count)
+        )
+        or sampling["selected_event_count"] > sampling["candidate_batch_count"]
+        or sampling["reason_counts"].get("donation_callout", 0) > event_kinds.get("donation_callout", 0)
+        or sampling["reason_counts"].get("question", 0) > surface_counts.get("question_mark", 0)
+        or not MIN_CAPTURE_DURATION_MS <= flow["duration_ms"] <= MAX_CAPTURE_DURATION_MS
+        or flow["eligible_rate"] != _ratio(sampling["baseline_eligible_count"], event_count)
+        or flow["duplicate_rate"] != _ratio(duplicate_count, event_count)
+        or flow["noise_rate"] != _ratio(noise_count, event_count)
+        or flow["interarrival_rate_per_minute"] != round(
+            (event_count - 1) * 60_000 / flow["duration_ms"], 6,
+        )
+        or flow["active_fixed_5s_bins"] > flow["duration_ms"] // 5_000 + 1
+        or noise_count != event_kinds.get("system_noise", 0)
+        or surface_counts.get("source_text_repeat", 0) != duplicate_count
+        or surface_counts.get("noise", 0) != noise_count
+        or any(
+            flow[name] is None for name in ("gap_p50_ms", "gap_p95_ms", "gap_max_ms")
+        )
+        or any(
+            flow[name] is not None and flow[name] > flow["duration_ms"]
+            for name in ("gap_p50_ms", "gap_p95_ms", "gap_max_ms")
+        )
+        or flow["gap_max_ms"] * (event_count - 1) < flow["duration_ms"]
+        or not (
+            flow["gap_p50_ms"] <= flow["gap_p95_ms"] <= flow["gap_max_ms"]
+        )
+    ):
+        raise CampaignFormatError("response sampling does not match delivered calls")
     _adjacent_signal_pairs(report["adjacent_signal_pair_counts"])
-    _flow(report["flow"], event_count)
     run_binding = hashlib.sha256(_canonical({
         "source_structural_sha256": report["structural_sha256"],
         "source_evidence": report["source_evidence"],
         "runtime_profile": report["runtime_profile"],
         "response_rows": rows,
+        "response_sampling": sampling,
     })).hexdigest()
     if not hmac.compare_digest(run_binding, report["run_binding_sha256"]):
         raise CampaignFormatError("replay run binding is invalid")
@@ -526,6 +583,7 @@ def validate_campaign_manifest(
         "capture_profile", "structural_sha256", "source_evidence", "event_count",
         "event_kinds", "timing_buckets", "duplicate_count", "noise_count",
         "delivered_count", "response_count", "surface_signal_counts",
+        "response_sampling",
         "adjacent_event_count", "adjacent_signal_pair_counts",
         "max_events_in_rolling_5s", "flow",
     )
@@ -535,6 +593,10 @@ def validate_campaign_manifest(
         left, right = pair
         if any(left["report"][name] != right["report"][name] for name in source_fields):
             raise CampaignFormatError("paired runs do not use the same exact source")
+        if tuple(row["seq"] for row in left["report"]["response_rows"]) != tuple(
+            row["seq"] for row in right["report"]["response_rows"]
+        ):
+            raise CampaignFormatError("paired runs selected different response events")
         if left["score"]["source_observation"] != right["score"]["source_observation"]:
             raise CampaignFormatError("paired source observation changed")
         left_selector, right_selector = left["score"]["selector"], right["score"]["selector"]

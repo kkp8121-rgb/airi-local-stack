@@ -74,9 +74,9 @@ class ChatReplayTests(unittest.TestCase):
             report_hmac_key=b"k" * 32,
         )
         serialized = json.dumps(report, ensure_ascii=False)
-        self.assertEqual(report["delivered_count"], 2)
-        self.assertEqual(report["response_count"], 2)
-        self.assertEqual(len(report["response_rows"]), 2)
+        self.assertEqual(report["delivered_count"], 1)
+        self.assertEqual(report["response_count"], 1)
+        self.assertEqual(len(report["response_rows"]), 1)
         self.assertEqual(report["timing_buckets"], {"1s_to_5s": 1, "under_1s": 3})
         self.assertEqual(report["surface_signal_counts"], {
             "donation": 1,
@@ -92,10 +92,9 @@ class ChatReplayTests(unittest.TestCase):
             "source_text_repeat->laughter_run": 1,
             "source_text_repeat->noise": 1,
         })
-        self.assertEqual(report["response_outcome_counts"], {"normal": 2})
+        self.assertEqual(report["response_outcome_counts"], {"normal": 1})
         self.assertEqual(report["outcome_by_surface_signal"], {
             "donation": {"normal": 1},
-            "none": {"normal": 1},
         })
         self.assertEqual(report["max_events_in_rolling_5s"], 4)
         self.assertEqual(report["flow"], {
@@ -117,7 +116,8 @@ class ChatReplayTests(unittest.TestCase):
         self.assertNotIn("응원해요", serialized)
         offline = run_replay(events)
         self.assertEqual(offline["response_count"], 0)
-        self.assertEqual(offline["delivered_count"], 2)
+        self.assertEqual(offline["delivered_count"], 0)
+        self.assertGreater(offline["response_sampling"]["selected_event_count"], 0)
 
     def test_source_repeat_is_measured_before_redaction_collision(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -156,6 +156,27 @@ class ChatReplayTests(unittest.TestCase):
         self.assertEqual(one["max_events_in_rolling_5s"], 1)
         minute = run_replay([event(1, 0), event(2, 60_000)])
         self.assertEqual(minute["flow"]["interarrival_rate_per_minute"], 1.0)
+
+    def test_fixed_5s_sampler_selects_one_tie_lowest_seq_and_skips_neutral(self):
+        events = [
+            ReplayEvent(1, 4999, "under_1s", "chat", "first?", None, True, ("question_mark",)),
+            ReplayEvent(2, 5000, "under_1s", "chat", "tie two?", None, True, ("question_mark",)),
+            ReplayEvent(3, 5001, "under_1s", "chat", "tie three?", None, True, ("question_mark",)),
+            ReplayEvent(4, 10000, "under_1s", "chat", "neutral", None, True, ()),
+        ]
+        calls: list[int] = []
+        report = run_replay(events, lambda _, event: calls.append(event.seq) or "ok", report_hmac_key=b"k" * 32)
+        self.assertEqual(calls, [1, 2])
+        self.assertEqual(report["response_sampling"]["fixed_5s_batch_count"], 3)
+        self.assertEqual(report["response_sampling"]["no_reply_batch_count"], 1)
+        self.assertEqual(report["response_sampling"]["selected_event_count"], 2)
+        self.assertNotIn("first?", json.dumps(report))
+
+    def test_invalid_prepared_eligibility_or_duplicate_is_rejected(self):
+        with self.assertRaises(ReplayFormatError):
+            run_replay([ReplayEvent(1, 0, "under_1s", "chat", "x", None, False, ())])
+        with self.assertRaises(ReplayFormatError):
+            run_replay([ReplayEvent(1, 0, "under_1s", "chat", "x", 1, False, ("source_text_repeat",))])
 
     def test_surface_signals_are_lexical_and_pair_counts_are_explicit(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -340,7 +361,7 @@ class ChatReplayTests(unittest.TestCase):
             "X-AIRI-Serious-Safety": "handled",
             "X-AIRI-Epistemic-Confidence": "live_state",
         })), "serious_safety")
-        event = ReplayEvent(1, 0, "under_1s", "chat", "질문", None, True, ())
+        event = ReplayEvent(1, 0, "under_1s", "chat", "질문?", None, True, ("question_mark",))
         report = run_replay(
             [event], lambda *_: ReplayResponse("실제 응답 원문", "epistemic_reference"),
             report_hmac_key=b"k" * 32,
@@ -353,7 +374,7 @@ class ChatReplayTests(unittest.TestCase):
 
     def test_private_review_packet_includes_skipped_rows_for_human_labels(self):
         events = [
-            ReplayEvent(1, 0, "under_1s", "chat", "입력 1", None, True, ()),
+            ReplayEvent(1, 0, "under_1s", "chat", "입력 1?", None, True, ("question_mark",)),
             ReplayEvent(2, 1, "under_1s", "system_noise", "ㅋㅋ", None, False, ("laughter_run", "noise")),
         ]
         profile = {"source_slot": "channel_a", "phase": "opening"}
@@ -371,6 +392,7 @@ class ChatReplayTests(unittest.TestCase):
             "source_structural_sha256": source_report["structural_sha256"],
             "source_evidence": evidence, "runtime_profile": runtime,
             "response_rows": source_report["response_rows"],
+            "response_sampling": source_report["response_sampling"],
         })).hexdigest()
         replay = {
             **source_report,
@@ -385,6 +407,7 @@ class ChatReplayTests(unittest.TestCase):
             events, {1: "응답 1"}, profile, source_report["structural_sha256"],
             evidence, runtime, binding, replay["report_hmac_sha256"],
             source_report["response_rows"],
+            source_report["response_sampling"],
         )
         self.assertEqual(len(packet["rows"]), 2)
         self.assertEqual(

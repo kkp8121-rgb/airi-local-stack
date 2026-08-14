@@ -15,6 +15,15 @@
 
 최종 갱신: 2026-08-15
 
+- **2026-08-15** (dev PC, G3/B3-f 장시간 replay 범위 고정): 사용자가 원하는
+  평가 단위를 단발 3문장이 아니라 장시간 다시보기/스트림의 실제 시청자 채팅
+  흐름으로 재확정했다. report v3에 `offline_fixed_5s_response_sampler_v1`을 추가해
+  모든 event를 보존하면서 half-open 5초 창당 최대 1개만 AIRI에 전달하고 no-reply를
+  허용한다. scorer는 선택을 원 event로 재계산하며 paired campaign은 OFF/ON 선택
+  seq 일치와 캡처당 연속 30~120분·300~20,000 event를 강제한다. 세 방송인 이름은
+  저챗 source 탐색 예시일 뿐 고정 target이나 모사 대상이 아니다. 집중 42 PASS.
+  승인 실제 장시간 export와 Mi:dm OFF/ON 실측은 미완료다.
+  (`완료/AIRI-LONG-STREAM-CHAT-REPLAY-SAMPLER-2026-08-15.md`)
 - **2026-08-15** (dev PC, G3/B3-f 3-source paired campaign 기반): normalization
   receipt v2에 동일 승인 source를 여러 캡처에서 확인하는 local-key identity HMAC을
   추가하고, exact capture·replay report·private response·human score의 HMAC 증거
@@ -33,7 +42,8 @@
   report v2는 pre-redaction 원문 반복, rolling 5초 몰림, 간격/유입률, bounded lexical
   signal pair와 proxy fallback outcome을 content-free로 집계한다. 모든 event와 AIRI
   대응을 보는 ignored human packet 및 text-free scorer도 추가했다. 이는 합성·오프라인
-  기반 완료이며 세 채널 승인 캡처, Mi:dm OFF/ON 사람 검수, 운영 ON 채택은 미완료다.
+  기반 완료이며 세 익명 source 승인 캡처, Mi:dm OFF/ON 사람 검수, 운영 ON 채택은
+  미완료다.
   (`완료/AIRI-AUTHORIZED-CHAT-REPLAY-ANALYSIS-FOUNDATION-2026-08-15.md`)
 - **2026-08-15** (dev PC, G3/B3-f 착수): moderation과 분리된
   epistemic-confidence greybox를 기본 OFF로 구현해 현재/live 정보 무근거
@@ -288,7 +298,7 @@
     없는 지시어/짧은 미확립 대상을 pre-publication 한국어 fallback으로 처리하고
     content-free health counter를 제공한다. 실제 승인 채팅 Mi:dm OFF/ON 비교와
     운영 ON 채택은 미완료이며 사용자 확인 전 자동 승격하지 않는다.
-  - [~] 승인 실제 한국 방송 채팅 흐름 replay — 권한 sidecar와 hash-bound
+  - [~] 승인 실제 한국 장시간 방송 채팅 흐름 replay — 권한 sidecar와 hash-bound
     local provenance artifact,
     명시 identity·정형 PII 패턴·후원 금액 pre-model 삭제, 순서·상대 시간·
     중복·잡음 보존,
@@ -296,8 +306,10 @@
     content-free report·모든 event의 ignored private review와 human scorer 구현.
     receipt v2 source identity/exact capture, replay/score HMAC, bounded 사람 분위기·
     pattern label, 3-source×2-phase×OFF/ON campaign validator/aggregate까지 완료.
-    탬탬버린·아카네 리제·아이네 실제 캡처는 방송인/플랫폼 공식 권한 대기이며
-    무단 scraping하지 않는다. offline selector 수치는 B1b/B4a 실선택 성능이 아니다.
+    report v3 fixed 5초 offline sampler·no-reply와 캡처당 연속 30~120분·300~20,000
+    event gate까지 완료. 탬탬버린·아카네 리제·아이네는 source 탐색 예시이며,
+    승인 실제 장시간 export는 방송인/플랫폼 공식 권한 대기다. 무단 scraping하지
+    않으며 offline selector 수치는 B1b/B4a 실선택 성능이 아니다.
     상세: `진행예정/AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md`.
   - [ ] 인간 검수 100건 수집 (dev PC)
   - [ ] 16케이스 자동 게이트 PASS (현재 양 모델 FAIL)
@@ -435,10 +447,10 @@
     not semantic-safety/proxy/UI/TTS proof
   - [ ] B3-e category별(욕설·음란성 등) 설치 UI/TTS 차단 반응 실기 — 현재는
     dictionary/unit + generic match-all 배선 확인만. output moderation 기본 OFF
-  - [~] B3-f 실제 한국 방송 채팅 흐름/확신도 replay — local privacy·권한·
-    replay·승인 export 정규화·흐름/사람 score·paired campaign 기반 완료, 세 채널
-    승인 캡처·Mi:dm OFF/ON 대응 검수·설치 Electron/B1b 종단 실증 대기. 실제
-    원문은 git/학습 데이터에 넣지 않는다.
+  - [~] B3-f 실제 한국 장시간 방송 채팅 흐름/확신도 replay — local privacy·권한·
+    replay·승인 export 정규화·흐름/사람 score·fixed 5초 sampler·30~120분 paired
+    campaign 기반 완료, 세 익명 source 승인 캡처·Mi:dm OFF/ON 대응 검수·설치
+    Electron/B1b 종단 실증 대기. 실제 원문은 git/학습 데이터에 넣지 않는다.
   - [ ] B2 송출 (OBS Browser Source + App Audio Capture — 결정 2 이후)
 - [~] **M4** (B4 방송 디렉터 + C3/C4 ∥ I3 주제 풀)
   - [~] B4a 기반 구현 — 기본 OFF/inert; simulation-only 집중 테스트 17 PASS·독립 최종 검토 PASS.
@@ -479,7 +491,7 @@
   ignored output, replay 전 receipt HMAC 재검증을 추가했다. report v2는 redaction 전 source-text repeat와 rolling
   5초 burst, 간격/유입률, lexical signal pair, proxy outcome만 보존한다. ignored
   private packet은 skipped event까지 포함하고 별도 scorer는 사람 label의 confusion
-  matrix·quality rate·critical failure만 일반 report로 낸다. 실제 세 채널 데이터와
+  matrix·quality rate·critical failure만 일반 report로 낸다. 실제 세 익명 source 데이터와
   Mi:dm OFF/ON 결과는 없으며 운영 gate 기본값은 바꾸지 않았다. 상세:
   `완료/AIRI-AUTHORIZED-CHAT-REPLAY-ANALYSIS-FOUNDATION-2026-08-15.md`,
   `진행예정/AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md`.

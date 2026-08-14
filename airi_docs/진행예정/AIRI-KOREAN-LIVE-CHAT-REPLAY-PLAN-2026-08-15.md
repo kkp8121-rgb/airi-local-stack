@@ -2,25 +2,28 @@
 
 상태: G3/C0·M3의 새 평가 트랙. 로컬 privacy/authorization gate, 승인형 safe
 envelope 정규화, 결정론적 흐름/표면 신호 report, private human score 기반까지
-구현했다. 세 익명 source×최소 2국면×epistemic OFF/ON을 강제하는 HMAC-bound
-campaign validator와 content-free 집계도 준비됐지만, 세 채널의 승인된 실제 채팅
-확보와 Mi:dm 실측은 아직 완료되지 않았다.
+구현했다. 장시간 replay용 fixed 5초 응답 sampler와 세 익명 source×최소 2국면×
+epistemic OFF/ON을 강제하는 HMAC-bound campaign validator도 준비됐다. 실제
+campaign은 캡처마다 연속 30~120분·300~20,000 event를 요구한다. 승인된 실제
+장시간 채팅 확보와 Mi:dm OFF/ON 실측은 아직 완료되지 않았다.
 오프라인 후속 근거: `완료/AIRI-AUTHORIZED-CHAT-REPLAY-ANALYSIS-FOUNDATION-2026-08-15.md`.
 
 ## 목표와 비목표
 
-목표는 한국 방송에서 실제로 발생하는 채팅의 속도, 몰림, 반복, 잡음, 화제 전환,
-장난, 정정, 질문, 후원 이벤트를 시간순으로 AIRI에 전달하고 대응을 관찰하는 것이다.
+목표는 한국 장시간 방송 다시보기 또는 장시간 스트림에서 실제로 발생한 시청자
+채팅의 속도, 몰림, 반복, 잡음, 화제 전환, 장난, 정정, 질문, 후원 이벤트를 시간순으로
+AIRI에 전달하고 언제 어떤 채팅을 골라 어떻게 대응하는지 관찰하는 것이다. 세 문장
+단발 평가는 연결 smoke일 뿐 campaign 완료 근거가 아니다.
 세 방송인의 말투·목소리·고유 밈·정체성을 모사하거나 실제 채팅 원문을 학습
 데이터로 승격하는 작업이 아니다. 실제 채팅은 승인된 비공개 리허설에서만
 일시적으로 사용하고, 저장소에는 독립 작성한 합성 회귀 fixture만 둔다.
 
-## 관찰 대상과 접근 경계
+## source 예시와 접근 경계
 
-- 탬탬버린: 치지직 `a7e175625fdea5a7d98428302b7aa57f`
-- 아카네 리제: 치지직 `4325b1d5bbc321fad3042306646e2e50`
-- 아이네: SOOP `inehine`. 사용자 표현의 `아이네이 3명`은 문맥상
-  `아이네, 이 3명`으로 해석한다.
+탬탬버린·아카네 리제·아이네는 대형 한국 저챗 source를 찾기 위한 예시다. 실제
+campaign이 이 세 방송인으로 고정되는 것은 아니며, 권한이 확인된 한국 장시간
+저챗 source를 `channel_a`~`channel_c` 익명 slot으로 사용한다. 목표는 방송인
+말투가 아니라 시간에 따라 변하는 시청자 채팅과 AIRI 대응이다.
 
 치지직 Developers와 SOOP Chat SDK의 공식 경로만 허용한다. 치지직 실시간 채팅
 이벤트는 사용자 OAuth의 채팅 메시지 조회 권한이 필요하고, SOOP Chat SDK는 현재
@@ -80,9 +83,16 @@ campaign 집계 전에 변조·교환 여부를 검증한다.
 
 ## 입력·분석 단위
 
-캡처마다 시작/중간/화제 전환 또는 게임 전환 구간을 분리한다. 이벤트는 wall-clock
-sleep 없이 원래 순서와 상대 간격을 유지해 재생하고, AIRI 모델 대화 history는 최근
-8개 교환쌍으로 제한한다. 실제 B1b가 생기기 전의 offline replay는 다음을 측정한다.
+source마다 서로 다른 시작/중간/화제 전환 또는 게임 전환 국면을 최소 2개 고른다.
+각 캡처는 연속 30~120분과 300~20,000 event를 모두 만족해야 하며, 더 긴 VOD는
+짧은 발췌가 아니라 이 범위의 연속 구간으로 나눈다. 이벤트는 wall-clock sleep 없이
+원래 순서와 상대 간격을 유지해 재생하고, AIRI 모델 대화 history는 최근 8개
+교환쌍으로 제한한다. 실제 B1b가 생기기 전의 offline replay는 다음을 측정한다.
+
+- 고정 half-open 5초 창마다 eligible 채팅을 최대 1개만 응답 대상으로 고른다.
+  질문·후원과 제한된 표면/최근 문맥 신호가 threshold를 넘지 않으면 AIRI는
+  응답하지 않는다. 선택되지 않은 채팅도 흐름·반복·잡음 분석과 사람 검수에는
+  전부 남는다.
 
 - rolling 5초 최대 유입량·burst start, 간격 p50/p95/max·유입률, 중복률,
   웃음/시스템 잡음률
@@ -103,11 +113,13 @@ sleep 없이 원래 순서와 상대 간격을 유지해 재생하고, AIRI 모�
 ## 실행 순서와 합격 기준
 
 1. default-OFF epistemic-confidence gate와 local replay 하네스의 offline 계약을
-   고정한다. **코드 완료**: consent v2/HMAC normalizer, report v2 흐름·표면 신호·
+   고정한다. **코드 완료**: consent v2/HMAC normalizer, report v3 흐름·표면 신호·
    proxy outcome, 모든 event를 담는 ignored human packet과 content-free scorer,
-   report/score HMAC, 3-source paired campaign validator와 operator checklist.
-2. 세 채널별 권한을 확보하고, 각 채널에서 서로 다른 방송 국면을 최소 2개씩
-   짧게 캡처한다. 필요한 양은 첫 분석 뒤 정하며 대량 수집부터 하지 않는다.
+   fixed 5초 offline response sampler, report/score HMAC, 3-source paired campaign
+   validator와 operator checklist.
+2. 세 익명 source별 권한을 확보하고, 각 source에서 서로 다른 방송 국면을 최소
+   2개씩 연속 30~120분·300~20,000 event로 캡처한다. 짧은 단발 문장은 이 단계의
+   증거로 인정하지 않는다.
 3. 원문을 모델에 보내기 전에 자동 삭제와 사람 privacy 검수를 수행한다.
 4. 게이트 OFF/ON을 같은 redacted sequence로 Mi:dm에 재생하고 content-free report와
    ignored private review packet을 만든다. runner는 gate를 변경하지 않고 현재
@@ -123,6 +135,24 @@ sleep 없이 원래 순서와 상대 간격을 유지해 재생하고, AIRI 모�
 
 게이트 ON 운영 채택, 캡처 범위 확대, 실제 채팅의 학습 데이터 사용은 각각 별도
 사용자 확인과 권리 검토 없이는 자동 승격하지 않는다.
+
+## 외부 조사 근거와 현재 확보 경계
+
+- SIGDIAL 2024의 장시간 live-chat selection 연구는 28개 replay의 20,514개
+  5초 chat batch를 평가했고 batch당 평균 11.91개 채팅에서 응답할 1개 또는
+  no-reply를 고르는 문제로 정의했다. 이 구조를 참고하되 현재 sampler는 좁은
+  결정론적 offline harness이며 해당 연구 재현이나 실제 B1b 성능이 아니다.
+  https://aclanthology.org/2024.sigdial-1.16/
+- SOOP 연구의 LiveChatBench는 허가 아래 수집된 대규모 실제 한국 채팅과 1,000개
+  번역 benchmark를 기술하지만, 이번 조사에서는 시간순 장시간 원 corpus의 공개
+  download를 확인하지 못했다. 논문에 공개된 3개 예문은 Mi:dm 연결 smoke에만
+  사용했고 장시간 campaign에 포함하지 않는다.
+  https://arxiv.org/abs/2601.02641
+- YouTube는 종료된 live archive에서 chat replay UI를 기본 제공할 수 있지만
+  creator가 끌 수 있고, 공식 `liveChatMessages` API는 종료된 chat을 retrieve하지
+  않는다. 공개 시청 가능한 다시보기와 재사용 가능한 시간순 export를 구분한다.
+  https://support.google.com/youtube/answer/9826490?hl=en
+  https://developers.google.com/youtube/v3/live/docs/errors
 
 ## 공식 문서
 

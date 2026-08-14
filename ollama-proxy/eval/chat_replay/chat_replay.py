@@ -22,7 +22,9 @@ import unicodedata
 
 CONSENT_SCHEMA = "airi.chat-replay-consent.v1"
 CONSENT_SCHEMA_V2 = "airi.chat-replay-consent.v2"
-REPORT_SCHEMA = "airi.chat-replay-report.v2"
+REPORT_SCHEMA = "airi.chat-replay-report.v3"
+RESPONSE_SAMPLER_POLICY = "offline_fixed_5s_response_sampler_v1"
+RESPONSE_SAMPLER_WINDOW_MS = 5_000
 FIXTURE_SCHEMA = "airi.chat-replay-fixture.v1"
 ALLOWED_KINDS = frozenset({"chat", "donation_callout", "system_noise"})
 ALLOWED_AUTHORIZATION_BASES = frozenset({
@@ -423,6 +425,76 @@ def _rolling_5s_counts(replay: list[ReplayEvent]) -> list[int]:
     return counts
 
 
+def _sampler_terms(text: str) -> frozenset[str]:
+    """Return a small, content-local lexical signature for sampler tie-breaking."""
+    return frozenset(re.findall(r"[\w가-힣]{2,32}", text.casefold()))
+
+
+def _sample_response_events(replay: list[ReplayEvent]) -> tuple[list[ReplayEvent], dict[str, Any]]:
+    """Choose at most one eligible event per fixed half-open five-second bin.
+
+    This is deliberately a bounded lexical heuristic, not a semantic selector.
+    """
+    bins: dict[int, list[ReplayEvent]] = {}
+    for event in replay:
+        if event.selection_eligible:
+            bins.setdefault(event.offset_ms // RESPONSE_SAMPLER_WINDOW_MS, []).append(event)
+    selected: list[ReplayEvent] = []
+    reasons: Counter[str] = Counter()
+    recent_chat_terms: frozenset[str] | None = None
+    for _, candidates in sorted(bins.items()):
+        scored: list[tuple[int, int, ReplayEvent, str]] = []
+        for event in candidates:
+            signals = set(event.surface_signals)
+            if event.event_kind == "donation_callout":
+                score, reason = 100, "donation_callout"
+            elif "question_mark" in signals:
+                score, reason = 80, "question"
+            else:
+                score = (
+                    12 * ("correction_marker" in signals)
+                    + 8 * ("emphasis" in signals)
+                    + 5 * ("laughter_run" in signals)
+                )
+                reason = "lexical_signal"
+                terms = _sampler_terms(event.model_text)
+                if recent_chat_terms is not None and terms:
+                    overlap = len(terms & recent_chat_terms)
+                    novelty = len(terms - recent_chat_terms)
+                    score += min(novelty, 4) * 2 - min(overlap, 4) * 2
+                    if novelty > overlap:
+                        reason = "lexical_novelty"
+                    elif overlap:
+                        reason = "lexical_overlap"
+            # Low-strength conversational surface cues are intentionally not
+            # enough by themselves; sparse/neutral bins produce no reply.
+            if score >= 20:
+                scored.append((score, -event.seq, event, reason))
+        if not scored:
+            reasons["no_reply"] += 1
+            continue
+        _, _, chosen, reason = max(scored)
+        selected.append(chosen)
+        reasons[reason] += 1
+        if chosen.event_kind == "chat":
+            recent_chat_terms = _sampler_terms(chosen.model_text)
+    candidate_batch_count = len(bins)
+    sampled_count = len(selected)
+    return selected, {
+        "policy_id": RESPONSE_SAMPLER_POLICY,
+        "fixed_window_ms": RESPONSE_SAMPLER_WINDOW_MS,
+        "fixed_5s_batch_count": len({event.offset_ms // RESPONSE_SAMPLER_WINDOW_MS for event in replay}),
+        "candidate_batch_count": candidate_batch_count,
+        "no_reply_batch_count": candidate_batch_count - sampled_count,
+        "baseline_eligible_count": sum(event.selection_eligible for event in replay),
+        "selected_event_count": sampled_count,
+        "eligible_not_selected_count": sum(event.selection_eligible for event in replay) - sampled_count,
+        "per_batch_limit": 1,
+        "selection_rate": _ratio(sampled_count, sum(event.selection_eligible for event in replay)),
+        "reason_counts": dict(sorted(reasons.items())),
+    }
+
+
 def run_replay(
     events: Iterable[ReplayEvent],
     responder: Callable[[str, ReplayEvent], str | ReplayResponse] | None = None,
@@ -438,6 +510,13 @@ def run_replay(
         or event.offset_ms < 0
         or (index > 1 and event.offset_ms < replay[index - 2].offset_ms)
         or event.event_kind not in ALLOWED_KINDS
+        or event.selection_eligible is not (
+            event.event_kind != "system_noise" and event.duplicate_of_seq is None
+        )
+        or (
+            event.duplicate_of_seq is not None
+            and (type(event.duplicate_of_seq) is not int or not 1 <= event.duplicate_of_seq < index)
+        )
         or event.surface_signals != _surface_signals(
             event.model_text,
             event.event_kind,
@@ -471,13 +550,15 @@ def run_replay(
             for left in previous_signals
             for right in current_signals
         )
+    sampled_events, response_sampling = _sample_response_events(replay)
+    sampled_seqs = {event.seq for event in sampled_events}
     delivered = 0
     responses = 0
     response_rows: list[dict[str, Any]] = []
     response_outcomes: Counter[str] = Counter()
     outcomes_by_signal: dict[str, Counter[str]] = {}
     for event in replay:
-        if not event.selection_eligible:
+        if event.seq not in sampled_seqs or responder is None:
             continue
         delivered += 1
         if responder is not None:
@@ -536,6 +617,7 @@ def run_replay(
         "delivered_count": delivered,
         "response_count": responses,
         "response_rows": response_rows,
+        "response_sampling": response_sampling,
         "response_outcome_counts": dict(sorted(response_outcomes.items())),
         "outcome_by_surface_signal": {
             signal: dict(sorted(counts.items()))

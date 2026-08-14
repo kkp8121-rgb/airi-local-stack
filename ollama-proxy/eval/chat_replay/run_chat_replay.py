@@ -202,6 +202,7 @@ def build_private_review_packet(
     run_binding_sha256: str,
     report_hmac_sha256: str,
     response_rows: list[dict[str, object]],
+    response_sampling: dict[str, object],
 ) -> dict[str, object]:
     response_by_seq = {item["seq"]: item for item in response_rows}
     rows = [{
@@ -238,6 +239,7 @@ def build_private_review_packet(
         "runtime_profile": runtime_profile,
         "run_binding_sha256": run_binding_sha256,
         "report_hmac_sha256": report_hmac_sha256,
+        "response_sampling": response_sampling,
         "source_review": {
             "atmosphere": None, "pace": None, "context_pressure": None,
             "dominant_patterns": [],
@@ -353,6 +355,7 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
             "source_evidence": source_evidence,
             "runtime_profile": runtime_profile,
             "response_rows": report["response_rows"],
+            "response_sampling": report["response_sampling"],
         })).hexdigest()
         report["report_hmac_sha256"] = replay_report_hmac(identity_key, report)
     _write_atomic(args.report, report, HERE / "reports")
@@ -365,6 +368,7 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
                 report["runtime_profile"], report["run_binding_sha256"],
                 report["report_hmac_sha256"],
                 report["response_rows"],
+                report["response_sampling"],
             ),
             HERE / "private-replays",
         )

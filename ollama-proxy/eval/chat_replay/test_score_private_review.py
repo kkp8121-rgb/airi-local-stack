@@ -1,5 +1,6 @@
 import ast
 import hashlib
+import hmac
 import json
 from pathlib import Path
 import sys
@@ -18,15 +19,15 @@ class PrivateReviewScorerTests(unittest.TestCase):
     def fixture(self, directory: Path):
         key = b"k" * 32
         key_path = directory / "identity.key"; key_path.write_bytes(key)
-        events = [ReplayEvent(1, 100, "under_1s", "chat", "sensitive input", None, True, ())]
+        events = [ReplayEvent(1, 100, "under_1s", "chat", "sensitive input?", None, True, ("question_mark",))]
         source = run_replay(events, lambda *_: "private response", report_hmac_key=key,
                             capture_profile={"source_slot": "channel_a", "phase": "opening"})
         evidence = {"provider": "test", "source_identity_hmac": "a" * 64, "exact_capture_hmac": "b" * 64}
         runtime = {"model": "frozen", "history_turns": 8}
-        binding = hashlib.sha256(_canonical({"source_structural_sha256": source["structural_sha256"], "source_evidence": evidence, "runtime_profile": runtime, "response_rows": source["response_rows"]})).hexdigest()
+        binding = hashlib.sha256(_canonical({"source_structural_sha256": source["structural_sha256"], "source_evidence": evidence, "runtime_profile": runtime, "response_rows": source["response_rows"], "response_sampling": source["response_sampling"]})).hexdigest()
         replay = {**source, "source_evidence": evidence, "runtime_profile": runtime, "run_binding_sha256": binding}
         replay["report_hmac_sha256"] = run_chat_replay.replay_report_hmac(key, replay)
-        packet = run_chat_replay.build_private_review_packet(events, {1: "private response"}, source["capture_profile"], source["structural_sha256"], evidence, runtime, binding, replay["report_hmac_sha256"], source["response_rows"])
+        packet = run_chat_replay.build_private_review_packet(events, {1: "private response"}, source["capture_profile"], source["structural_sha256"], evidence, runtime, binding, replay["report_hmac_sha256"], source["response_rows"], source["response_sampling"])
         packet["source_review"] = {"atmosphere": "calm", "pace": "steady", "context_pressure": "low", "dominant_patterns": ["question_wave"]}
         packet["rows"][0]["review"] = {"expected_action": "respond", "grounded": True, "context_preserved": True, "tone_ok": True, "privacy_ok": False, "current_fact_ok": False, "reference_grounding_ok": True, "agreement_calibration_ok": False}
         packet_path, replay_path = directory / "packet.json", directory / "replay.json"
@@ -65,6 +66,77 @@ class PrivateReviewScorerTests(unittest.TestCase):
             replay.write_text(json.dumps(value), encoding="utf-8")
             with self.assertRaises(PrivateReviewError):
                 score_private_review(packet, replay, key)
+
+    def test_signed_but_semantically_invalid_sampling_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            packet, replay_path, key_path = self.fixture(root)
+            key = key_path.read_bytes()
+            replay = json.loads(replay_path.read_text(encoding="utf-8"))
+            packet_value = json.loads(packet.read_text(encoding="utf-8"))
+            sampling = replay["response_sampling"]
+            sampling["reason_counts"] = {"lexical_signal": 1}
+            packet_value["response_sampling"] = sampling
+            replay["run_binding_sha256"] = hashlib.sha256(_canonical({
+                "source_structural_sha256": replay["structural_sha256"],
+                "source_evidence": replay["source_evidence"],
+                "runtime_profile": replay["runtime_profile"],
+                "response_rows": replay["response_rows"],
+                "response_sampling": sampling,
+            })).hexdigest()
+            packet_value["run_binding_sha256"] = replay["run_binding_sha256"]
+            unsigned = dict(replay)
+            unsigned.pop("report_hmac_sha256")
+            replay["report_hmac_sha256"] = hmac.new(
+                key, scorer.REPORT_HMAC_DOMAIN + _canonical(unsigned), hashlib.sha256,
+            ).hexdigest()
+            packet_value["report_hmac_sha256"] = replay["report_hmac_sha256"]
+            packet.write_text(json.dumps(packet_value), encoding="utf-8")
+            replay_path.write_text(json.dumps(replay), encoding="utf-8")
+            with self.assertRaises(PrivateReviewError):
+                score_private_review(packet, replay_path, key_path)
+
+    def test_sampling_rate_rejects_bool_nan_and_infinity(self):
+        for value in (True, float("nan"), float("inf")):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as temp:
+                packet, replay, key = self.fixture(Path(temp))
+                packet_value = json.loads(packet.read_text(encoding="utf-8"))
+                packet_value["response_sampling"]["selection_rate"] = value
+                packet.write_text(json.dumps(packet_value), encoding="utf-8")
+                with self.assertRaises(PrivateReviewError):
+                    score_private_review(packet, replay, key)
+
+    def test_rehmaced_impossible_report_count_and_outcome_are_rejected(self):
+        for mode in ("count", "outcome"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                packet_path, replay_path, key_path = self.fixture(root)
+                key = key_path.read_bytes()
+                packet = json.loads(packet_path.read_text(encoding="utf-8"))
+                replay = json.loads(replay_path.read_text(encoding="utf-8"))
+                if mode == "count":
+                    replay["event_count"] = 999
+                else:
+                    replay["response_rows"][0]["outcome"] = "arbitrary"
+                    packet["rows"][0]["outcome"] = "arbitrary"
+                replay["run_binding_sha256"] = hashlib.sha256(_canonical({
+                    "source_structural_sha256": replay["structural_sha256"],
+                    "source_evidence": replay["source_evidence"],
+                    "runtime_profile": replay["runtime_profile"],
+                    "response_rows": replay["response_rows"],
+                    "response_sampling": replay["response_sampling"],
+                })).hexdigest()
+                packet["run_binding_sha256"] = replay["run_binding_sha256"]
+                unsigned = dict(replay)
+                unsigned.pop("report_hmac_sha256")
+                replay["report_hmac_sha256"] = hmac.new(
+                    key, scorer.REPORT_HMAC_DOMAIN + _canonical(unsigned), hashlib.sha256,
+                ).hexdigest()
+                packet["report_hmac_sha256"] = replay["report_hmac_sha256"]
+                packet_path.write_text(json.dumps(packet), encoding="utf-8")
+                replay_path.write_text(json.dumps(replay), encoding="utf-8")
+                with self.assertRaises(PrivateReviewError):
+                    score_private_review(packet_path, replay_path, key_path)
 
     def test_source_observation_is_bound_by_score_structure(self):
         with tempfile.TemporaryDirectory() as temp:
