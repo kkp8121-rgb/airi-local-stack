@@ -19,6 +19,7 @@ SOURCE_MANIFEST = Path(__file__).parent / "model-usage-manifests" / "motif-2.6b-
 class FakeModel:
     def __init__(self) -> None:
         self.calls: list[tuple[list[dict], dict]] = []
+        self.generation_config = type("GenerationConfig", (), {"eos_token_id": [219395, 219405]})()
 
     def generate_text(self, messages: list[dict], options: dict) -> str:
         self.calls.append((messages, options))
@@ -119,6 +120,43 @@ class MotifLocalBackendTests(unittest.TestCase):
                 self.assertEqual(status, 400); self.assertIn("num_predict exceeds", json.loads(data)["error"])
             finally:
                 server.shutdown(); server.server_close(); thread.join()
+
+    def test_singular_or_mismatched_model_eos_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            backend, model, _ = self._backend(Path(raw))
+            for eos_token_id in (219395, [219395], [219395, 219406]):
+                with self.subTest(eos_token_id=eos_token_id):
+                    model.generation_config.eos_token_id = eos_token_id
+                    with self.assertRaisesRegex(motif.MotifBackendError, "runtime load failed"):
+                        backend.chat({"messages": [{"role": "user", "content": "x"}]})
+                    self.assertIsNone(backend.model)
+                    model.generation_config.eos_token_id = [219395, 219405]
+
+    def test_full_model_eos_list_reaches_transformers_generate(self) -> None:
+        class Value:
+            shape = (1, 2)
+            def to(self, _device): return self
+        class Generated:
+            class Tokens:
+                shape = (1,)
+                def __getitem__(self, _index): return self
+            def __getitem__(self, _index): return self.Tokens()
+        class Tokenizer:
+            pad_token_id = 0
+            def apply_chat_template(self, *_args, **_kwargs): return Value()
+            def decode(self, _tokens, **_kwargs): return "answer"
+        class StandardModel:
+            generation_config = type("GenerationConfig", (), {"eos_token_id": [219395, 219405]})()
+            def __init__(self): self.calls = []
+            def get_input_embeddings(self): return type("Embedding", (), {"weight": type("Weight", (), {"device": "device"})()})()
+            def generate(self, _encoded, **kwargs): self.calls.append(kwargs); return Generated()
+        with tempfile.TemporaryDirectory() as raw:
+            manifest, snapshot = self._fixture(Path(raw)); model = StandardModel()
+            backend = motif.MotifBackend(manifest_path=manifest, snapshot_path=snapshot, loader=lambda *_: (model, Tokenizer(), FakeTorch()), version_resolver=lambda package: motif.DEPENDENCY_LOCK[package])
+            result = backend.chat({"messages": [{"role": "user", "content": "x"}]})
+        self.assertEqual(result.content, "answer")
+        self.assertEqual(model.calls[0]["eos_token_id"], [219395, 219405])
+        self.assertEqual(model.calls[0]["pad_token_id"], 0)
 
     def test_option_allowlist_num_gpu_think_and_format(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

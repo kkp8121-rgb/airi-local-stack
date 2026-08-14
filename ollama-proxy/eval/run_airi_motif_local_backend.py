@@ -40,10 +40,19 @@ QUANTIZATION = {
 DEPENDENCY_LOCK = {"accelerate": "1.6.0", "bitsandbytes": "0.45.5", "torch": "2.5.1+cu121", "transformers": "4.51.3"}
 OFFLINE_ENV = {"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "HF_HUB_DISABLE_TELEMETRY": "1", "DO_NOT_TRACK": "1"}
 _HEX = re.compile(r"^[0-9a-f]{64}$")
+PINNED_EOS_TOKEN_IDS = [219395, 219405]
 
 
 class MotifBackendError(ValueError):
     """A safe-to-return backend contract error."""
+
+
+def _pinned_eos_token_ids(model: Any) -> list[int]:
+    """Return only the audited model's complete generation EOS contract."""
+    eos_token_id = getattr(getattr(model, "generation_config", None), "eos_token_id", None)
+    if not isinstance(eos_token_id, list) or eos_token_id != PINNED_EOS_TOKEN_IDS:
+        raise MotifBackendError("loaded Motif generation EOS tokens do not match the pinned contract")
+    return list(eos_token_id)
 
 
 class GenerationResult:
@@ -194,6 +203,7 @@ class MotifBackend:
         self.loader = loader
         self.version_resolver = version_resolver or importlib.metadata.version
         self.model: Any = None; self.tokenizer: Any = None; self.torch: Any = None
+        self.eos_token_ids: list[int] | None = None
         self._generation_lock = threading.RLock()
         self._report("ready")
 
@@ -224,6 +234,7 @@ class MotifBackend:
                 tokenizer = AutoTokenizer.from_pretrained(self.snapshot, local_files_only=True, trust_remote_code=False, use_safetensors=True)
                 model = AutoModelForCausalLM.from_pretrained(self.snapshot, local_files_only=True, trust_remote_code=True, quantization_config=quant, torch_dtype=torch.bfloat16, device_map="auto", max_memory=self.max_memory, attn_implementation="eager", offload_buffers=True, low_cpu_mem_usage=True, use_safetensors=True)
                 self.model, self.tokenizer, self.torch = model, tokenizer, torch
+            self.eos_token_ids = _pinned_eos_token_ids(self.model)
         except Exception as exc:
             self.cleanup()
             self._report("error", "runtime load failed: " + type(exc).__name__)
@@ -242,7 +253,7 @@ class MotifBackend:
 
     def cleanup(self) -> None:
         with self._generation_lock:
-            self.model = None; self.tokenizer = None
+            self.model = None; self.tokenizer = None; self.eos_token_ids = None
             torch = self.torch; self.torch = None
             gc.collect()
             if torch is not None:
@@ -334,7 +345,9 @@ class MotifBackend:
                     raise MotifBackendError("encoded prompt plus requested completion exceeds effective num_ctx")
                 device = self.model.get_input_embeddings().weight.device
                 generation_options = {key: value for key, value in options.items() if key not in {"seed", "num_ctx"}}
-                generated = self.model.generate(encoded.to(device), pad_token_id=self.tokenizer.pad_token_id, eos_token_id=self.tokenizer.eos_token_id, **generation_options)
+                if self.eos_token_ids is None:
+                    raise MotifBackendError("loaded Motif generation EOS tokens are unavailable")
+                generated = self.model.generate(encoded.to(device), pad_token_id=self.tokenizer.pad_token_id, eos_token_id=self.eos_token_ids, **generation_options)
                 tokens = generated[0][input_count:]
                 return GenerationResult(self.tokenizer.decode(tokens, skip_special_tokens=True), input_count, int(tokens.shape[-1]), time.monotonic_ns() - started)
             except Exception as exc:

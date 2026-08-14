@@ -25,6 +25,7 @@ class _Weight: device = "embedding-device"
 class _Embedding: weight = _Weight()
 class _Model:
     hf_device_map = {"model": 0}
+    generation_config = types.SimpleNamespace(eos_token_id=[219395, 219405])
     def get_input_embeddings(self): return _Embedding()
 
 
@@ -71,6 +72,30 @@ class MotifNativeTests(unittest.TestCase):
             root=Path(raw); output=root/"out.json"; result=runner.run_motif(stage="p2",manifest_path=MANIFEST,snapshot_path=root,report_path=output,cache_dir=root/"cache")
         self.assertEqual(result["status"], "complete"); self.assertEqual(result["counts"]["run_count"], 48)
         tokenizer_kwargs=dict(calls)["tokenizer"]; model_kwargs=dict(calls)["model"]; self.assertFalse(tokenizer_kwargs["trust_remote_code"]); self.assertTrue(model_kwargs["trust_remote_code"]); self.assertTrue(model_kwargs["use_safetensors"]); self.assertEqual(model_kwargs["attn_implementation"], "eager"); self.assertEqual(model_kwargs["torch_dtype"], "bf16")
+
+    def test_generate_uses_full_pinned_model_eos_list(self):
+        calls = []
+        class Value:
+            shape = (1, 2)
+            def to(self, _device): return self
+        class Generated:
+            shape = (1, 3)
+            def __getitem__(self, _index): return [1, 2, 3]
+        class Tokenizer(_Tokenizer):
+            def apply_chat_template(self, *_args, **_kwargs): return {"input_ids": Value()}
+            def decode(self, _tokens, **_kwargs): return "answer"
+        class Model(_Model):
+            def generate(self, **kwargs): calls.append(kwargs); return Generated()
+        runner._generate(types.SimpleNamespace(cuda=_Cuda()), Tokenizer(), Model(), [{"role": "user", "content": "x"}], runner._pinned_eos_token_ids(Model()))
+        self.assertEqual(calls[0]["eos_token_id"], [219395, 219405])
+        self.assertEqual(calls[0]["pad_token_id"], 0)
+
+    def test_singular_or_mismatched_model_eos_is_rejected(self):
+        for eos_token_id in (219395, [219395], [219395, 219406]):
+            with self.subTest(eos_token_id=eos_token_id):
+                model = _Model(); model.generation_config = types.SimpleNamespace(eos_token_id=eos_token_id)
+                with self.assertRaisesRegex(runner.ProbeError, "EOS tokens"):
+                    runner._pinned_eos_token_ids(model)
 
     def test_p3_and_p4_counts_and_aggregates(self):
         class Loader:

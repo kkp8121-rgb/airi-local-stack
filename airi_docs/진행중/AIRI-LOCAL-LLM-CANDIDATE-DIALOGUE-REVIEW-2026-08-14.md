@@ -1,5 +1,7 @@
 # AIRI 로컬 LLM 후보 대화 원문 검토 - 2026-08-14
 
+> **대체 고지 (2026-08-14):** 이 문서의 기존 Motif native/common 원문·결론은 이전 실행의 singular-EOS override 및 이전 대화에서 유래했을 우려가 있는 fixture 때문에 방법론적으로 유효하지 않으며 대체되었다. 새 Mi:dm native 대 Motif native 재실행의 원문은 [AIRI-MIDM-MOTIF-NATIVE-BROADCAST-RERUN-2026-08-14.md](AIRI-MIDM-MOTIF-NATIVE-BROADCAST-RERUN-2026-08-14.md)를 참조한다.
+
 ## 목적과 보존 범위
 
 이 한국어 검토 문서는 지정된 로컬 캡처의 prompt/response 252쌍(P6 실제 180 turn,

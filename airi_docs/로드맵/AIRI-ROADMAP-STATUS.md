@@ -631,3 +631,20 @@
   - [x] Operational baseline restored: Mi:dm exact digest; STT, extraction, and
     moderation OFF; no loaded runner; installed ASAR unchanged — 2026-08-14
   - [ ] Public/revenue Motif deployment approval (blocked: pinned LICENSE file absent)
+
+- **2026-08-14 (Mi:dm–Motif native clean rerun checkpoint):** 기존 Motif 비교는 단일
+  EOS 방법론 오류와 이전 대화에서 유래한 fixture 우려 때문에 역사 기록으로만 보존하고,
+  비교 결론에서는 대체한다. 새 일반 합성 방송 16건을 native 경로에서 재실행했으며
+  메시지 해시는 64/64 일치했고, `hf_card` 1회 및 `broadcast_equal` 3회 profile에서
+  TTFT/총 시간/tok/s를 기록했다. equal-profile 핵심 수치는 Mi:dm TTFT
+  P50/P95 `0.156/0.157s`, 총 시간 `2.657/8.391s`, `13.973 tok/s`; Motif는
+  `0.203/0.219s`, `12.493/24.516s`, `5.227 tok/s`다. 품질은 인간 검수 대기이며,
+  Mi:dm은 운영 기준을 유지하고 Motif는 배포 차단을 유지한다. 상세:
+  `진행중/AIRI-MIDM-MOTIF-NATIVE-BROADCAST-RERUN-2026-08-14.md`.
+  - [x] native rehearsal 및 Motif dual-EOS 집중 회귀: 28 PASS, 1 skip
+  - [x] eval unittest discovery: 135 PASS, 1 skip
+  - [x] Python 3.12 core pytest: 999 PASS, 2 skip, 869 subtests PASS
+  - [x] sender Node 계약: 32 PASS
+  - [x] six-manifest complete-set 및 current checkpoint: PASS
+  - [x] Mi:dm exact digest, local provider, `num_ctx=2048`, STT/extraction/moderation
+    OFF, Ollama temporary runner 없음으로 복원

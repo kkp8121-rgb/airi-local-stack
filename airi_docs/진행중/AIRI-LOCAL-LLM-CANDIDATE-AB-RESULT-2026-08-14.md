@@ -1,5 +1,7 @@
 # AIRI 로컬 LLM 후보 A/B 실측 결과 — 2026-08-14
 
+> **대체 고지 (2026-08-14):** 이 문서의 기존 Motif native/common 비교 결론은 이전 실행의 singular-EOS override 및 이전 대화에서 유래했을 우려가 있는 fixture 때문에 방법론적으로 유효하지 않으며 대체되었다. 새 비교는 Mi:dm native 대 Motif native만을 다룬 [AIRI-MIDM-MOTIF-NATIVE-BROADCAST-RERUN-2026-08-14.md](AIRI-MIDM-MOTIF-NATIVE-BROADCAST-RERUN-2026-08-14.md)를 기준으로 한다.
+
 ## 결론
 
 이 개발 PC의 RTX 3060 Ti 8 GB와 현재 AIRI 방송 경로에서 **foreground 기본 모델은

@@ -30,20 +30,15 @@ quantization이 다르므로 exact revision의 사용법 manifest를 먼저 만�
 
 production-context v2 gate는 구현·측정을 완료했지만 **FAIL**이다. 7개 필드 중 6개는 12/12이고 두 continuity color는 v1보다 개선됐으나, `dialogue_marker`가 0/12로 memory marker `silver-fern`을 결정적으로 복사한다. 따라서 prompt tuning을 계속하거나 품질 PASS라고 주장하지 않는다. 기본 2048·추출 OFF·STT OFF를 유지하며, 설치 extraction을 재실행하지 않았다.
 
-로컬 LLM P0–P7 A/B 실측은 2026-08-14 완료했다. foreground 운영 모델은
-Mi:dm exact digest를 유지하며, Phi-4 Mini와 Ministral은 인간 검수 challenger다.
-Qwen3는 확신도/문맥 자동 규칙 8/12와 production-context 12/12였지만 실제 첫
-render P50 약 9.15초, 120-turn 80/120, 빈 응답 때문에 foreground 승격 대상이
-아니다. Motif exact revision `70bf316e166f2a256b1068e35c8310541a6a06bc`는 공식 F32
-shard 전량 다운로드·hash-verify와 remote-code 감사 뒤 offline 실행을 완료했다. Native
-BF16+CPU offload P1/P2/P3/P4/P6와 experimental local Transformers+bitsandbytes NF4
-비-Ollama common P1/P2/P4/P5/P6/intelligence/P7가 actual이다. P2 native/common은
-0/16·1/16이고, common P3는 JSON-schema 미지원 HTTP 400이다. P5는 80/120(TTFT 약
-8.02초), intelligence 4/12(clarify 0/2, unknown 0), P7 render P50 약 9.22초로
-**권장하지 않는다**. pinned LICENSE 파일은 계속 없으므로 evaluation exception만 허용하고
-public/revenue deployment는 승인하지 않는다. 검토 PC는 모델명을 열기 전에 P6와 intelligence의 두 익명 packet을
-채우고, 그 뒤 별도 key로 매핑한다. 상세:
-`airi_docs/진행중/AIRI-LOCAL-LLM-CANDIDATE-AB-RESULT-2026-08-14.md`.
+Mi:dm–Motif native 비교는 2026-08-14 clean rerun으로 갱신했다. 기존 Motif 비교는
+단일 EOS 방법론 오류와 이전 대화 유래 fixture 우려로 결론에서 제외하되 역사 기록은
+보존한다. 새 일반 합성 방송 16건은 메시지 해시 64/64 일치, `hf_card` 1회와
+`broadcast_equal` 3회 profile로 TTFT/총 시간/tok/s를 기록했다. equal-profile에서 Mi:dm은
+TTFT P50/P95 `0.156/0.157s`, 총 시간 `2.657/8.391s`, `13.973 tok/s`; Motif는
+`0.203/0.219s`, `12.493/24.516s`, `5.227 tok/s`다. 품질은 인간 검수 대기다.
+Mi:dm exact digest를 운영 기준으로 유지하고 Motif는 배포 차단을 유지한다. 상세:
+`airi_docs/진행중/AIRI-MIDM-MOTIF-NATIVE-BROADCAST-RERUN-2026-08-14.md`.
+로컬 전체 검증 결과는 위 상세 문서의 `로컬 검증과 종료 상태`를 기준으로 확인한다.
 
 모든 후보가 모호한 고유명사·현재 정보 불확실성·무조건 동의를 완전히 처리하지
 못했으므로 음란/비속어 moderation과 별도의 epistemic-confidence gate가 다음

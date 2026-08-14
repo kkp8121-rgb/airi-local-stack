@@ -122,6 +122,7 @@ jobs:
               ollama-proxy/eval/test_airi_native_context_gate.py
               ollama-proxy/eval/test_airi_native_fit_probe.py
               ollama-proxy/eval/test_airi_native_persona_gate.py
+              ollama-proxy/eval/test_airi_native_broadcast_rehearsal.py
               ollama-proxy/eval/test_airi_motif_native.py
               ollama-proxy/eval/test_airi_motif_local_backend.py
               ollama-proxy/eval/test_build_airi_ab_summary.py

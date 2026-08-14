@@ -33,6 +33,7 @@ REPORT_SCHEMA = "airi.motif-native-harness.v1"
 CANDIDATE_ID = "motif-2.6b-v1.1-lc"
 REVISION = "70bf316e166f2a256b1068e35c8310541a6a06bc"
 PERSONA_CASES = Path(__file__).with_name("airi_persona_jailbreak_cases.json")
+PINNED_EOS_TOKEN_IDS = [219395, 219405]
 
 
 def _now() -> str:
@@ -126,13 +127,21 @@ def _messages(stage: str, payload: Any, index: int) -> list[dict[str, str]]:
     return [{"role":"system", "content":"You are AIRI, a friendly Korean broadcast companion."}, {"role":"user", "content": str(payload)}]
 
 
-def _generate(torch: Any, tokenizer: Any, model: Any, messages: list[dict[str, str]]) -> tuple[str, int, float]:
+def _pinned_eos_token_ids(model: Any) -> list[int]:
+    """Return only the audited model's complete generation EOS contract."""
+    eos_token_id = getattr(getattr(model, "generation_config", None), "eos_token_id", None)
+    if not isinstance(eos_token_id, list) or eos_token_id != PINNED_EOS_TOKEN_IDS:
+        raise ProbeError("loaded Motif generation EOS tokens do not match the pinned contract")
+    return list(eos_token_id)
+
+
+def _generate(torch: Any, tokenizer: Any, model: Any, messages: list[dict[str, str]], eos_token_ids: list[int]) -> tuple[str, int, float]:
     encoded = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt", return_dict=True)
     encoded.pop("token_type_ids", None)
     encoded = {key: value.to(model.get_input_embeddings().weight.device) for key, value in encoded.items()}
     synchronized = bool(torch.cuda.is_available())
     if synchronized: torch.cuda.synchronize()
-    start = time.monotonic(); generated = model.generate(**encoded, do_sample=False, max_new_tokens=128, use_cache=True, pad_token_id=tokenizer.pad_token_id, eos_token_id=tokenizer.eos_token_id)
+    start = time.monotonic(); generated = model.generate(**encoded, do_sample=False, max_new_tokens=128, use_cache=True, pad_token_id=tokenizer.pad_token_id, eos_token_id=eos_token_ids)
     if synchronized: torch.cuda.synchronize()
     elapsed = time.monotonic() - start; input_count = encoded["input_ids"].shape[-1]
     output = tokenizer.decode(generated[0][input_count:], skip_special_tokens=True); tokens = int(generated.shape[-1] - input_count)
@@ -157,6 +166,7 @@ def run_motif(*, stage: str, manifest_path: str | Path, snapshot_path: str | Pat
         torch = imported_torch; snapshot = _local_dir(snapshot_path); memory: dict[Any, str] = {0:f"{gpu_max_mib}MiB", "cpu":f"{cpu_max_gib}GiB"}
         tokenizer = AutoTokenizer.from_pretrained(snapshot, local_files_only=True, trust_remote_code=False, use_fast=True)
         model = AutoModelForCausalLM.from_pretrained(snapshot, local_files_only=True, trust_remote_code=True, use_safetensors=True, torch_dtype=torch.bfloat16, attn_implementation="eager", device_map="auto", offload_buffers=True, low_cpu_mem_usage=True, max_memory=memory)
+        eos_token_ids = _pinned_eos_token_ids(model)
         runtime = {"preflight":preflight, "runtime_request":{"trust_remote_code":True,"local_files_only":True,"use_safetensors":True,"torch_dtype":"bfloat16","attn_implementation":"eager","device_map":"auto","offload_buffers":True,"low_cpu_mem_usage":True,"batch_size":1,"padding":False,"max_memory":{"0":memory[0],"cpu":memory["cpu"]}}, "versions":{"torch":torch.__version__,"transformers":transformers.__version__}, "device_map":_safe_device_map(model)}
         runtime["pre_gpu"] = _gpu_snapshot(torch); runtime["pre_ram"] = _ram_snapshot()
         if torch.cuda.is_available(): torch.cuda.reset_peak_memory_stats()
@@ -168,7 +178,7 @@ def run_motif(*, stage: str, manifest_path: str | Path, snapshot_path: str | Pat
         samples=[]; turns=[]
         for payload, index in items:
             for _ in range(repeats):
-                output, token_count, elapsed = _generate(torch, tokenizer, model, _messages(stage, payload, index))
+                output, token_count, elapsed = _generate(torch, tokenizer, model, _messages(stage, payload, index), eos_token_ids)
                 if stage == "p6":
                     if not output.strip(): raise ProbeError("empty P6 response")
                     turns.append({"turn":len(turns)+1,"prompt":payload,"response":output})
