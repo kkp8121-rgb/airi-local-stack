@@ -1,0 +1,81 @@
+{
+  "schema_version": "airi.broadcast-chat-fixtures.v1",
+  "generated_at": "2026-08-14",
+  "purpose": "Mi:dm vs Motif A/B 입력 픽스처 — 실제 방송에서 낭독된 시청자 채팅을 역추출한 것",
+  "source_study": "airi_docs/참조/AIRI-BROADCAST-OBSERVATION-STUDY-2026-08-14.md",
+  "source_transcripts": [
+    "tam-transcript.txt (kr_streamer_justchat, 94분)",
+    "ine-transcript.txt + ine-blocks.txt (kr_vtuber_lowload_talk, 134분)",
+    "lize-transcript.txt (kr_vtuber_longform, 6.5시간)"
+  ],
+  "extraction_rules": [
+    "YouTube 자동자막에서 존댓말 의문형·평서형 낭독 구간을 역추출 (관찰 연구가 '시청자 원문 강한 후보'로 판정한 유형)",
+    "리제 트랜스크립트는 화자 전환(>>) 직후 존댓말 구간을 후보로 사용",
+    "미션 제안형(~해 주세요/~하기), 응원·인사형, 오해·놀림형(반박 트리거)을 별도 수집"
+  ],
+  "sanitization_rules": [
+    "ASR 오인식이 심해 자연스러운 한국어로 복원되지 않는 문장은 전량 제외",
+    "개인정보(전화번호·실명·주소·소속 식별자) 포함 문장 절대 배제 — 수집 단계에서 0건",
+    "특정 방송인 고유 닉네임·팬덤명·소속명·전용 밈은 삭제하거나 일반화",
+    "호명(vocative)은 관찰된 구조를 보존하되 실존 방송인 이름 대신 'AIRI'로 치환",
+    "타임스탬프·방송인명·영상 ID는 항목에 기록하지 않는다"
+  ],
+  "field_semantics": {
+    "id": "고유 식별자",
+    "category": "B4 픽업 우선순위 분류",
+    "text": "모델 입력이 될 시청자 채팅 원문 (러너가 '[YouTube] ' 접두사를 붙인다)",
+    "source": "어느 방송 유형에서 온 것인지 (방송인명·타임스탬프 미기록)",
+    "synthetic": "true면 실측 추출이 아니라 관찰 패턴 기반 합성",
+    "normalized": "true면 ASR 조사·어미 오인식을 자연스러운 한국어로 최소 복원(의미 변경 없음)"
+  },
+  "categories": {
+    "question": "질문형 — 답을 요구하는 직접 질문·고민 상담",
+    "topic_expand": "화제확장 — 진행 중 화제에 정보·의견·설정을 덧붙임",
+    "reaction": "진심 리액션 — 감정·경험 공유형 반응",
+    "support": "응원 — 격려·성원",
+    "mission": "미션 제안 — 화면·행동을 바꾸라는 요청",
+    "donation": "후원 메시지형 — 후원에 얹힌 짧은 메시지",
+    "greeting": "인사 — 입장 신고·첫 인사",
+    "tricky": "오해·놀림형 — 관찰 연구 P4의 '반박 트리거'"
+  },
+  "items": [
+    {"id": "q01", "category": "question", "text": "1월 초에 첫 직장에 입사하게 되었는데 너무 떨려요. 괜찮아지겠죠?", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "q02", "category": "question", "text": "20대 후반인데 작곡 일 꿈이 계속 생각나요. 종종 학원이라도 가는 거 괜찮을까요?", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "q03", "category": "question", "text": "베이스를 치고 싶은데 동호회를 가입해야 될까요, 밴드를 가입해야 될까요?", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "q04", "category": "question", "text": "AIRI님, 조카가 제 얼굴만 보면 우는데 어떡하죠?", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "q05", "category": "question", "text": "번아웃 왔을 때는 쉬는 게 답이라고 하셨는데, 쉴 수 없을 때는 어떻게 할까요?", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "q06", "category": "question", "text": "제가 남 눈치를 많이 보는 성격이라 할 말도 못 하고 혼자 끙끙 앓아요. 어떻게 고칠 수 있을까요?", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "te01", "category": "topic_expand", "text": "이거 돈 버는 게임인가요, 돈 쓰는 게임인가요?", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "te02", "category": "topic_expand", "text": "근데 저기로 다 넣으면 배수구 막히는 거 아닌가요?", "source": "kr_vtuber_lowload_talk"},
+    {"id": "te03", "category": "topic_expand", "text": "청소를 극도로 싫어했던 사람은 영원히 낙엽을 줍는 지옥에 간대요.", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "te04", "category": "topic_expand", "text": "시간을 들여서 얼굴 볼 때마다 간식을 주면 언젠가는 웃습니다.", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "te05", "category": "topic_expand", "text": "토너 다음에 앰플, 크림 순서로 바르면 덜 건조한 것 같아요.", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "rx01", "category": "reaction", "text": "이 방송 알게 되고 힐링 많이 됐어요.", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "rx02", "category": "reaction", "text": "2년 전에 번아웃 왔을 때 그 말 듣고 이겨냈어요. 얼마 전에 또 왔는데 그때 생각하면서 버텼어요.", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "rx03", "category": "reaction", "text": "아기 토끼가 겨울잠 자려고 낙엽 모으네요.", "source": "kr_vtuber_lowload_talk"},
+    {"id": "rx04", "category": "reaction", "text": "전 즉흥적으로 실천하고 금방 그만두는 게 별로라고 생각했는데, 좋게 말씀해 주셔서 감사해요.", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "sp01", "category": "support", "text": "하시는 일이 지구 폭파만 아니면 다 응원할게요.", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "sp02", "category": "support", "text": "이 방송 보면 번아웃 극복, 승진, 합격 다 가능합니다.", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "sp03", "category": "support", "text": "응원 한마디만 해 주시면 큰 힘이 될 것 같아요.", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "sp04", "category": "support", "text": "자격증 공부하면서 방송 봤습니다. 합격해서 내년부터 일해요.", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "ms01", "category": "mission", "text": "AIRI님, 낙엽 더미에 누워서 천사 만들고 싶어요. 좀 모아 주세요.", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "ms02", "category": "mission", "text": "저 작업할 때는 쳐다보지 말아 주시겠어요?", "source": "kr_vtuber_lowload_talk"},
+    {"id": "ms03", "category": "mission", "text": "방금 못 봤는데 한 번만 더 해 주실 수 있나요?", "source": "kr_vtuber_longform", "normalized": true},
+    {"id": "ms04", "category": "mission", "text": "줍다가 한 번씩 허리 펴고 하늘 봐 주세요.", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "ms05", "category": "mission", "text": "토끼 모양 만들기 도전해 주세요.", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "dn01", "category": "donation", "text": "늘 잘 보고 있어요. 오늘도 재밌게 해 주세요.", "source": "observed_pattern_synthesis", "synthetic": true},
+    {"id": "dn02", "category": "donation", "text": "커피값 보냅니다. 따뜻한 거 드시면서 하세요.", "source": "observed_pattern_synthesis", "synthetic": true},
+    {"id": "dn03", "category": "donation", "text": "지난번에 해 주신 말대로 했더니 잘 풀렸어요. 고마운 마음으로 보냅니다.", "source": "observed_pattern_synthesis", "synthetic": true},
+    {"id": "dn04", "category": "donation", "text": "생일 축하해요. 오늘은 하고 싶은 거 다 하세요.", "source": "observed_pattern_synthesis", "synthetic": true},
+    {"id": "gr01", "category": "greeting", "text": "지금 들어왔는데 이런 게임 또 어디서 잘 찾으셨어요.", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "gr02", "category": "greeting", "text": "저 먹을 고구마 가져왔어요.", "source": "kr_vtuber_lowload_talk"},
+    {"id": "gr03", "category": "greeting", "text": "퇴근하고 이제 들어왔어요. 많이 놓쳤나요?", "source": "observed_pattern_synthesis", "synthetic": true},
+    {"id": "gr04", "category": "greeting", "text": "안녕하세요, 오늘 처음 왔어요.", "source": "observed_pattern_synthesis", "synthetic": true},
+    {"id": "tk01", "category": "tricky", "text": "말도 안 해 주셨으면서 이렇게 나오시면 저 노동청에 신고해요.", "source": "kr_vtuber_lowload_talk"},
+    {"id": "tk02", "category": "tricky", "text": "제가 실패했다고 생각하시면 알아서 실패 누르세요.", "source": "kr_vtuber_lowload_talk"},
+    {"id": "tk03", "category": "tricky", "text": "설마 잘못 보고 영양제라고 한 거 아닌가요?", "source": "kr_vtuber_longform", "normalized": true},
+    {"id": "tk04", "category": "tricky", "text": "화장품 얘기 하고 싶어서 몰래 부계정으로 접속해서 질문하신 거 아니죠?", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "tk05", "category": "tricky", "text": "갈퀴한테 기대한 자신을 탓하세요.", "source": "kr_vtuber_lowload_talk", "normalized": true},
+    {"id": "tk06", "category": "tricky", "text": "고생하세요. 그 속도면 가을이 다시 오겠어요.", "source": "kr_vtuber_lowload_talk", "normalized": true}
+  ]
+}

@@ -15,6 +15,15 @@
 
 최종 갱신: 2026-08-14
 
+- **2026-08-14** (검토 PC): 원격 방송 채팅 A/B — 실측 시청자 채팅 38건으로
+  Mi:dm Q4 vs Motif NF4를 Tailscale 원격 경로(방송 중 원격 LLM 시나리오
+  근사)에서 76/76 실측. **완료 p50 357.8ms vs 9,842.6ms(27.5배)**, 형식
+  규격(10~45자) 55% vs 0%, Motif는 접두사 누수·반복 루프 아티팩트 —
+  **Mi:dm 유지 확정 권고**. 공통 발견: raw 직접 호출 시 존댓말 미러링
+  (35~37/38 — 방송 경로가 프록시 스타일 게이트를 경유하는지 배선 확인
+  필요). 원격 서버 계약 2건(스트리밍 미지원·max_tokens 상한 128~159)은
+  dev PC 후속. (`완료/AIRI-REMOTE-BROADCAST-CHAT-AB-2026-08-14.md`,
+  픽스처·러너 `ollama-proxy/eval/broadcast_chat/`)
 - **2026-08-14** (검토 PC): 브랜치 정리 실행(사용자 승인, dev PC 완료
   후) — 주석 태그 `archive/llm-backend-modes-2026-08-07`(재사용 인덱스:
   CodexBackend 하드닝·hybrid 반사 3함수·bench-llm-modes 하네스)와
