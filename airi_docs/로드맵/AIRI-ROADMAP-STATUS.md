@@ -15,6 +15,13 @@
 
 최종 갱신: 2026-08-14
 
+- **2026-08-14** (검토 PC): 브랜치 정리 실행(사용자 승인, dev PC 완료
+  후) — 주석 태그 `archive/llm-backend-modes-2026-08-07`(재사용 인덱스:
+  CodexBackend 하드닝·hybrid 반사 3함수·bench-llm-modes 하네스)와
+  `archive/memory-layer-2026-08-07`(is_true 진위 방화벽·fake 결정론
+  임베더) 생성 후 원격 브랜치 11개 삭제(병합 9 + 태그 보존된 프로토타입
+  2). 잔존: main + chore/dev-pc-live-gates-2026-08-13. 커밋 유실 0
+  (병합 9는 main 도달 가능, 프로토타입 2는 태그 도달 가능).
 - **2026-08-14** (검토 PC): 전 브랜치(12개) 실측 감사 — 분산·유실 작업
   없음 확정. ① 병합 9종: main 조상 관계 실측(9/9), 내용은 현행 전체
   스위트로 검증됨 ② 활성 브랜치: 987 passed/1 skipped/863 subtests +
