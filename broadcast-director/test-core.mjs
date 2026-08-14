@@ -37,9 +37,17 @@ test('recent dedupe has independent true-LRU capacity', () => {
     for (let i = 0; i < 8; i++) send(d, chat('positive', `y${i}`))
     assert.equal(send(d, first).status, 'accepted') // refreshed first is eventually evicted only after eight newer ids
 })
-test('donation is name-only ack then deferred read and separate reaction', () => {
+test('donation queues an immediate validated name-callout then deferred read and separate reaction', () => {
     const d = make(); boot(d); d.submitDonation(donation('read later')); let a = d.nextAction(0)
-    a = d.nextAction(0); assert.equal(a.type, 'donation_ack'); assert.equal('message' in a, false); done(d, a, 0); d.requestSeam(0); a = d.nextAction(0); assert.equal(a.type, 'donation_read_request'); assert.equal(a.message, 'read later'); done(d, a, 0); a = d.nextAction(0); assert.equal(a.type, 'donation_reaction_request')
+    a = d.nextAction(0); assert.equal(a.type, 'donation_name_callout_request'); assert.equal(a.displayName, 'Nora'); assert.equal('message' in a, false); assert.equal('amount' in a, false); assert.equal('viewerKey' in a, false); done(d, a, 0); d.requestSeam(0); a = d.nextAction(0); assert.equal(a.type, 'donation_read_request'); assert.equal(a.message, 'read later'); done(d, a, 0); a = d.nextAction(0); assert.equal(a.type, 'donation_reaction_request'); done(d, a, 0)
+
+    for (const displayName of [undefined, '', 'N'.repeat(81), 'Nora\u0000', 'Nora\u202e', '\ud800']) {
+        const event = donation('not queued')
+        if (displayName === undefined) delete event.displayName
+        else event.displayName = displayName
+        assert.equal(d.submitDonation(event).status, 'rejected')
+        assert.equal(d.nextAction(0).status, 'idle')
+    }
 })
 test('question cycle is 3:2 and waits exactly 12 seconds', () => {
     const d = make(); boot(d); d.advance(30_000)
@@ -92,7 +100,7 @@ test('B1 text bounds count code points', () => {
     const d = make(); boot(d); assert.equal(send(d, chat('positive', '😀'.repeat(1000))).status, 'accepted'); assert.equal(send(d, chat('positive', '😀'.repeat(1001))).status, 'rejected')
 })
 test('donation seam is one-shot', () => {
-    const d = make(); boot(d); d.submitDonation(donation('one')); let a = d.nextAction(0); done(d, a, 0); d.requestSeam(0); a = d.nextAction(0); assert.equal(a.type, 'donation_read_request'); done(d, a, 0); a = d.nextAction(0); done(d, a, 0); d.submitDonation(donation('two')); a = d.nextAction(0); assert.equal(a.type, 'donation_ack'); done(d, a, 0); assert.notEqual(d.nextAction(0).type, 'donation_read_request'); d.requestSeam(0); assert.equal(d.nextAction(0).type, 'donation_read_request')
+    const d = make(); boot(d); d.submitDonation(donation('one')); let a = d.nextAction(0); done(d, a, 0); d.requestSeam(0); a = d.nextAction(0); assert.equal(a.type, 'donation_read_request'); done(d, a, 0); a = d.nextAction(0); done(d, a, 0); d.submitDonation(donation('two')); a = d.nextAction(0); assert.equal(a.type, 'donation_name_callout_request'); done(d, a, 0); assert.notEqual(d.nextAction(0).type, 'donation_read_request'); d.requestSeam(0); assert.equal(d.nextAction(0).type, 'donation_read_request')
 })
 test('compressed six block rehearsal retains final outputs', () => {
     const d = make(); d.start(0); const types = []; for (let b = 0; b < 6; b++) { const at = b * 1_200_000 + 900_000; d.advance(at); for (;;) { const a = d.nextAction(at); if (a.status === 'idle' || a.status === 'completed') break; types.push(a.type); if (a.type.endsWith('lease_request')) d.resolveLease({ actionId: a.actionId, approved: false, leaseToken: '' }, at); else done(d, a, at) } }

@@ -15,6 +15,15 @@
 
 최종 갱신: 2026-08-14
 
+- **2026-08-14** (dev PC, B4c 인수 후속): 검토 PC 배치와 직전 로컬 자산
+  통합 경계를 최신 main에서 대조했다. retired 11439 gateway의 보존 소스로
+  비스트리밍·`max_tokens=1..128` 정확 계약을 확인했고, listener와 Tailscale
+  Serve가 이미 비활성임을 확인했다. canonical AIRI source patch의 exact
+  11435/v1 허용·11434/원격 거부 marker를 checkpoint에 추가했다. B4a 후원
+  action은 `donation_name_callout_request`로 명시했으며 실제 1회 호명 강제는
+  B4b 리허설 게이트로 남겼다. `AIRI_BROADCAST_CONTRACT` 기본 OFF와 사용자
+  승인 전 운영 ON 금지는 유지한다.
+  (`완료/AIRI-B4C-DEV-PC-FOLLOWUP-2026-08-14.md`)
 - **2026-08-14** (dev PC): 분산 개발 자산을 main 기준으로 통합했다. 최종
   LLM은 사용자 확정 Mi:dm Q4 두 Ollama 태그로 단일화하고 비최종 후보
   11태그와 재다운로드 가능한 native snapshot·평가 환경, 비최종 TTS의
@@ -32,8 +41,9 @@
   규격(10~45자) 55% vs 0%, Motif는 접두사 누수·반복 루프 아티팩트 —
   **Mi:dm 유지 확정(사용자 확정)**. 공통 발견: raw 직접 호출 시 존댓말 미러링
   (35~37/38 — 방송 경로가 프록시 스타일 게이트를 경유하는지 배선 확인
-  필요). 원격 서버 계약 2건(스트리밍 미지원·max_tokens 상한 128~159)은
-  dev PC 후속. (`완료/AIRI-REMOTE-BROADCAST-CHAT-AB-2026-08-14.md`,
+  필요). 원격 서버 계약 2건은 dev PC 후속에서 해소·경계 확정: retired 평가
+  gateway는 비스트리밍이며 정확한 `max_tokens` 상한은 128, 현재 배포는 없음.
+  (`완료/AIRI-REMOTE-BROADCAST-CHAT-AB-2026-08-14.md`,
   픽스처·러너 `ollama-proxy/eval/broadcast_chat/`)
 - **2026-08-14** (검토 PC): 브랜치 정리 실행(사용자 승인, dev PC 완료
   후) — 주석 태그 `archive/llm-backend-modes-2026-08-07`(재사용 인덱스:
@@ -256,6 +266,9 @@
     독립 최종 검토 PASS — 2026-08-13
     (`완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`). 실제 런타임,
     AIRI/TTS/OBS, YouTube/OAuth·쿼터, 외부 killswitch·모더레이션 및 2시간 실기는 미증명.
+    2026-08-14 후속에서 후원 즉시 action을 명시적
+    `donation_name_callout_request`로 바꾸고 broadcast-director 전체 24/24
+    PASS; 이름 1회 실제 호명은 B4b adapter 리허설 대기.
   - [x] B4a B1 screened event 우선순위 정책 — strict B1 shape/ID/Unicode code point/timestamp·descriptor snapshot 검증, 개인정보 비보존 수동 문자열 매처, 질문>화제 확장>진심 리액션>응원>긍정 fallback. 로컬 broadcast 집중 시험 24/24 PASS, 독립 combined ingress/policy/director 검토 36/36 PASS — 2026-08-13 (`완료/AIRI-B4A-CHAT-PRIORITY-POLICY-2026-08-13.md`). B4a/G5/M4는 partial이다.
   - [~] B4c 방송 발화 계약 — 수신자 지향 구조(인용→반응 2박자·문체
     스위칭·태그의문·호명 정책) + 디렉터 상태별 가변 길이 + 낭독·응답
@@ -271,7 +284,8 @@
     proxy 스타일 게이트 이중 배선 필요), 흐름 마커 콜백 창안 1/1·
     창밖 0/1(I2 시청자 기억 필요성 실증)
     (`완료/AIRI-B4C-CONTRACT-AB-2026-08-14.md`). 남은 것: 파라미터
-    확정·운영 ON 채택(사용자 확인 경유), 후원 호명 의무화 문구 조정.
+    확정·운영 ON 채택(사용자 확인 경유). 후원 호명은 B4c 문구가 아니라
+    B4a explicit action으로 정리했으며 B4b 실제 호명 실증은 남는다.
   - [~] 스타일 게이트 방송 경로 배선 확인 — 코드 실측 완료 2026-08-14: 게이트는
     치환(`normalize_korean_register`)+미해결 존댓말 문장 드롭(fail-closed)이며
     proxy `chat/completions` 출력 전부에 적용, 우회 플래그 없음. 레포 내 방송
@@ -279,6 +293,13 @@
     provider 설정(proxy 11435) 의존이라 라이브 실증은 B1b 실제 AIRI 주입
     착수 시 확인 필요. 원격 A/B 존댓말 35/38은 벤치마크가 raw 서버(11439)를
     직접 호출한 설계 차이로 설명됨(방송 경로 우회 아님).
+    - [x] source/checkpoint: canonical AIRI patch는 exact loopback `11435/v1`만
+      허용하고 `11434`, 잘못된 `/api`, 원격 HTTPS provider를 거부. 의미 marker를
+      `test-patch-manifest.ps1`에 고정 — 2026-08-14
+    - [ ] B1b live: screened event→실제 AIRI 모델 요청→11435 proxy→스타일
+      치환/미해결 문장 drop→public wire/TTS를 같은 turn으로 증명. 현재
+      approved `broadcast_line` 직접 반환 분기는 모델 출력 게이트 실증이 아님.
+      계약 ON 증거는 별도 사용자 승인 후에만 추가.
   - [x] 멀티턴 방송 리허설 평가 (오프라인 흐름 축) — 구축 완료 2026-08-14
     (`88700ac` — 시나리오 2×24턴·콜백 창 안/밖 분리·여론 집계·후원 호명
     스코핑·politeness_drift·34 tests·CI evaluations shard 등록). 원격 Mi:dm
@@ -392,6 +413,17 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-14** (dev PC, B4c 인수 후속): 직전 자산 통합의
+  `archived_not_deployed` 경계를 보존한 채 검토 PC 세 후속을 정리했다.
+  retired 11439 gateway 소스 계약은 비스트리밍·`max_tokens=1..128`로 확정,
+  현행 listener/Tailscale Serve 없음. canonical AIRI source patch의 exact
+  11435/v1 allow와 11434/원격 reject를 checkpoint 의미 marker로 고정했다.
+  B4a 후원 action은 `donation_name_callout_request`로 명시하고 missing/unsafe
+  이름을 fail-closed했다. B1b style-gate 종단 실증과 B4b 이름 1회 실제 호명은
+  미완료이며, 계약 ON·파라미터 채택은 사용자 승인 전 자동 승격하지 않는다.
+  로컬 broadcast-director 24/24, B4c+멀티턴 55/55, current checkpoint PASS;
+  CI billing 차단 지속. 상세:
+  `완료/AIRI-B4C-DEV-PC-FOLLOWUP-2026-08-14.md`.
 - **2026-08-14** (검토 PC, B4c 선행 배치): 사용자가 로컬 LLM을 Mi:dm으로
   확정했다(결정 6 — 원격 방송 채팅 A/B 지연 27.5배·형식 규격 55% vs 0%·
   Motif 아티팩트 근거). B4c 방송 발화 계약의 greybox 구현을 완료했다

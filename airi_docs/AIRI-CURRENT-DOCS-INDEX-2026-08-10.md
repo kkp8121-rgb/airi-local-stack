@@ -92,6 +92,11 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-B4C-DEV-PC-FOLLOWUP-2026-08-14.md` — 검토 PC B4c 배치와 직전
+  로컬 자산 통합의 dev PC 인수 기록. retired 11439 gateway의 정확한
+  비스트리밍·`max_tokens=1..128` 소스 계약, canonical 11435/v1 방송 경로
+  checkpoint, B1b style-gate 종단 실증 체크리스트와 B4a 명시적 후원 이름 호명
+  action을 다룬다. 계약 ON·파라미터 승격은 포함하지 않는다.
 - `AIRI-LOCAL-ASSET-CONSOLIDATION-2026-08-14.md` — 분산 worktree·검증 clone·
   모델 평가 자산의 main 통합 기록. 최종 Mi:dm runtime만 유지하면서 후보
   weights는 제거하고, source bundle·P0 provenance·중간 patch·Codex session

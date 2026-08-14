@@ -25,8 +25,10 @@ B4a `broadcast-director/`의 오프라인·결정론적 기반 코어와 README�
   채팅은 모두 bounded queue로 수용하며, 우선순위는 질문 > 토픽 확장 > 진심
   > 응원 > 긍정, 같은 우선순위는 FIFO다. backpressure는 명시하고 조용한 drop은
   없다. `viewerKey`·통계 상태는 emit하지 않고 원시 provider ID도 없다.
-- 후원은 즉시 이름만 ACK하고 금액은 다루지 않는다. 읽기는 one-shot seam 또는
-  클로징에 이연하며, 리액션 요청은 별도 계약이다.
+- 후원은 즉시 `donation_name_callout_request`를 내며 검증된 `displayName`을
+  정확히 한 번 호명하는 것이 future adapter의 MUST 계약이다. 이름이 없거나
+  안전하지 않으면 event 전체를 거부하고 이름을 추측하지 않는다. 금액은 다루지
+  않으며, 읽기는 one-shot seam 또는 클로징에 이연하고 리액션 요청은 분리한다.
 - 승인 토픽은 내용이 아닌 opaque lease seam만 다룬다. 활성 토큰은 유일하며
   ABA 안전, delivered terminal status와 teardown release 계약을 가진다.
 - pause/resume, kill/close, inflight 1건 재생, frozen output, 내용 없는 통계,
@@ -38,3 +40,8 @@ B4a `broadcast-director/`의 오프라인·결정론적 기반 코어와 README�
 부분 완료이며 M4, B5 또는 실제 방송 구현 완료가 아니다. 다음 작업은 외부
 자격증명·B1b가 계속 막힌 상태를 유지한 채 B4b 런타임 어댑터와 승인된 비공개
 리허설을 별도 권한·실측으로 진행하는 것이다. STT는 OFF/deferred를 유지한다.
+
+2026-08-14 후속에서 위 이름 호명 action을 명시하고 집중 suite 24/24 PASS를
+확인했다. 실제 모델/TTS가 이름을 한 번 호명하는 증거는 B4b adapter 이후의
+비공개 리허설 게이트다
+(`완료/AIRI-B4C-DEV-PC-FOLLOWUP-2026-08-14.md`).

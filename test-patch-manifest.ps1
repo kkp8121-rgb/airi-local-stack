@@ -209,6 +209,26 @@ foreach ($marker in $requiredUpgradeScoutMarkers) {
     }
 }
 
+# B4 방송 생성은 raw Ollama나 임의 원격 provider를 통과하면 proxy의
+# fail-closed 스타일 게이트를 잃는다. Byte/hash pin에 더해 사람이 읽을 수
+# 있는 의미 계약으로 exact 11435/v1 허용과 대표 거부 케이스를 고정한다.
+$runtimeSourcePatch = Join-Path $root 'airi_docs/patches/AIRI-v0.11.3-local-runtime-source.patch'
+$runtimeSourceText = [IO.File]::ReadAllText($runtimeSourcePatch, [Text.Encoding]::UTF8)
+$requiredBroadcastProxyMarkers = @(
+    'export function isExactLocalLoopbackProvider',
+    "target.port === '11435'",
+    '^\/v1(?:\/|$)',
+    "provider('http://127.0.0.1:11434/v1')",
+    "provider('http://127.0.0.1:11435/api')",
+    "provider('https://example.test:11435/v1')",
+    "headers: { 'x-airi-turn-origin': 'local-proactive' }"
+)
+foreach ($marker in $requiredBroadcastProxyMarkers) {
+    if (-not $runtimeSourceText.Contains($marker)) {
+        throw "Broadcast proxy routing marker missing: $marker"
+    }
+}
+
 $pythonJob = [regex]::Match($workflow, '(?ms)^  python-core-tests:\r?\n(?<body>.*?)(?=^  [^\s]|\z)')
 if (-not $pythonJob.Success) {
     throw 'Missing python-core-tests workflow job.'

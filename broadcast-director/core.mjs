@@ -103,7 +103,7 @@ export function createBroadcastDirector(input = {}) {
             if (!e || !eventId(e.eventId) || !(e.displayName = normalText(e.displayName, 80)) || !(e.message = normalText(e.message, 280)) || !safeNow(e.publishedAtMs) || e.publishedAtMs > wall + 30_000) return response('rejected', { reason: 'invalid_event' })
             if (recent.has(e.eventId)) { touch(e.eventId); return response('duplicate') }
             if (!room(2)) return response('backpressure')
-            touch(e.eventId); acks.push(make('donation_ack', { eventId: e.eventId, displayName: e.displayName })); reads.push(make('donation_read_request', { eventId: e.eventId, displayName: e.displayName, message: e.message })); lastAudience = elapsed; lastSilenceStep = elapsed; silence = 0; return response('accepted')
+            touch(e.eventId); acks.push(make('donation_name_callout_request', { eventId: e.eventId, displayName: e.displayName })); reads.push(make('donation_read_request', { eventId: e.eventId, displayName: e.displayName, message: e.message })); lastAudience = elapsed; lastSilenceStep = elapsed; silence = 0; return response('accepted')
         },
         pause(now) { if (state !== 'running') return response(state); if (!advance(now)) return response('rejected', { reason: 'invalid_time' }); state = 'paused'; return response('paused') },
         resume(now) { if (state !== 'paused') return response(state); if (!validTime(now)) return response('rejected', { reason: 'invalid_time' }); wall = now; state = 'running'; return response('running') },

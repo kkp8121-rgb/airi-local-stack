@@ -37,6 +37,15 @@ Mi:dm exact digest를 운영 기준으로 유지하고 Motif는 배포 차단을
 `airi_docs/진행중/AIRI-MIDM-MOTIF-NATIVE-BROADCAST-RERUN-2026-08-14.md`.
 로컬 전체 검증 결과는 위 상세 문서의 `로컬 검증과 종료 상태`를 기준으로 확인한다.
 
+B4c 검토 PC 배치의 dev PC 후속도 2026-08-14에 인수했다. 원격 A/B용 11439
+gateway는 `archived_not_deployed`이고 현재 내려가 있으며, 보존 소스의 정확 계약은
+비스트리밍·`max_tokens=1..128`이다. B4 방송 모델 경로는 canonical source patch의
+exact `11435/v1` 계약을 checkpoint에 고정했으나 B1b 실제 주입 종단 실증은 남아
+있다. B4a 후원 action은 `donation_name_callout_request`로 명시했으며 실제 이름
+1회 호명은 B4b adapter 리허설 완료 조건이다. `AIRI_BROADCAST_CONTRACT` 기본 OFF와
+사용자 확인 전 운영 ON 금지를 유지한다. 상세:
+`airi_docs/완료/AIRI-B4C-DEV-PC-FOLLOWUP-2026-08-14.md`.
+
 모든 후보가 모호한 고유명사·현재 정보 불확실성·무조건 동의를 완전히 처리하지
 못했으므로 음란/비속어 moderation과 별도의 epistemic-confidence gate가 다음
 구현 우선순위다. 외부 검색은 여전히 OFF이며 검색하지 않았는데 검색했다고 말하면
