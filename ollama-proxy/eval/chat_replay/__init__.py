@@ -1,0 +1,42 @@
+"""Package-compatible exports for the local chat replay evaluator."""
+
+from .chat_replay import (
+    ALLOWED_KINDS,
+    CAPTURE_PHASES,
+    MAX_EXPORT_BYTES,
+    MAX_SAFE_INTEGER,
+    ReplayAuthorizationError,
+    ReplayEvent,
+    ReplayFormatError,
+    ReplayResponse,
+    SOURCE_SLOTS,
+    SURFACE_SIGNAL_ORDER,
+    _BIDI,
+    _DISALLOWED_CONTROL,
+    _canonical,
+    _parse_utc,
+    _surface_signals,
+    authorize_capture,
+    import_private_replay,
+    load_private_replay,
+    redact_text,
+    run_replay,
+)
+
+__all__ = (
+    "ALLOWED_KINDS",
+    "CAPTURE_PHASES",
+    "MAX_EXPORT_BYTES",
+    "MAX_SAFE_INTEGER",
+    "ReplayAuthorizationError",
+    "ReplayEvent",
+    "ReplayFormatError",
+    "ReplayResponse",
+    "SOURCE_SLOTS",
+    "SURFACE_SIGNAL_ORDER",
+    "authorize_capture",
+    "import_private_replay",
+    "load_private_replay",
+    "redact_text",
+    "run_replay",
+)

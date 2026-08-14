@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import ipaddress
 import json
-import os
 from pathlib import Path
 import re
-import stat
-import tempfile
 from typing import Callable
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
-from chat_replay import import_private_replay, run_replay
+from chat_replay import ReplayEvent, ReplayResponse, load_private_replay, run_replay
+from normalize_authorized_export import read_identity_key, verify_normalization_receipt
+from replay_local_io import _is_reparse, _secure_inside, write_atomic_json
 
 
 HERE = Path(__file__).resolve().parent
@@ -29,52 +29,8 @@ EVAL_MODEL_DIGEST = "92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef3
 MODEL_DIGEST_RE = re.compile(r"[0-9a-f]{64}")
 
 
-def _is_reparse(path: Path) -> bool:
-    try:
-        info = os.lstat(path)
-    except OSError:
-        return False
-    attributes = getattr(info, "st_file_attributes", 0)
-    return stat.S_ISLNK(info.st_mode) or bool(
-        attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
-    )
-
-
-def _secure_inside(path: Path, parent: Path) -> bool:
-    candidate = Path(os.path.abspath(path))
-    trusted_parent = Path(os.path.abspath(parent))
-    trusted_root = Path(os.path.abspath(HERE))
-    try:
-        candidate.relative_to(trusted_parent)
-        relative = candidate.relative_to(trusted_root)
-    except ValueError:
-        return False
-    current = trusted_root
-    if _is_reparse(current):
-        return False
-    for part in relative.parts:
-        current /= part
-        if os.path.lexists(current) and _is_reparse(current):
-            return False
-    return True
-
-
 def _write_atomic(path: Path, value: object, parent: Path) -> None:
-    if not _secure_inside(path, parent):
-        raise RuntimeError("output path escaped its local ignored directory")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not _secure_inside(path, parent):
-        raise RuntimeError("output path became unsafe")
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
-        temporary = Path(handle.name)
-        json.dump(value, handle, ensure_ascii=False, sort_keys=True, indent=2)
-        handle.write("\n")
-    try:
-        if not _secure_inside(path, parent):
-            raise RuntimeError("output path became unsafe")
-        os.replace(temporary, path)
-    finally:
-        temporary.unlink(missing_ok=True)
+    write_atomic_json(path, value, parent)
 
 
 def _validated_proxy_url(url: str):
@@ -149,6 +105,27 @@ def verify_loopback_health(
     }
 
 
+def _response_outcome(response: object) -> str:
+    headers = getattr(response, "headers", None)
+
+    def value(name: str) -> str:
+        found = headers.get(name) if hasattr(headers, "get") else None
+        if found is None and hasattr(response, "getheader"):
+            found = response.getheader(name)
+        return str(found or "").strip()
+
+    if value("X-AIRI-Serious-Safety") == "handled":
+        return "serious_safety"
+    if value("X-AIRI-Input-Screened") == "blocked":
+        return "input_screened"
+    epistemic = value("X-AIRI-Epistemic-Confidence")
+    if epistemic in {"live_state", "agreement", "reference"}:
+        return f"epistemic_{epistemic}"
+    if epistemic:
+        return "epistemic_other"
+    return "normal"
+
+
 def loopback_responder(
     url: str,
     model: str,
@@ -182,6 +159,7 @@ def loopback_responder(
         with urlopen(request, timeout=15) as response:  # explicit opt-in only
             if response.status >= 400:
                 raise RuntimeError(f"loopback model returned HTTP {response.status}")
+            outcome = _response_outcome(response)
             body = json.loads(response.read().decode("utf-8"))
         choices = body.get("choices") if isinstance(body, dict) else None
         message = choices[0].get("message") if isinstance(choices, list) and choices and isinstance(choices[0], dict) else None
@@ -196,15 +174,52 @@ def loopback_responder(
             raise RuntimeError("local AIRI proxy profile changed during a replay turn")
         history.extend(({"role": "user", "content": text}, {"role": "assistant", "content": result}))
         del history[:-2 * history_turns]
-        return result
+        return ReplayResponse(result, outcome)
     return respond
 
 
-def main() -> int:
+def build_private_review_packet(
+    events: list[ReplayEvent],
+    responses: dict[int, str],
+    capture_profile: dict[str, str],
+    source_structural_sha256: str,
+) -> dict[str, object]:
+    rows = [{
+        "seq": event.seq,
+        "offset_ms": event.offset_ms,
+        "timing_bucket": event.timing_bucket,
+        "event_kind": event.event_kind,
+        "duplicate_of_seq": event.duplicate_of_seq,
+        "surface_signals": list(event.surface_signals),
+        "selection_eligible": event.selection_eligible,
+        "delivered": event.seq in responses,
+        "input": event.model_text,
+        "response": responses.get(event.seq),
+        "review": {
+            "expected_action": None,
+            "grounded": None,
+            "context_preserved": None,
+            "tone_ok": None,
+            "privacy_ok": None,
+            "epistemic_ok": None,
+        },
+    } for event in events]
+    return {
+        "schema_version": "airi.chat-replay-private-review.v2",
+        "local_only": True,
+        "capture_profile": capture_profile,
+        "source_structural_sha256": source_structural_sha256,
+        "rows": rows,
+    }
+
+
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--consent", required=True, type=Path)
     parser.add_argument("--provenance", required=True, type=Path)
+    parser.add_argument("--normalization-receipt", required=True, type=Path)
+    parser.add_argument("--identity-key", required=True, type=Path)
     parser.add_argument("--report", required=True, type=Path)
     parser.add_argument("--loopback-url", help="explicit local-model opt-in; default makes no request")
     parser.add_argument("--model", help="model name used only with --loopback-url")
@@ -214,7 +229,12 @@ def main() -> int:
         help="assert the gate state without changing it (default: on)",
     )
     parser.add_argument("--private-review-output", type=Path, help="explicit ignored local input/response review packet")
-    args = parser.parse_args()
+    return parser
+
+
+def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
     if bool(args.loopback_url) != bool(args.model):
         parser.error("--loopback-url and --model must be supplied together")
     if args.private_review_output and not args.loopback_url:
@@ -225,12 +245,29 @@ def main() -> int:
         parser.error("--consent must stay inside the ignored chat_replay/local-replay-intake directory")
     if not _secure_inside(args.provenance, HERE / "local-replay-intake"):
         parser.error("--provenance must stay inside the ignored chat_replay/local-replay-intake directory")
+    if not _secure_inside(args.identity_key, HERE / "local-replay-intake"):
+        parser.error("--identity-key must stay inside the ignored chat_replay/local-replay-intake directory")
+    if not _secure_inside(args.normalization_receipt, HERE / "reports"):
+        parser.error("--normalization-receipt must stay inside the ignored chat_replay/reports directory")
     if not _secure_inside(args.report, HERE / "reports"):
         parser.error("--report must stay inside the ignored chat_replay/reports directory")
     if args.private_review_output and not _secure_inside(args.private_review_output, HERE / "private-replays"):
         parser.error("--private-review-output must stay inside the ignored chat_replay/private-replays directory")
-    events = import_private_replay(args.input, args.consent, args.provenance)
-    private_rows: list[dict[str, object]] = []
+    if str(args.report.absolute()).casefold() == str(args.normalization_receipt.absolute()).casefold():
+        parser.error("--report must not overwrite --normalization-receipt")
+    events, capture_profile = load_private_replay(
+        args.input, args.consent, args.provenance, now=now,
+    )
+    if capture_profile is None:
+        parser.error("replay CLI requires a consent v2 capture_profile")
+    receipt_profile = verify_normalization_receipt(
+        args.input, args.consent, args.provenance,
+        args.normalization_receipt, args.identity_key,
+        expected_event_count=len(events), now=now,
+    )
+    if receipt_profile != capture_profile:
+        raise RuntimeError("normalization receipt capture profile mismatch")
+    private_responses: dict[int, str] = {}
     runtime_profile = (
         verify_loopback_health(
             args.loopback_url,
@@ -255,11 +292,11 @@ def main() -> int:
             history_turns=args.history_turns,
             attest=attest,
         ) if args.loopback_url else None,
-        (lambda event, response: private_rows.append({
-            "seq": event.seq, "offset_ms": event.offset_ms,
-            "event_kind": event.event_kind, "input": event.model_text,
-            "response": response,
-        })) if args.private_review_output else None,
+        (lambda event, response: private_responses.__setitem__(
+            event.seq, response,
+        )) if args.private_review_output else None,
+        capture_profile=capture_profile,
+        report_hmac_key=(read_identity_key(args.identity_key) if args.loopback_url else None),
     )
     if runtime_profile is not None:
         final_profile = verify_loopback_health(
@@ -272,11 +309,14 @@ def main() -> int:
         report["runtime_profile"] = runtime_profile
     _write_atomic(args.report, report, HERE / "reports")
     if args.private_review_output:
-        _write_atomic(args.private_review_output, {
-            "schema_version": "airi.chat-replay-private-review.v1",
-            "local_only": True,
-            "rows": private_rows,
-        }, HERE / "private-replays")
+        _write_atomic(
+            args.private_review_output,
+            build_private_review_packet(
+                events, private_responses, capture_profile,
+                report["structural_sha256"],
+            ),
+            HERE / "private-replays",
+        )
     return 0
 
 

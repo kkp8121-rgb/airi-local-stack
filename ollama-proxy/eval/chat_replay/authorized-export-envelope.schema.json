@@ -1,0 +1,17 @@
+{
+  "schema_version": "airi.authorized-provider-export.v1",
+  "record_format": "JSONL",
+  "header": {"exact_fields": ["record_type", "schema_version", "provider", "channel_id", "exporter_id", "source_schema", "exported_at_ms"], "record_type": "header", "providers": ["chzzk", "soop", "youtube"], "source_schema": "provider-approved-envelope.v1"},
+  "event": {"exact_fields": ["record_type", "provider", "channel_id", "occurred_at_ms", "source_type", "text"], "record_type": "event", "source_types": ["text", "donation", "system"], "text_null_only_for": ["donation", "system"]},
+  "authorization": {
+    "consent_schema": "airi.chat-replay-consent.v2",
+    "channel_binding": "HMAC-SHA256 with a local identity key",
+    "allowlist_schema": "airi.provider-channel-allowlist.v1"
+  },
+  "privacy": {
+    "raw_provider_api_schemas_supported": false,
+    "header_channel_and_exporter_ids_local_only": true,
+    "event_identity_fields_permitted": false,
+    "donation_text_or_amount_forwarded": false
+  }
+}

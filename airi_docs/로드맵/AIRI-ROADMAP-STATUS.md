@@ -15,6 +15,17 @@
 
 최종 갱신: 2026-08-15
 
+- **2026-08-15** (dev PC, G3/B3-f 승인 export·흐름 분석 후속): 실제 채팅
+  권한 확보 뒤 즉시 실행할 수 있도록 strict provider-safe envelope normalizer와
+  consent v2/local-key HMAC 채널·익명 slot 바인딩을 추가했다. raw CHZZK/SOOP/
+  YouTube payload는 받지 않고, 후원 본문·이름·금액은 event 의미만 남기고 폐기한다.
+  replay 전 exact normalized bytes와 slot/phase/provider binding의 receipt HMAC을
+  재검증해 일부 output 또는 우회 입력은 모델 호출 전에 거부한다.
+  report v2는 pre-redaction 원문 반복, rolling 5초 몰림, 간격/유입률, bounded lexical
+  signal pair와 proxy fallback outcome을 content-free로 집계한다. 모든 event와 AIRI
+  대응을 보는 ignored human packet 및 text-free scorer도 추가했다. 이는 합성·오프라인
+  기반 완료이며 세 채널 승인 캡처, Mi:dm OFF/ON 사람 검수, 운영 ON 채택은 미완료다.
+  (`완료/AIRI-AUTHORIZED-CHAT-REPLAY-ANALYSIS-FOUNDATION-2026-08-15.md`)
 - **2026-08-15** (dev PC, G3/B3-f 착수): moderation과 분리된
   epistemic-confidence greybox를 기본 OFF로 구현해 현재/live 정보 무근거
   단정, 무조건 동의, 문맥 없는 지시어·짧은 미확립 대상을 모델 호출 전에
@@ -272,8 +283,10 @@
     local provenance artifact,
     명시 identity·정형 PII 패턴·후원 금액 pre-model 삭제, 순서·상대 시간·
     중복·잡음 보존,
-    content-free report/ignored private review 기반 구현. 탬탬버린·아카네 리제·
-    아이네 실제 캡처는 방송인/플랫폼 공식 권한 대기이며 무단 scraping하지 않는다.
+    strict safe-envelope/HMAC 채널 바인딩·rolling 흐름/lexical signal/proxy outcome
+    content-free report·모든 event의 ignored private review와 human scorer 구현.
+    탬탬버린·아카네 리제·아이네 실제 캡처는 방송인/플랫폼 공식 권한 대기이며
+    무단 scraping하지 않는다. offline selector 수치는 B1b/B4a 실선택 성능이 아니다.
     상세: `진행예정/AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md`.
   - [ ] 인간 검수 100건 수집 (dev PC)
   - [ ] 16케이스 자동 게이트 PASS (현재 양 모델 FAIL)
@@ -335,7 +348,8 @@
 - [~] **C0. 기준선·평가 세트 고정**
   - [x] 16케이스 fixture·A/B 하네스 고정 — 2026-08-12
   - [~] 실제 채팅 구조 기반 합성 replay fixture — 기반과 독립 작성 synthetic
-    smoke fixture 완료; 승인 실제 캡처 분석 뒤 패턴 회귀 세트 확정 필요
+    smoke fixture 및 content-free 흐름/표면 signal 분석 기반 완료; 승인 실제 캡처와
+    사람 의미 검수 뒤 패턴 회귀 세트 확정 필요
   - [ ] 인간 검수 평가 세트 고정 (G3와 동일 병목)
 - [ ] **C1. 성격 SFT LoRA** — (보류: G4와 동일 조건)
   - [x] 캐릭터 헌법 초안 (학습 목표 정의의 입력) — 2026-08-12 (`7dc4e76`)
@@ -411,8 +425,9 @@
   - [ ] B3-e category별(욕설·음란성 등) 설치 UI/TTS 차단 반응 실기 — 현재는
     dictionary/unit + generic match-all 배선 확인만. output moderation 기본 OFF
   - [~] B3-f 실제 한국 방송 채팅 흐름/확신도 replay — local privacy·권한·
-    replay 기반 완료, 세 채널 승인 캡처·Mi:dm 대응 검수·설치 Electron/B1b
-    종단 실증 대기. 실제 원문은 git/학습 데이터에 넣지 않는다.
+    replay·승인 export 정규화·흐름/사람 score 기반 완료, 세 채널 승인 캡처·Mi:dm
+    OFF/ON 대응 검수·설치 Electron/B1b 종단 실증 대기. 실제 원문은 git/학습
+    데이터에 넣지 않는다.
   - [ ] B2 송출 (OBS Browser Source + App Audio Capture — 결정 2 이후)
 - [~] **M4** (B4 방송 디렉터 + C3/C4 ∥ I3 주제 풀)
   - [~] B4a 기반 구현 — 기본 OFF/inert; simulation-only 집중 테스트 17 PASS·독립 최종 검토 PASS.
@@ -439,6 +454,16 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-15** (dev PC, G3/B3-f 승인 export·흐름 분석 후속): strict
+  `airi.authorized-provider-export.v1` envelope만 받는 offline normalizer, consent
+  v2/local-key HMAC channel-slot binding, 후원 본문 전량 폐기와 reparse-safe atomic
+  ignored output, replay 전 receipt HMAC 재검증을 추가했다. report v2는 redaction 전 source-text repeat와 rolling
+  5초 burst, 간격/유입률, lexical signal pair, proxy outcome만 보존한다. ignored
+  private packet은 skipped event까지 포함하고 별도 scorer는 사람 label의 confusion
+  matrix·quality rate·critical failure만 일반 report로 낸다. 실제 세 채널 데이터와
+  Mi:dm OFF/ON 결과는 없으며 운영 gate 기본값은 바꾸지 않았다. 상세:
+  `완료/AIRI-AUTHORIZED-CHAT-REPLAY-ANALYSIS-FOUNDATION-2026-08-15.md`,
+  `진행예정/AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md`.
 - **2026-08-15** (dev PC, G3/B3-f 실제 채팅 평가 기반): default-OFF
   epistemic-confidence pre-publication gate와 승인/보존 fail-closed local chat
   replay를 구현했다. replay는 실제 채팅의 명시 identity·정형 PII 패턴·후원

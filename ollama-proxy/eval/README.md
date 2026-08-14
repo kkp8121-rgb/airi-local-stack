@@ -6,7 +6,12 @@
 boundary for authorized Korean livestream chat exports. Real captures and
 redacted response review packets are ignored and require a current consent
 sidecar plus its hash-bound local provenance artifact; normal reports are
-content-free. The committed
+content-free. A strict offline provider-safe envelope normalizer adds a
+local-key HMAC channel/slot binding, drops donation wording and amount, and
+rejects raw CHZZK/SOOP/YouTube payload shapes. Report v2 measures rolling flow,
+pre-redaction source-text repeats, bounded lexical signals, and closed proxy
+outcomes. A separate private-review scorer emits only confusion counts and
+quality pass rates. The committed
 fixture is independently authored synthetic text, not anonymized chat and not
 training data. See `chat_replay/README.md` for the exact custody and CLI
 contract. No provider scraping or network request occurs by default.

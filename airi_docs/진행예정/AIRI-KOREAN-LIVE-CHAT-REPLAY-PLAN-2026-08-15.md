@@ -1,8 +1,9 @@
 # 한국 라이브 채팅 흐름 재현 계획 — 2026-08-15
 
-상태: G3/C0·M3의 새 평가 트랙. 로컬 privacy/authorization gate와 결정론적
-replay 기반은 구현했지만, 세 채널의 승인된 실제 채팅 확보와 Mi:dm 실측은 아직
-완료되지 않았다.
+상태: G3/C0·M3의 새 평가 트랙. 로컬 privacy/authorization gate, 승인형 safe
+envelope 정규화, 결정론적 흐름/표면 신호 report, private human score 기반까지
+구현했지만, 세 채널의 승인된 실제 채팅 확보와 Mi:dm 실측은 아직 완료되지 않았다.
+오프라인 후속 근거: `완료/AIRI-AUTHORIZED-CHAT-REPLAY-ANALYSIS-FOUNDATION-2026-08-15.md`.
 
 ## 목표와 비목표
 
@@ -50,8 +51,19 @@ provenance hash는 운영자가 제출한 로컬 증거 파일이 바뀌지 않�
 허용하고 unknown field를 거부하며, 자동 정형 패턴 삭제 뒤에도 사람 privacy
 검수를 통과해야 한다.
 
+실제 provider 입력은 `airi.authorized-provider-export.v1` safe envelope만 받는다.
+이는 치지직/SOOP raw callback dump나 YouTube `liveChatMessage` resource parser가
+아니며, 세 플랫폼이 historical export API를 제공한다는 뜻도 아니다. raw export의
+provider/channel/exporter와 권한 근거·익명 source slot은 로컬 32-byte 이상 비밀키의
+HMAC-SHA256으로 consent v2와 allowlist에 함께 묶는다. 일반 receipt에는 평문 channel/
+exporter나 사전 대입 가능한 단순 SHA를 남기지 않는다. 후원 event는 종류만 보존하고
+본문·호명·금액·통화는 `[후원 이벤트]`로 폐기한다. replay CLI는 정규화된 exact
+bytes·provider class·slot/phase·provider binding에 대한 receipt HMAC과 같은 로컬
+비밀키를 다시 검증하므로 receipt가 없거나 일부 output만 남은 bundle은 모델로 보내지
+않는다.
+
 실제 원문·redacted 원문·응답 원문은 일반 report에 쓰지 않는다. 일반 report에는
-순서·상대 시간·간격 bucket·event kind·중복 관계·응답 길이/해시와 집계만 남긴다.
+순서·상대 시간·간격 bucket·event kind·중복 관계·응답 길이/local-key HMAC과 집계만 남긴다.
 사람이 실제 대응을 검토해야 할 때만 별도 명시 옵션으로
 `private-replays/`에 redacted 입력/응답 packet을 만들며, 이 경로도 gitignored다.
 권한 철회 또는 삭제 기한 도달 시 원본, sidecar, private packet을 함께 삭제한다.
@@ -66,9 +78,12 @@ provenance hash는 운영자가 제출한 로컬 증거 파일이 바뀌지 않�
 sleep 없이 원래 순서와 상대 간격을 유지해 재생하고, AIRI 모델 대화 history는 최근
 8개 교환쌍으로 제한한다. 실제 B1b가 생기기 전의 offline replay는 다음을 측정한다.
 
-- 5초당 최대 유입량, 간격 bucket, 중복률, 웃음/시스템 잡음률
-- 질문·정정·장난·집단 반복·화제 전환·후원 event 분포
-- 어떤 채팅을 답할지의 precision/recall과 중복·잡음 오응답률
+- rolling 5초 최대 유입량·burst start, 간격 p50/p95/max·유입률, 중복률,
+  웃음/시스템 잡음률
+- 질문부호·웃음 반복·정정 표지·강조·원문 반복·후원 event의 bounded lexical 분포와
+  인접 signal pair. 이는 장난·감정·화제 전환의 의미 판정이 아니라 사람 검수 후보다.
+- offline harness selector의 precision/recall과 중복·잡음 오응답률. AIRI/B4a의
+  실제 선택 성능이라고 부르지 않으며 B1b 종단에서 별도 측정한다.
 - 직전 맥락 추적, 정정 보존, callback, 오래된 화제 회귀
 - 현재 정보 단정·모호한 대상 날조·무조건 동의·검색 허위 주장
 - 입력 인젝션·괴롭힘·개인정보 차단과 반복 공격 내성
@@ -79,12 +94,14 @@ sleep 없이 원래 순서와 상대 간격을 유지해 재생하고, AIRI 모�
 ## 실행 순서와 합격 기준
 
 1. default-OFF epistemic-confidence gate와 local replay 하네스의 offline 계약을
-   고정한다.
+   고정한다. **코드 완료**: consent v2/HMAC normalizer, report v2 흐름·표면 신호·
+   proxy outcome, 모든 event를 담는 ignored human packet과 content-free scorer.
 2. 세 채널별 권한을 확보하고, 각 채널에서 서로 다른 방송 국면을 최소 2개씩
    짧게 캡처한다. 필요한 양은 첫 분석 뒤 정하며 대량 수집부터 하지 않는다.
 3. 원문을 모델에 보내기 전에 자동 삭제와 사람 privacy 검수를 수행한다.
 4. 게이트 OFF/ON을 같은 redacted sequence로 Mi:dm에 재생하고 content-free report와
-   ignored private review packet을 만든다.
+   ignored private review packet을 만든다. runner는 gate를 변경하지 않고 현재
+   health 상태가 기대한 ON/OFF인지 검증만 한다.
 5. 현재 정보·모호한 대상·무조건 동의 critical failure는 0이어야 한다. 중복/잡음에
    대한 발화, 문맥 회귀, 잘못된 호명은 개별 turn으로 검토한다.
 6. 관찰된 구조만 독립 작성한 합성 fixture로 옮겨 정기 회귀에 편입한다. 실제 문장,
