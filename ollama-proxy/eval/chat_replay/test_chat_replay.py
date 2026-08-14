@@ -138,9 +138,27 @@ class ChatReplayTests(unittest.TestCase):
         self.assertTrue(events[1].selection_eligible)
         self.assertNotIn("source_text_repeat", events[1].surface_signals)
 
+    def test_donation_placeholders_remain_distinct_and_eligible(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            export = directory / "capture.jsonl"
+            rows = [
+                {"timestamp_ms": 0, "kind": "donation", "text": "first donation"},
+                {"timestamp_ms": 1, "kind": "donation", "text": "second donation"},
+            ]
+            export.write_text("\n".join(json.dumps(row) for row in rows), encoding="utf-8")
+            provenance = directory / "permission.txt"; provenance.write_text("permission", encoding="utf-8")
+            consent = directory / "consent.json"; consent.write_text(json.dumps(consent_for(export, provenance)), encoding="utf-8")
+            events = import_private_replay(export, consent, provenance, now=NOW)
+        self.assertEqual([event.duplicate_of_seq for event in events], [None, None])
+        self.assertTrue(all(event.selection_eligible for event in events))
+
     def test_rolling_flow_boundaries_and_single_event_are_exact(self):
         def event(seq, offset):
-            return ReplayEvent(seq, offset, "under_1s", "chat", f"채팅 {seq}", None, True, ())
+            previous = (0, 0, 4999, 5000, 5000, 5000)[seq - 1]
+            gap = offset - previous if seq > 1 else 0
+            bucket = "under_1s" if gap < 1000 else "1s_to_5s" if gap < 5000 else "5s_to_15s" if gap < 15000 else "15s_plus"
+            return ReplayEvent(seq, offset, bucket, "chat", f"채팅 {seq}", None, True, ())
 
         boundary = run_replay([
             event(1, 0), event(2, 4999), event(3, 5000),
@@ -162,7 +180,7 @@ class ChatReplayTests(unittest.TestCase):
             ReplayEvent(1, 4999, "under_1s", "chat", "first?", None, True, ("question_mark",)),
             ReplayEvent(2, 5000, "under_1s", "chat", "tie two?", None, True, ("question_mark",)),
             ReplayEvent(3, 5001, "under_1s", "chat", "tie three?", None, True, ("question_mark",)),
-            ReplayEvent(4, 10000, "under_1s", "chat", "neutral", None, True, ()),
+            ReplayEvent(4, 10000, "1s_to_5s", "chat", "neutral", None, True, ()),
         ]
         calls: list[int] = []
         report = run_replay(events, lambda _, event: calls.append(event.seq) or "ok", report_hmac_key=b"k" * 32)
@@ -177,6 +195,16 @@ class ChatReplayTests(unittest.TestCase):
             run_replay([ReplayEvent(1, 0, "under_1s", "chat", "x", None, False, ())])
         with self.assertRaises(ReplayFormatError):
             run_replay([ReplayEvent(1, 0, "under_1s", "chat", "x", 1, False, ("source_text_repeat",))])
+
+    def test_prepared_timing_and_response_length_bounds_fail_closed(self):
+        event = ReplayEvent(1, 0, "under_1s", "chat", "question?", None, True, ("question_mark",))
+        with self.assertRaises(ReplayFormatError):
+            run_replay([ReplayEvent(1, 0, "15s_plus", "chat", "question?", None, True, ("question_mark",))])
+        for response in ("", "x" * 4001):
+            with self.assertRaises(ReplayFormatError):
+                run_replay([event], lambda *_: response, report_hmac_key=b"k" * 32)
+        report = run_replay([event], lambda *_: "x" * 4000, report_hmac_key=b"k" * 32)
+        self.assertEqual(report["response_rows"][0]["response_char_count"], 4000)
 
     def test_surface_signals_are_lexical_and_pair_counts_are_explicit(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -299,15 +327,18 @@ class ChatReplayTests(unittest.TestCase):
                 return self
             def __exit__(self, *_):
                 return False
-            def read(self):
-                return json.dumps({"choices": [{"message": {"content": f"응답 {len(requests)}"}}]}).encode("utf-8")
+            def read(self, size=-1):
+                body = json.dumps({"choices": [{"message": {"content": f"응답 {len(requests)}"}}]}).encode("utf-8")
+                offset = getattr(self, "offset", 0); end = None if size < 0 else offset + size
+                self.offset = len(body) if end is None else min(end, len(body))
+                return body[offset:end]
 
         def fake_urlopen(request, timeout):
             self.assertEqual(timeout, 15)
             requests.append(request)
             return Response()
 
-        with mock.patch.object(run_chat_replay, "urlopen", side_effect=fake_urlopen):
+        with mock.patch.object(run_chat_replay, "_open_loopback", side_effect=fake_urlopen):
             attestations = []
             profile = {"model": "midm-airi:2.0-mini"}
             respond = run_chat_replay.loopback_responder(
@@ -337,7 +368,7 @@ class ChatReplayTests(unittest.TestCase):
                 "http://127.0.0.1:11434/v1/chat/completions", "model",
             )
         profiles = iter(({"digest": "before"}, {"digest": "after"}))
-        with mock.patch.object(run_chat_replay, "urlopen", side_effect=fake_urlopen):
+        with mock.patch.object(run_chat_replay, "_open_loopback", side_effect=fake_urlopen):
             unstable = run_chat_replay.loopback_responder(
                 "http://127.0.0.1:11435/v1/chat/completions",
                 "midm-airi:2.0-mini",
@@ -463,12 +494,15 @@ class ChatReplayTests(unittest.TestCase):
                 return self
             def __exit__(self, *_):
                 return False
-            def read(self):
-                return json.dumps(self.value).encode("utf-8")
+            def read(self, size=-1):
+                body = json.dumps(self.value).encode("utf-8")
+                offset = getattr(self, "offset", 0); end = None if size < 0 else offset + size
+                self.offset = len(body) if end is None else min(end, len(body))
+                return body[offset:end]
 
         requests = []
         with mock.patch.object(
-            run_chat_replay, "urlopen",
+            run_chat_replay, "_open_loopback",
             side_effect=lambda request, timeout: requests.append((request, timeout)) or Response(health),
         ):
             profile = run_chat_replay.verify_loopback_health(
@@ -490,7 +524,7 @@ class ChatReplayTests(unittest.TestCase):
                 broken = dict(health)
                 broken.update(changed)
                 with mock.patch.object(
-                    run_chat_replay, "urlopen", return_value=Response(broken),
+                    run_chat_replay, "_open_loopback", return_value=Response(broken),
                 ):
                     with self.assertRaises(RuntimeError):
                         run_chat_replay.verify_loopback_health(
@@ -513,6 +547,112 @@ class ChatReplayTests(unittest.TestCase):
         self.assertFalse(
             run_chat_replay._secure_inside(here / "outside.json", here / "reports"),
         )
+
+    def test_loopback_response_body_response_and_deadline_bounds(self):
+        class Response:
+            status = 200
+            headers = {}
+            def __init__(self, body): self.body = body; self.requested = None; self.offset = 0
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+            def read(self, size=-1):
+                self.requested = size; end = None if size < 0 else self.offset + size
+                part = self.body[self.offset:end]; self.offset += len(part); return part
+
+        url = "http://127.0.0.1:11435/v1/chat/completions"
+        for content in ("", "x" * 4001):
+            response = Response(json.dumps({"choices": [{"message": {"content": content}}]}).encode())
+            with mock.patch.object(run_chat_replay, "_open_loopback", return_value=response):
+                with self.assertRaisesRegex(RuntimeError, "1..4000"):
+                    run_chat_replay.loopback_responder(url, run_chat_replay.EVAL_MODEL)("question?", None)
+            self.assertEqual(response.requested, run_chat_replay.READ_CHUNK_BYTES)
+        exact = Response(json.dumps({"choices": [{"message": {"content": "x" * 4000}}]}).encode())
+        with mock.patch.object(run_chat_replay, "_open_loopback", return_value=exact):
+            self.assertEqual(len(run_chat_replay.loopback_responder(url, run_chat_replay.EVAL_MODEL)("question?", None).text), 4000)
+        oversized = Response(b"x" * (run_chat_replay.MAX_RESPONSE_BODY_BYTES + 1))
+        with mock.patch.object(run_chat_replay, "_open_loopback", return_value=oversized):
+            with self.assertRaisesRegex(RuntimeError, "64KiB"):
+                run_chat_replay.loopback_responder(url, run_chat_replay.EVAL_MODEL)("question?", None)
+        with mock.patch.object(run_chat_replay, "_open_loopback") as open_mock:
+            with self.assertRaisesRegex(RuntimeError, "max-run-seconds"):
+                run_chat_replay.loopback_responder(url, run_chat_replay.EVAL_MODEL, deadline=0)("question?", None)
+            open_mock.assert_not_called()
+
+    def test_redirects_and_deadline_crossing_during_reads_fail_closed(self):
+        handler = run_chat_replay._RejectRedirects()
+        self.assertIsNone(handler.redirect_request(None, None, 302, "Found", {}, "http://127.0.0.1/other"))
+        with mock.patch(
+            "urllib.request.getproxies",
+            return_value={"http": "http://external-proxy.invalid:8080"},
+        ):
+            direct_opener = run_chat_replay._build_loopback_opener()
+        self.assertFalse(any(
+            isinstance(item, run_chat_replay.ProxyHandler)
+            for item in direct_opener.handlers
+        ))
+        class Response:
+            status = 200; headers = {}
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+            def read(self, size=-1): return b'{}'
+        ticks = iter((0.0, 0.0, 2.0))
+        with mock.patch.object(run_chat_replay.time, "monotonic", side_effect=lambda: next(ticks)):
+            with mock.patch.object(run_chat_replay, "_open_loopback", return_value=Response()):
+                with self.assertRaisesRegex(RuntimeError, "max-run-seconds"):
+                    run_chat_replay.verify_loopback_health(
+                        "http://127.0.0.1:11435/v1/chat/completions", run_chat_replay.EVAL_MODEL, deadline=1.0,
+                    )
+        class Chunks:
+            def __init__(self): self.parts = [b'{"choices":[', b'{"message":{"content":"ok"}}]}']
+            status = 200; headers = {}
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+            def read(self, size=-1): return self.parts.pop(0) if self.parts else b''
+        ticks = iter((0.0, 0.0, 0.0, 2.0))
+        with mock.patch.object(run_chat_replay.time, "monotonic", side_effect=lambda: next(ticks)):
+            with mock.patch.object(run_chat_replay, "_open_loopback", return_value=Chunks()):
+                with self.assertRaisesRegex(RuntimeError, "max-run-seconds"):
+                    run_chat_replay.loopback_responder(
+                        "http://127.0.0.1:11435/v1/chat/completions", run_chat_replay.EVAL_MODEL, deadline=1.0,
+                    )("question?", None)
+
+    def test_loopback_history_is_complete_pairs_and_request_bounded(self):
+        requests = []
+        class Response:
+            status = 200; headers = {}
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+            def read(self, size=-1):
+                body = b'{"choices":[{"message":{"content":"reply"}}]}'
+                offset = getattr(self, "offset", 0); end = None if size < 0 else offset + size
+                self.offset = len(body) if end is None else min(end, len(body)); return body[offset:end]
+        with mock.patch.object(run_chat_replay, "_open_loopback", side_effect=lambda request, timeout: requests.append(request) or Response()):
+            respond = run_chat_replay.loopback_responder(
+                "http://127.0.0.1:11435/v1/chat/completions", run_chat_replay.EVAL_MODEL,
+                history_turns=32,
+            )
+            for _ in range(8): respond("u" * 1000, None)
+        payload = json.loads(requests[-1].data)
+        self.assertLessEqual(len(requests[-1].data), run_chat_replay.MAX_REQUEST_BYTES)
+        self.assertEqual((len(payload["messages"]) - 1) % 2, 0)
+        self.assertEqual([item["role"] for item in payload["messages"][:-1]][::2], ["user"] * ((len(payload["messages"]) - 1) // 2))
+
+    def test_model_preflight_rejects_short_and_call_budget_without_network(self):
+        short = [ReplayEvent(1, 0, "under_1s", "chat", "question?", None, True, ("question_mark",))]
+        many = [ReplayEvent(index, (index - 1) * 5000, "5s_to_15s" if index > 1 else "under_1s", "chat", "question?", None, True, ("question_mark",)) for index in range(1, 361)]
+        with mock.patch.object(run_chat_replay, "verify_loopback_health") as health:
+            with self.assertRaises(ValueError):
+                run_chat_replay.validate_model_replay_preflight(short, max_model_calls=1)
+            with self.assertRaises(ValueError):
+                run_chat_replay.validate_model_replay_preflight(many, max_model_calls=1)
+            health.assert_not_called()
+
+    def test_private_atomic_writer_forwards_size_limit(self):
+        with tempfile.TemporaryDirectory(dir=run_chat_replay.HERE) as temp:
+            parent = Path(temp)
+            with self.assertRaises(ValueError):
+                run_chat_replay._write_atomic(parent / "packet.json", {"x": "too large"}, parent, max_bytes=1)
+            self.assertFalse((parent / "packet.json").exists())
 
 
 if __name__ == "__main__":

@@ -44,6 +44,10 @@ _SPACE = re.compile(r"\s+")
 _BIDI = re.compile(r"[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]")
 _DISALLOWED_CONTROL = re.compile(r"[\u0000-\u0008\u000e-\u001f\u007f-\u009f]")
 MAX_EXPORT_BYTES = 32 * 1024 * 1024
+MAX_REPLAY_EVENTS = 20_000
+MIN_RESPONSE_CHARS = 1
+MAX_RESPONSE_CHARS = 4_000
+MAX_PRIVATE_PACKET_BYTES = 96 * 1024 * 1024
 MAX_CONSENT_BYTES = 64 * 1024
 MAX_PROVENANCE_BYTES = 1024 * 1024
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
@@ -308,7 +312,7 @@ def _load_lines(export_bytes: bytes) -> list[dict[str, Any]]:
         lines = export_bytes.decode("utf-8").splitlines()
     except UnicodeError as exc:
         raise ReplayFormatError("export is unreadable") from exc
-    if not lines or len(lines) > 20_000:
+    if not lines or len(lines) > MAX_REPLAY_EVENTS:
         raise ReplayFormatError("export must contain 1..20000 JSONL events")
     events: list[dict[str, Any]] = []
     for number, line in enumerate(lines, 1):
@@ -374,8 +378,10 @@ def load_private_replay(
         # Detect repeated source wording before redaction. Different source
         # messages may collapse to the same placeholders and must not be
         # misreported or suppressed as exact repeats.
-        duplicate_of = seen_source_text.get((kind, source_text))
-        if duplicate_of is None:
+        # Donation wording is intentionally normalized to a common placeholder;
+        # each callout remains a distinct event and must stay eligible.
+        duplicate_of = None if kind == "donation_callout" else seen_source_text.get((kind, source_text))
+        if kind != "donation_callout" and duplicate_of is None:
             seen_source_text[(kind, source_text)] = seq
         eligible = kind != "system_noise" and duplicate_of is None
         output.append(ReplayEvent(
@@ -505,10 +511,15 @@ def run_replay(
 ) -> dict[str, Any]:
     """Deterministically replay prepared events without sleeping or retaining responses."""
     replay = list(events)
+    if not 1 <= len(replay) <= MAX_REPLAY_EVENTS:
+        raise ReplayFormatError("prepared replay must contain 1..20000 events")
     if any(
         event.seq != index
         or event.offset_ms < 0
         or (index > 1 and event.offset_ms < replay[index - 2].offset_ms)
+        or event.timing_bucket != _bucket(
+            0 if index == 1 else event.offset_ms - replay[index - 2].offset_ms
+        )
         or event.event_kind not in ALLOWED_KINDS
         or event.selection_eligible is not (
             event.event_kind != "system_noise" and event.duplicate_of_seq is None
@@ -571,7 +582,11 @@ def run_replay(
                 outcome = result.outcome
             else:
                 raise ReplayFormatError("responder must return text or ReplayResponse")
-            if not isinstance(response, str) or outcome not in ALLOWED_RESPONSE_OUTCOMES:
+            if (
+                not isinstance(response, str)
+                or not MIN_RESPONSE_CHARS <= len(response) <= MAX_RESPONSE_CHARS
+                or outcome not in ALLOWED_RESPONSE_OUTCOMES
+            ):
                 raise ReplayFormatError("responder returned an invalid bounded outcome")
             responses += 1
             response_outcomes[outcome] += 1

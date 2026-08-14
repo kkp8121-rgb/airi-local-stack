@@ -61,8 +61,12 @@ def _atomic_text(path: Path, text: str, parent: Path) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def write_atomic_json(path: Path, value: object, parent: Path) -> None:
+def write_atomic_json(
+    path: Path, value: object, parent: Path, *, max_bytes: int | None = None,
+) -> None:
     text = json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+    if max_bytes is not None and len(text.encode("utf-8")) > max_bytes:
+        raise ValueError("serialized JSON exceeds the configured size limit")
     _atomic_text(path, text, parent)
 
 

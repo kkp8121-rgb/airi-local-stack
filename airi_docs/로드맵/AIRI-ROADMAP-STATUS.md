@@ -15,6 +15,17 @@
 
 최종 갱신: 2026-08-15
 
+- **2026-08-15** (dev PC, G3/B3-f 장시간 replay 실행 상한 검증): strict 승인
+  envelope 20,000 event를 120분 시간축으로 정규화→import→offline sampler→응답
+  callback까지 통과시키는 최대 경계 회귀를 추가했다. 공통 문구로 정규화되는 후원
+  event가 전역 중복으로 사라지던 결함을 수정해 각각 별도 callout으로 보존했다.
+  실제 Mi:dm opt-in 전 300~20,000 event·30~120분·최대 1,441 model call을
+  사전검증하고, 전체 실행 7,200초 cooperative deadline, 무리다이렉트 loopback,
+  health/response 64 KiB, 응답 1~4,000자, history 6,000자, request 12 KiB,
+  private packet 96 MiB 상한을 fail-closed로 고정했다. 장시간 replay 52 PASS 및
+  전체 checkpoint PASS. 공개·재사용 가능한 시간순 한국어 장시간 채팅 corpus는
+  확인하지 못했으므로 승인 실제 export와 OFF/ON 실측은 여전히 미완료다.
+  (`완료/AIRI-LONG-STREAM-REPLAY-LOAD-BOUNDS-2026-08-15.md`)
 - **2026-08-15** (dev PC, G3/B3-f 장시간 replay 범위 고정): 사용자가 원하는
   평가 단위를 단발 3문장이 아니라 장시간 다시보기/스트림의 실제 시청자 채팅
   흐름으로 재확정했다. report v3에 `offline_fixed_5s_response_sampler_v1`을 추가해

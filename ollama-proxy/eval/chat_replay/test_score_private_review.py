@@ -16,6 +16,9 @@ from score_private_review import PrivateReviewError, score_private_review
 
 
 class PrivateReviewScorerTests(unittest.TestCase):
+    def test_private_packet_limit_is_shared_with_writer_contract(self):
+        self.assertEqual(scorer.MAX_PACKET_BYTES, run_chat_replay.MAX_PRIVATE_PACKET_BYTES)
+
     def fixture(self, directory: Path):
         key = b"k" * 32
         key_path = directory / "identity.key"; key_path.write_bytes(key)

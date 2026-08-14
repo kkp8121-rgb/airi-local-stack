@@ -342,6 +342,25 @@ class CampaignAggregationTests(unittest.TestCase):
                     _resign_pair(files, "p00-on.json")
                 self.assert_invalid(files)
 
+    def test_runtime_profile_requires_exact_json_types(self):
+        for name, value in (
+            ("temperature", False),
+            ("history_turns", 8.0),
+            ("max_model_calls", 1441.0),
+            ("request_byte_limit", 12288.0),
+        ):
+            with self.subTest(name=name):
+                files = _artifacts()
+                for gate in campaign.GATES:
+                    report = files[f"p00-{gate}.json"]
+                    report["runtime_profile"][name] = value
+                    _resign_pair(files, f"p00-{gate}.json")
+                    score = files[f"p00-{gate}-score.json"]
+                    score["runtime_profile"][name] = value
+                    score["run_binding_sha256"] = report["run_binding_sha256"]
+                    _sign_score(score)
+                self.assert_invalid(files)
+
     def test_tampering_and_stale_attestation_fail_closed(self):
         for mode in ("report_hmac", "score_hmac", "attestation", "stale", "reviews", "leak_key", "critical_union"):
             with self.subTest(mode=mode):

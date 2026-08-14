@@ -8,7 +8,12 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from chat_replay import ReplayAuthorizationError, ReplayFormatError, import_private_replay
+from chat_replay import (
+    ReplayAuthorizationError,
+    ReplayFormatError,
+    import_private_replay,
+    run_replay,
+)
 from normalize_authorized_export import (
     HERE,
     main,
@@ -273,3 +278,61 @@ class AuthorizedExportNormalizerTests(unittest.TestCase):
                 "source_slot": "channel_a", "phase": "opening",
             })
             self.assertEqual(report_value["event_count"], 4)
+
+    def test_20000_event_authorized_export_replays_with_bounded_public_report(self):
+        """Exercise the advertised long offline path without retaining an artifact."""
+        event_count = 20_000
+        duration_ms = 7_200_000
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            events = [
+                {
+                    "record_type": "event",
+                    "provider": "chzzk",
+                    "channel_id": "opaque-channel",
+                    "occurred_at_ms": (index - 1) * duration_ms // (event_count - 1),
+                    "source_type": "donation" if index % 1_000 == 0 else "text",
+                    "text": None if index % 1_000 == 0 else f"e{index:05d}",
+                }
+                for index in range(1, event_count + 1)
+            ]
+            export, consent, provenance, allowlist, identity_key = self.make_files(
+                directory, events=events,
+            )
+            rows, derived, receipt = normalize_authorized_export(
+                export, consent, provenance, allowlist, identity_key, now=NOW,
+            )
+            self.assertEqual(len(rows), event_count)
+            self.assertEqual(receipt["input_event_count"], event_count)
+            self.assertEqual(receipt["output_event_count"], event_count)
+
+            normalized = directory / "normalized.jsonl"
+            normalized.write_bytes(b"".join(
+                json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8") + b"\n"
+                for row in rows
+            ))
+            derived_path = directory / "normalized.consent.json"
+            write_json(derived_path, derived)
+            imported = import_private_replay(normalized, derived_path, provenance, now=NOW)
+            self.assertEqual(len(imported), event_count)
+            self.assertEqual(imported[0].offset_ms, 0)
+            self.assertEqual(imported[-1].offset_ms, duration_ms)
+
+            callback_seqs = []
+            report = run_replay(
+                imported,
+                lambda _text, event: callback_seqs.append(event.seq) or "ok",
+                report_hmac_key=b"load-test-report-hmac-key-32-bytes",
+            )
+            self.assertEqual(report["event_count"], event_count)
+            self.assertEqual(report["flow"]["duration_ms"], duration_ms)
+            self.assertEqual(report["response_sampling"]["fixed_5s_batch_count"], 1_441)
+            self.assertEqual(report["response_sampling"]["selected_event_count"], 20)
+            self.assertEqual(report["response_count"], 20)
+            self.assertEqual(report["delivered_count"], 20)
+            self.assertEqual(len(callback_seqs), 20)
+            self.assertLessEqual(len(callback_seqs), duration_ms // 5_000 + 1)
+            self.assertLess(
+                len(json.dumps(report, sort_keys=True, separators=(",", ":")).encode("utf-8")),
+                64 * 1024,
+            )

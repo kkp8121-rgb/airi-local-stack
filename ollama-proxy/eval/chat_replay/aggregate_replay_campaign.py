@@ -55,6 +55,10 @@ EXPECTED_RUNTIME = {
     "seed": 42,
     "max_tokens": 128,
     "history_turns": 8,
+    "max_model_calls": 1441,
+    "max_run_seconds": 7200,
+    "history_char_limit": 6000,
+    "request_byte_limit": 12 * 1024,
 }
 RUNTIME_FIELDS = tuple(EXPECTED_RUNTIME)
 MAX_ARTIFACT_BYTES = 32 * 1024 * 1024
@@ -156,7 +160,11 @@ def _runtime(value: object) -> dict[str, Any]:
         not isinstance(value, dict)
         or set(value) != set(RUNTIME_FIELDS) | {"epistemic_confidence_enabled"}
         or type(value.get("epistemic_confidence_enabled")) is not bool
-        or any(value.get(name) != expected for name, expected in EXPECTED_RUNTIME.items())
+        or any(
+            type(value.get(name)) is not type(expected)
+            or value.get(name) != expected
+            for name, expected in EXPECTED_RUNTIME.items()
+        )
     ):
         raise CampaignFormatError("runtime is not the frozen Mi:dm replay profile")
     return value

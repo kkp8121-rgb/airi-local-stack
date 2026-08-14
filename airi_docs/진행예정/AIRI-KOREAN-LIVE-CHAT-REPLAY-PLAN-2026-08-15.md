@@ -140,14 +140,17 @@ source마다 서로 다른 시작/중간/화제 전환 또는 게임 전환 국�
 
 - SIGDIAL 2024의 장시간 live-chat selection 연구는 28개 replay의 20,514개
   5초 chat batch를 평가했고 batch당 평균 11.91개 채팅에서 응답할 1개 또는
-  no-reply를 고르는 문제로 정의했다. 이 구조를 참고하되 현재 sampler는 좁은
-  결정론적 offline harness이며 해당 연구 재현이나 실제 B1b 성능이 아니다.
+  no-reply를 고르는 문제로 정의했다. 원문은 일본어이며 논문이 예고한 공개
+  dataset/repository는 2026-08-15 조사에서 확인하지 못했다. 이 구조를 참고하되
+  현재 sampler는 좁은 결정론적 offline harness이며 해당 연구 재현이나 실제 B1b
+  성능이 아니다.
   https://aclanthology.org/2024.sigdial-1.16/
 - SOOP 연구의 LiveChatBench는 허가 아래 수집된 대규모 실제 한국 채팅과 1,000개
-  번역 benchmark를 기술하지만, 이번 조사에서는 시간순 장시간 원 corpus의 공개
-  download를 확인하지 못했다. 논문에 공개된 3개 예문은 Mi:dm 연결 smoke에만
+  번역 benchmark를 기술하지만, 논문과 OpenReview는 artifact를 향후 공개한다고만
+  명시하며 2026-08-15 현재 GitHub/Hugging Face/Zenodo/OSF에서 라이선스가 확인되는
+  시간순 장시간 corpus를 찾지 못했다. 논문에 공개된 3개 예문은 Mi:dm 연결 smoke에만
   사용했고 장시간 campaign에 포함하지 않는다.
-  https://arxiv.org/abs/2601.02641
+  https://openreview.net/forum?id=3DgbiMKhM0
 - YouTube는 종료된 live archive에서 chat replay UI를 기본 제공할 수 있지만
   creator가 끌 수 있고, 공식 `liveChatMessages` API는 종료된 chat을 retrieve하지
   않는다. 공개 시청 가능한 다시보기와 재사용 가능한 시간순 export를 구분한다.

@@ -12,14 +12,14 @@ from pathlib import Path
 import re
 from typing import Any
 
-from chat_replay import ALLOWED_KINDS, ALLOWED_RESPONSE_OUTCOMES, CAPTURE_PHASES, ReplayEvent, ReplayFormatError, REPORT_SCHEMA as REPLAY_SCHEMA, SOURCE_SLOTS, SURFACE_SIGNAL_ORDER, _canonical, _sample_response_events, _surface_signals, run_replay
+from chat_replay import ALLOWED_KINDS, ALLOWED_RESPONSE_OUTCOMES, CAPTURE_PHASES, MAX_PRIVATE_PACKET_BYTES, MAX_REPLAY_EVENTS, MAX_RESPONSE_CHARS, MIN_RESPONSE_CHARS, ReplayEvent, ReplayFormatError, REPORT_SCHEMA as REPLAY_SCHEMA, SOURCE_SLOTS, SURFACE_SIGNAL_ORDER, _canonical, _sample_response_events, _surface_signals, run_replay
 from normalize_authorized_export import read_identity_key
 from replay_local_io import _secure_inside, write_atomic_json
 
 HERE = Path(__file__).resolve().parent
 PACKET_SCHEMA = "airi.chat-replay-private-review.v3"
 REPORT_SCHEMA = "airi.chat-replay-human-score.v2"
-MAX_PACKET_BYTES = 32 * 1024 * 1024
+MAX_PACKET_BYTES = MAX_PRIVATE_PACKET_BYTES
 MAX_REPLAY_REPORT_BYTES = 32 * 1024 * 1024
 REPORT_HMAC_DOMAIN = b"airi.chat-replay-report.v1\0"
 SCORE_HMAC_DOMAIN = b"airi.chat-replay-human-score.v1\0"
@@ -66,7 +66,7 @@ def _load(path: Path) -> dict[str, Any]:
         value = json.loads(raw.decode("utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise PrivateReviewError("private review packet is unreadable") from exc
-    if not isinstance(value, dict) or set(value) != _PACKET_KEYS or value.get("schema_version") != PACKET_SCHEMA or value.get("local_only") is not True or not isinstance(value.get("rows"), list) or not 1 <= len(value["rows"]) <= 20_000:
+    if not isinstance(value, dict) or set(value) != _PACKET_KEYS or value.get("schema_version") != PACKET_SCHEMA or value.get("local_only") is not True or not isinstance(value.get("rows"), list) or not 1 <= len(value["rows"]) <= MAX_REPLAY_EVENTS:
         raise PrivateReviewError("private review packet has unsupported fields")
     if any(
         not isinstance(value.get(name), str)
@@ -165,7 +165,7 @@ def score_private_review(path: Path, replay_report_path: Path, identity_key_path
             or item["seq"] < 1
             or item.get("outcome") not in ALLOWED_RESPONSE_OUTCOMES
             or type(item.get("response_char_count")) is not int
-            or item["response_char_count"] < 1
+            or not MIN_RESPONSE_CHARS <= item["response_char_count"] <= MAX_RESPONSE_CHARS
             or not isinstance(item.get("response_hmac_sha256"), str)
             or re.fullmatch(r"[0-9a-f]{64}", item["response_hmac_sha256"]) is None
             or item["seq"] in report_rows
@@ -188,7 +188,7 @@ def score_private_review(path: Path, replay_report_path: Path, identity_key_path
             response = row.get("response")
             expected = report_rows.pop(seq, None)
             digest = hmac.new(key, b"airi.chat-replay-response.v1\0" + str(seq).encode("ascii") + b"\0" + (response.encode("utf-8") if isinstance(response, str) else b""), hashlib.sha256).hexdigest()
-            if not isinstance(response, str) or not response or len(response) > 4000 or not isinstance(row.get("outcome"), str) or row.get("response_char_count") != len(response) or not isinstance(row.get("response_hmac_sha256"), str) or expected != {"seq": seq, "outcome": row["outcome"], "response_char_count": len(response), "response_hmac_sha256": digest} or not hmac.compare_digest(row["response_hmac_sha256"], digest) or any(type(review[x]) is not bool for x in _QUALITY_FIELDS):
+            if not isinstance(response, str) or not MIN_RESPONSE_CHARS <= len(response) <= MAX_RESPONSE_CHARS or not isinstance(row.get("outcome"), str) or row.get("response_char_count") != len(response) or not isinstance(row.get("response_hmac_sha256"), str) or expected != {"seq": seq, "outcome": row["outcome"], "response_char_count": len(response), "response_hmac_sha256": digest} or not hmac.compare_digest(row["response_hmac_sha256"], digest) or any(type(review[x]) is not bool for x in _QUALITY_FIELDS):
                 raise PrivateReviewError("delivered response does not bind replay report")
             reviewed += 1
             for field in _QUALITY_FIELDS: passes[field] += review[field]

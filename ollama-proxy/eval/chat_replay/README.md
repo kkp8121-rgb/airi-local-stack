@@ -178,6 +178,23 @@ For an explicitly approved Mi:dm experiment, add:
 --private-review-output .\private-replays\capture-review.json
 ```
 
+Model opt-in is bounded before the first health request: the prepared capture
+must contain 300..20,000 events spanning 30..120 minutes, and the fixed
+offline sampler must select at least one and no more than
+`--max-model-calls` events (default 1441). `--max-run-seconds` defaults to
+7200 and applies a cooperative monotonic deadline to the complete
+health-and-request sequence. Each request starts with a socket timeout capped
+by the budget remaining at that point.
+It cannot hard-cancel a malicious peer that continuously trickles response
+headers or body bytes. The loopback reader accepts at most 64 KiB response bodies and
+responses must be 1..4000 characters. For the frozen 2048-token profile,
+history stays in complete exchange pairs and is conservatively limited to
+6,000 history characters and a 12 KiB serialized request. Private review
+packets are serialized once and rejected above 96 MiB before atomic replace;
+the scorer applies the same 96 MiB limit. Paired campaign evidence uses the
+frozen default call, deadline, history, and request limits; smaller CLI limits
+are diagnostic-only and fail the campaign profile check.
+
 Only literal loopback port 11435 is accepted. The runner never changes the
 epistemic gate; it only asserts `on` or `off`. Before and after every turn and
 the full run, it verifies the frozen Mi:dm tag, exact pinned/verified digest,
