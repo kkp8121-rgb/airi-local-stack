@@ -1,0 +1,25 @@
+{
+  "schema_version": "airi.chat-replay-suite-manifest.v1",
+  "suite_id": "korean-live-chat-structure-smoke-v1",
+  "synthetic_only": true,
+  "fixtures": [
+    {
+      "path": "fixtures/synthetic-korean-v1.jsonl",
+      "sha256": "c25687d9744ad0d2679a9c9aae6df6decff23883dca454adea1974fa0850016c"
+    }
+  ],
+  "model_profile": {
+    "model": "midm-airi:2.0-mini",
+    "model_digest": "92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f",
+    "temperature": 0,
+    "seed": 42,
+    "num_ctx": 2048,
+    "max_tokens": 128,
+    "history_turns": 8
+  },
+  "privacy": {
+    "real_chat_committed": false,
+    "identity_fields_allowed": false,
+    "response_text_in_report": false
+  }
+}

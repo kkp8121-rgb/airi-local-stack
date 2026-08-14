@@ -51,6 +51,9 @@ ollama-proxy/runtime/
 ollama-proxy/x
 ollama-proxy/bench-results/
 ollama-proxy/eval/results/
+ollama-proxy/eval/chat_replay/local-replay-intake/
+ollama-proxy/eval/chat_replay/private-replays/
+ollama-proxy/eval/chat_replay/reports/
 .codex/
 *.patch.bak-*
 

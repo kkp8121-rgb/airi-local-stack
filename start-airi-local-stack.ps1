@@ -50,6 +50,8 @@ param(
     [ValidateSet('on', 'off')]
     [string]$InputScreening = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_INPUT_SCREENING)) { 'off' } else { $env:AIRI_INPUT_SCREENING }),
     [string]$InputScreeningPolicy = $env:AIRI_INPUT_SCREENING_POLICY,
+    [ValidateSet('on', 'off')]
+    [string]$EpistemicConfidence = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_EPISTEMIC_CONFIDENCE)) { 'off' } else { $env:AIRI_EPISTEMIC_CONFIDENCE }),
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
@@ -85,6 +87,10 @@ if ($OutputModeration -notin @('on', 'off')) {
 $InputScreening = $InputScreening.ToLowerInvariant()
 if ($InputScreening -notin @('on', 'off')) {
     throw 'InputScreening must be on or off. Check the parameter or AIRI_INPUT_SCREENING.'
+}
+$EpistemicConfidence = $EpistemicConfidence.ToLowerInvariant()
+if ($EpistemicConfidence -notin @('on', 'off')) {
+    throw 'EpistemicConfidence must be on or off. Check the parameter or AIRI_EPISTEMIC_CONFIDENCE.'
 }
 if ($Stt -notin @('on', 'off')) {
     throw 'Stt must be on or off. Check the -Stt parameter or AIRI_STT environment variable.'
@@ -313,6 +319,7 @@ if ([string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
         -OutputModerationTerms $resolvedOutputModerationTerms `
         -InputScreening $InputScreening `
         -InputScreeningPolicy $resolvedInputScreeningPolicy `
+        -EpistemicConfidence $EpistemicConfidence `
         -ChatModelPreflighted `
         -AllowExternalSearch $AllowExternalSearch `
         -TopicBoardPath $TopicBoardPath `
@@ -334,6 +341,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
         -ChatProvider $ChatProvider -AllowExternalChat $AllowExternalChat -ChatModel $effectiveChatModel -ChatModelPreflighted `
         -OutputModeration $OutputModeration -OutputModerationTerms $resolvedOutputModerationTerms `
         -InputScreening $InputScreening -InputScreeningPolicy $resolvedInputScreeningPolicy `
+        -EpistemicConfidence $EpistemicConfidence `
         -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `
         -EnableCharacterEvaluator $EnableCharacterEvaluator -EvaluationMaxRecords $EvaluationMaxRecords `
         -VerifyExtractionGateOnly
@@ -370,6 +378,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
             -ChatModelDigest $ChatModelDigest `
             -OutputModeration $OutputModeration -OutputModerationTerms $resolvedOutputModerationTerms `
             -InputScreening $InputScreening -InputScreeningPolicy $resolvedInputScreeningPolicy `
+            -EpistemicConfidence $EpistemicConfidence `
             -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `
             -EnableCharacterEvaluator $EnableCharacterEvaluator -EvaluationMaxRecords $EvaluationMaxRecords
         $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
@@ -396,6 +405,7 @@ else {
 }
 $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
 $requestedInputScreening = $InputScreening -eq 'on'
+$requestedEpistemicConfidence = $EpistemicConfidence -eq 'on'
 if ($null -eq $proxy.input_screening) {
     throw 'Live proxy input screening state is missing, unready, or differs from the requested configuration.'
 }
@@ -413,6 +423,14 @@ if ($requestedInputScreening -and ($null -eq $livePolicyProperty -or
         $livePolicyProperty.Value -notmatch '^[0-9a-f]{64}$' -or
         $livePolicyProperty.Value -cne $expectedInputScreeningPolicySha256)) {
     throw 'Live proxy input screening policy digest differs from the requested policy.'
+}
+if ($null -eq $proxy.epistemic_confidence) {
+    throw 'Live proxy epistemic confidence state is missing or differs from the requested configuration.'
+}
+$liveEpistemicConfidenceEnabled = Get-AiriHealthBoolean `
+    $proxy.epistemic_confidence 'enabled' 'Live proxy epistemic confidence enabled'
+if ($liveEpistemicConfidenceEnabled -ne $requestedEpistemicConfidence) {
+    throw 'Live proxy epistemic confidence state is missing or differs from the requested configuration.'
 }
 $liveNumCtx = 0
 $liveNumCtxText = [Convert]::ToString(
@@ -493,6 +511,7 @@ if ($ChatProvider -eq 'local') {
     OutputModerationReady = $proxy.output_moderation.ready
     InputScreeningEnabled = $proxy.input_screening.enabled
     InputScreeningReady = $proxy.input_screening.ready
+    EpistemicConfidenceEnabled = $proxy.epistemic_confidence.enabled
     LLMWarmup = if ($warmup) { $warmup.StatusCode } else { $null }
     ChatProvider = $ChatProvider
     ChatModel = $effectiveChatModel

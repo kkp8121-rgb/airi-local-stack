@@ -12,6 +12,17 @@ STT_STOP = (ROOT / "stt" / "stop-local-stt.ps1").read_text(encoding="utf-8")
 
 
 class MidmModelConfigurationTests(unittest.TestCase):
+    def test_epistemic_confidence_launcher_contract_is_default_off_and_forwarded(self) -> None:
+        for script in (STACK, PROXY):
+            self.assertIn("[string]$EpistemicConfidence =", script)
+            self.assertIn("EpistemicConfidence must be on or off", script)
+        self.assertEqual(STACK.count("-EpistemicConfidence $EpistemicConfidence"), 3)
+        self.assertIn("AIRI_EPISTEMIC_CONFIDENCE = $EpistemicConfidence", PROXY)
+        self.assertIn("AIRI_EPISTEMIC_CONFIDENCE_MODE = 'enforce'", PROXY)
+        self.assertIn("Existing proxy epistemic confidence state differs", PROXY)
+        self.assertIn("Live proxy epistemic confidence state is missing or differs", STACK)
+        self.assertIn("EpistemicConfidenceEnabled = $proxy.epistemic_confidence.enabled", STACK)
+
     def test_input_screening_launcher_contract_is_validated_and_forwarded(self) -> None:
         for script in (STACK, PROXY):
             self.assertIn("[string]$InputScreening =", script)

@@ -13,8 +13,18 @@
   지연 = `AIRI-NEUROSAMA-LOW-LATENCY-PLAN.md` (v2.1)
 - 실행 계획(M1~M5 상세): `진행예정/AIRI-BROADCAST-CHARACTER-PLAN-2026-08-12.md`
 
-최종 갱신: 2026-08-14
+최종 갱신: 2026-08-15
 
+- **2026-08-15** (dev PC, G3/B3-f 착수): moderation과 분리된
+  epistemic-confidence greybox를 기본 OFF로 구현해 현재/live 정보 무근거
+  단정, 무조건 동의, 문맥 없는 지시어·짧은 미확립 대상을 모델 호출 전에
+  한국어 fallback으로 차단했다. 실제 한국 방송 채팅 흐름은 탬탬버린·아카네
+  리제·아이네를 관찰 대상으로 정하되, 공식 권한 없는 VOD/chat scraping은
+  금지했다. 권한·보존 sidecar, 모델 전달 전 명시 identity/정형 PII 패턴/
+  후원 금액 삭제,
+  시간순·중복·잡음 보존, content-free report와 ignored private review를 갖춘
+  local replay 기반을 추가했다. 실제 캡처와 Mi:dm OFF/ON 실측, 운영 ON 채택은
+  아직 완료가 아니다.
 - **2026-08-14** (dev PC, B4c 인수 후속): 검토 PC 배치와 직전 로컬 자산
   통합 경계를 최신 main에서 대조했다. retired 11439 gateway의 보존 소스로
   비스트리밍·`max_tokens=1..128` 정확 계약을 확인했고, listener와 Tailscale
@@ -241,12 +251,11 @@
     `extraction_enabled=true` 이후 Stage B commit↔foreground 겹침 증거 필요)
   - [ ] I2 시청자 기억 시스템 (M2)
 - [~] **G3. 평가·데이터 플라이휠**
-  - [~] 전 로컬 LLM 후보 동일 AIRI A/B — **최우선 즉시 착수**. Mi:dm,
-    Motif 2.6B v1.1-LC, Ministral 3 3B, Qwen3 4B, Phi-4-mini 3.8B,
-    Granite 3.3 2B 각각의 공식 사용법 manifest와 official-native/
-    AIRI-common 이중 profile을 고정하고 raw/context/persona/proxy/인간 검수/
-    full-stack을 동일 단계로 수행한다. EXAONE과 제한 라이선스 후보는 제외한다.
-    (`진행예정/AIRI-LOCAL-LLM-CANDIDATE-AB-PLAN-2026-08-13.md`)
+  - [x] 전 로컬 LLM 후보 동일 AIRI A/B — 완료 후 사용자가 Mi:dm Q4를
+    최종 운영 모델로 확정. 비최종 후보 weight는 2026-08-14 정리했고 pinned
+    manifest·실패/실측 기록만 보존한다. 후보 A/B를 다음 작업으로 다시 실행하지
+    않는다. (`진행예정/AIRI-LOCAL-LLM-CANDIDATE-AB-PLAN-2026-08-13.md`,
+    `완료/AIRI-LOCAL-ASSET-CONSOLIDATION-2026-08-14.md`)
   - [x] 오프라인 eval 하네스·120턴 A/B — 2026-08-12 (`진행중/AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md`)
   - [x] 장문 context·memory·card 합성 A/B 실측 — EXAONE exact 3/12,
     Mi:dm 0/12로 양 모델 FAIL — 2026-08-12
@@ -254,6 +263,18 @@
   - [x] 장문 context budget·card/정정 표현 및 고정 4압력×3회 production 회귀 측정 완료 — **FAIL**
     (v2: 7개 필드 중 6개 12/12, `dialogue_marker` 0/12가 `silver-fern` 복사; 두 continuity color는 v1보다 개선됐으나 dialogue-vs-memory 모델 한계. 운영 기본값 2048·extraction OFF 유지)
   - [x] eval provenance 해소 (수집 데이터를 승격 근거로 사용 가능) — 2026-08-12 (`932eae6`)
+  - [~] epistemic-confidence gate — 2026-08-15 greybox 구현. output
+    moderation과 독립, env 기본 OFF, 무근거 현재/live 상태·무조건 동의·문맥
+    없는 지시어/짧은 미확립 대상을 pre-publication 한국어 fallback으로 처리하고
+    content-free health counter를 제공한다. 실제 승인 채팅 Mi:dm OFF/ON 비교와
+    운영 ON 채택은 미완료이며 사용자 확인 전 자동 승격하지 않는다.
+  - [~] 승인 실제 한국 방송 채팅 흐름 replay — 권한 sidecar와 hash-bound
+    local provenance artifact,
+    명시 identity·정형 PII 패턴·후원 금액 pre-model 삭제, 순서·상대 시간·
+    중복·잡음 보존,
+    content-free report/ignored private review 기반 구현. 탬탬버린·아카네 리제·
+    아이네 실제 캡처는 방송인/플랫폼 공식 권한 대기이며 무단 scraping하지 않는다.
+    상세: `진행예정/AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md`.
   - [ ] 인간 검수 100건 수집 (dev PC)
   - [ ] 16케이스 자동 게이트 PASS (현재 양 모델 FAIL)
 - [ ] **G4. 성격 파인튜닝 (QLoRA)** — (보류: G3 인간 검수 데이터 축적)
@@ -313,6 +334,8 @@
 
 - [~] **C0. 기준선·평가 세트 고정**
   - [x] 16케이스 fixture·A/B 하네스 고정 — 2026-08-12
+  - [~] 실제 채팅 구조 기반 합성 replay fixture — 기반과 독립 작성 synthetic
+    smoke fixture 완료; 승인 실제 캡처 분석 뒤 패턴 회귀 세트 확정 필요
   - [ ] 인간 검수 평가 세트 고정 (G3와 동일 병목)
 - [ ] **C1. 성격 SFT LoRA** — (보류: G4와 동일 조건)
   - [x] 캐릭터 헌법 초안 (학습 목표 정의의 입력) — 2026-08-12 (`7dc4e76`)
@@ -387,6 +410,9 @@
     not semantic-safety/proxy/UI/TTS proof
   - [ ] B3-e category별(욕설·음란성 등) 설치 UI/TTS 차단 반응 실기 — 현재는
     dictionary/unit + generic match-all 배선 확인만. output moderation 기본 OFF
+  - [~] B3-f 실제 한국 방송 채팅 흐름/확신도 replay — local privacy·권한·
+    replay 기반 완료, 세 채널 승인 캡처·Mi:dm 대응 검수·설치 Electron/B1b
+    종단 실증 대기. 실제 원문은 git/학습 데이터에 넣지 않는다.
   - [ ] B2 송출 (OBS Browser Source + App Audio Capture — 결정 2 이후)
 - [~] **M4** (B4 방송 디렉터 + C3/C4 ∥ I3 주제 풀)
   - [~] B4a 기반 구현 — 기본 OFF/inert; simulation-only 집중 테스트 17 PASS·독립 최종 검토 PASS.
@@ -413,6 +439,15 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-15** (dev PC, G3/B3-f 실제 채팅 평가 기반): default-OFF
+  epistemic-confidence pre-publication gate와 승인/보존 fail-closed local chat
+  replay를 구현했다. replay는 실제 채팅의 명시 identity·정형 PII 패턴·후원
+  금액을 모델 전달
+  전에 제거하고 순서·상대 시간·중복·잡음을 보존하며, 일반 report에는 원문과
+  응답 원문을 남기지 않는다. 탬탬버린·아카네 리제·아이네의 실제 로그는
+  치지직/SOOP 공식 권한 없이는 수집하지 않으며, 승인 캡처·Mi:dm OFF/ON 실측·
+  운영 ON 채택은 후속이다. 계획:
+  `진행예정/AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md`.
 - **2026-08-14** (dev PC, B4c 인수 후속): 직전 자산 통합의
   `archived_not_deployed` 경계를 보존한 채 검토 PC 세 후속을 정리했다.
   retired 11439 gateway 소스 계약은 비스트리밍·`max_tokens=1..128`로 확정,

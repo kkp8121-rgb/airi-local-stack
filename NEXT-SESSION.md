@@ -46,10 +46,23 @@ exact `11435/v1` 계약을 checkpoint에 고정했으나 B1b 실제 주입 종�
 사용자 확인 전 운영 ON 금지를 유지한다. 상세:
 `airi_docs/완료/AIRI-B4C-DEV-PC-FOLLOWUP-2026-08-14.md`.
 
-모든 후보가 모호한 고유명사·현재 정보 불확실성·무조건 동의를 완전히 처리하지
-못했으므로 음란/비속어 moderation과 별도의 epistemic-confidence gate가 다음
-구현 우선순위다. 외부 검색은 여전히 OFF이며 검색하지 않았는데 검색했다고 말하면
+모든 후보가 실패한 모호한 고유명사·현재 정보 불확실성·무조건 동의에 대해
+음란/비속어 moderation과 별도의 epistemic-confidence greybox를 2026-08-15
+구현했다. env 기본 OFF이며 현재/live 상태 무근거 단정, 무조건 동의, 문맥 없는
+지시어·짧은 미확립 대상을 모델 호출 전에 한국어 fallback으로 처리한다. 아직
+승인 실제 채팅 Mi:dm OFF/ON 비교와 운영 ON 채택을 하지 않았으므로 완료/PASS로
+승격하지 않는다. 외부 검색은 여전히 OFF이며 검색하지 않았는데 검색했다고 말하면
 안 된다.
+
+한국 방송의 실제 변수도 G3/B3-f 평가축에 추가했다. 탬탬버린·아카네 리제·아이네의
+실제 채팅은 공개 화면을 무단 scraping하지 않고 방송인/플랫폼 서면 권한 또는
+사용자가 권리를 보유한 export가 있을 때만 사용한다. local replay 기반은 권한·
+삭제기한 sidecar, 명시 identity/정형 PII 패턴/후원 금액 pre-model 삭제,
+시간순·중복·잡음 보존,
+content-free report와 ignored private review packet까지 구현됐다. 다음 실작업은
+세 채널 권한 확보 → 짧은 구간 캡처 → privacy 사람 검수 → 동일 sequence의
+epistemic gate OFF/ON Mi:dm replay다. 상세:
+`airi_docs/진행예정/AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md`.
 
 현재 exact tip과 원격 동기화·CI 상태는 `git status`, `git log -1`, PR checks로 확인한다. 2026-08-14 자산 통합 checkpoint는 PASS이고 Python 3.12 core suite는 `1061 passed, 2 skipped, 916 subtests passed`다. historical test count는 해당 historical base에만 적용한다.
 
@@ -66,5 +79,7 @@ completion or runtime TTS duration/pitch verification. See
 
 - cloud streaming latency 재측정: 제공자 자격증명과 외부 사용 승인
 - 인간 검수 100건
+- 탬탬버린·아카네 리제·아이네 실제 채팅: 방송인/플랫폼 공식 권한 또는
+  사용자가 권리를 보유한 export
 - STT/실제 마이크 재개: 사용자 명시 요청
 - 제한 라이선스 모델 재도입: 사용자가 후보군에 다시 넣을 때만 별도 법률 검토

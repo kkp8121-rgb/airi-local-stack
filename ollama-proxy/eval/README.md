@@ -1,5 +1,16 @@
 # AIRI evaluations
 
+## Privacy-preserving Korean live-chat replay
+
+`chat_replay/` is the default-off, local-only intake and deterministic replay
+boundary for authorized Korean livestream chat exports. Real captures and
+redacted response review packets are ignored and require a current consent
+sidecar plus its hash-bound local provenance artifact; normal reports are
+content-free. The committed
+fixture is independently authored synthetic text, not anonymized chat and not
+training data. See `chat_replay/README.md` for the exact custody and CLI
+contract. No provider scraping or network request occurs by default.
+
 ## Persona-jailbreak direct-model marker-contract gate
 
 `run_airi_persona_jailbreak_gate.py` sends the frozen multilingual corpus

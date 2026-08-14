@@ -65,6 +65,7 @@ from input_screening import (
     validate_input_text,
 )
 from output_moderation import OutputModerationRuntime, load_moderation_policy
+from epistemic_confidence import build_runtime as build_epistemic_confidence_runtime
 from broadcast_contract import apply_broadcast_contract, broadcast_contract_enabled
 
 
@@ -5307,6 +5308,13 @@ def build_output_moderation_runtime() -> OutputModerationRuntime:
 
 output_moderation_runtime = build_output_moderation_runtime()
 
+# This is independent from output moderation: it checks unsupported confidence
+# in the request before generation, and remains completely inactive by default.
+epistemic_confidence_runtime = build_epistemic_confidence_runtime(
+    os.environ.get("AIRI_EPISTEMIC_CONFIDENCE", "off"),
+    os.environ.get("AIRI_EPISTEMIC_CONFIDENCE_MODE", "enforce"),
+)
+
 
 def output_moderation_enabled() -> bool:
     """Read the module-level switch at call time so tests can patch it."""
@@ -5383,6 +5391,83 @@ def openai_sse_finish(completion_id: str, model: str) -> bytes:
         f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
         "data: [DONE]\n\n"
     ).encode("utf-8")
+
+
+def pre_model_fallback_response(
+    path: str,
+    *,
+    requested_stream: bool,
+    body: bytes,
+    fallback: str,
+    trace_id: str,
+    request_started: float,
+    original_messages: list[dict[str, object]],
+    memory_session_id: str | None,
+    user_text: str,
+    response_header: tuple[str, str] | None,
+    action: str,
+    emotion_reason: str,
+) -> Response:
+    """Return a deterministic local boundary response before model output."""
+    try:
+        payload = json.loads(body)
+    except (TypeError, json.JSONDecodeError, UnicodeDecodeError):
+        payload = {}
+    model = str(payload.get("model") or resolve_chat_model()) if isinstance(payload, dict) else resolve_chat_model()
+    headers: dict[str, str] = {
+        "Cache-Control": "no-cache",
+        "X-AIRI-Immediate-Ack": "false",
+    }
+    if response_header is not None:
+        headers[response_header[0]] = response_header[1]
+
+    def complete() -> None:
+        emit_substantive_content(trace_id, request_started)
+        schedule_completed_turn(
+            original_messages,
+            session_id=memory_session_id,
+            user_text=user_text,
+            assistant_text=fallback,
+            trace_id=trace_id,
+            action=action,
+            emotion="neutral",
+            emotion_reason=emotion_reason,
+        )
+
+    if path.endswith("chat/completions") and requested_stream:
+        completion_id = f"chatcmpl-airi-{uuid4().hex}"
+
+        async def stream_fallback() -> AsyncIterator[bytes]:
+            emit_latency_event("llm", "first", trace_id, duration_ms=elapsed_ms(request_started), meta={action: 1})
+            yield openai_sse_delta(completion_id, model, "", include_role=True)
+            complete()
+            yield openai_sse_delta(completion_id, model, fallback)
+            yield openai_sse_finish(completion_id, model)
+            emit_latency_event("llm", "end", trace_id, duration_ms=elapsed_ms(request_started), meta={action: 1})
+
+        return StreamingResponse(
+            stream_fallback(), media_type="text/event-stream",
+            headers=headers,
+        )
+    emit_latency_event("llm", "first", trace_id, duration_ms=elapsed_ms(request_started), meta={action: 1})
+    complete()
+    emit_latency_event("llm", "end", trace_id, duration_ms=elapsed_ms(request_started), meta={action: 1})
+    if path.endswith("api/chat"):
+        item = {"model": model, "message": {"role": "assistant", "content": fallback}, "done": True, "done_reason": "stop"}
+        if requested_stream:
+            async def stream_native_fallback() -> AsyncIterator[bytes]:
+                yield json.dumps(item, ensure_ascii=False).encode("utf-8") + b"\n"
+
+            return StreamingResponse(
+                stream_native_fallback(), media_type="application/x-ndjson",
+                headers=headers,
+            )
+        return JSONResponse(item, headers=headers)
+    return JSONResponse(
+        {"id": f"chatcmpl-airi-{uuid4().hex}", "object": "chat.completion", "model": model,
+         "choices": [{"index": 0, "message": {"role": "assistant", "content": fallback}, "finish_reason": "stop"}]},
+        headers=headers,
+    )
 
 
 def to_openai_sse(payload: dict[str, object], content: str) -> bytes:
@@ -5735,6 +5820,7 @@ async def health() -> dict[str, object]:
         "proactive_output": proactive_output_telemetry.health(),
         "topic_board": topic_board_runtime.health(),
         "output_moderation": output_moderation_runtime.health(),
+        "epistemic_confidence": epistemic_confidence_runtime.health(),
         "num_ctx": NUM_CTX,
         "prompt_budget": prompt_budget_telemetry.health(NUM_CTX),
         "continuity_ledger": continuity_ledger_runtime.health(),
@@ -7297,6 +7383,60 @@ async def proxy(path: str, request: Request):
         query_recovered = False
         repeat_count = 1
         repeat_candidate = False
+    serious_fallback = (
+        serious_pre_stream_dialogue(last_user_text)
+        if is_chat_request and not proactive_turn and not quality_probe_turn
+        else ""
+    )
+    if serious_fallback:
+        return pre_model_fallback_response(
+            path,
+            requested_stream=requested_stream,
+            body=body,
+            fallback=serious_fallback,
+            trace_id=trace_id,
+            request_started=request_started,
+            original_messages=original_messages,
+            memory_session_id=memory_session_id,
+            user_text=last_user_text,
+            response_header=("X-AIRI-Serious-Safety", "handled"),
+            action="serious_safety",
+            emotion_reason="serious_support",
+        )
+    # Run before any model output can become an irreversible public stream.
+    # Caller-supplied tool-role messages and mere eligibility for a local
+    # knowledge lookup are not reviewed evidence, so neither bypasses this
+    # boundary. Existing urgent/bereavement safety handling takes priority.
+    # Quality probes remain raw model measurements; explicit synthetic
+    # evaluation turns may exercise the gate.
+    epistemic_verdict = (
+        epistemic_confidence_runtime.inspect(
+            original_messages,
+            last_user_text,
+            approved_evidence=False,
+        )
+        if (
+            is_chat_request
+            and not proactive_turn
+            and not quality_probe_turn
+        )
+        else None
+    )
+    if epistemic_verdict is not None and epistemic_verdict.blocked:
+        return pre_model_fallback_response(
+            path,
+            requested_stream=requested_stream,
+            body=body,
+            fallback=epistemic_verdict.fallback,
+            trace_id=trace_id,
+            request_started=request_started,
+            original_messages=original_messages,
+            memory_session_id=memory_session_id,
+            user_text=last_user_text,
+            response_header=("X-AIRI-Epistemic-Confidence", epistemic_verdict.reason),
+            action="epistemic_confidence",
+            emotion_reason=epistemic_verdict.reason,
+        )
     # Local proactive speech is always Korean-first even though it deliberately
     # has no user utterance from which to infer a language preference.
     response_language = (

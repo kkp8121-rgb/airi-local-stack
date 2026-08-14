@@ -1,0 +1,7 @@
+{
+  "schema_version": "airi.chat-replay-fixture.v1",
+  "synthetic_only": true,
+  "event_fields": ["timestamp_ms", "kind", "text"],
+  "prohibited_fields": ["viewer_id", "provider_id", "message_id", "display_name", "profile_url", "author_id", "channel", "creator"],
+  "note": "Fixtures are independently authored Korean text, not a transformed real capture."
+}

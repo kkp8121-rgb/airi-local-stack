@@ -55,6 +55,13 @@
 
 ## 진행예정 — 계획
 
+- `AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md` — G3/C0·M3의
+  실제 한국 방송 채팅 흐름 평가 계획. 탬탬버린·아카네 리제·아이네의 공개
+  채널을 관찰 대상으로 삼되 공식 권한 없는 수집은 금지한다. 승인된 비공개
+  export만 명시 identity/정형 PII 패턴/금액을 모델 전달 전에 제거해 시간순
+  replay하고,
+  원문은 git·일반 report·학습 데이터에 넣지 않는다. privacy replay 기반은
+  구현됐고 실제 캡처·Mi:dm OFF/ON 실측은 권한 대기다.
 - `AIRI-LOCAL-LLM-CANDIDATE-AB-PLAN-2026-08-13.md` — 즉시 착수하는
   G3/C0 최우선 배치. Mi:dm 대조군과 Motif·Ministral·Qwen3·Phi-4-mini·
   Granite 전 후보에 대해 모델별 공식 사용법 manifest, official-native와

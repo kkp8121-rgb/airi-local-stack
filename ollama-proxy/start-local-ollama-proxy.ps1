@@ -53,6 +53,8 @@ param(
     [ValidateSet('on', 'off')]
     [string]$InputScreening = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_INPUT_SCREENING)) { 'off' } else { $env:AIRI_INPUT_SCREENING }),
     [string]$InputScreeningPolicy = $env:AIRI_INPUT_SCREENING_POLICY,
+    [ValidateSet('on', 'off')]
+    [string]$EpistemicConfidence = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_EPISTEMIC_CONFIDENCE)) { 'off' } else { $env:AIRI_EPISTEMIC_CONFIDENCE }),
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
@@ -77,6 +79,10 @@ if ($OutputModeration -notin @('on', 'off')) {
 $InputScreening = $InputScreening.ToLowerInvariant()
 if ($InputScreening -notin @('on', 'off')) {
     throw 'InputScreening must be on or off. Check the parameter or AIRI_INPUT_SCREENING.'
+}
+$EpistemicConfidence = $EpistemicConfidence.ToLowerInvariant()
+if ($EpistemicConfidence -notin @('on', 'off')) {
+    throw 'EpistemicConfidence must be on or off. Check the parameter or AIRI_EPISTEMIC_CONFIDENCE.'
 }
 $parsedNumCtx = 0
 if (-not [int]::TryParse(
@@ -301,6 +307,11 @@ if ($listener) {
             throw 'Existing proxy input screening policy digest is malformed.'
         }
         $existingInputScreeningPolicySha256 = if ($null -ne $policyProperty) { $policyProperty.Value } else { '' }
+        if ($null -eq $existingHealth.epistemic_confidence) {
+            throw 'Existing proxy health does not report epistemic confidence state.'
+        }
+        $existingEpistemicConfidenceEnabled = Get-AiriHealthBoolean `
+            $existingHealth.epistemic_confidence 'enabled' 'Existing proxy epistemic confidence enabled'
     }
     catch {
         throw 'Existing proxy safety state could not be verified; stop it and restart.'
@@ -327,6 +338,9 @@ if ($listener) {
     if ($InputScreening -eq 'on' -and
             $existingInputScreeningPolicySha256 -cne $expectedInputScreeningPolicySha256) {
         throw 'Existing proxy input screening policy digest differs from the requested policy; stop it and restart.'
+    }
+    if ($existingEpistemicConfidenceEnabled -ne ($EpistemicConfidence -eq 'on')) {
+        throw 'Existing proxy epistemic confidence state differs from the requested configuration; stop it and restart.'
     }
     Write-Output 'A service is already listening on port 11435; it was not reconfigured.'
     return
@@ -371,6 +385,8 @@ $memoryEnvironment = @{
     AIRI_OUTPUT_MODERATION_TERMS = $resolvedOutputModerationTerms
     AIRI_INPUT_SCREENING = $InputScreening
     AIRI_INPUT_SCREENING_POLICY = $resolvedInputScreeningPolicy
+    AIRI_EPISTEMIC_CONFIDENCE = $EpistemicConfidence
+    AIRI_EPISTEMIC_CONFIDENCE_MODE = 'enforce'
     AIRI_OLLAMA_KEEP_ALIVE = $OllamaKeepAlive
     AIRI_OLLAMA_TEMPERATURE = $OllamaTemperature.ToString([Globalization.CultureInfo]::InvariantCulture)
     AIRI_OLLAMA_TOP_P = $OllamaTopP.ToString([Globalization.CultureInfo]::InvariantCulture)
