@@ -15,6 +15,16 @@
 
 최종 갱신: 2026-08-14
 
+- **2026-08-14** (dev PC): 분산 개발 자산을 main 기준으로 통합했다. 최종
+  LLM은 사용자 확정 Mi:dm Q4 두 Ollama 태그로 단일화하고 비최종 후보
+  11태그와 재다운로드 가능한 native snapshot·평가 환경, 비최종 TTS의
+  venv/model cache를 제거했다. 후보별
+  revision/hash/사용법/실측/실패 판단은 삭제하지 않고 tracked 문서, P0 metadata,
+  source bundle, TTS 중간 patch 6종, content-free Codex session inventory로
+  보존했다. ignored A/B 결과 119개와 TTS sample 9개는 main 로컬 자산에
+  무충돌 합쳤다. checkpoint PASS, Python 3.12 core `1061 passed, 2 skipped,
+  916 subtests passed`. 상세:
+  `완료/AIRI-LOCAL-ASSET-CONSOLIDATION-2026-08-14.md`.
 - **2026-08-14** (검토 PC): 원격 방송 채팅 A/B — 실측 시청자 채팅 38건으로
   Mi:dm Q4 vs Motif NF4를 Tailscale 원격 경로(방송 중 원격 LLM 시나리오
   근사)에서 76/76 실측. **완료 p50 357.8ms vs 9,842.6ms(27.5배)**, 형식

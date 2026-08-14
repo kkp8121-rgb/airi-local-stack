@@ -1,0 +1,126 @@
+{
+  "schema_version": "airi.codex-session-inventory.v1",
+  "generated_at": "2026-08-14T13:27:18Z",
+  "purpose": "Preserve a content-free index of Codex work that produced the AIRI roadmap, patches, tests, and technical decisions before local worktree consolidation.",
+  "scope": {
+    "session_store": "%CODEX_HOME%\\sessions",
+    "session_meta_cwd": "<repository-root>",
+    "started_from": "2026-08-04T11:27:19.786Z",
+    "started_through": "2026-08-13T12:15:38.702Z",
+    "root_sessions": 13,
+    "subagent_sessions": 503,
+    "total_sessions": 516,
+    "total_rollout_bytes": 1256396226
+  },
+  "privacy": {
+    "raw_prompts_copied": false,
+    "raw_responses_copied": false,
+    "credentials_copied": false,
+    "raw_rollouts_remain_in_codex_home": true
+  },
+  "directory_reference_counts": [
+    { "directory": "airi-upgrade-scout-full-20260811", "rollout_files": 204 },
+    { "directory": "airi-upgrade-scout-client-20260811", "rollout_files": 35 },
+    { "directory": "airi-upgrade-scout-main-20260811", "rollout_files": 29 },
+    { "directory": "airi-upstream-inspect-v0113", "rollout_files": 39 },
+    { "directory": "airi-tts-resampler-staging-20260813b", "rollout_files": 25 },
+    { "directory": "airi-tts-resampler-verify-20260813", "rollout_files": 13 },
+    { "directory": "airi-tts-resampler-verify2-20260813", "rollout_files": 13 },
+    { "directory": "airi-audit-venv-py312-20260811", "rollout_files": 33 },
+    { "directory": "airi-git-metadata-backup-20260805", "rollout_files": 34 }
+  ],
+  "root_session_rollouts": [
+    {
+      "id": "019fcc87-30e6-7ae3-924a-8e35bad56ff6",
+      "started_at": "2026-08-04T11:27:19.786Z",
+      "rollout_file": "%CODEX_HOME%\\sessions\\2026\\08\\04\\rollout-2026-08-04T20-27-19-019fcc87-30e6-7ae3-924a-8e35bad56ff6.jsonl",
+      "bytes": 49181193,
+      "sha256": "32924dcbddc402559dc02d69a6406e11997e4f87b619ae91b0306a50f41dc60d"
+    },
+    {
+      "id": "019fd1d9-c32d-78e3-9a30-dd471862e16c",
+      "started_at": "2026-08-05T12:15:37.412Z",
+      "rollout_file": "%CODEX_HOME%\\sessions\\2026\\08\\05\\rollout-2026-08-05T21-15-37-019fd1d9-c32d-78e3-9a30-dd471862e16c.jsonl",
+      "bytes": 1276730,
+      "sha256": "6d3c19048847b902662d59a1699d0a506dd2621e436d3e51608dd810af82b006"
+    },
+    {
+      "id": "019fd6e8-a74c-7680-813a-bc96c408e864",
+      "started_at": "2026-08-06T11:49:59.312Z",
+      "rollout_file": "%CODEX_HOME%\\sessions\\2026\\08\\06\\rollout-2026-08-06T20-49-59-019fd6e8-a74c-7680-813a-bc96c408e864.jsonl",
+      "bytes": 58861,
+      "sha256": "ce198823bce827352c86335e3d428d7081f9a6a56f3a0d712d497a83bd78104a"
+    },
+    {
+      "id": "019fd74d-eeb8-7551-b845-ff7762c27324",
+      "started_at": "2026-08-06T13:40:36.749Z",
+      "rollout_file": "%CODEX_HOME%\\sessions\\2026\\08\\06\\rollout-2026-08-06T22-40-36-019fd74d-eeb8-7551-b845-ff7762c27324.jsonl",
+      "bytes": 12991313,
+      "sha256": "3bb1108a717f5ddaa960bc2996ef94c590df7ca8ced3414b48acee352c627106"
+    },
+    {
+      "id": "019fdc95-3bb7-7de0-b15c-b068dae358b6",
+      "started_at": "2026-08-07T14:16:35.612Z",
+      "rollout_file": "%CODEX_HOME%\\sessions\\2026\\08\\07\\rollout-2026-08-07T23-16-35-019fdc95-3bb7-7de0-b15c-b068dae358b6.jsonl",
+      "bytes": 41449750,
+      "sha256": "16c4fc44b9ce0054b8cb26729f011de75b3b70bc6d5337c4848a911a455074a1"
+    },
+    {
+      "id": "019fdca1-7a31-7f63-819d-b1160a1c00bd",
+      "started_at": "2026-08-07T14:29:58.059Z",
+      "rollout_file": "%CODEX_HOME%\\sessions\\2026\\08\\07\\rollout-2026-08-07T23-29-58-019fdca1-7a31-7f63-819d-b1160a1c00bd.jsonl",
+      "bytes": 1759258,
+      "sha256": "1ace3a17d4af9dd0b2ce90da15fb9119ce7f63a143f9b825c374c7921a64cf77"
+    },
+    {
+      "id": "019fe07f-5841-70f2-9a02-1c128cd182e9",
+      "started_at": "2026-08-08T08:31:10.000Z",
+      "rollout_file": "%CODEX_HOME%\\sessions\\2026\\08\\08\\rollout-2026-08-08T17-31-10-019fe07f-5841-70f2-9a02-1c128cd182e9.jsonl",
+      "bytes": 219854474,
+      "sha256": "9b723b8f93414b3b148eb5bbec26e3ff683c443189febe23961427a69b00a00b"
+    },
+    {
+      "id": "019fe75d-f799-7c03-a8aa-5ea65720a519",
+      "started_at": "2026-08-09T16:32:03.065Z",
+      "rollout_file": "%CODEX_HOME%\\sessions\\2026\\08\\10\\rollout-2026-08-10T01-32-03-019fe75d-f799-7c03-a8aa-5ea65720a519.jsonl",
+      "bytes": 57964,
+      "sha256": "0d08bfda949c40332fa94b3120fe59732550e77ec1b94a29b7751f5f7893b34a"
+    },
+    {
+      "id": "019fe75e-2cb0-7821-96ec-a23d5e05e294",
+      "started_at": "2026-08-09T16:32:16.632Z",
+      "rollout_file": "%CODEX_HOME%\\sessions\\2026\\08\\10\\rollout-2026-08-10T01-32-16-019fe75e-2cb0-7821-96ec-a23d5e05e294.jsonl",
+      "bytes": 57968,
+      "sha256": "16676ef62ca76fad991e2fe6d2a669116bae5b49d079c8e6d1e574a4704b37bd"
+    },
+    {
+      "id": "019ff0b7-c561-7a20-ae1d-e76e34e33cd6",
+      "started_at": "2026-08-11T12:06:43.369Z",
+      "rollout_file": "%CODEX_HOME%\\sessions\\2026\\08\\11\\rollout-2026-08-11T21-06-43-019ff0b7-c561-7a20-ae1d-e76e34e33cd6.jsonl",
+      "bytes": 57966,
+      "sha256": "1ee87e022adcd79649ee600245722642ccfd19315f71dd37c723802aac2d2aa6"
+    },
+    {
+      "id": "019ff0bd-ed6a-7872-9e25-43b4a377dac5",
+      "started_at": "2026-08-11T12:13:26.862Z",
+      "rollout_file": "%CODEX_HOME%\\sessions\\2026\\08\\11\\rollout-2026-08-11T21-13-26-019ff0bd-ed6a-7872-9e25-43b4a377dac5.jsonl",
+      "bytes": 34165175,
+      "sha256": "df78f5704366fc583604dd723b6cc4fb2d36698760021e1b0d15c98231c4e03c"
+    },
+    {
+      "id": "019ff551-da2b-7cd2-b978-0bf06e447d35",
+      "started_at": "2026-08-12T09:33:30.110Z",
+      "rollout_file": "%CODEX_HOME%\\sessions\\2026\\08\\12\\rollout-2026-08-12T18-33-30-019ff551-da2b-7cd2-b978-0bf06e447d35.jsonl",
+      "bytes": 103544876,
+      "sha256": "378d6aeaf9b5ab263c1a8471787d30d2ccfeae2f8ff7b88594b3e2148f4a24c2"
+    },
+    {
+      "id": "019ffb0c-a88e-7540-b3b8-87d91a6acb40",
+      "started_at": "2026-08-13T12:15:38.702Z",
+      "rollout_file": "%CODEX_HOME%\\sessions\\2026\\08\\13\\rollout-2026-08-13T21-15-38-019ffb0c-a88e-7540-b3b8-87d91a6acb40.jsonl",
+      "bytes_at_inventory": 25683494,
+      "sha256": null,
+      "hash_status": "active_session_locked_during_inventory"
+    }
+  ]
+}

@@ -92,6 +92,10 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-LOCAL-ASSET-CONSOLIDATION-2026-08-14.md` — 분산 worktree·검증 clone·
+  모델 평가 자산의 main 통합 기록. 최종 Mi:dm runtime만 유지하면서 후보
+  weights는 제거하고, source bundle·P0 provenance·중간 patch·Codex session
+  inventory·ignored 실측 결과를 재현 경계에 맞춰 보존한 근거다.
 - `AIRI-LOCAL-TEMP-AND-FAILED-MODEL-CLEANUP-2026-08-13.md` records the completed
   user-requested local cleanup after the approval/candidate-failure block (not
   context exhaustion): removed temporary/reproducible data, preserved

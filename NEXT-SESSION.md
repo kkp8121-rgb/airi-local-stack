@@ -17,16 +17,13 @@ STT와 실제 마이크(AEC, barge-in, 20+20)는 사용자가 명시적으로 �
 
 ## 현재 작업 상태
 
-최우선 신규 배치는 명확한 허용 라이선스 후보와 사용자 승인 평가 예외 Motif를
-포함한 Mi:dm, Motif 2.6B v1.1-LC, Ministral 3 3B, Qwen3 4B,
-Phi-4-mini 3.8B, Granite 3.3 2B의 동일 AIRI A/B다.
-모델마다 공식 chat template·system role·thinking·sampling·EOS·context·
-quantization이 다르므로 exact revision의 사용법 manifest를 먼저 만들고,
-공식-native profile과 AIRI-common profile을 모두 측정한다. Motif의 원격 Python을
-실행하는 `trust_remote_code=True`를 mutable `main`에 사용하지 않는다. 운영 모델
-교체는 아니며 Mi:dm을 기준선으로 유지한다. EXAONE은 NC 라이선스 때문에
-공개·수익 방송 승격 후보에서 제외한다. 상세 SSoT는
-`airi_docs/진행예정/AIRI-LOCAL-LLM-CANDIDATE-AB-PLAN-2026-08-13.md`다.
+로컬 LLM 후보 동일 AIRI A/B는 완료됐고 사용자가 Mi:dm Q4를 최종 운영 모델로
+확정했다. Motif, Ministral, Qwen3, Phi-4-mini, Granite와 과거 EXAONE/Kanana/
+Gemma의 로컬 weight·평가 snapshot은 2026-08-14 정리했다. exact revision,
+모델별 사용법, 대화, 실측과 실패 판단은 지우지 않고 문서·manifest·ignored 결과로
+보존했다. 후보를 다시 실행하려면 기존 weight를 찾지 말고 pinned manifest로
+재다운로드한다. 통합·복구 경계는
+`airi_docs/완료/AIRI-LOCAL-ASSET-CONSOLIDATION-2026-08-14.md`를 따른다.
 
 production-context v2 gate는 구현·측정을 완료했지만 **FAIL**이다. 7개 필드 중 6개는 12/12이고 두 continuity color는 v1보다 개선됐으나, `dialogue_marker`가 0/12로 memory marker `silver-fern`을 결정적으로 복사한다. 따라서 prompt tuning을 계속하거나 품질 PASS라고 주장하지 않는다. 기본 2048·추출 OFF·STT OFF를 유지하며, 설치 extraction을 재실행하지 않았다.
 
@@ -45,7 +42,7 @@ Mi:dm exact digest를 운영 기준으로 유지하고 Motif는 배포 차단을
 구현 우선순위다. 외부 검색은 여전히 OFF이며 검색하지 않았는데 검색했다고 말하면
 안 된다.
 
-현재 exact tip과 원격 동기화·CI 상태는 `git status`, `git log -1`, PR checks로 확인한다. v2 전체 CI-equivalent Python 3.12.13 matrix는 858 passed / 1 skipped / 708 subtests다. historical test count는 해당 historical base에만 적용한다.
+현재 exact tip과 원격 동기화·CI 상태는 `git status`, `git log -1`, PR checks로 확인한다. 2026-08-14 자산 통합 checkpoint는 PASS이고 Python 3.12 core suite는 `1061 passed, 2 skipped, 916 subtests passed`다. historical test count는 해당 historical base에만 적용한다.
 
 Source-built ASAR deployment safety tooling has synthetic >1 MiB PASS coverage,
 and its full validator passed the installed ASAR read-only at SHA-256

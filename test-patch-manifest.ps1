@@ -237,7 +237,7 @@ if ($pythonJobBody -notmatch '(?m)^    timeout-minutes: 10\s*$' -or
 $trackedProxyTests = @(
     git -C $root ls-files -- `
         'ollama-proxy/test_*.py' `
-        'ollama-proxy/eval/test_*.py' `
+        ':(glob)ollama-proxy/eval/**/test_*.py' `
         'ollama-proxy/training/tests/test_*.py'
 )
 if ($LASTEXITCODE -ne 0) {

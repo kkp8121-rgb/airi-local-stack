@@ -1,0 +1,158 @@
+{
+  "schema_version": "airi.source-archive-manifest.v1",
+  "created_at": "2026-08-14T13:27:18Z",
+  "purpose": "Preserve the unpublished upstream AIRI source-port research before removing distributed local worktrees and verification clones.",
+  "archives": [
+    {
+      "path": "airi_docs/evidence/source-archives/airi-upstream-local-ports-20260811.bundle",
+      "bytes": 162162,
+      "sha256": "14955fb9aa103cf2d3304c6696bd814ab4dccf0ccff2d9b35cdfac17b0f7fed4",
+      "refs": {
+        "refs/heads/feat/upgrade-scout-client-2026-08-11": "ef0217c5cf599413807723a6935d5076da5f3b90",
+        "refs/heads/feat/upgrade-scout-main-2026-08-11": "c58e0d7362e8d89ce9e27af2280ec08262543196"
+      },
+      "prerequisites": [
+        "dbf812488829a61cc2e95909e021b215704d066c",
+        "d0b809a1f85793975c87193eaa0998c4a43f7347"
+      ]
+    },
+    {
+      "path": "airi_docs/evidence/source-archives/airi-tts-resampler-staging-20260813.bundle",
+      "bytes": 152249,
+      "sha256": "90d45dd5ceddbbeb3906f32f43d52a9a1a4b901d028869dbfa439f889360b740",
+      "refs": {
+        "refs/tags/archive/tts-resampler-staging-20260813": "bf173f2de870e3f779db02548d691c7b51bb290f"
+      },
+      "prerequisites": [
+        "dbf812488829a61cc2e95909e021b215704d066c"
+      ]
+    }
+  ],
+  "authoritative_runtime_patch_layers": [
+    {
+      "path": "airi_docs/patches/AIRI-v0.11.3-local-runtime-source.patch",
+      "sha256": "2077d440481d64bd08b9a890c318d3cdfabadfe0e1398c28caf3a3ab8b76cd86"
+    },
+    {
+      "path": "airi_docs/patches/AIRI-v0.11.3-context-correlation-sanitizer.patch",
+      "status": "retained"
+    },
+    {
+      "path": "airi_docs/patches/AIRI-v0.11.3-upgrade-scout-runtime-20260811.patch",
+      "sha256": "cc172a16281e56dc03e6a6f261b5531367711c0393d57e171c932ea8544c5e3e"
+    }
+  ],
+  "research_patch_iterations": {
+    "path": "airi_docs/evidence/source-archives/airi-tts-resampler-iterations-20260813.zip",
+    "bytes": 171025,
+    "sha256": "055094c4393573598b5961b0b5609af90961d0f5c5ff06a4e97399a6ed3c1cf6",
+    "members": [
+      {
+        "name": "airi-tts-resampler-layer3-20260813.patch",
+        "bytes": 109326,
+        "sha256": "6b4035dc21dadf24e12d1655abd28724929ba1c07f0fdb998d2d0e7fbb6e5922"
+      },
+      {
+        "name": "airi-tts-resampler-layer3-20260813-ack.patch",
+        "bytes": 127669,
+        "sha256": "6aa79be57fe996ed45c2b82cfc314bd15367e9ffeb5ffb7d9ecdb618ff8b5ab1"
+      },
+      {
+        "name": "airi-tts-resampler-layer3-20260813-ack-final.patch",
+        "bytes": 128214,
+        "sha256": "2a530cc2af53bee0938e31e1acef96c62d1dcf46bc88d0319ceba238b7e3c1e8"
+      },
+      {
+        "name": "airi-tts-resampler-layer3-20260813-final.patch",
+        "bytes": 122455,
+        "sha256": "32a88c3fef5e3324e502acb4d3e4bb4a12534a18aa41213d14c6684c57a057f6"
+      },
+      {
+        "name": "airi-tts-resampler-layer3-20260813-final2.patch",
+        "bytes": 123354,
+        "sha256": "b491e6cece20e0b8e8b1162c351464c3c6414068084707fb02a3e6e39c0c1c6f"
+      },
+      {
+        "name": "airi-tts-resampler-layer3-20260813-utf8.patch",
+        "bytes": 112974,
+        "sha256": "fcc7ed13ffaf7bd076b248fd3946edd14ec7fdd70cd427ab21fe2ec4c70d8a22"
+      }
+    ]
+  },
+  "research_remote_rehearsal": {
+    "status": "archived_not_deployed",
+    "decision": "Retained as authenticated-loopback remote-test research; not part of the final Mi:dm runtime and not registered as an executable checkpoint.",
+    "files": [
+      {
+        "archive_name": "disable-airi-remote-model-test-tailscale.ps1",
+        "original_path": "disable-airi-remote-model-test-tailscale.ps1",
+        "bytes": 5844,
+        "sha256": "c91486e6a4d884c58bdf9b1ba3b35f7e69a457e0209be96c3c96d43a1007e790"
+      },
+      {
+        "archive_name": "enable-airi-remote-model-test-tailscale.ps1",
+        "original_path": "enable-airi-remote-model-test-tailscale.ps1",
+        "bytes": 7794,
+        "sha256": "5907f2a4159ef525048ce976a9667c73c3e122a4b5a9f5431fb55008ed6d769f"
+      },
+      {
+        "archive_name": "ollama-proxy__eval__run_airi_remote_model_test_gateway.py",
+        "original_path": "ollama-proxy/eval/run_airi_remote_model_test_gateway.py",
+        "bytes": 10883,
+        "sha256": "2b7e8796b33def4ff848ce7a1b65084ac7e49c427014625bbdc44bb6385a4cdb"
+      },
+      {
+        "archive_name": "ollama-proxy__eval__test_airi_remote_model_test_gateway.py",
+        "original_path": "ollama-proxy/eval/test_airi_remote_model_test_gateway.py",
+        "bytes": 6450,
+        "sha256": "f27c5869f6a5c037430fa43e7fa5a40eda48efdfb1ff47c89fa4afdd62c2c603"
+      },
+      {
+        "archive_name": "start-airi-remote-model-test.ps1",
+        "original_path": "start-airi-remote-model-test.ps1",
+        "bytes": 10242,
+        "sha256": "66e94719cd8fa0d28dc9ac5045975a6726eb42e809230c4662a7a92154c71904"
+      },
+      {
+        "archive_name": "stop-airi-remote-model-test.ps1",
+        "original_path": "stop-airi-remote-model-test.ps1",
+        "bytes": 5025,
+        "sha256": "b3504c82bf2cbf32ff7fb4a592ca20c5a84ccacdfb1cd67aa2a974929da40ab6"
+      },
+      {
+        "archive_name": "test_airi_remote_model_test_stack.py",
+        "original_path": "test_airi_remote_model_test_stack.py",
+        "bytes": 4140,
+        "sha256": "7ad1f626669bc17df73bc80282baa7312573b1f7d7ceb30645df642212f1f332"
+      },
+      {
+        "archive_name": "test_airi_remote_model_test_tailscale.py",
+        "original_path": "test_airi_remote_model_test_tailscale.py",
+        "bytes": 6767,
+        "sha256": "fb24a22aa3028a98948caea63686c523b200b25d3be164499c570c2116fdc837"
+      }
+    ]
+  },
+  "model_provenance_collection": {
+    "path": "airi_docs/evidence/source-archives/airi-p0-hf-artifacts-20260813.json",
+    "bytes": 8985,
+    "sha256": "510e1e5ccb71380a8ff31aa05080b6117c792437a25a58f8a3d8485ace5d5413",
+    "contains_weights": false,
+    "contains_prompts_or_outputs": false
+  },
+  "verification_clone_receipt": {
+    "base_commit": "dbf812488829a61cc2e95909e021b215704d066c",
+    "copies": [
+      "airi-tts-resampler-verify-20260813",
+      "airi-tts-resampler-verify2-20260813"
+    ],
+    "porcelain_entries_per_copy": 83,
+    "dirty_leaf_files_per_copy": 84,
+    "tracked_binary_diff_git_hash": "2b7084e3660c31372753dd02c2210cccf38db67a",
+    "patch_id": "9db3213",
+    "cross_copy_content_mismatches": 0,
+    "all_paths_preserved_or_extended_in_staging": true
+  },
+  "raw_session_content_included": false,
+  "credentials_included": false
+}
