@@ -104,7 +104,11 @@
 - Python 3.12 core suite: `1061 passed, 2 skipped, 916 subtests passed`
 - source bundles: prerequisite를 가진 upstream 저장소에서 `git bundle verify` PASS
 - archive JSON parse: PASS
-- `git diff --check -- . ':(exclude)airi_docs/patches/*.patch'`: PASS 예정
+- `git diff --check -- . ':(exclude)airi_docs/patches/*.patch'`: PASS
+- main push commit: `26b0a935fdd231f00e21479c2f8b857ac37f67d9`
+- Actions run `31807207795`: 13개 job 전부 steps 0으로 종료. 테스트 실패가
+  아니라 기존 runner allocation/결제 차단 상태이므로 위 로컬 전체 suite와
+  checkpoint를 검증 근거로 사용한다.
 
 최종 확인에서 로컬 project root의 AIRI 관련 항목은 main repository와 작은 Git metadata
 backup만 남았다. main 단일 worktree, 최종 Mi:dm 두 태그, Tailscale 비활성,

@@ -23,7 +23,8 @@
   source bundle, TTS 중간 patch 6종, content-free Codex session inventory로
   보존했다. ignored A/B 결과 119개와 TTS sample 9개는 main 로컬 자산에
   무충돌 합쳤다. checkpoint PASS, Python 3.12 core `1061 passed, 2 skipped,
-  916 subtests passed`. 상세:
+  916 subtests passed`. main `26b0a93` push 후 Actions run `31807207795`는
+  기존 결제 차단과 같은 13 job 모두 steps 0 실패로, 코드 테스트 결과가 아니다. 상세:
   `완료/AIRI-LOCAL-ASSET-CONSOLIDATION-2026-08-14.md`.
 - **2026-08-14** (검토 PC): 원격 방송 채팅 A/B — 실측 시청자 채팅 38건으로
   Mi:dm Q4 vs Motif NF4를 Tailscale 원격 경로(방송 중 원격 LLM 시나리오
