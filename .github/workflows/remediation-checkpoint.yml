@@ -135,6 +135,7 @@ jobs:
               ollama-proxy/eval/test_run_airi_aux_thinking_quality.py
               ollama-proxy/eval/test_run_airi_broadcast_intelligence_rehearsal.py
               ollama-proxy/eval/test_run_airi_p7_common_render_probe.py
+              ollama-proxy/eval/broadcast_chat/test_run_broadcast_rehearsal.py
           - shard: ollama-proxy-training
             tests: >-
               ollama-proxy/training/tests/test_audit_airi_style_fixture_readiness.py

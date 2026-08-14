@@ -1,0 +1,101 @@
+{
+  "schema_version": "airi.broadcast-rehearsal-fixtures.v1",
+  "generated_at": "2026-08-14",
+  "purpose": "멀티턴 오프라인 방송 리허설 입력 — 단발 Q→A가 못 재는 '흐름' 축(낭독→응답 연쇄·콜백·여론 집계·후원 인라인·화제 전환)을 측정한다",
+  "source_study": "airi_docs/참조/AIRI-BROADCAST-OBSERVATION-STUDY-2026-08-14.md (§2 P1·P5·P6·P7, §5 차이표, §6 파라미터 후보)",
+  "source_fixtures": "broadcast-chat-fixtures.json (실측 시청자 채팅 38건) — 대부분의 턴은 여기서 그대로 재사용하고 source_fixture_id 로 추적한다",
+  "limitation": "채팅 낭독(TTS 음성)이 없는 텍스트 시뮬레이션이다. '낭독→응답 원자화'는 텍스트 근사로만 관측되며 실제 음성 타이밍을 대체하지 않는다.",
+  "input_format": {
+    "prefix": "러너가 모든 턴 입력 앞에 '[YouTube] ' 를 붙인다 (chat-ingress/airi-event.mjs 와 동일)",
+    "chat": "시청자 채팅 원문 그대로",
+    "multi_chat": "'여러 시청자가 같은 말을 한다 — ' 뒤에 개별 채팅을 ' / ' 로 이어 붙인 합성 입력. 운영 ingress 는 이벤트 1건씩 보내므로 이 묶음은 리허설 전용 합성이다",
+    "donation": "'[후원] {닉네임}: {메시지}' 형식. 운영 ingress 는 아직 후원 경로가 없고 시청자 displayName 을 모델에 넘기지 않으므로(chat-ingress/proxy-screen.mjs 의 의도적 차단) 이 형식도 리허설 전용이다. 호명 정책(관찰 연구 P6 — 후원·특별시만)을 측정하려면 이름이 입력에 있어야 한다",
+    "callback_probe": "앞 화제를 직접 이름 대지 않고 간접 재언급하는 채팅. 모델 응답이 seed 턴의 화제 키워드를 스스로 다시 꺼내는지를 본다",
+    "topic_shift": "직전 화제와 무관한 새 화제 채팅. 실측 규범은 블록·주제 선언 없이 미끄러지듯 넘어가는 것이다(관찰 연구 P7·§5)"
+  },
+  "event_types": {
+    "chat": "일반 시청자 채팅 1건",
+    "multi_chat": "같은 취지 채팅 3~4건 묶음 — 여론 집계 발화 트리거 (§4 탬 '여론 요약 후 소수의견 고수')",
+    "donation": "후원 메시지 — 인라인 처리 + 닉네임 호명 (P5·P6)",
+    "callback_probe": "앞 화제 간접 재언급 — 콜백 재참조 측정",
+    "topic_shift": "무관한 새 화제 — 선언 없는 자연 전환 측정"
+  },
+  "flow_check_schema": {
+    "chat": "{} — 흐름 전용 마커 없음. 기존 출력 규격 마커만 채점한다",
+    "multi_chat": "{aggregate_items: [개별 채팅], majority_hint: 다수 취지}",
+    "donation": "{donation_name: 후원자 닉네임, expect_name_call: true}",
+    "callback_probe": "{seed_turn_id, callback_keywords: [재참조 기대 키워드], expected_window: in|out}",
+    "topic_shift": "{expect_no_block_declaration: true}"
+  },
+  "callback_window_design": {
+    "note": "러너 기본 --history-turns 8 (num_ctx 2048 제약)에서 seed 가 컨텍스트에 남는지가 콜백 가능성을 좌우한다. 시나리오마다 in(거리 8 — 유지 경계) 1건 + out(거리 10~12 — 창 밖) 1건을 배치해, 콜백 실패가 '모델 능력'인지 '히스토리 캡'인지 구분할 수 있게 했다.",
+    "runtime_field": "러너는 요청에 실제로 실린 메시지에서 seed 를 찾아 seed_in_context 를 기록한다. expected_window 는 설계 의도이고 판정 근거는 seed_in_context 다."
+  },
+  "sanitization": "원본 픽스처의 정제 규칙을 그대로 승계한다 — 개인정보 0건, 실존 방송인 고유 닉네임·팬덤명·전용 밈 없음. 후원 닉네임은 전부 합성(단풍우체부·고구마장수·밤샘노동자·새벽세시)이며 실존 계정과 무관하다.",
+  "scenarios": [
+    {
+      "id": "autumn_leaves",
+      "title": "가을 낙엽 저스트챗 — 낭독 연쇄·콜백·후원 인라인",
+      "description": "낙엽 청소 화제로 열어 모양 만들기(토끼)를 seed 로 심고, 여론 집계·후원 인라인·화제 전환을 거쳐 두 번의 콜백 probe 로 닫는다. 상담·응원 구간을 섞어 후반 존댓말 drift 도 관측한다.",
+      "callback_keywords": ["토끼", "모양", "토너", "앰플", "크림", "순서"],
+      "turns": [
+        {"id": "a01", "event_type": "chat", "input": "안녕하세요, 오늘 처음 왔어요.", "source_fixture_id": "gr04", "flow_check": {}},
+        {"id": "a02", "event_type": "chat", "input": "저 먹을 고구마 가져왔어요.", "source_fixture_id": "gr02", "flow_check": {}},
+        {"id": "a03", "event_type": "chat", "input": "AIRI님, 낙엽 더미에 누워서 천사 만들고 싶어요. 좀 모아 주세요.", "source_fixture_id": "ms01", "flow_check": {}},
+        {"id": "a04", "event_type": "chat", "input": "아기 토끼가 겨울잠 자려고 낙엽 모으네요.", "source_fixture_id": "rx03", "flow_check": {}},
+        {"id": "a05", "event_type": "chat", "input": "토끼 모양 만들기 도전해 주세요.", "source_fixture_id": "ms05", "note": "callback seed — a13 이 간접 재언급한다", "flow_check": {}},
+        {"id": "a06", "event_type": "multi_chat", "input": "여러 시청자가 같은 말을 한다 — 토끼요 / 토끼 각 / 곰도 괜찮은데 / 그냥 토끼로 가자", "synthetic": true, "flow_check": {"aggregate_items": ["토끼요", "토끼 각", "곰도 괜찮은데", "그냥 토끼로 가자"], "majority_hint": "토끼"}},
+        {"id": "a07", "event_type": "chat", "input": "청소를 극도로 싫어했던 사람은 영원히 낙엽을 줍는 지옥에 간대요.", "source_fixture_id": "te03", "flow_check": {}},
+        {"id": "a08", "event_type": "chat", "input": "갈퀴한테 기대한 자신을 탓하세요.", "source_fixture_id": "tk05", "flow_check": {}},
+        {"id": "a09", "event_type": "donation", "input": "[후원] 단풍우체부: 커피값 보냅니다. 따뜻한 거 드시면서 하세요.", "source_fixture_id": "dn02", "flow_check": {"donation_name": "단풍우체부", "expect_name_call": true}},
+        {"id": "a10", "event_type": "chat", "input": "고생하세요. 그 속도면 가을이 다시 오겠어요.", "source_fixture_id": "tk06", "flow_check": {}},
+        {"id": "a11", "event_type": "chat", "input": "줍다가 한 번씩 허리 펴고 하늘 봐 주세요.", "source_fixture_id": "ms04", "flow_check": {}},
+        {"id": "a12", "event_type": "chat", "input": "응원 한마디만 해 주시면 큰 힘이 될 것 같아요.", "source_fixture_id": "sp03", "flow_check": {}},
+        {"id": "a13", "event_type": "callback_probe", "input": "아까 하자던 그 모양, 지금 어떻게 됐어요?", "synthetic": true, "flow_check": {"seed_turn_id": "a05", "callback_keywords": ["토끼", "모양"], "expected_window": "in"}},
+        {"id": "a14", "event_type": "topic_shift", "input": "토너 다음에 앰플, 크림 순서로 바르면 덜 건조한 것 같아요.", "source_fixture_id": "te05", "note": "무관 화제 전환 + a24 콜백 seed", "flow_check": {"expect_no_block_declaration": true}},
+        {"id": "a15", "event_type": "chat", "input": "화장품 얘기 하고 싶어서 몰래 부계정으로 접속해서 질문하신 거 아니죠?", "source_fixture_id": "tk04", "flow_check": {}},
+        {"id": "a16", "event_type": "chat", "input": "AIRI님, 조카가 제 얼굴만 보면 우는데 어떡하죠?", "source_fixture_id": "q04", "flow_check": {}},
+        {"id": "a17", "event_type": "chat", "input": "시간을 들여서 얼굴 볼 때마다 간식을 주면 언젠가는 웃습니다.", "source_fixture_id": "te04", "flow_check": {}},
+        {"id": "a18", "event_type": "multi_chat", "input": "여러 시청자가 같은 말을 한다 — 간식이 답이다 / 간식 공세 가자 / 그냥 놀아주면 됨 / 간식부터 주자", "synthetic": true, "flow_check": {"aggregate_items": ["간식이 답이다", "간식 공세 가자", "그냥 놀아주면 됨", "간식부터 주자"], "majority_hint": "간식"}},
+        {"id": "a19", "event_type": "donation", "input": "[후원] 고구마장수: 지난번에 해 주신 말대로 했더니 잘 풀렸어요. 고마운 마음으로 보냅니다.", "source_fixture_id": "dn03", "flow_check": {"donation_name": "고구마장수", "expect_name_call": true}},
+        {"id": "a20", "event_type": "topic_shift", "input": "1월 초에 첫 직장에 입사하게 되었는데 너무 떨려요. 괜찮아지겠죠?", "source_fixture_id": "q01", "flow_check": {"expect_no_block_declaration": true}},
+        {"id": "a21", "event_type": "chat", "input": "자격증 공부하면서 방송 봤습니다. 합격해서 내년부터 일해요.", "source_fixture_id": "sp04", "flow_check": {}},
+        {"id": "a22", "event_type": "chat", "input": "하시는 일이 지구 폭파만 아니면 다 응원할게요.", "source_fixture_id": "sp01", "flow_check": {}},
+        {"id": "a23", "event_type": "chat", "input": "이 방송 알게 되고 힐링 많이 됐어요.", "source_fixture_id": "rx01", "flow_check": {}},
+        {"id": "a24", "event_type": "callback_probe", "input": "아까 말한 그 바르는 순서, 그대로 해봤어요?", "synthetic": true, "flow_check": {"seed_turn_id": "a14", "callback_keywords": ["토너", "앰플", "크림", "순서"], "expected_window": "out"}}
+      ]
+    },
+    {
+      "id": "game_and_career",
+      "title": "게임·진로 상담 저스트챗 — 여론 집계·상담 연쇄·초장기 콜백",
+      "description": "야식(국밥) seed 를 초반에 심고 게임 화제로 흐른 뒤, 진로 상담 구간에서 두 번째 seed(작곡·학원)를 심는다. 콜백 probe 두 건은 각각 히스토리 창 안/밖에 배치했다.",
+      "callback_keywords": ["국밥", "작곡", "학원"],
+      "turns": [
+        {"id": "b01", "event_type": "chat", "input": "퇴근하고 이제 들어왔어요. 많이 놓쳤나요?", "source_fixture_id": "gr03", "flow_check": {}},
+        {"id": "b02", "event_type": "chat", "input": "저는 야식으로 국밥 먹고 왔어요.", "synthetic": true, "note": "callback seed — b10 이 간접 재언급한다", "flow_check": {}},
+        {"id": "b03", "event_type": "chat", "input": "이거 돈 버는 게임인가요, 돈 쓰는 게임인가요?", "source_fixture_id": "te01", "flow_check": {}},
+        {"id": "b04", "event_type": "chat", "input": "지금 들어왔는데 이런 게임 또 어디서 잘 찾으셨어요.", "source_fixture_id": "gr01", "flow_check": {}},
+        {"id": "b05", "event_type": "multi_chat", "input": "여러 시청자가 같은 말을 한다 — 이거 쉬운데 / 쉬움 인정 / 운빨겜이지 / 그냥 쉬운 거 맞음", "synthetic": true, "flow_check": {"aggregate_items": ["이거 쉬운데", "쉬움 인정", "운빨겜이지", "그냥 쉬운 거 맞음"], "majority_hint": "쉽다"}},
+        {"id": "b06", "event_type": "chat", "input": "제가 실패했다고 생각하시면 알아서 실패 누르세요.", "source_fixture_id": "tk02", "flow_check": {}},
+        {"id": "b07", "event_type": "chat", "input": "방금 못 봤는데 한 번만 더 해 주실 수 있나요?", "source_fixture_id": "ms03", "flow_check": {}},
+        {"id": "b08", "event_type": "donation", "input": "[후원] 밤샘노동자: 늘 잘 보고 있어요. 오늘도 재밌게 해 주세요.", "source_fixture_id": "dn01", "flow_check": {"donation_name": "밤샘노동자", "expect_name_call": true}},
+        {"id": "b09", "event_type": "chat", "input": "이 방송 보면 번아웃 극복, 승진, 합격 다 가능합니다.", "source_fixture_id": "sp02", "flow_check": {}},
+        {"id": "b10", "event_type": "callback_probe", "input": "갑자기 뜨끈한 국물 생각나는데, 아까 뭐 먹고 왔다고 했죠?", "synthetic": true, "flow_check": {"seed_turn_id": "b02", "callback_keywords": ["국밥"], "expected_window": "in"}},
+        {"id": "b11", "event_type": "topic_shift", "input": "20대 후반인데 작곡 일 꿈이 계속 생각나요. 종종 학원이라도 가는 거 괜찮을까요?", "source_fixture_id": "q02", "note": "무관 화제 전환 + b23 콜백 seed", "flow_check": {"expect_no_block_declaration": true}},
+        {"id": "b12", "event_type": "chat", "input": "베이스를 치고 싶은데 동호회를 가입해야 될까요, 밴드를 가입해야 될까요?", "source_fixture_id": "q03", "flow_check": {}},
+        {"id": "b13", "event_type": "multi_chat", "input": "여러 시청자가 같은 말을 한다 — 밴드가 낫지 / 밴드 가자 / 무조건 밴드 / 동호회부터 해보든가", "synthetic": true, "flow_check": {"aggregate_items": ["밴드가 낫지", "밴드 가자", "무조건 밴드", "동호회부터 해보든가"], "majority_hint": "밴드"}},
+        {"id": "b14", "event_type": "chat", "input": "전 즉흥적으로 실천하고 금방 그만두는 게 별로라고 생각했는데, 좋게 말씀해 주셔서 감사해요.", "source_fixture_id": "rx04", "flow_check": {}},
+        {"id": "b15", "event_type": "chat", "input": "제가 남 눈치를 많이 보는 성격이라 할 말도 못 하고 혼자 끙끙 앓아요. 어떻게 고칠 수 있을까요?", "source_fixture_id": "q06", "flow_check": {}},
+        {"id": "b16", "event_type": "chat", "input": "번아웃 왔을 때는 쉬는 게 답이라고 하셨는데, 쉴 수 없을 때는 어떻게 할까요?", "source_fixture_id": "q05", "flow_check": {}},
+        {"id": "b17", "event_type": "chat", "input": "2년 전에 번아웃 왔을 때 그 말 듣고 이겨냈어요. 얼마 전에 또 왔는데 그때 생각하면서 버텼어요.", "source_fixture_id": "rx02", "flow_check": {}},
+        {"id": "b18", "event_type": "donation", "input": "[후원] 새벽세시: 생일 축하해요. 오늘은 하고 싶은 거 다 하세요.", "source_fixture_id": "dn04", "flow_check": {"donation_name": "새벽세시", "expect_name_call": true}},
+        {"id": "b19", "event_type": "topic_shift", "input": "밖에 비 엄청 오는데 거기도 와요?", "synthetic": true, "flow_check": {"expect_no_block_declaration": true}},
+        {"id": "b20", "event_type": "chat", "input": "말도 안 해 주셨으면서 이렇게 나오시면 저 노동청에 신고해요.", "source_fixture_id": "tk01", "flow_check": {}},
+        {"id": "b21", "event_type": "chat", "input": "저 작업할 때는 쳐다보지 말아 주시겠어요?", "source_fixture_id": "ms02", "flow_check": {}},
+        {"id": "b22", "event_type": "chat", "input": "설마 잘못 보고 영양제라고 한 거 아닌가요?", "source_fixture_id": "tk03", "flow_check": {}},
+        {"id": "b23", "event_type": "callback_probe", "input": "아까 그 꿈 얘기 하신 분, 결국 어디 등록하기로 했을까요?", "synthetic": true, "flow_check": {"seed_turn_id": "b11", "callback_keywords": ["작곡", "학원"], "expected_window": "out"}},
+        {"id": "b24", "event_type": "chat", "input": "오늘도 잘 놀다 가요. 다음에 또 올게요.", "synthetic": true, "flow_check": {}}
+      ]
+    }
+  ]
+}
