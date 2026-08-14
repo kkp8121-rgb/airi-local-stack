@@ -51,10 +51,11 @@ _ALLOWLIST_ENTRY_KEYS = frozenset({
 _DONATION_TEXT = "[후원 이벤트]"
 _SYSTEM_TEXT = "[시스템 메시지]"
 HERE = Path(__file__).resolve().parent
-RECEIPT_SCHEMA = "airi.authorized-provider-normalization-receipt.v1"
+RECEIPT_SCHEMA = "airi.authorized-provider-normalization-receipt.v2"
 _RECEIPT_KEYS = frozenset({
     "schema_version", "provider", "source_slot", "phase",
-    "normalization_hmac_sha256", "input_event_count", "output_event_count",
+    "source_identity_hmac", "normalization_hmac_sha256", "input_event_count",
+    "output_event_count",
 })
 
 
@@ -151,6 +152,29 @@ def provider_binding_hmac(
     return hmac.new(key, "\0".join(fields).encode("utf-8"), hashlib.sha256).hexdigest()
 
 
+def source_identity_hmac(
+    key: bytes,
+    *,
+    provider: str,
+    channel_id: str,
+) -> str:
+    """Return stable channel evidence independent of exporter and local slot."""
+    metadata = {
+        "provider": provider,
+        "channel_id": channel_id,
+    }
+    payload = b"airi.authorized-provider-source-identity.v1\0" + _canonical(metadata)
+    return hmac.new(key, payload, hashlib.sha256).hexdigest()
+
+
+def _is_lower_hex(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(char in "0123456789abcdef" for char in value)
+    )
+
+
 def _authorize_allowlist(
     allowlist_path: Path,
     identity_key_path: Path,
@@ -216,6 +240,7 @@ def normalization_receipt_hmac(
     provider: str,
     source_slot: str,
     phase: str,
+    source_identity: str,
     provider_binding: str,
     input_event_count: int,
     output_event_count: int,
@@ -224,6 +249,7 @@ def normalization_receipt_hmac(
         "provider": provider,
         "source_slot": source_slot,
         "phase": phase,
+        "source_identity_hmac": source_identity,
         "provider_binding_hmac": provider_binding,
         "input_event_count": input_event_count,
         "output_event_count": output_event_count,
@@ -244,7 +270,7 @@ def verify_normalization_receipt(
     *,
     expected_event_count: int,
     now: datetime | None = None,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     normalized = _read_source(normalized_export_path)
     consent = authorize_capture(
         consent_path, normalized_export_path, provenance_path,
@@ -270,8 +296,8 @@ def verify_normalization_receipt(
         or type(receipt.get("output_event_count")) is not int
         or receipt["input_event_count"] != expected_event_count
         or receipt["output_event_count"] != expected_event_count
-        or not isinstance(receipt.get("normalization_hmac_sha256"), str)
-        or len(receipt["normalization_hmac_sha256"]) != 64
+        or not _is_lower_hex(receipt.get("source_identity_hmac"))
+        or not _is_lower_hex(receipt.get("normalization_hmac_sha256"))
     ):
         raise ReplayAuthorizationError("normalization receipt is invalid")
     identity_key = read_identity_key(identity_key_path)
@@ -281,13 +307,22 @@ def verify_normalization_receipt(
         provider=receipt["provider"],
         source_slot=receipt["source_slot"],
         phase=receipt["phase"],
+        source_identity=receipt["source_identity_hmac"],
         provider_binding=profile["provider_binding_hmac"],
         input_event_count=receipt["input_event_count"],
         output_event_count=receipt["output_event_count"],
     )
     if not hmac.compare_digest(receipt["normalization_hmac_sha256"], expected):
         raise ReplayAuthorizationError("normalization receipt HMAC is invalid")
-    return {"source_slot": profile["source_slot"], "phase": profile["phase"]}
+    return {
+        "capture_profile": {
+            "source_slot": profile["source_slot"],
+            "phase": profile["phase"],
+        },
+        "provider": receipt["provider"],
+        "source_identity_hmac": receipt["source_identity_hmac"],
+        "exact_capture_hmac": receipt["normalization_hmac_sha256"],
+    }
 
 
 def normalize_authorized_export(
@@ -346,17 +381,24 @@ def normalize_authorized_export(
     derived = dict(consent)
     derived["source_sha256"] = hashlib.sha256(normalized).hexdigest()
     event_count = len(records) - 1
+    source_identity = source_identity_hmac(
+        identity_key,
+        provider=provider,
+        channel_id=channel_id,
+    )
     receipt = {
         "schema_version": RECEIPT_SCHEMA,
         "provider": provider,
         "source_slot": consent["capture_profile"]["source_slot"],
         "phase": consent["capture_profile"]["phase"],
+        "source_identity_hmac": source_identity,
         "normalization_hmac_sha256": normalization_receipt_hmac(
             identity_key,
             normalized,
             provider=provider,
             source_slot=consent["capture_profile"]["source_slot"],
             phase=consent["capture_profile"]["phase"],
+            source_identity=source_identity,
             provider_binding=consent["capture_profile"]["provider_binding_hmac"],
             input_event_count=event_count,
             output_event_count=len(rows),

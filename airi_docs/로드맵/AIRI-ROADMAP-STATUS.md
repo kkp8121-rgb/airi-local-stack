@@ -15,6 +15,15 @@
 
 최종 갱신: 2026-08-15
 
+- **2026-08-15** (dev PC, G3/B3-f 3-source paired campaign 기반): normalization
+  receipt v2에 동일 승인 source를 여러 캡처에서 확인하는 local-key identity HMAC을
+  추가하고, exact capture·replay report·private response·human score의 HMAC 증거
+  체인을 닫았다. bounded 사람 분위기/속도/맥락 압력/pattern label과 세 익명
+  source×각 2개 이상 국면×동일 캡처 OFF/ON을 강제하는 fresh-attestation campaign
+  validator를 추가했다. aggregate는 source identity/path/hash/HMAC/text 없이 흐름·
+  pattern·OFF/ON 품질/critical 차이만 내며 자동 운영 채택은 항상 false다. 이는
+  오프라인 실행 준비 완료이지 탬탬버린·아카네 리제·아이네 승인 캡처나 Mi:dm
+  실측 완료가 아니다. (`완료/AIRI-AUTHORIZED-CHAT-REPLAY-CAMPAIGN-CONTROL-2026-08-15.md`)
 - **2026-08-15** (dev PC, G3/B3-f 승인 export·흐름 분석 후속): 실제 채팅
   권한 확보 뒤 즉시 실행할 수 있도록 strict provider-safe envelope normalizer와
   consent v2/local-key HMAC 채널·익명 slot 바인딩을 추가했다. raw CHZZK/SOOP/
@@ -285,6 +294,8 @@
     중복·잡음 보존,
     strict safe-envelope/HMAC 채널 바인딩·rolling 흐름/lexical signal/proxy outcome
     content-free report·모든 event의 ignored private review와 human scorer 구현.
+    receipt v2 source identity/exact capture, replay/score HMAC, bounded 사람 분위기·
+    pattern label, 3-source×2-phase×OFF/ON campaign validator/aggregate까지 완료.
     탬탬버린·아카네 리제·아이네 실제 캡처는 방송인/플랫폼 공식 권한 대기이며
     무단 scraping하지 않는다. offline selector 수치는 B1b/B4a 실선택 성능이 아니다.
     상세: `진행예정/AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md`.
@@ -425,9 +436,9 @@
   - [ ] B3-e category별(욕설·음란성 등) 설치 UI/TTS 차단 반응 실기 — 현재는
     dictionary/unit + generic match-all 배선 확인만. output moderation 기본 OFF
   - [~] B3-f 실제 한국 방송 채팅 흐름/확신도 replay — local privacy·권한·
-    replay·승인 export 정규화·흐름/사람 score 기반 완료, 세 채널 승인 캡처·Mi:dm
-    OFF/ON 대응 검수·설치 Electron/B1b 종단 실증 대기. 실제 원문은 git/학습
-    데이터에 넣지 않는다.
+    replay·승인 export 정규화·흐름/사람 score·paired campaign 기반 완료, 세 채널
+    승인 캡처·Mi:dm OFF/ON 대응 검수·설치 Electron/B1b 종단 실증 대기. 실제
+    원문은 git/학습 데이터에 넣지 않는다.
   - [ ] B2 송출 (OBS Browser Source + App Audio Capture — 결정 2 이후)
 - [~] **M4** (B4 방송 디렉터 + C3/C4 ∥ I3 주제 풀)
   - [~] B4a 기반 구현 — 기본 OFF/inert; simulation-only 집중 테스트 17 PASS·독립 최종 검토 PASS.
@@ -454,6 +465,14 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-15** (dev PC, G3/B3-f 3-source paired campaign 기반): receipt v2의
+  local-key source identity와 exact capture HMAC, replay report/response/human score
+  HMAC binding, bounded 사람 source observation을 추가했다. fresh operator
+  attestation 아래 세 익명 source, source별 2개 이상 국면, exact capture별 Mi:dm
+  epistemic OFF/ON 한 쌍, frozen digest/profile/history를 검증하는 content-free
+  campaign aggregate를 추가했다. output은 identity/provider/path/hash/HMAC/text를
+  제외하고 운영 자동 채택을 금지한다. 실제 승인 캡처와 Mi:dm 결과는 아직 없다.
+  상세: `완료/AIRI-AUTHORIZED-CHAT-REPLAY-CAMPAIGN-CONTROL-2026-08-15.md`.
 - **2026-08-15** (dev PC, G3/B3-f 승인 export·흐름 분석 후속): strict
   `airi.authorized-provider-export.v1` envelope만 받는 offline normalizer, consent
   v2/local-key HMAC channel-slot binding, 후원 본문 전량 폐기와 reparse-safe atomic

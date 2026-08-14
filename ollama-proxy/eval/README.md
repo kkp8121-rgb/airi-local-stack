@@ -11,7 +11,12 @@ local-key HMAC channel/slot binding, drops donation wording and amount, and
 rejects raw CHZZK/SOOP/YouTube payload shapes. Report v2 measures rolling flow,
 pre-redaction source-text repeats, bounded lexical signals, and closed proxy
 outcomes. A separate private-review scorer emits only confusion counts and
-quality pass rates. The committed
+quality pass rates after binding the exact replay report and responses with a
+local key. A strict campaign validator then requires three anonymous sources,
+at least two phases per source, paired Mi:dm epistemic OFF/ON runs, completed
+bounded human atmosphere/pattern labels, and a fresh operator attestation.
+Its aggregate omits all source identities, paths, hashes, HMACs, and text and
+never authorizes automatic gate adoption. The committed
 fixture is independently authored synthetic text, not anonymized chat and not
 training data. See `chat_replay/README.md` for the exact custody and CLI
 contract. No provider scraping or network request occurs by default.

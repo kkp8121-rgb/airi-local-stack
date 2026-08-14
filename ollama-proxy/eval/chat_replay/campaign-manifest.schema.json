@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Local replay campaign manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "local_only", "campaign_id", "operator_attestation", "runs"],
+  "properties": {
+    "schema_version": {"const": "airi.chat-replay-campaign-manifest.v1"},
+    "local_only": {"const": true},
+    "campaign_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$"},
+    "operator_attestation": {"type": "object", "additionalProperties": false, "required": ["permission_scope_verified", "privacy_review_completed", "retention_and_revocation_checked", "exclusive_local_model_session", "reviewed_at", "valid_until", "reviewer_role"], "properties": {"permission_scope_verified": {"const": true}, "privacy_review_completed": {"const": true}, "retention_and_revocation_checked": {"const": true}, "exclusive_local_model_session": {"const": true}, "reviewed_at": {"type": "string", "pattern": "Z$"}, "valid_until": {"type": "string", "pattern": "Z$"}, "reviewer_role": {"enum": ["operator", "authorized_reviewer"]}}},
+    "runs": {"type": "array", "minItems": 12, "maxItems": 32, "items": {"type": "object", "additionalProperties": false, "required": ["pair_id", "gate", "replay_report", "human_score_report"], "properties": {"pair_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$"}, "gate": {"enum": ["off", "on"]}, "replay_report": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\\.json$"}, "human_score_report": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\\.json$"}}}}
+  }
+}

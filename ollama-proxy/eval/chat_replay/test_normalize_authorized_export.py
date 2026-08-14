@@ -14,6 +14,7 @@ from normalize_authorized_export import (
     main,
     normalize_authorized_export,
     provider_binding_hmac,
+    source_identity_hmac,
     verify_normalization_receipt,
 )
 import run_chat_replay
@@ -27,7 +28,7 @@ def write_json(path, value):
 
 
 class AuthorizedExportNormalizerTests(unittest.TestCase):
-    def make_files(self, directory, provider="chzzk", events=None):
+    def make_files(self, directory, provider="chzzk", events=None, phase="opening", source_slot="channel_a"):
         export = directory / "provider-safe.jsonl"
         header = {"record_type": "header", "schema_version": "airi.authorized-provider-export.v1", "provider": provider, "channel_id": "opaque-channel", "exporter_id": "opaque-exporter", "source_schema": "provider-approved-envelope.v1", "exported_at_ms": 100}
         events = events or [
@@ -44,12 +45,12 @@ class AuthorizedExportNormalizerTests(unittest.TestCase):
             identity_key.read_bytes(), provider=provider,
             channel_id="opaque-channel", exporter_id="opaque-exporter",
             source_schema="provider-approved-envelope.v1",
-            authorization_ref_sha256=provenance_hash, source_slot="channel_a",
+            authorization_ref_sha256=provenance_hash, source_slot=source_slot,
         )
         consent = directory / "consent.json"
-        write_json(consent, {"schema_version": "airi.chat-replay-consent.v2", "authorization": "authorized", "authorization_basis": "creator_or_platform_written_permission", "authorized_at": (NOW - timedelta(days=1)).isoformat().replace("+00:00", "Z"), "purposes": ["local_replay_evaluation"], "expires_at": (NOW + timedelta(days=1)).isoformat().replace("+00:00", "Z"), "delete_by": (NOW + timedelta(days=1)).isoformat().replace("+00:00", "Z"), "revoked": False, "source_sha256": hashlib.sha256(export.read_bytes()).hexdigest(), "provenance_sha256": provenance_hash, "excluded_creator_names": ["NamedCreator"], "capture_profile": {"source_slot": "channel_a", "phase": "opening", "provider_binding_hmac": binding}})
+        write_json(consent, {"schema_version": "airi.chat-replay-consent.v2", "authorization": "authorized", "authorization_basis": "creator_or_platform_written_permission", "authorized_at": (NOW - timedelta(days=1)).isoformat().replace("+00:00", "Z"), "purposes": ["local_replay_evaluation"], "expires_at": (NOW + timedelta(days=1)).isoformat().replace("+00:00", "Z"), "delete_by": (NOW + timedelta(days=1)).isoformat().replace("+00:00", "Z"), "revoked": False, "source_sha256": hashlib.sha256(export.read_bytes()).hexdigest(), "provenance_sha256": provenance_hash, "excluded_creator_names": ["NamedCreator"], "capture_profile": {"source_slot": source_slot, "phase": phase, "provider_binding_hmac": binding}})
         allowlist = directory / "allowlist.json"
-        write_json(allowlist, {"schema_version": "airi.provider-channel-allowlist.v1", "entries": [{"provider": provider, "channel_id": "opaque-channel", "exporter_id": "opaque-exporter", "source_schema": "provider-approved-envelope.v1", "authorization_ref_sha256": provenance_hash, "source_slot": "channel_a", "provider_binding_hmac": binding, "not_after": (NOW + timedelta(days=1)).isoformat().replace("+00:00", "Z"), "enabled": True}]})
+        write_json(allowlist, {"schema_version": "airi.provider-channel-allowlist.v1", "entries": [{"provider": provider, "channel_id": "opaque-channel", "exporter_id": "opaque-exporter", "source_schema": "provider-approved-envelope.v1", "authorization_ref_sha256": provenance_hash, "source_slot": source_slot, "provider_binding_hmac": binding, "not_after": (NOW + timedelta(days=1)).isoformat().replace("+00:00", "Z"), "enabled": True}]})
         return export, consent, provenance, allowlist, identity_key
 
     def test_all_providers_normalize_and_derived_consent_imports(self):
@@ -64,6 +65,8 @@ class AuthorizedExportNormalizerTests(unittest.TestCase):
                 self.assertEqual(rows[2]["text"], "[시스템 메시지]")
                 self.assertEqual(rows[3]["text"], "[후원 이벤트]")
                 self.assertNotIn("opaque-channel", json.dumps(receipt)); self.assertNotIn("opaque-exporter", json.dumps(receipt))
+                self.assertEqual(receipt["schema_version"], "airi.authorized-provider-normalization-receipt.v2")
+                self.assertEqual(len(receipt["source_identity_hmac"]), 64)
                 self.assertFalse({"channel_sha256", "exporter_sha256", "input_sha256", "output_sha256"} & set(receipt))
                 self.assertEqual(len(receipt["normalization_hmac_sha256"]), 64)
                 normalized = directory / "normalized.jsonl"
@@ -89,6 +92,49 @@ class AuthorizedExportNormalizerTests(unittest.TestCase):
                 # Rebind only to make this a format test, not a stale-consent test.
                 data = json.loads(consent.read_text(encoding="utf-8")); data["source_sha256"] = hashlib.sha256(export.read_bytes()).hexdigest(); write_json(consent, data)
                 with self.assertRaises(ReplayFormatError): normalize_authorized_export(export, consent, provenance, allowlist, identity_key, now=NOW)
+
+    def test_source_identity_is_stable_and_domain_separated(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            first_dir = directory / "first"; first_dir.mkdir()
+            second_dir = directory / "second"; second_dir.mkdir()
+            first = self.make_files(first_dir)
+            different_events = [{
+                "record_type": "event", "provider": "chzzk",
+                "channel_id": "opaque-channel", "occurred_at_ms": 400,
+                "source_type": "text", "text": "a different capture",
+            }]
+            second = self.make_files(second_dir, events=different_events, phase="middle")
+            first_receipt = normalize_authorized_export(*first, now=NOW)[2]
+            second_receipt = normalize_authorized_export(*second, now=NOW)[2]
+            self.assertEqual(
+                first_receipt["source_identity_hmac"],
+                second_receipt["source_identity_hmac"],
+            )
+            self.assertNotEqual(
+                first_receipt["normalization_hmac_sha256"],
+                second_receipt["normalization_hmac_sha256"],
+            )
+
+            key = first[-1].read_bytes()
+            baseline = source_identity_hmac(
+                key, provider="chzzk", channel_id="opaque-channel",
+            )
+            self.assertNotEqual(baseline, source_identity_hmac(
+                key, provider="chzzk", channel_id="other-channel",
+            ))
+            self.assertNotEqual(baseline, source_identity_hmac(
+                key, provider="soop", channel_id="opaque-channel",
+            ))
+
+            third_dir = directory / "third"; third_dir.mkdir()
+            third = self.make_files(third_dir, source_slot="channel_b")
+            third_receipt = normalize_authorized_export(*third, now=NOW)[2]
+            self.assertEqual(
+                baseline,
+                third_receipt["source_identity_hmac"],
+                "campaign slots must not make one raw channel look distinct",
+            )
 
     def test_authorization_and_allowlist_fail_closed(self):
         for mode in ("revoked", "missing", "duplicate", "expired", "disabled", "reference", "binding", "consent-binding", "wrong-key"):
@@ -179,16 +225,31 @@ class AuthorizedExportNormalizerTests(unittest.TestCase):
                 normalized, derived, provenance, receipt, identity_key,
                 expected_event_count=4, now=NOW,
             )
-            self.assertEqual(verified_profile, {
-                "source_slot": "channel_a", "phase": "opening",
-            })
             serialized_receipt = receipt.read_text(encoding="utf-8")
+            receipt_value = json.loads(serialized_receipt)
+            self.assertEqual(verified_profile, {
+                "capture_profile": {"source_slot": "channel_a", "phase": "opening"},
+                "provider": "chzzk",
+                "source_identity_hmac": receipt_value["source_identity_hmac"],
+                "exact_capture_hmac": receipt_value["normalization_hmac_sha256"],
+            })
             self.assertNotIn("NamedCreator", serialized_receipt)
             self.assertNotIn("opaque-channel", serialized_receipt)
+            self.assertNotIn("opaque-exporter", serialized_receipt)
+            self.assertNotIn("@viewer", serialized_receipt)
             self.assertNotIn("10,000", serialized_receipt)
 
             changed = json.loads(serialized_receipt)
             changed["phase"] = "middle"
+            write_json(receipt, changed)
+            with self.assertRaises(ReplayAuthorizationError):
+                verify_normalization_receipt(
+                    normalized, derived, provenance, receipt, identity_key,
+                    expected_event_count=4, now=NOW,
+                )
+
+            changed = json.loads(serialized_receipt)
+            changed["source_identity_hmac"] = "0" * 64
             write_json(receipt, changed)
             with self.assertRaises(ReplayAuthorizationError):
                 verify_normalization_receipt(

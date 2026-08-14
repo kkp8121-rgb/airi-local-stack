@@ -5,112 +5,95 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from chat_replay import ReplayEvent, _canonical, run_replay
+import run_chat_replay
+import score_private_review as scorer
 from score_private_review import PrivateReviewError, score_private_review
-from chat_replay import _canonical
-
-
-def row(
-    seq, *, delivered, expected, event_kind="chat", signals=None,
-    duplicate_of_seq=None, quality=True,
-):
-    return {
-        "seq": seq,
-        "offset_ms": seq * 100,
-        "timing_bucket": "under_1s",
-        "event_kind": event_kind,
-        "duplicate_of_seq": duplicate_of_seq,
-        "surface_signals": signals or [],
-        "selection_eligible": event_kind != "system_noise" and duplicate_of_seq is None,
-        "delivered": delivered,
-        "input": f"민감 입력 {seq}",
-        "response": f"민감 응답 {seq}" if delivered else None,
-        "review": {
-            "expected_action": expected,
-            "grounded": quality if delivered else None,
-            "context_preserved": quality if delivered else None,
-            "tone_ok": quality if delivered else None,
-            "privacy_ok": True if delivered else None,
-            "epistemic_ok": quality if delivered else None,
-        },
-    }
 
 
 class PrivateReviewScorerTests(unittest.TestCase):
-    def write_packet(self, directory: Path) -> Path:
-        path = directory / "review.json"
-        rows = [
-            row(1, delivered=True, expected="respond"),
-            row(2, delivered=True, expected="ignore", event_kind="system_noise", signals=["noise", "source_text_repeat"], duplicate_of_seq=1, quality=False),
-            row(3, delivered=False, expected="respond"),
-            row(4, delivered=False, expected="ignore"),
-        ]
-        profile = {"source_slot": "channel_a", "phase": "opening"}
-        source_rows = [{
-            "seq": item["seq"],
-            "offset_ms": item["offset_ms"],
-            "timing_bucket": item["timing_bucket"],
-            "event_kind": item["event_kind"],
-            "duplicate_of_seq": item["duplicate_of_seq"],
-            "selection_eligible": item["selection_eligible"],
-            "surface_signals": item["surface_signals"],
-        } for item in rows]
-        packet = {
-            "schema_version": "airi.chat-replay-private-review.v2",
-            "local_only": True,
-            "capture_profile": profile,
-            "source_structural_sha256": hashlib.sha256(_canonical({
-                "capture_profile": profile, "events": source_rows,
-            })).hexdigest(),
-            "rows": rows,
-        }
-        path.write_text(json.dumps(packet, ensure_ascii=False), encoding="utf-8")
-        return path
+    def fixture(self, directory: Path):
+        key = b"k" * 32
+        key_path = directory / "identity.key"; key_path.write_bytes(key)
+        events = [ReplayEvent(1, 100, "under_1s", "chat", "sensitive input", None, True, ())]
+        source = run_replay(events, lambda *_: "private response", report_hmac_key=key,
+                            capture_profile={"source_slot": "channel_a", "phase": "opening"})
+        evidence = {"provider": "test", "source_identity_hmac": "a" * 64, "exact_capture_hmac": "b" * 64}
+        runtime = {"model": "frozen", "history_turns": 8}
+        binding = hashlib.sha256(_canonical({"source_structural_sha256": source["structural_sha256"], "source_evidence": evidence, "runtime_profile": runtime, "response_rows": source["response_rows"]})).hexdigest()
+        replay = {**source, "source_evidence": evidence, "runtime_profile": runtime, "run_binding_sha256": binding}
+        replay["report_hmac_sha256"] = run_chat_replay.replay_report_hmac(key, replay)
+        packet = run_chat_replay.build_private_review_packet(events, {1: "private response"}, source["capture_profile"], source["structural_sha256"], evidence, runtime, binding, replay["report_hmac_sha256"], source["response_rows"])
+        packet["source_review"] = {"atmosphere": "calm", "pace": "steady", "context_pressure": "low", "dominant_patterns": ["question_wave"]}
+        packet["rows"][0]["review"] = {"expected_action": "respond", "grounded": True, "context_preserved": True, "tone_ok": True, "privacy_ok": False, "current_fact_ok": False, "reference_grounding_ok": True, "agreement_calibration_ok": False}
+        packet_path, replay_path = directory / "packet.json", directory / "replay.json"
+        packet_path.write_text(json.dumps(packet), encoding="utf-8"); replay_path.write_text(json.dumps(replay), encoding="utf-8")
+        return packet_path, replay_path, key_path
 
-    def test_scores_all_confusion_cells_and_emits_no_text(self):
+    def test_binding_and_content_free_score(self):
         with tempfile.TemporaryDirectory() as temp:
-            path = self.write_packet(Path(temp))
-            report = score_private_review(path)
-        self.assertEqual(report["replay_selector"], {
-            "tp": 1, "fp": 1, "fn": 1, "tn": 1,
-            "precision": 0.5, "recall": 0.5, "f1": 0.5,
-            "noise_delivery_count": 1,
-            "source_repeat_delivery_count": 1,
-        })
-        self.assertEqual(report["reviewed_response_count"], 2)
-        self.assertEqual(report["response_quality"]["grounded"], {
-            "pass_count": 1, "pass_rate": 0.5,
-        })
-        self.assertEqual(report["critical_failure_count"], 1)
-        serialized = json.dumps(report, ensure_ascii=False)
-        self.assertNotIn("민감 입력", serialized)
-        self.assertNotIn("민감 응답", serialized)
+            packet, replay, key = self.fixture(Path(temp)); report = score_private_review(packet, replay, key)
+        self.assertEqual(report["critical_failure_counts"], {"privacy_ok": 1, "current_fact_ok": 1, "reference_grounding_ok": 0, "agreement_calibration_ok": 1, "total_critical_rows": 1})
+        self.assertRegex(report["source_label_hmac_sha256"], r"^[0-9a-f]{64}$")
+        self.assertRegex(report["score_hmac_sha256"], r"^[0-9a-f]{64}$")
+        encoded = json.dumps(report); self.assertNotIn("private response", encoded); self.assertNotIn("sensitive input", encoded)
 
-    def test_incomplete_or_free_text_labels_fail_closed(self):
-        for change in (
-            lambda packet: packet["rows"][0]["review"].update(expected_action=None),
-            lambda packet: packet["rows"][0]["review"].update(grounded=None),
-            lambda packet: packet["rows"][0].update(event_kind="named-channel"),
-            lambda packet: packet["rows"][0].update(surface_signals=["free-text-signal"]),
-        ):
-            with self.subTest(change=change), tempfile.TemporaryDirectory() as temp:
-                path = self.write_packet(Path(temp))
-                packet = json.loads(path.read_text(encoding="utf-8"))
-                change(packet)
-                path.write_text(json.dumps(packet, ensure_ascii=False), encoding="utf-8")
-                with self.assertRaises(PrivateReviewError):
-                    score_private_review(path)
+    def test_wrong_key_changed_response_or_swapped_report_fail_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); packet, replay, key = self.fixture(root)
+            wrong = root / "wrong.key"; wrong.write_bytes(b"x" * 32)
+            with self.assertRaises(PrivateReviewError): score_private_review(packet, replay, wrong)
+            value = json.loads(packet.read_text()); value["rows"][0]["response"] = "changed response"; packet.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaises(PrivateReviewError): score_private_review(packet, replay, key)
+            other = root / "other.json"; other.write_text(json.dumps({}), encoding="utf-8")
+            with self.assertRaises(PrivateReviewError): score_private_review(packet, other, key)
+
+    def test_incomplete_source_labels_fail_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); packet, replay, key = self.fixture(root); value = json.loads(packet.read_text()); value["source_review"]["pace"] = None; packet.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaises(PrivateReviewError): score_private_review(packet, replay, key)
+
+    def test_duplicate_replay_response_row_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            packet, replay, key = self.fixture(root)
+            value = json.loads(replay.read_text(encoding="utf-8"))
+            value["response_rows"].append(value["response_rows"][0])
+            replay.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaises(PrivateReviewError):
+                score_private_review(packet, replay, key)
+
+    def test_source_observation_is_bound_by_score_structure(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            packet, replay, key = self.fixture(root)
+            first = score_private_review(packet, replay, key)
+            value = json.loads(packet.read_text(encoding="utf-8"))
+            value["source_review"]["atmosphere"] = "playful"
+            packet.write_text(json.dumps(value), encoding="utf-8")
+            second = score_private_review(packet, replay, key)
+        self.assertNotEqual(first["structural_sha256"], second["structural_sha256"])
 
     def test_scorer_has_no_network_imports(self):
-        path = Path(__file__).parent / "score_private_review.py"
-        tree = ast.parse(path.read_text(encoding="utf-8"))
+        tree = ast.parse((Path(__file__).parent / "score_private_review.py").read_text(encoding="utf-8"))
         forbidden = {"requests", "urllib", "http", "socket", "aiohttp", "webbrowser"}
         for node in ast.walk(tree):
             if isinstance(node, (ast.Import, ast.ImportFrom)):
-                names = [alias.name.split(".")[0] for alias in node.names] if isinstance(node, ast.Import) else [(node.module or "").split(".")[0]]
+                names = [x.name.split(".")[0] for x in node.names] if isinstance(node, ast.Import) else [(node.module or "").split(".")[0]]
                 self.assertFalse(set(names) & forbidden)
 
+    def test_cli_refuses_to_overwrite_replay_evidence(self):
+        replay = Path("same-report.json")
+        with mock.patch.object(scorer, "_secure_inside", return_value=True):
+            with self.assertRaises(SystemExit):
+                scorer.main([
+                    "--input", "review.json",
+                    "--replay-report", str(replay),
+                    "--identity-key", "identity.key",
+                    "--report", str(replay),
+                ])
 
-if __name__ == "__main__":
-    unittest.main()
+if __name__ == "__main__": unittest.main()

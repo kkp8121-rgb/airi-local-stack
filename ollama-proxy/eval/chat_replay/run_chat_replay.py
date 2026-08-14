@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime
+import hashlib
+import hmac
 import ipaddress
 import json
 from pathlib import Path
@@ -12,7 +14,7 @@ from typing import Callable
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
-from chat_replay import ReplayEvent, ReplayResponse, load_private_replay, run_replay
+from chat_replay import ReplayEvent, ReplayResponse, _canonical, load_private_replay, run_replay
 from normalize_authorized_export import read_identity_key, verify_normalization_receipt
 from replay_local_io import _is_reparse, _secure_inside, write_atomic_json
 
@@ -27,10 +29,22 @@ EVAL_MAX_TOKENS = 128
 EVAL_MODEL = "midm-airi:2.0-mini"
 EVAL_MODEL_DIGEST = "92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f"
 MODEL_DIGEST_RE = re.compile(r"[0-9a-f]{64}")
+REPORT_HMAC_DOMAIN = b"airi.chat-replay-report.v1\0"
 
 
 def _write_atomic(path: Path, value: object, parent: Path) -> None:
     write_atomic_json(path, value, parent)
+
+
+def replay_report_hmac(identity_key: bytes, report: dict[str, object]) -> str:
+    """Bind the complete content-free replay report for later human review."""
+    unsigned = dict(report)
+    unsigned.pop("report_hmac_sha256", None)
+    return hmac.new(
+        identity_key,
+        REPORT_HMAC_DOMAIN + _canonical(unsigned),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 def _validated_proxy_url(url: str):
@@ -183,7 +197,13 @@ def build_private_review_packet(
     responses: dict[int, str],
     capture_profile: dict[str, str],
     source_structural_sha256: str,
+    source_evidence: dict[str, str],
+    runtime_profile: dict[str, object],
+    run_binding_sha256: str,
+    report_hmac_sha256: str,
+    response_rows: list[dict[str, object]],
 ) -> dict[str, object]:
+    response_by_seq = {item["seq"]: item for item in response_rows}
     rows = [{
         "seq": event.seq,
         "offset_ms": event.offset_ms,
@@ -195,20 +215,33 @@ def build_private_review_packet(
         "delivered": event.seq in responses,
         "input": event.model_text,
         "response": responses.get(event.seq),
+        "outcome": response_by_seq[event.seq]["outcome"] if event.seq in responses else None,
+        "response_char_count": response_by_seq[event.seq]["response_char_count"] if event.seq in responses else None,
+        "response_hmac_sha256": response_by_seq[event.seq]["response_hmac_sha256"] if event.seq in responses else None,
         "review": {
             "expected_action": None,
             "grounded": None,
             "context_preserved": None,
             "tone_ok": None,
             "privacy_ok": None,
-            "epistemic_ok": None,
+            "current_fact_ok": None,
+            "reference_grounding_ok": None,
+            "agreement_calibration_ok": None,
         },
     } for event in events]
     return {
-        "schema_version": "airi.chat-replay-private-review.v2",
+        "schema_version": "airi.chat-replay-private-review.v3",
         "local_only": True,
         "capture_profile": capture_profile,
         "source_structural_sha256": source_structural_sha256,
+        "source_evidence": source_evidence,
+        "runtime_profile": runtime_profile,
+        "run_binding_sha256": run_binding_sha256,
+        "report_hmac_sha256": report_hmac_sha256,
+        "source_review": {
+            "atmosphere": None, "pace": None, "context_pressure": None,
+            "dominant_patterns": [],
+        },
         "rows": rows,
     }
 
@@ -260,13 +293,15 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
     )
     if capture_profile is None:
         parser.error("replay CLI requires a consent v2 capture_profile")
-    receipt_profile = verify_normalization_receipt(
+    receipt_evidence = verify_normalization_receipt(
         args.input, args.consent, args.provenance,
         args.normalization_receipt, args.identity_key,
         expected_event_count=len(events), now=now,
     )
+    receipt_profile = receipt_evidence["capture_profile"]
     if receipt_profile != capture_profile:
         raise RuntimeError("normalization receipt capture profile mismatch")
+    identity_key = read_identity_key(args.identity_key)
     private_responses: dict[int, str] = {}
     runtime_profile = (
         verify_loopback_health(
@@ -296,7 +331,7 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
             event.seq, response,
         )) if args.private_review_output else None,
         capture_profile=capture_profile,
-        report_hmac_key=(read_identity_key(args.identity_key) if args.loopback_url else None),
+        report_hmac_key=(identity_key if args.loopback_url else None),
     )
     if runtime_profile is not None:
         final_profile = verify_loopback_health(
@@ -306,14 +341,30 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
         )
         if final_profile != runtime_profile:
             raise RuntimeError("local AIRI proxy profile changed during replay")
+        runtime_profile = {**runtime_profile, "history_turns": args.history_turns}
+        source_evidence = {
+            name: receipt_evidence[name]
+            for name in ("provider", "source_identity_hmac", "exact_capture_hmac")
+        }
         report["runtime_profile"] = runtime_profile
+        report["source_evidence"] = source_evidence
+        report["run_binding_sha256"] = hashlib.sha256(_canonical({
+            "source_structural_sha256": report["structural_sha256"],
+            "source_evidence": source_evidence,
+            "runtime_profile": runtime_profile,
+            "response_rows": report["response_rows"],
+        })).hexdigest()
+        report["report_hmac_sha256"] = replay_report_hmac(identity_key, report)
     _write_atomic(args.report, report, HERE / "reports")
     if args.private_review_output:
         _write_atomic(
             args.private_review_output,
             build_private_review_packet(
                 events, private_responses, capture_profile,
-                report["structural_sha256"],
+                report["structural_sha256"], report["source_evidence"],
+                report["runtime_profile"], report["run_binding_sha256"],
+                report["report_hmac_sha256"],
+                report["response_rows"],
             ),
             HERE / "private-replays",
         )

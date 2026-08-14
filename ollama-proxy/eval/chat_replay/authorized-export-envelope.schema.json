@@ -6,7 +6,9 @@
   "authorization": {
     "consent_schema": "airi.chat-replay-consent.v2",
     "channel_binding": "HMAC-SHA256 with a local identity key",
-    "allowlist_schema": "airi.provider-channel-allowlist.v1"
+    "allowlist_schema": "airi.provider-channel-allowlist.v1",
+    "normalization_receipt_schema": "airi.authorized-provider-normalization-receipt.v2",
+    "campaign_source_identity": "local-key HMAC-SHA256; never a public identifier"
   },
   "privacy": {
     "raw_provider_api_schemas_supported": false,

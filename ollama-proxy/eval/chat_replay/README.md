@@ -145,6 +145,11 @@ The runner recomputes the normalization receipt HMAC over the exact normalized
 bytes, provider class, bound source slot/phase, and provider-channel binding.
 Missing or altered normalization evidence therefore fails before any model
 request; a partially written normalization bundle is not replay-authorized.
+Receipt v2 also carries a local-key `source_identity_hmac`, which stays stable
+for the same provider/channel across exporters, schemas, phases, and anonymous
+slots. This prevents one channel from satisfying multiple campaign slots.
+The receipt HMAC itself becomes the per-capture `exact_capture_hmac`. These
+values are local linking evidence only; the final campaign summary omits both.
 
 For an explicitly approved Mi:dm experiment, add:
 
@@ -164,23 +169,77 @@ the full run, it verifies the frozen Mi:dm tag, exact pinned/verified digest,
 ## Human response review
 
 The ignored private packet contains every redacted event, including skipped
-noise and repeats, plus any response. A reviewer fills only the bounded fields
-`expected_action`, `grounded`, `context_preserved`, `tone_ok`, `privacy_ok`, and
-`epistemic_ok`. Then run:
+noise and repeats, plus any response. At the capture level, a reviewer fills
+the bounded `source_review` fields:
+
+- `atmosphere`: `calm`, `playful`, `excited`, `tense`, `supportive`, `mixed`,
+  or `unclear`;
+- `pace`: `slow`, `steady`, or `bursty`;
+- `context_pressure`: `low`, `medium`, or `high`;
+- one to four sorted `dominant_patterns` from `question_wave`,
+  `laughter_wave`, `correction_wave`, `donation_reaction`, `topic_shift`,
+  `game_transition`, `repetition_wave`, `cross_viewer_followup`, or `unclear`.
+
+For each event, the reviewer fills `expected_action` and, for delivered
+responses, the booleans `grounded`, `context_preserved`, `tone_ok`,
+`privacy_ok`, `current_fact_ok`, `reference_grounding_ok`, and
+`agreement_calibration_ok`. There is no free-text review field. Then run:
 
 ```powershell
 python .\score_private_review.py `
   --input .\private-replays\capture-review.json `
+  --replay-report .\reports\capture-structure.json `
+  --identity-key .\local-replay-intake\provider-identity.key `
   --report .\reports\capture-human-score.json
 ```
 
+The replay report is HMAC-bound as a whole, and every private response is
+checked against its sequence, length, outcome, and local-key response HMAC
+before labels are accepted. The ordered per-event `respond|ignore` source
+labels receive a separate HMAC so OFF/ON margins cannot hide label swaps. The
+resulting score has its own local-key HMAC.
 The score report contains only TP/FP/FN/TN, precision/recall/F1, bounded
-quality pass rates, critical-failure count, anonymous capture profile, and a
-text-free structural hash. These selection numbers evaluate the replay
-selector used by this harness—not the future B1b/B4a live priority path. AIRI
-live selection precision and end-to-end latency remain unproven until the same
-capture is replayed through `screened event -> 11435 proxy -> style gate ->
-public wire/TTS`.
+quality pass rates, explicit privacy/current-fact/reference/agreement failure
+counts, anonymous capture metadata, and text-free bindings. These selection
+numbers evaluate the replay selector used by this harness—not the future
+B1b/B4a live priority path.
+
+## Three-source paired campaign
+
+Create an ignored `airi.chat-replay-campaign-manifest.v1` under
+`private-replays/`, following `campaign-manifest.schema.json` and
+`OPERATOR-CHECKLIST.md`. It must reference 12 to 32 unique report/score
+basenames under `reports/` and contain:
+
+- three distinct anonymous source identities (`channel_a`..`channel_c`);
+- at least two distinct phases for each source;
+- exactly one epistemic OFF and one ON run for every exact capture;
+- a fresh, at-most-24-hour operator attestation that permission scope,
+  privacy review, retention/revocation state, and exclusive local-model
+  execution were checked.
+
+Aggregate only after every private review is complete:
+
+```powershell
+python .\aggregate_replay_campaign.py `
+  --manifest .\private-replays\campaign.json `
+  --identity-key .\local-replay-intake\provider-identity.key `
+  --output .\reports\campaign-summary.json
+```
+
+The validator requires the exact frozen Mi:dm digest and profile, verifies the
+replay and score HMACs, requires paired source/labels to match, and rejects
+missing arms, changed identities, reused captures, profile drift, stale
+attestation, and incomplete review. The output pools content-free flow,
+surface-signal and human atmosphere/pattern counts once per source capture,
+then reports OFF/ON response-quality, epistemic-outcome and critical-failure
+differences. It omits source/provider identities, file paths, pair IDs,
+digests, HMACs, response rows, and text. A passing campaign still says
+`automatic_adoption: false` and requires explicit user confirmation.
+
+AIRI live selection precision and end-to-end latency remain unproven until the
+same capture is replayed through `screened event -> 11435 proxy -> style gate
+-> public wire/TTS`.
 
 Committed fixtures are independently authored synthetic material and are not
 anonymized real chat. Revocation or retention expiry requires deleting the raw

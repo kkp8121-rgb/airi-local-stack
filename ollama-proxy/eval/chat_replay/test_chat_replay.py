@@ -13,6 +13,7 @@ from chat_replay import (
     ReplayEvent,
     ReplayFormatError,
     ReplayResponse,
+    _canonical,
     import_private_replay,
     run_replay,
 )
@@ -356,11 +357,39 @@ class ChatReplayTests(unittest.TestCase):
             ReplayEvent(2, 1, "under_1s", "system_noise", "ㅋㅋ", None, False, ("laughter_run", "noise")),
         ]
         profile = {"source_slot": "channel_a", "phase": "opening"}
-        source_report = run_replay(events, capture_profile=profile)
+        key = b"k" * 32
+        source_report = run_replay(
+            events, lambda *_: "응답 1", capture_profile=profile,
+            report_hmac_key=key,
+        )
+        evidence = {
+            "provider": "test-provider", "source_identity_hmac": "a" * 64,
+            "exact_capture_hmac": "b" * 64,
+        }
+        runtime = {"history_turns": 8}
+        binding = hashlib.sha256(_canonical({
+            "source_structural_sha256": source_report["structural_sha256"],
+            "source_evidence": evidence, "runtime_profile": runtime,
+            "response_rows": source_report["response_rows"],
+        })).hexdigest()
+        replay = {
+            **source_report,
+            "source_evidence": evidence,
+            "runtime_profile": runtime,
+            "run_binding_sha256": binding,
+        }
+        replay["report_hmac_sha256"] = run_chat_replay.replay_report_hmac(
+            key, replay,
+        )
         packet = run_chat_replay.build_private_review_packet(
             events, {1: "응답 1"}, profile, source_report["structural_sha256"],
+            evidence, runtime, binding, replay["report_hmac_sha256"],
+            source_report["response_rows"],
         )
         self.assertEqual(len(packet["rows"]), 2)
+        self.assertEqual(
+            packet["report_hmac_sha256"], replay["report_hmac_sha256"],
+        )
         self.assertTrue(packet["rows"][0]["delivered"])
         self.assertFalse(packet["rows"][1]["delivered"])
         self.assertIsNone(packet["rows"][1]["response"])
@@ -370,16 +399,26 @@ class ChatReplayTests(unittest.TestCase):
         packet["rows"][0]["review"] = {
             "expected_action": "respond", "grounded": True,
             "context_preserved": True, "tone_ok": True,
-            "privacy_ok": True, "epistemic_ok": True,
+            "privacy_ok": True, "current_fact_ok": True,
+            "reference_grounding_ok": True, "agreement_calibration_ok": True,
         }
         packet["rows"][1]["review"]["expected_action"] = "ignore"
+        packet["source_review"] = {
+            "atmosphere": "calm", "pace": "steady",
+            "context_pressure": "low", "dominant_patterns": ["question_wave"],
+        }
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "review.json"
+            replay_path = Path(temp) / "replay.json"
+            key_path = Path(temp) / "key.bin"
             path.write_text(json.dumps(packet, ensure_ascii=False), encoding="utf-8")
-            score = score_private_review(path)
+            replay_path.write_text(json.dumps(replay), encoding="utf-8")
+            key_path.write_bytes(key)
+            score = score_private_review(path, replay_path, key_path)
         self.assertEqual(score["row_count"], 2)
         self.assertEqual(score["replay_selector"]["tp"], 1)
         self.assertEqual(score["replay_selector"]["tn"], 1)
+        self.assertRegex(score["score_hmac_sha256"], r"^[0-9a-f]{64}$")
 
     def test_loopback_health_attests_profile_and_gate_without_mutating_them(self):
         digest = run_chat_replay.EVAL_MODEL_DIGEST
