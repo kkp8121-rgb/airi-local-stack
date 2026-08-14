@@ -129,9 +129,13 @@ Q&A + 다음 방송 예고). 주제 준비량은 방송 시간의 1.5배.
   Text(GDI+). CEF 브라우저 소스 최소화.
 - **VRAM 판정: 여유 842MiB로 NVENC 상주 불가** — 인코더 surface pool만
   195~340MiB 실측(OBS #13656, look-ahead 설정 의존). 해법 사다리:
-  ① 방송 중 `AIRI_LLM_MODE=cloud` 전환(Mi:dm ~1.9GB 반납, 이미 구현된
-  스위치) ② x264 CPU 인코딩(5600X 여유 실측 필요) ③ 720p 다운스케일 +
-  look-ahead OFF + 미리보기 비활성.
+  ① 방송 중 클라우드 LLM 전환(Mi:dm ~1.9GB 반납) — 현행 스위치는
+  `AIRI_CHAT_PROVIDER=openai|anthropic` + `AIRI_ALLOW_EXTERNAL_CHAT=1`
+  (과거 표기 `AIRI_LLM_MODE`는 옛 프로토타입 브랜치의 스위치로 현행
+  코드에 없음. 그 프로토타입의 hybrid 반사 응답·모드 벤치는
+  `archive/llm-backend-modes-2026-08-07` 태그에 보존 — 반사 1.36s 수치는
+  exaone/CPU 기준이라 현행 모델로 재측정 필요) ② x264 CPU 인코딩(5600X
+  여유 실측 필요) ③ 720p 다운스케일 + look-ahead OFF + 미리보기 비활성.
 - 측정 프로토콜: `nvidia-smi` 3단계 델타(스택만 / +OBS / +방송).
 
 ### B-3. 안전장치
