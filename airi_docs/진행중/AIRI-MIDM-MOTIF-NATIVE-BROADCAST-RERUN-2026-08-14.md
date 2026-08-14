@@ -155,6 +155,11 @@ P50은 통상 median(짝수 표본의 가운데 둘 평균), P95는 nearest-rank
 - `test-current-checkpoint.ps1`: PASS (offline synthetic ASAR only)
 - `git diff --check -- . ':(exclude)airi_docs/patches/*.patch'`: PASS
 
+GitHub Actions [run 31775348398](https://github.com/kkp8121-rgb/airi-local-stack/actions/runs/31775348398)은
+13개 job 모두 `steps: []`이고 실행 로그 없이 약 3초 만에 실패했다. 기존 Actions 결제
+차단과 같은 step-zero 상태이므로 코드·테스트 실패로 해석하지 않으며, 위 로컬 Python
+전체 suite, checkpoint, manifest 계약을 이 배치의 검증 근거로 사용한다.
+
 종료 시 foreground 설정은 Mi:dm `midm-airi:2.0-mini` exact digest
 `92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f`, local
 provider, `num_ctx=2048`로 복원했다. STT·memory extraction·output moderation은 OFF이고,

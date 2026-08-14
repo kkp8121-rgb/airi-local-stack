@@ -648,3 +648,5 @@
   - [x] six-manifest complete-set 및 current checkpoint: PASS
   - [x] Mi:dm exact digest, local provider, `num_ctx=2048`, STT/extraction/moderation
     OFF, Ollama temporary runner 없음으로 복원
+  - [x] Actions run `31775348398`: 13개 job 모두 step 0, 로그 없이 실패. 기존 결제
+    차단 상태로 기록하고 로컬 전체 suite/checkpoint/manifest를 검증 근거로 사용
