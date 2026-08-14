@@ -15,6 +15,32 @@
 
 최종 갱신: 2026-08-13
 
+- **2026-08-13 (all eligible local LLM candidates — immediate AIRI A/B):**
+  사용자는 명확한 허용 라이선스 후보와 평가 전용 조건부 Motif 예외를 모두
+  Mi:dm에 적용한 것과 같은 AIRI 평가 경로로 지금 비교하도록 우선순위를
+  변경했다. 대상은
+  Mi:dm 기준선 + Motif 2.6B v1.1-LC + Ministral 3 3B + Qwen3 4B +
+  Phi-4-mini 3.8B + Granite 3.3 2B다. 각 모델은 공식 chat template,
+  system-role 처리, thinking, EOS/stop, sampling, context, dtype/attention,
+  quantization과 engine 지원을 exact revision의 usage manifest로 먼저 고정한다.
+  official-native와 AIRI-common profile을 분리해 raw 16-case×3, context
+  4압력×3, persona 20-case, proxy 120-turn, 한국어 방송 대화 인간 검수,
+  full-stack n=10을 수행한다. P0 provenance/P1 8 GB에서 멈춘 모델도 명시적
+  BLOCKED/UNRUNNABLE 결과로 남기며 다른 후보는 계속한다. 운영 Mi:dm은 최종
+  사용자 재승인까지 유지한다. 상세 SSoT:
+  `진행예정/AIRI-LOCAL-LLM-CANDIDATE-AB-PLAN-2026-08-13.md`.
+- **2026-08-13 (Motif evaluation-candidate decision / next-session handoff):**
+  사용자는 `Motif-Technologies/Motif-2.6b-v1.1-LC`를 라이선스 불명확성을
+  기록한 상태에서 Mi:dm과 비교할 정식 실측 후보로 승격했다. 이는 운영 기본
+  모델 교체나 공개 방송 법률 승인 완료가 아니다. v1.1-LC metadata의
+  `license: mit`와 `license_name: motif-license`/삭제된 LICENSE 이력, 기반
+  Motif-2.6B의 별도 Agreement를 함께 보존한다. 실제 채택 시 채널 소개와 방송
+  설명란에 `Built with Motif`를 표시하고 적용 license/Notice 의무를 따른다.
+  mutable remote code를 실행하지 않으며 pinned revision 코드 감사 → 8 GB 4-bit
+  실행 prove-or-stop → 동일 AIRI fixture Mi:dm A/B 순으로 진행한다. EXAONE은
+  NC 라이선스 때문에 공개·수익 방송 승격 후보에서 제외하고 과거 증거/호환
+  이력만 보존한다. 근거와 다음 순서는
+  `진행중/AIRI-NEXT-SESSION-HANDOFF-2026-08-13.md`에 고정했다.
 - **2026-08-13 (B3-c/B3-d evidence completion):** B3-c's local deterministic
   input prefilter and local B1 downstream spine are implemented, default OFF,
   and independently reviewed PASS. It blocks the categories
@@ -148,6 +174,12 @@
     `extraction_enabled=true` 이후 Stage B commit↔foreground 겹침 증거 필요)
   - [ ] I2 시청자 기억 시스템 (M2)
 - [~] **G3. 평가·데이터 플라이휠**
+  - [~] 전 로컬 LLM 후보 동일 AIRI A/B — **최우선 즉시 착수**. Mi:dm,
+    Motif 2.6B v1.1-LC, Ministral 3 3B, Qwen3 4B, Phi-4-mini 3.8B,
+    Granite 3.3 2B 각각의 공식 사용법 manifest와 official-native/
+    AIRI-common 이중 profile을 고정하고 raw/context/persona/proxy/인간 검수/
+    full-stack을 동일 단계로 수행한다. EXAONE과 제한 라이선스 후보는 제외한다.
+    (`진행예정/AIRI-LOCAL-LLM-CANDIDATE-AB-PLAN-2026-08-13.md`)
   - [x] 오프라인 eval 하네스·120턴 A/B — 2026-08-12 (`진행중/AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md`)
   - [x] 장문 context·memory·card 합성 A/B 실측 — EXAONE exact 3/12,
     Mi:dm 0/12로 양 모델 FAIL — 2026-08-12
@@ -545,7 +577,7 @@
 - **2026-08-12** (`41b1c20`, 검토 PC): 현황판 신설. 검토 PC 선행 배치
   반영 — 모델 SSoT 게이트 4종 코드 해소, I1 추출 배선(발효 대기),
   MEM-04 WAL, B3 모더레이션 코드 완료(M3 일부 선행), C1 헌법 초안.
-- **2026-08-13** (최신 사용자 결정·읽기 전용 continuation audit): §2 로컬 실기 배치는 완료다. push/CI green은 완료 조건이 아니며 저장소는 private 유지·public visibility 변경 없음, 사용자가 요청할 때까지 push하지 않는다. historical Actions billing run `31673311636`과 `31673428754`는 각각 13 jobs 모두 `runner_id=0`/steps 0으로 runner 배정 전 실패한 사실을 보존한다. §3의 승인된 기존 후보(Mi:dm 포함)는 모두 FAIL이고 verifier는 `EXTRACTION_GATE_GATE_NOT_PASSED`; 11436·runner 없음·extraction OFF를 유지하며 새 full balanced PASS 전에는 failed weight 재실행/활성화 금지다. §4 구현은 완료: 설치 ASAR SHA-256 `1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0`, live TTS cache 7/7, 기본 moderation OFF이며 중복 재시작은 하지 않는다. §9-b는 126번 예비 보존·현행 일본어 음성 유지·STT/mic 보류로 완료다. cloud call은 명시적 전송·지출·모델 승인이 필요하고, B0-1은 YouTube OAuth/quota가 필요하다.
+- **2026-08-13** (최신 사용자 결정·읽기 전용 continuation audit): §2 로컬 실기 배치는 완료다. push/CI green은 완료 조건이 아니며 저장소는 private 유지·public visibility 변경 없음, 사용자가 요청할 때까지 push하지 않는다. historical Actions billing run `31673311636`과 `31673428754`는 각각 13 jobs 모두 `runner_id=0`/steps 0으로 runner 배정 전 실패한 사실을 보존한다. §3의 승인된 기존 extraction 후보(Mi:dm 포함)는 모두 FAIL이고 verifier는 `EXTRACTION_GATE_GATE_NOT_PASSED`; 11436·runner 없음·extraction OFF를 유지하며 새 full balanced PASS 전에는 failed weight를 **extraction runner에서** 재실행하거나 extraction을 활성화하면 안 된다. 동일 weight의 격리 foreground-chat A/B는 새 G3 계획에 따라 허용하며 extraction 결과와 분리한다. §4 구현은 완료: 설치 ASAR SHA-256 `1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0`, live TTS cache 7/7, 기본 moderation OFF이며 중복 재시작은 하지 않는다. §9-b는 126번 예비 보존·현행 일본어 음성 유지·STT/mic 보류로 완료다. cloud call은 명시적 전송·지출·모델 승인이 필요하고, B0-1은 YouTube OAuth/quota가 필요하다.
 
 - **2026-08-13** (production context v2): generic structured-output 계약으로 spoken style 충돌을 제거하고 source-oriented fields, 답 canary가 없는 질문, swapped/reordered anti-overfit test를 적용했다. 구조 변환 PASS, 7개 필드 중 6개 12/12이며 두 continuity color는 v1보다 개선됐지만 `dialogue_marker` 0/12가 memory marker `silver-fern`을 결정적으로 복사해 semantic/gate/authoritative는 FAIL이다. dialogue-vs-memory는 모델 한계로 결론냈고 prompt tuning을 계속하지 않는다. default `num_ctx=2048`·extraction OFF를 유지한다.
 
@@ -565,3 +597,17 @@
   OFF/deferred, 설치 AIRI·서비스·모델은 변경하지 않았으며 물리적 5-turn
   gate는 닫지 않았다. 상세:
   `완료/AIRI-LATENCY-DASHBOARD-SUBSTANTIVE-KPI-2026-08-13.md`.
+
+- **2026-08-14** (dev PC, local LLM P0–P7 actual A/B): 여섯 후보 exact HF
+  revision/manifest를 고정하고 실행 가능한 다섯 common Q4와 Mi:dm/Granite native
+  bounded-offload를 한 번에 하나씩 실측했다. P2/P3/P4, common P5 120-turn,
+  P6 20-turn review packet, common P7 Electron→GPT-SoVITS→Windows render n=10을
+  완료했다. Motif는 pinned license file 부재·remote code·8 GB safe quant 부재로
+  UNRUNNABLE이며 다른 후보는 계속 실행했다. common 첫 render P50/P95는
+  Mi:dm 1.762/2.489초, Ministral 2.347/4.589초, Qwen3 9.148/9.575초,
+  Phi 1.842/3.740초, Granite 1.694/3.158초다. 모호성·근거·불확실성·무조건 동의
+  12-scene 리허설은 Qwen 8, Phi/Ministral 7, Mi:dm 6, Granite 5였지만 Qwen은
+  P50 30.020초와 빈 응답으로 foreground 부적합이다. 운영 Mi:dm 유지,
+  Phi/Ministral 인간 검수 challenger, 인간 packet 대기. 설치 ASAR 불변,
+  STT/extraction/moderation OFF. 상세:
+  `진행중/AIRI-LOCAL-LLM-CANDIDATE-AB-RESULT-2026-08-14.md`.

@@ -1,0 +1,240 @@
+{
+  "schema_version": "airi.local-llm-usage-manifest.v1",
+  "candidate_id": "phi-4-mini-instruct",
+  "repo_id": "microsoft/Phi-4-mini-instruct",
+  "exact_revision": "cfbefacb99257ffa30c83adab238a50856ac3083",
+  "retrieved_at": "2026-08-13T12:19:18Z",
+  "official_model_info": "https://huggingface.co/api/models/microsoft/Phi-4-mini-instruct",
+  "license": {
+    "declared": "MIT",
+    "license_files": [
+      "LICENSE"
+    ],
+    "notice": "NOTICE.md: FlashAttention BSD-3",
+    "public_broadcast_status": "allowed",
+    "evaluation_allowed": true
+  },
+  "libraries": {
+    "transformers": "4.49.0",
+    "torch": "unknown",
+    "accelerate": "unknown",
+    "minimums": {
+      "transformers": "==4.49.0",
+      "flash_attn": "==2.7.4.post1"
+    }
+  },
+  "remote_code": {
+    "required": true,
+    "audited_artifacts": [
+      {
+        "path": "configuration_phi3.py",
+        "kind": "audited_python",
+        "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/configuration_phi3.py",
+        "sha256": "ec2044b77d0b8111640ac134daa3af1f40dc552a739f8959626e7e58ea3352df",
+        "size": 10875,
+        "method": "downloaded_sha256"
+      },
+      {
+        "path": "modeling_phi3.py",
+        "kind": "audited_python",
+        "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/modeling_phi3.py",
+        "sha256": "d5fd551a7fe759b1d25e5b16b5012aa98b9b8bd400d26c7ee69c0090a245d6cd",
+        "size": 54268,
+        "method": "downloaded_sha256"
+      },
+      {
+        "path": "sample_finetune.py",
+        "kind": "audited_python",
+        "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/sample_finetune.py",
+        "sha256": "ec9ead444318c31095e5be48ec4b17ec031134836dd7906a73186265c323348a",
+        "size": 6167,
+        "method": "downloaded_sha256"
+      }
+    ],
+    "findings": {
+      "imports": "configuration_model_audited; sample_finetune_training_dependencies",
+      "network": "configuration_model_no_static_matches; sample_finetune_loads_HF_model_and_HuggingFaceH4_dataset",
+      "shell": "no_static_matches",
+      "telemetry": "no_static_matches",
+      "filesystem": "configuration_model_no_static_matches; sample_finetune_writes_checkpoint_dir",
+      "dynamic_execution": "no_static_matches",
+      "serialization": "no_static_matches"
+    }
+  },
+  "tokenizer": {
+    "implementation": "explicit_local_GPT2TokenizerFast_required",
+    "eos_token_id": [
+      200020,
+      199999
+    ],
+    "pad_token_id": 199999,
+    "auto_map": "Xenova/gpt-4o mutable external reference; pinned native GPT2 assets revision 7956d98f2a83b2751a98ea7136fdf7fe6cf54e69"
+  },
+  "template": {
+    "source": "tokenizer_config.json",
+    "sha256": "febf589225c9728ab791f52e8897d7607a823d45368f0a4c92fa68997b40cce9"
+  },
+  "system_role": {
+    "accepted": true,
+    "default_injection": "none"
+  },
+  "thinking": {
+    "supported": false
+  },
+  "generation": {
+    "official_defaults": {
+      "temperature": 0,
+      "max_new_tokens": 500
+    }
+  },
+  "context": {
+    "maximum_tokens": 131072
+  },
+  "runtime": {
+    "dtype": "bfloat16",
+    "device_map": "auto",
+    "use_cache": true,
+    "attention_implementation": "eager_fallback"
+  },
+  "quantization": {
+    "official_artifacts": [],
+    "official_recommendation": "unknown"
+  },
+  "engine_support": {
+    "ollama": "unknown",
+    "llama_cpp": "unknown"
+  },
+  "artifacts": [
+    {
+      "path": "LICENSE",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/LICENSE",
+      "sha256": "fa8235e5b48faca34e3ca98cf4f694ef08bd216d28b58071a1f85b1d50cb814d",
+      "size": 1084,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "NOTICE.md",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/NOTICE.md",
+      "sha256": "a3386cc7125ec75ed34d4f0a340c47782982095e251d322e01d8ecab22d87ba4",
+      "size": 1809,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "README.md",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/README.md",
+      "sha256": "c4f34916182a3ee87d95d00c92847cfa687ab21dc338a577275f0c34cf0e1dfd",
+      "size": 29246,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/config.json",
+      "sha256": "ac65d86061d3d0d704ee2511fd0eb8713ef19eb6eedba17c3080a4165d5b933b",
+      "size": 2504,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "configuration_phi3.py",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/configuration_phi3.py",
+      "sha256": "ec2044b77d0b8111640ac134daa3af1f40dc552a739f8959626e7e58ea3352df",
+      "size": 10875,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "generation_config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/generation_config.json",
+      "sha256": "3e3f48753753f92d2b958679151861d4fd7bf26e4dfc41fd47056116c4914dcd",
+      "size": 168,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "modeling_phi3.py",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/modeling_phi3.py",
+      "sha256": "d5fd551a7fe759b1d25e5b16b5012aa98b9b8bd400d26c7ee69c0090a245d6cd",
+      "size": 54268,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "sample_finetune.py",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/sample_finetune.py",
+      "sha256": "ec9ead444318c31095e5be48ec4b17ec031134836dd7906a73186265c323348a",
+      "size": 6167,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "tokenizer.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/tokenizer.json",
+      "sha256": "382cc235b56c725945e149cc25f191da667c836655efd0857b004320e90e91ea",
+      "size": 15524095,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/tokenizer_config.json",
+      "sha256": "9c9b6bc0c94d95f69f826c41069a3e8b387ac3ced89601d201886e99240ac9db",
+      "size": 2932,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "model-00001-of-00002.safetensors",
+      "kind": "weight",
+      "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/model-00001-of-00002.safetensors",
+      "sha256": "bc703090b63eda16f639fa4de7ac54635c23105ab1da2f6ec4d3403151d38ee6",
+      "size": 4903637712,
+      "method": "huggingface_lfs_sha256"
+    },
+    {
+      "path": "model-00002-of-00002.safetensors",
+      "kind": "weight",
+      "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/model-00002-of-00002.safetensors",
+      "sha256": "7ff79b9d2d31076bac2663393451f6530f4fc8ca49b09002116c92c373dba983",
+      "size": 2768428504,
+      "method": "huggingface_lfs_sha256"
+    },
+    {
+      "path": "model.safetensors.index.json",
+      "kind": "weight_index",
+      "source_url": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/cfbefacb99257ffa30c83adab238a50856ac3083/model.safetensors.index.json",
+      "sha256": "613a98d5e5716ca96fa75931abedc9c5a5d95f488ce4d62df71e639fe3ac6c59",
+      "size": 16273,
+      "method": "downloaded_sha256"
+    }
+  ],
+  "status": "READY",
+  "reasons": [
+    "OFFICIAL_REMOTE_TOKENIZER_AUTO_MAP_MUTABLE_PATH_FORBIDDEN",
+    "DOCUMENTED_REMOTE_PATH_NOT_EXECUTED",
+    "P1_REQUIRES_PINNED_INTEGRATED_PHI3_MODEL_AND_LOCAL_GPT2TOKENIZERFAST_VERIFICATION"
+  ],
+  "profiles": {
+    "native": {
+      "supported_options": {
+        "dtype": "bfloat16",
+        "device_map": "auto",
+        "use_cache": true,
+        "attention_implementation": "eager"
+      },
+      "unsupported": []
+    },
+    "common": {
+      "supported_options": "unknown",
+      "unsupported": [
+        "num_ctx",
+        "temperature",
+        "seed",
+        "top_p",
+        "repeat_penalty"
+      ]
+    }
+  }
+}

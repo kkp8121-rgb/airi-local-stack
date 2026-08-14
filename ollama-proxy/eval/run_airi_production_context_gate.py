@@ -72,10 +72,14 @@ def validate_args(args):
             or not re.fullmatch(r"[1-9][0-9]*[smh]", args.keep_alive)
             or not math.isfinite(args.timeout) or not 0 < args.timeout <= 3600
             or not math.isfinite(args.temperature) or not 0 <= args.temperature <= 2
+            or not math.isfinite(getattr(args, "top_p", 1.0)) or not 0 < getattr(args, "top_p", 1.0) <= 1
+            or not math.isfinite(getattr(args, "repeat_penalty", 1.0)) or not 0 < getattr(args, "repeat_penalty", 1.0) <= 2
             or not 512 <= args.num_ctx <= 32768 or not 1 <= args.num_predict <= 512
             or not 0 <= args.num_gpu <= 999 or not 0 <= args.seed <= 2_147_483_647
             or args.runs < 1):
         raise EvalError("invalid runtime range")
+    if getattr(args, "expected_digest", None) is not None and re.fullmatch(r"[0-9a-f]{64}", args.expected_digest) is None:
+        raise EvalError("expected digest must be lowercase 64-hex")
 def build_original(fixture, pressure):
     c = fixture["canaries"]
     messages = [
@@ -101,7 +105,7 @@ def build_original(fixture, pressure):
     ))
     return messages
 def base_payload(messages, args, schema=SCHEMA):
-    return {"model":args.model, "messages":messages, "stream":False, "format":schema, "think":False, "keep_alive":args.keep_alive, "options":{"num_ctx":args.num_ctx, "temperature":args.temperature, "seed":args.seed, "num_predict":args.num_predict}}
+    return {"model":args.model, "messages":messages, "stream":False, "format":schema, "think":False, "keep_alive":args.keep_alive, "options":{"num_ctx":args.num_ctx, "temperature":args.temperature, "top_p":getattr(args, "top_p", 1.0), "repeat_penalty":getattr(args, "repeat_penalty", 1.0), "seed":args.seed, "num_predict":args.num_predict}}
 def pipeline(fixture, pressure, args, *, field_order=FIELDS, schema=None):
     original = build_original(fixture, pressure); before = copy.deepcopy(original)
     # Use the same stateful runtime as an explicit production session, but a
@@ -238,7 +242,7 @@ def run_one(endpoint, native, args, expected, transport=chat_once):
                 value = response.get(key)
                 metrics[key.removesuffix("_duration") + "_duration_ms"] = round(value / 1_000_000, 3) if isinstance(value, int) and value >= 0 else None
             content=response["message"]["content"]
-            return {"complete":True,"retry_used":number > 0,"attempts":attempts + [{"attempt":number+1,"valid":True}],"raw_response_content":content,"raw_response_sha256":sha(content),"parsed_result":data,"parsed_result_sha256":sha(canonical(data)),"score":score(data, expected),"metrics":metrics}
+            return {"complete":True,"retry_used":number > 0,"attempts":attempts + [{"attempt":number+1,"valid":True}],"raw_response_sha256":sha(content),"parsed_result_sha256":sha(canonical(data)),"score":score(data, expected),"metrics":metrics}
         except (TransportError, SchemaError) as exc: attempts.append({"attempt":number+1,"valid":False,"error":str(exc)})
     return {"complete":False,"retry_used":True,"attempts":attempts}
 def aggregate(runs):
@@ -255,9 +259,11 @@ def atomic_write(path, value):
 def source_hashes():
     return {name: hashlib.sha256((PROXY_DIR / name).read_bytes()).hexdigest() for name in ("ollama_proxy.py", "memory_runtime.py", "airi_memory.py", "foreground_context.py", "continuity_ledger.py", "character_state.py")}
 def main(argv=None):
-    ap=argparse.ArgumentParser(); ap.add_argument("--endpoint",default=DEFAULT_ENDPOINT); ap.add_argument("--allow-host",action="store_true"); ap.add_argument("--model",default="midm-airi:2.0-mini"); ap.add_argument("--runs",type=int,default=3); ap.add_argument("--num-ctx",type=int,default=2048); ap.add_argument("--num-gpu",type=int,default=999); ap.add_argument("--temperature",type=float,default=0); ap.add_argument("--seed",type=int,default=42); ap.add_argument("--num-predict",type=int,default=128); ap.add_argument("--keep-alive",default="5m"); ap.add_argument("--timeout",type=float,default=180); ap.add_argument("--output",default="airi-production-context-report.json"); ap.add_argument("--fail-on-gate",action="store_true"); args=ap.parse_args(argv)
+    ap=argparse.ArgumentParser(); ap.add_argument("--endpoint",default=DEFAULT_ENDPOINT); ap.add_argument("--allow-host",action="store_true"); ap.add_argument("--model",default="midm-airi:2.0-mini"); ap.add_argument("--expected-digest"); ap.add_argument("--runs",type=int,default=3); ap.add_argument("--num-ctx",type=int,default=2048); ap.add_argument("--num-gpu",type=int,default=999); ap.add_argument("--temperature",type=float,default=.45); ap.add_argument("--top-p",type=float,default=.9); ap.add_argument("--repeat-penalty",type=float,default=1.05); ap.add_argument("--seed",type=int,default=42); ap.add_argument("--num-predict",type=int,default=128); ap.add_argument("--keep-alive",default="5m"); ap.add_argument("--timeout",type=float,default=180); ap.add_argument("--output",default="airi-production-context-report.json"); ap.add_argument("--fail-on-gate",action="store_true"); args=ap.parse_args(argv)
     try:
-        validate_args(args); fixture_path=EVAL_DIR / "airi_production_context_cases.json"; fixture=load_fixture(fixture_path); report={"version":RUNNER_VERSION,"timestamp_utc":datetime.now(timezone.utc).isoformat(),"endpoint":args.endpoint,"model":args.model,"metadata":metadata(args.endpoint,args.model,args.timeout),"fixture_sha256":sha(canonical(fixture)),"fixture_file_sha256":hashlib.sha256(fixture_path.read_bytes()).hexdigest(),"runner_sha256":hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),"production_source_sha256":source_hashes(),"configuration":vars(args),"authoritative":args.runs == 3,"pressures":[]}; all_runs=[]
+        validate_args(args); fixture_path=EVAL_DIR / "airi_production_context_cases.json"; fixture=load_fixture(fixture_path); model_metadata=metadata(args.endpoint,args.model,args.timeout)
+        if args.expected_digest is not None and model_metadata["model_digest"] != args.expected_digest: raise EvalError("exact model digest mismatch")
+        report={"version":RUNNER_VERSION,"timestamp_utc":datetime.now(timezone.utc).isoformat(),"endpoint":args.endpoint,"model":args.model,"metadata":model_metadata,"fixture_sha256":sha(canonical(fixture)),"fixture_file_sha256":hashlib.sha256(fixture_path.read_bytes()).hexdigest(),"runner_sha256":hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),"production_source_sha256":source_hashes(),"configuration":vars(args),"authoritative":args.runs == 3,"pressures":[]}; all_runs=[]
         for pressure in fixture["pressure_levels"]:
             item={"pressure":pressure,"runs":[]}; baseline=None
             for _ in range(args.runs):

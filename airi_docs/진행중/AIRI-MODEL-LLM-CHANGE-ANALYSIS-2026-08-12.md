@@ -220,3 +220,15 @@ gate만으로 롤백을 결정하지 않지만 Mi:dm의 장문/card 안전성을
 이 문서의 최초 분석에 남은 model SSoT/eval provenance/ACK/digest 미구현 지적은 **당시의 역사적 상태이며 해소됨**이다. production proxy에는 이어서 typed active card, bounded canonical continuity ledger, 순수 snapshot seam 및 명시 session만의 persistence가 들어갔다. 이는 raw Ollama A/B와 구분해야 한다.
 
 권위 production-context gate version 2.0는 `num_ctx=2048`, 0/8/20/48 압력×3회에서 구조·privacy·ordering PASS를 확인했다. generic structured-output 계약으로 spoken style 충돌을 제거하고 source-oriented fields·답 canary가 없는 질문·swapped/reordered anti-overfit test를 더한 결과, 7개 필드 중 6개는 12/12가 됐고 두 continuity color 필드는 v1의 11/12에서 개선됐다. 그러나 `dialogue_marker`는 0/12로 memory marker `silver-fern`을 결정적으로 복사해 semantic/gate/authoritative 전체는 FAIL이다. 이는 dialogue-vs-memory 구분의 모델 한계이므로 추가 prompt tuning이나 quality PASS 주장을 하지 않는다. raw capacity 2048/4096 근거를 바꾸지 않으며 default 2048과 extraction OFF를 유지한다. 상세는 `완료/AIRI-PRODUCTION-CONTEXT-CONTINUITY-GATE-2026-08-13.md` 참조.
+
+## 전 후보 재평가 사용자 결정 (2026-08-13)
+
+이 문서의 Mi:dm 유지 판정은 현재 운영 기준선을 뜻하며 후보 탐색 종료 선언이
+아니다. 사용자는 명확한 허용 라이선스 후보와 평가 전용 조건부 Motif 예외인
+Mi:dm, Motif 2.6B v1.1-LC, Ministral 3 3B, Qwen3 4B,
+Phi-4-mini 3.8B, Granite 3.3 2B 전부를
+Mi:dm과 같은 AIRI 경로로 즉시 비교하도록 결정했다. 각 모델의 공식 chat
+template·system role·thinking·sampling·EOS·context·quantization이 다르므로
+official-native와 AIRI-common profile을 분리한다. 새로운 실행 SSoT는
+`진행예정/AIRI-LOCAL-LLM-CANDIDATE-AB-PLAN-2026-08-13.md`다. 최종 결과와
+사용자 재승인 전에는 Mi:dm 운영 기본값을 변경하지 않는다.

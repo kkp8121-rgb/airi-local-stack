@@ -1,0 +1,196 @@
+{
+  "schema_version": "airi.local-llm-usage-manifest.v1",
+  "candidate_id": "qwen3-4b",
+  "repo_id": "Qwen/Qwen3-4B",
+  "exact_revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+  "retrieved_at": "2026-08-13T12:19:18Z",
+  "official_model_info": "https://huggingface.co/api/models/Qwen/Qwen3-4B",
+  "license": {
+    "declared": "Apache-2.0",
+    "license_files": [
+      "LICENSE"
+    ],
+    "notice": "unknown",
+    "public_broadcast_status": "allowed",
+    "evaluation_allowed": true
+  },
+  "libraries": {
+    "transformers": "4.51.0_serialized",
+    "torch": "unknown",
+    "accelerate": "unknown",
+    "minimums": {
+      "transformers": ">=4.51"
+    }
+  },
+  "remote_code": {
+    "required": false,
+    "audited_artifacts": [],
+    "findings": {
+      "imports": "not_applicable_native_qwen3",
+      "network": "not_applicable_native_qwen3",
+      "shell": "not_applicable_native_qwen3",
+      "telemetry": "not_applicable_native_qwen3",
+      "filesystem": "not_applicable_native_qwen3",
+      "dynamic_execution": "not_applicable_native_qwen3",
+      "serialization": "not_applicable_native_qwen3"
+    }
+  },
+  "tokenizer": {
+    "implementation": "native_qwen3",
+    "eos_token_id": [
+      151645,
+      151643
+    ],
+    "pad_token_id": 151643
+  },
+  "template": {
+    "source": "tokenizer_config.json",
+    "sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+  },
+  "system_role": {
+    "accepted": true,
+    "default_injection": "none"
+  },
+  "thinking": {
+    "default": true,
+    "airi_enable_thinking": false,
+    "native_foreground": "nonthinking"
+  },
+  "generation": {
+    "official_nonthinking": {
+      "temperature": 0.7,
+      "top_p": 0.8,
+      "top_k": 20,
+      "min_p": 0
+    },
+    "official_thinking": {
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0
+    },
+    "greedy": "do_not_use"
+  },
+  "context": {
+    "config_maximum_tokens": 40960,
+    "README_default": 32768,
+    "YaRN_maximum_tokens": 131072
+  },
+  "runtime": {
+    "dtype": "bfloat16",
+    "device_map": "auto",
+    "use_cache": true
+  },
+  "quantization": {
+    "official_artifacts": [],
+    "official_recommendation": "unknown"
+  },
+  "engine_support": {
+    "ollama": "officially_documented",
+    "llama_cpp": "officially_documented"
+  },
+  "artifacts": [
+    {
+      "path": "LICENSE",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/Qwen/Qwen3-4B/resolve/1cfa9a7208912126459214e8b04321603b3df60c/LICENSE",
+      "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+      "size": 11343,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "README.md",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/Qwen/Qwen3-4B/resolve/1cfa9a7208912126459214e8b04321603b3df60c/README.md",
+      "sha256": "71add1cd091c309b1cb1a6b943f2476eb2b004124b3bd1d32dcd0b24cc1abc47",
+      "size": 16857,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/Qwen/Qwen3-4B/resolve/1cfa9a7208912126459214e8b04321603b3df60c/config.json",
+      "sha256": "8ba006f74fecfaaeb392872a60f4a480e7ec9860153d2e1b769ec81f9a147f8a",
+      "size": 726,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "generation_config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/Qwen/Qwen3-4B/resolve/1cfa9a7208912126459214e8b04321603b3df60c/generation_config.json",
+      "sha256": "2325da0f15bb848e018c5ae071b7943332e9f871d6b60e2ed22ca97d4cb993d2",
+      "size": 239,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "tokenizer.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/Qwen/Qwen3-4B/resolve/1cfa9a7208912126459214e8b04321603b3df60c/tokenizer.json",
+      "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+      "size": 11422654,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/Qwen/Qwen3-4B/resolve/1cfa9a7208912126459214e8b04321603b3df60c/tokenizer_config.json",
+      "sha256": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+      "size": 9732,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "model-00001-of-00003.safetensors",
+      "kind": "weight",
+      "source_url": "https://huggingface.co/Qwen/Qwen3-4B/resolve/1cfa9a7208912126459214e8b04321603b3df60c/model-00001-of-00003.safetensors",
+      "sha256": "328a91d3122359d5547f9d79521205bc0a46e1f79a792dfe650e99fc2d651223",
+      "size": 3957900840,
+      "method": "huggingface_lfs_sha256"
+    },
+    {
+      "path": "model-00002-of-00003.safetensors",
+      "kind": "weight",
+      "source_url": "https://huggingface.co/Qwen/Qwen3-4B/resolve/1cfa9a7208912126459214e8b04321603b3df60c/model-00002-of-00003.safetensors",
+      "sha256": "6cd087b316306a68c562436b5492edbcf6e16c6dba3a1308279caa5a58e21ca5",
+      "size": 3987450520,
+      "method": "huggingface_lfs_sha256"
+    },
+    {
+      "path": "model-00003-of-00003.safetensors",
+      "kind": "weight",
+      "source_url": "https://huggingface.co/Qwen/Qwen3-4B/resolve/1cfa9a7208912126459214e8b04321603b3df60c/model-00003-of-00003.safetensors",
+      "sha256": "e4bf436957184f4eeb86a80e9db394503f1f56446b2e6b7edeac5b81470f4ca1",
+      "size": 99630640,
+      "method": "huggingface_lfs_sha256"
+    },
+    {
+      "path": "model.safetensors.index.json",
+      "kind": "weight_index",
+      "source_url": "https://huggingface.co/Qwen/Qwen3-4B/resolve/1cfa9a7208912126459214e8b04321603b3df60c/model.safetensors.index.json",
+      "sha256": "6dc0981b8829fead746441f68f38f24c5ca4a3a66351f652c26c6df0efc43ab2",
+      "size": 32819,
+      "method": "downloaded_sha256"
+    }
+  ],
+  "status": "READY",
+  "reasons": [],
+  "profiles": {
+    "native": {
+      "supported_options": {
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0,
+        "enable_thinking": false
+      },
+      "unsupported": [
+        "num_ctx",
+        "seed",
+        "repeat_penalty"
+      ]
+    },
+    "common": {
+      "supported_options": "unknown",
+      "unsupported": []
+    }
+  }
+}

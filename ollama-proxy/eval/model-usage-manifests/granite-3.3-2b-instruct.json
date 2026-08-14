@@ -1,0 +1,163 @@
+{
+  "schema_version": "airi.local-llm-usage-manifest.v1",
+  "candidate_id": "granite-3.3-2b-instruct",
+  "repo_id": "ibm-granite/granite-3.3-2b-instruct",
+  "exact_revision": "707f574c62054322f6b5b04b6d075f0a8f05e0f0",
+  "retrieved_at": "2026-08-13T12:19:18Z",
+  "official_model_info": "https://huggingface.co/api/models/ibm-granite/granite-3.3-2b-instruct",
+  "license": {
+    "declared": "Apache-2.0_metadata",
+    "license_files": [],
+    "notice": "absent",
+    "public_broadcast_status": "allowed",
+    "evaluation_allowed": true
+  },
+  "libraries": {
+    "transformers": "4.49.0_serialized",
+    "torch": "unknown",
+    "accelerate": "unknown",
+    "minimums": "unknown"
+  },
+  "remote_code": {
+    "required": false,
+    "audited_artifacts": [],
+    "findings": {
+      "imports": "not_applicable_native_granite",
+      "network": "not_applicable_native_granite",
+      "shell": "not_applicable_native_granite",
+      "telemetry": "not_applicable_native_granite",
+      "filesystem": "not_applicable_native_granite",
+      "dynamic_execution": "not_applicable_native_granite",
+      "serialization": "not_applicable_native_granite"
+    }
+  },
+  "tokenizer": {
+    "implementation": "native_granite",
+    "eos_token_id": 0,
+    "pad_token_id": 0,
+    "bos_token_id": 0
+  },
+  "template": {
+    "source": "tokenizer_config.json",
+    "sha256": "0bea7711316005a1c37c9941a7ee2a26311d223c979abee416aab0a402fc5b56"
+  },
+  "system_role": {
+    "accepted": true,
+    "default_injection": "dynamic_date_and_IBM_system_prompt_when_absent"
+  },
+  "thinking": {
+    "airi": false,
+    "separate_mode": true,
+    "tags": [
+      "<think>",
+      "</think>"
+    ]
+  },
+  "generation": {
+    "official_defaults": "unknown"
+  },
+  "context": {
+    "maximum_tokens": 131072
+  },
+  "runtime": {
+    "dtype": "bfloat16",
+    "device_map": "auto",
+    "use_cache": true
+  },
+  "quantization": {
+    "official_artifacts": [],
+    "official_recommendation": "unknown"
+  },
+  "engine_support": {
+    "ollama": "unknown",
+    "llama_cpp": "unknown"
+  },
+  "artifacts": [
+    {
+      "path": "README.md",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/ibm-granite/granite-3.3-2b-instruct/resolve/707f574c62054322f6b5b04b6d075f0a8f05e0f0/README.md",
+      "sha256": "dd7a9d401b703f4d6136b70b575a8070b88d173f61804dad48fccc7949afe610",
+      "size": 37026,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/ibm-granite/granite-3.3-2b-instruct/resolve/707f574c62054322f6b5b04b6d075f0a8f05e0f0/config.json",
+      "sha256": "9202d328d8368958aab7dad89a8e6aa35c250b3a2eedd2d8850ee0bcceca65f6",
+      "size": 787,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "generation_config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/ibm-granite/granite-3.3-2b-instruct/resolve/707f574c62054322f6b5b04b6d075f0a8f05e0f0/generation_config.json",
+      "sha256": "9c95e80167f08fbeb1feba239e0749507c25d18ffab43ffa10887821eed21c38",
+      "size": 132,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "tokenizer.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/ibm-granite/granite-3.3-2b-instruct/resolve/707f574c62054322f6b5b04b6d075f0a8f05e0f0/tokenizer.json",
+      "sha256": "91168e938f05796aa6dcca7e485e4b30ab52785320c7a6391ecef86e6c84681e",
+      "size": 3476578,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/ibm-granite/granite-3.3-2b-instruct/resolve/707f574c62054322f6b5b04b6d075f0a8f05e0f0/tokenizer_config.json",
+      "sha256": "f65a6a5a911424c85f157c40cfbdf06e025814c755480ba2e998d7fba1178664",
+      "size": 9930,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "model-00001-of-00002.safetensors",
+      "kind": "weight",
+      "source_url": "https://huggingface.co/ibm-granite/granite-3.3-2b-instruct/resolve/707f574c62054322f6b5b04b6d075f0a8f05e0f0/model-00001-of-00002.safetensors",
+      "sha256": "12880d33c0ad4726af5cf8c07406905f9b496253c58ee46f52be8bde8ccf2254",
+      "size": 4999999840,
+      "method": "huggingface_lfs_sha256"
+    },
+    {
+      "path": "model-00002-of-00002.safetensors",
+      "kind": "weight",
+      "source_url": "https://huggingface.co/ibm-granite/granite-3.3-2b-instruct/resolve/707f574c62054322f6b5b04b6d075f0a8f05e0f0/model-00002-of-00002.safetensors",
+      "sha256": "a8757c5bf7627933e7fddbd9bab0533491b4dc0962820e0617f356ca1a379ffa",
+      "size": 67121712,
+      "method": "huggingface_lfs_sha256"
+    },
+    {
+      "path": "model.safetensors.index.json",
+      "kind": "weight_index",
+      "source_url": "https://huggingface.co/ibm-granite/granite-3.3-2b-instruct/resolve/707f574c62054322f6b5b04b6d075f0a8f05e0f0/model.safetensors.index.json",
+      "sha256": "32ea3f438335d51c8e630a83898ceb23bdffd34291a0eade07474211928fa243",
+      "size": 29835,
+      "method": "downloaded_sha256"
+    }
+  ],
+  "status": "READY",
+  "reasons": [],
+  "profiles": {
+    "native": {
+      "supported_options": {
+        "dtype": "bfloat16",
+        "device_map": "auto",
+        "use_cache": true
+      },
+      "unsupported": []
+    },
+    "common": {
+      "supported_options": "unknown",
+      "unsupported": [
+        "num_ctx",
+        "temperature",
+        "seed",
+        "top_p",
+        "repeat_penalty"
+      ]
+    }
+  }
+}

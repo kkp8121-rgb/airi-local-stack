@@ -1,0 +1,175 @@
+{
+  "schema_version": "airi.local-llm-usage-manifest.v1",
+  "candidate_id": "ministral-3-3b-instruct-2512-bf16",
+  "repo_id": "mistralai/Ministral-3-3B-Instruct-2512-BF16",
+  "exact_revision": "b6d637bef2393152b3da2b2fde72eecdee30557e",
+  "retrieved_at": "2026-08-13T12:19:39Z",
+  "official_model_info": "https://huggingface.co/api/models/mistralai/Ministral-3-3B-Instruct-2512-BF16",
+  "license": {
+    "declared": "Apache-2.0_metadata_and_canonical_link",
+    "license_files": [],
+    "notice": "absent",
+    "public_broadcast_status": "allowed",
+    "evaluation_allowed": true
+  },
+  "libraries": {
+    "transformers": "5.0.0.dev0_serialized_provenance_not_recommendation",
+    "torch": "unknown",
+    "accelerate": "unknown",
+    "minimums": "unknown"
+  },
+  "remote_code": {
+    "required": false,
+    "audited_artifacts": [],
+    "findings": {
+      "imports": "not_applicable_native_mistral3",
+      "network": "not_applicable_native_mistral3",
+      "shell": "not_applicable_native_mistral3",
+      "telemetry": "not_applicable_native_mistral3",
+      "filesystem": "not_applicable_native_mistral3",
+      "dynamic_execution": "not_applicable_native_mistral3",
+      "serialization": "not_applicable_native_mistral3"
+    }
+  },
+  "tokenizer": {
+    "implementation": "native_mistral3_multimodal",
+    "eos_token_id": 2,
+    "pad_token_id": 11,
+    "bos_token_id": 1
+  },
+  "template": {
+    "source": "chat_template.jinja",
+    "sha256": "0701cfbdc2b7d44fdbad104dff604faee4b0543e8247624568777fe465746f9b"
+  },
+  "system_role": {
+    "accepted": true,
+    "default_injection": "system_default_injection"
+  },
+  "thinking": {
+    "supported": "unknown"
+  },
+  "generation": {
+    "official_defaults": "unknown"
+  },
+  "context": {
+    "maximum_tokens": 262144,
+    "rope_scaling": "YaRN"
+  },
+  "runtime": {
+    "dtype": "bfloat16",
+    "minimum_memory": "16GB_official",
+    "use_cache": true,
+    "engine": "vLLM_library_mentioned"
+  },
+  "quantization": {
+    "official_artifacts": [],
+    "official_recommendation": "under_8GB_unspecified_method"
+  },
+  "engine_support": {
+    "ollama": "unknown",
+    "llama_cpp": "unknown"
+  },
+  "artifacts": [
+    {
+      "path": "README.md",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-BF16/resolve/b6d637bef2393152b3da2b2fde72eecdee30557e/README.md",
+      "sha256": "88189c3b964024a8a1d39e0a820596776b997fabb332a151a25973b242f06382",
+      "size": 8570,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "chat_template.jinja",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-BF16/resolve/b6d637bef2393152b3da2b2fde72eecdee30557e/chat_template.jinja",
+      "sha256": "0701cfbdc2b7d44fdbad104dff604faee4b0543e8247624568777fe465746f9b",
+      "size": 11912,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-BF16/resolve/b6d637bef2393152b3da2b2fde72eecdee30557e/config.json",
+      "sha256": "c89d1a0b4f237d2892ce911d1fe03e9e5a4834579f7149ebc715a4c3fa564214",
+      "size": 1579,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "generation_config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-BF16/resolve/b6d637bef2393152b3da2b2fde72eecdee30557e/generation_config.json",
+      "sha256": "e0923390059f84a9180b00e5501778acc45ea9856cd7f2fd68208b360927c677",
+      "size": 131,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "tokenizer.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-BF16/resolve/b6d637bef2393152b3da2b2fde72eecdee30557e/tokenizer.json",
+      "sha256": "d5f6046775b112f0e2d456ee9dba450684ab964fe5c4e231599bdc6773028135",
+      "size": 17078128,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-BF16/resolve/b6d637bef2393152b3da2b2fde72eecdee30557e/tokenizer_config.json",
+      "sha256": "f59f7294e4f26383d0ea93840fe21cf197784be0842a8301a0343e8c34ed0d6d",
+      "size": 198094,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "consolidated.safetensors",
+      "kind": "weight",
+      "source_url": "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-BF16/resolve/b6d637bef2393152b3da2b2fde72eecdee30557e/consolidated.safetensors",
+      "sha256": "722430146632596c6c41137b2e582095ed01a50342932b035cb8662f7855a340",
+      "size": 7698234952,
+      "method": "huggingface_lfs_sha256"
+    },
+    {
+      "path": "model-00001-of-00002.safetensors",
+      "kind": "weight",
+      "source_url": "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-BF16/resolve/b6d637bef2393152b3da2b2fde72eecdee30557e/model-00001-of-00002.safetensors",
+      "sha256": "b3821ebc30884f66e3d26d339e161641f34b91ed916627011e7b08e5f1edd884",
+      "size": 4967581832,
+      "method": "huggingface_lfs_sha256"
+    },
+    {
+      "path": "model-00002-of-00002.safetensors",
+      "kind": "weight",
+      "source_url": "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-BF16/resolve/b6d637bef2393152b3da2b2fde72eecdee30557e/model-00002-of-00002.safetensors",
+      "sha256": "718d087fa591fd4356b7241f293c24219399d86f092d46cf36f765051498033a",
+      "size": 2730659224,
+      "method": "huggingface_lfs_sha256"
+    },
+    {
+      "path": "model.safetensors.index.json",
+      "kind": "weight_index",
+      "source_url": "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-BF16/resolve/b6d637bef2393152b3da2b2fde72eecdee30557e/model.safetensors.index.json",
+      "sha256": "7829dcf0040e34f1172b401563fcbb27cc3c5a0244ef01e6af18b7a64d63a81e",
+      "size": 45577,
+      "method": "downloaded_sha256"
+    }
+  ],
+  "status": "READY",
+  "reasons": [],
+  "profiles": {
+    "native": {
+      "supported_options": {
+        "dtype": "bfloat16",
+        "use_cache": true
+      },
+      "unsupported": []
+    },
+    "common": {
+      "supported_options": "unknown",
+      "unsupported": [
+        "num_ctx",
+        "temperature",
+        "seed",
+        "top_p",
+        "repeat_penalty"
+      ]
+    }
+  }
+}

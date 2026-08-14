@@ -1,0 +1,158 @@
+{
+  "schema_version": "airi.local-llm-usage-manifest.v1",
+  "candidate_id": "midm-2.0-mini-instruct",
+  "repo_id": "K-intelligence/Midm-2.0-Mini-Instruct",
+  "exact_revision": "383eb221c52a32278f1985257b264ade8d982e60",
+  "retrieved_at": "2026-08-13T12:19:39Z",
+  "official_model_info": "https://huggingface.co/api/models/K-intelligence/Midm-2.0-Mini-Instruct",
+  "license": {
+    "declared": "MIT License",
+    "license_files": [
+      "LICENSE.txt"
+    ],
+    "notice": "unknown",
+    "public_broadcast_status": "allowed",
+    "evaluation_allowed": true
+  },
+  "libraries": {
+    "transformers": "4.48.2_serialized",
+    "torch": "unknown",
+    "accelerate": "unknown",
+    "minimums": {
+      "transformers": ">=4.45"
+    }
+  },
+  "remote_code": {
+    "required": false,
+    "audited_artifacts": [],
+    "findings": {
+      "imports": "not_applicable_native_llama",
+      "network": "not_applicable_native_llama",
+      "shell": "not_applicable_native_llama",
+      "telemetry": "not_applicable_native_llama",
+      "filesystem": "not_applicable_native_llama",
+      "dynamic_execution": "not_applicable_native_llama",
+      "serialization": "not_applicable_native_llama"
+    }
+  },
+  "tokenizer": {
+    "implementation": "native_llama",
+    "eos_token_id": 2,
+    "pad_token_id": 2,
+    "eot_delimiter": "<|eot_id|>"
+  },
+  "template": {
+    "source": "tokenizer_config.json",
+    "sha256": "af6fe088a0d58f0b6ba00143fa9e6f639a4456d88fa978fe8a58a5d1bba70138"
+  },
+  "system_role": {
+    "accepted": true,
+    "default_injection": "embedded_model_identity_and_safety_prompt"
+  },
+  "thinking": {
+    "supported": false
+  },
+  "generation": {
+    "official_defaults": {
+      "temperature": 0.8,
+      "top_k": 20,
+      "top_p": 0.75,
+      "repetition_penalty": 1
+    },
+    "eos_token_id": 2
+  },
+  "context": {
+    "maximum_tokens": 32768
+  },
+  "runtime": {
+    "dtype": "bfloat16",
+    "device_map": "auto",
+    "use_cache": true
+  },
+  "quantization": {
+    "official_artifacts": [],
+    "official_recommendation": "unknown"
+  },
+  "engine_support": {
+    "ollama": "README_mentions_support_exact_version_unknown",
+    "llama_cpp": "README_mentions_support_exact_version_unknown"
+  },
+  "artifacts": [
+    {
+      "path": "LICENSE.txt",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/K-intelligence/Midm-2.0-Mini-Instruct/resolve/383eb221c52a32278f1985257b264ade8d982e60/LICENSE.txt",
+      "sha256": "076244f75f511936ea0712777947c4e5b74899a81aa885c59b0859b049fb4496",
+      "size": 1071,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "README.md",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/K-intelligence/Midm-2.0-Mini-Instruct/resolve/383eb221c52a32278f1985257b264ade8d982e60/README.md",
+      "sha256": "28d4ef0008f6a950c33f27fea17b39c42df994d908e7bcfa5883e156de041be3",
+      "size": 17933,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/K-intelligence/Midm-2.0-Mini-Instruct/resolve/383eb221c52a32278f1985257b264ade8d982e60/config.json",
+      "sha256": "ca16d5679da00bf534664a27c77f90e3968b15d824574164238ca6e0fd43882c",
+      "size": 746,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "generation_config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/K-intelligence/Midm-2.0-Mini-Instruct/resolve/383eb221c52a32278f1985257b264ade8d982e60/generation_config.json",
+      "sha256": "6d2601ae5af95e5d9d194e99c312843c731d84d51d4e5790a23f119c3f7a5537",
+      "size": 185,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "tokenizer.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/K-intelligence/Midm-2.0-Mini-Instruct/resolve/383eb221c52a32278f1985257b264ade8d982e60/tokenizer.json",
+      "sha256": "56af6093020d6923882ebc787e4c22b74ac26bce41cbdc0e7952dd70a91baad7",
+      "size": 10398090,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/K-intelligence/Midm-2.0-Mini-Instruct/resolve/383eb221c52a32278f1985257b264ade8d982e60/tokenizer_config.json",
+      "sha256": "0cf85520adf785f708cd682d20a0525f5b5eb82c50bc1e6df7f8f14499bc2139",
+      "size": 21692,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "model.safetensors",
+      "kind": "weight",
+      "source_url": "https://huggingface.co/K-intelligence/Midm-2.0-Mini-Instruct/resolve/383eb221c52a32278f1985257b264ade8d982e60/model.safetensors",
+      "sha256": "03755deae6cc183c9957bcf7b753924b0d1284e1b44aea95aaa822594765e70b",
+      "size": 4611084960,
+      "method": "huggingface_lfs_sha256"
+    }
+  ],
+  "status": "READY",
+  "reasons": [],
+  "profiles": {
+    "native": {
+      "supported_options": {
+        "num_ctx": 32768,
+        "temperature": 0.8,
+        "top_k": 20,
+        "top_p": 0.75,
+        "repetition_penalty": 1
+      },
+      "unsupported": [
+        "seed"
+      ]
+    },
+    "common": {
+      "supported_options": "unknown",
+      "unsupported": []
+    }
+  }
+}

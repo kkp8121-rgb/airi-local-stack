@@ -59,6 +59,7 @@ def ensure_local_endpoint(endpoint, allow_host=False):
 def validate_args(a):
     ensure_local_endpoint(a.endpoint, a.allow_host)
     if not a.model or not 1 <= a.runs <= 5 or not 1024 <= a.num_ctx <= 32768 or a.num_gpu < 0 or not math.isfinite(a.timeout) or a.timeout <= 0 or not math.isfinite(a.temperature) or not 0 <= a.temperature <= 2 or not 0 <= a.max_retries <= 1 or not 1 <= a.num_predict <= 256: raise EvalError("invalid runtime option")
+    if getattr(a, "expected_digest", None) is not None and re.fullmatch(r"[0-9a-f]{64}", a.expected_digest) is None: raise EvalError("expected digest must be lowercase 64-hex")
 
 def build_messages(system, contract, fixture, filler_pairs):
     c = fixture["canaries"]
@@ -94,7 +95,7 @@ def attempt(endpoint, body, timeout, expected, call=chat_once):
     response=call(endpoint,body,timeout); data=valid_response(response)
     metrics={k:response.get(k) for k in ("prompt_eval_count","eval_count") if isinstance(response.get(k),(int,float)) and not isinstance(response.get(k),bool)}
     metrics.update({k + "_ms": round(response[k] / 1_000_000, 3) for k in ("total_duration","eval_duration") if isinstance(response.get(k),(int,float)) and not isinstance(response.get(k),bool) and response[k] >= 0})
-    return {"valid":True,"data":data,"score":score(data,expected),"metrics":metrics}
+    return {"valid":True,"parsed_result_sha256":sha(canonical(data)),"score":score(data,expected),"metrics":metrics}
 def run_one(endpoint, body, args, expected, call=chat_once):
     attempts=[]
     for number in range(args.max_retries+1):
@@ -138,9 +139,11 @@ def metadata(endpoint, model, runtime, allow_host=False):
     safe=safe_model_metadata(tags, model_info, model)
     return {"ollama_version":version["version"],"model":safe,"runtime":runtime,"python":platform.python_version()}
 def main(argv=None):
-    ap=argparse.ArgumentParser(); ap.add_argument("--endpoint",default=DEFAULT_ENDPOINT); ap.add_argument("--allow-host",action="store_true"); ap.add_argument("--model",default=DEFAULT_MODEL); ap.add_argument("--num-ctx",type=int,default=2048); ap.add_argument("--num-gpu",type=int,default=999); ap.add_argument("--temperature",type=float,default=0); ap.add_argument("--seed",type=int,default=42); ap.add_argument("--runs",type=int,default=3); ap.add_argument("--max-retries",type=int,default=1); ap.add_argument("--timeout",type=float,default=180); ap.add_argument("--num-predict",type=int,default=128); ap.add_argument("--output",default="airi-context-gate-report.json"); ap.add_argument("--fail-on-gate",action="store_true"); args=ap.parse_args(argv)
+    ap=argparse.ArgumentParser(); ap.add_argument("--endpoint",default=DEFAULT_ENDPOINT); ap.add_argument("--allow-host",action="store_true"); ap.add_argument("--model",default=DEFAULT_MODEL); ap.add_argument("--expected-digest"); ap.add_argument("--num-ctx",type=int,default=2048); ap.add_argument("--num-gpu",type=int,default=999); ap.add_argument("--temperature",type=float,default=0); ap.add_argument("--seed",type=int,default=42); ap.add_argument("--runs",type=int,default=3); ap.add_argument("--max-retries",type=int,default=1); ap.add_argument("--timeout",type=float,default=180); ap.add_argument("--num-predict",type=int,default=128); ap.add_argument("--output",default="airi-context-gate-report.json"); ap.add_argument("--fail-on-gate",action="store_true"); args=ap.parse_args(argv)
     try:
-        validate_args(args); fixture=load_fixture(); system,contract=source_literals(); runtime={k:getattr(args,k) for k in ("endpoint","model","num_ctx","num_gpu","temperature","seed","runs","max_retries","timeout","num_predict")}; report={"complete":False,"created_at_utc":datetime.now(timezone.utc).isoformat(),"suite":{"id":fixture["suite_id"],"version":fixture["suite_version"],"fixture_sha256":sha(canonical(fixture)),"runner_sha256":hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),"system_prompt_sha256":sha(system),"final_contract_sha256":sha(contract),"combined_prompt_sha256":sha(system+contract)},"runtime":runtime,"metadata":metadata(args.endpoint,args.model,runtime,args.allow_host),"evidence":[]}; atomic_write(args.output,report)
+        validate_args(args); fixture=load_fixture(); system,contract=source_literals(); runtime={k:getattr(args,k) for k in ("endpoint","model","num_ctx","num_gpu","temperature","seed","runs","max_retries","timeout","num_predict")}; runtime["expected_digest"]=args.expected_digest; model_metadata=metadata(args.endpoint,args.model,runtime,args.allow_host)
+        if args.expected_digest is not None and model_metadata["model"]["digest"] != args.expected_digest: raise EvalError("exact model digest mismatch")
+        report={"complete":False,"created_at_utc":datetime.now(timezone.utc).isoformat(),"suite":{"id":fixture["suite_id"],"version":fixture["suite_version"],"fixture_sha256":sha(canonical(fixture)),"runner_sha256":hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),"system_prompt_sha256":sha(system),"final_contract_sha256":sha(contract),"combined_prompt_sha256":sha(system+contract)},"runtime":runtime,"metadata":model_metadata,"evidence":[]}; atomic_write(args.output,report)
         for level in fixture["pressure_levels"]:
             messages=build_messages(system,contract,fixture,level["filler_pairs"]); entry={"pressure":level,"message_count":len(messages),"input_char_count":sum(len(message["content"]) for message in messages),"runs":[]}; report["evidence"].append(entry)
             for _ in range(args.runs): entry["runs"].append(run_one(args.endpoint,payload(args.model,messages,args),args,fixture["expected"])); atomic_write(args.output,report)

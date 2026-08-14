@@ -135,3 +135,32 @@ safety, proxy, Electron, UI, or TTS claim. Installed red-team remains pending.
 검토 결과는 PASS/REQUEST CHANGES와 함께 blocker, exact file/line, 재현 명령,
 실제 완료 범위를 남긴다. 외부 호출, 실제 채팅·후원, ASAR 설치, 마이크 테스트는
 별도 사용자 승인 없이 실행하지 않는다.
+
+## 로컬 LLM A/B 검토 추가 — 2026-08-14
+
+개발 PC가 여섯 후보 P0과 실행 가능한 다섯 후보 P1–P7을 완료했다. 결과 SSoT는
+`AIRI-LOCAL-LLM-CANDIDATE-AB-RESULT-2026-08-14.md`다. 운영 기본값은 Mi:dm을
+유지한다. 모델 승격 commit이나 installed ASAR 교체는 하지 않았다.
+
+검토 PC 순서:
+
+1. `ollama-proxy/eval/results/local-llm-ab-p6-human-review-packet-2026-08-14.json`
+   의 rubric을 모델명 없이 채운다.
+2. `ollama-proxy/eval/results/local-llm-ab-intelligence-human-review-packet-2026-08-14.json`
+   의 도움됨/확신도/근거/간결성 rubric을 모델명 없이 채운다.
+3. 두 packet을 저장한 뒤에만 각각의 `review-key`를 열어 sample을 모델에 매핑한다.
+4. 자동 gate 하나로 winner를 정하지 말고 P2 구조, P3 문맥, P5 120-turn, P7
+   render tail, native/common 경계를 함께 본다.
+5. 인간 점수가 Mi:dm 대비 명확한 차이를 보이지 않으면 Mi:dm을 유지한다.
+
+특별 검토 항목은 문맥 없는 `정범`, history의 `정범=방송 고양이`, 무조건 동의,
+확인할 수 없는 현재 patch/server 질문이다. 이 항목은 음란·비속어 moderation이
+아니라 epistemic-confidence gate 요구다. 외부 검색은 이 배치에서 실행하지 않았다.
+
+Motif는 누락이 아니다. pinned custom Python은 실행하지 않고 정적 감사했으며,
+pinned repository의 license file 부재와 8 GB safe quant 부재로 P1–P7
+UNRUNNABLE이다. `local-llm-ab-motif-unavailable-2026-08-14.json`을 확인한다.
+
+`ollama-proxy/eval/results/`는 의도적으로 gitignored다. 검토 PC에는 결과 디렉터리를
+별도 전송하고 result SSoT의 packet/key bytes와 SHA-256을 대조한다. generated
+output을 `git add -f`로 commit하지 않는다.

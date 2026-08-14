@@ -18,6 +18,16 @@
 
 ## 진행중 — 현행 계약
 
+- `AIRI-LOCAL-LLM-CANDIDATE-AB-RESULT-2026-08-14.md` — 여섯 후보 exact
+  provenance, P0–P7 실제 실행, 방송 지능 리허설, foreground 결정과 검토-PC
+  인간 packet SSoT.
+- `AIRI-LOCAL-LLM-CANDIDATE-DIALOGUE-REVIEW-2026-08-14.md` — P6 실제 대화
+  140 turn과 common 방송 지능 리허설 60 prompt/response를 모델명으로 대조하는
+  UTF-8 원문 검토 자료. 로컬 실행·보존 경계와 빈 응답도 함께 고정한다.
+- `AIRI-NEXT-SESSION-HANDOFF-2026-08-13.md` — 최신 세션 진입점. B3-c/d의
+  정확한 완료 경계, Motif-2.6B v1.1-LC 평가 후보 승격 결정, 라이선스 표시·
+  `trust_remote_code` 보안 경계, 8 GB prove-or-stop 평가 순서와 금지 작업을
+  고정한다.
 - `AIRI-REVIEW-PC-HANDOFF-2026-08-13.md` — 검토 브랜치의 정확한 완료·미완료,
   설치 AIRI 실기와 offline simulation의 경계, CI runner-allocation 실패, 검토
   우선순위를 한곳에 고정한 review PC 인수 문서.
@@ -45,6 +55,11 @@
 
 ## 진행예정 — 계획
 
+- `AIRI-LOCAL-LLM-CANDIDATE-AB-PLAN-2026-08-13.md` — 즉시 착수하는
+  G3/C0 최우선 배치. Mi:dm 대조군과 Motif·Ministral·Qwen3·Phi-4-mini·
+  Granite 전 후보에 대해 모델별 공식 사용법 manifest, official-native와
+  AIRI-common 이중 profile, raw/context/persona/proxy/인간 검수/full-stack
+  동일 조건 평가를 정의한다.
 - `AIRI-BROADCAST-CHARACTER-PLAN-2026-08-12.md` — 지능·캐릭터성·방송 통합
   계획. 사용자 결정 중 1·3·4 확정, 2 조건부. 결정 3은 정식 팬덤명 유보·
   일반 호칭 “시청자들” 사용, T-05 126번 예비 후보 보존·현행 음성 유지다.
@@ -296,9 +311,11 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
   완료 조건이 아니다. 저장소는 private 유지·public visibility 변경 없음이고, 사용자가 요청할
   때까지 push하지 않는다. historical Actions billing 실패(run `31673311636`,
   `31673428754`: 각각 13 jobs, 모두 `runner_id=0`/steps 0)는 사실대로 보존한다.
-  §3은 Mi:dm을 포함한 승인된 기존 후보가 모두 FAIL이고,
+  §3은 Mi:dm을 포함한 승인된 기존 extraction 후보가 모두 FAIL이고,
   verifier `EXTRACTION_GATE_GATE_NOT_PASSED`, 11436/runner 없음/extraction OFF 상태이며 새
-  full balanced PASS 전 failed weight 재실행·활성화 금지다. §4는 설치 ASAR
+  full balanced PASS 전 failed weight를 extraction runner에서 재실행하거나
+  extraction을 활성화하면 안 된다. 동일 weight의 foreground-chat A/B는 새 G3
+  계획에 따라 별도로 허용한다. §4는 설치 ASAR
   `1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0`, live TTS cache
   7/7, 기본 moderation OFF로 완료·중복 재시작 불필요다. §9-b는 126번 예비 보존, 현행 일본어
   음성 유지, STT/mic 보류로 완료다. cloud call은 명시적 전송·지출·모델 승인, B0-1 live는

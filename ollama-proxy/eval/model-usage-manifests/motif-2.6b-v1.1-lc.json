@@ -1,0 +1,205 @@
+{
+  "schema_version": "airi.local-llm-usage-manifest.v1",
+  "candidate_id": "motif-2.6b-v1.1-lc",
+  "repo_id": "Motif-Technologies/Motif-2.6b-v1.1-LC",
+  "exact_revision": "70bf316e166f2a256b1068e35c8310541a6a06bc",
+  "retrieved_at": "2026-08-13T12:19:39Z",
+  "official_model_info": "https://huggingface.co/api/models/Motif-Technologies/Motif-2.6b-v1.1-LC",
+  "license": {
+    "declared": "metadata: mit; license_name: motif-license",
+    "license_files": [],
+    "notice": "absent",
+    "public_broadcast_status": "unknown",
+    "evaluation_allowed": true
+  },
+  "libraries": {
+    "transformers": "4.46.3_config; 4.51.3_generation",
+    "torch": "unknown",
+    "accelerate": "unknown",
+    "minimums": "unknown"
+  },
+  "remote_code": {
+    "required": true,
+    "audited_artifacts": [
+      {
+        "path": "configuration_motif.py",
+        "kind": "audited_python",
+        "source_url": "https://huggingface.co/Motif-Technologies/Motif-2.6b-v1.1-LC/resolve/70bf316e166f2a256b1068e35c8310541a6a06bc/configuration_motif.py",
+        "sha256": "5c39537a8bd72b4db624d1af4e65d12e4198c7b75b461dc64648c331eb834de5",
+        "size": 9805,
+        "method": "downloaded_sha256"
+      },
+      {
+        "path": "modeling_motif.py",
+        "kind": "audited_python",
+        "source_url": "https://huggingface.co/Motif-Technologies/Motif-2.6b-v1.1-LC/resolve/70bf316e166f2a256b1068e35c8310541a6a06bc/modeling_motif.py",
+        "sha256": "1a7e03096d5c218abc764ed8b2ff67d644a2c3bb462339852e5a2c5656626ca9",
+        "size": 66973,
+        "method": "downloaded_sha256"
+      }
+    ],
+    "findings": {
+      "imports": "math_dataclasses_typing_torch_transformers",
+      "network": "no_static_matches",
+      "shell": "no_static_matches",
+      "telemetry": "no_static_matches",
+      "filesystem": "no_static_matches",
+      "dynamic_execution": "no_static_matches",
+      "serialization": "no_static_matches"
+    }
+  },
+  "tokenizer": {
+    "implementation": "GPT2TokenizerFast",
+    "system_role_accepted": true,
+    "eos_token_id": [
+      219395,
+      219405
+    ],
+    "pad_token": "<|endoftext|>"
+  },
+  "template": {
+    "source": "tokenizer_config.json",
+    "sha256": "5c5d0ddb1786109995df6fda9257a265a07ba4184334f9a96fbd4e2ffe3293c1"
+  },
+  "system_role": {
+    "accepted": true,
+    "default_injection": "none"
+  },
+  "thinking": {
+    "supported": "no_AIRI_thinking_mode"
+  },
+  "generation": {
+    "official_defaults": "unknown"
+  },
+  "context": {
+    "maximum_tokens": 16384
+  },
+  "runtime": {
+    "dtype": "bfloat16",
+    "use_cache": true,
+    "attention_implementation": "eager; FlashAttention2_mentioned"
+  },
+  "quantization": {
+    "official_artifacts": [],
+    "official_recommendation": "unknown"
+  },
+  "engine_support": {
+    "ollama": "unknown",
+    "llama_cpp": "unknown"
+  },
+  "artifacts": [
+    {
+      "path": "README.md",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/Motif-Technologies/Motif-2.6b-v1.1-LC/resolve/70bf316e166f2a256b1068e35c8310541a6a06bc/README.md",
+      "sha256": "db6e60ee3b5b8803002a1b25be73da209c8abb6f35b4d64948c67e3773ff45f4",
+      "size": 3779,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/Motif-Technologies/Motif-2.6b-v1.1-LC/resolve/70bf316e166f2a256b1068e35c8310541a6a06bc/config.json",
+      "sha256": "5116b257b3bd0f098e4acc18e95580b4dc2535b77a5514b621cd613115b4f611",
+      "size": 944,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "configuration_motif.py",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/Motif-Technologies/Motif-2.6b-v1.1-LC/resolve/70bf316e166f2a256b1068e35c8310541a6a06bc/configuration_motif.py",
+      "sha256": "5c39537a8bd72b4db624d1af4e65d12e4198c7b75b461dc64648c331eb834de5",
+      "size": 9805,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "generation_config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/Motif-Technologies/Motif-2.6b-v1.1-LC/resolve/70bf316e166f2a256b1068e35c8310541a6a06bc/generation_config.json",
+      "sha256": "8ea4d805909a563ee7077c927766be93de572a4500ef6b18f2ce146914ad89d1",
+      "size": 164,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "modeling_motif.py",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/Motif-Technologies/Motif-2.6b-v1.1-LC/resolve/70bf316e166f2a256b1068e35c8310541a6a06bc/modeling_motif.py",
+      "sha256": "1a7e03096d5c218abc764ed8b2ff67d644a2c3bb462339852e5a2c5656626ca9",
+      "size": 66973,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "tokenizer.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/Motif-Technologies/Motif-2.6b-v1.1-LC/resolve/70bf316e166f2a256b1068e35c8310541a6a06bc/tokenizer.json",
+      "sha256": "275139d476909028da05d4ee035aba88f0ca0dbfd0d395f72b7fc80fd7782e19",
+      "size": 17264873,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "kind": "repository_file",
+      "source_url": "https://huggingface.co/Motif-Technologies/Motif-2.6b-v1.1-LC/resolve/70bf316e166f2a256b1068e35c8310541a6a06bc/tokenizer_config.json",
+      "sha256": "aac71d50a3a65fb337a1aefd4c05e4aa0f285b631ad7ddc44d422f5eeb65368b",
+      "size": 24109,
+      "method": "downloaded_sha256"
+    },
+    {
+      "path": "model-00001-of-00003.safetensors",
+      "kind": "weight",
+      "source_url": "https://huggingface.co/Motif-Technologies/Motif-2.6b-v1.1-LC/resolve/70bf316e166f2a256b1068e35c8310541a6a06bc/model-00001-of-00003.safetensors",
+      "sha256": "f4bb7226abf3755ad349bd8a97fcbd3d4bbdbbae2e15a8b8f8a63354aded51d4",
+      "size": 4952662512,
+      "method": "huggingface_lfs_sha256"
+    },
+    {
+      "path": "model-00002-of-00003.safetensors",
+      "kind": "weight",
+      "source_url": "https://huggingface.co/Motif-Technologies/Motif-2.6b-v1.1-LC/resolve/70bf316e166f2a256b1068e35c8310541a6a06bc/model-00002-of-00003.safetensors",
+      "sha256": "70b25a63a957984acd806069dd2f6bca0a95ea49f647bb473ad8b8ca91e27ea5",
+      "size": 4966459400,
+      "method": "huggingface_lfs_sha256"
+    },
+    {
+      "path": "model-00003-of-00003.safetensors",
+      "kind": "weight",
+      "source_url": "https://huggingface.co/Motif-Technologies/Motif-2.6b-v1.1-LC/resolve/70bf316e166f2a256b1068e35c8310541a6a06bc/model-00003-of-00003.safetensors",
+      "sha256": "6f2ac83eb3c0304aca1c639fdf4c27c71e1835833c31f919259c104e8b944a12",
+      "size": 469808712,
+      "method": "huggingface_lfs_sha256"
+    },
+    {
+      "path": "model.safetensors.index.json",
+      "kind": "weight_index",
+      "source_url": "https://huggingface.co/Motif-Technologies/Motif-2.6b-v1.1-LC/resolve/70bf316e166f2a256b1068e35c8310541a6a06bc/model.safetensors.index.json",
+      "sha256": "92c0806cf35c61753e1d4a837d6289e2dfa1cd43d802d0864deb80e99aba6e1a",
+      "size": 41422,
+      "method": "downloaded_sha256"
+    }
+  ],
+  "status": "READY",
+  "reasons": [
+    "PUBLIC_BROADCAST_BLOCKED_PENDING_LICENSE_CLARIFICATION",
+    "P1_SAFE_QUANT_PENDING"
+  ],
+  "profiles": {
+    "native": {
+      "supported_options": {
+        "dtype": "bfloat16",
+        "use_cache": true,
+        "attention_implementation": "eager"
+      },
+      "unsupported": []
+    },
+    "common": {
+      "supported_options": "unknown",
+      "unsupported": [
+        "num_ctx",
+        "temperature",
+        "seed",
+        "top_p",
+        "repeat_penalty"
+      ]
+    }
+  }
+}
