@@ -240,6 +240,10 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 
 ## 참조
 
+- `AIRI-BROADCAST-OBSERVATION-STUDY-2026-08-14.md` — 저스트챗 방송 방식
+  관찰 연구 (사용자 지정 4인 트랜스크립트 1차 실측). 공통 패턴 10종·차이
+  스펙트럼·기존 설계 수정 지점 7건·B4c 파라미터 후보. 2차 자료 기반이던
+  방송 설계의 실증 검증.
 - `AIRI-BROADCAST-RESEARCH-2026-08-12.md` — 저스트챗 방송 구조·뉴로사마
   벤치마크·한국 씬 + 채팅 API·OBS·안전장치 기술 조사 (출처 포함).
 - `AIRI-VTUBER-JUST-CHATTING-REFERENCE-2026-08-08.md` — **현행 스타일 계약**

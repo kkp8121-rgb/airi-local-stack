@@ -15,6 +15,15 @@
 
 최종 갱신: 2026-08-14
 
+- **2026-08-14** (검토 PC): 저스트챗 방송 방식 관찰 연구 완료 — 사용자
+  지정 4인(시구레 우이·탬탬버린·아이네·아카네 리제)의 "혼자 저챗 좋아요
+  최다" 영상 트랜스크립트를 타이밍 포함 정량+정성 분석. 핵심: 발화 이중
+  레이어(≤2초 조각 40~60% + 명분 있는 긴 블록), 낭독→응답 중앙값
+  1.06~1.2초(한 단위 원자화 필요), 무선언 무음 상한 10~27초, 발화
+  점유율은 오디오 베드 유무에 종속(34~92%), 화제 전환 엔진은 블록 선언이
+  아니라 채팅. 기존 설계 수정 지점 7건과 파라미터 후보 도출.
+  M4에 B4c(방송 발화 계약) 등록.
+  (`참조/AIRI-BROADCAST-OBSERVATION-STUDY-2026-08-14.md`)
 - **2026-08-13 (all eligible local LLM candidates — immediate AIRI A/B):**
   사용자는 명확한 허용 라이선스 후보와 평가 전용 조건부 Motif 예외를 모두
   Mi:dm에 적용한 것과 같은 AIRI 평가 경로로 지금 비교하도록 우선순위를
@@ -200,6 +209,12 @@
     (`완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`). 실제 런타임,
     AIRI/TTS/OBS, YouTube/OAuth·쿼터, 외부 killswitch·모더레이션 및 2시간 실기는 미증명.
   - [x] B4a B1 screened event 우선순위 정책 — strict B1 shape/ID/Unicode code point/timestamp·descriptor snapshot 검증, 개인정보 비보존 수동 문자열 매처, 질문>화제 확장>진심 리액션>응원>긍정 fallback. 로컬 broadcast 집중 시험 24/24 PASS, 독립 combined ingress/policy/director 검토 36/36 PASS — 2026-08-13 (`완료/AIRI-B4A-CHAT-PRIORITY-POLICY-2026-08-13.md`). B4a/G5/M4는 partial이다.
+  - [ ] B4c 방송 발화 계약 — 수신자 지향 구조(인용→반응 2박자·문체
+    스위칭·태그의문·호명 정책) + 디렉터 상태별 가변 길이 + 낭독·응답
+    원자화(응답 개시 ≤1.3초). 실증 근거:
+    `참조/AIRI-BROADCAST-OBSERVATION-STUDY-2026-08-14.md`(4인 트랜스크립트
+    실측 — 공통 패턴 10종·설계 차이표·파라미터 후보). 파라미터 확정은
+    사용자 확인 경유
   - [ ] B4b 어댑터·승인 비공개 리허설 (보류: B1b 외부 자격증명·쿼터 실측·운영 승인;
     STT OFF/deferred 유지)
 - [ ] **G6. 화면·게임·채팅 에이전트** (G5 이후)
