@@ -19,7 +19,7 @@
   Mi:dm Q4 vs Motif NF4를 Tailscale 원격 경로(방송 중 원격 LLM 시나리오
   근사)에서 76/76 실측. **완료 p50 357.8ms vs 9,842.6ms(27.5배)**, 형식
   규격(10~45자) 55% vs 0%, Motif는 접두사 누수·반복 루프 아티팩트 —
-  **Mi:dm 유지 확정 권고**. 공통 발견: raw 직접 호출 시 존댓말 미러링
+  **Mi:dm 유지 확정(사용자 확정)**. 공통 발견: raw 직접 호출 시 존댓말 미러링
   (35~37/38 — 방송 경로가 프록시 스타일 게이트를 경유하는지 배선 확인
   필요). 원격 서버 계약 2건(스트리밍 미지원·max_tokens 상한 128~159)은
   dev PC 후속. (`완료/AIRI-REMOTE-BROADCAST-CHAT-AB-2026-08-14.md`,
@@ -185,6 +185,10 @@
   데뷔), 날짜 고정 없음 — 2026-08-12
 - [x] 결정 5 — 지연 목표: 재정의 제안(첫 반응 ≤1.5s / 본답변 ≤2.5s)
   기각 — §12 원문 유지 확정 — 2026-08-12
+- [x] 결정 6 — 로컬 LLM: Mi:dm 확정 — 2026-08-14 (사용자 확정). 근거:
+  원격 방송 채팅 A/B 실측 — 완료 p50 357.8ms vs 9,842.6ms(27.5배), 형식
+  규격(10~45자) 55% vs 0%, Motif는 접두사 누수·반복 루프 아티팩트
+  (`완료/AIRI-REMOTE-BROADCAST-CHAT-AB-2026-08-14.md`)
 
 ## G축 — 성장 로드맵
 
@@ -242,12 +246,27 @@
     (`완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`). 실제 런타임,
     AIRI/TTS/OBS, YouTube/OAuth·쿼터, 외부 killswitch·모더레이션 및 2시간 실기는 미증명.
   - [x] B4a B1 screened event 우선순위 정책 — strict B1 shape/ID/Unicode code point/timestamp·descriptor snapshot 검증, 개인정보 비보존 수동 문자열 매처, 질문>화제 확장>진심 리액션>응원>긍정 fallback. 로컬 broadcast 집중 시험 24/24 PASS, 독립 combined ingress/policy/director 검토 36/36 PASS — 2026-08-13 (`완료/AIRI-B4A-CHAT-PRIORITY-POLICY-2026-08-13.md`). B4a/G5/M4는 partial이다.
-  - [ ] B4c 방송 발화 계약 — 수신자 지향 구조(인용→반응 2박자·문체
+  - [~] B4c 방송 발화 계약 — 수신자 지향 구조(인용→반응 2박자·문체
     스위칭·태그의문·호명 정책) + 디렉터 상태별 가변 길이 + 낭독·응답
     원자화(응답 개시 ≤1.3초). 실증 근거:
     `참조/AIRI-BROADCAST-OBSERVATION-STUDY-2026-08-14.md`(4인 트랜스크립트
     실측 — 공통 패턴 10종·설계 차이표·파라미터 후보). 파라미터 확정은
-    사용자 확인 경유
+    사용자 확인 경유. 계약 greybox 구현 완료 2026-08-14 (`f0ff26e` —
+    `ollama-proxy/broadcast_contract.py` env 게이트 `AIRI_BROADCAST_CONTRACT`
+    기본 OFF·계약 블록 369자·관찰 연구 §6 후보값 상수 테이블·21 tests
+    PASS·OFF 시 프롬프트 바이트 동일). 전/후 실측(A/B 러너 `--contract` +
+    멀티턴 리허설)은 Tailscale 링크 복구 대기.
+  - [~] 스타일 게이트 방송 경로 배선 확인 — 코드 실측 완료 2026-08-14: 게이트는
+    치환(`normalize_korean_register`)+미해결 존댓말 문장 드롭(fail-closed)이며
+    proxy `chat/completions` 출력 전부에 적용, 우회 플래그 없음. 레포 내 방송
+    체인은 AIRI 앱 WS 전달에서 끊김(B4a는 라이브 어댑터 없음) — AIRI 앱
+    provider 설정(proxy 11435) 의존이라 라이브 실증은 B1b 실제 AIRI 주입
+    착수 시 확인 필요. 원격 A/B 존댓말 35/38은 벤치마크가 raw 서버(11439)를
+    직접 호출한 설계 차이로 설명됨(방송 경로 우회 아님).
+  - [~] 멀티턴 방송 리허설 평가 (오프라인 흐름 축) — 구축 완료 2026-08-14
+    (`88700ac` — 시나리오 2×24턴·콜백 창 안/밖 분리·여론 집계·후원 호명
+    스코핑·politeness_drift·34 tests·CI evaluations shard 등록). 원격 Mi:dm
+    실측은 링크 복구 대기.
   - [ ] B4b 어댑터·승인 비공개 리허설 (보류: B1b 외부 자격증명·쿼터 실측·운영 승인;
     STT OFF/deferred 유지)
 - [ ] **G6. 화면·게임·채팅 에이전트** (G5 이후)
@@ -355,6 +374,20 @@
 ---
 
 ## 갱신 로그 (최신이 위)
+
+- **2026-08-14** (검토 PC, B4c 선행 배치): 사용자가 로컬 LLM을 Mi:dm으로
+  확정했다(결정 6 — 원격 방송 채팅 A/B 지연 27.5배·형식 규격 55% vs 0%·
+  Motif 아티팩트 근거). B4c 방송 발화 계약의 greybox 구현을 완료했다
+  (`f0ff26e` — `ollama-proxy/broadcast_contract.py` env 게이트
+  `AIRI_BROADCAST_CONTRACT` 기본 OFF, 21 tests PASS, OFF 시 프롬프트 바이트
+  동일). 멀티턴 방송 리허설 평가를 구축했다(`88700ac` — 시나리오 2×24턴·
+  콜백 창 안/밖 분리·politeness_drift·34 tests·CI evaluations shard 등록).
+  스타일 게이트(`normalize_korean_register` 치환+미해결 존댓말 문장 드롭,
+  fail-closed)가 proxy 출력 전부에 적용됨을 코드로 확인했으나 방송 체인은
+  AIRI 앱 WS 전달에서 끊겨 부분 경유이며 B1b 조건부 라이브 실증이 남는다.
+  전/후 원격 실측(A/B `--contract` + 멀티턴 리허설)은 Tailscale 순단으로
+  대기하며 복구 후 즉시 진행한다. CI billing 차단 지속 — 로컬 검증으로
+  대체(신규 테스트 55건 PASS).
 
 - **2026-08-13** (B0-1 streamList): offline injected-transport measurement core를
   완료했다. 실제 내용·provider ID·AIRI 주입 없이 bounded duration/messages/responses/
