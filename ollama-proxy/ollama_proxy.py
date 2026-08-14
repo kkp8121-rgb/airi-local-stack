@@ -65,6 +65,7 @@ from input_screening import (
     validate_input_text,
 )
 from output_moderation import OutputModerationRuntime, load_moderation_policy
+from broadcast_contract import apply_broadcast_contract, broadcast_contract_enabled
 
 
 def emit_substantive_content(trace_id: str, request_started: float) -> None:
@@ -5811,7 +5812,14 @@ def transform_body(
             ][:1]
             visible_history.reverse()
         projected_messages: list[dict[str, object]] = [
-            {"role": "system", "content": base_system_prompt},
+            # B4c 방송 발화 계약은 greybox 기본 OFF다. 꺼져 있으면 이 호출은
+            # 입력 문자열을 그대로 돌려주므로 요청 프롬프트가 바뀌지 않는다.
+            {
+                "role": "system",
+                "content": apply_broadcast_contract(
+                    base_system_prompt, broadcast_contract_enabled()
+                ),
+            },
             *visible_history,
         ]
         insert_at = next(

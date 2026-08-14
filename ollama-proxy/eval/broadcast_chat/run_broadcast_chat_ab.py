@@ -12,6 +12,7 @@
 
 오프라인 검증:
   python run_broadcast_chat_ab.py --dry-run --output /tmp/dry.json
+  python run_broadcast_chat_ab.py --dry-run --contract on --output /tmp/dry-contract.json
   python mock_openai_server.py &  # 그 후 --base-url http://127.0.0.1:PORT/v1
 """
 from __future__ import annotations
@@ -36,6 +37,18 @@ except ImportError:  # pragma: no cover - dependency guard
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_FIXTURES = BASE_DIR / "broadcast-chat-fixtures.json"
 SCHEMA = "airi.broadcast-chat-ab.v1"
+
+# B4c 방송 발화 계약 블록은 임베드하지 않고 프로덕션 모듈에서 그대로 가져온다
+# (러너 사본과 운영 계약이 갈라지는 것을 원천 차단).
+PROXY_DIR = BASE_DIR.parents[1]
+if str(PROXY_DIR) not in sys.path:
+    sys.path.insert(0, str(PROXY_DIR))
+try:
+    from broadcast_contract import build_broadcast_contract_block
+except ImportError as exc:  # pragma: no cover - 배치 오류 가드
+    raise SystemExit(
+        f"broadcast_contract 모듈을 찾지 못했다 ({PROXY_DIR}): {exc}"
+    ) from exc
 
 # ---------------------------------------------------------------------------
 # 시스템 프롬프트
@@ -245,9 +258,17 @@ def verify_repo_prompt(proxy_source: Path) -> dict[str, Any]:
     }
 
 
-def build_messages(chat_text: str) -> list[dict[str, str]]:
+def build_system_content(contract_block: str = "") -> str:
+    """시스템 메시지 전문. contract_block 이 비면 기존 조합 그대로다(바이트 동일)."""
+    combined = AIRI_SYSTEM_PROMPT + "\n\n" + BROADCAST_FRAME
+    if contract_block:
+        combined += "\n\n" + contract_block
+    return combined
+
+
+def build_messages(chat_text: str, contract_block: str = "") -> list[dict[str, str]]:
     return [
-        {"role": "system", "content": AIRI_SYSTEM_PROMPT + "\n\n" + BROADCAST_FRAME},
+        {"role": "system", "content": build_system_content(contract_block)},
         {"role": "user", "content": USER_PREFIX + chat_text},
     ]
 
@@ -508,10 +529,10 @@ def call_once(
 
 
 def measure_baseline(
-    transport: Any, model: str, reps: int, timeout: float
+    transport: Any, model: str, reps: int, timeout: float, contract_block: str = ""
 ) -> dict[str, Any]:
     """max_tokens=1 최소 요청으로 왕복+TLS+서버 오버헤드 바닥선을 잰다."""
-    messages = build_messages("응")
+    messages = build_messages("응", contract_block)
     rows = []
     for index in range(reps):
         row = call_once(
@@ -545,12 +566,13 @@ def run_model(
     timeout: float,
     max_tokens: int,
     baseline_reps: int,
+    contract_block: str = "",
 ) -> dict[str, Any]:
     print(f"[{model}] warmup...", file=sys.stderr)
     warmup = call_once(
         transport,
         model=model,
-        messages=build_messages("안녕, 방송 시작했어?"),
+        messages=build_messages("안녕, 방송 시작했어?", contract_block),
         max_tokens=max_tokens,
         timeout=timeout,
     )
@@ -563,7 +585,7 @@ def run_model(
     baseline = None
     if baseline_reps > 0:
         print(f"[{model}] baseline x{baseline_reps} (max_tokens=1)...", file=sys.stderr)
-        baseline = measure_baseline(transport, model, baseline_reps, timeout)
+        baseline = measure_baseline(transport, model, baseline_reps, timeout, contract_block)
 
     runs: list[dict[str, Any]] = []
     total = len(items) * reps
@@ -573,7 +595,7 @@ def run_model(
             record = call_once(
                 transport,
                 model=model,
-                messages=build_messages(item["text"]),
+                messages=build_messages(item["text"], contract_block),
                 max_tokens=max_tokens,
                 timeout=timeout,
             )
@@ -740,7 +762,9 @@ def _fmt(value: Any, width: int = 9) -> str:
     return ("-" if value is None else str(value)).rjust(width)
 
 
-def print_report(summaries: list[dict[str, Any]], fixtures: dict[str, Any], reps: int) -> None:
+def print_report(
+    summaries: list[dict[str, Any]], fixtures: dict[str, Any], reps: int, contract: str = "off"
+) -> None:
     line = "=" * 96
     print(line)
     print("AIRI 방송 채팅 A/B — 실측 시청자 채팅 기반 (Mi:dm vs Motif)")
@@ -748,6 +772,10 @@ def print_report(summaries: list[dict[str, Any]], fixtures: dict[str, Any], reps
     print(f"[측정 범위] {MEASUREMENT_SCOPE}")
     print(f"[입력] 픽스처 {len(fixtures['items'])}건 × reps {reps} — 출처: 실제 방송 트랜스크립트 역추출")
     print("[채점] 자동 마커는 휴리스틱이다. 인간 검수를 대체하지 않는다.")
+    print(
+        f"[발화 계약] B4c 방송 발화 계약 {contract}"
+        + (" — 시스템 메시지 끝에 계약 블록을 덧붙였다" if contract == "on" else " (기존 프롬프트 그대로)")
+    )
 
     non_streaming = [s for s in summaries if not s.get("streaming", True)]
     fallbacks = [
@@ -906,7 +934,15 @@ def main(argv: list[str] | None = None) -> int:
         help="dry-run 에서 '스트리밍 미지원 서버'를 흉내내 auto-fallback 경로를 검증",
     )
     parser.add_argument("--proxy-source", help="ollama_proxy.py 경로 — 시스템 프롬프트 drift 검증")
+    parser.add_argument(
+        "--contract",
+        choices=("off", "on"),
+        default="off",
+        help="B4c 방송 발화 계약 블록 부착 여부. off(기본)=기존 프롬프트 그대로",
+    )
     args = parser.parse_args(argv)
+
+    contract_block = build_broadcast_contract_block() if args.contract == "on" else ""
 
     fixtures = load_fixtures(Path(args.fixtures))
     items = fixtures["items"]
@@ -958,6 +994,7 @@ def main(argv: list[str] | None = None) -> int:
                 timeout=args.timeout,
                 max_tokens=args.max_tokens,
                 baseline_reps=max(0, args.baseline_reps),
+                contract_block=contract_block,
             )
         finally:
             if hasattr(transport, "close"):
@@ -994,11 +1031,14 @@ def main(argv: list[str] | None = None) -> int:
         "prompt": {
             "system_prompt_sha256": sha256(AIRI_SYSTEM_PROMPT),
             "broadcast_frame_sha256": sha256(BROADCAST_FRAME),
-            "combined_system_sha256": sha256(AIRI_SYSTEM_PROMPT + "\n\n" + BROADCAST_FRAME),
+            "combined_system_sha256": sha256(build_system_content(contract_block)),
             "user_prefix": USER_PREFIX,
             "repo_prompt_check": prompt_check,
             "system_prompt": AIRI_SYSTEM_PROMPT,
             "broadcast_frame": BROADCAST_FRAME,
+            "contract": args.contract,
+            "contract_block_sha256": sha256(contract_block) if contract_block else None,
+            "contract_block": contract_block or None,
         },
         "fixtures": {
             "path": str(Path(args.fixtures).resolve()),
@@ -1014,7 +1054,7 @@ def main(argv: list[str] | None = None) -> int:
     }
     output = Path(args.output)
     atomic_write(output, payload)
-    print_report(summaries, {"items": items}, args.reps)
+    print_report(summaries, {"items": items}, args.reps, args.contract)
     print(f"\n원 응답 전문 포함 결과: {output.resolve()}")
     return 0
 
