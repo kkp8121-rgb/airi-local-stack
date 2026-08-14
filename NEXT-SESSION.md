@@ -34,8 +34,14 @@ production-context v2 gate는 구현·측정을 완료했지만 **FAIL**이다. 
 Mi:dm exact digest를 유지하며, Phi-4 Mini와 Ministral은 인간 검수 challenger다.
 Qwen3는 확신도/문맥 자동 규칙 8/12와 production-context 12/12였지만 실제 첫
 render P50 약 9.15초, 120-turn 80/120, 빈 응답 때문에 foreground 승격 대상이
-아니다. Motif는 pinned license file 부재, remote code, 8 GB safe quant 부재로
-UNRUNNABLE이다. 검토 PC는 모델명을 열기 전에 P6와 intelligence의 두 익명 packet을
+아니다. Motif exact revision `70bf316e166f2a256b1068e35c8310541a6a06bc`는 공식 F32
+shard 전량 다운로드·hash-verify와 remote-code 감사 뒤 offline 실행을 완료했다. Native
+BF16+CPU offload P1/P2/P3/P4/P6와 experimental local Transformers+bitsandbytes NF4
+비-Ollama common P1/P2/P4/P5/P6/intelligence/P7가 actual이다. P2 native/common은
+0/16·1/16이고, common P3는 JSON-schema 미지원 HTTP 400이다. P5는 80/120(TTFT 약
+8.02초), intelligence 4/12(clarify 0/2, unknown 0), P7 render P50 약 9.22초로
+**권장하지 않는다**. pinned LICENSE 파일은 계속 없으므로 evaluation exception만 허용하고
+public/revenue deployment는 승인하지 않는다. 검토 PC는 모델명을 열기 전에 P6와 intelligence의 두 익명 packet을
 채우고, 그 뒤 별도 key로 매핑한다. 상세:
 `airi_docs/진행중/AIRI-LOCAL-LLM-CANDIDATE-AB-RESULT-2026-08-14.md`.
 

@@ -5,6 +5,10 @@ from pathlib import Path
 from urllib.parse import urlparse
 from urllib.request import Request,urlopen
 from model_usage_manifest import validate_manifest,canonical_json_bytes,canonical_sha256
+import sys
+PROXY_DIR=Path(__file__).resolve().parents[1]
+if str(PROXY_DIR) not in sys.path:sys.path.insert(0,str(PROXY_DIR))
+from benchmark_dialogue_quality import answer_from_sse
 SCHEMA='airi.broadcast-intelligence-rehearsal.v1'; RAW_SCHEMA='airi.broadcast-intelligence-raw-capture.v1'
 class RehearsalError(ValueError):pass
 def fail(x):raise RehearsalError(x)
@@ -50,9 +54,9 @@ def run_case(proxy,runtime,case):
  for index,value in enumerate(case.get('history',[])):messages.append({'role':'user' if index%2==0 else 'assistant','content':value})
  messages.append({'role':'user','content':case['prompt']});started=time.perf_counter();text=''
  for _ in range(3):
-  req=Request(proxy.rstrip('/')+'/v1/chat/completions',data=json.dumps({'model':runtime['model'],'messages':messages,'stream':False},ensure_ascii=False).encode('utf-8'),headers={'Content-Type':'application/json','X-AIRI-Turn-Origin':'local-quality-probe'})
-  with urlopen(req,timeout=180) as response:data=json.loads(response.read())
-  choices=data.get('choices');text=choices[0].get('message',{}).get('content','') if isinstance(choices,list) and choices else ''
+  req=Request(proxy.rstrip('/')+'/v1/chat/completions',data=json.dumps({'model':runtime['model'],'messages':messages,'stream':True},ensure_ascii=False).encode('utf-8'),headers={'Content-Type':'application/json','Accept':'text/event-stream','X-AIRI-Turn-Origin':'local-quality-probe'})
+  with urlopen(req,timeout=180) as response:chunks=list(response)
+  text,_,_=answer_from_sse(chunks)
   if isinstance(text,str) and text.strip():break
  return text if isinstance(text,str) else '',round((time.perf_counter()-started)*1000,3)
 def blinded_review_packet(raw_capture, blind_seed):

@@ -15,9 +15,15 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Any, Callable, Mapping
+from urllib.parse import urlsplit
 
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from benchmark_dialogue_quality import answer_from_sse
 from build_airi_p6_review_packet import CAPTURE_SCHEMA_VERSION
 from model_usage_manifest import canonical_sha256, file_sha256, validate_manifest
 from run_airi_native_fit_probe import (
@@ -86,34 +92,35 @@ def _http_transport(endpoint: str, body: Mapping[str, Any]) -> Mapping[str, Any]
     return value
 
 
-def _proxy_transport(endpoint: str, body: Mapping[str, Any]) -> Mapping[str, Any]:
+def _proxy_transport(endpoint: str, body: Mapping[str, Any], *, ollama_endpoint: str) -> Mapping[str, Any]:
     if body.get("options", {}).get("airi_p6_provenance_only") is True:
         health_url = endpoint.rsplit("/v1/", 1)[0] + "/health"
-        with urllib.request.urlopen(health_url, timeout=10) as response:
-            health = json.loads(response.read().decode("utf-8"))
-        with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=10) as response:
-            tags = json.loads(response.read().decode("utf-8"))
+        try:
+            with urllib.request.urlopen(health_url, timeout=10) as response:
+                health = json.loads(response.read().decode("utf-8"))
+            with urllib.request.urlopen(ollama_endpoint, timeout=10) as response:
+                tags = json.loads(response.read().decode("utf-8"))
+        except (OSError, urllib.error.HTTPError, json.JSONDecodeError) as exc:
+            raise CaptureError("local proxy provenance transport failed") from exc
         model = body.get("model")
         matching = [item for item in tags.get("models", []) if isinstance(item, dict) and item.get("name") == model]
         observed = health.get("chat_model", {}).get("model") if isinstance(health, dict) else None
         if observed != model or len(matching) != 1:
             raise CaptureError("proxy provenance binding is not exact")
         return {"model": model, "digest": matching[0].get("digest")}
-    payload = {"model": body.get("model"), "messages": body.get("messages"), "stream": False}
+    payload = {"model": body.get("model"), "messages": body.get("messages"), "stream": True}
     request = urllib.request.Request(
         endpoint,
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json", "X-AIRI-Turn-Origin": "local-quality-probe"},
+        headers={"Content-Type": "application/json", "Accept": "text/event-stream", "X-AIRI-Turn-Origin": "local-quality-probe"},
         method="POST",
     )
     try:
         with urllib.request.urlopen(request, timeout=180) as response:
-            value = json.loads(response.read().decode("utf-8"))
+            text, _, _ = answer_from_sse(response)
     except (OSError, urllib.error.HTTPError, json.JSONDecodeError) as exc:
         raise CaptureError("local proxy capture transport failed") from exc
-    if not isinstance(value, dict):
-        raise CaptureError("local proxy capture response is invalid")
-    return value
+    return {"done": True, "message": {"content": text}}
 
 
 def _response_text(value: Mapping[str, Any]) -> str:
@@ -129,9 +136,28 @@ def _response_text(value: Mapping[str, Any]) -> str:
     return text
 
 
-def _validate_local_endpoint(endpoint: str) -> None:
-    if endpoint not in {"http://127.0.0.1:11434/api/chat", "http://localhost:11434/api/chat", "http://127.0.0.1:11435/v1/chat/completions", "http://localhost:11435/v1/chat/completions"}:
-        raise CaptureError("endpoint must be an exact local AIRI or Ollama chat endpoint")
+def _validate_loopback_endpoint(endpoint: str, *, path: str, name: str) -> None:
+    """Accept only literal IP loopback URLs with the expected local API path."""
+    try:
+        parsed = urlsplit(endpoint)
+        literal_loopback = bool(parsed.hostname) and ip_address(parsed.hostname).is_loopback
+        valid = (
+            parsed.scheme == "http"
+            and literal_loopback
+            and parsed.path == path
+            and not parsed.query
+            and not parsed.fragment
+            and parsed.username is None
+            and parsed.password is None
+        )
+    except ValueError:
+        valid = False
+    if not valid:
+        raise CaptureError(f"{name} must be a literal loopback URL ending in {path}")
+
+
+def _validate_local_endpoint(endpoint: str, mode: str) -> None:
+    _validate_loopback_endpoint(endpoint, path="/v1/chat/completions" if mode == "proxy" else "/api/chat", name="endpoint")
 
 
 def _native_capture(manifest: Mapping[str, Any], *, manifest_path: Path, snapshot_path: str | Path | None, gpu_max_mib: int | None, cpu_max_gib: int | None) -> dict[str, Any]:
@@ -194,7 +220,7 @@ def _native_capture(manifest: Mapping[str, Any], *, manifest_path: Path, snapsho
             torch.cuda.empty_cache()
 
 
-def capture_dialogue(*, manifest_path: str | Path, output_path: str | Path, profile: str, model: str | None = None, expected_digest: str | None = None, endpoint: str = "http://127.0.0.1:11434/api/chat", mode: str = "ollama", transport: Transport | None = None, proxy_test_origin: bool = False, proxy_nonpersistent: bool = False, snapshot_path: str | Path | None = None, gpu_max_mib: int | None = None, cpu_max_gib: int | None = None) -> dict[str, Any]:
+def capture_dialogue(*, manifest_path: str | Path, output_path: str | Path, profile: str, model: str | None = None, expected_digest: str | None = None, endpoint: str = "http://127.0.0.1:11434/api/chat", ollama_endpoint: str = "http://127.0.0.1:11434/api/tags", mode: str = "ollama", transport: Transport | None = None, proxy_test_origin: bool = False, proxy_nonpersistent: bool = False, snapshot_path: str | Path | None = None, gpu_max_mib: int | None = None, cpu_max_gib: int | None = None) -> dict[str, Any]:
     """Atomically write one builder-compatible capture; never contacts non-local endpoints."""
     manifest_file = Path(manifest_path)
     try:
@@ -206,12 +232,17 @@ def capture_dialogue(*, manifest_path: str | Path, output_path: str | Path, prof
         else:
             if mode not in {"ollama", "proxy"}:
                 raise CaptureError("mode must be ollama or proxy")
-            _validate_local_endpoint(endpoint)
-            if not model or not _valid_digest(expected_digest or ""):
-                raise CaptureError("common capture requires model and lowercase expected digest")
             if mode == "proxy" and (not proxy_test_origin or not proxy_nonpersistent):
                 raise CaptureError("proxy capture requires asserted test-origin and nonpersistent semantics")
-            effective_transport = transport or (_proxy_transport if mode == "proxy" else _http_transport)
+            _validate_local_endpoint(endpoint, mode)
+            if mode == "proxy":
+                _validate_loopback_endpoint(ollama_endpoint, path="/api/tags", name="ollama-endpoint")
+            if not model or not _valid_digest(expected_digest or ""):
+                raise CaptureError("common capture requires model and lowercase expected digest")
+            effective_transport = transport or (
+                (lambda request_endpoint, body: _proxy_transport(request_endpoint, body, ollama_endpoint=ollama_endpoint))
+                if mode == "proxy" else _http_transport
+            )
             # Exact installed digest is asserted by the injected/local transport
             # before dialogue begins.  This avoids running an unpinned tag.
             provenance = effective_transport(endpoint, {"model": model, "stream": False, "messages": [], "options": {"airi_p6_provenance_only": True}})
@@ -220,14 +251,17 @@ def capture_dialogue(*, manifest_path: str | Path, output_path: str | Path, prof
             turns = []
             for number, prompt in enumerate(PROMPTS, 1):
                 messages = [{"role": "system", "content": "당신은 AIRI입니다. 방송용으로 짧고 친절한 한국어로 답하세요."}, {"role": "user", "content": prompt}]
-                body: dict[str, Any] = {"model": model, "messages": messages, "stream": False, "options": {"temperature": 0, "seed": 42}}
+                body: dict[str, Any] = {"model": model, "messages": messages, "stream": mode == "proxy", "options": {"temperature": 0, "seed": 42}}
                 text = ""; elapsed = 0.0
                 for _ in range(3):
-                    started = time.monotonic(); response = effective_transport(endpoint, body); elapsed += time.monotonic() - started
+                    started = time.monotonic()
                     try:
+                        response = effective_transport(endpoint, body)
+                        elapsed += time.monotonic() - started
                         text = _response_text(response)
                         break
                     except CaptureError:
+                        elapsed += time.monotonic() - started
                         continue
                 if not text:
                     raise CaptureError(f"local capture turn {number} remained empty after bounded retries")
@@ -247,12 +281,12 @@ def capture_dialogue(*, manifest_path: str | Path, output_path: str | Path, prof
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", required=True); parser.add_argument("--output", required=True); parser.add_argument("--profile", choices=("native", "common"), required=True)
-    parser.add_argument("--model"); parser.add_argument("--expected-digest"); parser.add_argument("--endpoint", default="http://127.0.0.1:11434/api/chat"); parser.add_argument("--mode", choices=("ollama", "proxy"), default="ollama")
+    parser.add_argument("--model"); parser.add_argument("--expected-digest"); parser.add_argument("--endpoint", default="http://127.0.0.1:11434/api/chat"); parser.add_argument("--ollama-endpoint", default="http://127.0.0.1:11434/api/tags", help="literal loopback Ollama /api/tags URL used only for proxy provenance"); parser.add_argument("--mode", choices=("ollama", "proxy"), default="ollama")
     parser.add_argument("--proxy-test-origin", action="store_true"); parser.add_argument("--proxy-nonpersistent", action="store_true")
     parser.add_argument("--snapshot"); parser.add_argument("--gpu-max-mib", type=int); parser.add_argument("--cpu-max-gib", type=int)
     args = parser.parse_args(argv)
     try:
-        capture_dialogue(manifest_path=args.manifest, output_path=args.output, profile=args.profile, model=args.model, expected_digest=args.expected_digest, endpoint=args.endpoint, mode=args.mode, proxy_test_origin=args.proxy_test_origin, proxy_nonpersistent=args.proxy_nonpersistent, snapshot_path=args.snapshot, gpu_max_mib=args.gpu_max_mib, cpu_max_gib=args.cpu_max_gib)
+        capture_dialogue(manifest_path=args.manifest, output_path=args.output, profile=args.profile, model=args.model, expected_digest=args.expected_digest, endpoint=args.endpoint, ollama_endpoint=args.ollama_endpoint, mode=args.mode, proxy_test_origin=args.proxy_test_origin, proxy_nonpersistent=args.proxy_nonpersistent, snapshot_path=args.snapshot, gpu_max_mib=args.gpu_max_mib, cpu_max_gib=args.cpu_max_gib)
     except CaptureError as exc:
         parser.error(str(exc))
     return 0

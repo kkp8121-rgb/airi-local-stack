@@ -20,7 +20,12 @@ from model_usage_manifest import canonical_sha256, file_sha256, validate_manifes
 
 
 REPORT_SCHEMA = "airi.ollama-model-fit-probe.v1"
-LOOPBACK_ENDPOINTS = {"http://127.0.0.1:11434", "http://localhost:11434"}
+LOOPBACK_ENDPOINTS = {
+    "http://127.0.0.1:11434",
+    "http://localhost:11434",
+    "http://127.0.0.1:11437",
+    "http://localhost:11437",
+}
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 PROMPT = "안녕하세요 AIRI. 오늘 할 수 있는 짧고 차분한 응원 한 문장만 말해 주세요."
 Transport = Callable[[str, str, Mapping[str, Any] | None], Any]

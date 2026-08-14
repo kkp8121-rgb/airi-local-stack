@@ -150,8 +150,17 @@ Python 구현을 로컬 프로세스에서 실행한다는 뜻이다. mutable `m
 `AIRI-LOCAL-LLM-CANDIDATE-AB-RESULT-2026-08-14.md`다. 운영 foreground는
 Mi:dm exact digest를 유지하고, Phi-4 Mini와 Ministral을 익명 인간 검수
 challenger로 넘긴다. Qwen3는 문맥/확신도 자동 항목에서 가장 높았지만 실제 방송
-지연과 빈 응답 때문에 foreground 승격하지 않는다. Motif는 P0 정적 감사 뒤
-P1–P7 UNRUNNABLE이다.
+지연과 빈 응답 때문에 foreground 승격하지 않는다. Motif exact revision
+`70bf316e166f2a256b1068e35c8310541a6a06bc`의 공식 F32 shard 전량은 다운로드·hash-verify했고,
+remote code 감사 뒤 offline 실행했다. Native BF16+CPU offload는 P1/P2/P3/P4/P6,
+experimental local Transformers+bitsandbytes NF4 비-Ollama common은
+P1/P2/P4/P5/P6/intelligence/P7 actual이다. P2 native/common은 0/16·1/16이고 common
+P3는 JSON-schema 미지원 HTTP 400이다. P5 80/120(TTFT 약 8.02초), intelligence
+4/12(clarify 0/2, unknown 0), P7 render P50 약 9.22초로 권장하지 않는다. pinned
+LICENSE 파일 부재 때문에 evaluation exception만 유지하며 public/revenue deployment는 승인하지 않는다.
+
+평가 종료 상태는 Mi:dm exact digest 복원, STT/extraction/moderation OFF, loaded runner 없음,
+설치 ASAR 불변이다.
 
 검토 PC는 P6 20-turn packet과 intelligence 12-scene packet을 먼저 blind review한
 뒤 별도 key를 연다. 사람 점수는 아직 공란이다. 후속 구현 우선순위는 음란·비속어

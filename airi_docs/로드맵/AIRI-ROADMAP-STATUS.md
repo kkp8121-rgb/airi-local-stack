@@ -13,7 +13,7 @@
   지연 = `AIRI-NEUROSAMA-LOW-LATENCY-PLAN.md` (v2.1)
 - 실행 계획(M1~M5 상세): `진행예정/AIRI-BROADCAST-CHARACTER-PLAN-2026-08-12.md`
 
-최종 갱신: 2026-08-13
+최종 갱신: 2026-08-14
 
 - **2026-08-13 (all eligible local LLM candidates — immediate AIRI A/B):**
   사용자는 명확한 허용 라이선스 후보와 평가 전용 조건부 Motif 예외를 모두
@@ -611,3 +611,23 @@
   Phi/Ministral 인간 검수 challenger, 인간 packet 대기. 설치 ASAR 불변,
   STT/extraction/moderation OFF. 상세:
   `진행중/AIRI-LOCAL-LLM-CANDIDATE-AB-RESULT-2026-08-14.md`.
+
+- **2026-08-14 (Motif actual-status correction and closeout):** This supplements
+  the prior planning/unavailable record without rewriting history. Motif exact
+  revision `70bf316e166f2a256b1068e35c8310541a6a06bc` had official F32 shards
+  fully downloaded and hash-verified; audited remote code then ran offline.
+  Native BF16+CPU offload actually completed P1/P2/P3/P4/P6. The experimental,
+  localhost-only Transformers+bitsandbytes NF4 backend (explicitly not
+  Ollama-native) actually completed common P1/P2/P4/P5/P6/intelligence/P7.
+  Native/common P2 were 0/16 and 1/16. Common P3 explicitly does not support
+  JSON-schema and returned HTTP 400. Common P5 was 80/120 with TTFT about 8.02 s;
+  intelligence was 4/12 (clarify 0/2, unknown 0); P7 render P50 was about 9.22 s.
+  Result: not recommended. The pinned LICENSE file remains absent: evaluation
+  exception only, with no public or revenue deployment approval.
+
+  - [x] Exact revision, official F32 shard hashes, and remote-code audit recorded
+    — 2026-08-14
+  - [x] Native and local-NF4 actual evaluation paths recorded — 2026-08-14
+  - [x] Operational baseline restored: Mi:dm exact digest; STT, extraction, and
+    moderation OFF; no loaded runner; installed ASAR unchanged — 2026-08-14
+  - [ ] Public/revenue Motif deployment approval (blocked: pinned LICENSE file absent)

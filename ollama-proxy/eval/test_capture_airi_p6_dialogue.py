@@ -5,9 +5,10 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent))
-from capture_airi_p6_dialogue import PROMPTS, CaptureError, capture_dialogue
+from capture_airi_p6_dialogue import PROMPTS, CaptureError, _proxy_transport, capture_dialogue
 from build_airi_p6_review_packet import CAPTURE_SCHEMA_VERSION
 
 
@@ -22,6 +23,14 @@ class FakeTransport:
         self.calls.append(body)
         if body["messages"] == []: return {"model": "test:model", "digest": DIGEST}
         return {"done": True, "message": {"content": "안녕하세요. 오늘도 즐거운 방송이에요."}}
+
+
+class Response:
+    def __init__(self, payload=b"{}", chunks=()): self.payload = payload; self.chunks = chunks
+    def __enter__(self): return self
+    def __exit__(self, *unused): return False
+    def read(self): return self.payload
+    def __iter__(self): return iter(self.chunks)
 
 
 class CaptureP6Tests(unittest.TestCase):
@@ -58,6 +67,37 @@ class CaptureP6Tests(unittest.TestCase):
                 capture_dialogue(manifest_path=MANIFEST, output_path=target, profile="common", model="test:model", expected_digest="b" * 64, transport=fake)
             with self.assertRaisesRegex(CaptureError, "test-origin"):
                 capture_dialogue(manifest_path=MANIFEST, output_path=target, profile="common", model="test:model", expected_digest=DIGEST, mode="proxy", transport=fake)
+            with self.assertRaisesRegex(CaptureError, "nonpersistent"):
+                capture_dialogue(manifest_path=MANIFEST, output_path=target, profile="common", model="test:model", expected_digest=DIGEST, mode="proxy", transport=fake, proxy_test_origin=True)
+
+    def test_proxy_transport_parses_sse_and_uses_configured_ollama(self) -> None:
+        responses = [
+            Response(json.dumps({"chat_model": {"model": "test:model"}}).encode()),
+            Response(json.dumps({"models": [{"name": "test:model", "digest": DIGEST}]}).encode()),
+            Response(chunks=(
+                b'data: {"choices":[{"delta":{"content":"hello "}}]}\n\n',
+                b'data: {"choices":[{"delta":{"content":"world"}}]}\n\n',
+            )),
+        ]
+        with patch("capture_airi_p6_dialogue.urllib.request.urlopen", side_effect=responses) as opened:
+            provenance = _proxy_transport("http://127.0.0.1:11438/v1/chat/completions", {"model": "test:model", "messages": [], "options": {"airi_p6_provenance_only": True}}, ollama_endpoint="http://127.0.0.1:11437/api/tags")
+            result = _proxy_transport("http://127.0.0.1:11438/v1/chat/completions", {"model": "test:model", "messages": [{"role": "user", "content": "x"}]}, ollama_endpoint="http://127.0.0.1:11437/api/tags")
+        self.assertEqual(provenance["digest"], DIGEST)
+        self.assertEqual(result["message"]["content"], "hello world")
+        self.assertEqual(opened.call_args_list[1].args[0], "http://127.0.0.1:11437/api/tags")
+        request = opened.call_args_list[2].args[0]
+        self.assertTrue(json.loads(request.data.decode())["stream"])
+        self.assertEqual(request.get_header("Accept"), "text/event-stream")
+
+    def test_proxy_endpoint_safety_and_assertions(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            target = Path(raw) / "capture.json"; fake = FakeTransport()
+            capture_dialogue(manifest_path=MANIFEST, output_path=target, profile="common", model="test:model", expected_digest=DIGEST, endpoint="http://127.0.0.1:11438/v1/chat/completions", ollama_endpoint="http://127.0.0.1:11437/api/tags", mode="proxy", transport=fake, proxy_test_origin=True, proxy_nonpersistent=True)
+            self.assertTrue(all(call["stream"] is True for call in fake.calls[1:]))
+            with self.assertRaisesRegex(CaptureError, "literal loopback"):
+                capture_dialogue(manifest_path=MANIFEST, output_path=target, profile="common", model="test:model", expected_digest=DIGEST, endpoint="http://example.com:11438/v1/chat/completions", mode="proxy", transport=fake, proxy_test_origin=True, proxy_nonpersistent=True)
+            with self.assertRaisesRegex(CaptureError, "literal loopback"):
+                capture_dialogue(manifest_path=MANIFEST, output_path=target, profile="common", model="test:model", expected_digest=DIGEST, endpoint="http://127.0.0.1:11438/v1/chat/completions", ollama_endpoint="http://example.com:11437/api/tags", mode="proxy", transport=fake, proxy_test_origin=True, proxy_nonpersistent=True)
 
 
 if __name__ == "__main__":

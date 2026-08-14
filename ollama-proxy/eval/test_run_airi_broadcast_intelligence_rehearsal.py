@@ -2,6 +2,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent))
 import run_airi_broadcast_intelligence_rehearsal as runner
@@ -34,6 +35,39 @@ class Tests(unittest.TestCase):
         self.assertNotIn('candidate_id', json.dumps(packet))
         self.assertIn('candidate_id', json.dumps(key))
         self.assertTrue(all(value == '' for value in packet['samples'][0]['rubric'].values()))
+
+    def test_run_case_uses_streaming_sse_and_never_requests_nonstream_json(self):
+        requests = []
+
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def __iter__(self):
+                return iter((
+                    b'data: {"choices":[{"delta":{"content":"first "}}]}\n\n',
+                    b'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n',
+                    b'data: [DONE]\n\n',
+                ))
+
+        def fake_urlopen(request, timeout):
+            requests.append(request)
+            self.assertEqual(180, timeout)
+            return Response()
+
+        with patch.object(runner, 'urlopen', side_effect=fake_urlopen):
+            text, _ = runner.run_case('http://127.0.0.1:11435', {'model': 'local-model'}, {'prompt': 'hello'})
+
+        self.assertEqual('first answer', text)
+        self.assertEqual(1, len(requests))
+        payload = json.loads(requests[0].data.decode('utf-8'))
+        self.assertIs(True, payload['stream'])
+        self.assertNotIn(False, [payload['stream']])
+        self.assertEqual('text/event-stream', requests[0].get_header('Accept'))
+        self.assertEqual('local-quality-probe', requests[0].get_header('X-airi-turn-origin'))
 
 
 if __name__ == '__main__':

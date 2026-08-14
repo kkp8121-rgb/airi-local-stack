@@ -47,7 +47,7 @@ gate가 불리하다. 익명 인간 검수가 이 차이를 뒤집기 전에는 
 | 후보 | official repository | full revision | license/표시 | remote-code/8 GB 판정 |
 |---|---|---|---|---|
 | Mi:dm | `K-intelligence/Midm-2.0-Mini-Instruct` | `383eb221c52a32278f1985257b264ade8d982e60` | MIT `LICENSE.txt`, 공개 방송 허용 | native Llama, remote code 불필요; BF16 bounded CPU/GPU offload 실제 실행 |
-| Motif | `Motif-Technologies/Motif-2.6b-v1.1-LC` | `70bf316e166f2a256b1068e35c8310541a6a06bc` | metadata는 MIT이나 pinned `LICENSE` 부재, 공개 방송 보류 | custom Python 정적 감사 완료·실행 안 함; F32 약 10.4 GB, 검증 quant 없음 → UNRUNNABLE |
+| Motif | `Motif-Technologies/Motif-2.6b-v1.1-LC` | `70bf316e166f2a256b1068e35c8310541a6a06bc` | metadata는 MIT이나 pinned `LICENSE` 부재: 배포는 계속 차단 | official F32 weight를 내려받아 hash 검증한 native 실제 실행과, 로컬 in-flight BnB NF4 experimental backend 실제 실행. NF4는 Ollama/official artifact가 아님 |
 | Ministral | `mistralai/Ministral-3-3B-Instruct-2512-BF16` | `b6d637bef2393152b3da2b2fde72eecdee30557e` | Apache-2.0 metadata/canonical link | native Mistral3; 공식 최소 16 GB, BF16 native는 8 GB 불가; Ollama Q4 common 실행 |
 | Qwen3 | `Qwen/Qwen3-4B` | `1cfa9a7208912126459214e8b04321603b3df60c` | Apache-2.0 `LICENSE` | native Qwen3; foreground `thinking=false`; Ollama Q4 common 실행 |
 | Phi-4 Mini | `microsoft/Phi-4-mini-instruct` | `cfbefacb99257ffa30c83adab238a50856ac3083` | MIT `LICENSE`, `NOTICE.md` FlashAttention BSD-3 | pinned custom/integrated 경계 감사; native remote path 미실행; Ollama Q4 common 실행 |
@@ -79,11 +79,19 @@ attention/device/KV, quantization, Ollama/llama.cpp 지원 상태는
 | 후보 | P1 8 GB | P2 common 구조 | P3 context | P4 persona/safety marker | P5 120-turn 구조 | P7 completion P50/P95 | P7 render P50/P95 | 확신도/문맥 리허설 | native peak VRAM | 주 실패 |
 |---|---|---:|---|---|---:|---:|---:|---|---|---|
 | Mi:dm | common Q4 actual; native BF16 offload actual | 9/16; native 7/16 | common raw FAIL; production FAIL; native 0/4 압력 | common FAIL; native 0/20 | 120/120 | 0.900/1.087 s | 1.762/2.489 s | 6/12, P50 0.268 s, empty 1 | P3 alloc/reserved 6.283/6.652 GiB | current-state 불확실성, contextual `정범` 회수, disagreement empty |
-| Motif | UNRUNNABLE | not run | not run | not run | not run | not run | not run | not run | unknown | pinned license file 부재, remote code, F32>8 GB, safe quant 없음 |
+| Motif | native actual 26.797 s/128 tok; common NF4 actual 24.156 s, 9.99 tok/s | native 0/16 (P50/P95 24.250/24.844 s, 6144 tok); common NF4 1/16 (25.765/33.079 s, 9.954/10.496 tok/s, 12288 tok) | native 0/4: pressure median 24.641/29.657 s near VRAM boundary; common NF4 raw+production constrained decoding HTTP 400 unsupported | native 0/20; common NF4 marker 14/20 gate fail, P50/P95 14.200/16.514 s | common NF4 80/120, TTFT 8.019/8.038 s | 8.185/8.249 s | 9.222/9.602 s | common NF4 4/12; expected clarify 2→actual 0, unknown 0; P50/P95 8.025/8.029 s | native P1 allocated/reserved about 4.42/4.97 GiB | latency, length control, intelligence failure; NF4 is experimental; pinned license still absent |
 | Ministral | common Q4 actual; native BF16 UNRUNNABLE | 2/16 | raw FAIL; production FAIL | common FAIL | 120/120 | 1.295/3.614 s | 2.347/4.589 s | 7/12, P50 1.068 s | common unknown | 모호성·고양이 문맥·현재 정보 불확실성 실패, 긴 tail |
 | Qwen3 | common Q4 actual; native BF16 UNRUNNABLE | 0/16 | raw semantic 41.7%; production 12/12 PASS | common FAIL | 80/120 | 8.141/8.149 s | 9.148/9.575 s | 8/12, P50 30.020 s, max 80.662 s, empty 1 | common unknown | 방송 지연·무응답; thinking 1,024 row도 15/16 최종 발화 0자 |
 | Phi-4 Mini | common Q4 actual; native boundary UNRUNNABLE | 4/16 | raw FAIL; production FAIL | common FAIL | 110/120 | 1.114/3.032 s | 1.842/3.740 s | 7/12, P50 0.951 s | common unknown | 모호성/현재 정보 보류 실패, tail, native remote 경계 |
 | Granite | common Q4 actual; native BF16 offload actual | 2/16; native 6/16 | common FAIL; native 0/4 압력 | common FAIL; native 0/20 | 119/120 | 0.967/2.212 s | 1.694/3.158 s | 5/12, P50 0.581 s | P3 alloc/reserved 6.122/6.426 GiB | 가장 낮은 확신도/문맥 통과, thinking backend 미지원 |
+
+Motif native P1 peak observed allocated/reserved is about 4.42/4.97 GiB (the P1
+post-run snapshot is about 4.35/4.97 GiB); it is not a 8 GB deployment clearance.
+Its official F32 weights were downloaded and hash-verified, but the local in-flight
+BnB NF4 path uses bitsandbytes 0.45.5 and is explicitly experimental,
+non-Ollama, and non-official. The fixed Motif revision is
+`70bf316e166f2a256b1068e35c8310541a6a06bc`; the pinned-license absence remains a
+deployment block. It is therefore neither recommended nor a final model candidate.
 
 P2 common tok/s P50/P95는 Mi:dm 32.84/101.97, Ministral 35.83/47.83,
 Qwen3 53.02/55.38, Phi 29.37/78.66, Granite 59.51/113.09다. P5 report는
@@ -115,17 +123,18 @@ Qwen thinking 보조 row는 foreground와 분리했다. 256-token row는 16/16 �
 
 ## 인간 검수 packet
 
-모델명이 공개된 200개 prompt/response 원문 대조본과 실행·보존 범위는
+모델명이 공개된 252개 prompt/response 원문 대조본과 실행·보존 범위는
 `AIRI-LOCAL-LLM-CANDIDATE-DIALOGUE-REVIEW-2026-08-14.md`에 있다. 이 자료는
-P6 실제 140 turn과 common 지능 리허설 60 row만 보존하며, review-key는 열람하지
+P6 실제 180 turn(추가 Motif native/common 각 20)과 common 지능 리허설 72 row(추가
+Motif 12)를 보존하며, review-key는 열람하지
 않고 P2/P3/P4/P5/P7 raw text와 hostile P4 출력은 포함하지 않는다.
 
 검토 PC에서는 모델명을 보기 전에 다음 순서로 검수한다.
 
 1. `ollama-proxy/eval/results/local-llm-ab-p6-human-review-packet-2026-08-14.json`
-   - 12 sample: actually-run 7, unavailable 5
-   - common 20턴: Mi:dm, Ministral, Qwen3, Phi, Granite
-   - native 20턴: Mi:dm, Granite
+   - 14 sample: actually-run 9, unavailable 5
+   - common 20턴: Mi:dm, Ministral, Qwen3, Phi, Granite, Motif NF4
+   - native 20턴: Mi:dm, Granite, Motif
    - rubric 전부 공란
 2. `ollama-proxy/eval/results/local-llm-ab-intelligence-human-review-packet-2026-08-14.json`
    - common 다섯 모델 × 12 scene
@@ -150,18 +159,20 @@ P6 실제 140 turn과 common 지능 리허설 60 row만 보존하며, review-key
 ## P0–P7 실제 실행 요약
 
 - P0: official HF model-info full revision pin, artifact hash, Motif/Phi Python 정적 감사
-- P1: common 5개 Q4 actual; native Mi:dm/Granite BF16 bounded offload actual;
-  나머지와 Motif는 명시적 UNRUNNABLE
-- P2: common 5×16×3, native 2×16×3 actual. Qwen 최초 uncapped partial은
+- P1: common 5개 Q4 actual와 Motif local BnB NF4 actual; native Mi:dm/Granite
+  BF16 bounded offload 및 Motif F32 actual. Motif NF4는 Ollama/official quant가 아니다.
+- P2: common 5×16×3와 Motif NF4 16×3, native 2×16×3와 Motif 16×3 actual. Qwen 최초 uncapped partial은
   `unbounded-interrupted`로 보존하고 공식 비교에서 제외
-- P3: common raw+production 5개, native Mi:dm/Granite 0/8/20/48×3 actual
-- P4: common 5×20, native 2×20 actual. hostile raw output은 TTS하지 않음
-- P5: common 5×120 actual, test-origin/nonpersistent, memory/knowledge/eval OFF
-- P6: common 5×20, native 2×20 actual; 익명 packet 인간 대기
-- P7: common 5×10 actual; source client revision
+- P3: common raw+production 5개와 Motif NF4 attempted (JSON-schema constrained decoding HTTP 400 unsupported); native Mi:dm/Granite 0/8/20/48×3와 Motif 0/4 actual
+- P4: common 5×20와 Motif NF4 20, native 2×20와 Motif 20 actual. hostile raw output은 TTS하지 않음
+- P5: common 5×120와 Motif NF4 120 actual, test-origin/nonpersistent, memory/knowledge/eval OFF
+- P6: common 5×20와 Motif NF4 20, native 2×20와 Motif 20 actual; 익명 packet 인간 대기
+- P7: common 5×10와 Motif NF4 10 actual; source client revision
   `ef0217c5cf599413807723a6935d5076da5f3b90`; 설치 ASAR 불변
-- Motif의 P1–P7 명시 결과는
-  `local-llm-ab-motif-unavailable-2026-08-14.json`이다.
+- Motif P1/P2/P3/P4/P6 native 및 P1/P2/P3/P4/P5/P6/intelligence/P7 common-NF4의
+  actual result files가 `ollama-proxy/eval/results/`에 있다. 이전
+  `local-llm-ab-motif-unavailable-2026-08-14.json`은 superseded preflight 기록일 뿐,
+  현재 실행 결과를 대신하지 않는다.
 
 ## 복원 및 제한
 
@@ -183,16 +194,20 @@ unit test를 CI 대체 근거로 사용한다. 최종 검증 수치는 이 문�
   `969 passed / 1 skipped / 863 subtests / 7 existing deprecation warnings`
 - `test-current-checkpoint.ps1`: PASS
 - manifest validator `--require-complete-set`: 6/6 valid
-- `ollama-proxy/eval/test_*.py`: 23/23 CI evaluation shard 등록
-- `python -m compileall -q ollama-proxy/eval`: PASS
+- `ollama-proxy/eval/test_*.py`: 25/25 CI evaluation shard 등록,
+  `unittest discover` 122 tests PASS
+- core Python suite: 985 passed, 1 skipped, 863 subtests passed, 7 warnings
+- `test-current-checkpoint.ps1`: PASS; sender Node contract 32/32 PASS
+- 변경 Motif/P6/intelligence runner `py_compile`: PASS
 - manifest 6개 + intelligence fixture JSON parse: 7/7 PASS
 - `git diff --check -- . ':(exclude)airi_docs/patches/*.patch'`: PASS
 - `airi_docs/patches/`: 변경 없음
 - 최종 health: Mi:dm exact digest, `num_ctx=2048`, external false,
   extraction false, output moderation false
-- 최종 port: TTS 9880, STT 8890, extraction 11436, latency 20000 모두 closed
+- 최종 port: Motif backend 11437, experimental proxy 11438, TTS 9880,
+  STT 8890, extraction 11436, latency 20000 모두 closed
 - 최종 `ollama ps`: loaded runner 없음
 - 최종 installed ASAR SHA-256:
   `1b68ae5ecb9db998002ac7268de707661ec0c81fc4bd90836f3c3e25719b88b0`
-- staged diff: 없음
-- push: 실행하지 않음
+- Git 배치에는 코드·테스트·문서만 포함하며 weight, raw result, review-key,
+  audio, log, runtime DB는 포함하지 않음

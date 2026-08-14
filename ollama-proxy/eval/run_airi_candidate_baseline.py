@@ -57,8 +57,13 @@ def _atomic(path: Path, report: Mapping[str, Any]) -> None:
 
 def _require_loopback(endpoint: str) -> None:
     parsed = urlparse(endpoint)
-    if parsed.scheme != "http" or parsed.netloc not in {"127.0.0.1:11434", "localhost:11434"} or parsed.path not in {"", "/"}:
-        raise RunnerError("endpoint must be exact local Ollama loopback http://127.0.0.1:11434 or http://localhost:11434")
+    if parsed.scheme != "http" or parsed.netloc not in {
+        "127.0.0.1:11434",
+        "localhost:11434",
+        "127.0.0.1:11437",
+        "localhost:11437",
+    } or parsed.path not in {"", "/"}:
+        raise RunnerError("endpoint must be an approved local Ollama-compatible loopback")
 
 
 def _request(transport: Transport, method: str, endpoint: str, path: str, body: Mapping[str, Any] | None = None) -> Any:
