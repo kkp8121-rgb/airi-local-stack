@@ -10,6 +10,63 @@ The current foundation is ready for an authorized local capture, but no real
 capture from the three target channels has been obtained or evaluated yet.
 Public VOD/chat visibility is not collection permission.
 
+## Official authorized YouTube LIVE capture
+
+`collect_youtube_live_export.py` is the only provider collector currently
+implemented. It reads a currently live, explicitly authorized YouTube broadcast
+through the official `videos.list` and `liveChatMessages.list` endpoints. It is
+not a VOD downloader and cannot recover an ended live chat. CHZZK and SOOP
+remain provider-approved-envelope inputs only; no raw callback or public-player
+collector is implemented for them.
+
+The collector requires a local authorization document matching
+`youtube-live-capture-authorization.schema.json`, the exact permission artifact
+named by its provenance hash, the campaign identity key, and a YouTube API key.
+All four inputs stay in ignored `local-replay-intake/`; the API key is read from
+a file and is never accepted on the command line or written to output. The
+authorization binds the exact video/channel/exporter, anonymous source slot,
+phase, 30--120 minute duration, 300--20,000 event cap, redaction terms, and a
+`provider_binding_hmac()` calculated with the same local identity key used by
+normalization.
+
+```powershell
+python .\collect_youtube_live_export.py `
+  --authorization .\local-replay-intake\capture.authorization.json `
+  --provenance .\local-replay-intake\capture.permission.txt `
+  --identity-key .\local-replay-intake\provider-identity.key `
+  --api-key .\local-replay-intake\youtube-api.key `
+  --output .\local-replay-intake\capture.safe.jsonl `
+  --consent-output .\local-replay-intake\capture.consent-v2.json `
+  --receipt .\reports\capture-live-receipt.json
+```
+
+Only publish time, event class, and text-message content cross the provider
+message adapter. Provider-returned author IDs, profiles, display names and
+message IDs, donation wording and amounts, page tokens, credentials, and raw
+provider error text are not persisted. The explicitly authorized channel and
+local exporter IDs do remain in the ignored safe-envelope header/events so the
+normalizer can verify their local allowlist/HMAC binding and redact them before
+model delivery. Messages returned from before the authorized start are
+excluded. The collector honors the provider polling interval, bounds retries,
+uses a no-proxy/no-redirect HTTPS transport, and stops on authorization expiry,
+deletion deadline, explicit abort, live-chat end, byte/event limits, or unsafe
+data. A successful run covers the whole requested interval and writes an exact
+safe envelope, derived consent v2, and content-free HMAC receipt. Ordinary
+write failures roll all three paths back. A process or power loss cannot make
+three independent filesystem replacements globally atomic, so the operator
+must require the capture receipt during normalization and run capture with
+exclusive custody of these directories. Collector output uses the distinct
+`airi.youtube-live-api-minimized.v1` source schema; for that schema the
+normalizer rejects a missing, stale, or tampered capture receipt and verifies
+its HMAC over both the exact export and canonical consent.
+
+YouTube API-key reads are treated as non-authorized API data even when separate
+creator permission exists: `delete_by` must be no later than 30 days after
+capture starts, deletion/revocation controls remain mandatory, and unrelated
+content owners are not combined unless the applicable permissions and platform
+policy allow it. This collector has offline synthetic transport coverage only;
+no real viewer chat has been captured by the repository batch.
+
 ## Custody and authorization
 
 All raw exports, consent/provenance records, allowlists, local identity keys,
@@ -88,12 +145,14 @@ and `enabled`. The canonical calculation is the local
 creation is intentionally an operator custody step: generating a syntactically
 valid HMAC or sidecar does not establish that permission exists.
 
-Example normalization (all files shown are ignored):
+Example normalization for a YouTube live collector bundle (all files shown are
+ignored):
 
 ```powershell
 python .\normalize_authorized_export.py `
   --input .\local-replay-intake\capture.safe.jsonl `
   --consent .\local-replay-intake\capture.consent-v2.json `
+  --capture-receipt .\reports\capture-live-receipt.json `
   --provenance .\local-replay-intake\capture.permission.txt `
   --allowlist .\local-replay-intake\provider-channel-allowlist.json `
   --identity-key .\local-replay-intake\provider-identity.key `
@@ -101,6 +160,10 @@ python .\normalize_authorized_export.py `
   --derived-consent-output .\local-replay-intake\capture.normalized.consent.json `
   --receipt .\reports\capture-normalization.json
 ```
+
+`--capture-receipt` is mandatory for the YouTube live collector schema and is
+not used for separately approved manual `provider-approved-envelope.v1`
+exports.
 
 The normalizer redacts declared creator names, header channel/exporter IDs,
 URLs, handles, email, phone and resident-registration-number-shaped strings.

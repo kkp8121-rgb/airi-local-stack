@@ -5,7 +5,9 @@ envelope 정규화, 결정론적 흐름/표면 신호 report, private human scor
 구현했다. 장시간 replay용 fixed 5초 응답 sampler와 세 익명 source×최소 2국면×
 epistemic OFF/ON을 강제하는 HMAC-bound campaign validator도 준비됐다. 실제
 campaign은 캡처마다 연속 30~120분·300~20,000 event를 요구한다. 승인된 실제
-장시간 채팅 확보와 Mi:dm OFF/ON 실측은 아직 완료되지 않았다.
+장시간 채팅 확보와 Mi:dm OFF/ON 실측은 아직 완료되지 않았다. 공식 YouTube
+LIVE API를 safe envelope로 최소화하는 승인형 수집기는 준비됐지만, 이번 배치에서는
+API key나 권한 있는 실제 방송을 사용하지 않아 합성 transport로만 검증했다.
 오프라인 후속 근거: `완료/AIRI-AUTHORIZED-CHAT-REPLAY-ANALYSIS-FOUNDATION-2026-08-15.md`.
 
 ## 목표와 비목표
@@ -31,6 +33,16 @@ campaign이 이 세 방송인으로 고정되는 것은 아니며, 권한이 확
 채팅 replay 화면을 볼 수 있다는 사실은 수집·저장 허가가 아니다. YouTube 공식
 `liveChatMessages`도 라이브 중에만 제공되므로 종료된 VOD 채팅을 비공식 endpoint나
 화면 scraper로 수집하지 않는다.
+
+첫 실측 경로는 YouTube의 현재 LIVE 방송으로 한정한다. 승인 문서가 특정 video와
+channel, 30~120분 구간, 익명 source slot/phase, 삭제 기한을 모두 덮는 경우에만
+공식 `videos.list`로 `activeLiveChatId`를 확인하고 `liveChatMessages.list`의
+`nextPageToken`과 `pollingIntervalMillis`를 따른다. 초기 응답에 섞인 캡처 시작 전
+메시지는 제외하고, author details·message ID·후원 금액/문구·page token은 저장하지
+않는다. API key는 CLI 문자열이 아니라 ignored 로컬 파일로만 받는다. gRPC
+`streamList`는 공식 권장 저지연 경로지만, 이 평가용 capture v1은 새 의존성이 없는
+REST polling으로 범위를 좁혔다. 종료된 VOD의 chat replay UI를 이 수집기의 입력으로
+사용하지 않는다.
 
 따라서 다음 중 하나가 있을 때만 실제 캡처를 시작한다.
 
@@ -165,4 +177,7 @@ source마다 서로 다른 시작/중간/화제 전환 또는 게임 전환 국�
 - SOOP Chat SDK 제작: https://developers.sooplive.co.kr/?sub=how_to_development&szWork=chat_sdk
 - SOOP Chat SDK 문서: https://developers.sooplive.co.kr/?sub=documentation&szWork=chat_sdk
 - YouTube LiveChatMessages: https://developers.google.com/youtube/v3/live/docs/liveChatMessages
+- YouTube streaming live chat: https://developers.google.com/youtube/v3/live/streaming-live-chat
+- YouTube LiveChatMessages list: https://developers.google.com/youtube/v3/live/docs/liveChatMessages/list
+- YouTube videos.list: https://developers.google.com/youtube/v3/docs/videos/list
 - YouTube API 정책: https://developers.google.com/youtube/terms/developer-policies

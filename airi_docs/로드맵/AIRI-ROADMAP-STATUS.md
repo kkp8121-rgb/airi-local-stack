@@ -15,6 +15,21 @@
 
 최종 갱신: 2026-08-15
 
+- **2026-08-15** (dev PC, G3/B3-f 공식 YouTube LIVE 수집 기반): 종료된 VOD
+  화면이나 비공식 endpoint를 긁지 않고, 권한이 명시된 현재 LIVE 방송을 공식
+  `videos.list`/`liveChatMessages.list`로 30~120분 수집해 기존 strict safe
+  envelope로 넘기는 collector를 추가했다. video/channel·permission artifact·익명
+  source/phase·전체 구간 만료/30일 이내 삭제 기한을 local-key HMAC으로 묶고,
+  author/message ID/display name/후원 문구·금액/page token/API key를 저장하지 않는다.
+  direct no-proxy/no-redirect HTTPS, provider polling, bounded retry/event/byte, 시작 전
+  history 제거, live 종료·revocation·시간/출력 이상 fail-closed와 3-file rollback,
+  content-free receipt HMAC을 합성 transport로 검증했다. collector 전용 source
+  schema의 exact export+canonical consent receipt를 정규화 필수 입력으로 묶어
+  crash partial bundle도 거부한다. wall/monotonic 시작점을 한 번에 고정하고 승인
+  종료 이후 timestamp를 제외해 exact 30~120분 범위를 보장한다. chat replay 전체
+  62 PASS.
+  실제 API key·권한 방송은 사용하지 않았으므로 승인 장시간 캡처와 Mi:dm OFF/ON은
+  계속 미완료다. (`완료/AIRI-YOUTUBE-LIVE-CHAT-CAPTURE-FOUNDATION-2026-08-15.md`)
 - **2026-08-15** (dev PC, G3/B3-f 장시간 replay 실행 상한 검증): strict 승인
   envelope 20,000 event를 120분 시간축으로 정규화→import→offline sampler→응답
   callback까지 통과시키는 최대 경계 회귀를 추가했다. 공통 문구로 정규화되는 후원
@@ -319,8 +334,10 @@
     pattern label, 3-source×2-phase×OFF/ON campaign validator/aggregate까지 완료.
     report v3 fixed 5초 offline sampler·no-reply와 캡처당 연속 30~120분·300~20,000
     event gate까지 완료. 탬탬버린·아카네 리제·아이네는 source 탐색 예시이며,
-    승인 실제 장시간 export는 방송인/플랫폼 공식 권한 대기다. 무단 scraping하지
-    않으며 offline selector 수치는 B1b/B4a 실선택 성능이 아니다.
+    승인 실제 장시간 export는 방송인/플랫폼 공식 권한 대기다. 현재 LIVE에 한해
+    YouTube 공식 API→safe-envelope 수집 경로는 구현·합성 검증했지만 실제 API
+    key/권한 방송 실측은 하지 않았다. 무단 scraping하지 않으며 offline selector
+    수치는 B1b/B4a 실선택 성능이 아니다.
     상세: `진행예정/AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md`.
   - [ ] 인간 검수 100건 수집 (dev PC)
   - [ ] 16케이스 자동 게이트 PASS (현재 양 모델 FAIL)

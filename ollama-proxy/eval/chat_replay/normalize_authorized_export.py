@@ -29,6 +29,7 @@ from chat_replay import (
     redact_text,
 )
 from replay_local_io import _secure_inside, write_atomic_json, write_atomic_jsonl
+from youtube_live_capture_contract import SOURCE_SCHEMA as YOUTUBE_LIVE_SOURCE_SCHEMA, verify_capture_receipt
 
 
 ENVELOPE_SCHEMA = "airi.authorized-provider-export.v1"
@@ -101,17 +102,19 @@ def _load_jsonl(raw: bytes) -> list[dict[str, Any]]:
     return result
 
 
-def _validate_header(value: dict[str, Any]) -> tuple[str, str, str]:
+def _validate_header(value: dict[str, Any]) -> tuple[str, str, str, str]:
     if set(value) != _HEADER_KEYS or value.get("record_type") != "header":
         raise ReplayFormatError("authorized export header has unsupported fields")
-    if value.get("schema_version") != ENVELOPE_SCHEMA or value.get("source_schema") != "provider-approved-envelope.v1":
+    if value.get("schema_version") != ENVELOPE_SCHEMA or value.get("source_schema") not in {"provider-approved-envelope.v1", YOUTUBE_LIVE_SOURCE_SCHEMA}:
         raise ReplayFormatError("authorized export header schema is unsupported")
     provider = value.get("provider")
     if provider not in PROVIDERS or not _safe_string(value.get("channel_id"), 256) or not _safe_string(value.get("exporter_id"), 128):
         raise ReplayFormatError("authorized export header identity is invalid")
     if not _safe_integer(value.get("exported_at_ms")):
         raise ReplayFormatError("authorized export timestamp is invalid")
-    return provider, value["channel_id"], value["exporter_id"]
+    if value["source_schema"] == YOUTUBE_LIVE_SOURCE_SCHEMA and provider != "youtube":
+        raise ReplayFormatError("YouTube live capture schema requires YouTube")
+    return provider, value["channel_id"], value["exporter_id"], value["source_schema"]
 
 
 def _load_allowlist(path: Path) -> dict[str, Any]:
@@ -194,7 +197,11 @@ def _authorize_allowlist(
             entry.get("provider") in PROVIDERS
             and _safe_string(entry.get("channel_id"), 256)
             and _safe_string(entry.get("exporter_id"), 128)
-            and entry.get("source_schema") == "provider-approved-envelope.v1"
+            and entry.get("source_schema") in {"provider-approved-envelope.v1", YOUTUBE_LIVE_SOURCE_SCHEMA}
+            and not (
+                entry.get("source_schema") == YOUTUBE_LIVE_SOURCE_SCHEMA
+                and entry.get("provider") != "youtube"
+            )
             and isinstance(entry.get("authorization_ref_sha256"), str)
             and len(entry["authorization_ref_sha256"]) == 64
             and all(char in "0123456789abcdef" for char in entry["authorization_ref_sha256"])
@@ -332,6 +339,7 @@ def normalize_authorized_export(
     allowlist_path: Path,
     identity_key_path: Path,
     *,
+    capture_receipt_path: Path | None = None,
     now: datetime | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
     """Return rows, consent rebound to normalized bytes, and a content-free receipt.
@@ -342,8 +350,22 @@ def normalize_authorized_export(
     consent = authorize_capture(consent_path, export_path, provenance_path, now=now, export_bytes=raw)
     current = now or datetime.now(timezone.utc)
     records = _load_jsonl(raw)
-    provider, channel_id, exporter_id = _validate_header(records[0])
+    provider, channel_id, exporter_id, source_schema = _validate_header(records[0])
     header = records[0]
+    if source_schema == YOUTUBE_LIVE_SOURCE_SCHEMA:
+        if capture_receipt_path is None:
+            raise ReplayAuthorizationError("YouTube live capture requires its custody receipt")
+        try:
+            receipt_raw = capture_receipt_path.read_bytes()
+            capture_receipt = json.loads(receipt_raw.decode("utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise ReplayAuthorizationError("YouTube live capture receipt is unreadable") from exc
+        if not 1 <= len(receipt_raw) <= 64 * 1024:
+            raise ReplayAuthorizationError("YouTube live capture receipt size is invalid")
+        identity_key_for_receipt = read_identity_key(identity_key_path)
+        verify_capture_receipt(raw, consent, capture_receipt, identity_key_for_receipt)
+    elif capture_receipt_path is not None:
+        raise ReplayAuthorizationError("capture receipt is only valid for AIRI YouTube live captures")
     identity_key = _authorize_allowlist(
         allowlist_path, identity_key_path, header, consent, current,
     )
@@ -421,6 +443,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--derived-consent-output", required=True, type=Path)
     parser.add_argument("--receipt", required=True, type=Path)
+    parser.add_argument("--capture-receipt", type=Path)
     return parser
 
 
@@ -440,14 +463,18 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
         parser.error("normalized export and derived consent must stay inside local-replay-intake")
     if not _secure_inside(args.receipt, reports):
         parser.error("normalization receipt must stay inside the ignored reports directory")
+    if args.capture_receipt is not None and not _secure_inside(args.capture_receipt, reports):
+        parser.error("capture receipt must stay inside the ignored reports directory")
     normalized_inputs = {str(path.absolute()).casefold() for path in input_paths}
     if any(str(path.absolute()).casefold() in normalized_inputs for path in output_paths):
         parser.error("normalizer outputs must not overwrite source custody inputs")
     if str(args.output.absolute()).casefold() == str(args.derived_consent_output.absolute()).casefold():
         parser.error("normalized export and derived consent outputs must differ")
+    if args.capture_receipt is not None and str(args.capture_receipt.absolute()).casefold() == str(args.receipt.absolute()).casefold():
+        parser.error("capture receipt and normalization receipt outputs must differ")
     rows, derived, receipt = normalize_authorized_export(
         args.input, args.consent, args.provenance, args.allowlist,
-        args.identity_key, now=now,
+        args.identity_key, capture_receipt_path=args.capture_receipt, now=now,
     )
     # Individual atomic replacements are fail-closed as a bundle: a partial
     # write cannot pass the derived source hash on a later replay.

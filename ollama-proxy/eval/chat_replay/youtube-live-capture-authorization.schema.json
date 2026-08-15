@@ -1,0 +1,40 @@
+{
+  "schema_version": "airi.youtube-live-capture-authorization.v1",
+  "exact_fields": [
+    "schema_version",
+    "authorization",
+    "authorization_basis",
+    "authorized_at",
+    "expires_at",
+    "delete_by",
+    "revoked",
+    "purposes",
+    "provenance_sha256",
+    "provider",
+    "video_id",
+    "channel_id",
+    "exporter_id",
+    "source_slot",
+    "phase",
+    "duration_seconds",
+    "max_events",
+    "excluded_creator_names",
+    "provider_binding_hmac"
+  ],
+  "authorization": "authorized",
+  "authorization_basis": [
+    "creator_or_platform_written_permission",
+    "operator_owned_broadcast"
+  ],
+  "provider": "youtube",
+  "purposes": ["local_replay_evaluation"],
+  "revoked": false,
+  "source_slot": ["channel_a", "channel_b", "channel_c"],
+  "phase": ["opening", "middle", "topic_transition", "game_transition"],
+  "duration_seconds": {"minimum": 1800, "maximum": 7200},
+  "max_events": {"minimum": 300, "maximum": 20000},
+  "excluded_creator_names": {"minimum_items": 1, "maximum_items": 100},
+  "hashes": "provenance_sha256 and provider_binding_hmac are lowercase 64-character SHA-256 values; the latter is calculated by normalize_authorized_export.provider_binding_hmac with source_schema airi.youtube-live-api-minimized.v1 and the local identity key.",
+  "time_contract": "authorized_at must not be after capture start; expires_at and delete_by must cover the full requested interval; delete_by must be no later than 30 days after capture start.",
+  "privacy": "This local-only document contains platform identifiers and must remain in ignored custody. It is never a campaign report."
+}

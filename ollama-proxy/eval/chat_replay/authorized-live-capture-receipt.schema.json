@@ -1,0 +1,7 @@
+{
+  "schema_version": "airi.youtube-live-capture-receipt.v1",
+  "exact_fields": ["schema_version", "status", "requested_duration_seconds", "actual_duration_ms", "event_count", "source_type_counts", "batches", "retries", "duplicates", "prestart", "invalid", "bundle_hmac_sha256"],
+  "status": ["complete"],
+  "integrity": "bundle_hmac_sha256 authenticates the exact export bytes, canonical consent object, and every other receipt field with a local identity key.",
+  "privacy": "Receipt excludes paths, platform identifiers, messages, provider errors, API keys, page tokens, and plain content hashes."
+}

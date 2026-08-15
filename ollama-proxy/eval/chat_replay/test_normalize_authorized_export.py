@@ -98,6 +98,18 @@ class AuthorizedExportNormalizerTests(unittest.TestCase):
                 data = json.loads(consent.read_text(encoding="utf-8")); data["source_sha256"] = hashlib.sha256(export.read_bytes()).hexdigest(); write_json(consent, data)
                 with self.assertRaises(ReplayFormatError): normalize_authorized_export(export, consent, provenance, allowlist, identity_key, now=NOW)
 
+    def test_capture_receipt_is_unambiguously_rejected_for_manual_envelopes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            export, consent, provenance, allowlist, identity_key = self.make_files(directory)
+            capture_receipt = directory / "capture-receipt.json"
+            write_json(capture_receipt, {})
+            with self.assertRaises(ReplayAuthorizationError):
+                normalize_authorized_export(
+                    export, consent, provenance, allowlist, identity_key,
+                    capture_receipt_path=capture_receipt, now=NOW,
+                )
+
     def test_source_identity_is_stable_and_domain_separated(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
@@ -224,6 +236,14 @@ class AuthorizedExportNormalizerTests(unittest.TestCase):
                 "--derived-consent-output", str(derived), "--receipt", str(receipt),
             ], now=NOW)
             self.assertEqual(result, 0)
+            with self.assertRaises(SystemExit):
+                main([
+                    "--input", str(export), "--consent", str(consent),
+                    "--provenance", str(provenance), "--allowlist", str(allowlist),
+                    "--identity-key", str(identity_key), "--output", str(normalized),
+                    "--derived-consent-output", str(derived), "--receipt", str(receipt),
+                    "--capture-receipt", str(directory / "wrong-custody.json"),
+                ], now=NOW)
             events = import_private_replay(normalized, derived, provenance, now=NOW)
             self.assertEqual(len(events), 4)
             verified_profile = verify_normalization_receipt(
