@@ -8,6 +8,9 @@ campaign은 캡처마다 연속 30~120분·300~20,000 event를 요구한다. 승
 장시간 채팅 확보와 Mi:dm OFF/ON 실측은 아직 완료되지 않았다. 공식 YouTube
 LIVE API를 safe envelope로 최소화하는 승인형 수집기는 준비됐지만, 이번 배치에서는
 API key나 권한 있는 실제 방송을 사용하지 않아 합성 transport로만 검증했다.
+서면 권한을 확인한 운영자가 ignored request 한 개로 exact authorization과 캡처별
+1-entry allowlist/HMAC bundle을 만드는 offline preparer도 준비해 수작업 설정 단계는
+제거했다. 이 도구는 권한을 발급·추정·인증하지 않는다.
 오프라인 후속 근거: `완료/AIRI-AUTHORIZED-CHAT-REPLAY-ANALYSIS-FOUNDATION-2026-08-15.md`.
 
 ## 목표와 비목표
@@ -128,7 +131,9 @@ source마다 서로 다른 시작/중간/화제 전환 또는 게임 전환 국�
    고정한다. **코드 완료**: consent v2/HMAC normalizer, report v3 흐름·표면 신호·
    proxy outcome, 모든 event를 담는 ignored human packet과 content-free scorer,
    fixed 5초 offline response sampler, report/score HMAC, 3-source paired campaign
-   validator와 operator checklist.
+   validator와 operator checklist. YouTube LIVE는 operator decision+provenance+local
+   identity key에서 per-capture authorization/allowlist bundle을 준비하는 offline
+   CLI까지 완료했다.
 2. 세 익명 source별 권한을 확보하고, 각 source에서 서로 다른 방송 국면을 최소
    2개씩 연속 30~120분·300~20,000 event로 캡처한다. 짧은 단발 문장은 이 단계의
    증거로 인정하지 않는다.

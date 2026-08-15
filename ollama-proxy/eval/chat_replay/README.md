@@ -29,9 +29,62 @@ phase, 30--120 minute duration, 300--20,000 event cap, redaction terms, and a
 `provider_binding_hmac()` calculated with the same local identity key used by
 normalization.
 
+Do not construct the authorization or allowlist HMAC by hand. After a human has
+verified the permission issuer, scope, retention window, and revocation state,
+write one ignored request matching
+`youtube-live-capture-preparation-request.schema.json`. Its exact shape is:
+
+```json
+{
+  "schema_version": "airi.youtube-live-capture-preparation-request.v1",
+  "operator_decision": {
+    "authorization": "authorized",
+    "authorization_basis": "operator_owned_broadcast",
+    "authorized_at": "2026-08-15T00:00:00Z",
+    "expires_at": "2026-08-15T03:00:00Z",
+    "delete_by": "2026-08-16T00:00:00Z",
+    "revoked": false,
+    "purposes": ["local_replay_evaluation"]
+  },
+  "capture": {
+    "provider": "youtube",
+    "video_id": "LOCAL-VIDEO-ID",
+    "channel_id": "LOCAL-CHANNEL-ID",
+    "exporter_id": "airi-local-exporter",
+    "source_slot": "channel_a",
+    "phase": "opening",
+    "duration_seconds": 1800,
+    "max_events": 20000,
+    "excluded_creator_names": ["local-redaction-term"]
+  },
+  "custody": {
+    "provenance_file": "local-replay-intake/capture.permission.txt",
+    "identity_key_file": "local-replay-intake/provider-identity.key"
+  }
+}
+```
+
+The custody paths use forward-slash relative paths from this directory. The
+request, provenance file, and identity key must be three distinct files. Run
+the offline preparer with a new, opaque bundle directory:
+
+```powershell
+python .\prepare_youtube_live_capture.py `
+  --request .\local-replay-intake\capture-request.json `
+  --output-dir .\local-replay-intake\capture-0123456789abcdef
+```
+
+It performs no network request and does not read an API key. It publishes only
+`capture.authorization.json` and a one-entry
+`provider-channel-allowlist.json` in the fresh bundle. It never merges or
+overwrites a shared allowlist. The permission SHA and provider binding are
+calculated mechanically, but their existence is not evidence that the operator
+decision or permission issuer is genuine. Recheck permission and revocation
+immediately before starting capture.
+
 ```powershell
 python .\collect_youtube_live_export.py `
-  --authorization .\local-replay-intake\capture.authorization.json `
+  --authorization .\local-replay-intake\capture-0123456789abcdef\capture.authorization.json `
   --provenance .\local-replay-intake\capture.permission.txt `
   --identity-key .\local-replay-intake\provider-identity.key `
   --api-key .\local-replay-intake\youtube-api.key `
@@ -154,7 +207,7 @@ python .\normalize_authorized_export.py `
   --consent .\local-replay-intake\capture.consent-v2.json `
   --capture-receipt .\reports\capture-live-receipt.json `
   --provenance .\local-replay-intake\capture.permission.txt `
-  --allowlist .\local-replay-intake\provider-channel-allowlist.json `
+  --allowlist .\local-replay-intake\capture-0123456789abcdef\provider-channel-allowlist.json `
   --identity-key .\local-replay-intake\provider-identity.key `
   --output .\local-replay-intake\capture.normalized.jsonl `
   --derived-consent-output .\local-replay-intake\capture.normalized.consent.json `

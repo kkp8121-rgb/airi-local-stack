@@ -3,6 +3,8 @@
 All boxes are intentionally blank. Complete each one for the actual local study; do not record names, handles, source IDs, prompts, or response text in the manifest or campaign report.
 
 - [ ] Verify written permission covers this specific capture, paired replay, human review, and local retention period.
+- [ ] Record the verified decision in a local preparation request, keep its provenance and identity-key files distinct, and generate a fresh per-capture bundle with `prepare_youtube_live_capture.py`; do not hand-build or reuse a shared allowlist.
+- [ ] Treat generated SHA/HMAC documents only as custody integrity, not as proof that permission exists; recheck issuer, scope, expiry, deletion deadline, and revocation immediately before collection.
 - [ ] Confirm export and revocation status immediately before the campaign; stop if authorization has changed.
 - [ ] Keep the actual source-to-`channel_a`/`channel_b`/`channel_c` mapping only in the protected local operator record.
 - [ ] Capture only an authorized local export or an explicitly approved official API/SDK session. Do not scrape a VOD/player page, use unofficial endpoints, or import third-party dumps.

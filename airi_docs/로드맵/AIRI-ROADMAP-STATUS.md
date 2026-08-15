@@ -15,6 +15,17 @@
 
 최종 갱신: 2026-08-15
 
+- **2026-08-15** (dev PC, G3/B3-f YouTube LIVE 실측 준비 자동화): 권한 있는
+  실제 방송/API key가 준비됐을 때 authorization JSON과 allowlist HMAC을 사람이
+  수작업하지 않도록 offline preparer를 추가했다. operator decision·capture profile·
+  상대 custody 경로를 담은 ignored request와 서로 다른 permission artifact/identity
+  key를 입력받아 fresh per-capture directory에 exact collector authorization과
+  1-entry allowlist만 publish한다. 네트워크/API key/채팅을 다루지 않고 permission을
+  추정하지 않으며 shared allowlist를 병합·덮어쓰지 않는다. samefile/hard-link/reparse
+  충돌, 30일/30~120분/300~20,000 경계, write/fsync/rename 실패와 비노출 CLI를
+  fail-closed 회귀로 고정했다. chat replay 72 PASS 및 checkpoint PASS. 실제 승인
+  장시간 채팅 캡처와 Mi:dm OFF/ON은 여전히 외부 권한·방송 입력 대기다.
+  (`완료/AIRI-YOUTUBE-LIVE-CAPTURE-PREPARATION-2026-08-15.md`)
 - **2026-08-15** (dev PC, G3/B3-f 공식 YouTube LIVE 수집 기반): 종료된 VOD
   화면이나 비공식 endpoint를 긁지 않고, 권한이 명시된 현재 LIVE 방송을 공식
   `videos.list`/`liveChatMessages.list`로 30~120분 수집해 기존 strict safe
@@ -335,9 +346,10 @@
     report v3 fixed 5초 offline sampler·no-reply와 캡처당 연속 30~120분·300~20,000
     event gate까지 완료. 탬탬버린·아카네 리제·아이네는 source 탐색 예시이며,
     승인 실제 장시간 export는 방송인/플랫폼 공식 권한 대기다. 현재 LIVE에 한해
-    YouTube 공식 API→safe-envelope 수집 경로는 구현·합성 검증했지만 실제 API
-    key/권한 방송 실측은 하지 않았다. 무단 scraping하지 않으며 offline selector
-    수치는 B1b/B4a 실선택 성능이 아니다.
+    YouTube 공식 API→safe-envelope 수집 경로와 per-capture authorization/allowlist
+    offline preparer는 구현·합성 검증했지만 실제 API key/권한 방송 실측은 하지
+    않았다. 무단 scraping하지 않으며 offline selector 수치는 B1b/B4a 실선택
+    성능이 아니다.
     상세: `진행예정/AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md`.
   - [ ] 인간 검수 100건 수집 (dev PC)
   - [ ] 16케이스 자동 게이트 PASS (현재 양 모델 FAIL)

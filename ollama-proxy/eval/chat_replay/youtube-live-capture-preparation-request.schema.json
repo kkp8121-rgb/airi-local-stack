@@ -1,0 +1,18 @@
+{
+  "schema_version": "airi.youtube-live-capture-preparation-request.v1",
+  "exact_fields": ["schema_version", "operator_decision", "capture", "custody"],
+  "operator_decision_exact_fields": ["authorization", "authorization_basis", "authorized_at", "expires_at", "delete_by", "revoked", "purposes"],
+  "capture_exact_fields": ["provider", "video_id", "channel_id", "exporter_id", "source_slot", "phase", "duration_seconds", "max_events", "excluded_creator_names"],
+  "custody_exact_fields": ["provenance_file", "identity_key_file"],
+  "authorization": "authorized",
+  "authorization_basis": ["creator_or_platform_written_permission", "operator_owned_broadcast"],
+  "provider": "youtube",
+  "purposes": ["local_replay_evaluation"],
+  "revoked": false,
+  "duration_seconds": {"minimum": 1800, "maximum": 7200},
+  "max_events": {"minimum": 300, "maximum": 20000},
+  "excluded_creator_names": {"minimum_items": 1, "maximum_items": 100},
+  "time_contract": "All decision times use UTC Z. authorized_at must be at or before preparation time. expires_at and delete_by must be strictly after the requested capture interval; delete_by must be no later than 30 days after preparation time.",
+  "custody_contract": "Custody files are normalized relative paths beginning local-replay-intake/ and are resolved only beneath chat_replay/local-replay-intake.",
+  "privacy": "The request and output bundle are ignored local custody artifacts. This tool does not discover, contact, or attest any provider permission."
+}
