@@ -8316,6 +8316,16 @@ async def proxy(path: str, request: Request):
                     )
                 if boundary.language_blocked and not sanitized:
                     sanitized = ""
+            if not sanitized and not proactive_turn:
+                # Match the streaming output boundary: ordinary turns must
+                # never turn a rejected control-only, incomplete, or
+                # language-blocked draft into apparent pipeline silence.
+                # Keep the fallback inside tool-truth enforcement so the
+                # public response and completed-turn journal share one
+                # canonical, safe dialogue value.
+                sanitized = enforce_tool_truth(
+                    original_messages, GROUNDING_SILENCE_FALLBACK_DIALOGUE
+                )
             if requested_stream:
                 # unreached - kept for non-stream fallback reference (streaming
                 # chat/completions is answered above by stream_local_with_ack).

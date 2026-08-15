@@ -21,6 +21,19 @@ fixture is independently authored synthetic text, not anonymized chat and not
 training data. See `chat_replay/README.md` for the exact custody and CLI
 contract. No provider scraping or network request occurs by default.
 
+## Conversation-soak ACK boundary
+
+`run_airi_conversation_soak.py` evaluates the substantive model reply, not the
+proxy's intentional audible first-response ACK. When, and only when, the stream
+declares `X-AIRI-Immediate-Ack: audible`, runner v0.3.3 removes one exact leading
+`LOCAL_IMMEDIATE_ACK` or `SEARCH_IMMEDIATE_ACK` before scoring and history
+insertion. The report records its closed classification and count. Unexpected,
+malformed, duplicated, or undeclared ACT/CALL/DELAY text remains visible to the
+`no_control` failure. A static source-contract test binds the runner's two ACK
+literals and canonical `음, 잠깐만.` liveness fallback to the proxy constants,
+and that fallback fails `substantive_response` rather than being counted as a
+quality answer.
+
 ## Persona-jailbreak direct-model marker-contract gate
 
 `run_airi_persona_jailbreak_gate.py` sends the frozen multilingual corpus

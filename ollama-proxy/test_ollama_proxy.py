@@ -1450,6 +1450,20 @@ def post_stream_messages(messages: list[dict[str, str]]) -> object:
     )
 
 
+def post_nonstream_messages(
+    messages: list[dict[str, str]], *, headers: dict[str, str] | None = None
+) -> object:
+    return TestClient(ollama_proxy.app).post(
+        "/v1/chat/completions",
+        headers=headers,
+        json={
+            "model": "exaone-airi:2.4b",
+            "stream": False,
+            "messages": messages,
+        },
+    )
+
+
 def openai_sse_content(wire: str) -> str:
     """Join streamed OpenAI deltas without depending on chunk boundaries."""
     parts: list[str] = []
@@ -4257,6 +4271,78 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertEqual(memory.completed[0]["assistant"], "hello there")
         self.assertEqual(len(evaluator.completed), 1)
         self.assertEqual(evaluator.completed[0]["assistant"], "hello there")
+
+    def test_nonstream_control_only_draft_uses_canonical_fallback_and_journals_it(self) -> None:
+        chat = _CapturingChatClient('ACT {"emotion":"neutral"}')
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_nonstream_messages([
+                {"role": "user", "content": "question"},
+            ])
+
+        fallback = ollama_proxy.enforce_tool_truth(
+            [{"role": "user", "content": "question"}],
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["choices"][0]["message"]["content"], fallback)
+        self.assertEqual(memory.completed[0]["assistant"], fallback)
+
+    def test_nonstream_language_blocked_retry_uses_canonical_fallback(self) -> None:
+        chat = _CapturingChatClient("This remains English.")
+        memory = _FakeMemoryRuntime()
+        user = "\uc548\ub155"
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_nonstream_messages([
+                {"role": "user", "content": user},
+            ])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["choices"][0]["message"]["content"],
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
+        self.assertEqual(memory.completed[0]["assistant"], ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE)
+        self.assertEqual(len(chat.requests), 2)
+
+    def test_nonstream_local_evaluation_control_only_draft_is_not_silent(self) -> None:
+        chat = _CapturingChatClient('ACT {"emotion":"neutral"}')
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ), mock.patch.object(
+            ollama_proxy, "is_local_synthetic_evaluation_turn", return_value=True
+        ):
+            response = post_nonstream_messages(
+                [{"role": "user", "content": "question"}],
+                headers={"x-airi-turn-origin": "local-evaluation"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["choices"][0]["message"]["content"],
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
+        # Synthetic evaluations intentionally do not mutate durable memory.
+        self.assertEqual(memory.completed, [])
+
+    def test_nonstream_proactive_turn_preserves_designed_silence(self) -> None:
+        chat = _StubClient(RuntimeError("model must not run without an approved topic"))
+        topic_runtime = ollama_proxy.TopicBoardRuntime("")
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "is_local_proactive_turn", return_value=True
+        ), mock.patch.object(ollama_proxy, "topic_board_runtime", topic_runtime):
+            response = post_nonstream_messages(
+                [{"role": "assistant", "content": "proactive cue"}],
+                headers={"x-airi-turn-origin": "local-proactive"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["choices"][0]["message"]["content"], "")
 
     def test_normal_stream_injects_memory_upstream_and_journals_only_final_dialogue(self) -> None:
         # This is the exact malformed envelope shape observed in the live AIRI

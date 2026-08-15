@@ -13,13 +13,29 @@ import json
 from pathlib import Path
 import re
 import time
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal
 from uuid import uuid4
 
 import httpx
 
 
-RUNNER_VERSION = "0.3.2"
+RUNNER_VERSION = "0.3.3"
+LOCAL_IMMEDIATE_ACK = (
+    '<|ACT {"emotion":"think"}|> 응! '
+    '<|ACT {"emotion":"think"}|>'
+)
+SEARCH_IMMEDIATE_ACK = (
+    '<|ACT {"emotion":"curious"}|> 응! 바로 찾아볼게. '
+    '<|ACT {"emotion":"curious"}|>'
+)
+IMMEDIATE_ACKS: tuple[tuple[Literal["local", "search"], str], ...] = (
+    ("local", LOCAL_IMMEDIATE_ACK),
+    ("search", SEARCH_IMMEDIATE_ACK),
+)
+# This is the proxy's deliberately content-free last-resort line. It is a
+# useful audible recovery, but it is not a substantive answer for this soak.
+NON_SUBSTANTIVE_RESPONSES = frozenset({"음, 잠깐만."})
 META_RE = re.compile(
     r"(?:^|\n)\s*[\"'“‘]?\s*(?:\[?(?:사용자|아이리)\]?|너|AIRI|assistant|user|user input|stage execution plan)\s*:"
     r"|(?:대화|답변|질문|사용자\s*입력)\s*예시"
@@ -113,6 +129,34 @@ def _health(client: httpx.Client, endpoint: str) -> dict[str, Any]:
     }
 
 
+@dataclass(frozen=True)
+class StreamReply:
+    """The substantive stream content plus a header-gated ACK classification."""
+
+    content: str
+    immediate_ack: Literal["local", "search"] | None
+    immediate_ack_count: int
+    latency_ms: float
+
+
+def _split_immediate_ack(
+    content: str, immediate_ack_header: str | None,
+) -> tuple[str, Literal["local", "search"] | None, int]:
+    """Remove only the proxy's exact, declared leading audible ACK.
+
+    Control text is normally a scoring failure.  The sole exception is the
+    known proxy ACK, and it is accepted only when this response explicitly
+    declares an audible ACK.  In particular, do not try to repair or strip
+    model-produced control text that merely resembles an ACK.
+    """
+    if (immediate_ack_header or "").strip().lower() != "audible":
+        return content, None, 0
+    for classification, ack in IMMEDIATE_ACKS:
+        if content.startswith(ack):
+            return content[len(ack):], classification, 1
+    return content, None, 0
+
+
 def _stream_reply(
     client: httpx.Client,
     endpoint: str,
@@ -120,7 +164,7 @@ def _stream_reply(
     messages: list[dict[str, str]],
     session_id: str,
     temperature: float = 0.2,
-) -> tuple[str, float]:
+) -> StreamReply:
     started = time.perf_counter()
     chunks: list[str] = []
     headers = {
@@ -136,6 +180,7 @@ def _stream_reply(
     }
     with client.stream("POST", endpoint, headers=headers, json=payload) as response:
         response.raise_for_status()
+        immediate_ack_header = response.headers.get("X-AIRI-Immediate-Ack")
         for line in response.iter_lines():
             if not line.startswith("data: "):
                 continue
@@ -151,7 +196,17 @@ def _stream_reply(
                 content = delta.get("content")
                 if isinstance(content, str):
                     chunks.append(content)
-    return "".join(chunks).strip(), (time.perf_counter() - started) * 1000
+    content, immediate_ack, immediate_ack_count = _split_immediate_ack(
+        "".join(chunks), immediate_ack_header,
+    )
+    return StreamReply(
+        # Keep the old post-join normalization, but apply it after removing
+        # only the exact declared ACK so final dialogue is scored consistently.
+        content=content.strip(),
+        immediate_ack=immediate_ack,
+        immediate_ack_count=immediate_ack_count,
+        latency_ms=(time.perf_counter() - started) * 1000,
+    )
 
 
 def _score(case: dict[str, Any], output: str) -> dict[str, Any]:
@@ -172,6 +227,7 @@ def _score(case: dict[str, Any], output: str) -> dict[str, Any]:
         "question_limit": output.count("?") <= int(case.get("max_questions", 1)),
         "no_meta": META_RE.search(output) is None,
         "no_control": CONTROL_RE.search(output) is None,
+        "substantive_response": output.strip() not in NON_SUBSTANTIVE_RESPONSES,
         "target_language": language_ok,
         "banmal_register": language != "ko" or (
             POLITE_REGISTER_RE.search(output) is None and MID_POLITE_REGISTER_RE.search(output) is None
@@ -285,12 +341,16 @@ def main() -> int:
             error_type = None
             started = time.perf_counter()
             try:
-                output, latency_ms = _stream_reply(
+                reply = _stream_reply(
                     client, args.endpoint, args.model, request_messages, session_id, args.temperature,
                 )
+                output = reply.content
+                latency_ms = reply.latency_ms
             except httpx.HTTPError as exc:
                 output = ""
                 latency_ms = (time.perf_counter() - started) * 1000
+                immediate_ack = None
+                immediate_ack_count = 0
                 error_type = type(exc).__name__
                 # Later turns in the same group would no longer have a valid
                 # synthetic history. Start a fresh local-only group instead of
@@ -298,6 +358,8 @@ def main() -> int:
                 histories[group] = []
                 sessions[group] = f"codex-soak-{uuid4().hex}"
             else:
+                immediate_ack = reply.immediate_ack
+                immediate_ack_count = reply.immediate_ack_count
                 history.extend((
                     {"role": "user", "content": case["input"]},
                     {"role": "assistant", "content": output},
@@ -307,6 +369,8 @@ def main() -> int:
                 "group": group,
                 "input": case["input"],
                 "output": output,
+                "immediate_ack": immediate_ack,
+                "immediate_ack_count": immediate_ack_count,
                 "latency_ms": round(latency_ms, 1),
                 **_score(case, output),
                 "human_review": "PENDING",

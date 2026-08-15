@@ -15,6 +15,17 @@
 
 최종 갱신: 2026-08-15
 
+- **2026-08-15** (dev PC, G3/B3-f Mi:dm replay 출력 경계 readiness): 설치된
+  `midm-airi:2.0-mini`의 고정 digest·`num_ctx=2048`을 기본 OFF의 임시 11435
+  프록시에서 확인하고 합성 1턴을 실제 통과시켰다. 이 과정에서 의도된 audible
+  ACT ACK가 soak 본답변 점수·history에 섞이는 평가기 결함과, 장시간 replay가
+  사용하는 OpenAI non-stream 경로가 output-boundary 거부 뒤 빈 assistant를 반환하는
+  실행 차단을 재현했다. soak v0.3.3은 exact header-declared ACK만 분리하고 canonical
+  대기 fallback을 비실질 응답으로 판정하며, proxy는 ordinary non-proactive non-stream
+  턴을 tool-truth 경계의 canonical nonempty fallback으로 닫는다. 수정 후 동일 OFF
+  프로필에서 stream ACK 1회·control 0·실질 plain reply와 non-stream nonempty/control-free를
+  재확인하고 소유한 11435 PID만 종료했다. 실제 승인 장시간 캡처·Mi:dm OFF/ON·B1b/TTS는
+  여전히 미완료다. (`완료/AIRI-MIDM-REPLAY-OUTPUT-BOUNDARY-2026-08-15.md`)
 - **2026-08-15** (dev PC, G3/B3-f YouTube LIVE 실측 준비 자동화): 권한 있는
   실제 방송/API key가 준비됐을 때 authorization JSON과 allowlist HMAC을 사람이
   수작업하지 않도록 offline preparer를 추가했다. operator decision·capture profile·
