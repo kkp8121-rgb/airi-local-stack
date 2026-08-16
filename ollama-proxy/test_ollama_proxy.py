@@ -6582,5 +6582,172 @@ class ImmediateAckMetadataTests(unittest.TestCase):
         self.assertEqual(reported["immediate_ack"], "audible")
 
 
+class AffectContinuityGreyboxTests(unittest.TestCase):
+    @staticmethod
+    def _event() -> dict[str, object]:
+        return {
+            "schema_version": "airi.affect-event.v1", "source": "screened_chat",
+            "kind": "chat_question", "weight": 1, "turn_index": 1,
+            "appraisal": {"goal_congruence": 0, "agency": "audience", "control": 1,
+                          "novelty": 1, "social_tone": "neutral"},
+        }
+
+    def test_default_off_keeps_bytes_and_does_not_create_a_session(self) -> None:
+        runtime = ollama_proxy.AffectStateRuntime()
+        body = b'{  "messages" : [ { "content" : "hello", "role" : "user" } ] }'
+        with mock.patch.object(ollama_proxy, "affect_continuity_runtime", runtime), mock.patch.object(
+            ollama_proxy, "AFFECT_CONTINUITY_ENABLED", False
+        ), mock.patch.object(ollama_proxy, "affect_continuity_ready", False):
+            self.assertIs(ollama_proxy.inject_affect_continuity(body, "session", normal_turn=True), body)
+            self.assertIsNone(ollama_proxy.apply_affect_continuity_event("session", self._event()))
+        self.assertIsNone(runtime.snapshot_if_present("session"))
+
+    def test_enabled_injects_known_snapshot_only_for_explicit_normal_sessions(self) -> None:
+        runtime = ollama_proxy.AffectStateRuntime()
+        body = b'{"messages":[{"role":"system","name":"airi_request_local","content":"existing"},{"role":"user","content":"hello"}]}'
+        with mock.patch.object(ollama_proxy, "affect_continuity_runtime", runtime), mock.patch.object(
+            ollama_proxy, "AFFECT_CONTINUITY_ENABLED", True
+        ), mock.patch.object(ollama_proxy, "affect_continuity_ready", True):
+            self.assertIsNotNone(ollama_proxy.apply_affect_continuity_event("session", self._event()))
+            injected = ollama_proxy.inject_affect_continuity(body, "session", normal_turn=True)
+            payload = json.loads(injected)
+            note = payload["messages"][0]["content"]
+            self.assertIn("[airi_affect_continuity", note)
+            self.assertLessEqual(len(note.rsplit("\n\n", 1)[-1].encode("utf-8")), 384)
+            self.assertEqual(ollama_proxy.inject_affect_continuity(body, None, normal_turn=True), body)
+            self.assertEqual(ollama_proxy.inject_affect_continuity(body, "session", normal_turn=False), body)
+            invalid = dict(self._event(), raw_text="do not store me")
+            self.assertIsNone(ollama_proxy.apply_affect_continuity_event("other", invalid))
+            self.assertIsNone(runtime.snapshot_if_present("other"))
+
+    def test_configuration_requires_exact_on(self) -> None:
+        self.assertTrue(ollama_proxy.configured_affect_continuity("on"))
+        for value in (None, True, "", "ON", "true", "1", "off", " on", "on ", "invalid"):
+            with self.subTest(value=value):
+                self.assertFalse(ollama_proxy.configured_affect_continuity(value))
+
+    def test_runtime_lifecycle_is_fresh_and_failed_start_cannot_reuse_state(self) -> None:
+        original_runtime = ollama_proxy.affect_continuity_runtime
+        original_ready = ollama_proxy.affect_continuity_ready
+        try:
+            with mock.patch.object(ollama_proxy, "AFFECT_CONTINUITY_ENABLED", True):
+                ollama_proxy.initialize_affect_continuity_runtime()
+                first = ollama_proxy.affect_continuity_runtime
+                self.assertIsNotNone(first)
+                first.apply_event("session", self._event())
+                ollama_proxy.initialize_affect_continuity_runtime()
+                second = ollama_proxy.affect_continuity_runtime
+                self.assertIsNot(first, second)
+                self.assertEqual(second.health()["sessions"], 0)
+                with mock.patch.object(
+                    ollama_proxy, "AffectStateRuntime", side_effect=RuntimeError("secret")
+                ):
+                    with self.assertRaises(RuntimeError):
+                        ollama_proxy.initialize_affect_continuity_runtime()
+                self.assertIsNone(ollama_proxy.affect_continuity_runtime)
+                self.assertFalse(ollama_proxy.affect_continuity_ready)
+        finally:
+            ollama_proxy.affect_continuity_runtime = original_runtime
+            ollama_proxy.affect_continuity_ready = original_ready
+
+    def test_real_route_injects_only_for_the_seeded_normal_session(self) -> None:
+        runtime = ollama_proxy.AffectStateRuntime()
+        runtime.apply_event("session-a", self._event())
+        version = runtime.version_if_present("session-a")
+        normal = _CapturingChatClient("정상 응답이야.")
+        evaluation = _CapturingChatClient("평가 응답이야.")
+        other = _CapturingChatClient("다른 응답이야.")
+        reset = _CapturingChatClient("주제 전환 응답이야.")
+        common = (
+            mock.patch.object(ollama_proxy, "AFFECT_CONTINUITY_ENABLED", True),
+            mock.patch.object(ollama_proxy, "affect_continuity_ready", True),
+            mock.patch.object(ollama_proxy, "affect_continuity_runtime", runtime),
+        )
+        with common[0], common[1], common[2], mock.patch.object(ollama_proxy, "client", normal):
+            response = post_nonstream_messages(
+                [{"role": "user", "content": "질문이야."}],
+                headers={"x-airi-session-id": "session-a"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("[airi_affect_continuity", json.dumps(normal.requests[0], ensure_ascii=False))
+        with common[0], common[1], common[2], mock.patch.object(
+            ollama_proxy, "client", evaluation
+        ), mock.patch.object(ollama_proxy, "is_local_synthetic_evaluation_turn", return_value=True):
+            response = post_nonstream_messages(
+                [{"role": "user", "content": "합성 평가야."}],
+                headers={"x-airi-session-id": "session-a", "x-airi-turn-origin": "local-evaluation"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("[airi_affect_continuity", json.dumps(evaluation.requests[0], ensure_ascii=False))
+        self.assertEqual(runtime.version_if_present("session-a"), version)
+        with common[0], common[1], common[2], mock.patch.object(ollama_proxy, "client", other):
+            response = post_nonstream_messages(
+                [{"role": "user", "content": "다른 세션이야."}],
+                headers={"x-airi-session-id": "session-b"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("[airi_affect_continuity", json.dumps(other.requests[0], ensure_ascii=False))
+        self.assertIsNone(runtime.snapshot_if_present("session-b"))
+        with common[0], common[1], common[2], mock.patch.object(ollama_proxy, "client", reset):
+            response = post_nonstream_messages(
+                [{"role": "user", "content": "새 주제로 넘어가자"}],
+                headers={"x-airi-session-id": "session-a"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("[airi_affect_continuity", json.dumps(reset.requests[0], ensure_ascii=False))
+
+    def test_off_full_route_never_calls_affect_injector(self) -> None:
+        chat = _CapturingChatClient("기존 응답이야.")
+        with mock.patch.object(ollama_proxy, "AFFECT_CONTINUITY_ENABLED", False), mock.patch.object(
+            ollama_proxy, "inject_affect_continuity", side_effect=AssertionError("must not run")
+        ), mock.patch.object(ollama_proxy, "client", chat):
+            response = post_nonstream_messages([{"role": "user", "content": "그대로 가자."}])
+        self.assertEqual(response.status_code, 200)
+
+    def test_health_is_closed_and_content_free(self) -> None:
+        runtime = ollama_proxy.AffectStateRuntime()
+        runtime.apply_event("secret-session-id", self._event())
+        with mock.patch.object(ollama_proxy, "AFFECT_CONTINUITY_ENABLED", True), mock.patch.object(
+            ollama_proxy, "affect_continuity_ready", True
+        ), mock.patch.object(ollama_proxy, "affect_continuity_runtime", runtime):
+            health = ollama_proxy.affect_continuity_health()
+        self.assertEqual(health["mode"], "typed-snapshot-v1")
+        self.assertEqual(health["prompt_cap_bytes"], 384)
+        self.assertIn("schema_version", health)
+        self.assertIs(type(health["enabled"]), bool)
+        self.assertIs(type(health["ready"]), bool)
+        serialized = json.dumps(health)
+        for forbidden in ("secret-session-id", "chat_question", "curious", "ask_back"):
+            self.assertNotIn(forbidden, serialized)
+
+    def test_health_failure_disables_the_actual_event_and_injection_paths(self) -> None:
+        body = b'{"messages":[{"role":"user","content":"hello"}]}'
+        broken = mock.Mock()
+        broken.health.side_effect = RuntimeError("do not expose this")
+        broken.snapshot_if_present.return_value = {}
+        original_runtime = ollama_proxy.affect_continuity_runtime
+        original_ready = ollama_proxy.affect_continuity_ready
+        try:
+            with mock.patch.object(ollama_proxy, "AFFECT_CONTINUITY_ENABLED", True):
+                ollama_proxy.affect_continuity_runtime = broken
+                ollama_proxy.affect_continuity_ready = True
+                health = ollama_proxy.affect_continuity_health()
+                self.assertFalse(health["ready"])
+                self.assertIsNone(ollama_proxy.affect_continuity_runtime)
+                self.assertFalse(ollama_proxy.affect_continuity_ready)
+                self.assertIs(
+                    ollama_proxy.inject_affect_continuity(body, "session", normal_turn=True),
+                    body,
+                )
+                self.assertIsNone(
+                    ollama_proxy.apply_affect_continuity_event("session", self._event())
+                )
+                broken.snapshot_if_present.assert_not_called()
+                broken.apply_event.assert_not_called()
+        finally:
+            ollama_proxy.affect_continuity_runtime = original_runtime
+            ollama_proxy.affect_continuity_ready = original_ready
+
+
 if __name__ == "__main__":
     unittest.main()

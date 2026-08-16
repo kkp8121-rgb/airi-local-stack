@@ -12,9 +12,44 @@
   C = `AIRI-MODEL-CUSTOMIZATION-PLAN.md` §6 /
   지연 = `AIRI-NEUROSAMA-LOW-LATENCY-PLAN.md` (v2.1)
 - 실행 계획(M1~M5 상세): `진행예정/AIRI-BROADCAST-CHARACTER-PLAN-2026-08-12.md`
+- G1a 감정·캐릭터 연속성 상세:
+  `진행예정/AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`
 
-최종 갱신: 2026-08-15
+최종 갱신: 2026-08-16
 
+- **2026-08-16** (dev PC, G1a A2 default-OFF affect proxy greybox): A1 typed
+  snapshot을 explicit session의 정상 foreground 요청에만 384-byte request-local
+  tail로 투영하는 greybox를 추가했다. 공개 event endpoint나 free-text appraisal은
+  없고, typed seam에 미리 검증된 event가 들어온 session만 상태가 생긴다. 평가·
+  quality·proactive·topic-reset·sessionless 요청은 주입/변이하지 않으며 OFF full
+  route는 injector도 호출하지 않는다. startup/shutdown fresh runtime, content-free
+  enabled/ready health와 두 launcher의 기존 11435 reuse mismatch 거부를 고정했다.
+  affect 21/21, greybox 8/8, model shard 75/75, launcher 20/20과 PowerShell parse를
+  통과했고 전체 offline checkpoint도 PASS했다. API 동등 unittest 393개 중 392개
+  PASS, 남은 1건은 기존 Python 3.14 raw-watchdog timing metadata 오류다. 독립 최종
+  검토는 HIGH/MEDIUM 잔여 finding 없이 clean이었다. 운영 gate와 evaluator는 계속
+  OFF이며 A0/A3/A4, Mi:dm A/B와 방송 실증은 미완료다.
+  (`완료/AIRI-G1A-AFFECT-PROXY-GREYBOX-2026-08-16.md`)
+- **2026-08-16** (dev PC, G1a A1 affect core foundation): strict state/event
+  schema, source-kind/weight allowlist, pure one-step reducer, inertia·decay·recovery,
+  safety lock, 13 primary reachability, 256/4096 session LRU·128 event ring,
+  broadcast-end reset과 content-free health를 `affect_state.py`에 구현했다. proxy·
+  prompt·env·B4/TTS에는 아직 연결하지 않아 운영 영향은 없다. focused 20/20,
+  동일 CI model shard 74/74, root 50,000-case 및 독립 39,852-transition property
+  검사, py_compile, candidate CI matrix 72, diff-check, 독립 최종 검토를 통과했다.
+  Actions는 billing 차단으로 미실행이며 A0 사용자 확정과 A2 이후는 미완료다.
+  (`완료/AIRI-G1A-AFFECT-CORE-FOUNDATION-2026-08-16.md`)
+- **2026-08-16** (dev PC, G1a 감정·캐릭터 연속성 계획 신설): 방송 가정
+  출력의 사용자 검토에서 단발 문장과 별개로 ① 질문/말투가 실제 저챗 흐름과
+  다름 ② 턴 간 대화·캐릭터 stance가 이어지지 않음 ③ 정서가 밝은 동의·감탄으로
+  평탄화되는 문제가 확인됐다. 현 `character_state`의 model-owned emotion text는
+  신뢰 prompt에서 의도적으로 제외되고 3단계 리액션은 긍정 강도 중심이므로,
+  공개 MIT/Apache 프로젝트의 bounded affect·event reducer·memory-layer 패턴만
+  참고해 repo-native G1a를 자체 제작하는 상세 계획을 추가했다. typed event →
+  deterministic inertia/decay/recovery reducer → request-local snapshot → 11435
+  boundary와 synthetic 6×24 OFF/ON·인간 검수를 정의한다. 코드·운영값은 변경하지
+  않았고 constitution v2, enum/threshold, 구현 착수와 운영 ON은 사용자 승인
+  대기다. (`진행예정/AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`)
 - **2026-08-15** (dev PC, G3/B3-f Mi:dm replay 출력 경계 readiness): 설치된
   `midm-airi:2.0-mini`의 고정 digest·`num_ctx=2048`을 기본 OFF의 임시 11435
   프록시에서 확인하고 합성 1턴을 실제 통과시켰다. 이 과정에서 의도된 audible
@@ -305,7 +340,28 @@
 - [~] **G1. 캐릭터 루프**
   - [x] 세션 상태 필드 구현 (`character_state.py`, G1 최소 상태와 ≈1:1 — 2026-08-10 검토 확인)
   - [x] 상태 프롬프트 주입의 prompt-injection/privacy hardening — 2026-08-13
-  - [ ] evaluator 재활성 (보류: 품질 평가 재개 조건 확정 후; 방송 계획 C2)
+  - [ ] evaluator 재활성 (보류: G1a typed candidate validator·reducer와 합성
+    OFF/ON 품질 평가 확정 후; evaluator는 authoritative state writer가 아님)
+  - [ ] **G1a. 감정·캐릭터 연속성 엔진** — 2026-08-16 상세 계획 신설,
+    A1 core·A2 default-OFF greybox 완료, A0 사용자 결정·A3/A4 이후 대기.
+    (`진행예정/AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`)
+    - [ ] A0 constitution v2: likes/dislikes/pride/embarrassment/conflict/repair와
+      state/event enum·metric threshold 사용자 확정
+    - [x] A1 순수 typed affect reducer: strict schema, kind weight cap,
+      one-step inertia·decay·hysteresis·recovery·safety lock, bounded in-memory
+      content-free event ring — 2026-08-16
+      (`완료/AIRI-G1A-AFFECT-CORE-FOUNDATION-2026-08-16.md`)
+    - [x] A2 proxy greybox: `AIRI_AFFECT_CONTINUITY_ENABLED` 기본 OFF,
+      OFF full-route byte identity, explicit-session request-local tail·content-free
+      health·11435 reuse fail-closed — 2026-08-16
+      (`완료/AIRI-G1A-AFFECT-PROXY-GREYBOX-2026-08-16.md`)
+    - [ ] A3 미래 B4b adapter event source: B4a frozen action shape를 유지하고
+      delivery-confirmed callback/donation/game/silence/repair outcome만 개인정보
+      없는 authoritative stimulus로 변환
+    - [ ] A4 독립 합성 6 scenario×24 turn OFF/ON·blind human review: positivity
+      collapse, 인과 적합성, turn continuity, AIRI specificity 검증
+    - [ ] A5 trusted state→TTS/Live2D 표현 배선 (보류: 텍스트 게이트 PASS)
+    - [ ] A6 B1b/B4b 설치 AIRI 30~120분 비공개 리허설과 운영 ON 사용자 결정
 - [~] **G2. 장기 기억**
   - [x] 저장·검색·저널 회상 운영 — 2026-08-09 라이브 스모크, KURE fp16 2026-08-11
   - [x] 추출 승격 루프 코드 + 게이트 프로파일 strict/balanced — 2026-08-12 (`932eae6`)
@@ -481,6 +537,9 @@
   - [x] B1a offline transport-neutral chat-ingress core — strict YouTube candidate admission, HMAC pseudonyms, bounded FIFO screening/delivery, established AIRI envelope (`data.text` only; viewer sidecar 없음), Node contract tests; 기본 OFF, B1 persistence 없음 — 2026-08-13
   - [x] I2a viewer-memory foundation — separate opt-in SQLite, strict `yt:v1`/`viewer:v1`/`broadcast:v1` HMAC pseudonyms, content-free B1 observation boundary, manual capped tiers, bounded explicit facts, retention/deletion, count-only donations, and untrusted callback candidates; no runtime wiring or AIRI injection. I2 remains partial pending an authorized next-broadcast callback smoke — 2026-08-13 (`완료/AIRI-I2A-VIEWER-MEMORY-FOUNDATION-2026-08-13.md`)
   - [ ] B1b live adapter/quota/OAuth 및 실제 AIRI 주입 (보류: 외부 YouTube 자격증명·쿼터 실측·운영 승인)
+  - [~] G1a A0~A2 typed affect core/proxy greybox — A1/A2 코드 완료, A0
+    constitution v2·metric 사용자 확정 대기 (기본 OFF; C2의 자유 텍스트 emotion
+    직접 주입을 대체하는 안전 경로)
 - [~] **M3** (B2 송출 + B3 안전)
   - [x] B3 모더레이션 게이트 코드 (사전 113항목+패턴 7, 기본 off) — 2026-08-12 (`932eae6`)
   - [x] B3 배선 3종 — TTS 폴백 7/7·런처 env·Electron "필터당함" 배지,
@@ -507,6 +566,8 @@
   - [~] B4a 기반 구현 — 기본 OFF/inert; simulation-only 집중 테스트 17 PASS·독립 최종 검토 PASS.
     B4b 런타임 어댑터와 실제 비공개 리허설은 미착수
     (`완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`)
+  - [ ] G1a A3~A5 — B4 content-free affect event source, 합성 방송 A/B,
+    텍스트 PASS 뒤 TTS/Live2D 표현 배선
 - [ ] **M5** (리허설 → 데뷔 → I4 플라이휠)
 
 ## 모델 SSoT 게이트 (전환 고정 선언의 전제)

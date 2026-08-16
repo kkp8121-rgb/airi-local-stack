@@ -55,6 +55,12 @@
 
 ## 진행예정 — 계획
 
+- `AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md` — G1a 감정·
+  캐릭터 연속성 엔진 상세 계획. 공개 MIT/Apache 프로젝트의 bounded affect,
+  event-sourced reducer, memory-layer 패턴만 인용하고 repo-native typed reducer를
+  자체 제작한다. constitution v2 사용자 결정, 기본 OFF proxy greybox, 독립
+  합성 6×24 OFF/ON·인간 검수, 이후 B4/TTS/Live2D·장시간 리허설 순서를 정의한다.
+  코드·운영값은 아직 변경하지 않았다.
 - `AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md` — G3/C0·M3의
   실제 한국 방송 채팅 흐름 평가 계획. 탬탬버린·아카네 리제·아이네의 공개
   채널을 관찰 대상으로 삼되 공식 권한 없는 수집은 금지한다. 승인된 비공개
@@ -81,11 +87,11 @@
 
 ## 로드맵 — 지도와 현황판 (상태 폴더와 별개 관리)
 
-- `AIRI-ROADMAP-STATUS.md` — **살아있는 현황판.** G0~G6·C0~C5·지연·M1~M5
+- `AIRI-ROADMAP-STATUS.md` — **살아있는 현황판.** G0~G6(G1a 포함)·C0~C5·지연·M1~M5
   전 축의 상태와 근거, 사용자 결정 차단 지점, 배치별 갱신 로그.
   **매 작업 배치 커밋마다 갱신 의무** (검토 PC·dev PC 공통).
 - `AIRI-GROWTH-STRATEGY.md` — **사용자 승인 방향.**
-  G0~G6 성장 로드맵 정의 (G1 캐릭터 루프 → G2 장기 기억 → G3 평가
+  G0~G6 성장 로드맵 정의 (G1/G1a 캐릭터·감정 연속성 루프 → G2 장기 기억 → G3 평가
   플라이휠 → G4 파인튜닝 → G5 자발 행동·방송 디렉터 → G6 게임 에이전트).
   (옛 이름 `AIRI-EXAONE-GROWTH-STRATEGY-2026-08-07.md` — 2026-08-12 모델
   중립 개정으로 개명. 개정 전 원본은 `아카이브/`에 옛 이름으로 보존.)
@@ -98,6 +104,16 @@
   `아카이브/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-pre-midm.md`.
 
 ## 완료 — 유효한 증거 기록 (최신순)
+
+- `AIRI-G1A-AFFECT-CORE-FOUNDATION-2026-08-16.md` — G1a A1 scoped 완료.
+  strict typed affect schema, deterministic one-step reducer, decay/recovery/safety,
+  bounded in-memory LRU/ring과 content-free health. A1 배치 자체는 proxy/prompt/env에
+  미배선이었고 같은 날 후속 A2 greybox가 별도 완료 문서로 이어졌다.
+
+- `AIRI-G1A-AFFECT-PROXY-GREYBOX-2026-08-16.md` — G1a A2 scoped 완료.
+  기본 OFF, explicit-session typed snapshot의 384-byte request-local projection,
+  평가/quality/proactive 비변이, content-free enabled/ready health와 launcher reuse
+  fail-closed를 고정한다. 운영 event source·Mi:dm A/B·운영 ON은 포함하지 않는다.
 
 - `AIRI-B4C-DEV-PC-FOLLOWUP-2026-08-14.md` — 검토 PC B4c 배치와 직전
   로컬 자산 통합의 dev PC 인수 기록. retired 11439 gateway의 정확한

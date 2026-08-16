@@ -55,6 +55,10 @@ param(
     [string]$InputScreeningPolicy = $env:AIRI_INPUT_SCREENING_POLICY,
     [ValidateSet('on', 'off')]
     [string]$EpistemicConfidence = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_EPISTEMIC_CONFIDENCE)) { 'off' } else { $env:AIRI_EPISTEMIC_CONFIDENCE }),
+    # Continuity across turns is an explicit opt-in. Leave it disabled unless
+    # the caller supplies the exact supported mode.
+    [ValidateSet('on', 'off')]
+    [string]$AffectContinuity = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_AFFECT_CONTINUITY_ENABLED)) { 'off' } else { $env:AIRI_AFFECT_CONTINUITY_ENABLED }),
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
@@ -72,6 +76,17 @@ function Get-AiriHealthBoolean {
     }
     return $property.Value
 }
+function Assert-AiriAffectContinuityContract {
+    param([object]$Container, [string]$Description)
+    $mode = if ($null -ne $Container) { $Container.PSObject.Properties['mode'] } else { $null }
+    $schema = if ($null -ne $Container) { $Container.PSObject.Properties['schema_version'] } else { $null }
+    $cap = if ($null -ne $Container) { $Container.PSObject.Properties['prompt_cap_bytes'] } else { $null }
+    if ($null -eq $mode -or $mode.Value -isnot [string] -or $mode.Value -cne 'typed-snapshot-v1' -or
+            $null -eq $schema -or $schema.Value -isnot [string] -or $schema.Value -cne 'airi.affect-state.v1' -or
+            $null -eq $cap -or $cap.Value -isnot [int] -or $cap.Value -ne 384) {
+        throw "$Description contract is missing or unsupported."
+    }
+}
 $OutputModeration = $OutputModeration.ToLowerInvariant()
 if ($OutputModeration -notin @('on', 'off')) {
     throw 'OutputModeration must be on or off. Check the parameter or AIRI_OUTPUT_MODERATION.'
@@ -83,6 +98,10 @@ if ($InputScreening -notin @('on', 'off')) {
 $EpistemicConfidence = $EpistemicConfidence.ToLowerInvariant()
 if ($EpistemicConfidence -notin @('on', 'off')) {
     throw 'EpistemicConfidence must be on or off. Check the parameter or AIRI_EPISTEMIC_CONFIDENCE.'
+}
+$AffectContinuity = $AffectContinuity.ToLowerInvariant()
+if ($AffectContinuity -notin @('on', 'off')) {
+    throw 'AffectContinuity must be on or off. Check the parameter or AIRI_AFFECT_CONTINUITY_ENABLED.'
 }
 $parsedNumCtx = 0
 if (-not [int]::TryParse(
@@ -312,6 +331,15 @@ if ($listener) {
         }
         $existingEpistemicConfidenceEnabled = Get-AiriHealthBoolean `
             $existingHealth.epistemic_confidence 'enabled' 'Existing proxy epistemic confidence enabled'
+        if ($null -eq $existingHealth.affect_continuity) {
+            throw 'Existing proxy health does not report affect continuity state.'
+        }
+        Assert-AiriAffectContinuityContract `
+            $existingHealth.affect_continuity 'Existing proxy affect continuity'
+        $existingAffectContinuityEnabled = Get-AiriHealthBoolean `
+            $existingHealth.affect_continuity 'enabled' 'Existing proxy affect continuity enabled'
+        $existingAffectContinuityReady = Get-AiriHealthBoolean `
+            $existingHealth.affect_continuity 'ready' 'Existing proxy affect continuity ready'
     }
     catch {
         throw 'Existing proxy safety state could not be verified; stop it and restart.'
@@ -341,6 +369,12 @@ if ($listener) {
     }
     if ($existingEpistemicConfidenceEnabled -ne ($EpistemicConfidence -eq 'on')) {
         throw 'Existing proxy epistemic confidence state differs from the requested configuration; stop it and restart.'
+    }
+    if ($existingAffectContinuityEnabled -ne ($AffectContinuity -eq 'on')) {
+        throw 'Existing proxy affect continuity state differs from the requested configuration; stop it and restart.'
+    }
+    if ($AffectContinuity -eq 'on' -and -not $existingAffectContinuityReady) {
+        throw 'Existing proxy affect continuity is enabled but not ready; stop it and restart.'
     }
     Write-Output 'A service is already listening on port 11435; it was not reconfigured.'
     return
@@ -387,6 +421,7 @@ $memoryEnvironment = @{
     AIRI_INPUT_SCREENING_POLICY = $resolvedInputScreeningPolicy
     AIRI_EPISTEMIC_CONFIDENCE = $EpistemicConfidence
     AIRI_EPISTEMIC_CONFIDENCE_MODE = 'enforce'
+    AIRI_AFFECT_CONTINUITY_ENABLED = $AffectContinuity
     AIRI_OLLAMA_KEEP_ALIVE = $OllamaKeepAlive
     AIRI_OLLAMA_TEMPERATURE = $OllamaTemperature.ToString([Globalization.CultureInfo]::InvariantCulture)
     AIRI_OLLAMA_TOP_P = $OllamaTopP.ToString([Globalization.CultureInfo]::InvariantCulture)

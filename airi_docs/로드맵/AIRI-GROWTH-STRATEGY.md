@@ -2,6 +2,8 @@
 
 - 결정일: 2026-08-07 (KST)
 - 개정일: 2026-08-12 — 모델 중립 개정. 기반 LLM을 EXAONE 고유명으로 고정하던 전제를 현행 SSoT 모델 참조로 치환하고, 모델 교체(EXAONE→Mi:dm)로 해소된 결정을 명시했다. 개정 전 원본은 `아카이브/AIRI-EXAONE-GROWTH-STRATEGY-2026-08-07.md`에 보존돼 있다.
+- 추가 개정: 2026-08-16 — G1의 자유 텍스트 감정 필드를 운영 prompt에 직접
+  승격하지 않고 typed·bounded·deterministic 상태 전이로 구현하는 G1a를 신설했다.
 - 기반 LLM 표기 원칙: 이 문서는 기반 LLM을 고유명으로 고정하지 않고 **현행 SSoT 모델**로 참조한다. 실체는 프록시의 `resolve_chat_model()`(env `AIRI_CHAT_MODEL`)이 결정하며, 2026-08-12 기준 값은 `midm-airi:2.0-mini`(Mi:dm 2.0 Mini Instruct Q4_K_M, MIT)다. 롤백 태그 `exaone-airi:2.4b`는 보존돼 있다.
 - 상태: 사용자 승인 방향
 - 현재 단계: 개인 연구·개발, 당장 방송 또는 수익화 계획 없음
@@ -199,6 +201,27 @@
 - 반복 횟수 같은 단일 숫자로 최종 대사를 강제하지 않는다.
 - 안전과 실제 도구 실행 여부는 코드 경계로 지킨다.
 - 캐릭터 행동은 최근 맥락과 모델 판단으로 결정한다.
+
+#### G1a. 감정·캐릭터 연속성 엔진
+
+목적: 매 턴의 감정 단어를 기록하는 데 그치지 않고, 방송 사건의 원인과 앞선
+stance가 다음 반응에 검증 가능하게 이어지도록 한다.
+
+원칙:
+
+- model-owned 자유 텍스트 `emotion`·`emotion_reason`은 authoritative state나
+  trusted prompt가 아니다.
+- screened/director outcome을 closed enum·bounded 수치의 affect event로 바꾸고,
+  순수 reducer가 관성·감쇠·회복을 포함한 현재 snapshot을 계산한다.
+- snapshot만 request-local prompt tail에 투영하며 raw 채팅·닉네임·후원 금액·
+  개인별 관계는 넣지 않는다.
+- affect는 발화의 stance·길이·질문/repair drive에 영향을 주지만 safety, 실제 도구
+  결과, B4 action selection을 덮어쓰지 않는다.
+- 기본 OFF와 OFF request byte identity를 유지하고 합성 6 scenario×24 turn
+  Mi:dm OFF/ON·blind human review 뒤에만 운영 채택을 검토한다.
+
+상세 구현·평가·사용자 결정 게이트는
+[`AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`](../진행예정/AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md)에 둔다.
 
 ### G2. 장기 기억
 

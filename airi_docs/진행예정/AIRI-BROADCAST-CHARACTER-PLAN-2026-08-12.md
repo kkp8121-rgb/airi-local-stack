@@ -40,10 +40,17 @@
 | # | 작업 | 내용 |
 |---|---|---|
 | **C1** | 캐릭터 헌법 | 949자 시스템 프롬프트 → 캐릭터 카드 확장: 정체성·가치관·**말버릇 3~5개**(밈 시드)·좋아하는 것/약점(갭 요소)·관계 규정. 기존 signal garden 서사 활용. 시청자 해석이 정본이 되는 경로(Evil Neuro "사랑받지 못한 아이" = 팬 해석의 정본화)를 의도적으로 열어둔다 |
-| **C2** | G1 캐릭터 루프 배선 | `character_state.py`에 이미 있는 상태(current_topic·dialogue_goal·emotion·relationship_stage·repeat_intent·silence_ms)를 **프롬프트에 실제 주입** + 평가자 재활성화(방송 중은 클라우드 LLM이라 VRAM 경합 없음). 리액션 톤 3단계(평상 1 / 감탄 1.5 / 큰 사건 2)를 상태 파라미터로 노출 |
+| **C2** | G1/G1a 캐릭터 루프 배선 | 기존 action·repeat·timing의 privacy-safe request-local 주입은 유지한다. model-owned 자유 텍스트 emotion/relationship을 trusted prompt에 직접 올리지 않고, G1a의 closed enum·bounded affect snapshot만 추가한다. evaluator는 기본 OFF의 candidate producer로만 재검토한다. 리액션 톤 3단계는 정서 종류·원인·관성을 대신하지 않는다 |
 | **C3** | 결함의 콘텐츠화 | 모더레이션 차단 시 침묵 대신 화면에 "필터당함" 표시 + 캐릭터 반응 대사("방금 그건 말하면 안 된대"). 2026-08-12 **B3 3종 배선 완료**: `blocked_dialogue` 5종 SSE 게이트·TTS 7/7·런처 env·Electron 배지, 신규 3층 source test/typecheck/build 및 설치본 실제 차단 턴 확인 (`완료/AIRI-B3-ELECTRON-MODERATION-VERIFICATION-2026-08-12.md`). 대사 문구의 사용자 재승인은 별도 |
 | **C4** | 관계 장치 | 시그니처 인사(10~30초, 한국 관례) · 시청자 호칭 · 고정 클로징(감사 + 다음 방송 예고) — 인사·클로징 메타 개그형은 확정. “아이리스”는 공개 충돌 FAIL로 철회했고 정식 팬덤명은 당분간 두지 않는다. 일반 호칭 “시청자들”만 사용하며 자연 발생 호칭이 쌓인 뒤 재검토한다 (`완료/AIRI-FANDOM-NAME-COLLISION-CHECK-2026-08-12.md`). 공동 창작 경로는 밈 시드 해석 정본화로 유지 |
 | **C5** | 일관성 게이트 | 배포 전 회귀: 16케이스 + 스타일 계약 + 인간 검수. "성격이 바뀌었다"가 최대 리스크(83% 근거) — 캐릭터 카드 변경도 코드와 동일한 회귀 게이트를 거친다 |
+| **G1a** | 감정·캐릭터 연속성 | 현재 C2의 자유 텍스트 emotion과 긍정 강도 3단계를 authoritative 입력으로 쓰지 않는다. typed 방송 사건을 inertia·decay·recovery가 있는 deterministic reducer로 처리하고 bounded snapshot만 request-local tail에 주입한다. constitution v2와 독립 합성 6×24 OFF/ON·인간 검수 뒤에만 TTS/Live2D·B4b로 확장한다 (`AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`) |
+
+**C2 정정/구체화(2026-08-16):** `emotion`·`emotion_reason` 같은 model-owned
+자유 텍스트를 trusted prompt에 직접 주입하는 종전 계획은 prompt-injection/privacy
+경계와 맞지 않는다. C2의 연속성 배선은 G1a typed snapshot으로 구현한다. 기존
+evaluator는 G1a validator를 거치는 candidate producer로만 재검토하며 자동
+재활성하지 않는다. 리액션 1/1.5/2는 정서 종류·원인·관성의 대체물이 아니다.
 
 ## 3. 트랙 B — 방송 (기술 판정: 가능, 조건 3)
 
@@ -176,9 +183,10 @@ AIRI sender/TTS/OBS, 외부 killswitch·실제 모더레이션 및 설치 ASAR �
 
 ```
 M1 (즉시): B0 실측 3종 ∥ I1 추출 활성화 ∥ C1 캐릭터 헌법
-M2: B1 채팅 브리지 ∥ C2 루프 배선 ∥ I2 시청자 기억
+M2: B1 채팅 브리지 ∥ C2/G1a typed 상태 루프 ∥ I2 시청자 기억
 M3: B2 송출 + B3 안전장치        ← "기술적으로 방송 가능" 지점
-M4: B4 방송 디렉터 + C3/C4 ∥ I3 주제 풀   ← "재미있는 방송 가능" 지점
+M4: B4 방송 디렉터 + C3/C4 + G1a 방송 사건/A-B ∥ I3 주제 풀
+    ← "재미있는 방송 가능" 지점
 M5: B5 리허설 → 데뷔 → I4 플라이휠 가동
 ```
 
@@ -186,5 +194,6 @@ M5: B5 리허설 → 데뷔 → I4 플라이휠 가동
 
 1. 비공개 리허설 2시간 완주: 오디오 공백 0(정의된 침묵 사다리 동작), 채팅→응답 P50 ≤2.5초, killswitch 동작 확인
 2. 안전: 금칙어 게이트 + 지연 버퍼 + 인젝션 방어가 리허설에서 실증
-3. 캐릭터: 16케이스 인간 검수 통과분 + 시그니처 인사·클로징 고정
+3. 캐릭터: 기존 16케이스 + G1a 합성 6×24 OFF/ON 인간 검수에서 정서 인과·
+   턴 연속성·캐릭터 specificity 통과 + 시그니처 인사·클로징 고정
 4. 기억: 리허설 시청자(테스트 계정)의 이전 방송 발언을 다음 방송에서 콜백

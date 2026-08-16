@@ -46,6 +46,14 @@ from memory_runtime import MemoryRuntime, NullMemoryRuntime
 from cloud_chat_provider import CloudChatConfig, CloudChatProvider
 from character_state import CharacterStateRuntime
 from character_state_evaluator import CharacterStateEvaluator, CharacterStateEvaluatorConfig
+from affect_state import (
+    AffectStateRuntime,
+    AffectValidationError,
+    CONTINUITY_MODE as AFFECT_CONTINUITY_MODE,
+    CONTINUITY_PROMPT_CAP_BYTES,
+    STATE_SCHEMA_VERSION as AFFECT_STATE_SCHEMA_VERSION,
+    render_continuity_snapshot as render_affect_continuity_snapshot,
+)
 from evaluation_store import (
     EvaluationConfig,
     EvaluationDisabledError,
@@ -317,6 +325,19 @@ memory_runtime: MemoryRuntime | NullMemoryRuntime = NullMemoryRuntime()
 knowledge_runtime = None
 character_state_runtime = CharacterStateRuntime()
 character_state_evaluator = CharacterStateEvaluator(character_state_runtime)
+
+
+def configured_affect_continuity(value: object) -> bool:
+    """Enable only the exact documented token; every other value is OFF."""
+    return isinstance(value, str) and value == "on"
+
+
+AFFECT_CONTINUITY_ENABLED = configured_affect_continuity(
+    os.environ.get("AIRI_AFFECT_CONTINUITY_ENABLED", "off")
+)
+affect_continuity_runtime: AffectStateRuntime | None = None
+affect_continuity_ready = False
+affect_continuity_lock = threading.RLock()
 evaluation_runtime: EvaluationStore | NullEvaluationStore = NullEvaluationStore()
 input_screening_runtime = build_input_screening_runtime()
 memory_journal_tasks: set[asyncio.Task[None]] = set()
@@ -4557,6 +4578,94 @@ def inject_character_state(body: bytes, session_id: str) -> bytes:
         return body
 
 
+def apply_affect_continuity_event(session_id: str | None, event: object) -> dict[str, object] | None:
+    """Internal typed-event seam; no HTTP request may author affect events."""
+    with affect_continuity_lock:
+        if (
+            not AFFECT_CONTINUITY_ENABLED
+            or not affect_continuity_ready
+            or affect_continuity_runtime is None
+            or session_id is None
+        ):
+            return None
+        try:
+            # The runtime validates the explicit session identifier and the
+            # exact event schema. This seam never repairs or infers an event.
+            return affect_continuity_runtime.apply_event(session_id, event)
+        except (AffectValidationError, TypeError, ValueError):
+            return None
+
+
+def initialize_affect_continuity_runtime() -> None:
+    """Create a fresh opt-in runtime, discarding every prior in-process state."""
+    global affect_continuity_runtime, affect_continuity_ready
+    with affect_continuity_lock:
+        affect_continuity_runtime = None
+        affect_continuity_ready = False
+        if AFFECT_CONTINUITY_ENABLED:
+            affect_continuity_runtime = AffectStateRuntime()
+            affect_continuity_ready = True
+
+
+def inject_affect_continuity(body: bytes, session_id: str | None, *, normal_turn: bool) -> bytes:
+    """Append an existing typed snapshot to the request-local note, fail closed."""
+    with affect_continuity_lock:
+        if (
+            not AFFECT_CONTINUITY_ENABLED
+            or not affect_continuity_ready
+            or affect_continuity_runtime is None
+            or not normal_turn
+            or not session_id
+        ):
+            return body
+        try:
+            snapshot = affect_continuity_runtime.snapshot_if_present(session_id)
+            if snapshot is None:
+                return body
+            return inject_request_local_system_note(
+                body, render_affect_continuity_snapshot(snapshot),
+            )
+        except Exception:
+            return body
+
+
+def affect_continuity_health() -> dict[str, object]:
+    """Return only closed-schema counters; never state values or identifiers."""
+    global affect_continuity_runtime, affect_continuity_ready
+    with affect_continuity_lock:
+        ready = affect_continuity_ready
+        try:
+            runtime = (
+                affect_continuity_runtime.health()
+                if ready and affect_continuity_runtime is not None
+                else {
+                    "sessions": 0, "events": 0, "state_version": 0,
+                    "primary_enum_count": 0, "drive_enum_count": 0,
+                }
+            )
+        except Exception:
+            ready = False
+            # Health/readiness and the event/request paths must never disagree.
+            affect_continuity_runtime = None
+            affect_continuity_ready = False
+            runtime = {
+                "sessions": 0, "events": 0, "state_version": 0,
+                "primary_enum_count": 0, "drive_enum_count": 0,
+            }
+    return {
+        "enabled": AFFECT_CONTINUITY_ENABLED,
+        "ready": ready,
+        "mode": AFFECT_CONTINUITY_MODE,
+        "schema_version": AFFECT_STATE_SCHEMA_VERSION,
+        "prompt_cap_bytes": CONTINUITY_PROMPT_CAP_BYTES,
+        "sessions": runtime["sessions"],
+        "events": runtime["events"],
+        "state_version": runtime["state_version"],
+        "primary_enum_count": runtime["primary_enum_count"],
+        "drive_enum_count": runtime["drive_enum_count"],
+    }
+
+
 def completed_user_turn_count(messages: list[dict[str, object]]) -> int:
     """Return the stable 1-based user turn number used by the memory journal."""
     return sum(1 for message in messages if message.get("role") == "user")
@@ -5510,7 +5619,15 @@ HOP_BY_HOP_HEADERS = {
 
 @app.on_event("startup")
 async def startup() -> None:
-    global client, cloud_client, cloud_chat_provider, memory_runtime, evaluation_runtime, character_state_evaluator, knowledge_runtime
+    global client, cloud_client, cloud_chat_provider, memory_runtime, evaluation_runtime, character_state_evaluator, knowledge_runtime, affect_continuity_runtime, affect_continuity_ready
+    try:
+        initialize_affect_continuity_runtime()
+    except Exception as exc:
+        print(json.dumps({
+            "event": "affect_continuity", "status": "error",
+            "error_type": type(exc).__name__,
+        }), flush=True)
+        raise RuntimeError("affect continuity runtime failed") from None
     client = httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT)
     try:
         character_state_evaluator = CharacterStateEvaluator(
@@ -5601,6 +5718,7 @@ async def startup() -> None:
 
 @app.on_event("shutdown")
 async def shutdown() -> None:
+    global affect_continuity_runtime, affect_continuity_ready
     try:
         await character_state_evaluator.shutdown()
         if memory_journal_tasks:
@@ -5614,6 +5732,9 @@ async def shutdown() -> None:
                     task.cancel()
         await memory_runtime.shutdown()
     finally:
+        with affect_continuity_lock:
+            affect_continuity_runtime = None
+            affect_continuity_ready = False
         if cloud_client is not None:
             await cloud_client.aclose()
         if client is not None:
@@ -5830,6 +5951,7 @@ async def health() -> dict[str, object]:
         "chat_provider": cloud_chat_provider.health(),
         "character_state": character_state_runtime.health(),
         "character_state_evaluator": character_state_evaluator.health(),
+        "affect_continuity": affect_continuity_health(),
         "memory": await memory_runtime.health(),
         "knowledge": knowledge_runtime.health() if knowledge_runtime is not None else {
             "enabled": False, "ready": False, "documents": 0, "chunks": 0,
@@ -7477,6 +7599,20 @@ async def proxy(path: str, request: Request):
                 body = inject_character_state(body, character_sid)
         except Exception:
             pass
+    # Affect continuity is deliberately narrower than character state: it has
+    # no implicit process-wide session and evaluation/quality traffic is pure.
+    if AFFECT_CONTINUITY_ENABLED:
+        body = inject_affect_continuity(
+            body,
+            memory_session_id,
+            normal_turn=(
+                is_chat_request
+                and bool(last_user_text)
+                and not proactive_turn
+                and not nonmutating_turn
+                and not TOPIC_RESET_RE.search(last_user_text)
+            ),
+        )
     request_headers = {
         key: value
         for key, value in request.headers.items()

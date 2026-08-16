@@ -52,6 +52,9 @@ param(
     [string]$InputScreeningPolicy = $env:AIRI_INPUT_SCREENING_POLICY,
     [ValidateSet('on', 'off')]
     [string]$EpistemicConfidence = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_EPISTEMIC_CONFIDENCE)) { 'off' } else { $env:AIRI_EPISTEMIC_CONFIDENCE }),
+    # Affect continuity stays opt-in; no launcher path may promote it.
+    [ValidateSet('on', 'off')]
+    [string]$AffectContinuity = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_AFFECT_CONTINUITY_ENABLED)) { 'off' } else { $env:AIRI_AFFECT_CONTINUITY_ENABLED }),
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
@@ -68,6 +71,17 @@ function Get-AiriHealthBoolean {
         throw "$Description must be a JSON Boolean."
     }
     return $property.Value
+}
+function Assert-AiriAffectContinuityContract {
+    param([object]$Container, [string]$Description)
+    $mode = if ($null -ne $Container) { $Container.PSObject.Properties['mode'] } else { $null }
+    $schema = if ($null -ne $Container) { $Container.PSObject.Properties['schema_version'] } else { $null }
+    $cap = if ($null -ne $Container) { $Container.PSObject.Properties['prompt_cap_bytes'] } else { $null }
+    if ($null -eq $mode -or $mode.Value -isnot [string] -or $mode.Value -cne 'typed-snapshot-v1' -or
+            $null -eq $schema -or $schema.Value -isnot [string] -or $schema.Value -cne 'airi.affect-state.v1' -or
+            $null -eq $cap -or $cap.Value -isnot [int] -or $cap.Value -ne 384) {
+        throw "$Description contract is missing or unsupported."
+    }
 }
 function Resolve-AiriNumCtx {
     param([object]$Value)
@@ -91,6 +105,10 @@ if ($InputScreening -notin @('on', 'off')) {
 $EpistemicConfidence = $EpistemicConfidence.ToLowerInvariant()
 if ($EpistemicConfidence -notin @('on', 'off')) {
     throw 'EpistemicConfidence must be on or off. Check the parameter or AIRI_EPISTEMIC_CONFIDENCE.'
+}
+$AffectContinuity = $AffectContinuity.ToLowerInvariant()
+if ($AffectContinuity -notin @('on', 'off')) {
+    throw 'AffectContinuity must be on or off. Check the parameter or AIRI_AFFECT_CONTINUITY_ENABLED.'
 }
 if ($Stt -notin @('on', 'off')) {
     throw 'Stt must be on or off. Check the -Stt parameter or AIRI_STT environment variable.'
@@ -283,6 +301,7 @@ if ($EnableMemoryExtraction -and [string]::IsNullOrWhiteSpace($MemoryExtractionM
                     -MemoryExtractionModel $autoModel `
                     -MemoryExtractionGateReport $autoGateReport `
                     -MemoryExtractionGateProfile $MemoryExtractionGateProfile `
+                    -AffectContinuity $AffectContinuity `
                     -VerifyExtractionGateOnly | Out-Null
                 $MemoryExtractionModel = $autoModel
                 $MemoryExtractionGateReport = $autoGateReport
@@ -320,6 +339,7 @@ if ([string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
         -InputScreening $InputScreening `
         -InputScreeningPolicy $resolvedInputScreeningPolicy `
         -EpistemicConfidence $EpistemicConfidence `
+        -AffectContinuity $AffectContinuity `
         -ChatModelPreflighted `
         -AllowExternalSearch $AllowExternalSearch `
         -TopicBoardPath $TopicBoardPath `
@@ -342,6 +362,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
         -OutputModeration $OutputModeration -OutputModerationTerms $resolvedOutputModerationTerms `
         -InputScreening $InputScreening -InputScreeningPolicy $resolvedInputScreeningPolicy `
         -EpistemicConfidence $EpistemicConfidence `
+        -AffectContinuity $AffectContinuity `
         -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `
         -EnableCharacterEvaluator $EnableCharacterEvaluator -EvaluationMaxRecords $EvaluationMaxRecords `
         -VerifyExtractionGateOnly
@@ -379,6 +400,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
             -OutputModeration $OutputModeration -OutputModerationTerms $resolvedOutputModerationTerms `
             -InputScreening $InputScreening -InputScreeningPolicy $resolvedInputScreeningPolicy `
             -EpistemicConfidence $EpistemicConfidence `
+            -AffectContinuity $AffectContinuity `
             -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `
             -EnableCharacterEvaluator $EnableCharacterEvaluator -EvaluationMaxRecords $EvaluationMaxRecords
         $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
@@ -406,6 +428,7 @@ else {
 $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
 $requestedInputScreening = $InputScreening -eq 'on'
 $requestedEpistemicConfidence = $EpistemicConfidence -eq 'on'
+$requestedAffectContinuity = $AffectContinuity -eq 'on'
 if ($null -eq $proxy.input_screening) {
     throw 'Live proxy input screening state is missing, unready, or differs from the requested configuration.'
 }
@@ -431,6 +454,18 @@ $liveEpistemicConfidenceEnabled = Get-AiriHealthBoolean `
     $proxy.epistemic_confidence 'enabled' 'Live proxy epistemic confidence enabled'
 if ($liveEpistemicConfidenceEnabled -ne $requestedEpistemicConfidence) {
     throw 'Live proxy epistemic confidence state is missing or differs from the requested configuration.'
+}
+if ($null -eq $proxy.affect_continuity) {
+    throw 'Live proxy affect continuity state is missing or differs from the requested configuration.'
+}
+Assert-AiriAffectContinuityContract $proxy.affect_continuity 'Live proxy affect continuity'
+$liveAffectContinuityEnabled = Get-AiriHealthBoolean `
+    $proxy.affect_continuity 'enabled' 'Live proxy affect continuity enabled'
+$liveAffectContinuityReady = Get-AiriHealthBoolean `
+    $proxy.affect_continuity 'ready' 'Live proxy affect continuity ready'
+if ($liveAffectContinuityEnabled -ne $requestedAffectContinuity -or
+        ($requestedAffectContinuity -and -not $liveAffectContinuityReady)) {
+    throw 'Live proxy affect continuity state is missing or differs from the requested configuration.'
 }
 $liveNumCtx = 0
 $liveNumCtxText = [Convert]::ToString(
@@ -512,6 +547,8 @@ if ($ChatProvider -eq 'local') {
     InputScreeningEnabled = $proxy.input_screening.enabled
     InputScreeningReady = $proxy.input_screening.ready
     EpistemicConfidenceEnabled = $proxy.epistemic_confidence.enabled
+    AffectContinuityEnabled = $proxy.affect_continuity.enabled
+    AffectContinuityReady = $proxy.affect_continuity.ready
     LLMWarmup = if ($warmup) { $warmup.StatusCode } else { $null }
     ChatProvider = $ChatProvider
     ChatModel = $effectiveChatModel

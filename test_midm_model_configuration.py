@@ -12,6 +12,30 @@ STT_STOP = (ROOT / "stt" / "stop-local-stt.ps1").read_text(encoding="utf-8")
 
 
 class MidmModelConfigurationTests(unittest.TestCase):
+    def test_affect_continuity_launcher_contract_is_default_off_and_forwarded(self) -> None:
+        for script in (STACK, PROXY):
+            self.assertIn("[string]$AffectContinuity =", script)
+            self.assertIn("AIRI_AFFECT_CONTINUITY_ENABLED", script)
+            self.assertIn("AffectContinuity must be on or off", script)
+            self.assertIn("$AffectContinuity = $AffectContinuity.ToLowerInvariant()", script)
+        self.assertEqual(STACK.count("-AffectContinuity $AffectContinuity"), 4)
+        self.assertIn("AIRI_AFFECT_CONTINUITY_ENABLED = $AffectContinuity", PROXY)
+        self.assertIn("Existing proxy health does not report affect continuity state.", PROXY)
+        self.assertIn("Assert-AiriAffectContinuityContract", PROXY)
+        self.assertIn("Assert-AiriAffectContinuityContract", STACK)
+        for expected in ("typed-snapshot-v1", "airi.affect-state.v1", "prompt_cap_bytes", "-isnot [int]", "-ne 384"):
+            self.assertIn(expected, PROXY)
+            self.assertIn(expected, STACK)
+        self.assertIn("Existing proxy affect continuity state differs", PROXY)
+        self.assertIn("Existing proxy affect continuity is enabled but not ready", PROXY)
+        self.assertIn("Live proxy affect continuity state is missing or differs", STACK)
+        self.assertIn("AffectContinuityEnabled = $proxy.affect_continuity.enabled", STACK)
+        self.assertIn("AffectContinuityReady = $proxy.affect_continuity.ready", STACK)
+        self.assertIn("Get-AiriHealthBoolean `\n            $existingHealth.affect_continuity", PROXY)
+        self.assertIn("Get-AiriHealthBoolean `\n    $proxy.affect_continuity", STACK)
+        self.assertNotRegex(PROXY, r"\[bool\]\$existingHealth\.affect_continuity")
+        self.assertNotRegex(STACK, r"\[bool\]\$proxy\.affect_continuity")
+
     def test_epistemic_confidence_launcher_contract_is_default_off_and_forwarded(self) -> None:
         for script in (STACK, PROXY):
             self.assertIn("[string]$EpistemicConfidence =", script)
