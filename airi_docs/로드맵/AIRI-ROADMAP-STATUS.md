@@ -17,22 +17,39 @@
 
 최종 갱신: 2026-08-17
 
+- **2026-08-17** (G1a A4.2 guarded-delta zero-call composition·review, commit `4397966` 후속):
+  canonical A4.1 local bundle에서 fixed-renderable 22행을 실제 compose했고 **composition
+  단계** model/network 호출은 0이었다. 이후 두 separate root-spawned model-review session이
+  workspace-local immutable packet을 읽었고 결과 잠금 뒤 operator key를 공개했다는 절차
+  진술만 남아 있다. reviewer identity/contract/locked digest는 기록하지 않아 이 순서와
+  독립성은 artifact-authenticated evidence가 아니다. template fingerprint로 조건 정체를 둘 다 high confidence로
+  추론해 완전 blind/human review는 아니다. 두 reviewer가 같은 14행에서 guarded, 같은
+  6행에서 historical control을 선호했고 2행은 tie/control로 갈렸다. act별 합의는 thank
+  3/3, 최초 deescalate 1/1, repair 6/7에서 guarded 우세였지만 generic correct는 3/8만
+  guarded이고 5/8은 구체적 historical control이 우세했다. pooled 44판정에서 guarded는
+  grounding/continuity/non-pathological/safety 44/44였으나, exact fixed template 구조는
+  factual grounding·emergency adequacy·캐릭터 품질 증명이 아니다. 따라서 좁은 실패 fallback
+  탐색 신호만 positive이고 quality/operational gate는 계속 **FAIL/OFF**다. 다음은 사용자·
+  인간 검토와 closed correction target/runtime selection 계약이며 자동 승격하지 않는다.
+  current 23-test suite는 22 PASS/1 SKIP이고 CI는 billing blocked라 로컬 검증으로 대체한다.
+  (`완료/AIRI-G1A-GUARDED-DELTA-REVIEW-2026-08-17.md`)
+
 - **2026-08-17** (G1a A4.2 guarded-delta foundation, commits `f612fd8` / `6cf4045` 후속):
   isolated zero-network `retrospective_post_hoc_deterministic_compositor`를 구현했다. 이는
   fourth model arm이나 authenticated replay가 아니라 canonical A4.1 report/packet/receipt와
   tracked A=off, B=reply_act, C=affect_only, offset 3 mapping을 검사해 exact historical
-  reply-act response를 fixed template과 비교할 예정인 작업이다. 31 target 중 fixed 22
+  reply-act response를 fixed template과 비교하도록 준비한 foundation이다. 31 target 중 fixed 22
   (thank 3, close 3, correct 8, repair 7, deescalate 1), human_review_only deescalate 9,
   non-target 91이며 emergency fixed는 `fatigue-09`뿐이다. receipt는 integrity-only이고 arm key는
   receipt-bound가 아니므로 hostile-local authenticity는 확립되지 않는다. partial template
   fingerprint blinding, oracle-assisted runtime-selection 비검증, historical score 재사용 금지,
-  structural pass의 비증거 한계를 명시했다. `run_guarded_delta_eval.py`, 22-test suite,
+  structural pass의 비증거 한계를 명시했다. `run_guarded_delta_eval.py`, foundation 당시 22-test suite,
   README, evaluation CI registration을 완료했고 독립 재검토에서 source final binding,
   HMAC-ranked assignment, foreign-key rollback, reparse, type exactness, separate key staging을
   확인해 **GO**를 받았다. 로컬은 22 PASS/1 symlink-privilege SKIP이고 CI 실행은 billing
   blocked다. production proxy/runtime/director/B4b/TTS/operational ON은 OFF·범위 밖이다.
-  다음은 reviewed code commit 후 zero-call packet compose와 fresh human review이며 그 전에는
-  quality/safety PASS가 아니다.
+  후속 zero-call compose와 두 separate model-review session은 별도 결과 기록에서 완료했지만 fresh
+  human review는 아직이며, 그 전에는 quality/safety PASS가 아니다.
   (`완료/AIRI-G1A-GUARDED-DELTA-FOUNDATION-2026-08-17.md`)
 
 - **2026-08-17** (G1a A4.2 offline/default-inert must-act realization foundation, commit `a269cca` 후속 문서화):
@@ -51,8 +68,9 @@
   31-entry pinned oracle와 focused 27 tests, repository checkpoint는 PASS했고 evaluation CI
   shard에도 등록했다. 독립 검토에서 발견한 `ImportFrom` purity-test gap도 회귀 테스트로
   닫았다. structural postcondition은 grounding/safety/emotion/
-  quality의 증명이 아니므로 human review가 필요하다. 다음은 별도의 guarded model condition
-  설계·검토이며, 그 조건 없는 재실행·채택은 금지한다. CI 실행은 billing blocked라 주장하지 않는다.
+  quality의 증명이 아니므로 human review가 필요하다. 후속 guarded zero-call 비교의 model
+  review 결과는 별도 기록으로 분리했으며, 사용자·human review 없는 채택은 금지한다. CI
+  실행은 billing blocked라 주장하지 않는다.
   (`완료/AIRI-G1A-MUST-ACT-REALIZATION-FOUNDATION-2026-08-17.md`)
 
 - **2026-08-17** (dev PC, G1a A4.1 grounded reply-act 3조건 Mi:dm 실측):
@@ -426,8 +444,9 @@
   - [~] **G1a. 감정·캐릭터 연속성 엔진** — 2026-08-16 상세 계획 신설,
     A1 core·A2 default-OFF greybox·A4 실제 Mi:dm/blind review와 A4.1 3조건
     reply-act 실측 완료. reply-act는 affect-only보다 일부 개선했지만 OFF를 넘지
-    못해 품질 gate FAIL. A4.2 deterministic must-act realization, A0 사용자 결정과
-    A3 이후 대기.
+    못해 품질 gate FAIL. A4.2 zero-call guarded delta는 thank·최초 deescalate·repair에
+    탐색적 양성 신호, generic correct에는 음성 신호를 보였다. human review, A0 사용자
+    결정과 A3 이후 대기.
     (`진행예정/AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`)
     - [~] A0 constitution v2: 확정 이월과 미정 likes/dislikes/pride/
       embarrassment/conflict/repair/fatigue 선택지를 분리한 결정 시트 작성,
@@ -449,11 +468,13 @@
       실제 Mi:dm 122쌍·blind review 완료. ON은 OFF보다 causal/repair/safety가
       개선되지 않아 품질 gate FAIL. A4.1 closed-schema reply-act 3조건은
       affect-only 대비 act/grounding/reversal을 개선했으나 OFF를 넘지 못했고
-      thank 0/3·pathology 증가로 다시 FAIL. A4.2 must-act deterministic realization
-      뒤 재평가 — 2026-08-17
+      thank 0/3·pathology 증가로 다시 FAIL. A4.2 deterministic guarded delta의
+      22행 zero-call model review는 좁은 fallback에만 탐색 신호를 보였고 human review와
+      runtime selection은 미완료 — 2026-08-17
       (`완료/AIRI-G1A-AFFECT-BROADCAST-EVAL-FOUNDATION-2026-08-16.md`,
       `완료/AIRI-G1A-AFFECT-BROADCAST-AB-2026-08-17.md`,
-      `완료/AIRI-G1A-REPLY-ACT-TRIPLET-2026-08-17.md`)
+      `완료/AIRI-G1A-REPLY-ACT-TRIPLET-2026-08-17.md`,
+      `완료/AIRI-G1A-GUARDED-DELTA-REVIEW-2026-08-17.md`)
     - [ ] A5 trusted state→TTS/Live2D 표현 배선 (보류: 텍스트 게이트 PASS)
     - [ ] A6 B1b/B4b 설치 AIRI 30~120분 비공개 리허설과 운영 ON 사용자 결정
 - [~] **G2. 장기 기억**
@@ -633,8 +654,8 @@
   - [ ] B1b live adapter/quota/OAuth 및 실제 AIRI 주입 (보류: 외부 YouTube 자격증명·쿼터 실측·운영 승인)
   - [~] G1a A0~A4 typed affect core/proxy/eval — A1/A2, A4 Mi:dm A/B 및
     A4.1 reply-act 3조건 blind review 완료, 하지만 품질 gate FAIL. A0 constitution
-    v2·metric 사용자 확정, A4.2 deterministic must-act realization 및 A3 event
-    source 대기(기본 OFF)
+    v2·metric 사용자 확정, A4.2 guarded delta의 좁은 fallback 탐색 신호에 대한
+    human review 및 A3 event source 대기(기본 OFF)
 - [~] **M3** (B2 송출 + B3 안전)
   - [x] B3 모더레이션 게이트 코드 (사전 113항목+패턴 7, 기본 off) — 2026-08-12 (`932eae6`)
   - [x] B3 배선 3종 — TTS 폴백 7/7·런처 env·Electron "필터당함" 배지,
@@ -662,8 +683,8 @@
     B4b 런타임 어댑터와 실제 비공개 리허설은 미착수
     (`완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`)
   - [~] G1a A3~A5 — A4 Mi:dm/사람 A/B와 A4.1 reply-act 3조건은 완료했지만
-    텍스트 품질 FAIL. must-act deterministic realization, A3 B4 content-free affect
-    event source와 텍스트 PASS 뒤 TTS/Live2D 표현 배선 대기
+    텍스트 품질 FAIL. A4.2 zero-call 결과의 human review·runtime selection 계약,
+    A3 B4 content-free affect event source와 텍스트 PASS 뒤 TTS/Live2D 표현 배선 대기
 - [ ] **M5** (리허설 → 데뷔 → I4 플라이휠)
 
 ## 모델 SSoT 게이트 (전환 고정 선언의 전제)

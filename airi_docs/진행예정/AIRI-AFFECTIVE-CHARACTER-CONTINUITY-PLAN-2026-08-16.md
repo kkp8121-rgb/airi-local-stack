@@ -455,15 +455,27 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
   selection은 runtime selection을 시험하지 않으며, exact-template structural pass는 grounding,
   safety, emotion, quality 또는 generalization의 증거가 아니다. fresh human review가 필수이고
   미래 비교는 blank paired review를 새로 만들어야 하며 historical score를 재사용할 수 없다.
-- `run_guarded_delta_eval.py`, 22-test suite, README, evaluation CI registration을 구현했다.
+- `run_guarded_delta_eval.py`, current 23-test suite, README, evaluation CI registration을 구현했다.
   독립 재검토에서 source final binding, HMAC-ranked 11/11 assignment, foreign-key rollback,
   lexical reparse, type exactness, separate key staging을 확인해 actual composition **GO**를
   받았다. 로컬은 22 PASS/1 symlink-privilege SKIP이며 CI 실행은 billing blocked라
   주장하지 않는다.
 - production proxy/runtime/director, B4b, TTS/live model, operational ON은 범위 밖이고 모두
-  OFF다. 다음 gate는 reviewed code commit 후 ignored 실제 artifact로 zero-call packet을
-  compose하고 immutable blank packet과 분리된 fresh human-review overlay를 만드는 것이다.
+  OFF다.
+- Commit `4397966` 후 canonical ignored bundle에서 22행을 zero-call compose했다. composition
+  자체는 model/network 0회다. 이후 two separate root-spawned model-review session이 immutable
+  packet을 검토하고 결과를 잠근 뒤 unblind했다는 절차 진술이 있으나 reviewer identity/
+  contract/locked digest를 보존하지 않아 artifact-authenticated review provenance는 아니다. 양쪽 모두 같은
+  14행에서 guarded, 같은 6행에서 control을 골랐고 2행은 tie/control로 갈렸다. template
+  identity 추론 confidence가 둘 다 high였으므로 이는 완전 blind human review가 아니다.
+- act 합의는 thank 3/3, 최초 deescalate 1/1, repair 6/7에서 guarded 우세였지만 correct는
+  3/8만 guarded이고 5/8은 실제 correction direction을 담은 historical control이 우세했다.
+  fixed generic correction은 정상 발화나 factual correction을 대체하지 않는다.
+- 다음 gate는 사용자·fresh human review로 fallback 대상 act를 좁히고, correct에는 validated
+  target/direction이 있는 closed contract를 별도로 설계하는 것이다. runtime selection,
+  history regeneration, B4b/live path, operational ON은 계속 미완료다.
 - 근거: `../완료/AIRI-G1A-GUARDED-DELTA-FOUNDATION-2026-08-17.md`,
+  `../완료/AIRI-G1A-GUARDED-DELTA-REVIEW-2026-08-17.md`,
   `../완료/AIRI-G1A-MUST-ACT-REALIZATION-FOUNDATION-2026-08-17.md`,
   `../완료/AIRI-G1A-REPLY-ACT-TRIPLET-2026-08-17.md`
 

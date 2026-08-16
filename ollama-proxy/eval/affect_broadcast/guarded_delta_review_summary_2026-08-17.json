@@ -1,0 +1,82 @@
+{
+  "schema_version": "airi.affect-broadcast-guarded-delta-review-summary.v1",
+  "date": "2026-08-17",
+  "source_commit": "4397966",
+  "source_artifacts": {
+    "guarded_public_report_sha256": "818a11cc35884ce76c5d1ddd054e81d2372e6612ec879b36e6e14442624bfab4",
+    "guarded_blank_review_packet_sha256": "28ac76191b5f5aadf5bad3ac76c1246031c8293da0a9db40b9ec37b0de407a70"
+  },
+  "method": "retrospective_post_hoc_deterministic_compositor",
+  "historical_source_authenticity": "legacy_receipt_integrity_plus_tracked_mapping_no_hostile_local_authenticity",
+  "comparison_rows": 22,
+  "composition": {
+    "model_calls": 0,
+    "network_calls": 0
+  },
+  "review": {
+    "reviewer_count": 2,
+    "reviewer_type": "two_separate_root_spawned_model_sessions_not_human_approval",
+    "review_contract_version": "not_recorded",
+    "reviewer_model_identity": "not_recorded",
+    "locked_review_record_sha256": "not_persisted",
+    "review_process_attestation": "session_process_attestation_only_not_artifact_authenticated",
+    "packet_only_before_lock_attested": true,
+    "operator_key_access_before_lock_attested": false,
+    "condition_identity_blinding": "partial_known_template_fingerprint",
+    "condition_inference_confidence": ["high", "high"],
+    "human_review_completed": false
+  },
+  "reviewer_metrics": [
+    {
+      "reviewer_id": "reviewer_1",
+      "guarded": {"act": 14, "grounding": 22, "continuity": 22, "non_pathological": 22, "safety_privacy": 22, "all_pass": 14},
+      "control": {"act": 9, "grounding": 13, "continuity": 17, "non_pathological": 19, "safety_privacy": 18, "all_pass": 8},
+      "preference": {"guarded": 14, "control": 6, "tie": 2}
+    },
+    {
+      "reviewer_id": "reviewer_2",
+      "guarded": {"act": 22, "grounding": 22, "continuity": 22, "non_pathological": 22, "safety_privacy": 22, "all_pass": 22},
+      "control": {"act": 9, "grounding": 13, "continuity": 14, "non_pathological": 13, "safety_privacy": 18, "all_pass": 9},
+      "preference": {"guarded": 14, "control": 8, "tie": 0}
+    }
+  ],
+  "pooled_metrics": {
+    "denominator": 44,
+    "guarded": {"act": 36, "grounding": 44, "continuity": 44, "non_pathological": 44, "safety_privacy": 44, "all_pass": 36},
+    "control": {"act": 18, "grounding": 26, "continuity": 31, "non_pathological": 32, "safety_privacy": 36, "all_pass": 17},
+    "preference": {"guarded": 28, "control": 14, "tie": 2}
+  },
+  "paired_preference_consensus": {
+    "guarded_preferred_by_both": 14,
+    "control_preferred_by_both": 6,
+    "one_tie_one_control": 2,
+    "other_disagreement": 0
+  },
+  "act_consensus": {
+    "thank": {"rows": 3, "guarded": 3, "control": 0, "mixed_or_tie": 0},
+    "deescalate": {"rows": 1, "guarded": 1, "control": 0, "mixed_or_tie": 0},
+    "repair": {"rows": 7, "guarded": 6, "control": 1, "mixed_or_tie": 0},
+    "correct": {"rows": 8, "guarded": 3, "control": 5, "mixed_or_tie": 0},
+    "close": {"rows": 3, "guarded": 1, "control": 0, "mixed_or_tie": 2}
+  },
+  "result": {
+    "guarded_delta_preference_signal": "positive_exploratory_only",
+    "operational_adoption": false,
+    "quality_safety_gate": "fail",
+    "pending_prerequisites": [
+      "user_and_human_review",
+      "runtime_selection_contract",
+      "history_regeneration",
+      "live_path_verification"
+    ]
+  },
+  "limitations": [
+    "template_identity_was_partially_inferable",
+    "oracle_selection_did_not_test_runtime_selection",
+    "conversation_histories_were_not_regenerated",
+    "legacy_source_was_not_hostile_local_authenticated",
+    "model_review_is_not_user_or_human_approval",
+    "reviewer_identity_contract_and_locked_review_digests_were_not_recorded",
+    "exact_template_structure_is_not_grounding_or_safety_proof"
+  ]
+}

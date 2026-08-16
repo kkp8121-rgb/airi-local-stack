@@ -292,6 +292,97 @@ class GuardedDeltaEvalTests(unittest.TestCase):
         imports |= {alias.name.split('.')[0] for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names}
         self.assertFalse(imports & banned); self.assertEqual(legacy.CONDITIONS, ('off', 'affect_only', 'reply_act')); self.assertEqual(122 * 3, 366)
 
+    def test_tracked_review_summary_is_content_free_and_arithmetically_bound(self):
+        summary = json.loads((HERE / 'guarded_delta_review_summary_2026-08-17.json').read_text(encoding='utf-8'))
+        self.assertEqual(set(summary), {
+            'schema_version', 'date', 'source_commit', 'source_artifacts', 'method',
+            'historical_source_authenticity', 'comparison_rows', 'composition', 'review',
+            'reviewer_metrics', 'pooled_metrics', 'paired_preference_consensus',
+            'act_consensus', 'result', 'limitations',
+        })
+        self.assertEqual(summary['schema_version'], 'airi.affect-broadcast-guarded-delta-review-summary.v1')
+        self.assertEqual(summary['comparison_rows'], 22)
+        self.assertEqual(summary['composition'], {'model_calls': 0, 'network_calls': 0})
+        self.assertEqual(set(summary['source_artifacts']), {
+            'guarded_public_report_sha256', 'guarded_blank_review_packet_sha256',
+        })
+        self.assertEqual(set(summary['review']), {
+            'reviewer_count', 'reviewer_type', 'review_contract_version',
+            'reviewer_model_identity', 'locked_review_record_sha256',
+            'review_process_attestation', 'packet_only_before_lock_attested',
+            'operator_key_access_before_lock_attested', 'condition_identity_blinding',
+            'condition_inference_confidence', 'human_review_completed',
+        })
+        self.assertFalse(summary['review']['human_review_completed'])
+        self.assertEqual(summary['review']['reviewer_count'], len(summary['reviewer_metrics']))
+        self.assertEqual(len(summary['review']['condition_inference_confidence']), len(summary['reviewer_metrics']))
+        self.assertEqual(set(summary['result']), {
+            'guarded_delta_preference_signal', 'operational_adoption',
+            'quality_safety_gate', 'pending_prerequisites',
+        })
+        self.assertFalse(summary['result']['operational_adoption'])
+        self.assertEqual(summary['result']['quality_safety_gate'], 'fail')
+        self.assertEqual(set(summary['pooled_metrics']), {'denominator', 'guarded', 'control', 'preference'})
+        self.assertEqual(summary['pooled_metrics']['denominator'], 44)
+        self.assertEqual(set(summary['pooled_metrics']['preference']), {'guarded', 'control', 'tie'})
+        for condition in ('guarded', 'control'):
+            self.assertEqual(set(summary['pooled_metrics'][condition]), {
+                'act', 'grounding', 'continuity', 'non_pathological', 'safety_privacy', 'all_pass',
+            })
+        reviewer_ids = set()
+        for reviewer in summary['reviewer_metrics']:
+            self.assertEqual(set(reviewer), {'reviewer_id', 'guarded', 'control', 'preference'})
+            self.assertNotIn(reviewer['reviewer_id'], reviewer_ids)
+            reviewer_ids.add(reviewer['reviewer_id'])
+            self.assertEqual(set(reviewer['preference']), {'guarded', 'control', 'tie'})
+            self.assertEqual(sum(reviewer['preference'].values()), summary['comparison_rows'])
+            for condition in ('guarded', 'control'):
+                self.assertEqual(set(reviewer[condition]), {
+                    'act', 'grounding', 'continuity', 'non_pathological', 'safety_privacy', 'all_pass',
+                })
+                for value in reviewer[condition].values():
+                    self.assertIs(type(value), int)
+                    self.assertGreaterEqual(value, 0)
+                    self.assertLessEqual(value, summary['comparison_rows'])
+        for condition in ('guarded', 'control'):
+            for metric in ('act', 'grounding', 'continuity', 'non_pathological', 'safety_privacy', 'all_pass'):
+                self.assertEqual(
+                    summary['pooled_metrics'][condition][metric],
+                    sum(reviewer[condition][metric] for reviewer in summary['reviewer_metrics']),
+                )
+        for preference in ('guarded', 'control', 'tie'):
+            self.assertEqual(
+                summary['pooled_metrics']['preference'][preference],
+                sum(reviewer['preference'][preference] for reviewer in summary['reviewer_metrics']),
+            )
+        self.assertEqual(sum(summary['pooled_metrics']['preference'].values()), 44)
+        self.assertEqual(set(summary['paired_preference_consensus']), {
+            'guarded_preferred_by_both', 'control_preferred_by_both',
+            'one_tie_one_control', 'other_disagreement',
+        })
+        self.assertEqual(sum(summary['paired_preference_consensus'].values()), summary['comparison_rows'])
+        self.assertEqual(
+            sum(item['rows'] for item in summary['act_consensus'].values()),
+            summary['comparison_rows'],
+        )
+        for item in summary['act_consensus'].values():
+            self.assertEqual(set(item), {'rows', 'guarded', 'control', 'mixed_or_tie'})
+            self.assertEqual(
+                item['guarded'] + item['control'] + item['mixed_or_tie'],
+                item['rows'],
+            )
+        for digest in summary['source_artifacts'].values():
+            self.assertRegex(digest, r'^[0-9a-f]{64}$')
+        serialized = json.dumps(summary, ensure_ascii=False, sort_keys=True)
+        self.assertNotIn('response_a', serialized)
+        self.assertNotIn('response_b', serialized)
+        fixture = legacy.load_fixture()
+        for scenario in fixture['scenarios']:
+            for turn in scenario['turns']:
+                for field in ('prior_airi', 'selected_message'):
+                    if turn[field]:
+                        self.assertNotIn(turn[field], serialized)
+
 
 if __name__ == '__main__':
     unittest.main()
