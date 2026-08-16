@@ -2,7 +2,7 @@
 
 - 로드맵 위치: **G1a** (G1 캐릭터 루프의 신규 하위 트랙)
 - 연결 트랙: 방송 계획 C1·C2·C5, G3 평가, G5/B4 방송 디렉터, M2·M4·M5
-- 상태: **진행중 — A1 pure core·A2 default-OFF greybox 완료 / A0·A3 이후 미완료**
+- 상태: **진행중 — A1 pure core·A2 default-OFF greybox·A4 offline foundation 완료 / A0 승인·A3·A4 실측 이후 미완료**
 - 운영 영향: 없음. 이 문서는 어떤 환경 변수나 런타임 게이트도 켜지 않는다.
 - 원칙: 외부 프로젝트는 설계 근거로만 인용한다. 1단계 구현에는 새 런타임
   의존성, 외부 서비스, 원격 모델을 추가하지 않는다.
@@ -343,10 +343,12 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
 
 ### A0. 계약·헌법 확정
 
+- 상태: **사용자 결정 대기 — 2026-08-16 승인 시트 작성**
 - 이 계획의 state/event enum, 금지선, 임시 수명 승인
 - C1 constitution v2의 likes/dislikes/pride/embarrassment/conflict/repair 확정
 - synthetic fixture v2 6개 시나리오와 human rubric 승인
 - 산출물: 문서만. 운영 영향 없음.
+- 승인 시트: `AIRI-CHARACTER-CONSTITUTION-V2-DECISION-2026-08-16.md`
 
 ### A1. 순수 affect core
 
@@ -383,13 +385,19 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
 
 ### A4. 합성 방송 평가
 
-- 신규 후보: `ollama-proxy/eval/affect_broadcast/`
+- 상태: **offline foundation 완료 — 2026-08-16 / 실제 Mi:dm OFF/ON·human review 미완료**
+- 신규: `ollama-proxy/eval/affect_broadcast/`
 - fixture schema, 6×24 synthetic flow, reducer oracle, OFF/ON runner, content-free
   report, ignored private human packet
 - 기존 rehearsal·long replay 결과와 명칭/증거를 섞지 않음
 - 현 `local-evaluation` replay/soak가 character state mutation을 의도적으로 우회하는
   계약은 유지한다. 운영/개인 세션을 건드리지 않는 isolated affect runtime을 runner에
   주입하고, direct reducer oracle과 11435 model response를 분리해 검증한다.
+- foundation은 144-turn exact reducer oracle, 122 response pair·22 no-response·
+  명시적 ambient noise 1턴, bounded canonical history, frozen Mi:dm
+  profile/pre-post health, public/private evidence 경계를 고정한다. 기본 CLI는
+  offline이며 실제 모델 응답을 생성하지 않았다.
+- 근거: `../완료/AIRI-G1A-AFFECT-BROADCAST-EVAL-FOUNDATION-2026-08-16.md`
 
 ### A5. 표현 계층
 

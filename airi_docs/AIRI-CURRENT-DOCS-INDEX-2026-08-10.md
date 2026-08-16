@@ -60,7 +60,12 @@
   event-sourced reducer, memory-layer 패턴만 인용하고 repo-native typed reducer를
   자체 제작한다. constitution v2 사용자 결정, 기본 OFF proxy greybox, 독립
   합성 6×24 OFF/ON·인간 검수, 이후 B4/TTS/Live2D·장시간 리허설 순서를 정의한다.
-  코드·운영값은 아직 변경하지 않았다.
+  A1/A2와 A4 offline foundation은 구현됐고, A0 사용자 승인·A3·실제 Mi:dm/사람
+  A4 평가·운영 ON은 미완료다.
+- `AIRI-CHARACTER-CONSTITUTION-V2-DECISION-2026-08-16.md` — G1a A0 사용자
+  결정 시트. 기존 확정 정체성·말투·안전 경계와 미정 likes/dislikes/pride/
+  embarrassment/conflict/repair/fatigue 및 metric threshold 선택지를 분리한다.
+  문서 작성은 승인이나 운영값 채택을 뜻하지 않는다.
 - `AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md` — G3/C0·M3의
   실제 한국 방송 채팅 흐름 평가 계획. 탬탬버린·아카네 리제·아이네의 공개
   채널을 관찰 대상으로 삼되 공식 권한 없는 수집은 금지한다. 승인된 비공개
@@ -104,6 +109,12 @@
   `아카이브/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-pre-midm.md`.
 
 ## 완료 — 유효한 증거 기록 (최신순)
+
+- `AIRI-G1A-AFFECT-BROADCAST-EVAL-FOUNDATION-2026-08-16.md` — G1a A4의
+  offline foundation 완료. 독립 한국어 방송 6×24 fixture, A1 reducer 144/144
+  oracle, 122개 OFF/ON paired request/transport 계약, frozen Mi:dm profile,
+  content-free report·blind private packet 경계를 고정한다. 실제 Mi:dm 응답과
+  blind human review, 운영 ON은 포함하지 않는다.
 
 - `AIRI-G1A-AFFECT-CORE-FOUNDATION-2026-08-16.md` — G1a A1 scoped 완료.
   strict typed affect schema, deterministic one-step reducer, decay/recovery/safety,

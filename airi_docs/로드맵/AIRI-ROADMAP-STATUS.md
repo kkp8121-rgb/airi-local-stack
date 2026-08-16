@@ -17,6 +17,19 @@
 
 최종 갱신: 2026-08-16
 
+- **2026-08-16** (dev PC, G1a A0 결정 시트·A4 offline evaluation foundation):
+  기존 확정 헌법과 미정 likes/dislikes/pride/embarrassment/conflict/repair/fatigue를
+  분리한 사용자 결정 시트를 만들었다. 별도로 실제 한국어 방송 인과 흐름 6개×
+  24턴(총 144턴, 응답 대상 122쌍, 무응답 22턴, 명시적 ambient noise 1턴)을
+  frozen fixture로 고정하고, A1 reducer 144/144 exact oracle, 8-turn history의
+  OFF/ON request-local note 대칭, literal 11435 `/api/chat` transport·pre/post
+  Mi:dm profile attestation, content-free public report와 blind private packet 기반을
+  추가했다. forged health evidence, non-assistant/empty/HTTP 응답, profile drift,
+  URL 변형과 fixture drift는 fail-closed다. focused 10/10, py_compile, offline CLI,
+  diff-check를 통과했고 evaluations CI shard에 등록했다. 실제 Mi:dm 응답·blind
+  human review·A0 사용자 선택은 아직 없으며 운영 affect gate는 계속 기본 OFF다.
+  (`완료/AIRI-G1A-AFFECT-BROADCAST-EVAL-FOUNDATION-2026-08-16.md`,
+  `진행예정/AIRI-CHARACTER-CONSTITUTION-V2-DECISION-2026-08-16.md`)
 - **2026-08-16** (dev PC, G1a A2 default-OFF affect proxy greybox): A1 typed
   snapshot을 explicit session의 정상 foreground 요청에만 384-byte request-local
   tail로 투영하는 greybox를 추가했다. 공개 event endpoint나 free-text appraisal은
@@ -342,11 +355,14 @@
   - [x] 상태 프롬프트 주입의 prompt-injection/privacy hardening — 2026-08-13
   - [ ] evaluator 재활성 (보류: G1a typed candidate validator·reducer와 합성
     OFF/ON 품질 평가 확정 후; evaluator는 authoritative state writer가 아님)
-  - [ ] **G1a. 감정·캐릭터 연속성 엔진** — 2026-08-16 상세 계획 신설,
-    A1 core·A2 default-OFF greybox 완료, A0 사용자 결정·A3/A4 이후 대기.
+  - [~] **G1a. 감정·캐릭터 연속성 엔진** — 2026-08-16 상세 계획 신설,
+    A1 core·A2 default-OFF greybox·A4 offline foundation 완료, A0 사용자 결정·
+    A3·A4 실제 Mi:dm/사람 평가 이후 대기.
     (`진행예정/AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`)
-    - [ ] A0 constitution v2: likes/dislikes/pride/embarrassment/conflict/repair와
-      state/event enum·metric threshold 사용자 확정
+    - [~] A0 constitution v2: 확정 이월과 미정 likes/dislikes/pride/
+      embarrassment/conflict/repair/fatigue 선택지를 분리한 결정 시트 작성,
+      state/event enum·metric threshold 사용자 확정 대기
+      (`진행예정/AIRI-CHARACTER-CONSTITUTION-V2-DECISION-2026-08-16.md`)
     - [x] A1 순수 typed affect reducer: strict schema, kind weight cap,
       one-step inertia·decay·hysteresis·recovery·safety lock, bounded in-memory
       content-free event ring — 2026-08-16
@@ -358,8 +374,11 @@
     - [ ] A3 미래 B4b adapter event source: B4a frozen action shape를 유지하고
       delivery-confirmed callback/donation/game/silence/repair outcome만 개인정보
       없는 authoritative stimulus로 변환
-    - [ ] A4 독립 합성 6 scenario×24 turn OFF/ON·blind human review: positivity
-      collapse, 인과 적합성, turn continuity, AIRI specificity 검증
+    - [~] A4 독립 합성 6 scenario×24 turn OFF/ON·blind human review: 한국어
+      인과 fixture, reducer oracle, paired request/transport, content-free report
+      기반 완료. 실제 Mi:dm 122쌍과 blind human positivity collapse·인과 적합성·
+      turn continuity·AIRI specificity 평가는 미실행 — 2026-08-16
+      (`완료/AIRI-G1A-AFFECT-BROADCAST-EVAL-FOUNDATION-2026-08-16.md`)
     - [ ] A5 trusted state→TTS/Live2D 표현 배선 (보류: 텍스트 게이트 PASS)
     - [ ] A6 B1b/B4b 설치 AIRI 30~120분 비공개 리허설과 운영 ON 사용자 결정
 - [~] **G2. 장기 기억**
@@ -537,9 +556,9 @@
   - [x] B1a offline transport-neutral chat-ingress core — strict YouTube candidate admission, HMAC pseudonyms, bounded FIFO screening/delivery, established AIRI envelope (`data.text` only; viewer sidecar 없음), Node contract tests; 기본 OFF, B1 persistence 없음 — 2026-08-13
   - [x] I2a viewer-memory foundation — separate opt-in SQLite, strict `yt:v1`/`viewer:v1`/`broadcast:v1` HMAC pseudonyms, content-free B1 observation boundary, manual capped tiers, bounded explicit facts, retention/deletion, count-only donations, and untrusted callback candidates; no runtime wiring or AIRI injection. I2 remains partial pending an authorized next-broadcast callback smoke — 2026-08-13 (`완료/AIRI-I2A-VIEWER-MEMORY-FOUNDATION-2026-08-13.md`)
   - [ ] B1b live adapter/quota/OAuth 및 실제 AIRI 주입 (보류: 외부 YouTube 자격증명·쿼터 실측·운영 승인)
-  - [~] G1a A0~A2 typed affect core/proxy greybox — A1/A2 코드 완료, A0
-    constitution v2·metric 사용자 확정 대기 (기본 OFF; C2의 자유 텍스트 emotion
-    직접 주입을 대체하는 안전 경로)
+  - [~] G1a A0~A4 typed affect core/proxy/eval — A1/A2와 A4 offline foundation
+    완료, A0 constitution v2·metric 사용자 확정 및 A3 event source·실제 Mi:dm
+    A/B 대기 (기본 OFF; C2의 자유 텍스트 emotion 직접 주입을 대체하는 안전 경로)
 - [~] **M3** (B2 송출 + B3 안전)
   - [x] B3 모더레이션 게이트 코드 (사전 113항목+패턴 7, 기본 off) — 2026-08-12 (`932eae6`)
   - [x] B3 배선 3종 — TTS 폴백 7/7·런처 env·Electron "필터당함" 배지,
@@ -566,8 +585,9 @@
   - [~] B4a 기반 구현 — 기본 OFF/inert; simulation-only 집중 테스트 17 PASS·독립 최종 검토 PASS.
     B4b 런타임 어댑터와 실제 비공개 리허설은 미착수
     (`완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`)
-  - [ ] G1a A3~A5 — B4 content-free affect event source, 합성 방송 A/B,
-    텍스트 PASS 뒤 TTS/Live2D 표현 배선
+  - [~] G1a A3~A5 — A4 합성 방송 평가 기반은 완료했지만 실제 Mi:dm/사람 A/B,
+    A3 B4 content-free affect event source와 텍스트 PASS 뒤 TTS/Live2D 표현 배선은
+    대기
 - [ ] **M5** (리허설 → 데뷔 → I4 플라이휠)
 
 ## 모델 SSoT 게이트 (전환 고정 선언의 전제)
