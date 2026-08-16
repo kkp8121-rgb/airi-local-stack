@@ -4,6 +4,10 @@
 - 상태: **offline foundation 완료 / A4 Mi:dm A/B·blind human review는 미완료**
 - 운영 영향: 없음. `AIRI_AFFECT_CONTINUITY_ENABLED` 기본 OFF 유지
 
+후속 참고: 위 상태는 이 foundation 배치 당시 범위다. 2026-08-17 실제 Mi:dm
+122쌍과 blind review를 완료했으나 품질 gate는 FAIL했다. 현재 판단은
+`AIRI-G1A-AFFECT-BROADCAST-AB-2026-08-17.md`를 함께 본다.
+
 ## 1. 이번 배치가 만든 것
 
 - `ollama-proxy/eval/affect_broadcast/synthetic_affect_broadcast_v1.json`

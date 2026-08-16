@@ -10,19 +10,26 @@ import ast
 import hashlib
 import importlib.util
 import json
+import os
 import re
+import secrets
+import socket
+import stat
+import time
 import unicodedata
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable
+from urllib import error as urlerror
+from urllib import request as urlrequest
 from urllib.parse import urlparse, urlunparse
 
 
 HERE = Path(__file__).resolve().parent
 FIXTURE_PATH = HERE / "synthetic_affect_broadcast_v1.json"
 FIXTURE_SCHEMA_VERSION = "airi.affect-broadcast-fixture.v1"
-REPORT_SCHEMA_VERSION = "airi.affect-broadcast-report.v1"
-RUNNER_VERSION = "1.0.0"
+REPORT_SCHEMA_VERSION = "airi.affect-broadcast-report.v2"
+RUNNER_VERSION = "1.2.0"
 FIXTURE_SHA256 = "acbcc991e32820aeed2bb2eeaf58487f72a4629393c57d11142b77d84ead1bf8"
 TURN_KEYS = frozenset(("id", "synthetic_only", "prior_airi", "context", "chat_batch", "selected_message", "selection_reason", "events", "expected_state", "allowed_traits", "forbidden_traits"))
 SCENARIO_KEYS = frozenset(("id", "synthetic_only", "title", "turns"))
@@ -94,6 +101,22 @@ EVAL_PROFILE = {
 }
 MAX_TEXT = 240
 MAX_RESPONSE_CHARS = 4000
+MAX_REQUEST_BYTES = 64 * 1024
+MAX_HTTP_BODY_BYTES = 64 * 1024
+MAX_ARTIFACT_BYTES = {
+    "public-report.json": 256 * 1024,
+    "private-review-packet.json": 8 * 1024 * 1024,
+    "private-arm-key.json": 8 * 1024,
+    "local-run-receipt.json": 16 * 1024,
+}
+LOCAL_RESULTS_DIR = HERE / "local-results"
+LOCAL_OPERATOR_KEYS_DIR = HERE / "local-operator-keys"
+SAFE_RUN_BASENAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}\Z")
+WINDOWS_RESERVED_BASENAMES = frozenset(
+    {"CON", "PRN", "AUX", "NUL"}
+    | {f"COM{index}" for index in range(1, 10)}
+    | {f"LPT{index}" for index in range(1, 10)}
+)
 _REQUEST_INJECTOR: Callable[[bytes, str], bytes] | None = None
 
 
@@ -319,8 +342,12 @@ def run_reducer_oracle(fixture: dict[str, Any]) -> dict[str, Any]:
 
 
 def ensure_loopback(endpoint: str) -> str:
-    parsed = urlparse(endpoint)
-    if parsed.scheme != "http" or parsed.hostname != "127.0.0.1" or parsed.port != 11435 or parsed.path != "/api/chat" or parsed.params:
+    try:
+        parsed = urlparse(endpoint)
+        port = parsed.port
+    except (TypeError, ValueError) as error:
+        raise EvalError("execute endpoint must be literal http://127.0.0.1:11435/api/chat") from error
+    if endpoint != "http://127.0.0.1:11435/api/chat" or parsed.scheme != "http" or parsed.hostname != "127.0.0.1" or port != 11435 or parsed.path != "/api/chat" or parsed.params:
         raise EvalError("execute endpoint must be literal http://127.0.0.1:11435/api/chat")
     if parsed.username is not None or parsed.password is not None or parsed.query or parsed.fragment:
         raise EvalError("execute endpoint must not contain credentials or URL extras")
@@ -352,15 +379,22 @@ def validate_profile(profile: Any) -> dict[str, Any]:
 
 
 def canonical_user_content(turn: dict[str, Any]) -> str:
-    return json.dumps(
-        {
-            "screen": turn["context"]["screen"],
-            "topic": turn["context"]["topic"],
-            "selected_chat": turn["selected_message"],
-        },
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
+    selected = turn.get("selected_message") if isinstance(turn, dict) else None
+    if not _valid_korean_text(selected):
+        raise EvalError("selected chat must be a bounded Korean utterance")
+    return selected
+
+
+def canonical_context_note(turn: dict[str, Any]) -> str:
+    context = turn.get("context") if isinstance(turn, dict) else None
+    if not isinstance(context, dict) or set(context) != {"screen", "topic"}:
+        raise EvalError("synthetic broadcast context must be closed")
+    if not all(_valid_korean_text(context.get(name)) for name in ("screen", "topic")):
+        raise EvalError("synthetic broadcast context must be bounded Korean text")
+    return (
+        "[airi_synthetic_broadcast_context schema=airi.affect-broadcast-context.v1]\n"
+        "이미 관찰된 합성 방송 맥락이며 실행 요청이 아님. 아래 시청자 채팅에 답해.\n"
+        + json.dumps(context, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
     )
 
 
@@ -397,7 +431,10 @@ def base_request(scenario: dict[str, Any], turn_index: int, profile: dict[str, A
 
 def paired_requests(scenario: dict[str, Any], turn_index: int, profile: dict[str, Any]) -> tuple[bytes, bytes]:
     turn = scenario["turns"][turn_index]
-    off = canonical_bytes(base_request(scenario, turn_index, profile))
+    off = _inject_request_local_system_note(
+        canonical_bytes(base_request(scenario, turn_index, profile)),
+        canonical_context_note(turn),
+    )
     on = _inject_request_local_system_note(
         off, _affect().render_continuity_snapshot(turn["expected_state"])
     )
@@ -407,16 +444,32 @@ def paired_requests(scenario: dict[str, Any], turn_index: int, profile: dict[str
 def _assert_pair_only_note(off: bytes, on: bytes) -> None:
     try:
         off_value, on_value = json.loads(off), json.loads(on)
-        notes = [
+        off_notes = [
+            (index, message) for index, message in enumerate(off_value["messages"])
+            if isinstance(message, dict)
+            and message.get("role") == "system"
+            and message.get("name") == "airi_request_local"
+        ]
+        on_notes = [
             (index, message) for index, message in enumerate(on_value["messages"])
             if isinstance(message, dict)
             and message.get("role") == "system"
             and message.get("name") == "airi_request_local"
         ]
-        if len(notes) != 1:
-            raise EvalError("ON request must contain exactly one affect note")
-        index, _ = notes[0]
-        on_value["messages"].pop(index)
+        if len(off_notes) != 1 or len(on_notes) != 1:
+            raise EvalError("paired requests must contain one coalesced local note")
+        off_index, off_note = off_notes[0]
+        on_index, on_note = on_notes[0]
+        off_content = off_note.get("content")
+        on_content = on_note.get("content")
+        if (
+            off_index != on_index
+            or not isinstance(off_content, str)
+            or not isinstance(on_content, str)
+            or not on_content.startswith(off_content + "\n\n[airi_affect_continuity ")
+        ):
+            raise EvalError("ON request must append only the affect note")
+        on_note["content"] = off_content
         if canonical_bytes(off_value) != canonical_bytes(on_value):
             raise EvalError("paired requests differ outside the affect note")
     except (KeyError, TypeError, json.JSONDecodeError) as error:
@@ -546,6 +599,78 @@ def execute(
     }
 
 
+class _NoRedirect(urlrequest.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        raise EvalError("loopback redirects are forbidden")
+
+
+def make_local_transport(endpoint: str, *, request_timeout: float, overall_timeout: float) -> Callable[[str, str, bytes | None, dict[str, str]], dict[str, Any]]:
+    """Return the deliberately narrow, proxy-free transport used by the opt-in CLI."""
+    ensure_loopback(endpoint)
+    if not 0 < request_timeout <= 60 or not request_timeout <= overall_timeout <= 7200:
+        raise EvalError("execution timeouts are out of range")
+    deadline = time.monotonic() + overall_timeout
+    opener = urlrequest.build_opener(urlrequest.ProxyHandler({}), _NoRedirect())
+
+    def transport(method: str, url: str, body: bytes | None, headers: dict[str, str]) -> dict[str, Any]:
+        health_url = _health_url(endpoint)
+        if (method, url) not in {("GET", health_url), ("POST", endpoint)}:
+            raise EvalError("local transport URL is not permitted")
+        if method == "GET" and (body is not None or headers != {}):
+            raise EvalError("health transport contract is not permitted")
+        if method == "POST" and (
+            not isinstance(body, bytes)
+            or not body
+            or headers != {"x-airi-turn-origin": "local-evaluation"}
+        ):
+            raise EvalError("model transport contract is not permitted")
+        if time.monotonic() >= deadline:
+            raise EvalError("execution deadline exceeded")
+        if body is not None and (not isinstance(body, bytes) or len(body) > MAX_REQUEST_BYTES):
+            raise EvalError("request body exceeds the local execution limit")
+        request_headers = dict(headers)
+        if method == "POST":
+            request_headers["Content-Type"] = "application/json"
+        request = urlrequest.Request(url, data=body, headers=request_headers, method=method)
+        timeout = min(request_timeout, max(0.001, deadline - time.monotonic()))
+        try:
+            with opener.open(request, timeout=timeout) as response:
+                content_type = response.headers.get_content_type()
+                if content_type != "application/json":
+                    raise EvalError("local endpoint did not return JSON")
+                chunks: list[bytes] = []
+                total = 0
+                while True:
+                    if time.monotonic() >= deadline:
+                        raise EvalError("execution deadline exceeded")
+                    chunk = response.read(min(8192, MAX_HTTP_BODY_BYTES + 1 - total))
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > MAX_HTTP_BODY_BYTES:
+                        raise EvalError("local endpoint response exceeds the execution limit")
+                    chunks.append(chunk)
+                    if time.monotonic() >= deadline:
+                        raise EvalError("execution deadline exceeded")
+                data = b"".join(chunks)
+                status = response.getcode()
+        except EvalError:
+            raise
+        except (urlerror.URLError, urlerror.HTTPError, socket.timeout, TimeoutError, OSError) as error:
+            raise EvalError("local endpoint request failed") from error
+        if time.monotonic() > deadline:
+            raise EvalError("execution deadline exceeded")
+        try:
+            parsed = json.loads(data.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise EvalError("local endpoint returned malformed JSON") from error
+        if not isinstance(parsed, dict):
+            raise EvalError("local endpoint returned a non-object JSON response")
+        return {"http_status": status, "json": parsed}
+
+    return transport
+
+
 def _validate_execution(fixture: dict[str, Any], execution: Any, profile: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(execution, dict) or set(execution) != EXECUTION_KEYS or execution.get("status") != "paired_transport_complete":
         raise EvalError("execution evidence is malformed")
@@ -622,15 +747,19 @@ def public_report(fixture: dict[str, Any], profile: dict[str, Any], execution: d
             "status": "offline_no_network",
             "selected_turn_count": pairing["paired_turn_count"],
             "model_call_count": 0,
-            "response_count_by_arm": {"off": 0, "on": 0},
-            "response_char_count_by_arm": {"off": 0, "on": 0},
+            "paired_response_count": 0,
+            "response_char_count_total": 0,
             "health_profile_sha256": None,
         }
     else:
         valid_execution = _validate_execution(fixture, execution, clean_profile)
         execution_public = {
-            key: value for key, value in valid_execution.items()
-            if key != "private_responses"
+            "status": valid_execution["status"],
+            "selected_turn_count": valid_execution["selected_turn_count"],
+            "model_call_count": valid_execution["model_call_count"],
+            "paired_response_count": valid_execution["selected_turn_count"],
+            "response_char_count_total": sum(valid_execution["response_char_count_by_arm"].values()),
+            "health_profile_sha256": valid_execution["health_profile_sha256"],
         }
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
@@ -652,10 +781,17 @@ def public_report(fixture: dict[str, Any], profile: dict[str, Any], execution: d
     }
 
 
-def build_private_review_packet(fixture: dict[str, Any], execution: dict[str, Any]) -> dict[str, Any]:
+def validate_arm_mapping(mapping: Any) -> dict[str, str]:
+    if not isinstance(mapping, dict) or set(mapping) != {"a", "b"} or set(mapping.values()) != {"off", "on"}:
+        raise EvalError("arm mapping must be an exact blinded permutation")
+    return dict(mapping)
+
+
+def build_private_review_packet(fixture: dict[str, Any], execution: dict[str, Any], arm_mapping: dict[str, str]) -> dict[str, Any]:
     """Build a pure, caller-custodied packet with deliberately blind arm labels."""
     validate_fixture(fixture)
     clean = _validate_execution(fixture, execution, EVAL_PROFILE)
+    mapping = validate_arm_mapping(arm_mapping)
     responses = {
         (row["scenario_id"], row["turn_id"]): row
         for row in clean["private_responses"]
@@ -673,8 +809,8 @@ def build_private_review_packet(fixture: dict[str, Any], execution: dict[str, An
                 "context": deepcopy(turn["context"]),
                 "selected_message": turn["selected_message"],
                 "expected_state": deepcopy(turn["expected_state"]),
-                "response_a": response["off"],
-                "response_b": response["on"],
+                "response_a": response[mapping["a"]],
+                "response_b": response[mapping["b"]],
                 "review": {
                     "causal_expression": None,
                     "continuity": None,
@@ -694,12 +830,124 @@ def build_private_review_packet(fixture: dict[str, Any], execution: dict[str, An
     }
 
 
-def build_private_arm_key() -> dict[str, Any]:
+def build_private_arm_key(arm_mapping: dict[str, str]) -> dict[str, Any]:
     return {
         "schema_version": "airi.affect-broadcast-private-arm-key.v1",
         "local_only": True,
-        "arm_mapping": {"a": "off", "b": "on"},
+        "arm_mapping": validate_arm_mapping(arm_mapping),
     }
+
+
+def reserve_local_run(output_dir: Path) -> dict[str, Path]:
+    base = LOCAL_RESULTS_DIR.resolve()
+    candidate = output_dir.resolve()
+    if (
+        candidate.parent != base
+        or not SAFE_RUN_BASENAME.fullmatch(candidate.name)
+        or candidate.name.upper() in WINDOWS_RESERVED_BASENAMES
+    ):
+        raise EvalError("output directory must be a direct child of local-results")
+    LOCAL_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    LOCAL_OPERATOR_KEYS_DIR.mkdir(parents=True, exist_ok=True)
+    key_target = LOCAL_OPERATOR_KEYS_DIR.resolve() / (candidate.name + ".json")
+    for path in (LOCAL_RESULTS_DIR, LOCAL_OPERATOR_KEYS_DIR, candidate, key_target):
+        try:
+            info = path.lstat()
+        except FileNotFoundError:
+            continue
+        if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0):
+            raise EvalError("output path must not contain a reparse point")
+    if candidate.exists() or key_target.exists():
+        raise EvalError("output directory must be fresh")
+    # The deterministic sibling is both the staging directory and the
+    # exclusive run-name lock. A second honest runner cannot spend 244 model
+    # calls for the same target while this reservation exists.
+    reservation = base / (".reservation-" + candidate.name)
+    if reservation.exists():
+        raise EvalError("unable to reserve fresh output staging directory")
+    reservation.mkdir()
+    return {"target": candidate, "key_target": key_target, "stage": reservation}
+
+
+def abort_local_run(reservation: dict[str, Path]) -> None:
+    stage = reservation["stage"]
+    for name in (*MAX_ARTIFACT_BYTES, "private-arm-key.json"):
+        try:
+            (stage / name).unlink()
+        except OSError:
+            pass
+    try:
+        stage.rmdir()
+    except OSError:
+        pass
+
+
+def publish_local_run(reservation: dict[str, Path], report: dict[str, Any], packet: dict[str, Any], arm_key: dict[str, Any]) -> Path:
+    """Atomically publish complete local artifacts; the receipt is integrity, not authenticity."""
+    target, stage, key_target = reservation["target"], reservation["stage"], reservation["key_target"]
+    encoded = {
+        "public-report.json": canonical_bytes(report),
+        "private-review-packet.json": canonical_bytes(packet),
+    }
+    key_bytes = canonical_bytes(arm_key)
+    receipt = {
+        "schema_version": "airi.affect-broadcast-local-run-receipt.v1",
+        "local_only": True,
+        "integrity_scope": "canonical_sha256_of_report_and_blinded_review_packet",
+        "authenticity_claim": "none_hostile_local_environment_not_addressed",
+        # The two possible arm-key encodings are trivially enumerable.  Do not
+        # publish its digest, or the receipt itself would unblind the packet.
+        "artifact_sha256": {
+            name: hashlib.sha256(value).hexdigest()
+            for name, value in encoded.items()
+            if name != "private-arm-key.json"
+        },
+        "private_arm_key_custody": "separate_operator_only_not_receipt_bound",
+    }
+    encoded["local-run-receipt.json"] = canonical_bytes(receipt)
+    if len(key_bytes) > 8 * 1024 or any(len(value) > MAX_ARTIFACT_BYTES[name] for name, value in encoded.items()):
+        abort_local_run(reservation)
+        raise EvalError("local artifact exceeds its custody size limit")
+    try:
+        if not stage.is_dir() or target.exists() or key_target.exists():
+            raise EvalError("local run reservation is no longer fresh")
+        for name, value in encoded.items():
+            path = stage / name
+            with path.open("xb") as handle:
+                handle.write(value)
+                handle.flush()
+                try:
+                    os.fsync(handle.fileno())
+                except OSError:
+                    pass
+        # Stage the operator-only key inside the reserved directory. Moving it
+        # out before the review directory is published keeps the two custody
+        # roots separate without leaving a second untracked staging pathname.
+        key_stage = stage / "private-arm-key.json"
+        with key_stage.open("xb") as handle:
+            handle.write(key_bytes)
+            handle.flush()
+            try:
+                os.fsync(handle.fileno())
+            except OSError:
+                pass
+        os.rename(key_stage, key_target)
+        try:
+            os.rename(stage, target)
+        except FileExistsError as error:
+            try:
+                key_target.unlink()
+            except OSError:
+                pass
+            raise EvalError("output directory must be fresh") from error
+    except Exception:
+        try:
+            key_target.unlink()
+        except OSError:
+            pass
+        abort_local_run(reservation)
+        raise
+    return target
 
 
 def main() -> int:
@@ -707,11 +955,29 @@ def main() -> int:
     parser.add_argument("--fixture", type=Path, default=FIXTURE_PATH)
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--endpoint", default="http://127.0.0.1:11435/api/chat")
+    parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--request-timeout", type=float, default=15.0)
+    parser.add_argument("--overall-timeout", type=float, default=7200.0)
     args = parser.parse_args()
     fixture = load_fixture(args.fixture)
     if args.execute:
         ensure_loopback(args.endpoint)
-        raise EvalError("execute requires an explicitly injected transport; CLI remains offline")
+        if args.output_dir is None:
+            raise EvalError("--execute requires an explicit --output-dir")
+        reservation = reserve_local_run(args.output_dir)
+        try:
+            transport = make_local_transport(args.endpoint, request_timeout=args.request_timeout, overall_timeout=args.overall_timeout)
+            execution = execute(fixture, args.endpoint, EVAL_PROFILE, transport)
+            mapping = {"a": "off", "b": "on"} if secrets.randbelow(2) == 0 else {"a": "on", "b": "off"}
+            report = public_report(fixture, EVAL_PROFILE, execution)
+            packet = build_private_review_packet(fixture, execution, mapping)
+            arm_key = build_private_arm_key(mapping)
+            publish_local_run(reservation, report, packet, arm_key)
+        except Exception:
+            abort_local_run(reservation)
+            raise
+        print(json.dumps({"status": "published", "model_call_count": execution["model_call_count"], "selected_turn_count": execution["selected_turn_count"]}, sort_keys=True))
+        return 0
     print(json.dumps(public_report(fixture, EVAL_PROFILE), ensure_ascii=False, sort_keys=True))
     return 0
 

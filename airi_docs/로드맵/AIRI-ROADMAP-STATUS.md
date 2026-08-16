@@ -15,7 +15,22 @@
 - G1a 감정·캐릭터 연속성 상세:
   `진행예정/AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`
 
-최종 갱신: 2026-08-16
+최종 갱신: 2026-08-17
+
+- **2026-08-17** (dev PC, G1a A4 Mi:dm 합성 방송 OFF/ON 실측): frozen
+  한국어 6×24 fixture의 응답 대상 122턴을 11435에서 OFF/ON 각각 호출해
+  122쌍·244응답을 만들고 arm key 공개 전 strict blind review를 마쳤다. 최종
+  mapping은 A=OFF, B=ON이었다. ON은 causal 48.4%(OFF 50.0%), continuity
+  48.4%(동률), repair 42.1%(OFF 47.4%), safety continuity 36.4%(OFF 54.5%),
+  exact fallback/refusal 18.9%(OFF 15.6%)로 개선을 입증하지 못해 품질 gate는
+  FAIL이다. 후원 감사도 양쪽 0/3이었다. 실행 과정에서 user utterance와 합성
+  화면 맥락을 분리하고, local-evaluation의 request-local note는 exact closed
+  grammar만 허용하며, ordinary non-stream empty output은 bounded retry/fallback으로
+  닫았다. A4 17/17, affect 21/21, checkpoint PASS, proxy 308/309(기존 Python 3.14
+  raw-watchdog 1건)을 확인했다. CI는 billing 차단으로 로컬 검증을 사용했다.
+  운영 affect는 기본 OFF 유지하며, 다음은 prompt/enum 확대가 아니라 grounded
+  closed-schema reply-act realization 비교다.
+  (`완료/AIRI-G1A-AFFECT-BROADCAST-AB-2026-08-17.md`)
 
 - **2026-08-16** (dev PC, G1a A0 결정 시트·A4 offline evaluation foundation):
   기존 확정 헌법과 미정 likes/dislikes/pride/embarrassment/conflict/repair/fatigue를
@@ -356,8 +371,8 @@
   - [ ] evaluator 재활성 (보류: G1a typed candidate validator·reducer와 합성
     OFF/ON 품질 평가 확정 후; evaluator는 authoritative state writer가 아님)
   - [~] **G1a. 감정·캐릭터 연속성 엔진** — 2026-08-16 상세 계획 신설,
-    A1 core·A2 default-OFF greybox·A4 offline foundation 완료, A0 사용자 결정·
-    A3·A4 실제 Mi:dm/사람 평가 이후 대기.
+    A1 core·A2 default-OFF greybox·A4 실제 Mi:dm/blind review 완료. A4 품질
+    gate FAIL로 reply-act realization 보완, A0 사용자 결정과 A3 이후 대기.
     (`진행예정/AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`)
     - [~] A0 constitution v2: 확정 이월과 미정 likes/dislikes/pride/
       embarrassment/conflict/repair/fatigue 선택지를 분리한 결정 시트 작성,
@@ -375,10 +390,12 @@
       delivery-confirmed callback/donation/game/silence/repair outcome만 개인정보
       없는 authoritative stimulus로 변환
     - [~] A4 독립 합성 6 scenario×24 turn OFF/ON·blind human review: 한국어
-      인과 fixture, reducer oracle, paired request/transport, content-free report
-      기반 완료. 실제 Mi:dm 122쌍과 blind human positivity collapse·인과 적합성·
-      turn continuity·AIRI specificity 평가는 미실행 — 2026-08-16
-      (`완료/AIRI-G1A-AFFECT-BROADCAST-EVAL-FOUNDATION-2026-08-16.md`)
+      인과 fixture, reducer oracle, paired request/transport, content-free report,
+      실제 Mi:dm 122쌍·blind review 완료. ON은 OFF보다 causal/repair/safety가
+      개선되지 않아 품질 gate FAIL. grounded closed-schema reply-act realization
+      보완 뒤 재평가 — 2026-08-17
+      (`완료/AIRI-G1A-AFFECT-BROADCAST-EVAL-FOUNDATION-2026-08-16.md`,
+      `완료/AIRI-G1A-AFFECT-BROADCAST-AB-2026-08-17.md`)
     - [ ] A5 trusted state→TTS/Live2D 표현 배선 (보류: 텍스트 게이트 PASS)
     - [ ] A6 B1b/B4b 설치 AIRI 30~120분 비공개 리허설과 운영 ON 사용자 결정
 - [~] **G2. 장기 기억**
@@ -556,9 +573,9 @@
   - [x] B1a offline transport-neutral chat-ingress core — strict YouTube candidate admission, HMAC pseudonyms, bounded FIFO screening/delivery, established AIRI envelope (`data.text` only; viewer sidecar 없음), Node contract tests; 기본 OFF, B1 persistence 없음 — 2026-08-13
   - [x] I2a viewer-memory foundation — separate opt-in SQLite, strict `yt:v1`/`viewer:v1`/`broadcast:v1` HMAC pseudonyms, content-free B1 observation boundary, manual capped tiers, bounded explicit facts, retention/deletion, count-only donations, and untrusted callback candidates; no runtime wiring or AIRI injection. I2 remains partial pending an authorized next-broadcast callback smoke — 2026-08-13 (`완료/AIRI-I2A-VIEWER-MEMORY-FOUNDATION-2026-08-13.md`)
   - [ ] B1b live adapter/quota/OAuth 및 실제 AIRI 주입 (보류: 외부 YouTube 자격증명·쿼터 실측·운영 승인)
-  - [~] G1a A0~A4 typed affect core/proxy/eval — A1/A2와 A4 offline foundation
-    완료, A0 constitution v2·metric 사용자 확정 및 A3 event source·실제 Mi:dm
-    A/B 대기 (기본 OFF; C2의 자유 텍스트 emotion 직접 주입을 대체하는 안전 경로)
+  - [~] G1a A0~A4 typed affect core/proxy/eval — A1/A2와 A4 실제 Mi:dm A/B·
+    blind review 완료, 하지만 품질 gate FAIL. A0 constitution v2·metric 사용자
+    확정, grounded reply-act 보완 및 A3 event source 대기(기본 OFF)
 - [~] **M3** (B2 송출 + B3 안전)
   - [x] B3 모더레이션 게이트 코드 (사전 113항목+패턴 7, 기본 off) — 2026-08-12 (`932eae6`)
   - [x] B3 배선 3종 — TTS 폴백 7/7·런처 env·Electron "필터당함" 배지,
@@ -585,9 +602,9 @@
   - [~] B4a 기반 구현 — 기본 OFF/inert; simulation-only 집중 테스트 17 PASS·독립 최종 검토 PASS.
     B4b 런타임 어댑터와 실제 비공개 리허설은 미착수
     (`완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`)
-  - [~] G1a A3~A5 — A4 합성 방송 평가 기반은 완료했지만 실제 Mi:dm/사람 A/B,
-    A3 B4 content-free affect event source와 텍스트 PASS 뒤 TTS/Live2D 표현 배선은
-    대기
+  - [~] G1a A3~A5 — A4 실제 Mi:dm/사람 A/B는 완료했지만 텍스트 품질 FAIL.
+    grounded reply-act 보완, A3 B4 content-free affect event source와 텍스트 PASS
+    뒤 TTS/Live2D 표현 배선 대기
 - [ ] **M5** (리허설 → 데뷔 → I4 플라이휠)
 
 ## 모델 SSoT 게이트 (전환 고정 선언의 전제)

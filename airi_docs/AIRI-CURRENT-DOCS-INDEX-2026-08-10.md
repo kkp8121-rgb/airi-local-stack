@@ -110,6 +110,12 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-G1A-AFFECT-BROADCAST-AB-2026-08-17.md` — G1a A4의 실제 Mi:dm
+  합성 방송 122쌍·244응답과 blind human review 기록. unblind 결과 OFF가
+  causal/repair/safety와 fallback에서 근소하게 낫고 ON은 개선을 입증하지 못해
+  품질 gate FAIL. 대표 OFF/ON 원문과 다음 grounded reply-act 보완 방향을 담으며,
+  운영 affect gate는 기본 OFF를 유지한다.
+
 - `AIRI-G1A-AFFECT-BROADCAST-EVAL-FOUNDATION-2026-08-16.md` — G1a A4의
   offline foundation 완료. 독립 한국어 방송 6×24 fixture, A1 reducer 144/144
   oracle, 122개 OFF/ON paired request/transport 계약, frozen Mi:dm profile,

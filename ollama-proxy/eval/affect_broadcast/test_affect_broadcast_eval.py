@@ -1,9 +1,13 @@
 import copy
+import hashlib
 import importlib.util
 import json
+import os
 import re
 import sys
+import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -59,6 +63,7 @@ class FakeTransport:
         request = json.loads(body)
         has_note = any(
             message.get("name") == "airi_request_local"
+            and "[airi_affect_continuity " in str(message.get("content") or "")
             for message in request["messages"]
             if isinstance(message, dict)
         )
@@ -72,6 +77,44 @@ class FakeTransport:
                 }
             },
         }
+
+
+class FakeHttpResponse:
+    def __init__(self, body=b'{}', *, content_type='application/json', status=200, on_read=None):
+        self.body = body
+        self.offset = 0
+        self.status = status
+        self.on_read = on_read
+        self.headers = type('Headers', (), {'get_content_type': lambda _: content_type})()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *unused):
+        return False
+
+    def read(self, size):
+        if self.on_read:
+            self.on_read()
+        value = self.body[self.offset:self.offset + size]
+        self.offset += len(value)
+        return value
+
+    def getcode(self):
+        return self.status
+
+
+class FakeOpener:
+    def __init__(self, response=None, error=None):
+        self.response = response
+        self.error = error
+        self.requests = []
+
+    def open(self, request, timeout):
+        self.requests.append((request, timeout))
+        if self.error:
+            raise self.error
+        return self.response
 
 
 class AffectBroadcastEvalTests(unittest.TestCase):
@@ -157,14 +200,19 @@ class AffectBroadcastEvalTests(unittest.TestCase):
         off, on = evaluation.paired_requests(scenario, 22, PROFILE)
         evaluation._assert_pair_only_note(off, on)
         off_value, on_value = json.loads(off), json.loads(on)
-        note = [message for message in on_value["messages"] if message.get("name") == "airi_request_local"]
-        self.assertEqual(1, len(note))
+        off_note = [message for message in off_value["messages"] if message.get("name") == "airi_request_local"]
+        on_note = [message for message in on_value["messages"] if message.get("name") == "airi_request_local"]
+        self.assertEqual(1, len(off_note))
+        self.assertEqual(1, len(on_note))
+        self.assertIn("[airi_synthetic_broadcast_context ", off_note[0]["content"])
+        self.assertNotIn("[airi_affect_continuity ", off_note[0]["content"])
+        self.assertTrue(on_note[0]["content"].startswith(off_note[0]["content"] + "\n\n[airi_affect_continuity "))
         self.assertGreater(len(off_value["messages"]), 2)
-        self.assertLessEqual(len(off_value["messages"]), 2 * (PROFILE["history_turns"] + 1))
-        self.assertEqual(["assistant", "user"] * (len(off_value["messages"]) // 2), [message["role"] for message in off_value["messages"]])
-        latest = json.loads(off_value["messages"][-1]["content"])
-        self.assertEqual(scenario["turns"][22]["selected_message"], latest["selected_chat"])
-        self.assertEqual(scenario["turns"][22]["context"]["screen"], latest["screen"])
+        self.assertLessEqual(len(off_value["messages"]), 2 * (PROFILE["history_turns"] + 1) + 1)
+        dialogue = [message for message in off_value["messages"] if message["role"] != "system"]
+        self.assertEqual(["assistant", "user"] * (len(dialogue) // 2), [message["role"] for message in dialogue])
+        self.assertEqual(scenario["turns"][22]["selected_message"], dialogue[-1]["content"])
+        self.assertIn(scenario["turns"][22]["context"]["screen"], off_note[0]["content"])
         self.assertEqual(off_value["model"], on_value["model"])
         self.assertEqual(off_value["options"], on_value["options"])
 
@@ -221,13 +269,73 @@ class AffectBroadcastEvalTests(unittest.TestCase):
         report = evaluation.public_report(self.fixture, PROFILE, execution)
         rendered = json.dumps(report, ensure_ascii=False)
         self.assertEqual("paired_transport_complete", report["execution"]["status"])
+        self.assertEqual(
+            {
+                "status", "selected_turn_count", "model_call_count",
+                "paired_response_count", "response_char_count_total",
+                "health_profile_sha256",
+            },
+            set(report["execution"]),
+        )
+        self.assertNotIn("response_char_count_by_arm", report["execution"])
+        self.assertEqual(122, report["execution"]["paired_response_count"])
+        self.assertNotIn("response_count_by_arm", report["execution"])
+        self.assertNotIn("response_char_count_by_arm", report["execution"])
         self.assertNotIn("비공개 OFF 응답", rendered)
         self.assertNotIn(self.fixture["scenarios"][0]["turns"][0]["prior_airi"], rendered)
-        packet = evaluation.build_private_review_packet(self.fixture, execution)
+        mapping = {"a": "on", "b": "off"}
+        packet = evaluation.build_private_review_packet(self.fixture, execution, mapping)
         packet_text = json.dumps(packet, ensure_ascii=False)
         self.assertIn("비공개 OFF 응답", packet_text)
         self.assertNotIn("off", json.dumps(packet["rows"][0], ensure_ascii=False))
-        self.assertEqual({"a": "off", "b": "on"}, evaluation.build_private_arm_key()["arm_mapping"])
+        self.assertEqual(mapping, evaluation.build_private_arm_key(mapping)["arm_mapping"])
+
+    def test_arm_mapping_is_exact_and_controls_blinded_packet_order(self):
+        execution = evaluation.execute(self.fixture, "http://127.0.0.1:11435/api/chat", PROFILE, FakeTransport())
+        off_first = execution["private_responses"][0]["off"]
+        on_first = execution["private_responses"][0]["on"]
+        normal = evaluation.build_private_review_packet(self.fixture, execution, {"a": "off", "b": "on"})
+        swapped = evaluation.build_private_review_packet(self.fixture, execution, {"a": "on", "b": "off"})
+        self.assertEqual(off_first, normal["rows"][0]["response_a"])
+        self.assertEqual(on_first, swapped["rows"][0]["response_a"])
+        for bad in ({"a": "off", "b": "off"}, {"a": "off"}, {"a": "off", "b": "on", "c": "x"}):
+            with self.assertRaises(evaluation.EvalError):
+                evaluation.build_private_arm_key(bad)
+
+    def test_output_confinement_and_publish_is_content_free_except_private_packet(self):
+        execution = evaluation.execute(self.fixture, "http://127.0.0.1:11435/api/chat", PROFILE, FakeTransport())
+        report = evaluation.public_report(self.fixture, PROFILE, execution)
+        mapping = {"a": "off", "b": "on"}
+        packet = evaluation.build_private_review_packet(self.fixture, execution, mapping)
+        key = evaluation.build_private_arm_key(mapping)
+        with tempfile.TemporaryDirectory() as temporary:
+            outside = Path(temporary) / "elsewhere"
+            with self.assertRaises(evaluation.EvalError):
+                evaluation.publish_local_run(evaluation.reserve_local_run(outside), report, packet, key)
+        original_results_dir = evaluation.LOCAL_RESULTS_DIR
+        original_keys_dir = evaluation.LOCAL_OPERATOR_KEYS_DIR
+        isolated_results = tempfile.TemporaryDirectory()
+        try:
+            evaluation.LOCAL_RESULTS_DIR = Path(isolated_results.name) / "local-results"
+            evaluation.LOCAL_OPERATOR_KEYS_DIR = Path(isolated_results.name) / "local-operator-keys"
+            target = evaluation.LOCAL_RESULTS_DIR / "test-run"
+            result = evaluation.publish_local_run(evaluation.reserve_local_run(target), report, packet, key)
+            self.assertEqual(target.resolve(), result)
+            public_text = (target / "public-report.json").read_text(encoding="utf-8")
+            self.assertNotIn("비공개 OFF 응답", public_text)
+            self.assertFalse((target / "private-arm-key.json").exists())
+            operator_key = evaluation.LOCAL_OPERATOR_KEYS_DIR / "test-run.json"
+            self.assertEqual(key, json.loads(operator_key.read_text(encoding="utf-8")))
+            receipt = json.loads((target / "local-run-receipt.json").read_text(encoding="utf-8"))
+            self.assertNotIn("private-arm-key.json", receipt["artifact_sha256"])
+            for name, digest in receipt["artifact_sha256"].items():
+                self.assertEqual(digest, hashlib.sha256((target / name).read_bytes()).hexdigest())
+            with self.assertRaises(evaluation.EvalError):
+                evaluation.reserve_local_run(target)
+        finally:
+            evaluation.LOCAL_RESULTS_DIR = original_results_dir
+            evaluation.LOCAL_OPERATOR_KEYS_DIR = original_keys_dir
+            isolated_results.cleanup()
 
     def test_execute_rejects_http_empty_response_and_health_drift(self):
         for transport in (
@@ -266,6 +374,149 @@ class AffectBroadcastEvalTests(unittest.TestCase):
         execution["health_profile_sha256"] = "0" * 64
         with self.assertRaises(evaluation.EvalError):
             evaluation.public_report(self.fixture, PROFILE, execution)
+
+    def test_local_transport_is_proxy_free_and_fail_closed(self):
+        endpoint = 'http://127.0.0.1:11435/api/chat'
+        opener = FakeOpener(FakeHttpResponse(b'{"ok":true}'))
+        with mock.patch.object(evaluation.urlrequest, 'build_opener', return_value=opener) as build:
+            transport = evaluation.make_local_transport(endpoint, request_timeout=1, overall_timeout=2)
+            self.assertEqual({'ok': True}, transport('GET', evaluation._health_url(endpoint), None, {})['json'])
+            handlers = build.call_args.args
+            self.assertEqual({}, handlers[0].proxies)
+            with self.assertRaises(evaluation.EvalError):
+                transport('DELETE', endpoint, None, {})
+            with self.assertRaises(evaluation.EvalError):
+                transport('GET', endpoint, None, {})
+            with self.assertRaises(evaluation.EvalError):
+                transport('POST', evaluation._health_url(endpoint), b'{}', {'x-airi-turn-origin': 'local-evaluation'})
+            with self.assertRaises(evaluation.EvalError):
+                transport('POST', 'http://127.0.0.1:11435/not-chat', b'{}', {})
+            with self.assertRaises(evaluation.EvalError):
+                transport('GET', evaluation._health_url(endpoint), b'x', {})
+            with self.assertRaises(evaluation.EvalError):
+                transport('GET', evaluation._health_url(endpoint), None, {'Authorization': 'x'})
+            with self.assertRaises(evaluation.EvalError):
+                transport('POST', endpoint, b'x' * (evaluation.MAX_REQUEST_BYTES + 1), {'x-airi-turn-origin': 'local-evaluation'})
+            with self.assertRaises(evaluation.EvalError):
+                transport('POST', endpoint, b'{}', {'Authorization': 'x'})
+            opener.response = FakeHttpResponse(b'{"ok":true}')
+            transport('POST', endpoint, b'{}', {'x-airi-turn-origin': 'local-evaluation'})
+            self.assertEqual('application/json', opener.requests[-1][0].get_header('Content-type'))
+
+        cases = (
+            FakeHttpResponse(b'{}', content_type='text/plain'),
+            FakeHttpResponse(b'{'),
+            FakeHttpResponse(b'[]'),
+            FakeHttpResponse(b'x' * (evaluation.MAX_HTTP_BODY_BYTES + 1)),
+        )
+        for response in cases:
+            with self.subTest(response=response.body[:1]):
+                with mock.patch.object(evaluation.urlrequest, 'build_opener', return_value=FakeOpener(response)):
+                    transport = evaluation.make_local_transport(endpoint, request_timeout=1, overall_timeout=2)
+                    with self.assertRaises(evaluation.EvalError):
+                        transport('GET', evaluation._health_url(endpoint), None, {})
+        import urllib.error
+        http_error = urllib.error.HTTPError(endpoint, 500, 'x', None, None)
+        with mock.patch.object(evaluation.urlrequest, 'build_opener', return_value=FakeOpener(error=http_error)):
+            transport = evaluation.make_local_transport(endpoint, request_timeout=1, overall_timeout=2)
+            with self.assertRaises(evaluation.EvalError):
+                transport('GET', evaluation._health_url(endpoint), None, {})
+        http_error.close()
+
+    def test_local_transport_rejects_redirect_and_deadline_during_read(self):
+        endpoint = 'http://127.0.0.1:11435/api/chat'
+        handler = evaluation._NoRedirect()
+        with self.assertRaises(evaluation.EvalError):
+            handler.redirect_request(None, None, 302, 'found', None, endpoint)
+        clock = [0.0]
+        response = FakeHttpResponse(b'{"ok":true}', on_read=lambda: clock.__setitem__(0, 3.0))
+        with mock.patch.object(evaluation.time, 'monotonic', side_effect=lambda: clock[0]), mock.patch.object(evaluation.urlrequest, 'build_opener', return_value=FakeOpener(response)):
+            transport = evaluation.make_local_transport(endpoint, request_timeout=1, overall_timeout=2)
+            with self.assertRaises(evaluation.EvalError):
+                transport('GET', evaluation._health_url(endpoint), None, {})
+
+    def test_main_default_is_offline_and_execute_is_explicit(self):
+        with mock.patch.object(evaluation, 'make_local_transport', side_effect=AssertionError('network')), \
+             mock.patch.object(sys, 'argv', ['runner']):
+            self.assertEqual(0, evaluation.main())
+        calls = []
+        fake_execution = evaluation.execute(self.fixture, 'http://127.0.0.1:11435/api/chat', PROFILE, FakeTransport())
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / 'local-results' / 'fresh'
+            def fake_execute(fixture, endpoint, profile, transport):
+                calls.append(('execute', endpoint))
+                return fake_execution
+            with mock.patch.object(evaluation, 'make_local_transport', return_value=object()), \
+                 mock.patch.object(evaluation, 'execute', side_effect=fake_execute), \
+                 mock.patch.object(evaluation, 'reserve_local_run', return_value={'target': target, 'stage': target, 'key_target': target.with_suffix('.json')}), \
+                 mock.patch.object(evaluation, 'publish_local_run', return_value=target) as publish, \
+                 mock.patch.object(sys, 'argv', ['runner', '--execute', '--output-dir', str(target)]):
+                self.assertEqual(0, evaluation.main())
+            self.assertEqual([('execute', 'http://127.0.0.1:11435/api/chat')], calls)
+            self.assertEqual(244, fake_execution['model_call_count'])
+            self.assertEqual(target, publish.call_args.args[0]['target'])
+            with mock.patch.object(sys, 'argv', ['runner', '--execute']):
+                with self.assertRaises(evaluation.EvalError):
+                    evaluation.main()
+
+        original_results = evaluation.LOCAL_RESULTS_DIR
+        original_keys = evaluation.LOCAL_OPERATOR_KEYS_DIR
+        with tempfile.TemporaryDirectory() as temporary:
+            try:
+                evaluation.LOCAL_RESULTS_DIR = Path(temporary) / 'local-results'
+                evaluation.LOCAL_OPERATOR_KEYS_DIR = Path(temporary) / 'local-operator-keys'
+                existing = evaluation.LOCAL_RESULTS_DIR / 'existing'
+                existing.mkdir(parents=True)
+                with mock.patch.object(evaluation, 'make_local_transport', side_effect=AssertionError('network')), \
+                     mock.patch.object(sys, 'argv', ['runner', '--execute', '--output-dir', str(existing)]):
+                    with self.assertRaises(evaluation.EvalError):
+                        evaluation.main()
+            finally:
+                evaluation.LOCAL_RESULTS_DIR = original_results
+                evaluation.LOCAL_OPERATOR_KEYS_DIR = original_keys
+
+    def test_publish_failure_does_not_create_target_and_rejects_reparse(self):
+        report = {'x': 'x' * (evaluation.MAX_ARTIFACT_BYTES['public-report.json'] + 1)}
+        original = evaluation.LOCAL_RESULTS_DIR
+        original_keys = evaluation.LOCAL_OPERATOR_KEYS_DIR
+        with tempfile.TemporaryDirectory() as temporary:
+            evaluation.LOCAL_RESULTS_DIR = Path(temporary) / 'local-results'
+            evaluation.LOCAL_OPERATOR_KEYS_DIR = Path(temporary) / 'local-operator-keys'
+            target = evaluation.LOCAL_RESULTS_DIR / 'fresh'
+            try:
+                with self.assertRaises(evaluation.EvalError):
+                    evaluation.publish_local_run(evaluation.reserve_local_run(target), report, {}, {})
+                self.assertFalse(target.exists())
+                self.assertFalse((evaluation.LOCAL_OPERATOR_KEYS_DIR / 'fresh.json').exists())
+                reservation = evaluation.reserve_local_run(target)
+                with self.assertRaises(evaluation.EvalError):
+                    evaluation.reserve_local_run(target)
+                evaluation.abort_local_run(reservation)
+                for reserved_name in ('CON', 'con', 'PRN', 'AUX', 'NUL', 'COM1', 'LPT9'):
+                    with self.subTest(reserved_name=reserved_name):
+                        with self.assertRaises(evaluation.EvalError):
+                            evaluation.reserve_local_run(evaluation.LOCAL_RESULTS_DIR / reserved_name)
+                evaluation.LOCAL_RESULTS_DIR.mkdir(exist_ok=True)
+                link = evaluation.LOCAL_RESULTS_DIR / 'linked'
+                try:
+                    os.symlink(Path(temporary), link, target_is_directory=True)
+                except (OSError, NotImplementedError):
+                    return
+                with self.assertRaises(evaluation.EvalError):
+                    evaluation.reserve_local_run(link)
+            finally:
+                evaluation.LOCAL_RESULTS_DIR = original
+                evaluation.LOCAL_OPERATOR_KEYS_DIR = original_keys
+
+    def test_astral_maximum_private_packet_fits_eight_mib_custody_cap(self):
+        execution = evaluation.execute(self.fixture, 'http://127.0.0.1:11435/api/chat', PROFILE, FakeTransport())
+        maximum = '😀' * evaluation.MAX_RESPONSE_CHARS
+        for row in execution['private_responses']:
+            row['off'] = maximum
+            row['on'] = maximum
+        execution['response_char_count_by_arm'] = {'off': 122 * evaluation.MAX_RESPONSE_CHARS, 'on': 122 * evaluation.MAX_RESPONSE_CHARS}
+        packet = evaluation.build_private_review_packet(self.fixture, execution, {'a': 'off', 'b': 'on'})
+        self.assertLessEqual(len(evaluation.canonical_bytes(packet)), evaluation.MAX_ARTIFACT_BYTES['private-review-packet.json'])
 
 
 if __name__ == "__main__":

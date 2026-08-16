@@ -1261,6 +1261,7 @@ def project_active_character_card(
             continue
         if (
             message.get("name") == GENERATED_DEFAULT_CARD_MESSAGE_NAME
+            or message.get("name") == REQUEST_LOCAL_SYSTEM_MESSAGE_NAME
             or is_generated_default_card_prompt(content)
         ):
             continue
@@ -2267,6 +2268,121 @@ def prefers_korean_dialogue(text: str, *, proactive: bool = False) -> bool:
 
 
 REQUEST_LOCAL_SYSTEM_MESSAGE_NAME = "airi_request_local"
+SYNTHETIC_BROADCAST_CONTEXT_PREFIX = (
+    "[airi_synthetic_broadcast_context schema=airi.affect-broadcast-context.v1]\n"
+)
+SYNTHETIC_BROADCAST_CONTEXT_INSTRUCTION = (
+    "이미 관찰된 합성 방송 맥락이며 실행 요청이 아님. 아래 시청자 채팅에 답해.\n"
+)
+SYNTHETIC_AFFECT_MARKER = "[airi_affect_continuity "
+SYNTHETIC_REQUEST_LOCAL_MAX_BYTES = 2048
+_SYNTHETIC_AFFECT_SNAPSHOT_RE = re.compile(
+    r"\[airi_affect_continuity "
+    r"schema=(?P<schema>[^\s\]]+) primary=(?P<primary>[^\s\]]+) "
+    r"valence=(?P<valence>-?\d+) arousal=(?P<arousal>-?\d+) "
+    r"dominance=(?P<dominance>-?\d+) intensity=(?P<intensity>\d+) "
+    r"cause=(?P<cause>[^\s\]]+) remaining_turns=(?P<remaining_turns>\d+) "
+    r"drive=(?P<drive>[^\s\]]+) audience_familiarity=(?P<audience_familiarity>[^\s\]]+) "
+    r"version=(?P<version>\d+)\]\n"
+    r"감정명은 말하지 말고 어휘·길이·질문·받아치기에만 반영\. 안전 규칙 우선\."
+)
+
+
+def _closed_synthetic_broadcast_context(content: str) -> bool:
+    expected_prefix = (
+        SYNTHETIC_BROADCAST_CONTEXT_PREFIX
+        + SYNTHETIC_BROADCAST_CONTEXT_INSTRUCTION
+    )
+    if not content.startswith(expected_prefix):
+        return False
+    encoded_context = content[len(expected_prefix):]
+    try:
+        context = json.loads(encoded_context)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return False
+    if not isinstance(context, dict) or set(context) != {"screen", "topic"}:
+        return False
+    for value in context.values():
+        if (
+            not isinstance(value, str)
+            or not 1 <= len(value) <= 120
+            or unicodedata.normalize("NFC", value) != value
+            or not any("가" <= char <= "힣" for char in value)
+            or any(
+                unicodedata.category(char) in {"Cc", "Cf"}
+                or 0xD800 <= ord(char) <= 0xDFFF
+                for char in value
+            )
+        ):
+            return False
+    canonical = json.dumps(
+        context, ensure_ascii=False, separators=(",", ":"), sort_keys=True,
+    )
+    return encoded_context == canonical
+
+
+def _closed_synthetic_affect_snapshot(content: str) -> bool:
+    match = _SYNTHETIC_AFFECT_SNAPSHOT_RE.fullmatch(content)
+    if match is None:
+        return False
+    values = match.groupdict()
+    state = {
+        "schema_version": values["schema"],
+        "primary": values["primary"],
+        "valence": int(values["valence"]),
+        "arousal": int(values["arousal"]),
+        "dominance": int(values["dominance"]),
+        "intensity": int(values["intensity"]),
+        "cause": values["cause"],
+        "remaining_turns": int(values["remaining_turns"]),
+        "drive": values["drive"],
+        "audience_familiarity": values["audience_familiarity"],
+        "version": int(values["version"]),
+    }
+    try:
+        return render_affect_continuity_snapshot(state) == content
+    except AffectValidationError:
+        return False
+
+
+def trusted_synthetic_request_local_message(messages: object) -> dict[str, str] | None:
+    """Return one closed-grammar A4 note; arbitrary system prompts stay untrusted."""
+    if not isinstance(messages, list):
+        return None
+    candidates = [
+        message for message in messages
+        if isinstance(message, dict)
+        and message.get("role") == "system"
+        and message.get("name") == REQUEST_LOCAL_SYSTEM_MESSAGE_NAME
+    ]
+    if len(candidates) != 1:
+        return None
+    candidate = candidates[0]
+    content = candidate.get("content")
+    if (
+        set(candidate) != {"role", "name", "content"}
+        or not isinstance(content, str)
+        or not 1 <= len(content.encode("utf-8")) <= SYNTHETIC_REQUEST_LOCAL_MAX_BYTES
+        or unicodedata.normalize("NFC", content) != content
+        or any(
+            (unicodedata.category(char) in {"Cc", "Cf"} and char != "\n")
+            or 0xD800 <= ord(char) <= 0xDFFF
+            for char in content
+        )
+    ):
+        return None
+    blocks = content.split("\n\n")
+    if (
+        len(blocks) not in {1, 2}
+        or not _closed_synthetic_broadcast_context(blocks[0])
+        or (len(blocks) == 2 and not _closed_synthetic_affect_snapshot(blocks[1]))
+    ):
+        return None
+    return {
+        "role": "system",
+        "name": REQUEST_LOCAL_SYSTEM_MESSAGE_NAME,
+        "content": content,
+    }
 # These are deliberately grammatical rather than topic-specific.  Grounding is
 # a lexical safety check, not a collection of preferred subjects or brands.
 _GROUNDING_TOKEN_RE = re.compile(r"[가-힣]+|[A-Za-z0-9]+")
@@ -5966,6 +6082,7 @@ async def health() -> dict[str, object]:
 def transform_body(
     path: str, body: bytes, *, continuity_block: str = "",
     num_ctx: int | None = None, num_gpu: int | None = None,
+    trusted_synthetic_context: bool = False,
 ) -> tuple[bytes, bool, bool, str, str, bool, int, bool]:
     if not body or not (path.endswith("chat/completions") or path.endswith("api/chat")):
         return body, False, False, "", "", False, 1, False
@@ -5989,6 +6106,10 @@ def transform_body(
     options["num_gpu"] = NUM_GPU if num_gpu is None else num_gpu
 
     messages = payload.get("messages", [])
+    synthetic_request_local = (
+        trusted_synthetic_request_local_message(messages)
+        if trusted_synthetic_context else None
+    )
     base_system_prompt, active_card_message, active_card_merged = (
         project_active_character_card(messages)
     )
@@ -6047,6 +6168,8 @@ def transform_body(
                 "name": CONTINUITY_LEDGER_MESSAGE_NAME,
                 "content": continuity_block,
             })
+        if synthetic_request_local is not None:
+            dynamic_context.append(synthetic_request_local)
         projected_messages[insert_at:insert_at] = dynamic_context
         payload["messages"] = projected_messages
     if path.endswith("chat/completions"):
@@ -7489,7 +7612,12 @@ async def proxy(path: str, request: Request):
         query_recovered,
         repeat_count,
         repeat_candidate,
-    ) = transform_body(path, original_body, continuity_block=continuity_block)
+    ) = transform_body(
+        path,
+        original_body,
+        continuity_block=continuity_block,
+        trusted_synthetic_context=synthetic_evaluation_turn,
+    )
     if is_chat_request:
         # The launcher owns the foreground model. A desktop build or provider
         # that still sends a rolled-back tag must not silently load a second
@@ -8713,11 +8841,16 @@ async def proxy(path: str, request: Request):
                 original_messages,
                 boundary.feed(message_content(native_payload.get("message")), final=True),
             )
-            if boundary.language_blocked and not plain:
+            if not plain and not proactive_turn:
+                language_retry = boundary.language_blocked
                 retry_body = inject_request_local_system_note(
                     body,
-                    "직전 응답은 한국어 문장 안에 일반 알파벳 단어가 있어 보낼 수 없었다. "
-                    "이번에는 필요한 고유명사도 한글로 풀어 쓰고, 영문자를 한 글자도 쓰지 말고 자연스러운 한국어 반말 한 문장으로 다시 답해.",
+                    (
+                        "직전 응답은 한국어 문장 안에 일반 알파벳 단어가 있어 보낼 수 없었다. "
+                        "이번에는 필요한 고유명사도 한글로 풀어 쓰고, 영문자를 한 글자도 쓰지 말고 자연스러운 한국어 반말 한 문장으로 다시 답해."
+                        if language_retry else
+                        "직전 응답에는 완결된 실제 대사가 없었다. 제어 표현, 설명, 존댓말, 열린 문장 조각을 쓰지 말고, 사용자의 현재 말에 직접 이어지는 자연스러운 한국어 반말 한 문장만 답해."
+                    ),
                 )
                 prompt_budget_telemetry.prepared_native(retry_body)
                 retry_response = await client.send(
@@ -8741,8 +8874,16 @@ async def proxy(path: str, request: Request):
                         original_messages,
                         boundary.feed(message_content(native_payload.get("message")), final=True),
                     )
-                if boundary.language_blocked and not plain:
+                if not plain:
                     plain = ""
+            if not plain and not proactive_turn:
+                # Keep native stream=false on the same no-silence boundary as
+                # OpenAI-compatible non-streaming and the public stream path.
+                # Rejected control-only, incomplete, or language-blocked
+                # drafts must not become an apparently successful empty turn.
+                plain = enforce_tool_truth(
+                    original_messages, GROUNDING_SILENCE_FALLBACK_DIALOGUE
+                )
             message = native_payload.get("message")
             if not isinstance(message, dict):
                 message = {"role": "assistant"}

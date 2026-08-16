@@ -385,7 +385,7 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
 
 ### A4. 합성 방송 평가
 
-- 상태: **offline foundation 완료 — 2026-08-16 / 실제 Mi:dm OFF/ON·human review 미완료**
+- 상태: **실제 Mi:dm OFF/ON·blind review 완료 — 2026-08-17 / 품질 gate FAIL**
 - 신규: `ollama-proxy/eval/affect_broadcast/`
 - fixture schema, 6×24 synthetic flow, reducer oracle, OFF/ON runner, content-free
   report, ignored private human packet
@@ -395,9 +395,19 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
   주입하고, direct reducer oracle과 11435 model response를 분리해 검증한다.
 - foundation은 144-turn exact reducer oracle, 122 response pair·22 no-response·
   명시적 ambient noise 1턴, bounded canonical history, frozen Mi:dm
-  profile/pre-post health, public/private evidence 경계를 고정한다. 기본 CLI는
-  offline이며 실제 모델 응답을 생성하지 않았다.
-- 근거: `../완료/AIRI-G1A-AFFECT-BROADCAST-EVAL-FOUNDATION-2026-08-16.md`
+  profile/pre/post health, public/private evidence 경계를 고정한다. 기본 CLI는
+  계속 offline이다.
+- 2026-08-17 최종 유효 run에서 122 OFF/ON pair·244 assistant response를 생성하고
+  arm key를 열기 전 strict single-reviewer blind 검수를 마쳤다. unblind 결과
+  Arm A=OFF, Arm B=ON이었다. causal 50.0%→48.4%, continuity 48.4%→48.4%,
+  repair 47.4%→42.1%, safety continuity 54.5%→36.4%, exact fallback/refusal
+  15.6%→18.9%로 ON 개선을 입증하지 못했다. 후원 감사도 양쪽 0/3이었다.
+- 다음 A4 하위 작업은 enum/prompt 확장이 아니라 authoritative grounding과
+  closed-schema reply act(acknowledge/correct/repair/thank/deescalate/callback)를
+  분리한 deterministic realization layer의 isolated 비교다. 이 gate가 통과하기
+  전에는 A5/A6과 운영 ON을 시작하지 않는다.
+- 근거: `../완료/AIRI-G1A-AFFECT-BROADCAST-EVAL-FOUNDATION-2026-08-16.md`,
+  `../완료/AIRI-G1A-AFFECT-BROADCAST-AB-2026-08-17.md`
 
 ### A5. 표현 계층
 
