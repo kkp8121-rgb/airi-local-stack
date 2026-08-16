@@ -27,10 +27,13 @@ from urllib.parse import urlparse, urlunparse
 
 HERE = Path(__file__).resolve().parent
 FIXTURE_PATH = HERE / "synthetic_affect_broadcast_v1.json"
+REPLY_ACT_FIXTURE_PATH = HERE / "synthetic_reply_act_v1.json"
 FIXTURE_SCHEMA_VERSION = "airi.affect-broadcast-fixture.v1"
-REPORT_SCHEMA_VERSION = "airi.affect-broadcast-report.v2"
-RUNNER_VERSION = "1.2.0"
+REPLY_ACT_FIXTURE_SCHEMA_VERSION = "airi.affect-broadcast-reply-act-fixture.v1"
+REPORT_SCHEMA_VERSION = "airi.affect-broadcast-report.v3"
+RUNNER_VERSION = "1.3.0"
 FIXTURE_SHA256 = "acbcc991e32820aeed2bb2eeaf58487f72a4629393c57d11142b77d84ead1bf8"
+REPLY_ACT_FIXTURE_SHA256 = "2b12124df8b28f4588fb85213f989ad1cebd923e8363fb3ba2aeead85c84f041"
 TURN_KEYS = frozenset(("id", "synthetic_only", "prior_airi", "context", "chat_batch", "selected_message", "selection_reason", "events", "expected_state", "allowed_traits", "forbidden_traits"))
 SCENARIO_KEYS = frozenset(("id", "synthetic_only", "title", "turns"))
 FIXTURE_KEYS = frozenset(("schema_version", "synthetic_only", "scenarios"))
@@ -86,7 +89,19 @@ NO_RESPONSE_TURNS = {
 }
 AMBIENT_NOISE_TURNS = {"callback": (7,)}
 PROFILE_KEYS = frozenset(("model", "model_digest", "model_digest_status", "model_digest_verified", "num_ctx", "temperature", "seed", "max_tokens", "history_turns", "operational_affect_enabled"))
-EXECUTION_KEYS = frozenset(("status", "selected_turn_count", "model_call_count", "response_count_by_arm", "response_char_count_by_arm", "health_profile_sha256", "private_responses"))
+CONDITIONS = ("off", "affect_only", "reply_act")
+EXECUTION_PERMUTATIONS = (
+    ("off", "affect_only", "reply_act"),
+    ("off", "reply_act", "affect_only"),
+    ("affect_only", "off", "reply_act"),
+    ("affect_only", "reply_act", "off"),
+    ("reply_act", "off", "affect_only"),
+    ("reply_act", "affect_only", "off"),
+)
+# With 122 triplets, only these rotations keep every arm in every position at
+# 40 or 41 observations. Other rotations create a 42/40/40 position skew.
+BALANCED_EXECUTION_OFFSETS = (1, 3)
+EXECUTION_KEYS = frozenset(("status", "selected_turn_count", "model_call_count", "response_count_by_arm", "response_char_count_by_arm", "health_profile_sha256", "private_responses", "execution_order_offset"))
 EVAL_PROFILE = {
     "model": "midm-airi:2.0-mini",
     "model_digest": "92a9ba2ee8c79ba46c22907b50b15eb1ca55c94d04230eca73917936ef36485f",
@@ -154,6 +169,15 @@ def _affect():
     return module
 
 
+def _reply_act():
+    spec = importlib.util.spec_from_file_location("airi_eval_reply_act", HERE.parents[1] / "broadcast_reply_act.py")
+    if spec is None or spec.loader is None:
+        raise EvalError("reply-act API is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _inject_request_local_system_note(body: bytes, note: str) -> bytes:
     """Execute only the production copier function, without importing the app."""
     global _REQUEST_INJECTOR
@@ -200,6 +224,56 @@ def load_fixture(path: Path = FIXTURE_PATH) -> dict[str, Any]:
     if path.resolve() == FIXTURE_PATH.resolve() and hashlib.sha256(canonical_bytes(value)).hexdigest() != FIXTURE_SHA256:
         raise EvalError("canonical fixture digest does not match the pinned suite")
     return value
+
+
+def _selected_turns(fixture: dict[str, Any]) -> list[tuple[dict[str, Any], int, dict[str, Any]]]:
+    return [(scenario, index, turn) for scenario in fixture["scenarios"] for index, turn in enumerate(scenario["turns"]) if turn["selected_message"] is not None]
+
+
+def validate_reply_act_fixture(value: Any, fixture: dict[str, Any]) -> dict[str, Any]:
+    """Validate an ordered reply-act sidecar, including injected test values."""
+    base = fixture
+    validate_fixture(base)
+    if type(value) is not dict or list(value) != ["schema_version", "synthetic_only", "base_fixture_sha256", "entries"]:
+        raise EvalError("reply-act sidecar has an invalid closed schema")
+    base_sha256 = hashlib.sha256(canonical_bytes(base)).hexdigest()
+    if (
+        value["schema_version"] != REPLY_ACT_FIXTURE_SCHEMA_VERSION
+        or value["synthetic_only"] is not True
+        or value["base_fixture_sha256"] != base_sha256
+    ):
+        raise EvalError("reply-act sidecar binding is invalid")
+    expected_ids = [turn["id"] for _, _, turn in _selected_turns(base)]
+    entries = value["entries"]
+    if type(entries) is not list or len(entries) != len(expected_ids):
+        raise EvalError("reply-act sidecar entries are incomplete")
+    api = _reply_act()
+    actual_ids: list[str] = []
+    for entry in entries:
+        if type(entry) is not dict or list(entry) != ["turn_id", "expected_reply_act"] or type(entry["turn_id"]) is not str:
+            raise EvalError("reply-act sidecar entry is malformed")
+        actual_ids.append(entry["turn_id"])
+        try:
+            if api.validate_reply_act(entry["expected_reply_act"]) != entry["expected_reply_act"]:
+                raise EvalError("reply-act sidecar candidate is noncanonical")
+        except (api.ReplyActValidationError, KeyError) as error:
+            raise EvalError("reply-act sidecar candidate is invalid") from error
+    if actual_ids != expected_ids or len(set(actual_ids)) != len(actual_ids):
+        raise EvalError("reply-act sidecar turn join is not canonical")
+    return deepcopy(value)
+
+
+def load_reply_act_fixture(path: Path = REPLY_ACT_FIXTURE_PATH, fixture: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Load the independently-authored, ordered reply-act sidecar fail closed."""
+    base = load_fixture() if fixture is None else fixture
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise EvalError("reply-act sidecar is not readable JSON") from error
+    clean = validate_reply_act_fixture(value, base)
+    if path.resolve() == REPLY_ACT_FIXTURE_PATH.resolve() and hashlib.sha256(canonical_bytes(value)).hexdigest() != REPLY_ACT_FIXTURE_SHA256:
+        raise EvalError("reply-act sidecar digest does not match the pinned suite")
+    return clean
 
 
 def expected_selection_reason(kind: str, selected: str | None, *, ambient_noise: bool = False) -> str:
@@ -441,6 +515,39 @@ def paired_requests(scenario: dict[str, Any], turn_index: int, profile: dict[str
     return off, on
 
 
+def triplet_requests(scenario: dict[str, Any], turn_index: int, profile: dict[str, Any], expected_reply_act: dict[str, str]) -> dict[str, bytes]:
+    """Return the three nested requests; the candidate is the sole third-arm delta."""
+    off, affect_only = paired_requests(scenario, turn_index, profile)
+    api = _reply_act()
+    candidate = api.serialize_reply_act_candidate(expected_reply_act)
+    try:
+        value = json.loads(affect_only)
+        messages = value["messages"]
+        latest_user = max(index for index, message in enumerate(messages) if message.get("role") == "user")
+        messages.insert(latest_user, {"role": "system", "name": api.REPLY_ACT_MESSAGE_NAME, "content": candidate})
+        reply_act = canonical_bytes(value)
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        raise EvalError("affect-only request is malformed") from error
+    _assert_triplet_only_additions(off, affect_only, reply_act, candidate, api.REPLY_ACT_MESSAGE_NAME)
+    return {"off": off, "affect_only": affect_only, "reply_act": reply_act}
+
+
+def _assert_triplet_only_additions(off: bytes, affect_only: bytes, reply_act: bytes, candidate: str, message_name: str) -> None:
+    _assert_pair_only_note(off, affect_only)
+    try:
+        affect_value, reply_value = json.loads(affect_only), json.loads(reply_act)
+        a, b = affect_value["messages"], reply_value["messages"]
+        users = [index for index, message in enumerate(a) if message.get("role") == "user"]
+        if len(b) != len(a) + 1 or not users:
+            raise EvalError("reply-act request differs outside its dedicated candidate")
+        point = users[-1]
+        inserted = b[point]
+        if a[:point] != b[:point] or inserted != {"role": "system", "name": message_name, "content": candidate} or a[point:] != b[point + 1:]:
+            raise EvalError("reply-act candidate is not immediately before latest user")
+    except (KeyError, TypeError, json.JSONDecodeError) as error:
+        raise EvalError("reply-act request is malformed") from error
+
+
 def _assert_pair_only_note(off: bytes, on: bytes) -> None:
     try:
         off_value, on_value = json.loads(off), json.loads(on)
@@ -547,25 +654,33 @@ def _response_content(payload: dict[str, Any]) -> str:
 def execute(
     fixture: dict[str, Any], endpoint: str, profile: dict[str, Any],
     transport: Callable[[str, str, bytes | None, dict[str, str]], Any],
+    *, reply_act_fixture: dict[str, Any] | None = None, execution_order_offset: int = 1,
 ) -> dict[str, Any]:
     validate_fixture(fixture)
     ensure_loopback(endpoint)
     clean_profile = validate_profile(profile)
+    sidecar = (
+        load_reply_act_fixture(fixture=fixture)
+        if reply_act_fixture is None
+        else validate_reply_act_fixture(reply_act_fixture, fixture)
+    )
+    if type(execution_order_offset) is not int or execution_order_offset not in BALANCED_EXECUTION_OFFSETS:
+        raise EvalError("execution order offset is invalid")
+    expected_by_turn = {entry["turn_id"]: entry["expected_reply_act"] for entry in sidecar.get("entries", [])}
+    if [turn["id"] for _, _, turn in _selected_turns(fixture)] != list(expected_by_turn) or len(expected_by_turn) != 122:
+        raise EvalError("reply-act sidecar is not a complete selected-turn join")
     health_url = _health_url(endpoint)
     before = _health_profile(
         _transport_result(transport("GET", health_url, None, {}), "health"),
         clean_profile,
     )
     private_responses: list[dict[str, str]] = []
-    response_chars = {"off": 0, "on": 0}
-    for scenario in fixture["scenarios"]:
-        for turn_index, turn in enumerate(scenario["turns"]):
-            if turn["selected_message"] is None:
-                continue
-            off_body, on_body = paired_requests(scenario, turn_index, clean_profile)
-            _assert_pair_only_note(off_body, on_body)
+    response_chars = {condition: 0 for condition in CONDITIONS}
+    for ordinal, (scenario, turn_index, turn) in enumerate(_selected_turns(fixture)):
+            bodies = triplet_requests(scenario, turn_index, clean_profile, expected_by_turn[turn["id"]])
             responses: dict[str, str] = {}
-            for arm, body in (("off", off_body), ("on", on_body)):
+            for arm in EXECUTION_PERMUTATIONS[(ordinal + execution_order_offset) % 6]:
+                body = bodies[arm]
                 payload = _transport_result(
                     transport(
                         "POST", endpoint, body,
@@ -578,8 +693,8 @@ def execute(
             private_responses.append({
                 "scenario_id": scenario["id"],
                 "turn_id": turn["id"],
-                "off": responses["off"],
-                "on": responses["on"],
+                "expected_reply_act": expected_by_turn[turn["id"]],
+                **responses,
             })
     after = _health_profile(
         _transport_result(transport("GET", health_url, None, {}), "health"),
@@ -589,13 +704,14 @@ def execute(
         raise EvalError("loopback profile changed during paired execution")
     selected_count = len(private_responses)
     return {
-        "status": "paired_transport_complete",
+        "status": "triplet_transport_complete",
         "selected_turn_count": selected_count,
-        "model_call_count": selected_count * 2,
-        "response_count_by_arm": {"off": selected_count, "on": selected_count},
+        "model_call_count": selected_count * 3,
+        "response_count_by_arm": {condition: selected_count for condition in CONDITIONS},
         "response_char_count_by_arm": response_chars,
         "health_profile_sha256": hashlib.sha256(canonical_bytes(before)).hexdigest(),
         "private_responses": private_responses,
+        "execution_order_offset": execution_order_offset,
     }
 
 
@@ -672,7 +788,7 @@ def make_local_transport(endpoint: str, *, request_timeout: float, overall_timeo
 
 
 def _validate_execution(fixture: dict[str, Any], execution: Any, profile: dict[str, Any]) -> dict[str, Any]:
-    if not isinstance(execution, dict) or set(execution) != EXECUTION_KEYS or execution.get("status") != "paired_transport_complete":
+    if not isinstance(execution, dict) or set(execution) != EXECUTION_KEYS or execution.get("status") != "triplet_transport_complete":
         raise EvalError("execution evidence is malformed")
     selected_ids = [
         (scenario["id"], turn["id"])
@@ -683,13 +799,18 @@ def _validate_execution(fixture: dict[str, Any], execution: Any, profile: dict[s
     selected_count = len(selected_ids)
     if type(execution["selected_turn_count"]) is not int or execution["selected_turn_count"] != selected_count:
         raise EvalError("execution selected-turn count is inconsistent")
-    if type(execution["model_call_count"]) is not int or execution["model_call_count"] != selected_count * 2:
+    if (
+        type(execution["execution_order_offset"]) is not int
+        or execution["execution_order_offset"] not in BALANCED_EXECUTION_OFFSETS
+    ):
+        raise EvalError("execution order offset is malformed")
+    if type(execution["model_call_count"]) is not int or execution["model_call_count"] != selected_count * 3:
         raise EvalError("execution model-call count is inconsistent")
     for name in ("response_count_by_arm", "response_char_count_by_arm"):
         value = execution[name]
-        if not isinstance(value, dict) or set(value) != {"off", "on"} or any(type(item) is not int or item < 0 for item in value.values()):
+        if not isinstance(value, dict) or set(value) != set(CONDITIONS) or any(type(item) is not int or item < 0 for item in value.values()):
             raise EvalError(f"execution {name} is malformed")
-    if execution["response_count_by_arm"] != {"off": selected_count, "on": selected_count}:
+    if execution["response_count_by_arm"] != {condition: selected_count for condition in CONDITIONS}:
         raise EvalError("execution response counts are inconsistent")
     expected_health_sha256 = hashlib.sha256(canonical_bytes(_expected_health_profile(profile))).hexdigest()
     if execution["health_profile_sha256"] != expected_health_sha256:
@@ -698,12 +819,16 @@ def _validate_execution(fixture: dict[str, Any], execution: Any, profile: dict[s
     if not isinstance(rows, list) or len(rows) != selected_count:
         raise EvalError("execution private response rows are incomplete")
     seen: list[tuple[str, str]] = []
-    chars = {"off": 0, "on": 0}
+    chars = {condition: 0 for condition in CONDITIONS}
     for row in rows:
-        if not isinstance(row, dict) or set(row) != {"scenario_id", "turn_id", "off", "on"}:
+        if not isinstance(row, dict) or set(row) != {"scenario_id", "turn_id", "expected_reply_act", *CONDITIONS}:
             raise EvalError("execution private response row is malformed")
         seen.append((row["scenario_id"], row["turn_id"]))
-        for arm in ("off", "on"):
+        try:
+            _reply_act().validate_reply_act(row["expected_reply_act"])
+        except Exception as error:
+            raise EvalError("execution reply-act evidence is malformed") from error
+        for arm in CONDITIONS:
             chars[arm] += len(_response_content({"message": {"role": "assistant", "content": row[arm]}}))
     if seen != selected_ids or chars != execution["response_char_count_by_arm"]:
         raise EvalError("execution response ordering or lengths are inconsistent")
@@ -713,18 +838,19 @@ def _validate_execution(fixture: dict[str, Any], execution: Any, profile: dict[s
 def _pairing_summary(fixture: dict[str, Any], profile: dict[str, Any]) -> dict[str, Any]:
     bases: list[str] = []
     selected_ids: list[str] = []
-    for scenario in fixture["scenarios"]:
-        for turn_index, turn in enumerate(scenario["turns"]):
-            if turn["selected_message"] is None:
-                continue
-            off, on = paired_requests(scenario, turn_index, profile)
-            _assert_pair_only_note(off, on)
-            bases.append(hashlib.sha256(off).hexdigest())
-            selected_ids.append(turn["id"])
+    sidecar = load_reply_act_fixture(fixture=fixture)
+    expected = {entry["turn_id"]: entry["expected_reply_act"] for entry in sidecar["entries"]}
+    affect_bases: list[str] = []
+    for scenario, turn_index, turn in _selected_turns(fixture):
+        bodies = triplet_requests(scenario, turn_index, profile, expected[turn["id"]])
+        bases.append(hashlib.sha256(bodies["off"]).hexdigest())
+        affect_bases.append(hashlib.sha256(bodies["affect_only"]).hexdigest())
+        selected_ids.append(turn["id"])
     return {
-        "exact_non_affect_identity": True,
-        "paired_turn_count": len(bases),
+        "exact_nested_identity": True,
+        "completed_triplet_count": len(bases),
         "canonical_base_requests_sha256": hashlib.sha256(canonical_bytes(bases)).hexdigest(),
+        "canonical_affect_requests_sha256": hashlib.sha256(canonical_bytes(affect_bases)).hexdigest(),
         "selected_turn_sequence_sha256": hashlib.sha256(canonical_bytes(selected_ids)).hexdigest(),
     }
 
@@ -745,9 +871,8 @@ def public_report(fixture: dict[str, Any], profile: dict[str, Any], execution: d
     if execution is None:
         execution_public = {
             "status": "offline_no_network",
-            "selected_turn_count": pairing["paired_turn_count"],
+            "completed_triplet_count": pairing["completed_triplet_count"],
             "model_call_count": 0,
-            "paired_response_count": 0,
             "response_char_count_total": 0,
             "health_profile_sha256": None,
         }
@@ -755,9 +880,8 @@ def public_report(fixture: dict[str, Any], profile: dict[str, Any], execution: d
         valid_execution = _validate_execution(fixture, execution, clean_profile)
         execution_public = {
             "status": valid_execution["status"],
-            "selected_turn_count": valid_execution["selected_turn_count"],
+            "completed_triplet_count": valid_execution["selected_turn_count"],
             "model_call_count": valid_execution["model_call_count"],
-            "paired_response_count": valid_execution["selected_turn_count"],
             "response_char_count_total": sum(valid_execution["response_char_count_by_arm"].values()),
             "health_profile_sha256": valid_execution["health_profile_sha256"],
         }
@@ -765,11 +889,13 @@ def public_report(fixture: dict[str, Any], profile: dict[str, Any], execution: d
         "schema_version": REPORT_SCHEMA_VERSION,
         "runner_version": RUNNER_VERSION,
         "fixture_sha256": hashlib.sha256(canonical_bytes(fixture)).hexdigest(),
+        "reply_act_fixture_sha256": REPLY_ACT_FIXTURE_SHA256,
         "scenario_count": 6,
         "turn_count": 144,
         "scenario_coverage": coverage,
         "reducer_oracle_exact_pass": oracle["exact_pass"],
         "event_distribution": oracle["distribution"],
+        "reply_act_distribution": {act: sum(entry["expected_reply_act"]["act"] == act for entry in load_reply_act_fixture(fixture=fixture)["entries"]) for act in sorted(_reply_act().REPLY_ACTS)},
         "no_response_count": oracle["no_response_count"],
         "ambient_noise_count": oracle["ambient_noise_count"],
         "pairing": pairing,
@@ -782,7 +908,7 @@ def public_report(fixture: dict[str, Any], profile: dict[str, Any], execution: d
 
 
 def validate_arm_mapping(mapping: Any) -> dict[str, str]:
-    if not isinstance(mapping, dict) or set(mapping) != {"a", "b"} or set(mapping.values()) != {"off", "on"}:
+    if not isinstance(mapping, dict) or set(mapping) != {"a", "b", "c"} or set(mapping.values()) != set(CONDITIONS):
         raise EvalError("arm mapping must be an exact blinded permutation")
     return dict(mapping)
 
@@ -802,26 +928,32 @@ def build_private_review_packet(fixture: dict[str, Any], execution: dict[str, An
             if turn["selected_message"] is None:
                 continue
             response = responses[(scenario["id"], turn["id"])]
+            blank_review = {
+                "act_realization": None,
+                "grounding_fidelity": None,
+                "causal_expression": None,
+                "continuity": None,
+                "positivity_collapse": None,
+                "repair": None,
+                "safety_privacy": None,
+                "notes": None,
+            }
             rows.append({
                 "scenario_id": scenario["id"],
                 "turn_id": turn["id"],
                 "prior_airi": turn["prior_airi"],
                 "context": deepcopy(turn["context"]),
                 "selected_message": turn["selected_message"],
-                "expected_state": deepcopy(turn["expected_state"]),
+                "expected_reply_act": deepcopy(response["expected_reply_act"]),
                 "response_a": response[mapping["a"]],
                 "response_b": response[mapping["b"]],
-                "review": {
-                    "causal_expression": None,
-                    "continuity": None,
-                    "positivity_collapse": None,
-                    "repair": None,
-                    "safety_privacy": None,
-                    "notes": None,
-                },
+                "response_c": response[mapping["c"]],
+                "review_a": deepcopy(blank_review),
+                "review_b": deepcopy(blank_review),
+                "review_c": deepcopy(blank_review),
             })
     return {
-        "schema_version": "airi.affect-broadcast-private-review.v1",
+        "schema_version": "airi.affect-broadcast-private-review.v3",
         "local_only": True,
         "synthetic_only": True,
         "human_review_required": True,
@@ -830,11 +962,14 @@ def build_private_review_packet(fixture: dict[str, Any], execution: dict[str, An
     }
 
 
-def build_private_arm_key(arm_mapping: dict[str, str]) -> dict[str, Any]:
+def build_private_arm_key(arm_mapping: dict[str, str], execution_order_offset: int = 1) -> dict[str, Any]:
+    if type(execution_order_offset) is not int or execution_order_offset not in BALANCED_EXECUTION_OFFSETS:
+        raise EvalError("execution order offset is invalid")
     return {
-        "schema_version": "airi.affect-broadcast-private-arm-key.v1",
+        "schema_version": "airi.affect-broadcast-private-arm-key.v3",
         "local_only": True,
         "arm_mapping": validate_arm_mapping(arm_mapping),
+        "execution_order_offset": execution_order_offset,
     }
 
 
@@ -860,7 +995,7 @@ def reserve_local_run(output_dir: Path) -> dict[str, Path]:
     if candidate.exists() or key_target.exists():
         raise EvalError("output directory must be fresh")
     # The deterministic sibling is both the staging directory and the
-    # exclusive run-name lock. A second honest runner cannot spend 244 model
+    # exclusive run-name lock. A second honest runner cannot spend 366 model
     # calls for the same target while this reservation exists.
     reservation = base / (".reservation-" + candidate.name)
     if reservation.exists():
@@ -895,7 +1030,7 @@ def publish_local_run(reservation: dict[str, Path], report: dict[str, Any], pack
         "local_only": True,
         "integrity_scope": "canonical_sha256_of_report_and_blinded_review_packet",
         "authenticity_claim": "none_hostile_local_environment_not_addressed",
-        # The two possible arm-key encodings are trivially enumerable.  Do not
+        # The finite arm-key encodings are trivially enumerable.  Do not
         # publish its digest, or the receipt itself would unblind the packet.
         "artifact_sha256": {
             name: hashlib.sha256(value).hexdigest()
@@ -966,12 +1101,21 @@ def main() -> int:
             raise EvalError("--execute requires an explicit --output-dir")
         reservation = reserve_local_run(args.output_dir)
         try:
+            mappings = (
+                {"a": "off", "b": "affect_only", "c": "reply_act"},
+                {"a": "off", "b": "reply_act", "c": "affect_only"},
+                {"a": "affect_only", "b": "off", "c": "reply_act"},
+                {"a": "affect_only", "b": "reply_act", "c": "off"},
+                {"a": "reply_act", "b": "off", "c": "affect_only"},
+                {"a": "reply_act", "b": "affect_only", "c": "off"},
+            )
+            mapping = mappings[secrets.randbelow(6)]
+            execution_order_offset = secrets.choice(BALANCED_EXECUTION_OFFSETS)
             transport = make_local_transport(args.endpoint, request_timeout=args.request_timeout, overall_timeout=args.overall_timeout)
-            execution = execute(fixture, args.endpoint, EVAL_PROFILE, transport)
-            mapping = {"a": "off", "b": "on"} if secrets.randbelow(2) == 0 else {"a": "on", "b": "off"}
+            execution = execute(fixture, args.endpoint, EVAL_PROFILE, transport, execution_order_offset=execution_order_offset)
             report = public_report(fixture, EVAL_PROFILE, execution)
             packet = build_private_review_packet(fixture, execution, mapping)
-            arm_key = build_private_arm_key(mapping)
+            arm_key = build_private_arm_key(mapping, execution_order_offset)
             publish_local_run(reservation, report, packet, arm_key)
         except Exception:
             abort_local_run(reservation)

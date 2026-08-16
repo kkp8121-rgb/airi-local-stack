@@ -103,7 +103,7 @@ jobs:
             tests: >-
               ollama-proxy/test_ollama_proxy.py ollama-proxy/test_output_moderation.py ollama-proxy/test_input_screening.py
               ollama-proxy/test_provider_usage.py ollama-proxy/test_broadcast_contract.py
-              ollama-proxy/test_epistemic_confidence.py
+              ollama-proxy/test_broadcast_reply_act.py ollama-proxy/test_epistemic_confidence.py
           - shard: ollama-proxy-topic-workflows
             tests: >-
               ollama-proxy/test_topic_board.py ollama-proxy/test_topic_discovery_workflow.py

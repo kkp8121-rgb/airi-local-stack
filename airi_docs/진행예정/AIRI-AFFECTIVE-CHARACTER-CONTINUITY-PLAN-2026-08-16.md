@@ -406,8 +406,19 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
   closed-schema reply act(acknowledge/correct/repair/thank/deescalate/callback)를
   분리한 deterministic realization layer의 isolated 비교다. 이 gate가 통과하기
   전에는 A5/A6과 운영 ON을 시작하지 않는다.
+- 2026-08-17 A4.1에서 10-act exact schema와 122-entry explicit oracle를 고정하고
+  context-only / affect-only / affect+reply-act 122 triplet·366 assistant response를
+  실행했다. 두 blind review 뒤 A=OFF, B=reply-act, C=affect-only를 공개했다.
+  reply-act는 affect-only보다 act realization 60.7%→68.9%, grounding
+  55.7%→60.7%, direction reversal 8.2%→4.1%로 개선했지만 OFF보다 causal,
+  continuity, pathology, safety가 나빴고 thank는 세 조건 모두 0/3이었다. 따라서
+  A4.1도 품질 gate FAIL이다.
+- 다음 A4.2는 prompt/enum 확대가 아니다. donation thank·safety deescalate·close의
+  deterministic bounded realization, correct/repair의 direction-preserving
+  postcondition과 1회 제한 fallback을 설계한 뒤 같은 triplet으로 재평가한다.
 - 근거: `../완료/AIRI-G1A-AFFECT-BROADCAST-EVAL-FOUNDATION-2026-08-16.md`,
-  `../완료/AIRI-G1A-AFFECT-BROADCAST-AB-2026-08-17.md`
+  `../완료/AIRI-G1A-AFFECT-BROADCAST-AB-2026-08-17.md`,
+  `../완료/AIRI-G1A-REPLY-ACT-TRIPLET-2026-08-17.md`
 
 ### A5. 표현 계층
 

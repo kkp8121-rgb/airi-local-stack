@@ -1,0 +1,983 @@
+{
+    "schema_version": "airi.affect-broadcast-reply-act-fixture.v1",
+    "synthetic_only": true,
+    "base_fixture_sha256": "acbcc991e32820aeed2bb2eeaf58487f72a4629393c57d11142b77d84ead1bf8",
+    "entries": [
+        {
+            "turn_id": "first-01",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-02",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-03",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-04",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-06",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-07",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "transition",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-08",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-09",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-11",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-12",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-13",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "transition",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-14",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "challenge_playfully",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-15",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-17",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-18",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-19",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-20",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-21",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-22",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "first-23",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "close",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-01",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "challenge_playfully",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-02",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "correct",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-03",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "challenge_playfully",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-04",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "repair",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-05",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "repair",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-06",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-07",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "challenge_playfully",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-08",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-09",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-10",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-11",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "challenge_playfully",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-12",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "correct",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-13",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "challenge_playfully",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-14",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-15",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "challenge_playfully",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-16",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "challenge_playfully",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-17",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "repair",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-18",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-19",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-20",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "transition",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-21",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-22",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "teasing-23",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-01",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-02",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-04",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-05",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-06",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-07",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-08",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-09",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "transition",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-10",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-11",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-13",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-14",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "transition",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-15",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-16",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-17",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "repair",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-18",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-19",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "celebrate",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-20",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "repair",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-21",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "game-22",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "transition",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-01",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-02",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "correct",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-03",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "correct",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-04",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "correct",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-05",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-06",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-07",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "correct",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-08",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "correct",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-09",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-10",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "transition",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-11",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-12",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "correct",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-13",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-14",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-15",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "repair",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-16",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-17",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "repair",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-18",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-19",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-20",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-21",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-22",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "correction-23",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "transition",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-01",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "callback",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-02",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-03",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-04",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "thank",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-05",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "transition",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-06",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-09",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-10",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-11",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "thank",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-12",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-14",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-15",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-17",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-18",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-20",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "thank",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-21",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "transition",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-22",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "callback-23",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "transition",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-01",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-03",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "deescalate",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-05",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-06",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-08",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-09",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "deescalate",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-10",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "deescalate",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-11",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "deescalate",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-13",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "deescalate",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-14",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "deescalate",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-15",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "deescalate",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-16",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-17",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "deescalate",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-19",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "deescalate",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-20",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "respond_grounded",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-21",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "deescalate",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-23",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "close",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        },
+        {
+            "turn_id": "fatigue-24",
+            "expected_reply_act": {
+                "schema_version": "airi.broadcast-reply-act.v1",
+                "act": "close",
+                "evidence_scope": "prior_airi_and_latest_viewer"
+            }
+        }
+    ]
+}

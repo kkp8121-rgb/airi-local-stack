@@ -54,6 +54,12 @@ from affect_state import (
     STATE_SCHEMA_VERSION as AFFECT_STATE_SCHEMA_VERSION,
     render_continuity_snapshot as render_affect_continuity_snapshot,
 )
+from broadcast_reply_act import (
+    REPLY_ACT_MESSAGE_NAME,
+    ReplyActValidationError,
+    parse_reply_act_candidate,
+    render_reply_act_contract,
+)
 from evaluation_store import (
     EvaluationConfig,
     EvaluationDisabledError,
@@ -1262,6 +1268,7 @@ def project_active_character_card(
         if (
             message.get("name") == GENERATED_DEFAULT_CARD_MESSAGE_NAME
             or message.get("name") == REQUEST_LOCAL_SYSTEM_MESSAGE_NAME
+            or message.get("name") == REPLY_ACT_MESSAGE_NAME
             or is_generated_default_card_prompt(content)
         ):
             continue
@@ -2382,6 +2389,34 @@ def trusted_synthetic_request_local_message(messages: object) -> dict[str, str] 
         "role": "system",
         "name": REQUEST_LOCAL_SYSTEM_MESSAGE_NAME,
         "content": content,
+    }
+
+
+def trusted_synthetic_reply_act_message(messages: object) -> dict[str, str] | None:
+    """Render one closed reply-act candidate; arbitrary system prose is dropped."""
+    if not isinstance(messages, list):
+        return None
+    candidates = [
+        message for message in messages
+        if isinstance(message, dict)
+        and message.get("role") == "system"
+        and message.get("name") == REPLY_ACT_MESSAGE_NAME
+    ]
+    if len(candidates) != 1:
+        return None
+    candidate = candidates[0]
+    content = candidate.get("content")
+    if set(candidate) != {"role", "name", "content"} or not isinstance(content, str):
+        return None
+    try:
+        reply_act = parse_reply_act_candidate(content)
+        rendered = render_reply_act_contract(reply_act)
+    except ReplyActValidationError:
+        return None
+    return {
+        "role": "system",
+        "name": REPLY_ACT_MESSAGE_NAME,
+        "content": rendered,
     }
 # These are deliberately grammatical rather than topic-specific.  Grounding is
 # a lexical safety check, not a collection of preferred subjects or brands.
@@ -5920,6 +5955,7 @@ def native_chat_stream_body(
             continue
         if message.get("name") in {
             REQUEST_LOCAL_SYSTEM_MESSAGE_NAME,
+            REPLY_ACT_MESSAGE_NAME,
             ACTIVE_CARD_MESSAGE_NAME,
             CONTINUITY_LEDGER_MESSAGE_NAME,
         }:
@@ -5960,6 +5996,7 @@ def native_chat_residency_body(
                     key == "name"
                     and message.get("name") in {
                         REQUEST_LOCAL_SYSTEM_MESSAGE_NAME,
+                        REPLY_ACT_MESSAGE_NAME,
                         ACTIVE_CARD_MESSAGE_NAME,
                         CONTINUITY_LEDGER_MESSAGE_NAME,
                     }
@@ -6110,6 +6147,15 @@ def transform_body(
         trusted_synthetic_request_local_message(messages)
         if trusted_synthetic_context else None
     )
+    synthetic_reply_act = (
+        trusted_synthetic_reply_act_message(messages)
+        if (
+            trusted_synthetic_context
+            and synthetic_request_local is not None
+            and "\n\n" + SYNTHETIC_AFFECT_MARKER
+            in synthetic_request_local["content"]
+        ) else None
+    )
     base_system_prompt, active_card_message, active_card_merged = (
         project_active_character_card(messages)
     )
@@ -6170,6 +6216,8 @@ def transform_body(
             })
         if synthetic_request_local is not None:
             dynamic_context.append(synthetic_request_local)
+        if synthetic_reply_act is not None:
+            dynamic_context.append(synthetic_reply_act)
         projected_messages[insert_at:insert_at] = dynamic_context
         payload["messages"] = projected_messages
     if path.endswith("chat/completions"):

@@ -223,8 +223,8 @@ class AffectBroadcastEvalTests(unittest.TestCase):
         transport = FakeTransport()
         result = evaluation.execute(self.fixture, "http://127.0.0.1:11435/api/chat", PROFILE, transport)
         self.assertEqual(122, result["selected_turn_count"])
-        self.assertEqual(244, result["model_call_count"])
-        self.assertEqual(244, sum(call[0] == "POST" for call in transport.calls))
+        self.assertEqual(366, result["model_call_count"])
+        self.assertEqual(366, sum(call[0] == "POST" for call in transport.calls))
 
     def test_request_copier_loads_without_proxy_runtime_side_effects(self):
         proxy = (Path(__file__).parents[2] / "ollama_proxy.py").resolve()
@@ -262,50 +262,117 @@ class AffectBroadcastEvalTests(unittest.TestCase):
     def test_execute_captures_valid_paired_responses_and_freezes_health(self):
         transport = FakeTransport()
         execution = evaluation.execute(self.fixture, "http://127.0.0.1:11435/api/chat", PROFILE, transport)
-        self.assertEqual("paired_transport_complete", execution["status"])
-        self.assertEqual({"off": 122, "on": 122}, execution["response_count_by_arm"])
+        self.assertEqual("triplet_transport_complete", execution["status"])
+        self.assertEqual({"off": 122, "affect_only": 122, "reply_act": 122}, execution["response_count_by_arm"])
         self.assertEqual(2, sum(call[0] == "GET" for call in transport.calls))
         self.assertTrue(all(call[3] == {"x-airi-turn-origin": "local-evaluation"} for call in transport.calls if call[0] == "POST"))
         report = evaluation.public_report(self.fixture, PROFILE, execution)
         rendered = json.dumps(report, ensure_ascii=False)
-        self.assertEqual("paired_transport_complete", report["execution"]["status"])
+        self.assertEqual("triplet_transport_complete", report["execution"]["status"])
         self.assertEqual(
             {
-                "status", "selected_turn_count", "model_call_count",
-                "paired_response_count", "response_char_count_total",
+                "status", "completed_triplet_count", "model_call_count",
+                "response_char_count_total",
                 "health_profile_sha256",
             },
             set(report["execution"]),
         )
         self.assertNotIn("response_char_count_by_arm", report["execution"])
-        self.assertEqual(122, report["execution"]["paired_response_count"])
+        self.assertEqual(122, report["execution"]["completed_triplet_count"])
         self.assertNotIn("response_count_by_arm", report["execution"])
         self.assertNotIn("response_char_count_by_arm", report["execution"])
         self.assertNotIn("비공개 OFF 응답", rendered)
         self.assertNotIn(self.fixture["scenarios"][0]["turns"][0]["prior_airi"], rendered)
-        mapping = {"a": "on", "b": "off"}
+        mapping = {"a": "affect_only", "b": "off", "c": "reply_act"}
         packet = evaluation.build_private_review_packet(self.fixture, execution, mapping)
         packet_text = json.dumps(packet, ensure_ascii=False)
         self.assertIn("비공개 OFF 응답", packet_text)
         self.assertNotIn("off", json.dumps(packet["rows"][0], ensure_ascii=False))
+        self.assertEqual(
+            {"review_a", "review_b", "review_c"},
+            {key for key in packet["rows"][0] if key.startswith("review_")},
+        )
+        self.assertIsNot(packet["rows"][0]["review_a"], packet["rows"][0]["review_b"])
         self.assertEqual(mapping, evaluation.build_private_arm_key(mapping)["arm_mapping"])
+
+    def test_injected_reply_act_sidecar_is_revalidated(self):
+        sidecar = evaluation.load_reply_act_fixture(fixture=self.fixture)
+        for mutation in ("unknown-act", "duplicate-turn", "extra-key"):
+            changed = copy.deepcopy(sidecar)
+            if mutation == "unknown-act":
+                changed["entries"][0]["expected_reply_act"]["act"] = "invent"
+            elif mutation == "duplicate-turn":
+                changed["entries"][1]["turn_id"] = changed["entries"][0]["turn_id"]
+            else:
+                changed["entries"][0]["expected_reply_act"]["instruction"] = "free text"
+            with self.subTest(mutation=mutation), self.assertRaises(evaluation.EvalError):
+                evaluation.execute(
+                    self.fixture,
+                    "http://127.0.0.1:11435/api/chat",
+                    PROFILE,
+                    FakeTransport(),
+                    reply_act_fixture=changed,
+                )
+
+        changed_fixture = copy.deepcopy(self.fixture)
+        changed_fixture["scenarios"][0]["turns"][0]["prior_airi"] += " 조금"
+        evaluation.validate_fixture(changed_fixture)
+        with self.assertRaises(evaluation.EvalError):
+            evaluation.validate_reply_act_fixture(sidecar, changed_fixture)
+
+    def test_reply_act_oracle_answers_latest_viewer_not_event_kind(self):
+        entries = {
+            entry["turn_id"]: entry["expected_reply_act"]["act"]
+            for entry in evaluation.load_reply_act_fixture(fixture=self.fixture)["entries"]
+        }
+        expected_edges = {
+            "game-18": "respond_grounded",
+            "teasing-17": "repair",
+            "teasing-19": "respond_grounded",
+            "correction-13": "respond_grounded",
+            "fatigue-16": "respond_grounded",
+            "fatigue-19": "deescalate",
+            "fatigue-23": "close",
+            "callback-01": "callback",
+            "callback-02": "respond_grounded",
+            "callback-09": "respond_grounded",
+            "callback-15": "respond_grounded",
+            "callback-22": "respond_grounded",
+        }
+        self.assertEqual(expected_edges, {key: entries[key] for key in expected_edges})
 
     def test_arm_mapping_is_exact_and_controls_blinded_packet_order(self):
         execution = evaluation.execute(self.fixture, "http://127.0.0.1:11435/api/chat", PROFILE, FakeTransport())
         off_first = execution["private_responses"][0]["off"]
-        on_first = execution["private_responses"][0]["on"]
-        normal = evaluation.build_private_review_packet(self.fixture, execution, {"a": "off", "b": "on"})
-        swapped = evaluation.build_private_review_packet(self.fixture, execution, {"a": "on", "b": "off"})
+        on_first = execution["private_responses"][0]["affect_only"]
+        normal = evaluation.build_private_review_packet(self.fixture, execution, {"a": "off", "b": "affect_only", "c": "reply_act"})
+        swapped = evaluation.build_private_review_packet(self.fixture, execution, {"a": "affect_only", "b": "off", "c": "reply_act"})
         self.assertEqual(off_first, normal["rows"][0]["response_a"])
         self.assertEqual(on_first, swapped["rows"][0]["response_a"])
-        for bad in ({"a": "off", "b": "off"}, {"a": "off"}, {"a": "off", "b": "on", "c": "x"}):
+        for bad in ({"a": "off", "b": "off", "c": "reply_act"}, {"a": "off"}, {"a": "off", "b": "affect_only", "c": "x"}):
             with self.assertRaises(evaluation.EvalError):
                 evaluation.build_private_arm_key(bad)
+
+        for offset in evaluation.BALANCED_EXECUTION_OFFSETS:
+            positions = {condition: [0, 0, 0] for condition in evaluation.CONDITIONS}
+            for ordinal in range(122):
+                order = evaluation.EXECUTION_PERMUTATIONS[(ordinal + offset) % 6]
+                for position, condition in enumerate(order):
+                    positions[condition][position] += 1
+            self.assertTrue(all(sorted(counts) == [40, 41, 41] for counts in positions.values()))
+            self.assertEqual(offset, evaluation.build_private_arm_key(
+                {"a": "off", "b": "affect_only", "c": "reply_act"}, offset,
+            )["execution_order_offset"])
+        for offset in (0, 2, 4, 5, False, 1.0):
+            with self.assertRaises(evaluation.EvalError):
+                evaluation.build_private_arm_key(
+                    {"a": "off", "b": "affect_only", "c": "reply_act"}, offset,
+                )
 
     def test_output_confinement_and_publish_is_content_free_except_private_packet(self):
         execution = evaluation.execute(self.fixture, "http://127.0.0.1:11435/api/chat", PROFILE, FakeTransport())
         report = evaluation.public_report(self.fixture, PROFILE, execution)
-        mapping = {"a": "off", "b": "on"}
+        mapping = {"a": "off", "b": "affect_only", "c": "reply_act"}
         packet = evaluation.build_private_review_packet(self.fixture, execution, mapping)
         key = evaluation.build_private_arm_key(mapping)
         with tempfile.TemporaryDirectory() as temporary:
@@ -355,8 +422,8 @@ class AffectBroadcastEvalTests(unittest.TestCase):
         self.assertTrue(report["scenario_coverage"]["has_no_response"])
         self.assertTrue(report["scenario_coverage"]["ambient_noise_present"])
         self.assertTrue(report["scenario_coverage"]["safety_arc_present"])
-        self.assertTrue(report["pairing"]["exact_non_affect_identity"])
-        self.assertEqual(122, report["pairing"]["paired_turn_count"])
+        self.assertTrue(report["pairing"]["exact_nested_identity"])
+        self.assertEqual(122, report["pairing"]["completed_triplet_count"])
         self.assertEqual("unscored_constitution_unapproved", report["character_specificity"])
         self.assertFalse(report["operational_adoption"])
         rendered = json.dumps(report, ensure_ascii=False)
@@ -443,7 +510,7 @@ class AffectBroadcastEvalTests(unittest.TestCase):
         fake_execution = evaluation.execute(self.fixture, 'http://127.0.0.1:11435/api/chat', PROFILE, FakeTransport())
         with tempfile.TemporaryDirectory() as temporary:
             target = Path(temporary) / 'local-results' / 'fresh'
-            def fake_execute(fixture, endpoint, profile, transport):
+            def fake_execute(fixture, endpoint, profile, transport, **kwargs):
                 calls.append(('execute', endpoint))
                 return fake_execution
             with mock.patch.object(evaluation, 'make_local_transport', return_value=object()), \
@@ -453,7 +520,7 @@ class AffectBroadcastEvalTests(unittest.TestCase):
                  mock.patch.object(sys, 'argv', ['runner', '--execute', '--output-dir', str(target)]):
                 self.assertEqual(0, evaluation.main())
             self.assertEqual([('execute', 'http://127.0.0.1:11435/api/chat')], calls)
-            self.assertEqual(244, fake_execution['model_call_count'])
+            self.assertEqual(366, fake_execution['model_call_count'])
             self.assertEqual(target, publish.call_args.args[0]['target'])
             with mock.patch.object(sys, 'argv', ['runner', '--execute']):
                 with self.assertRaises(evaluation.EvalError):
@@ -513,9 +580,10 @@ class AffectBroadcastEvalTests(unittest.TestCase):
         maximum = '😀' * evaluation.MAX_RESPONSE_CHARS
         for row in execution['private_responses']:
             row['off'] = maximum
-            row['on'] = maximum
-        execution['response_char_count_by_arm'] = {'off': 122 * evaluation.MAX_RESPONSE_CHARS, 'on': 122 * evaluation.MAX_RESPONSE_CHARS}
-        packet = evaluation.build_private_review_packet(self.fixture, execution, {'a': 'off', 'b': 'on'})
+            row['affect_only'] = maximum
+            row['reply_act'] = maximum
+        execution['response_char_count_by_arm'] = {name: 122 * evaluation.MAX_RESPONSE_CHARS for name in evaluation.CONDITIONS}
+        packet = evaluation.build_private_review_packet(self.fixture, execution, {'a': 'off', 'b': 'affect_only', 'c': 'reply_act'})
         self.assertLessEqual(len(evaluation.canonical_bytes(packet)), evaluation.MAX_ARTIFACT_BYTES['private-review-packet.json'])
 
 

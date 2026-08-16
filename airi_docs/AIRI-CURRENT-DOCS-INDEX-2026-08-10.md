@@ -60,8 +60,9 @@
   event-sourced reducer, memory-layer 패턴만 인용하고 repo-native typed reducer를
   자체 제작한다. constitution v2 사용자 결정, 기본 OFF proxy greybox, 독립
   합성 6×24 OFF/ON·인간 검수, 이후 B4/TTS/Live2D·장시간 리허설 순서를 정의한다.
-  A1/A2와 A4 offline foundation은 구현됐고, A0 사용자 승인·A3·실제 Mi:dm/사람
-  A4 평가·운영 ON은 미완료다.
+  A1/A2와 A4 실제 Mi:dm OFF/ON, A4.1 reply-act 3조건 blind review까지 완료했으나
+  품질 gate는 FAIL이다. A0 사용자 승인·A3·A4.2 deterministic must-act·운영 ON은
+  미완료다.
 - `AIRI-CHARACTER-CONSTITUTION-V2-DECISION-2026-08-16.md` — G1a A0 사용자
   결정 시트. 기존 확정 정체성·말투·안전 경계와 미정 likes/dislikes/pride/
   embarrassment/conflict/repair/fatigue 및 metric threshold 선택지를 분리한다.
@@ -109,6 +110,11 @@
   `아카이브/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-pre-midm.md`.
 
 ## 완료 — 유효한 증거 기록 (최신순)
+
+- `AIRI-G1A-REPLY-ACT-TRIPLET-2026-08-17.md` — G1a A4.1의 context-only /
+  affect-only / affect+reply-act 122 triplet·366응답과 두 blind review 기록.
+  reply-act는 affect-only보다 act/grounding/reversal을 개선했지만 OFF를 넘지 못하고
+  pathology와 후원 감사 0/3 때문에 다시 품질 gate FAIL. 운영 gate는 OFF다.
 
 - `AIRI-G1A-AFFECT-BROADCAST-AB-2026-08-17.md` — G1a A4의 실제 Mi:dm
   합성 방송 122쌍·244응답과 blind human review 기록. unblind 결과 OFF가
