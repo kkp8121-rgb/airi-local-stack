@@ -420,32 +420,52 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
   `../완료/AIRI-G1A-AFFECT-BROADCAST-AB-2026-08-17.md`,
   `../완료/AIRI-G1A-REPLY-ACT-TRIPLET-2026-08-17.md`
 
-### A4.2. offline/default-inert must-act realization foundation
+### A4.2a. offline/default-inert must-act realization foundation
 
-- Commit `a269cca` 이후의 실제 A4.1 run은 condition B (`reply_act`)가
-  `affect_only`보다 expected act **68.9% vs 60.7%**, direction reversal **5 vs 10**으로
-  나았음을 보였다. 그러나 OFF와 비교하면 expected act는 **68.0% vs 68.9%**의 아주 작은
-  차이이고 grounding은 **63.1% vs 60.7%**로 OFF가 우세했으며, pathology는
-  **18 vs 24**, donation thank는 **0/3**이었다. 따라서 quality gate는 **FAIL**이고,
-  operational affect/reply-act contract는 계속 **OFF**다.
-- A4.2의 범위는 정확히 `thank`, `deescalate`, `close`, `correct`, `repair`의 다섯 semantic
-  act를 위한 **input-free renderer**와 content-free oracle이다. 31-entry oracle와 focused
-  27 tests와 독립 검토까지 마친 foundation only이며, guarded condition 실측 전에는 gate
-  진전을 뜻하지 않는다.
-- production endpoint, proxy runtime wiring, event mapper, B4b adapter, live model/TTS,
-  operational ON은 범위 밖이며, 기존 B4a action shape도 변경하지 않는다.
-- 미래 broadcast director가 semantic act를 선택하고 proxy-side renderer가 선택된 act의
-  제약된 wording만 실현한다. 미래 B4b adapter는 승인된 artifact를 전달하고 outcome만
-  보고하며, 이름·금액·그 밖의 사실을 절대 발명하지 않는다.
-- `deescalate`는 trusted closed emergency marker가 있을 때만 허용한다. deterministic
-  postcondition은 structural condition일 뿐 factual grounding, safety adequacy, emotion,
-  또는 응답 품질의 증명이 아니며 human review를 계속 요구한다.
-- 최초 호흡곤란 escalation인 `fatigue-09`만 fixed de-escalation 대상으로 둔다.
-  일반 피로 권고와 이미 119 연결·구급대 도착 대기·안내 이행·제3자 전언인 나머지
-  9개 행은 초기 지시 반복이 상황을 되돌리거나 잘못된 사람을 가리킬 수 있으므로
-  `human_review_only`다.
-- 다음 단계는 별도의 guarded model condition을 설계·검토하는 것이며, 그 조건 없이
-  재실행하거나 채택하지 않는다.
+- A4.1에서 `reply_act`는 `affect_only`보다 expected act **68.9% vs 60.7%**,
+  direction reversal **5 vs 10**으로 나았지만, OFF 대비 grounding은 **60.7% vs
+  63.1%**, pathology는 **24 vs 18**, donation thank는 **0/3**이었다. 따라서
+  quality gate는 **FAIL**이고 operational affect/reply-act contract는 계속 **OFF**다.
+- Commit `f612fd8`은 `thank`, `deescalate`, `close`, `correct`, `repair`의 input-free
+  renderer와 31-entry content-free oracle만 구현했다. production endpoint, runtime
+  wiring, event mapper, B4b, live model/TTS, B4a action shape는 바꾸지 않았다.
+- Commit `6cf4045`는 최초 호흡곤란 `fatigue-09`만 fixed de-escalation으로 남기고,
+  일반 피로·이미 119 연결·구급대 대기·안내 이행·제3자 전언 9행을
+  `human_review_only`로 좁혔다. structural pass는 grounding/safety/quality 증거가 아니다.
+- 미래 director가 semantic act를 선택하고 constrained renderer가 실현하며 B4b adapter는
+  승인 artifact 전달/outcome 보고만 담당한다. 이름·금액·사실을 발명하지 않는다.
+- 근거: `../완료/AIRI-G1A-MUST-ACT-REALIZATION-FOUNDATION-2026-08-17.md`
+
+### A4.2b. guarded-delta retrospective compositor foundation
+
+- Commit `f612fd8` 및 emergency 범위를 좁힌 `6cf4045`의 후속 작업은 새 model arm이나
+  authenticated replay가 아니다. `retrospective_post_hoc_deterministic_compositor`가 이전
+  A4.1의 **정확한 historical `reply_act` response**와 fixed Korean template artifact를
+  zero-network로 비교할 준비만 한다. 새 모델 호출은 없고 fixed history도 재생성하지 않는다.
+- 입력은 canonical local A4.1 `public-report.json`, `private-review-packet.json`,
+  `local-run-receipt.json`과 별도 operator key다. tracked 문서의 A=`off`, B=`reply_act`,
+  C=`affect_only`, execution-order offset `3` mapping을 정확히 검사해 정상 운영자의
+  arm 착오를 줄인다. 그러나 legacy receipt는 report/packet integrity 전용이고 arm key가
+  receipt-bound가 아니므로 hostile-local authenticity를 성립시키지 않는다.
+- current oracle은 target 31행이다. fixed comparison 22행은 thank 3, close 3, correct 8,
+  repair 7, deescalate 1이며, deescalate 9행은 `human_review_only`, non-target 91행은
+  제외한다. emergency fixed artifact는 최초 호흡곤란 escalation `fatigue-09`만 허용한다.
+  일반 피로 권고와 이미 119 연결·구급대 도착 대기·안내 이행·제3자 전언은 사람이 검토한다.
+- template fingerprint 때문에 condition identity는 부분적으로만 blinded다. oracle-assisted
+  selection은 runtime selection을 시험하지 않으며, exact-template structural pass는 grounding,
+  safety, emotion, quality 또는 generalization의 증거가 아니다. fresh human review가 필수이고
+  미래 비교는 blank paired review를 새로 만들어야 하며 historical score를 재사용할 수 없다.
+- `run_guarded_delta_eval.py`, 22-test suite, README, evaluation CI registration을 구현했다.
+  독립 재검토에서 source final binding, HMAC-ranked 11/11 assignment, foreign-key rollback,
+  lexical reparse, type exactness, separate key staging을 확인해 actual composition **GO**를
+  받았다. 로컬은 22 PASS/1 symlink-privilege SKIP이며 CI 실행은 billing blocked라
+  주장하지 않는다.
+- production proxy/runtime/director, B4b, TTS/live model, operational ON은 범위 밖이고 모두
+  OFF다. 다음 gate는 reviewed code commit 후 ignored 실제 artifact로 zero-call packet을
+  compose하고 immutable blank packet과 분리된 fresh human-review overlay를 만드는 것이다.
+- 근거: `../완료/AIRI-G1A-GUARDED-DELTA-FOUNDATION-2026-08-17.md`,
+  `../완료/AIRI-G1A-MUST-ACT-REALIZATION-FOUNDATION-2026-08-17.md`,
+  `../완료/AIRI-G1A-REPLY-ACT-TRIPLET-2026-08-17.md`
 
 ### A5. 표현 계층
 

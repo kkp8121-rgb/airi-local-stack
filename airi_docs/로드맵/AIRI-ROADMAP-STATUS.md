@@ -17,6 +17,24 @@
 
 최종 갱신: 2026-08-17
 
+- **2026-08-17** (G1a A4.2 guarded-delta foundation, commits `f612fd8` / `6cf4045` 후속):
+  isolated zero-network `retrospective_post_hoc_deterministic_compositor`를 구현했다. 이는
+  fourth model arm이나 authenticated replay가 아니라 canonical A4.1 report/packet/receipt와
+  tracked A=off, B=reply_act, C=affect_only, offset 3 mapping을 검사해 exact historical
+  reply-act response를 fixed template과 비교할 예정인 작업이다. 31 target 중 fixed 22
+  (thank 3, close 3, correct 8, repair 7, deescalate 1), human_review_only deescalate 9,
+  non-target 91이며 emergency fixed는 `fatigue-09`뿐이다. receipt는 integrity-only이고 arm key는
+  receipt-bound가 아니므로 hostile-local authenticity는 확립되지 않는다. partial template
+  fingerprint blinding, oracle-assisted runtime-selection 비검증, historical score 재사용 금지,
+  structural pass의 비증거 한계를 명시했다. `run_guarded_delta_eval.py`, 22-test suite,
+  README, evaluation CI registration을 완료했고 독립 재검토에서 source final binding,
+  HMAC-ranked assignment, foreign-key rollback, reparse, type exactness, separate key staging을
+  확인해 **GO**를 받았다. 로컬은 22 PASS/1 symlink-privilege SKIP이고 CI 실행은 billing
+  blocked다. production proxy/runtime/director/B4b/TTS/operational ON은 OFF·범위 밖이다.
+  다음은 reviewed code commit 후 zero-call packet compose와 fresh human review이며 그 전에는
+  quality/safety PASS가 아니다.
+  (`완료/AIRI-G1A-GUARDED-DELTA-FOUNDATION-2026-08-17.md`)
+
 - **2026-08-17** (G1a A4.2 offline/default-inert must-act realization foundation, commit `a269cca` 후속 문서화):
   A4.1 condition B (`reply_act`)는 `affect_only`보다 expected act 68.9% vs 60.7%,
   reversal 5 vs 10으로 개선됐지만, OFF와는 expected act 68.0% vs B 68.9%의 미세한 차이이고

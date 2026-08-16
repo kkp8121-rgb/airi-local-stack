@@ -61,9 +61,10 @@
   자체 제작한다. constitution v2 사용자 결정, 기본 OFF proxy greybox, 독립
   합성 6×24 OFF/ON·인간 검수, 이후 B4/TTS/Live2D·장시간 리허설 순서를 정의한다.
   A1/A2와 A4 실제 Mi:dm OFF/ON, A4.1 reply-act 3조건 blind review까지 완료했으나
-  품질 gate는 FAIL이다. A4.2는 commit `a269cca` 후속으로 thank/deescalate/close/correct/repair
-  input-free renderer와 content-free oracle의 경계를 구현하고 focused 27 tests를 통과한
-  independently reviewed offline foundation이다. A0 사용자 승인·A3·A4.2 guarded condition·운영 ON은 미완료다.
+  품질 gate는 FAIL이다. A4.2 guarded-delta는 commits `f612fd8`/`6cf4045` 후속의
+  zero-network retrospective compositor이며 22 tests와 독립 재검토 GO까지 완료했다.
+  canonical A4.1 bundle의 exact historical `reply_act` response를 fixed 22행과 비교할
+  예정이며, actual composition·fresh human review·A0 사용자 승인·A3·운영 ON은 미완료다.
 - `AIRI-CHARACTER-CONSTITUTION-V2-DECISION-2026-08-16.md` — G1a A0 사용자
   결정 시트. 기존 확정 정체성·말투·안전 경계와 미정 likes/dislikes/pride/
   embarrassment/conflict/repair/fatigue 및 metric threshold 선택지를 분리한다.
@@ -111,6 +112,11 @@
   `아카이브/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-pre-midm.md`.
 
 ## 완료 — 유효한 증거 기록 (최신순)
+
+- `AIRI-G1A-GUARDED-DELTA-FOUNDATION-2026-08-17.md` — A4.2 guarded-delta
+  zero-call retrospective compositor foundation. 31 target / 22 fixed / 9 human-only /
+  91 non-target oracle, legacy receipt/arm-key authenticity 한계, partial blinding을 기록한다.
+  22 tests·독립 재검토 GO까지 완료했으나 actual composition/fresh review는 아직이다.
 
 - `AIRI-G1A-MUST-ACT-REALIZATION-FOUNDATION-2026-08-17.md` — G1a A4.2의
   offline/default-inert foundation. A4.1 B가 affect_only보다 expected act 68.9% vs 60.7%,
