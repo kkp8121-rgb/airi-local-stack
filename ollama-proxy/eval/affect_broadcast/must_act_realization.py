@@ -18,7 +18,7 @@ ORACLE_SCHEMA_VERSION = "airi.must-act-realization-oracle.v1"
 OUTPUT_SCHEMA_VERSION = "airi.must-act-realization.v1"
 BASE_FIXTURE_SHA256 = "acbcc991e32820aeed2bb2eeaf58487f72a4629393c57d11142b77d84ead1bf8"
 REPLY_ACT_FIXTURE_SHA256 = "2b12124df8b28f4588fb85213f989ad1cebd923e8363fb3ba2aeead85c84f041"
-ORACLE_SHA256 = "7c48914b5b049c576adc6443afaae39a10026690bc5c02bf7bc8d2f422863a4d"
+ORACLE_SHA256 = "cec3f9b8c2fc797da8a73b4b35632d9fd7b9305d4e5537812c8d263fb0ffc997"
 MAX_RENDERED_BYTES = 512
 SUPPORTED_ACTS = frozenset(("thank", "deescalate", "close", "correct", "repair"))
 _DIRECTION = "fixed_korean_template"
@@ -30,7 +30,7 @@ _TEMPLATES = {
     "close": "오늘은 여기까지 할게. 고마워.",
     "correct": "정정할게. 확인된 내용만 말할게.",
     "repair": "미안해. 내가 잘못 말했어. 확인하고 바로잡을게.",
-    "deescalate": "지금은 안전이 먼저야. 혼자 있지 말고 119나 주변 사람에게 도움을 요청해.",
+    "deescalate": "지금은 안전이 먼저야. 바로 119에 연락하고 주변 사람에게도 도움을 요청해.",
 }
 
 

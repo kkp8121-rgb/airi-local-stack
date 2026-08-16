@@ -440,8 +440,10 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
 - `deescalate`는 trusted closed emergency marker가 있을 때만 허용한다. deterministic
   postcondition은 structural condition일 뿐 factual grounding, safety adequacy, emotion,
   또는 응답 품질의 증명이 아니며 human review를 계속 요구한다.
-- 일반 피로 권고인 `fatigue-03`은 emergency로 승격하지 않고 `human_review_only`로
-  명시하며, 나머지 9개 응급 문맥만 fixed de-escalation 대상으로 둔다.
+- 최초 호흡곤란 escalation인 `fatigue-09`만 fixed de-escalation 대상으로 둔다.
+  일반 피로 권고와 이미 119 연결·구급대 도착 대기·안내 이행·제3자 전언인 나머지
+  9개 행은 초기 지시 반복이 상황을 되돌리거나 잘못된 사람을 가리킬 수 있으므로
+  `human_review_only`다.
 - 다음 단계는 별도의 guarded model condition을 설계·검토하는 것이며, 그 조건 없이
   재실행하거나 채택하지 않는다.
 

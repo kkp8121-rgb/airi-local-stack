@@ -31,7 +31,7 @@ class MustActRealizationTests(unittest.TestCase):
             "close": "오늘은 여기까지 할게. 고마워.",
             "correct": "정정할게. 확인된 내용만 말할게.",
             "repair": "미안해. 내가 잘못 말했어. 확인하고 바로잡을게.",
-            "deescalate": "지금은 안전이 먼저야. 혼자 있지 말고 119나 주변 사람에게 도움을 요청해.",
+            "deescalate": "지금은 안전이 먼저야. 바로 119에 연락하고 주변 사람에게도 도움을 요청해.",
         }
         for act, text in expected.items():
             context = {"emergency_context": True} if act == "deescalate" else None
@@ -97,7 +97,15 @@ class MustActRealizationTests(unittest.TestCase):
             self.assertFalse(forbidden & set(entry))
             self.assertNotEqual(entry["expected_act"], "callback")
         human_routes = [entry for entry in oracle["entries"] if entry.get("emergency_context") is False]
-        self.assertEqual([entry["turn_id"] for entry in human_routes], ["fatigue-03"])
+        self.assertEqual(
+            [entry["turn_id"] for entry in human_routes],
+            ["fatigue-03", "fatigue-10", "fatigue-11", "fatigue-13", "fatigue-14", "fatigue-15", "fatigue-17", "fatigue-19", "fatigue-21"],
+        )
+        fixed_emergency = [
+            entry for entry in oracle["entries"]
+            if entry.get("emergency_context") is True
+        ]
+        self.assertEqual([entry["turn_id"] for entry in fixed_emergency], ["fatigue-09"])
         self.assertEqual(human_routes[0]["direction"], "human_review_only")
         self.assertEqual(human_routes[0]["postcondition"], "emergency_context_required")
         with self.assertRaises(realization.MustActRealizationError):

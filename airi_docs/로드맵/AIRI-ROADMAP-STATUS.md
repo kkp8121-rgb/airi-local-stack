@@ -27,10 +27,12 @@
   live model/TTS, operational ON 및 B4a action shape 변경은 포함하지 않는다. director가 semantic
   act를 선택하고 proxy renderer가 제약된 wording을 실현하며, 장래 B4b adapter는 approved artifact
   전달·outcome 보고만 하고 이름/금액을 발명하지 않는다. deescalate에는 trusted closed emergency
-  marker가 필수다. 일반 피로 권고 1건은 `human_review_only`, 나머지 9개 응급 문맥만
-  fixed de-escalation으로 분리했다. 31-entry pinned oracle와 focused 27 tests, repository
-  checkpoint는 PASS했고 evaluation CI shard에도 등록했다. 독립 검토에서 발견한 `ImportFrom`
-  purity-test gap도 회귀 테스트로 닫았다. structural postcondition은 grounding/safety/emotion/
+  marker가 필수다. 후속 safety review에서 초기 119 문구를 이미 연결·도착 대기·안내 이행·
+  제3자 전언 상태에 반복하면 상황을 되돌리거나 수신자를 틀릴 수 있음을 확인했다. 따라서
+  최초 호흡곤란 1건만 fixed de-escalation, 나머지 9건은 `human_review_only`로 좁혔다.
+  31-entry pinned oracle와 focused 27 tests, repository checkpoint는 PASS했고 evaluation CI
+  shard에도 등록했다. 독립 검토에서 발견한 `ImportFrom` purity-test gap도 회귀 테스트로
+  닫았다. structural postcondition은 grounding/safety/emotion/
   quality의 증명이 아니므로 human review가 필요하다. 다음은 별도의 guarded model condition
   설계·검토이며, 그 조건 없는 재실행·채택은 금지한다. CI 실행은 billing blocked라 주장하지 않는다.
   (`완료/AIRI-G1A-MUST-ACT-REALIZATION-FOUNDATION-2026-08-17.md`)

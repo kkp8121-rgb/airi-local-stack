@@ -50,9 +50,11 @@ The isolated implementation is:
 - `ollama-proxy/eval/affect_broadcast/must_act_realization_v1.json` — 31-entry
   content-free oracle pinned to the exact base fixture and reply-act sidecar.
 
-The ordinary fatigue warning at `fatigue-03` is explicitly `human_review_only` rather
-than being mislabeled as an emergency. The other nine de-escalation rows require the
-closed emergency marker. The implementation does not modify a production endpoint,
+Only the initial breathing-difficulty escalation at `fatigue-09` may use the closed
+emergency marker. The ordinary fatigue warning and eight ongoing/third-party emergency
+states are explicitly `human_review_only`: repeating an initial 119 instruction after
+connection, responder dispatch, or third-party hearsay could regress the situation or
+address the wrong person. The implementation does not modify a production endpoint,
 proxy runtime, event mapper, B4b, live-model/TTS, or B4a action-shape file.
 
 ## Local validation
@@ -63,6 +65,9 @@ proxy runtime, event mapper, B4b, live-model/TTS, or B4a action-shape file.
 - `test-current-checkpoint.ps1`: **PASS** after staging the new CI-tracked test.
 - Independent review found one purity-test AST gap for `from module import name`; the
   test now derives `ImportFrom` roots from `node.module` and includes a regression.
+- A deeper guarded-compositor safety review found that one de-escalation template was
+  not stage-correct for nine different states. The oracle was narrowed to one initial
+  escalation and nine human-review routes before any derived comparison.
 - Full diff-check is run at batch completion and recorded in the commit hand-off.
 - CI execution is not claimed; it remains billing blocked.
 
