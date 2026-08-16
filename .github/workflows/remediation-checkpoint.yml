@@ -139,6 +139,7 @@ jobs:
               ollama-proxy/eval/test_run_airi_broadcast_intelligence_rehearsal.py
               ollama-proxy/eval/test_run_airi_p7_common_render_probe.py
               ollama-proxy/eval/affect_broadcast/test_affect_broadcast_eval.py
+              ollama-proxy/eval/affect_broadcast/test_must_act_realization.py
               ollama-proxy/eval/broadcast_chat/test_run_broadcast_rehearsal.py
               ollama-proxy/eval/chat_replay/test_chat_replay.py
               ollama-proxy/eval/chat_replay/test_collect_youtube_live_export.py

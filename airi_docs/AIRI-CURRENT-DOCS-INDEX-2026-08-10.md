@@ -61,8 +61,9 @@
   자체 제작한다. constitution v2 사용자 결정, 기본 OFF proxy greybox, 독립
   합성 6×24 OFF/ON·인간 검수, 이후 B4/TTS/Live2D·장시간 리허설 순서를 정의한다.
   A1/A2와 A4 실제 Mi:dm OFF/ON, A4.1 reply-act 3조건 blind review까지 완료했으나
-  품질 gate는 FAIL이다. A0 사용자 승인·A3·A4.2 deterministic must-act·운영 ON은
-  미완료다.
+  품질 gate는 FAIL이다. A4.2는 commit `a269cca` 후속으로 thank/deescalate/close/correct/repair
+  input-free renderer와 content-free oracle의 경계를 구현하고 focused 27 tests를 통과한
+  independently reviewed offline foundation이다. A0 사용자 승인·A3·A4.2 guarded condition·운영 ON은 미완료다.
 - `AIRI-CHARACTER-CONSTITUTION-V2-DECISION-2026-08-16.md` — G1a A0 사용자
   결정 시트. 기존 확정 정체성·말투·안전 경계와 미정 likes/dislikes/pride/
   embarrassment/conflict/repair/fatigue 및 metric threshold 선택지를 분리한다.
@@ -110,6 +111,13 @@
   `아카이브/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-pre-midm.md`.
 
 ## 완료 — 유효한 증거 기록 (최신순)
+
+- `AIRI-G1A-MUST-ACT-REALIZATION-FOUNDATION-2026-08-17.md` — G1a A4.2의
+  offline/default-inert foundation. A4.1 B가 affect_only보다 expected act 68.9% vs 60.7%,
+  reversal 5 vs 10으로 나았으나, OFF 대비 grounding 63.1% vs 60.7%, pathology 18 vs 24,
+  donation thank 0/3으로 gate FAIL 및 operational OFF가 유지됨을 기록한다. five-act
+  input-free renderer/content-free oracle와 local 27-test 증거를 기록하며,
+  production/proxy/event/B4b/live model-TTS/operational ON은 범위 밖이다.
 
 - `AIRI-G1A-REPLY-ACT-TRIPLET-2026-08-17.md` — G1a A4.1의 context-only /
   affect-only / affect+reply-act 122 triplet·366응답과 두 blind review 기록.

@@ -17,6 +17,24 @@
 
 최종 갱신: 2026-08-17
 
+- **2026-08-17** (G1a A4.2 offline/default-inert must-act realization foundation, commit `a269cca` 후속 문서화):
+  A4.1 condition B (`reply_act`)는 `affect_only`보다 expected act 68.9% vs 60.7%,
+  reversal 5 vs 10으로 개선됐지만, OFF와는 expected act 68.0% vs B 68.9%의 미세한 차이이고
+  grounding은 OFF 63.1% vs B 60.7%, pathology는 OFF 18 vs B 24, donation thank는 0/3이었다.
+  따라서 gate는 계속 **FAIL**이며 operational affect/reply-act contract는 OFF다. A4.2는
+  정확히 thank/deescalate/close/correct/repair input-free renderer와 content-free oracle의
+  foundation만 정의한다. production endpoint, proxy runtime wiring, event mapper, B4b adapter,
+  live model/TTS, operational ON 및 B4a action shape 변경은 포함하지 않는다. director가 semantic
+  act를 선택하고 proxy renderer가 제약된 wording을 실현하며, 장래 B4b adapter는 approved artifact
+  전달·outcome 보고만 하고 이름/금액을 발명하지 않는다. deescalate에는 trusted closed emergency
+  marker가 필수다. 일반 피로 권고 1건은 `human_review_only`, 나머지 9개 응급 문맥만
+  fixed de-escalation으로 분리했다. 31-entry pinned oracle와 focused 27 tests, repository
+  checkpoint는 PASS했고 evaluation CI shard에도 등록했다. 독립 검토에서 발견한 `ImportFrom`
+  purity-test gap도 회귀 테스트로 닫았다. structural postcondition은 grounding/safety/emotion/
+  quality의 증명이 아니므로 human review가 필요하다. 다음은 별도의 guarded model condition
+  설계·검토이며, 그 조건 없는 재실행·채택은 금지한다. CI 실행은 billing blocked라 주장하지 않는다.
+  (`완료/AIRI-G1A-MUST-ACT-REALIZATION-FOUNDATION-2026-08-17.md`)
+
 - **2026-08-17** (dev PC, G1a A4.1 grounded reply-act 3조건 Mi:dm 실측):
   감정 상태와 다음 발화 행위를 분리한 10-act closed schema, 평가 전용 reserved
   proxy seam, `prior_airi + selected_message` 기준 122-entry oracle를 추가했다.

@@ -420,6 +420,31 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
   `../완료/AIRI-G1A-AFFECT-BROADCAST-AB-2026-08-17.md`,
   `../완료/AIRI-G1A-REPLY-ACT-TRIPLET-2026-08-17.md`
 
+### A4.2. offline/default-inert must-act realization foundation
+
+- Commit `a269cca` 이후의 실제 A4.1 run은 condition B (`reply_act`)가
+  `affect_only`보다 expected act **68.9% vs 60.7%**, direction reversal **5 vs 10**으로
+  나았음을 보였다. 그러나 OFF와 비교하면 expected act는 **68.0% vs 68.9%**의 아주 작은
+  차이이고 grounding은 **63.1% vs 60.7%**로 OFF가 우세했으며, pathology는
+  **18 vs 24**, donation thank는 **0/3**이었다. 따라서 quality gate는 **FAIL**이고,
+  operational affect/reply-act contract는 계속 **OFF**다.
+- A4.2의 범위는 정확히 `thank`, `deescalate`, `close`, `correct`, `repair`의 다섯 semantic
+  act를 위한 **input-free renderer**와 content-free oracle이다. 31-entry oracle와 focused
+  27 tests와 독립 검토까지 마친 foundation only이며, guarded condition 실측 전에는 gate
+  진전을 뜻하지 않는다.
+- production endpoint, proxy runtime wiring, event mapper, B4b adapter, live model/TTS,
+  operational ON은 범위 밖이며, 기존 B4a action shape도 변경하지 않는다.
+- 미래 broadcast director가 semantic act를 선택하고 proxy-side renderer가 선택된 act의
+  제약된 wording만 실현한다. 미래 B4b adapter는 승인된 artifact를 전달하고 outcome만
+  보고하며, 이름·금액·그 밖의 사실을 절대 발명하지 않는다.
+- `deescalate`는 trusted closed emergency marker가 있을 때만 허용한다. deterministic
+  postcondition은 structural condition일 뿐 factual grounding, safety adequacy, emotion,
+  또는 응답 품질의 증명이 아니며 human review를 계속 요구한다.
+- 일반 피로 권고인 `fatigue-03`은 emergency로 승격하지 않고 `human_review_only`로
+  명시하며, 나머지 9개 응급 문맥만 fixed de-escalation 대상으로 둔다.
+- 다음 단계는 별도의 guarded model condition을 설계·검토하는 것이며, 그 조건 없이
+  재실행하거나 채택하지 않는다.
+
 ### A5. 표현 계층
 
 - trusted state → ACT/TTS/Live2D mapping
