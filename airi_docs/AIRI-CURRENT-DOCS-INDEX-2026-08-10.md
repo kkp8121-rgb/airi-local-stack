@@ -121,6 +121,11 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-B3D-KOREAN-INPUT-SAFETY-CORPUS-2026-08-17.md` — 120개 한국어 우선
+  합성 corpus로 현재 규칙 prefilter의 100개 policy contract를 100/100 exact
+  고정하고, 20개 semantic gap을 사람 검토 전용으로 격리한 오프라인 회귀.
+  B3-d 전체 판정과 운영 gate는 계속 FAIL/OFF다.
+
 - `AIRI-G1A-EVALUATOR-RUNTIME-FENCE-2026-08-17.md` — A4.2~A4.5의 평가 전용
   renderer·target·runner·postcondition·oracle가 재귀 production runtime/launcher/patch에 literal
   reference되면 local checkpoint를 실패시키는 정적 fence. 운영 배선이나 품질 승격은 아니다.

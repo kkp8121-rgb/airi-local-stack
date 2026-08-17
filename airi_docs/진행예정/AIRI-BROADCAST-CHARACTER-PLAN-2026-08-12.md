@@ -101,6 +101,12 @@ evaluator는 G1a validator를 거치는 candidate producer로만 재검토하며
   PASS, hence overall FAIL; P50/P95/max 211.371/809.552/928.064 ms. It makes no
   semantic safety, proxy, Electron, UI, or TTS claim. Installed red-team is
   pending.
+- **B3-d Korean-first ruleset regression added (2026-08-17):** a separate
+  offline-only 120-case synthetic corpus pins the current deterministic policy.
+  Its 70 policy-bound + 30 transformed cases match verdict/category/rule
+  100/100; 20 semantic-gap cases remain `human_review_only` and never enter the
+  PASS denominator. It changes no runtime policy or flag and does not improve
+  the 5/20 standalone marker result, so B3-d remains overall FAIL/OFF.
 - **B3-e remains pending:** the fresh installed UI/TTS recheck stopped before
   model/TTS because cleanup removed sender SDK `@moeru/std`; installed ASAR was
   untouched. Earlier five-category TTS proof is historical only, not current

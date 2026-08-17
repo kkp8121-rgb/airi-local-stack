@@ -31,6 +31,31 @@ if ($runtimeFenceCount -lt $runtimeFenceMinimumTests) {
     throw "Affect evaluator runtime fence suite reported $runtimeFenceCount tests; expected at least $runtimeFenceMinimumTests."
 }
 
+$inputSafetyTest = Join-Path $PSScriptRoot 'ollama-proxy\eval\input_safety\test_airi_ko_input_safety_eval.py'
+$inputSafetyMinimumTests = 16
+$previousErrorActionPreference = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try {
+    $inputSafetyOutput = @(& python -m unittest -v $inputSafetyTest 2>&1 | ForEach-Object { $_.ToString() })
+    $inputSafetyExit = $LASTEXITCODE
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+$inputSafetyOutput | Write-Output
+if ($inputSafetyExit -ne 0) { throw 'B3-d input safety regression tests failed.' }
+$inputSafetyCountMatch = [regex]::Match(
+    ($inputSafetyOutput -join "`n"),
+    'Ran\s+(?<count>\d+)\s+tests?'
+)
+if (-not $inputSafetyCountMatch.Success) {
+    throw 'Could not read the B3-d input safety regression test count.'
+}
+$inputSafetyCount = [int]$inputSafetyCountMatch.Groups['count'].Value
+if ($inputSafetyCount -lt $inputSafetyMinimumTests) {
+    throw "B3-d input safety suite reported $inputSafetyCount tests; expected at least $inputSafetyMinimumTests."
+}
+
 # `node --test` exits zero when its glob matches no file, so a green run alone
 # does not prove the suite ran. Read the reported pass count and hold it to a
 # floor; raise the floor whenever chat-ingress tests are added.

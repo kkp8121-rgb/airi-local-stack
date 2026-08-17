@@ -17,6 +17,19 @@
 
 최종 갱신: 2026-08-17
 
+- **2026-08-17** (B3-d Korean-first input-safety corpus regression): 현재
+  default-OFF 규칙 기반 input prefilter를 120개 독립 합성 문장으로 고정했다.
+  70 policy-bound + 30 adversarial-transform 계약은 정책 SHA
+  `6d0678...06a8a`에 대해 verdict/category/rule 100/100 exact이고, 20
+  semantic-gap은 expected verdict 없이 human-review-only로 격리했다. corpus는
+  한국어 80건과 혼합/영·불·서·일·중 문장을 포함하며 전화·이메일·검증용
+  카드·가상 주민번호·비밀값 pattern 경로를 회귀한다. offline 16-test suite를
+  CI와 local checkpoint에 넣었고 생산 policy/proxy/flag는 변경하지 않았다.
+  이 PASS는 규칙 계약만 뜻한다. 기존 direct marker 5/20, 의미 안전성,
+  installed Electron/UI/TTS red-team은 미완료이므로 B3-d 전체는 계속
+  **FAIL/OFF**다.
+  (`완료/AIRI-B3D-KOREAN-INPUT-SAFETY-CORPUS-2026-08-17.md`)
+
 - **2026-08-17** (G1a evaluator-only runtime import fence): A4.2~A4.5의
   must-act/guarded-delta, correction-target A/B, correction-realization postcondition과 고정 oracle가
   proxy/director/chat ingress/launcher/first-party service/runtime patch에 literal import·reference되면
@@ -769,10 +782,12 @@
     multilingual semantic classification: ja/zh and unvalidated Latin fail closed
     as `unsupported_language`, and only 14 exact benign Korean-embedded tokens
     are permitted. No live YouTube/OAuth/provider adapter; output moderation OFF.
-  - [~] B3-d exact marker corpus + direct local prefilter evidence — 20-case
-    ko/en/ja/zh content-free report structural 20/20 PASS, standalone marker 5/20
-    PASS -> overall FAIL; installed Electron red-team remains pending and this is
-    not semantic-safety/proxy/UI/TTS proof
+  - [~] B3-d exact marker + Korean-first ruleset regression — 기존 20-case
+    ko/en/ja/zh direct report는 structural 20/20, standalone marker 5/20로
+    overall FAIL. 추가 120-case offline corpus의 100개 policy contract는
+    verdict/category/rule 100/100 exact이고 20 semantic-gap은 human-review-only다.
+    production policy·proxy·flag 변경은 없으며 installed Electron red-team과
+    semantic-safety/UI/TTS proof가 남아 전체 gate는 계속 FAIL/OFF
   - [ ] B3-e category별(욕설·음란성 등) 설치 UI/TTS 차단 반응 실기 — 현재는
     dictionary/unit + generic match-all 배선 확인만. output moderation 기본 OFF
   - [~] B3-f 실제 한국 장시간 방송 채팅 흐름/확신도 replay — local privacy·권한·
