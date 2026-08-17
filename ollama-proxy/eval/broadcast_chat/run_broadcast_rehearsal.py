@@ -24,7 +24,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import math
 import os
 import re
 import sys
@@ -50,6 +52,7 @@ except ImportError as exc:  # pragma: no cover - 배치 오류 가드
 DEFAULT_FIXTURES = BASE_DIR / "rehearsal-fixtures.json"
 SCHEMA = "airi.broadcast-rehearsal.v1"
 FIXTURE_SCHEMA = "airi.broadcast-rehearsal-fixtures.v1"
+CHECKPOINT_EVIDENCE_SCHEMA = "airi.broadcast-rehearsal-checkpoint-evidence.v1"
 
 # 운영 proxy 기본값 (ollama_proxy.py 의 요청 조립부와 동일). 이 위로 올리면 방송
 # 리듬과 다른 길이를 재게 되므로 경고한다.
@@ -234,6 +237,12 @@ def load_rehearsal_fixtures(path: Path) -> dict[str, Any]:
                 raise SystemExit(f"턴에 flow_check 딕셔너리가 없다: {label}")
             _validate_flow_check(turn, check, scenario, turn_ids, label)
     return data
+
+
+def canonical_json_sha256(data: Any) -> str:
+    """Hash JSON semantics, rather than its whitespace or platform line endings."""
+    canonical = json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _validate_flow_check(
@@ -576,6 +585,348 @@ def summarize_model(model_result: dict[str, Any]) -> dict[str, Any]:
             "note": "모델 첫 로드 흡수용. 집계에서 제외.",
         },
     }
+
+
+def _checkpoint_flow(flow: dict[str, Any]) -> dict[str, Any]:
+    """Keep only numeric flow evidence; names, prose, and turn content never escape."""
+    return {
+        "callback": {
+            key: {name: bucket[name] for name in ("probes", "hits", "rate")}
+            for key, bucket in (
+                ("all", flow["callback"]),
+                ("in_context", flow["callback"]["in_context"]),
+                ("out_of_context", flow["callback"]["out_of_context"]),
+            )
+        },
+        **{
+            name: {key: flow[name][key] for key in ("turns", "hits", "rate")}
+            for name in (
+                "aggregate_response",
+                "donation_name_call",
+                "no_name_leak",
+                "topic_shift_natural",
+            )
+        },
+        "politeness_drift": {
+            key: flow["politeness_drift"][key]
+            for key in ("window", "first_violation_rate", "second_violation_rate", "drift")
+        },
+        "length_variance": {
+            key: flow["length_variance"][key]
+            for key in ("p50", "p95", "min", "max", "spread", "distinct", "n")
+        },
+    }
+
+
+def _checkpoint_scenario(summary: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "scenario_id": summary["scenario_id"],
+        **{key: summary[key] for key in ("n_turns", "n_ok", "n_failed")},
+        "markers": summary["markers"],
+        "violations": summary["violations"],
+        "broadcast_pass": summary["broadcast_pass"],
+        "flow": _checkpoint_flow(summary["flow"]),
+    }
+
+
+def project_checkpoint_evidence(payload: dict[str, Any]) -> dict[str, Any]:
+    """Create the closed, content-free artifact used by the offline checkpoint.
+
+    This is deliberately a projection instead of a redaction pass: unknown report
+    fields cannot accidentally become evidence fields.
+    """
+    config = payload["config"]
+    prompt = payload["prompt"]
+    fixtures = payload["fixtures"]
+    default_fixture = DEFAULT_FIXTURES.resolve()
+    if Path(fixtures["path"]).resolve() != default_fixture:
+        raise ValueError("checkpoint evidence requires the shipped rehearsal fixture")
+    expected_ids = [scenario["id"] for scenario in load_rehearsal_fixtures(default_fixture)["scenarios"]]
+    contract = prompt.get("contract")
+    contract_block = contract_block_of(build_system_content(contract)) if contract in ("off", "on") else None
+    expected_hashes = {
+        "system_prompt_sha256": ab.sha256(ab.AIRI_SYSTEM_PROMPT),
+        "broadcast_frame_sha256": ab.sha256(ab.BROADCAST_FRAME),
+        "combined_system_sha256": ab.sha256(build_system_content(contract)) if contract in ("off", "on") else None,
+        "contract_block_sha256": ab.sha256(contract_block) if contract_block else None,
+    }
+    if (
+        config.get("dry_run") is not True
+        or config.get("token_supplied") is not False
+        or config.get("base_url") != "dry-run"
+        or config.get("models") != ["dry-midm"]
+        or config.get("max_tokens") != PRODUCTION_MAX_TOKENS
+        or config.get("history_turns") != DEFAULT_HISTORY_TURNS
+        or config.get("streaming") is not False
+        or contract not in ("off", "on")
+        or any(prompt.get(key) != value for key, value in expected_hashes.items())
+        or fixtures.get("selected_scenarios") != expected_ids
+        or fixtures.get("total_scenarios") != len(expected_ids)
+        or fixtures.get("selected_turns") != sum(len(s["turns"]) for s in load_rehearsal_fixtures(default_fixture)["scenarios"])
+    ):
+        raise ValueError("checkpoint evidence is limited to the full synthetic dry fixture")
+    evidence = {
+        "schema_version": CHECKPOINT_EVIDENCE_SCHEMA,
+        "config": {
+            key: config[key]
+            for key in ("models", "max_tokens", "history_turns", "dry_run", "streaming")
+        } | {"contract": contract},
+        "scope": {
+            "synthetic_only": True,
+            "network_used": False,
+            "model_called": False,
+            "proxy_path_tested": False,
+            "b1b_tested": False,
+            "tts_tested": False,
+        },
+        "hashes": {
+            key: prompt[key]
+            for key in (
+                "system_prompt_sha256",
+                "broadcast_frame_sha256",
+                "combined_system_sha256",
+                "contract_block_sha256",
+            )
+        },
+        "fixtures": {
+            "schema_version": fixtures["schema_version"],
+            "semantic_json_sha256": canonical_json_sha256(load_rehearsal_fixtures(DEFAULT_FIXTURES)),
+            **{key: fixtures[key] for key in ("selected_scenarios", "total_scenarios", "selected_turns")},
+        },
+        "summaries": [
+            {
+                "model": model["model"],
+                "scenarios": [_checkpoint_scenario(scenario) for scenario in model["scenarios"]],
+                "overall": {
+                    key: model["overall"][key]
+                    for key in (
+                        "n_turns", "n_ok", "n_failed", "length_variance", "broadcast_pass",
+                        "callback", "aggregate_response", "donation_name_call", "no_name_leak",
+                        "topic_shift_natural",
+                    )
+                },
+            }
+            for model in payload["summaries"]
+        ],
+    }
+    validate_checkpoint_evidence(evidence)
+    return evidence
+
+
+def validate_checkpoint_evidence(evidence: Any) -> None:
+    """Fail closed unless evidence exactly has the content-free v1 shape."""
+    if not isinstance(evidence, dict) or set(evidence) != {
+        "schema_version", "config", "scope", "hashes", "fixtures", "summaries"
+    }:
+        raise ValueError("checkpoint evidence root schema is not exact")
+    if evidence["schema_version"] != CHECKPOINT_EVIDENCE_SCHEMA:
+        raise ValueError("unsupported checkpoint evidence schema")
+    expected = {
+        "config": {"models", "max_tokens", "history_turns", "dry_run", "streaming", "contract"},
+        "scope": {"synthetic_only", "network_used", "model_called", "proxy_path_tested", "b1b_tested", "tts_tested"},
+        "hashes": {"system_prompt_sha256", "broadcast_frame_sha256", "combined_system_sha256", "contract_block_sha256"},
+        "fixtures": {"schema_version", "semantic_json_sha256", "selected_scenarios", "total_scenarios", "selected_turns"},
+    }
+    for key, keys in expected.items():
+        if not isinstance(evidence[key], dict) or set(evidence[key]) != keys:
+            raise ValueError(f"checkpoint evidence {key} schema is not exact")
+    if evidence["scope"] != {
+        "synthetic_only": True, "network_used": False, "model_called": False,
+        "proxy_path_tested": False, "b1b_tested": False, "tts_tested": False,
+    }:
+        raise ValueError("checkpoint evidence scope is not the closed synthetic scope")
+    config = evidence["config"]
+    if (
+        config["models"] != ["dry-midm"]
+        or config["max_tokens"] != PRODUCTION_MAX_TOKENS
+        or config["history_turns"] != DEFAULT_HISTORY_TURNS
+        or config["dry_run"] is not True
+        or config["streaming"] is not False
+        or config["contract"] not in ("off", "on")
+    ):
+        raise ValueError("checkpoint evidence config values are malformed")
+    contract_block = contract_block_of(build_system_content(config["contract"]))
+    expected_hashes = {
+        "system_prompt_sha256": ab.sha256(ab.AIRI_SYSTEM_PROMPT),
+        "broadcast_frame_sha256": ab.sha256(ab.BROADCAST_FRAME),
+        "combined_system_sha256": ab.sha256(build_system_content(config["contract"])),
+        "contract_block_sha256": ab.sha256(contract_block) if contract_block else None,
+    }
+    if evidence["hashes"] != expected_hashes:
+        raise ValueError("checkpoint evidence hashes are malformed")
+    shipped = load_rehearsal_fixtures(DEFAULT_FIXTURES)
+    expected_ids = [scenario["id"] for scenario in shipped["scenarios"]]
+    fixture = evidence["fixtures"]
+    if (
+        fixture["schema_version"] != FIXTURE_SCHEMA
+        or fixture["semantic_json_sha256"] != canonical_json_sha256(shipped)
+        or fixture["selected_scenarios"] != expected_ids
+        or fixture["total_scenarios"] != len(expected_ids)
+        or fixture["selected_turns"] != sum(len(s["turns"]) for s in shipped["scenarios"])
+    ):
+        raise ValueError("checkpoint evidence fixture pin is malformed")
+    if not isinstance(evidence["summaries"], list) or len(evidence["summaries"]) != 1:
+        raise ValueError("checkpoint evidence requires exactly one dry summary")
+    flow_keys = {
+        "callback", "aggregate_response", "donation_name_call", "no_name_leak",
+        "topic_shift_natural", "politeness_drift", "length_variance",
+    }
+    scenario_keys = {
+        "scenario_id", "n_turns", "n_ok", "n_failed", "markers", "violations",
+        "broadcast_pass", "flow",
+    }
+    overall_keys = {
+        "n_turns", "n_ok", "n_failed", "length_variance", "broadcast_pass", "callback",
+        "aggregate_response", "donation_name_call", "no_name_leak", "topic_shift_natural",
+    }
+    def exact_int(value: Any) -> bool:
+        return type(value) is int
+
+    def finite_number(value: Any) -> bool:
+        return type(value) in (int, float) and math.isfinite(float(value))
+
+    def validate_bucket(bucket: Any, denominator_key: str, expected_total: int) -> bool:
+        keys = {denominator_key, "hits", "rate"}
+        if not isinstance(bucket, dict) or set(bucket) != keys:
+            return False
+        total = bucket[denominator_key]
+        hits = bucket["hits"]
+        if not exact_int(total) or not exact_int(hits) or total != expected_total or not 0 <= hits <= total:
+            return False
+        expected_rate = round(hits / total, 3) if total else None
+        rate = bucket["rate"]
+        return rate is None if expected_rate is None else finite_number(rate) and rate == expected_rate
+
+    def validate_variance(value: Any, expected_n: int) -> bool:
+        if not isinstance(value, dict) or set(value) != {"p50", "p95", "min", "max", "spread", "distinct", "n"}:
+            return False
+        if not exact_int(value["n"]) or value["n"] != expected_n:
+            return False
+        if not exact_int(value["distinct"]) or not 1 <= value["distinct"] <= expected_n:
+            return False
+        metrics = [value[key] for key in ("min", "p50", "p95", "max", "spread")]
+        if not all(finite_number(item) and item >= 0 for item in metrics):
+            return False
+        if not value["min"] <= value["p50"] <= value["p95"] <= value["max"]:
+            return False
+        return value["spread"] == round(value["max"] - value["min"], 1)
+
+    def validate_drift(value: Any) -> bool:
+        if not isinstance(value, dict) or set(value) != {
+            "window", "first_violation_rate", "second_violation_rate", "drift"
+        }:
+            return False
+        if value["window"] != POLITENESS_WINDOW:
+            return False
+        first = value["first_violation_rate"]
+        second = value["second_violation_rate"]
+        drift = value["drift"]
+        return (
+            finite_number(first) and 0 <= first <= 1
+            and finite_number(second) and 0 <= second <= 1
+            and finite_number(drift) and -1 <= drift <= 1
+            and drift == round(second - first, 3)
+        )
+
+    model = evidence["summaries"][0]
+    if not isinstance(model, dict) or set(model) != {"model", "scenarios", "overall"}:
+        raise ValueError("checkpoint evidence model schema is not exact")
+    if model["model"] != "dry-midm" or not isinstance(model["scenarios"], list):
+        raise ValueError("checkpoint evidence model identity is malformed")
+    if [scenario.get("scenario_id") for scenario in model["scenarios"] if isinstance(scenario, dict)] != expected_ids:
+        raise ValueError("checkpoint evidence scenarios are not the frozen ordered pair")
+    if len(model["scenarios"]) != len(expected_ids):
+        raise ValueError("checkpoint evidence scenario count is malformed")
+
+    expected_flow_totals: dict[str, dict[str, int]] = {}
+    for source in shipped["scenarios"]:
+        kinds = [turn["event_type"] for turn in source["turns"]]
+        expected_flow_totals[source["id"]] = {
+            "aggregate_response": kinds.count("multi_chat"),
+            "donation_name_call": kinds.count("donation"),
+            "no_name_leak": len(kinds),
+            "topic_shift_natural": kinds.count("topic_shift"),
+        }
+
+    for scenario, source in zip(model["scenarios"], shipped["scenarios"]):
+        if not isinstance(scenario, dict) or set(scenario) != scenario_keys:
+            raise ValueError("checkpoint evidence scenario schema is not exact")
+        if (scenario["n_turns"], scenario["n_ok"], scenario["n_failed"]) != (24, 24, 0):
+            raise ValueError("checkpoint evidence scenario must be a complete 24-turn dry run")
+        if not isinstance(scenario["markers"], dict) or not isinstance(scenario["violations"], dict):
+            raise ValueError("checkpoint evidence score objects are malformed")
+        if set(scenario["markers"]) != set(ab.MARKER_ORDER) or set(scenario["violations"]) != set(ab.VIOLATION_ORDER):
+            raise ValueError("checkpoint evidence score schema is not exact")
+        if any(not validate_bucket(bucket, "n", 24) for bucket in scenario["markers"].values()):
+            raise ValueError("checkpoint evidence marker buckets are malformed")
+        if any(not exact_int(value) or not 0 <= value <= 24 for value in scenario["violations"].values()):
+            raise ValueError("checkpoint evidence violation counts are malformed")
+        if not validate_bucket(scenario["broadcast_pass"], "n", 24):
+            raise ValueError("checkpoint evidence broadcast bucket is malformed")
+        flow = scenario["flow"]
+        if not isinstance(flow, dict) or set(flow) != flow_keys:
+            raise ValueError("checkpoint evidence flow schema is not exact")
+        callback = flow["callback"]
+        if not isinstance(callback, dict) or set(callback) != {"all", "in_context", "out_of_context"}:
+            raise ValueError("checkpoint evidence callback schema is not exact")
+        if (
+            not validate_bucket(callback["all"], "probes", 2)
+            or not validate_bucket(callback["in_context"], "probes", 1)
+            or not validate_bucket(callback["out_of_context"], "probes", 1)
+            or callback["all"]["hits"] != callback["in_context"]["hits"] + callback["out_of_context"]["hits"]
+        ):
+            raise ValueError("checkpoint evidence callback values are malformed")
+        for key, expected_total in expected_flow_totals[source["id"]].items():
+            if not validate_bucket(flow[key], "turns", expected_total):
+                raise ValueError("checkpoint evidence flow bucket is malformed")
+        if not validate_drift(flow["politeness_drift"]):
+            raise ValueError("checkpoint evidence politeness drift is malformed")
+        if not validate_variance(flow["length_variance"], 24):
+            raise ValueError("checkpoint evidence flow variance is malformed")
+
+    overall = model["overall"]
+    if not isinstance(overall, dict) or set(overall) != overall_keys:
+        raise ValueError("checkpoint evidence overall schema is malformed")
+    if (overall["n_turns"], overall["n_ok"], overall["n_failed"]) != (48, 48, 0):
+        raise ValueError("checkpoint evidence overall counts are malformed")
+    scenarios = model["scenarios"]
+    if not validate_variance(overall["length_variance"], 48):
+        raise ValueError("checkpoint evidence overall variance is malformed")
+    if not validate_bucket(overall["broadcast_pass"], "n", 48) or overall["broadcast_pass"]["hits"] != sum(
+        scenario["broadcast_pass"]["hits"] for scenario in scenarios
+    ):
+        raise ValueError("checkpoint evidence overall broadcast bucket is malformed")
+    if not validate_bucket(overall["callback"], "probes", 4) or overall["callback"]["hits"] != sum(
+        scenario["flow"]["callback"]["all"]["hits"] for scenario in scenarios
+    ):
+        raise ValueError("checkpoint evidence overall callback bucket is malformed")
+    for key in ("aggregate_response", "donation_name_call", "no_name_leak", "topic_shift_natural"):
+        expected_total = sum(expected_flow_totals[scenario_id][key] for scenario_id in expected_ids)
+        if not validate_bucket(overall[key], "turns", expected_total) or overall[key]["hits"] != sum(
+            scenario["flow"][key]["hits"] for scenario in scenarios
+        ):
+            raise ValueError("checkpoint evidence overall flow bucket is malformed")
+    scenario_variances = [scenario["flow"]["length_variance"] for scenario in scenarios]
+    if (
+        overall["length_variance"]["min"] != min(value["min"] for value in scenario_variances)
+        or overall["length_variance"]["max"] != max(value["max"] for value in scenario_variances)
+    ):
+        raise ValueError("checkpoint evidence overall variance does not match its scenarios")
+    forbidden = {"prompt", "input", "input_text", "response", "error", "path", "token", "title", "description", "name_leak", "name_leaks", "note"}
+
+    def walk(value: Any) -> None:
+        if isinstance(value, dict):
+            if forbidden & set(value):
+                raise ValueError("checkpoint evidence contains content-bearing data")
+            for nested in value.values():
+                walk(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                walk(nested)
+        elif isinstance(value, str) and len(value) > 128:
+            raise ValueError("checkpoint evidence contains an unexpected long string")
+
+    walk(evidence)
 
 
 # ---------------------------------------------------------------------------

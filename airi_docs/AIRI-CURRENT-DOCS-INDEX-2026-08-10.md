@@ -121,6 +121,11 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-B4C-BROADCAST-REHEARSAL-CHECKPOINT-2026-08-17.md` — 고정 합성
+  2×24턴 방송 흐름을 37-test 필수 로컬 checkpoint로 편입한 기록. content-free
+  evidence는 exact 48/48·prompt hash·count/rate 산술을 검증한다. 모델/proxy,
+  B1b/B4b, public wire, TTS 또는 실방송 증거는 아니다.
+
 - `AIRI-B3D-KOREAN-INPUT-SAFETY-CORPUS-2026-08-17.md` — 120개 한국어 우선
   합성 corpus로 현재 규칙 prefilter의 100개 policy contract를 100/100 exact
   고정하고, 20개 semantic gap을 사람 검토 전용으로 격리한 오프라인 회귀.

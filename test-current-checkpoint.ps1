@@ -56,6 +56,39 @@ if ($inputSafetyCount -lt $inputSafetyMinimumTests) {
     throw "B3-d input safety suite reported $inputSafetyCount tests; expected at least $inputSafetyMinimumTests."
 }
 
+$broadcastRehearsalTest = Join-Path $PSScriptRoot 'ollama-proxy\eval\broadcast_chat\test_run_broadcast_rehearsal.py'
+$broadcastRehearsalMinimumTests = 37
+$previousBroadcastErrorActionPreference = $ErrorActionPreference
+$previousPythonIoEncoding = $env:PYTHONIOENCODING
+$ErrorActionPreference = 'Continue'
+$env:PYTHONIOENCODING = 'utf-8'
+try {
+    $broadcastRehearsalOutput = @(& python -m unittest -v $broadcastRehearsalTest 2>&1 | ForEach-Object { $_.ToString() })
+    $broadcastRehearsalExit = $LASTEXITCODE
+}
+finally {
+    $ErrorActionPreference = $previousBroadcastErrorActionPreference
+    if ($null -eq $previousPythonIoEncoding) {
+        Remove-Item Env:PYTHONIOENCODING -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:PYTHONIOENCODING = $previousPythonIoEncoding
+    }
+}
+$broadcastRehearsalOutput | Write-Output
+if ($broadcastRehearsalExit -ne 0) { throw 'B4c broadcast rehearsal regression tests failed.' }
+$broadcastRehearsalCountMatch = [regex]::Match(
+    ($broadcastRehearsalOutput -join "`n"),
+    'Ran\s+(?<count>\d+)\s+tests?'
+)
+if (-not $broadcastRehearsalCountMatch.Success) {
+    throw 'Could not read the B4c broadcast rehearsal test count.'
+}
+$broadcastRehearsalCount = [int]$broadcastRehearsalCountMatch.Groups['count'].Value
+if ($broadcastRehearsalCount -lt $broadcastRehearsalMinimumTests) {
+    throw "B4c broadcast rehearsal suite reported $broadcastRehearsalCount tests; expected at least $broadcastRehearsalMinimumTests."
+}
+
 # `node --test` exits zero when its glob matches no file, so a green run alone
 # does not prove the suite ran. Read the reported pass count and hold it to a
 # floor; raise the floor whenever chat-ingress tests are added.

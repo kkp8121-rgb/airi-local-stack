@@ -17,6 +17,20 @@
 
 최종 갱신: 2026-08-17
 
+- **2026-08-17** (B4c 멀티턴 방송 리허설 로컬 체크포인트): 기존
+  `autumn_leaves`/`game_and_career` 합성 fixture를 semantic SHA
+  `aeb2bc...96c8`과 exact 2×24턴으로 고정하고, 전체 48턴 주입 transport의
+  콜백 창 안/밖·여론 집계·후원 현재 이름 호명/과거 이름 비누출·주제 전환·
+  politeness drift·계약 OFF 프롬프트 바이트를 37-test 필수 로컬 회귀로
+  편입했다. content-free evidence v1은 dry-midm/128/history 8/full fixture,
+  48/48 성공, prompt hash 재계산, finite rate와 시나리오→overall 산술을
+  fail-closed로 검증한다. 독립 검토가 발견한 빈 summary·음수 count·NaN·위조
+  hash/model false pass를 닫은 뒤 최종 GO였고 current checkpoint도 PASS다.
+  이는 네트워크·모델·11435 proxy·B1b/B4b·public wire·TTS를 실행하지 않은
+  합성 텍스트 흐름 회귀일 뿐이다. 운영 계약은 기본 OFF이고 ON 채택은 사용자
+  확인 전 자동 승격하지 않는다.
+  (`완료/AIRI-B4C-BROADCAST-REHEARSAL-CHECKPOINT-2026-08-17.md`)
+
 - **2026-08-17** (B3-d Korean-first input-safety corpus regression): 현재
   default-OFF 규칙 기반 input prefilter를 120개 독립 합성 문장으로 고정했다.
   70 policy-bound + 30 adversarial-transform 계약은 정책 SHA
@@ -695,9 +709,12 @@
       계약 ON 증거는 별도 사용자 승인 후에만 추가.
   - [x] 멀티턴 방송 리허설 평가 (오프라인 흐름 축) — 구축 완료 2026-08-14
     (`88700ac` — 시나리오 2×24턴·콜백 창 안/밖 분리·여론 집계·후원 호명
-    스코핑·politeness_drift·34 tests·CI evaluations shard 등록). 원격 Mi:dm
+    스코핑·politeness_drift·CI evaluations shard 등록). 원격 Mi:dm
     실측 완료 2026-08-14(96턴 실패 0, 첫 턴 앵커 고정·콜백 창밖 미스
-    포착 — 평가 설계 목적 달성). 정기 회귀 편입은 후속.
+    포착 — 평가 설계 목적 달성). 2026-08-17 exact fixture SHA·48/48 주입
+    transport·content-free evidence·hostile mutation을 포함한 37 tests를
+    `test-current-checkpoint.ps1` 필수 회귀로 편입 완료. 이 로컬 PASS는
+    모델/proxy/B1b/B4b/public wire/TTS 실증이 아니다.
   - [ ] B4b 어댑터·승인 비공개 리허설 (보류: B1b 외부 자격증명·쿼터 실측·운영 승인;
     STT OFF/deferred 유지)
 - [ ] **G6. 화면·게임·채팅 에이전트** (G5 이후)

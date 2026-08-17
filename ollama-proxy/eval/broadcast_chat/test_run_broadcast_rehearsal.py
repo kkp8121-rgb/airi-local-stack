@@ -1,10 +1,13 @@
 """멀티턴 방송 리허설 러너 오프라인 테스트 — 네트워크 없이 전 경로를 태운다."""
+import copy
 import json
+import io
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from contextlib import redirect_stdout
 
 import httpx
 
@@ -90,24 +93,24 @@ class FixtureSchemaTests(unittest.TestCase):
     def test_shipped_fixture_matches_the_rehearsal_design(self) -> None:
         data = runner.load_rehearsal_fixtures(runner.DEFAULT_FIXTURES)
         self.assertEqual(runner.FIXTURE_SCHEMA, data["schema_version"])
-        self.assertEqual(2, len(data["scenarios"]))
+        self.assertEqual(
+            "aeb2bc2e8f74f6bd54a13eaf338ad48c288875b888b10ced430302fe906d96c8",
+            runner.canonical_json_sha256(data),
+        )
+        self.assertEqual(["autumn_leaves", "game_and_career"], [s["id"] for s in data["scenarios"]])
         for scenario in data["scenarios"]:
             turns = scenario["turns"]
-            self.assertTrue(22 <= len(turns) <= 26, f"{scenario['id']}: {len(turns)}턴")
+            self.assertEqual(24, len(turns), f"{scenario['id']}: {len(turns)}턴")
             kinds = [turn["event_type"] for turn in turns]
             self.assertGreaterEqual(kinds.count("multi_chat"), 1)
             self.assertGreaterEqual(kinds.count("donation"), 1)
             self.assertGreaterEqual(kinds.count("topic_shift"), 1)
             self.assertEqual(2, kinds.count("callback_probe"))
-            self.assertEqual(
-                {"in", "out"},
-                {
-                    turn["flow_check"]["expected_window"]
-                    for turn in turns
-                    if turn["event_type"] == "callback_probe"
-                },
-                "시나리오마다 히스토리 창 안/밖 probe 를 하나씩 둔다",
-            )
+            windows = [
+                turn["flow_check"]["expected_window"]
+                for turn in turns if turn["event_type"] == "callback_probe"
+            ]
+            self.assertEqual(["in", "out"], windows, "시나리오마다 창 안/밖 probe 는 정확히 하나씩")
 
     def test_callback_probes_sit_eight_to_twelve_turns_after_their_seed(self) -> None:
         data = runner.load_rehearsal_fixtures(runner.DEFAULT_FIXTURES)
@@ -463,11 +466,14 @@ class HttpTransportTests(unittest.TestCase):
 
 
 class DryRunMainTests(unittest.TestCase):
-    def _run_main(self, directory: str, contract: str) -> dict:
+    def _run_main(self, directory: str, contract: str, scenarios: str | None = "autumn_leaves") -> dict:
         output = Path(directory) / f"dry-{contract}.json"
-        code = runner.main(
-            ["--dry-run", "--contract", contract, "--output", str(output), "--scenarios", "autumn_leaves"]
-        )
+        args = ["--dry-run", "--contract", contract, "--output", str(output)]
+        if scenarios:
+            args.extend(["--scenarios", scenarios])
+        # Windows consoles can be cp949; the report is Korean but JSON is UTF-8.
+        with redirect_stdout(io.StringIO()):
+            code = runner.main(args)
         self.assertEqual(0, code)
         return json.loads(output.read_text(encoding="utf-8"))
 
@@ -501,6 +507,139 @@ class DryRunMainTests(unittest.TestCase):
             output = Path(directory) / "never.json"
             with self.assertRaises(SystemExit):
                 runner.main(["--dry-run", "--scenarios", "nope", "--output", str(output)])
+
+
+class CheckpointEvidenceTests(unittest.TestCase):
+    def _full_fixture_result(self) -> tuple[dict, dict]:
+        fixtures = runner.load_rehearsal_fixtures(runner.DEFAULT_FIXTURES)
+        responses = []
+        for scenario in fixtures["scenarios"]:
+            for turn in scenario["turns"]:
+                event = turn["event_type"]
+                if event == "callback_probe":
+                    responses.append(turn["flow_check"]["callback_keywords"][0] + " 얘기였어요.")
+                elif event == "donation":
+                    responses.append(turn["flow_check"]["donation_name"] + "님, 정말 고마워요.")
+                elif event == "multi_chat":
+                    responses.append("그 의견이 많지만 저는 조금 다르게 봐요.")
+                else:
+                    responses.append("네, 그렇게 해 볼게요.")
+        transport = RecordingTransport(responses)
+        results = [
+            runner.run_scenario(
+                transport, "synthetic-model", scenario, system_content=runner.build_system_content("off"),
+                max_tokens=128, timeout=5.0, history_turns=runner.DEFAULT_HISTORY_TURNS,
+            )
+            for scenario in fixtures["scenarios"]
+        ]
+        return fixtures, {"model": "synthetic-model", "scenarios": results}
+
+    def test_injected_transport_covers_both_shipped_scenarios_without_network(self) -> None:
+        fixtures, model_result = self._full_fixture_result()
+        summary = runner.summarize_model(model_result)
+        self.assertEqual(48, summary["overall"]["n_turns"])
+        self.assertEqual(48, summary["overall"]["n_ok"])
+        self.assertEqual(0, summary["overall"]["n_failed"])
+        for scenario in summary["scenarios"]:
+            self.assertEqual(24, scenario["n_ok"])
+            self.assertEqual({"probes": 1, "hits": 1, "rate": 1.0}, scenario["flow"]["callback"]["in_context"])
+            self.assertEqual({"probes": 1, "hits": 1, "rate": 1.0}, scenario["flow"]["callback"]["out_of_context"])
+            self.assertEqual(2, scenario["flow"]["aggregate_response"]["turns"])
+            self.assertEqual(2, scenario["flow"]["donation_name_call"]["turns"])
+            self.assertEqual(24, scenario["flow"]["no_name_leak"]["hits"])
+            self.assertEqual(10, scenario["flow"]["politeness_drift"]["window"])
+        for scenario in model_result["scenarios"]:
+            for turn in scenario["turns"]:
+                if turn["event_type"] == "donation":
+                    self.assertTrue(turn["flow"]["markers"]["donation_name_call"])
+                    self.assertTrue(turn["flow"]["markers"]["no_name_leak"])
+        self.assertEqual(["autumn_leaves", "game_and_career"], [s["id"] for s in fixtures["scenarios"]])
+
+    def test_checkpoint_evidence_is_content_free_and_rejects_full_or_malformed_reports(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            payload = DryRunMainTests()._run_main(directory, "off", scenarios=None)
+            on_payload = DryRunMainTests()._run_main(directory, "on", scenarios=None)
+        evidence = runner.project_checkpoint_evidence(payload)
+        on_evidence = runner.project_checkpoint_evidence(on_payload)
+        self.assertEqual(runner.CHECKPOINT_EVIDENCE_SCHEMA, evidence["schema_version"])
+        self.assertEqual("on", on_evidence["config"]["contract"])
+        self.assertRegex(on_evidence["hashes"]["contract_block_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(["autumn_leaves", "game_and_career"], evidence["fixtures"]["selected_scenarios"])
+        self.assertEqual(48, evidence["fixtures"]["selected_turns"])
+        self.assertEqual(
+            {"synthetic_only": True, "network_used": False, "model_called": False,
+             "proxy_path_tested": False, "b1b_tested": False, "tts_tested": False},
+            evidence["scope"],
+        )
+        encoded = json.dumps(evidence, ensure_ascii=False)
+        self.assertNotIn("[YouTube]", encoded)
+        self.assertNotIn('"system_prompt":', encoded)
+        with self.assertRaises(ValueError):
+            runner.validate_checkpoint_evidence(payload)
+        malformed = dict(evidence)
+        malformed["prompt"] = "content"
+        with self.assertRaises(ValueError):
+            runner.validate_checkpoint_evidence(malformed)
+        malformed = json.loads(json.dumps(evidence))
+        malformed["summaries"][0]["scenarios"][0]["markers"]["banmal"]["rate"] = "short text"
+        with self.assertRaises(ValueError):
+            runner.validate_checkpoint_evidence(malformed)
+        live = json.loads(json.dumps(payload))
+        live["config"]["dry_run"] = False
+        with self.assertRaises(ValueError):
+            runner.project_checkpoint_evidence(live)
+        custom = json.loads(json.dumps(payload))
+        custom["fixtures"]["path"] = str(Path(tempfile.gettempdir()) / "custom-fixture.json")
+        with self.assertRaises(ValueError):
+            runner.project_checkpoint_evidence(custom)
+
+    def test_checkpoint_evidence_rejects_forged_coverage_rates_hashes_and_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            payload = DryRunMainTests()._run_main(directory, "off", scenarios=None)
+        evidence = runner.project_checkpoint_evidence(payload)
+
+        mutations = []
+        bad = copy.deepcopy(evidence)
+        bad["summaries"] = []
+        mutations.append(("empty summaries", bad))
+        bad = copy.deepcopy(evidence)
+        bad["summaries"][0]["scenarios"] = []
+        mutations.append(("empty scenarios", bad))
+        bad = copy.deepcopy(evidence)
+        bad["summaries"][0]["overall"]["n_ok"] = 999
+        mutations.append(("mismatched totals", bad))
+        bad = copy.deepcopy(evidence)
+        bad["summaries"][0]["overall"]["broadcast_pass"]["hits"] = -1
+        mutations.append(("negative hits", bad))
+        bad = copy.deepcopy(evidence)
+        bad["summaries"][0]["overall"]["broadcast_pass"]["rate"] = float("nan")
+        mutations.append(("nonfinite rate", bad))
+        bad = copy.deepcopy(evidence)
+        bad["summaries"][0]["scenarios"] = [bad["summaries"][0]["scenarios"][0]] * 2
+        mutations.append(("duplicate scenario", bad))
+        bad = copy.deepcopy(evidence)
+        bad["hashes"]["combined_system_sha256"] = "0" * 64
+        mutations.append(("forged prompt hash", bad))
+        bad = copy.deepcopy(evidence)
+        bad["summaries"][0]["model"] = "creator-private-label"
+        mutations.append(("content-bearing model", bad))
+        for label, malformed in mutations:
+            with self.subTest(label=label), self.assertRaises(ValueError):
+                runner.validate_checkpoint_evidence(malformed)
+
+        forged_sources = []
+        bad = copy.deepcopy(payload)
+        bad["summaries"] = []
+        forged_sources.append(("empty source summaries", bad))
+        bad = copy.deepcopy(payload)
+        bad["prompt"]["combined_system_sha256"] = "0" * 64
+        forged_sources.append(("forged source hash", bad))
+        bad = copy.deepcopy(payload)
+        bad["config"]["models"] = ["creator-private-label"]
+        forged_sources.append(("custom source model", bad))
+        for label, malformed in forged_sources:
+            with self.subTest(label=label), self.assertRaises(ValueError):
+                runner.project_checkpoint_evidence(malformed)
 
 
 if __name__ == "__main__":

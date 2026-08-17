@@ -153,6 +153,17 @@ AIRI sender/TTS/OBS, 외부 killswitch·실제 모더레이션 및 설치 ASAR �
 않는다. STT는 OFF/deferred를 유지한다. 상세:
 `완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`.
 
+**B4c 멀티턴 리허설 체크포인트 (2026-08-17):** 기존 두 합성 시나리오를
+semantic SHA와 exact 2×24턴으로 고정하고 37-test offline suite를
+`test-current-checkpoint.ps1`의 필수 회귀로 편입했다. 전체 48턴 주입 transport,
+콜백 창 안/밖, 여론 집계, 후원 호명 범위/과거 이름 비누출, 주제 전환,
+politeness drift, 계약 OFF 프롬프트 바이트를 검사한다. content-free evidence는
+full fixture 48/48 성공과 prompt hash·count/rate 산술을 fail-closed로 검증한다.
+이 결과는 합성 텍스트 흐름 계약만 고정하며 live B1b/B4b, 11435 스타일 게이트,
+public wire, TTS, OBS 또는 실제 장시간 방송 증거가 아니다. B4c 운영 계약은
+기본 OFF이고 ON 채택은 사용자 확인 전 자동 승격하지 않는다. 상세:
+`완료/AIRI-B4C-BROADCAST-REHEARSAL-CHECKPOINT-2026-08-17.md`.
+
 **20분 블록 상태기계** (2시간 = 6블록):
 
 ```
