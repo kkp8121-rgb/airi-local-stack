@@ -17,6 +17,14 @@
 
 최종 갱신: 2026-08-17
 
+- **2026-08-17** (G1a A4.3 correction wording user-review sheet): exact 8개 synthetic
+  correction case마다 prior AIRI·selected viewer·screen basis·affect cause를 나란히 놓고,
+  model 공개 실패 시에만 고려할 짧은 fallback과 정상 캐릭터 발화 목표를 분리했다.
+  특히 embarrassed/skeptical/curious를 모두 긍정 톤으로 펴지 않고 민망함·확신 하향·가설
+  철회·hedged resemblance로 표현한다. 이는 사람이 작성한 proposal이며 새 Mi:dm run,
+  품질 PASS, prompt/runtime/TTS 배선 또는 운영 승격이 아니다. 사용자 판단 전 모든 gate는
+  **FAIL/OFF**다. (`진행예정/AIRI-G1A-CORRECTION-WORDING-DECISION-2026-08-17.md`)
+
 - **2026-08-17** (G1a A4.3 closed correction-target offline foundation): A4.2
   guarded-delta에서 generic `correct`가 8행 중 3행만 우세하고 historical control이 5행에서
   우세했던 원인을 교정 방향 손실로 좁혔다. 기존 합성 fixture/sidecar hash와 exact `correct`

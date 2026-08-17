@@ -55,6 +55,9 @@
 
 ## 진행예정 — 계획
 
+- `AIRI-G1A-CORRECTION-WORDING-DECISION-2026-08-17.md` — A4.3의 8개 synthetic
+  correction 장면을 최후 fallback과 정상 캐릭터 발화 목표로 나눈 사용자 검토 시트.
+  감정 원인·화면 근거·불확실성을 함께 보여 주지만 코드/운영 채택은 아니다.
 - `AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md` — G1a 감정·
   캐릭터 연속성 엔진 상세 계획. 공개 MIT/Apache 프로젝트의 bounded affect,
   event-sourced reducer, memory-layer 패턴만 인용하고 repo-native typed reducer를
