@@ -17,6 +17,17 @@
 
 최종 갱신: 2026-08-17
 
+- **2026-08-17** (G1a A4.4 correction-target fresh A/B foundation): A4.3의 exact
+  8개 synthetic target/direction을 실제 Mi:dm 새 응답으로 비교하기 위한 control/target
+  8쌍·16-call 러너를 추가했다. target arm은 기존 affect+`reply_act=correct` control과
+  byte-identical이고 closed target 메시지 하나만 다르다. proxy는 exact loopback
+  `local-evaluation` + valid context/affect/correct-act/target에서만 고정 한국어 target을 보존하며,
+  name/key/Unicode variant와 duplicate는 raw card projection까지 fail-closed한다. blinded packet,
+  별도 operator key, exact packet-bound locked overlay, content-free report와 Windows honest-local
+  custody를 고정했다. 독립 공격 검토는 proxy와 runner 모두 범위 내 **GO**다. 현재 11435/Ollama가
+  내려가 있어 fresh 16-call 실측은 아직 없으며 품질·운영 gate는 계속 **FAIL/OFF**다.
+  (`완료/AIRI-G1A-CORRECTION-TARGET-AB-FOUNDATION-2026-08-17.md`)
+
 - **2026-08-17** (G1a A4.3 correction wording user-review sheet): exact 8개 synthetic
   correction case마다 prior AIRI·selected viewer·screen basis·affect cause를 나란히 놓고,
   model 공개 실패 시에만 고려할 짧은 fallback과 정상 캐릭터 발화 목표를 분리했다.
@@ -467,7 +478,8 @@
     못해 품질 gate FAIL. A4.2 zero-call guarded delta는 thank·최초 deescalate·repair에
     탐색적 양성 신호, generic correct에는 음성 신호를 보였다. human review, A0 사용자
     결정과 A3 이후 대기. A4.3은 8개 synthetic correction target/direction의 offline
-    human-review eligibility까지만 완료했다.
+    human-review eligibility를 완료했고, A4.4는 같은 8행의 fresh 16-call blinded A/B
+    foundation까지 구현·검토했다. 실제 Mi:dm 실행과 human review는 대기 중이다.
     (`진행예정/AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`)
     - [~] A0 constitution v2: 확정 이월과 미정 likes/dislikes/pride/
       embarrassment/conflict/repair/fatigue 선택지를 분리한 결정 시트 작성,
@@ -491,13 +503,15 @@
       affect-only 대비 act/grounding/reversal을 개선했으나 OFF를 넘지 못했고
       thank 0/3·pathology 증가로 다시 FAIL. A4.2 deterministic guarded delta의
       22행 zero-call model review는 좁은 fallback에만 탐색 신호를 보였고 human review와
-      runtime selection은 미완료. A4.3 closed correction target 8행은 structural eligibility만
-      완료 — 2026-08-17
+      runtime selection은 미완료. A4.3 closed correction target 8행 structural eligibility와
+      A4.4 fresh control/target 16-call evaluation foundation은 완료했지만 실제 실행·human
+      review는 대기 — 2026-08-17
       (`완료/AIRI-G1A-AFFECT-BROADCAST-EVAL-FOUNDATION-2026-08-16.md`,
       `완료/AIRI-G1A-AFFECT-BROADCAST-AB-2026-08-17.md`,
       `완료/AIRI-G1A-REPLY-ACT-TRIPLET-2026-08-17.md`,
       `완료/AIRI-G1A-GUARDED-DELTA-REVIEW-2026-08-17.md`,
-      `완료/AIRI-G1A-CORRECTION-TARGET-FOUNDATION-2026-08-17.md`)
+      `완료/AIRI-G1A-CORRECTION-TARGET-FOUNDATION-2026-08-17.md`,
+      `완료/AIRI-G1A-CORRECTION-TARGET-AB-FOUNDATION-2026-08-17.md`)
     - [ ] A5 trusted state→TTS/Live2D 표현 배선 (보류: 텍스트 게이트 PASS)
     - [ ] A6 B1b/B4b 설치 AIRI 30~120분 비공개 리허설과 운영 ON 사용자 결정
 - [~] **G2. 장기 기억**

@@ -496,6 +496,21 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
 - 근거: `../완료/AIRI-G1A-CORRECTION-TARGET-FOUNDATION-2026-08-17.md`,
   `../완료/AIRI-G1A-GUARDED-DELTA-REVIEW-2026-08-17.md`
 
+### A4.4. fresh correction-target control/target evaluation
+
+- 대상은 A4.3 oracle의 exact 8행뿐이다. control은 기존 affect+`reply_act=correct`, target은
+  control에 canonical correction-target 메시지 하나만 추가한다.
+- shared candidate는 8개 fixed pair 외 입력을 받지 않으며, proxy는 exact loopback
+  `local-evaluation` + closed context/affect/correct act에서만 고정 한국어로 렌더한다.
+- name/key/Unicode variant, duplicate, malformed, extra-key target은 raw card projection까지
+  fail-closed한다. 일반 runtime event, director, B4b, TTS에는 연결하지 않는다.
+- explicit run은 8쌍·16 POST, frozen Mi:dm profile, 4 CT/4 TC, row/order/label CSPRNG,
+  content-free public report, separate ignored operator key, packet-bound locked review overlay를
+  사용한다. historical A4.1/A4.2 응답·점수·사람이 쓴 예시 대사는 재사용하지 않는다.
+- foundation 구현과 독립 검토는 완료했다. 현재 stack이 내려가 있어 fresh run/human review는
+  대기 중이고 operational gate는 계속 FAIL/OFF다.
+- 근거: `../완료/AIRI-G1A-CORRECTION-TARGET-AB-FOUNDATION-2026-08-17.md`
+
 ### A5. 표현 계층
 
 - trusted state → ACT/TTS/Live2D mapping

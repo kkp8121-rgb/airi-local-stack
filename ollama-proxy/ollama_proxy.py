@@ -60,6 +60,12 @@ from broadcast_reply_act import (
     parse_reply_act_candidate,
     render_reply_act_contract,
 )
+from broadcast_correction_target import (
+    CORRECTION_TARGET_MESSAGE_NAME,
+    CorrectionTargetValidationError,
+    parse_correction_target_candidate,
+    render_correction_target_contract,
+)
 from evaluation_store import (
     EvaluationConfig,
     EvaluationDisabledError,
@@ -1269,6 +1275,7 @@ def project_active_character_card(
             message.get("name") == GENERATED_DEFAULT_CARD_MESSAGE_NAME
             or message.get("name") == REQUEST_LOCAL_SYSTEM_MESSAGE_NAME
             or message.get("name") == REPLY_ACT_MESSAGE_NAME
+            or _is_correction_target_message_family(message)
             or is_generated_default_card_prompt(content)
         ):
             continue
@@ -2283,6 +2290,41 @@ SYNTHETIC_BROADCAST_CONTEXT_INSTRUCTION = (
 )
 SYNTHETIC_AFFECT_MARKER = "[airi_affect_continuity "
 SYNTHETIC_REQUEST_LOCAL_MAX_BYTES = 2048
+
+
+def _normalized_correction_target_control_token(value: str) -> str:
+    """Normalize control-token spelling variants without touching card text."""
+    return "".join(
+        char for char in unicodedata.normalize("NFKC", value)
+        if not char.isspace() and unicodedata.category(char) != "Cf"
+    ).casefold()
+
+
+def _is_correction_target_message_family(message: object) -> bool:
+    """Recognize only the reserved correction-target control-name family.
+
+    This is deliberately narrower than a generic system-name sanitizer: only
+    names beginning with the dedicated reserved prefix are withheld from cards.
+    Canonical spelling remains mandatory for a trusted control message.
+    """
+    if type(message) is not dict:
+        return False
+    for key, value in message.items():
+        if (
+            type(key) is str
+            and type(value) is str
+            and _normalized_correction_target_control_token(key) == "name"
+            and (
+                _normalized_correction_target_control_token(value).startswith(
+                    CORRECTION_TARGET_MESSAGE_NAME.casefold()
+                )
+                or _normalized_correction_target_control_token(value).replace("_", "").startswith(
+                    CORRECTION_TARGET_MESSAGE_NAME.casefold().replace("_", "")
+                )
+            )
+        ):
+            return True
+    return False
 _SYNTHETIC_AFFECT_SNAPSHOT_RE = re.compile(
     r"\[airi_affect_continuity "
     r"schema=(?P<schema>[^\s\]]+) primary=(?P<primary>[^\s\]]+) "
@@ -2418,6 +2460,36 @@ def trusted_synthetic_reply_act_message(messages: object) -> dict[str, str] | No
         "name": REPLY_ACT_MESSAGE_NAME,
         "content": rendered,
     }
+
+
+def trusted_synthetic_correction_target_message(messages: object) -> dict[str, str] | None:
+    """Render one closed correction target; arbitrary system prose is dropped."""
+    if not isinstance(messages, list):
+        return None
+    family = [
+        message for message in messages
+        if isinstance(message, dict)
+        and message.get("role") == "system"
+        and _is_correction_target_message_family(message)
+    ]
+    # A reserved-name near variant is an invalid sibling, not an unrelated
+    # card.  This makes the synthetic control family fail closed.
+    if len(family) != 1:
+        return None
+    candidate = family[0]
+    content = candidate.get("content")
+    if (
+        candidate.get("name") != CORRECTION_TARGET_MESSAGE_NAME
+        or set(candidate) != {"role", "name", "content"}
+        or not isinstance(content, str)
+    ):
+        return None
+    try:
+        correction_target = parse_correction_target_candidate(content)
+        rendered = render_correction_target_contract(correction_target)
+    except CorrectionTargetValidationError:
+        return None
+    return {"role": "system", "name": CORRECTION_TARGET_MESSAGE_NAME, "content": rendered}
 # These are deliberately grammatical rather than topic-specific.  Grounding is
 # a lexical safety check, not a collection of preferred subjects or brands.
 _GROUNDING_TOKEN_RE = re.compile(r"[가-힣]+|[A-Za-z0-9]+")
@@ -6156,6 +6228,24 @@ def transform_body(
             in synthetic_request_local["content"]
         ) else None
     )
+    synthetic_correction_target = None
+    if (
+        trusted_synthetic_context
+        and synthetic_request_local is not None
+        and "\n\n" + SYNTHETIC_AFFECT_MARKER in synthetic_request_local["content"]
+        and synthetic_reply_act is not None
+    ):
+        reply_candidates = [
+            message for message in messages if isinstance(message, dict)
+            and message.get("role") == "system"
+            and message.get("name") == REPLY_ACT_MESSAGE_NAME
+        ] if isinstance(messages, list) else []
+        try:
+            reply_act = parse_reply_act_candidate(reply_candidates[0].get("content"))
+        except (ReplyActValidationError, AttributeError):
+            reply_act = None
+        if reply_act is not None and reply_act["act"] == "correct":
+            synthetic_correction_target = trusted_synthetic_correction_target_message(messages)
     base_system_prompt, active_card_message, active_card_merged = (
         project_active_character_card(messages)
     )
@@ -6218,6 +6308,8 @@ def transform_body(
             dynamic_context.append(synthetic_request_local)
         if synthetic_reply_act is not None:
             dynamic_context.append(synthetic_reply_act)
+        if synthetic_correction_target is not None:
+            dynamic_context.append(synthetic_correction_target)
         projected_messages[insert_at:insert_at] = dynamic_context
         payload["messages"] = projected_messages
     if path.endswith("chat/completions"):

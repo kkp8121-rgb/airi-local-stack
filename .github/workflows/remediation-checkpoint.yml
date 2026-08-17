@@ -103,7 +103,8 @@ jobs:
             tests: >-
               ollama-proxy/test_ollama_proxy.py ollama-proxy/test_output_moderation.py ollama-proxy/test_input_screening.py
               ollama-proxy/test_provider_usage.py ollama-proxy/test_broadcast_contract.py
-              ollama-proxy/test_broadcast_reply_act.py ollama-proxy/test_epistemic_confidence.py
+              ollama-proxy/test_broadcast_reply_act.py ollama-proxy/test_broadcast_correction_target.py
+              ollama-proxy/test_epistemic_confidence.py
           - shard: ollama-proxy-topic-workflows
             tests: >-
               ollama-proxy/test_topic_board.py ollama-proxy/test_topic_discovery_workflow.py
@@ -142,6 +143,7 @@ jobs:
               ollama-proxy/eval/affect_broadcast/test_guarded_delta_eval.py
               ollama-proxy/eval/affect_broadcast/test_must_act_realization.py
               ollama-proxy/eval/affect_broadcast/test_correction_target.py
+              ollama-proxy/eval/affect_broadcast/test_run_correction_target_ab_eval.py
               ollama-proxy/eval/broadcast_chat/test_run_broadcast_rehearsal.py
               ollama-proxy/eval/chat_replay/test_chat_replay.py
               ollama-proxy/eval/chat_replay/test_collect_youtube_live_export.py

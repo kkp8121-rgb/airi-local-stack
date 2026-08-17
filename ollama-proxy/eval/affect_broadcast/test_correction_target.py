@@ -151,15 +151,30 @@ class CorrectionTargetTests(unittest.TestCase):
                 roots.add(node.module.split(".")[0])
         self.assertTrue(roots <= {"__future__", "hashlib", "json", "unicodedata", "copy", "pathlib", "typing"})
 
-    def test_runtime_and_launchers_do_not_reference_module(self) -> None:
-        runtime_files = [
-            HERE.parents[1] / "ollama_proxy.py",
+    def test_runtime_does_not_import_evaluator_or_wire_operational_launchers(self) -> None:
+        proxy_tree = ast.parse((HERE.parents[1] / "ollama_proxy.py").read_text(encoding="utf-8"))
+        imported_modules = {
+            node.module
+            for node in ast.walk(proxy_tree)
+            if isinstance(node, ast.ImportFrom) and node.module
+        }
+        imported_modules.update(
+            alias.name
+            for node in ast.walk(proxy_tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        )
+        self.assertNotIn("correction_target", imported_modules)
+        self.assertFalse(any(name.endswith(".correction_target") for name in imported_modules))
+        self.assertIn("broadcast_correction_target", imported_modules)
+
+        operational_files = [
             HERE.parents[2] / "broadcast-director" / "core.mjs",
             HERE.parents[2] / "broadcast-director" / "priority-policy.mjs",
         ]
-        runtime_files.extend(HERE.parents[2].glob("*airi*.ps1"))
-        for path in runtime_files:
-            self.assertNotIn("correction_target", path.read_text(encoding="utf-8"), path.name)
+        operational_files.extend(HERE.parents[2].glob("*airi*.ps1"))
+        for path in operational_files:
+            self.assertNotIn("broadcast_correction_target", path.read_text(encoding="utf-8"), path.name)
 
 
 if __name__ == "__main__":
