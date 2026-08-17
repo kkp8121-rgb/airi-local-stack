@@ -57,7 +57,8 @@
 
 - `AIRI-G1A-CORRECTION-WORDING-DECISION-2026-08-17.md` — A4.3의 8개 synthetic
   correction 장면을 최후 fallback과 정상 캐릭터 발화 목표로 나눈 사용자 검토 시트.
-  감정 원인·화면 근거·불확실성을 함께 보여 주지만 코드/운영 채택은 아니다.
+  2026-08-17 권장 표현 원칙은 승인됐고 A4.6 evaluator 계약에 반영했지만 exact 운영
+  대사·runtime/TTS 배선·운영 ON 채택은 아니다.
 - `AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md` — G1a 감정·
   캐릭터 연속성 엔진 상세 계획. 공개 MIT/Apache 프로젝트의 bounded affect,
   event-sourced reducer, memory-layer 패턴만 인용하고 repo-native typed reducer를
@@ -72,7 +73,10 @@
   사용자 승인·B4b authoritative observer·운영 ON은 미완료다. A3 candidate mapper foundation,
   A4.3 closed target, A4.4 fresh 8-pair target A/B,
   A4.5 zero-call lexical postcondition까지 이어졌으며 A4.5는 target 3/8 vs control 2/8,
-  fixed proposal 8/8 self-conformance로 품질 gate FAIL/OFF다.
+  fixed proposal 8/8 self-conformance다. A4.6은 승인 원칙을 닫힌 synthetic-only
+  prepublication policy와 retry-vs-fallback fake-transport attempt ledger로 고정했지만
+  성공은 비공개 구조 검토 eligibility로만 분류한다. live/model 실행과 운영 배선은 없어
+  품질 gate는 계속 FAIL/OFF다.
 - `AIRI-CHARACTER-CONSTITUTION-V2-DECISION-2026-08-16.md` — G1a A0 사용자
   결정 시트. 기존 확정 정체성·말투·안전 경계와 미정 likes/dislikes/pride/
   embarrassment/conflict/repair/fatigue 및 metric threshold 선택지를 분리한다.
@@ -121,6 +125,13 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-G1A-CORRECTION-PREPUBLICATION-FOUNDATION-2026-08-17.md` — 사용자 승인
+  표현 원칙을 exact 8-row synthetic policy와 lexical prepublication checker로 고정한
+  A4.6 evaluator-only foundation. constrained retry는 최대 2 upstream attempts,
+  fixed fallback은 1 model attempt 뒤 최후 1회로 분리하며 기본 실행은 network/model 0회다.
+  독립 재검토는 GO였지만 lexical 성공은 private review 대상일 뿐이다. fresh human review와
+  production/runtime/director/B4b/TTS/운영 ON은 미완료다.
+
 - `AIRI-B4C-BROADCAST-REHEARSAL-CHECKPOINT-2026-08-17.md` — 고정 합성
   2×24턴 방송 흐름을 37-test 필수 로컬 checkpoint로 편입한 기록. content-free
   evidence는 exact 48/48·prompt hash·count/rate 산술을 검증한다. 모델/proxy,
@@ -131,7 +142,7 @@
   고정하고, 20개 semantic gap을 사람 검토 전용으로 격리한 오프라인 회귀.
   B3-d 전체 판정과 운영 gate는 계속 FAIL/OFF다.
 
-- `AIRI-G1A-EVALUATOR-RUNTIME-FENCE-2026-08-17.md` — A4.2~A4.5의 평가 전용
+- `AIRI-G1A-EVALUATOR-RUNTIME-FENCE-2026-08-17.md` — A4.2~A4.6의 평가 전용
   renderer·target·runner·postcondition·oracle가 재귀 production runtime/launcher/patch에 literal
   reference되면 local checkpoint를 실패시키는 정적 fence. 운영 배선이나 품질 승격은 아니다.
 

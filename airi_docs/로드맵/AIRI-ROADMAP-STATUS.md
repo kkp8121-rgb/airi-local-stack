@@ -17,6 +17,21 @@
 
 최종 갱신: 2026-08-17
 
+- **2026-08-17** (G1a A4.6 승인 표현 정책 / prepublication evaluator foundation):
+  사용자가 구체 원인의 짧은 감정, 같은 턴 회복, 차분하고 분명한 skeptical
+  자기수정, 불확실할 때 한 번의 질문, fixed fallback의 공개 전 최후 사용이라는
+  권장안을 승인했다. 이를 A4.3 exact 8-row에만 결합한 synthetic-only policy와
+  lexical/structural checker로 고정했다. injected fake transport에서 constrained
+  retry는 최대 2 upstream attempts, fixed fallback은 initial 1회 뒤 추가 model call
+  없이 한 번만 허용한다. safety/tool-truth/public-token attestation 실패는 terminal이고,
+  attestation은 실제 경계 증거가 아니다. 기본 CLI는 network/proxy/model 0회이며 live
+  execute와 production proxy/director/B4b/TTS 배선은 없다. evaluator family를 runtime
+  fence와 CI shard에 추가했다. lexical 성공은 비공개 구조 검토 eligibility일 뿐 자동
+  발화·공개 판정이 아니다. 독립 재검토는 남은 HIGH/MEDIUM 없이 GO였으며,
+  fresh model/human review 전 품질·운영 gate는 계속
+  **FAIL/OFF**다.
+  (`완료/AIRI-G1A-CORRECTION-PREPUBLICATION-FOUNDATION-2026-08-17.md`)
+
 - **2026-08-17** (B4c 멀티턴 방송 리허설 로컬 체크포인트): 기존
   `autumn_leaves`/`game_and_career` 합성 fixture를 semantic SHA
   `aeb2bc...96c8`과 exact 2×24턴으로 고정하고, 전체 48턴 주입 transport의
@@ -565,7 +580,8 @@
     human-review eligibility를 완료했고, A4.4 same 8-row fresh 16-call A/B와 두 model
     review도 완료했다. A4.5 zero-call strict realization check는 target 3/8 vs control 2/8로
     target prompt만의 안정적 개선을 확인하지 못했고 fixed 8/8은 self-conformance뿐이다.
-    사용자 wording 판단·fresh human review, A0 결정과 B4b observer는 대기 중이다.
+    A4.6 표현 원칙은 사용자 승인됐고 evaluator-only retry-vs-fallback attempt foundation을
+    완료했지만 fresh model/human review, A0 결정과 B4b observer는 대기 중이다.
     (`진행예정/AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`)
     - [~] A0 constitution v2: 확정 이월과 미정 likes/dislikes/pride/
       embarrassment/conflict/repair/fatigue 선택지를 분리한 결정 시트 작성,
@@ -593,7 +609,9 @@
       runtime selection은 미완료. A4.3 closed correction target 8행, A4.4 fresh
       control/target 16-call과 두 model review, A4.5 zero-call lexical postcondition까지
       완료했다. A4.5는 target 3/8 vs control 2/8이고 fixed proposals 8/8은 구조적
-      self-conformance라 quality gate FAIL/OFF, 사용자 wording 판단·fresh human review 대기
+      self-conformance다. A4.6은 승인된 표현 원칙, exact 8-row policy, prepublication
+      checker와 retry 최대 2/fallback model attempt 1의 fake-transport ledger를 완료했다.
+      fresh model·blind human review와 운영 전략 채택은 대기하며 quality gate는 FAIL/OFF
       — 2026-08-17
       (`완료/AIRI-G1A-AFFECT-BROADCAST-EVAL-FOUNDATION-2026-08-16.md`,
       `완료/AIRI-G1A-AFFECT-BROADCAST-AB-2026-08-17.md`,
@@ -602,7 +620,8 @@
       `완료/AIRI-G1A-CORRECTION-TARGET-FOUNDATION-2026-08-17.md`,
       `완료/AIRI-G1A-CORRECTION-TARGET-AB-FOUNDATION-2026-08-17.md`,
       `완료/AIRI-G1A-CORRECTION-TARGET-AB-RESULTS-2026-08-17.md`,
-      `완료/AIRI-G1A-CORRECTION-REALIZATION-POSTCONDITION-2026-08-17.md`)
+      `완료/AIRI-G1A-CORRECTION-REALIZATION-POSTCONDITION-2026-08-17.md`,
+      `완료/AIRI-G1A-CORRECTION-PREPUBLICATION-FOUNDATION-2026-08-17.md`)
     - [ ] A5 trusted state→TTS/Live2D 표현 배선 (보류: 텍스트 게이트 PASS)
     - [ ] A6 B1b/B4b 설치 AIRI 30~120분 비공개 리허설과 운영 ON 사용자 결정
 - [~] **G2. 장기 기억**
@@ -785,8 +804,8 @@
   - [ ] B1b live adapter/quota/OAuth 및 실제 AIRI 주입 (보류: 외부 YouTube 자격증명·쿼터 실측·운영 승인)
   - [~] G1a A0~A4 typed affect core/proxy/eval — A1/A2, A4 Mi:dm A/B 및
     A4.1 reply-act 3조건 blind review, A4.4 fresh target A/B와 A4.5 zero-call lexical
-    postcondition과 A3 content-free candidate mapper foundation 완료, 하지만 품질 gate
-    FAIL. A0 constitution v2·metric·A4.5 wording 사용자 확정, A4.2/A4.3/A4.5 fresh
+    postcondition, A4.6 승인 표현 policy/attempt evaluator와 A3 content-free candidate mapper
+    foundation 완료, 하지만 품질 gate FAIL. A0 constitution v2·metric, A4.2~A4.6 fresh
     human review 및 B4b authoritative exactly-once event observer 대기(기본 OFF)
 - [~] **M3** (B2 송출 + B3 안전)
   - [x] B3 모더레이션 게이트 코드 (사전 113항목+패턴 7, 기본 off) — 2026-08-12 (`932eae6`)
@@ -818,7 +837,8 @@
     (`완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`)
   - [~] G1a A3~A5 — A4 Mi:dm/사람 A/B와 A4.1 reply-act 3조건은 완료했지만
     텍스트 품질 FAIL. A4.4 target A/B도 불안정했고 A4.5 strict lexical check는 target
-    3/8 vs control 2/8이다. fixed wording 사용자·fresh human review, runtime selection
+    3/8 vs control 2/8이다. A4.6 표현 정책은 승인됐지만 fake-transport foundation뿐이다.
+    fresh model/human review, runtime selection
     계약, A3의 B4b authoritative observer/runtime 적용과 텍스트 PASS 뒤 TTS/Live2D 표현 배선 대기
 - [ ] **M5** (리허설 → 데뷔 → I4 플라이휠)
 

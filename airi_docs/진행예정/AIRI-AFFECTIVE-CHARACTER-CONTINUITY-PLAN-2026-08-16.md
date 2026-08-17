@@ -546,12 +546,43 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
   report/packet/receipt/operator key와 realization oracle/checker, A4.5 runner, A4.4
   validator/base, A4.3 oracle code를 결합한다. A4.4 key가 원 source receipt에 결합되지 않은
   honest-local authenticity 한계는 그대로 공개한다.
-- 다음 A4.6은 사용자 wording 판단 뒤에만 검토한다. 기존 non-stream hidden retry와 겹치지
-  않도록 upstream attempt/postcondition outcome을 관찰하는 평가 전용 prepublication seam과
-  total-attempt cap이 먼저 필요하다. 그 전에는 retry/fixed fallback 전략을 선택하지 않는다.
+- A4.6 표현 원칙은 사용자 승인을 받았고 evaluator-only foundation까지 구현했다. 기존
+  non-stream hidden retry와 겹치지 않는 실제 관찰 transport는 아직 없으므로 fresh model
+  비교·human review 전에는 retry/fixed fallback 전략을 선택하지 않는다.
 - production proxy/runtime/director/B4b/TTS에는 import·endpoint·toggle·배선이 없고 quality/
   operational gate는 **FAIL/OFF**다.
 - 근거: `../완료/AIRI-G1A-CORRECTION-REALIZATION-POSTCONDITION-2026-08-17.md`
+
+### A4.6. approved wording policy / prepublication strategy foundation
+
+- 상태: **표현 원칙 사용자 승인, evaluator-only foundation 구현 — 운영 FAIL/OFF**
+- 2026-08-17 사용자는 구체 원인이 있는 짧은 감정 표현, 같은 턴의 회복 행동,
+  차분하지만 분명한 skeptical 자기수정, 불확실성이 남을 때 한 번의 후속 질문,
+  fixed fallback의 공개 전 최후 수단 사용을 승인했다.
+- exact 8개 A4.3 synthetic target에만 적용되는 닫힌 policy oracle은 normal specimen과
+  failure-only fallback을 분리한다. `authoritative_target:false`, `synthetic_only:true`,
+  `human_review_required:true`, `operational_adoption:false`를 고정하며 시청자 문장을
+  사실 근거로 승격하지 않는다.
+- lexical/structural checker는 target cue, 같은 턴의 정정, 미래 약속 부재, direct affect
+  범위, skeptical tone, 질문 수와 hedged resemblance를 검사한다. 이는 화면 truth,
+  자연스러움, 캐릭터 품질 또는 safety/tool-truth의 자동 증명이 아니다.
+- 평가 runner는 injected fake transport에서만 두 전략의 attempt ledger를 비교한다.
+  두 arm은 row별 exact initial candidate를 공유해 transport call-order drift를 전략 효과로
+  오인하지 않는다. transport가 fixed fallback 또는 주변 공백 변형을 첫 응답으로 내면 normal
+  후보로 인정하지 않고 실패로 처리한다.
+  constrained-retry arm은 initial 실패 뒤 최대 한 번 더 호출해 총 upstream attempt를 2로
+  제한하고, fixed-fallback arm은 initial 1회 실패 뒤 model call 없이 fallback을 한 번만
+  검사한다. safety/tool-truth/public-token attestation 실패는 terminal이며 어느 전략도
+  retry·fallback·구조 검토 eligibility를 부여하지 않는다. fixed fallback도 별도 injected boundary attestor를
+  통과해야 한다. attestation은 evaluator 입력일 뿐 실제 경계 증거가 아니다.
+- lexical 성공 상태는 `eligible_for_private_structural_review`일 뿐 자동 공개·발화 가능 판정이
+  아니다. target polarity, 미래 약속, tool 주장, 감정/공격성, 질문 범위의 보수적 회귀를
+  통과해도 사람의 의미 검토는 필수다.
+- 기본 CLI는 oracle eligibility만 출력하고 network/proxy/model call과 artifact write를 하지
+  않는다. live execute transport는 구현하지 않았고 기존 proxy hidden retry와 합성하지 않는다.
+- production proxy, director, B4b, TTS, launcher, 환경 변수에는 배선하지 않는다. fresh local
+  model 비교와 blind human review 뒤에도 운영 ON은 별도 사용자 결정이다.
+- 근거: `../완료/AIRI-G1A-CORRECTION-PREPUBLICATION-FOUNDATION-2026-08-17.md`
 
 ### A4.5b. evaluator-only runtime import fence
 

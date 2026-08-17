@@ -17,7 +17,7 @@ $senderTest = Join-Path $PSScriptRoot 'test-send-airi-local-text.mjs'
 if ($LASTEXITCODE -ne 0) { throw 'Sender contract tests failed.' }
 
 $runtimeFenceTest = Join-Path $PSScriptRoot 'test-affect-evaluator-runtime-fence.mjs'
-$runtimeFenceMinimumTests = 10
+$runtimeFenceMinimumTests = 11
 $runtimeFenceOutput = @(& node --test $runtimeFenceTest 2>&1 | ForEach-Object { $_.ToString() })
 $runtimeFenceExit = $LASTEXITCODE
 $runtimeFenceOutput | Write-Output

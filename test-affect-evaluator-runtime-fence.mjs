@@ -14,13 +14,19 @@ export const FORBIDDEN_TOKENS = Object.freeze([
   'correction_target_realization',
   'correction_target_realization_v1.json',
   'run_correction_realization_postcondition_eval',
+  'correction_prepublication_policy',
+  'correction_prepublication_policy_v1.json',
+  'run_correction_prepublication_eval',
   'correction_target',
   'correction_target_v1.json',
   'run_correction_target_ab_eval',
   'run_affect_broadcast_eval'
 ])
 
-const SOURCE_EXTENSIONS = new Set(['.py', '.js', '.mjs', '.cjs', '.ts', '.tsx', '.vue', '.ps1'])
+const SOURCE_EXTENSIONS = new Set([
+  '.py', '.js', '.mjs', '.cjs', '.ts', '.tsx', '.vue', '.ps1',
+  '.json', '.yaml', '.yml', '.toml', '.cmd', '.bat'
+])
 const EXCLUDED_DIRECTORY_NAMES = new Set([
   '.git', '.github', '.codex', '.codex-remote-attachments', 'airi_docs', 'external',
   'asar-inspect', 'tts-samples', 'chatterbox', 'faster-qwen3-tts',
@@ -234,6 +240,24 @@ test('detects direct and indirect evaluator helper imports', () => {
   }, (root) => assert.deepEqual(scanAffectEvaluatorRuntimeFence(root), [
     { path: 'chat-ingress/runtime.mjs', token: 'run_guarded_delta_eval' },
     { path: 'ollama-proxy/app.py', token: 'must_act_realization' }
+  ]))
+})
+
+test('detects A4.6 prepublication evaluator imports and launcher references', () => {
+  withFixture((root) => {
+    writeFixture(root, 'ollama-proxy/runtime/worker.py', 'import correction_prepublication_policy')
+    writeFixture(root, 'ollama-proxy/runtime/config.json', '{"policy":"correction_prepublication_policy_v1.json"}')
+    writeFixture(root, 'broadcast-director/core.mjs', "import './run_correction_prepublication_eval.mjs'")
+    writeFixture(root, 'start-a46.cmd', 'run_correction_prepublication_eval')
+    writeFixture(root, 'start-airi-local-stack.ps1', 'correction_prepublication_policy_v1.json')
+  }, (root) => assert.deepEqual(scanAffectEvaluatorRuntimeFence(root), [
+    { path: 'broadcast-director/core.mjs', token: 'run_correction_prepublication_eval' },
+    { path: 'ollama-proxy/runtime/config.json', token: 'correction_prepublication_policy' },
+    { path: 'ollama-proxy/runtime/config.json', token: 'correction_prepublication_policy_v1.json' },
+    { path: 'ollama-proxy/runtime/worker.py', token: 'correction_prepublication_policy' },
+    { path: 'start-a46.cmd', token: 'run_correction_prepublication_eval' },
+    { path: 'start-airi-local-stack.ps1', token: 'correction_prepublication_policy' },
+    { path: 'start-airi-local-stack.ps1', token: 'correction_prepublication_policy_v1.json' }
   ]))
 })
 

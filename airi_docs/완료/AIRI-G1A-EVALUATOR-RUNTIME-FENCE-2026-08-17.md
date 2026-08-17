@@ -1,6 +1,6 @@
 # G1a evaluator-only runtime import fence — 2026-08-17
 
-- 범위: A4.2~A4.5 평가 전용 artifact의 production literal import/reference 금지
+- 범위: A4.2~A4.6 평가 전용 artifact의 production literal import/reference 금지
 - 상태: **오프라인 정적 fence 완료 / 품질·운영 gate는 FAIL/OFF**
 - 운영 영향: 없음. production code, prompt, wording, endpoint, flag, launcher 동작을 바꾸지 않는다.
 - CI: GitHub Actions billing 차단이 계속되어 로컬 checkpoint 검증으로 대체했다.
@@ -16,12 +16,12 @@ accidental wiring을 local checkpoint에서 막지 못했다.
 ## 2. 구현
 
 - `test-affect-evaluator-runtime-fence.mjs`
-  - Node built-in만 쓰는 deterministic source scanner와 10개 self-test
+  - Node built-in만 쓰는 deterministic source scanner와 11개 self-test
   - repository root 아래 first-party source를 재귀적으로 scan하고 runtime patch도 별도 scan
   - repo-relative path와 forbidden token만 보고하고 source text는 반복하지 않음
 - `test-current-checkpoint.ps1`
   - 위 exact test를 `node --test`로 실행
-  - nonzero exit를 거부하고 최소 10개 reported test를 요구해 no-test green을 방지
+  - nonzero exit를 거부하고 최소 11개 reported test를 요구해 no-test green을 방지
 
 금지하는 evaluator-only literal family는 다음과 같다.
 
@@ -31,14 +31,17 @@ accidental wiring을 local checkpoint에서 막지 못했다.
 - `run_correction_target_ab_eval`, `run_affect_broadcast_eval`
 - `correction_target_realization`, `correction_target_realization_v1.json`
 - `run_correction_realization_postcondition_eval`
+- `correction_prepublication_policy`, `correction_prepublication_policy_v1.json`
+- `run_correction_prepublication_eval`
 
 intentional `broadcast_correction_target.py`는 A4.4의 exact local-evaluation transport seam이며
 위 renderer/postcondition module과 다른 닫힌 production module이므로 허용한다.
 
 ## 3. scan 경계
 
-scan 대상은 repository root 아래의 first-party Python/JavaScript/TypeScript/Vue/PowerShell
-source와 `airi_docs/patches/*.patch`다. 새 first-party component와 하위 runtime directory도
+scan 대상은 repository root 아래의 first-party Python/JavaScript/TypeScript/Vue/PowerShell,
+JSON/YAML/TOML 설정과 CMD/BAT launcher, `airi_docs/patches/*.patch`다. 새 first-party
+component와 하위 runtime directory도
 기본적으로 재귀 탐색한다. 다음은 의도적으로 제외한다.
 
 - `test-*`/`test_*`, 일반 docs, `ollama-proxy/eval`, training/testdata/bench 결과
@@ -54,7 +57,7 @@ source와 `airi_docs/patches/*.patch`다. 새 first-party component와 하위 ru
 fixture는 다음을 고정한다.
 
 1. direct import와 helper를 통한 indirect literal import 검출
-2. A4.3/A4.4 base/oracle/runner와 plain path reference 검출
+2. A4.3/A4.4 base/oracle/runner와 A4.6 prepublication policy/runner reference 검출
 3. 단순 quoted literal 결합 Python/JavaScript/PowerShell reference 검출
 4. root launcher와 runtime patch reference 검출
 5. 새 first-party component와 중첩 runtime source 자동 발견
@@ -73,7 +76,7 @@ provenance가 필요하다.
 
 ```text
 node --test test-affect-evaluator-runtime-fence.mjs
-10 tests: 8 PASS, 2 SKIP (현재 Windows 환경의 symlink 생성 권한 없음), 0 FAIL
+11 tests: 9 PASS, 2 SKIP (현재 Windows 환경의 symlink 생성 권한 없음), 0 FAIL
 
 .\test-current-checkpoint.ps1
 PASS
@@ -89,13 +92,14 @@ Python import 우회가 모두 회귀에서 검출되고, intentional `broadcast
 
 ## 6. 완료 경계
 
-이번 배치는 A4.2~A4.5 evaluator artifact의 accidental literal wiring을 방지할 뿐이다.
+이번 배치는 A4.2~A4.6 evaluator artifact의 accidental literal wiring을 방지할 뿐이다.
 다음을 완료하거나 승인하지 않는다.
 
-- 사용자 wording 선택과 fresh human review
-- fixed fallback 또는 constrained retry 전략
+- 승인 표현 정책의 fresh model·human review
+- fixed fallback 또는 constrained retry의 운영 전략 채택
 - proxy prepublication postcondition/runtime selector
 - A3 B4b authoritative observer, live model/TTS/installed AIRI 증거
 - `AIRI_AFFECT_CONTINUITY_ENABLED` 또는 다른 운영 gate ON
 
-따라서 A4.6과 운영 배선은 계속 사용자 판단 및 별도 evaluation gate 뒤에 남는다.
+따라서 A4.6 evaluator 결과를 운영 배선으로 승격하는 일은 계속 fresh evaluation·human
+review와 별도 사용자 결정 뒤에 남는다.
