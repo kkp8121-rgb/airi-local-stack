@@ -16,6 +16,21 @@ $senderTest = Join-Path $PSScriptRoot 'test-send-airi-local-text.mjs'
 & node --test $senderTest
 if ($LASTEXITCODE -ne 0) { throw 'Sender contract tests failed.' }
 
+$runtimeFenceTest = Join-Path $PSScriptRoot 'test-affect-evaluator-runtime-fence.mjs'
+$runtimeFenceMinimumTests = 10
+$runtimeFenceOutput = @(& node --test $runtimeFenceTest 2>&1 | ForEach-Object { $_.ToString() })
+$runtimeFenceExit = $LASTEXITCODE
+$runtimeFenceOutput | Write-Output
+if ($runtimeFenceExit -ne 0) { throw 'Affect evaluator runtime fence tests failed.' }
+$runtimeFenceCountMatch = [regex]::Match(($runtimeFenceOutput -join "`n"), '(?m)^.{0,4}tests\s+(?<count>\d+)\s*$')
+if (-not $runtimeFenceCountMatch.Success) {
+    throw 'Could not read the affect evaluator runtime fence test count.'
+}
+$runtimeFenceCount = [int]$runtimeFenceCountMatch.Groups['count'].Value
+if ($runtimeFenceCount -lt $runtimeFenceMinimumTests) {
+    throw "Affect evaluator runtime fence suite reported $runtimeFenceCount tests; expected at least $runtimeFenceMinimumTests."
+}
+
 # `node --test` exits zero when its glob matches no file, so a green run alone
 # does not prove the suite ran. Read the reported pass count and hold it to a
 # floor; raise the floor whenever chat-ingress tests are added.

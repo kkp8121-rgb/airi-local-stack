@@ -69,7 +69,8 @@
   canonical A4.1 bundle의 exact historical `reply_act` response와 fixed 22행의 실제
   zero-call composition 및 두 model review도 완료했다. thank·최초 deescalate·repair에는
   탐색적 양성 신호, generic correct에는 음성 신호가 나왔으며, fresh human review·A0
-  사용자 승인·A3·운영 ON은 미완료다. A4.3 closed target, A4.4 fresh 8-pair target A/B,
+  사용자 승인·B4b authoritative observer·운영 ON은 미완료다. A3 candidate mapper foundation,
+  A4.3 closed target, A4.4 fresh 8-pair target A/B,
   A4.5 zero-call lexical postcondition까지 이어졌으며 A4.5는 target 3/8 vs control 2/8,
   fixed proposal 8/8 self-conformance로 품질 gate FAIL/OFF다.
 - `AIRI-CHARACTER-CONSTITUTION-V2-DECISION-2026-08-16.md` — G1a A0 사용자
@@ -119,6 +120,10 @@
   `아카이브/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-pre-midm.md`.
 
 ## 완료 — 유효한 증거 기록 (최신순)
+
+- `AIRI-G1A-EVALUATOR-RUNTIME-FENCE-2026-08-17.md` — A4.2~A4.5의 평가 전용
+  renderer·target·runner·postcondition·oracle가 재귀 production runtime/launcher/patch에 literal
+  reference되면 local checkpoint를 실패시키는 정적 fence. 운영 배선이나 품질 승격은 아니다.
 
 - `AIRI-G1A-AFFECT-EVENT-MAPPER-FOUNDATION-2026-08-17.md` — A3의
   content-free outcome candidate를 A1 typed event로 바꾸는 순수 mapper 기반.

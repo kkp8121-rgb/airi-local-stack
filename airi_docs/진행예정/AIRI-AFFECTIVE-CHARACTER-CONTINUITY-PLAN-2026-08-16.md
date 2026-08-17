@@ -553,6 +553,24 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
   operational gate는 **FAIL/OFF**다.
 - 근거: `../완료/AIRI-G1A-CORRECTION-REALIZATION-POSTCONDITION-2026-08-17.md`
 
+### A4.5b. evaluator-only runtime import fence
+
+- 상태: **오프라인 정적 fence 완료 — 2026-08-17**
+- root Node contract가 A4.2~A4.5 renderer·oracle·runner의 exact literal token을 production
+  Python/JavaScript/TypeScript/Vue/PowerShell·runtime patch에서 재귀적으로 금지한다. Python
+  relative/qualified import와 단순 quoted literal 결합도 닫힌 module component로 검사한다.
+- 일반 docs, tests, `ollama-proxy/eval`, private/generated/runtime data와 third-party snapshot은
+  scan하지 않는다. intentional `broadcast_correction_target` synthetic transport seam은 별도
+  production module이므로 허용한다.
+- `test-current-checkpoint.ps1`가 exact test와 최소 reported test count를 확인해 GitHub Actions billing
+  차단 중에도 local checkpoint에서 미승인 evaluator wording의 accidental wiring을 막는다.
+- 이 fence는 literal static reference만 검출한다. 문자열 분할·코드 생성 같은 hostile
+  obfuscation의 보안 증명이 아니며 runtime adoption, wording 승인, retry/fallback 선택 또는
+  품질 PASS를 의미하지 않는다.
+- 독립 재검토는 **GO — HIGH/MEDIUM 잔여 없음**이었다. import 형태의 주석을 보수적으로
+  잡을 수 있다는 LOW false-positive 가능성은 위 정적 검사 한계 안에 남긴다.
+- 근거: `../완료/AIRI-G1A-EVALUATOR-RUNTIME-FENCE-2026-08-17.md`
+
 ### A5. 표현 계층
 
 - trusted state → ACT/TTS/Live2D mapping

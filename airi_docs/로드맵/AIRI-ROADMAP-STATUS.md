@@ -17,6 +17,18 @@
 
 최종 갱신: 2026-08-17
 
+- **2026-08-17** (G1a evaluator-only runtime import fence): A4.2~A4.5의
+  must-act/guarded-delta, correction-target A/B, correction-realization postcondition과 고정 oracle가
+  proxy/director/chat ingress/launcher/first-party service/runtime patch에 literal import·reference되면
+  오프라인 checkpoint가 실패하는 재귀 정적 fence를 추가했다. 새 first-party component도 기본
+  탐색하며 test/docs/eval/private/generated/
+  third-party 경로는 scan하지 않고 intentional `broadcast_correction_target` synthetic seam은
+  허용한다. temp fixture가 direct/helper/relative/qualified import, launcher, patch, 대소문자 변형을
+  검출하고 최소 test count로 zero-test green도 막는다. 이는 정적 literal fence이지 obfuscated dynamic
+  load 방지나 운영 안전 증명이 아니며, wording·fallback·retry·flag·runtime을 채택하지 않는다.
+  독립 재검토는 HIGH/MEDIUM 잔여 없이 GO였고, A4.5 품질/운영 gate는 계속 **FAIL/OFF**다.
+  (`완료/AIRI-G1A-EVALUATOR-RUNTIME-FENCE-2026-08-17.md`)
+
 - **2026-08-17** (G1a A3 broadcast outcome candidate mapper foundation): 미래 B4b가
   실제 전달 완료 뒤 내놓을 content-free outcome candidate를 A1 `airi.affect-event.v1`로 바꾸는
   순수 mapper를 추가했다. `accepted/queued/selected/scheduled/ACK/partial/error/control/failed`는
@@ -520,12 +532,13 @@
     A1 core·A2 default-OFF greybox·A4 실제 Mi:dm/blind review와 A4.1 3조건
     reply-act 실측 완료. reply-act는 affect-only보다 일부 개선했지만 OFF를 넘지
     못해 품질 gate FAIL. A4.2 zero-call guarded delta는 thank·최초 deescalate·repair에
-    탐색적 양성 신호, generic correct에는 음성 신호를 보였다. human review, A0 사용자
-    결정과 A3 이후 대기. A4.3은 8개 synthetic correction target/direction의 offline
+    탐색적 양성 신호, generic correct에는 음성 신호를 보였다. human review와 A0 사용자
+    결정은 대기다. A3 candidate mapper foundation은 완료했지만 B4b authoritative observer는
+    없다. A4.3은 8개 synthetic correction target/direction의 offline
     human-review eligibility를 완료했고, A4.4 same 8-row fresh 16-call A/B와 두 model
     review도 완료했다. A4.5 zero-call strict realization check는 target 3/8 vs control 2/8로
     target prompt만의 안정적 개선을 확인하지 못했고 fixed 8/8은 self-conformance뿐이다.
-    사용자 wording 판단·fresh human review, A0 결정과 A3 이후는 대기 중이다.
+    사용자 wording 판단·fresh human review, A0 결정과 B4b observer는 대기 중이다.
     (`진행예정/AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`)
     - [~] A0 constitution v2: 확정 이월과 미정 likes/dislikes/pride/
       embarrassment/conflict/repair/fatigue 선택지를 분리한 결정 시트 작성,
