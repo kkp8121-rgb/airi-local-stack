@@ -479,6 +479,23 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
   `../완료/AIRI-G1A-MUST-ACT-REALIZATION-FOUNDATION-2026-08-17.md`,
   `../완료/AIRI-G1A-REPLY-ACT-TRIPLET-2026-08-17.md`
 
+### A4.3. closed synthetic correction-target validation foundation
+
+- A4.2에서 generic fixed `correct`는 8행 중 3행만 guarded 우세, 5행은 실제 교정 방향을
+  담은 historical control 우세였다. 따라서 generic template은 승격하지 않는다.
+- 기존 fixture와 reply-act sidecar를 hash-pin하고, exact `correct` 8행을 닫힌 target ID와
+  `replace_prior_visual_interpretation` / `confirm_corrected_reading` /
+  `shift_to_hedged_resemblance` direction에 결합한다.
+- 출력은 `eligible_for_offline_human_review`뿐이다. dialogue text, selected viewer text,
+  identity, amount, event ID, runtime history를 받거나 내보내지 않는다.
+- target ID는 의미를 담은 `pinned_synthetic_fixture_assertion`이지 content-free fact,
+  실제 화면 관찰, 외부 검증 사실이 아니다. 특히 `glyph_feather_like`는 resemblance를
+  유지하고 확정 사실로 바꾸지 않는다.
+- production proxy, shared reply-act schema, director/B4a, B4b, TTS, launcher를 바꾸지 않으며
+  fallback selection과 operational ON은 사용자·human review 뒤의 별도 gate다.
+- 근거: `../완료/AIRI-G1A-CORRECTION-TARGET-FOUNDATION-2026-08-17.md`,
+  `../완료/AIRI-G1A-GUARDED-DELTA-REVIEW-2026-08-17.md`
+
 ### A5. 표현 계층
 
 - trusted state → ACT/TTS/Live2D mapping

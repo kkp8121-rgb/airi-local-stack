@@ -17,6 +17,18 @@
 
 최종 갱신: 2026-08-17
 
+- **2026-08-17** (G1a A4.3 closed correction-target offline foundation): A4.2
+  guarded-delta에서 generic `correct`가 8행 중 3행만 우세하고 historical control이 5행에서
+  우세했던 원인을 교정 방향 손실로 좁혔다. 기존 합성 fixture/sidecar hash와 exact `correct`
+  순서에 결합된 8개 target/direction ID oracle, canonical candidate parser, exact turn binding,
+  `eligible_for_offline_human_review` 판정만 추가했다. target ID는 pinned synthetic fixture
+  assertion이며 live/independent fact가 아니다. dialogue renderer, fallback selector,
+  proxy/runtime/director/B4b/TTS wiring은 없고 operational gate는 계속 **FAIL/OFF**다. focused
+  8/8, 관련 4-suite 57 PASS/1 SKIP, checkpoint PASS와 독립 review **GO**를 확인했고 CI
+  evaluation-shard에 등록했다. CI는 billing blocked라 실행하지 않았다. 다음은 target-aware
+  candidate를 별도 packet으로 만들어 human review하는 단계이며 자동 승격은 금지한다.
+  (`완료/AIRI-G1A-CORRECTION-TARGET-FOUNDATION-2026-08-17.md`)
+
 - **2026-08-17** (G1a A4.2 guarded-delta zero-call composition·review, commit `4397966` 후속):
   canonical A4.1 local bundle에서 fixed-renderable 22행을 실제 compose했고 **composition
   단계** model/network 호출은 0이었다. 이후 두 separate root-spawned model-review session이
@@ -446,7 +458,8 @@
     reply-act 실측 완료. reply-act는 affect-only보다 일부 개선했지만 OFF를 넘지
     못해 품질 gate FAIL. A4.2 zero-call guarded delta는 thank·최초 deescalate·repair에
     탐색적 양성 신호, generic correct에는 음성 신호를 보였다. human review, A0 사용자
-    결정과 A3 이후 대기.
+    결정과 A3 이후 대기. A4.3은 8개 synthetic correction target/direction의 offline
+    human-review eligibility까지만 완료했다.
     (`진행예정/AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`)
     - [~] A0 constitution v2: 확정 이월과 미정 likes/dislikes/pride/
       embarrassment/conflict/repair/fatigue 선택지를 분리한 결정 시트 작성,
@@ -470,11 +483,13 @@
       affect-only 대비 act/grounding/reversal을 개선했으나 OFF를 넘지 못했고
       thank 0/3·pathology 증가로 다시 FAIL. A4.2 deterministic guarded delta의
       22행 zero-call model review는 좁은 fallback에만 탐색 신호를 보였고 human review와
-      runtime selection은 미완료 — 2026-08-17
+      runtime selection은 미완료. A4.3 closed correction target 8행은 structural eligibility만
+      완료 — 2026-08-17
       (`완료/AIRI-G1A-AFFECT-BROADCAST-EVAL-FOUNDATION-2026-08-16.md`,
       `완료/AIRI-G1A-AFFECT-BROADCAST-AB-2026-08-17.md`,
       `완료/AIRI-G1A-REPLY-ACT-TRIPLET-2026-08-17.md`,
-      `완료/AIRI-G1A-GUARDED-DELTA-REVIEW-2026-08-17.md`)
+      `완료/AIRI-G1A-GUARDED-DELTA-REVIEW-2026-08-17.md`,
+      `완료/AIRI-G1A-CORRECTION-TARGET-FOUNDATION-2026-08-17.md`)
     - [ ] A5 trusted state→TTS/Live2D 표현 배선 (보류: 텍스트 게이트 PASS)
     - [ ] A6 B1b/B4b 설치 AIRI 30~120분 비공개 리허설과 운영 ON 사용자 결정
 - [~] **G2. 장기 기억**
@@ -654,7 +669,7 @@
   - [ ] B1b live adapter/quota/OAuth 및 실제 AIRI 주입 (보류: 외부 YouTube 자격증명·쿼터 실측·운영 승인)
   - [~] G1a A0~A4 typed affect core/proxy/eval — A1/A2, A4 Mi:dm A/B 및
     A4.1 reply-act 3조건 blind review 완료, 하지만 품질 gate FAIL. A0 constitution
-    v2·metric 사용자 확정, A4.2 guarded delta의 좁은 fallback 탐색 신호에 대한
+    v2·metric 사용자 확정, A4.2 guarded delta와 A4.3 correction-target eligibility의
     human review 및 A3 event source 대기(기본 OFF)
 - [~] **M3** (B2 송출 + B3 안전)
   - [x] B3 모더레이션 게이트 코드 (사전 113항목+패턴 7, 기본 off) — 2026-08-12 (`932eae6`)
@@ -683,8 +698,9 @@
     B4b 런타임 어댑터와 실제 비공개 리허설은 미착수
     (`완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`)
   - [~] G1a A3~A5 — A4 Mi:dm/사람 A/B와 A4.1 reply-act 3조건은 완료했지만
-    텍스트 품질 FAIL. A4.2 zero-call 결과의 human review·runtime selection 계약,
-    A3 B4 content-free affect event source와 텍스트 PASS 뒤 TTS/Live2D 표현 배선 대기
+    텍스트 품질 FAIL. A4.2 zero-call 결과와 A4.3 correction target의 human review·
+    runtime selection 계약, A3 B4 content-free affect event source와 텍스트 PASS 뒤
+    TTS/Live2D 표현 배선 대기
 - [ ] **M5** (리허설 → 데뷔 → I4 플라이휠)
 
 ## 모델 SSoT 게이트 (전환 고정 선언의 전제)

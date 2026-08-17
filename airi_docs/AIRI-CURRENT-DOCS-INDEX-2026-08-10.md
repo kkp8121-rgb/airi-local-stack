@@ -66,7 +66,8 @@
   canonical A4.1 bundle의 exact historical `reply_act` response와 fixed 22행의 실제
   zero-call composition 및 두 model review도 완료했다. thank·최초 deescalate·repair에는
   탐색적 양성 신호, generic correct에는 음성 신호가 나왔으며, fresh human review·A0
-  사용자 승인·A3·운영 ON은 미완료다.
+  사용자 승인·A3·운영 ON은 미완료다. A4.3은 generic correction 승격 대신 여덟 synthetic
+  target/direction의 closed offline eligibility까지만 추가했다.
 - `AIRI-CHARACTER-CONSTITUTION-V2-DECISION-2026-08-16.md` — G1a A0 사용자
   결정 시트. 기존 확정 정체성·말투·안전 경계와 미정 likes/dislikes/pride/
   embarrassment/conflict/repair/fatigue 및 metric threshold 선택지를 분리한다.
@@ -114,6 +115,11 @@
   `아카이브/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-pre-midm.md`.
 
 ## 완료 — 유효한 증거 기록 (최신순)
+
+- `AIRI-G1A-CORRECTION-TARGET-FOUNDATION-2026-08-17.md` — A4.3의 평가 전용
+  closed correction-target foundation. 기존 `correct` 8행을 exact semantic ID와 direction에
+  결합해 offline human-review eligibility만 판정한다. ID는 pinned synthetic assertion이며
+  live fact가 아니다. 대사·selector·runtime wiring·운영 승격은 없고 gate는 FAIL/OFF다.
 
 - `AIRI-G1A-GUARDED-DELTA-REVIEW-2026-08-17.md` — A4.2 canonical 22행
   zero-call composition과 두 separate model-review session의 unblind aggregate. 둘 다 같은 14행에서

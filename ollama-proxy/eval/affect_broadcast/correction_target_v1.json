@@ -1,0 +1,16 @@
+{
+  "schema_version": "airi.correction-target-oracle.v1",
+  "synthetic_only": true,
+  "base_fixture_sha256": "acbcc991e32820aeed2bb2eeaf58487f72a4629393c57d11142b77d84ead1bf8",
+  "reply_act_fixture_sha256": "2b12124df8b28f4588fb85213f989ad1cebd923e8363fb3ba2aeead85c84f041",
+  "entries": [
+    {"turn_id": "teasing-02", "expected_act": "correct", "target_id": "rabbit_ears", "direction": "replace_prior_visual_interpretation", "evidence_basis": "pinned_synthetic_fixture_assertion", "postcondition": "exact_closed_target_pair_only"},
+    {"turn_id": "teasing-12", "expected_act": "correct", "target_id": "candle_wick", "direction": "replace_prior_visual_interpretation", "evidence_basis": "pinned_synthetic_fixture_assertion", "postcondition": "exact_closed_target_pair_only"},
+    {"turn_id": "correction-02", "expected_act": "correct", "target_id": "exit_marker_right_door", "direction": "replace_prior_visual_interpretation", "evidence_basis": "pinned_synthetic_fixture_assertion", "postcondition": "exact_closed_target_pair_only"},
+    {"turn_id": "correction-03", "expected_act": "correct", "target_id": "bottom_glyph_compass", "direction": "replace_prior_visual_interpretation", "evidence_basis": "pinned_synthetic_fixture_assertion", "postcondition": "exact_closed_target_pair_only"},
+    {"turn_id": "correction-04", "expected_act": "correct", "target_id": "needle_gray", "direction": "replace_prior_visual_interpretation", "evidence_basis": "pinned_synthetic_fixture_assertion", "postcondition": "exact_closed_target_pair_only"},
+    {"turn_id": "correction-07", "expected_act": "correct", "target_id": "door_number_twenty_one", "direction": "replace_prior_visual_interpretation", "evidence_basis": "pinned_synthetic_fixture_assertion", "postcondition": "exact_closed_target_pair_only"},
+    {"turn_id": "correction-08", "expected_act": "correct", "target_id": "original_map_number_twenty_one", "direction": "confirm_corrected_reading", "evidence_basis": "pinned_synthetic_fixture_assertion", "postcondition": "exact_closed_target_pair_only"},
+    {"turn_id": "correction-12", "expected_act": "correct", "target_id": "glyph_feather_like", "direction": "shift_to_hedged_resemblance", "evidence_basis": "pinned_synthetic_fixture_assertion", "postcondition": "exact_closed_target_pair_only"}
+  ]
+}
