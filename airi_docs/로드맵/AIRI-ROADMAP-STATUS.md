@@ -17,6 +17,16 @@
 
 최종 갱신: 2026-08-17
 
+- **2026-08-17** (G1a A4.4 correction-target fresh A/B result): protocol v2로 pinned
+  synthetic correction 8쌍·16 POST를 새로 실행하고, 두 separate model-review session의
+  판정을 exact packet hash에 잠근 뒤 unblind했다. pair 합의는 target 3, control 2, tie 2,
+  split 1이며 pooled 선호는 target 7/control 5/tie 4였다. target은 오답 유지·새 오답을
+  3행에서 고쳤지만 2행에서는 핵심 교정 명사를 일반 설명으로 희석했고, 1행은 양쪽 silence
+  fallback, 1행은 실질 차이가 없었다. 이는 사람 승인·실제 방송·통계적 우위가 아니므로
+  품질/운영 gate는 **FAIL/OFF**다. 다음은 synthetic-only target-specific realization/
+  postcondition 비교이며 자동 승격하지 않는다.
+  (`완료/AIRI-G1A-CORRECTION-TARGET-AB-RESULTS-2026-08-17.md`)
+
 - **2026-08-17** (G1a A4.4 contextual review protocol v2): 첫 fresh 16-call 실행은
   응답 생성에는 성공했지만 v1 blinded packet에 prior AIRI·selected viewer·screen·topic이
   없어 correction grounding을 판정할 수 없었다. 해당 v1 packet/overlay/receipt/key는

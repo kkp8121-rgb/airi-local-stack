@@ -509,9 +509,12 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
   사용한다. historical A4.1/A4.2 응답·점수·사람이 쓴 예시 대사는 재사용하지 않는다.
 - 최초 v1 packet은 review context가 없어 grounding 판정이 불가능하므로 obsolete다. v2는
   pinned prior AIRI·selected viewer·screen·topic을 제공하며, target 의미가 아닌 A/B arm
-  mapping만 blinded다. foundation 구현과 독립 검토는 완료했고 새 v2 fresh run/review가
-  대기 중이며 operational gate는 계속 FAIL/OFF다.
-- 근거: `../완료/AIRI-G1A-CORRECTION-TARGET-AB-FOUNDATION-2026-08-17.md`
+  mapping만 blinded다. v2 fresh 8-pair/16-call과 두 model-review를 완료했으며 합의는 target
+  3/control 2/tie 2/split 1이다. target은 일부 명확한 오답을 고쳤지만 일부 핵심 명사를
+  희석했고 silence도 남아 있어 operational gate는 계속 FAIL/OFF다. 다음은 target-specific
+  realization/postcondition의 별도 synthetic-only 비교다.
+- 근거: `../완료/AIRI-G1A-CORRECTION-TARGET-AB-FOUNDATION-2026-08-17.md`,
+  `../완료/AIRI-G1A-CORRECTION-TARGET-AB-RESULTS-2026-08-17.md`
 
 ### A5. 표현 계층
 

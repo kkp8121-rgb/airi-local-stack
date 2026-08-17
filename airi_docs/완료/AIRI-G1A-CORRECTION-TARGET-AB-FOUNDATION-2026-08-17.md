@@ -2,7 +2,7 @@
 
 Date: 2026-08-17
 
-Status: **implementation and offline review complete; fresh Mi:dm run and human review pending; operational gate FAIL/OFF**
+Status: **foundation complete; subsequent v2 Mi:dm/model-review result recorded separately; operational gate FAIL/OFF**
 
 ## 목적
 
@@ -78,8 +78,9 @@ frozen Mi:dm profile을 pre/post health로 확인한다.
 foundation 커밋 뒤 로컬 11435와 Ollama를 올려 첫 16회 실행을 완료했지만, 그 실행의 v1
 review packet은 prior AIRI·viewer·screen·topic이 없어 target grounding을 판정할 수 없었다.
 따라서 첫 실행은 명시적으로 obsolete이며 열람·unblind·품질 집계하지 않는다. target-aware가
-실제로 더 자연스럽거나 정확하다는 결과는 아직 없다. 다음은 독립 검토된 v2로 새 run name의
-16회를 다시 실행하고, key를 열기 전에 packet-bound review를 끝내는 것이다.
+실제로 더 자연스럽거나 정확한지는 후속 protocol v2 fresh run과 두 model-review에서 확인했다.
+결과는 `AIRI-G1A-CORRECTION-TARGET-AB-RESULTS-2026-08-17.md`에 분리했으며, 우위가 작고
+불균일해 승격하지 않았다.
 
 이 seam은 합성 평가 전용이다. production event mapper, director/B4a/B4b, renderer fallback,
 TTS/Live2D, operational affect/reply-act ON은 모두 변경하지 않았고 자동 승격하지 않는다.

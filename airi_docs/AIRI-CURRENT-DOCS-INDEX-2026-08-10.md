@@ -119,10 +119,14 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-G1A-CORRECTION-TARGET-AB-RESULTS-2026-08-17.md` — A4.4 protocol v2 fresh
+  8-pair/16-call 실제 대사와 두 model-review 결과. target 3/control 2/tie 2/split 1의 합의와
+  target의 명확한 성공·희석·silence 사례를 모두 공개하며 gate는 FAIL/OFF다.
+
 - `AIRI-G1A-CORRECTION-TARGET-AB-FOUNDATION-2026-08-17.md` — A4.4의 평가 전용
   fresh 8-pair/16-call control-target foundation. closed target proxy seam, frozen Mi:dm
   transport/profile, contextual review v2 packet·separate key·packet-bound overlay를 고정한다.
-  문맥 없는 첫 v1 실행은 obsolete이고 새 v2 16-call/review가 대기 중이며 gate는 FAIL/OFF다.
+  문맥 없는 첫 v1 실행은 obsolete이며 후속 v2 결과는 별도 결과 문서에 있고 gate는 FAIL/OFF다.
 
 - `AIRI-G1A-CORRECTION-TARGET-FOUNDATION-2026-08-17.md` — A4.3의 평가 전용
   closed correction-target foundation. 기존 `correct` 8행을 exact semantic ID와 direction에
