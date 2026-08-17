@@ -17,6 +17,16 @@
 
 최종 갱신: 2026-08-17
 
+- **2026-08-17** (G1a A4.4 contextual review protocol v2): 첫 fresh 16-call 실행은
+  응답 생성에는 성공했지만 v1 blinded packet에 prior AIRI·selected viewer·screen·topic이
+  없어 correction grounding을 판정할 수 없었다. 해당 v1 packet/overlay/receipt/key는
+  `obsolete_incomplete_review_context`로 명시하고 열람·unblind·품질 증거에서 제외했다.
+  v2는 pinned synthetic context를 exact 검증해 packet에 넣고, target 의미가 아니라 A/B arm
+  mapping만 blinded라고 범위를 좁혔다. exact v2 packet hash에 결합된 complete overlay 전에는
+  key를 열 수 없으며, 18/18 offline tests와 독립 재검토 후 새 run name으로 다시 측정한다.
+  운영 gate는 계속 **FAIL/OFF**이고 자동 승격하지 않는다.
+  (`완료/AIRI-G1A-CORRECTION-TARGET-AB-FOUNDATION-2026-08-17.md`)
+
 - **2026-08-17** (G1a A4.4 correction-target fresh A/B foundation): A4.3의 exact
   8개 synthetic target/direction을 실제 Mi:dm 새 응답으로 비교하기 위한 control/target
   8쌍·16-call 러너를 추가했다. target arm은 기존 affect+`reply_act=correct` control과

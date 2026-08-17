@@ -121,8 +121,8 @@
 
 - `AIRI-G1A-CORRECTION-TARGET-AB-FOUNDATION-2026-08-17.md` — A4.4의 평가 전용
   fresh 8-pair/16-call control-target foundation. closed target proxy seam, frozen Mi:dm
-  transport/profile, blinded packet·separate key·packet-bound overlay를 고정한다. 구현·독립
-  검토만 완료했고 실제 16-call/human review는 대기 중이며 gate는 FAIL/OFF다.
+  transport/profile, contextual review v2 packet·separate key·packet-bound overlay를 고정한다.
+  문맥 없는 첫 v1 실행은 obsolete이고 새 v2 16-call/review가 대기 중이며 gate는 FAIL/OFF다.
 
 - `AIRI-G1A-CORRECTION-TARGET-FOUNDATION-2026-08-17.md` — A4.3의 평가 전용
   closed correction-target foundation. 기존 `correct` 8행을 exact semantic ID와 direction에

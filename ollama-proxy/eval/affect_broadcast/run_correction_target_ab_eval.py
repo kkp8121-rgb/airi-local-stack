@@ -20,6 +20,8 @@ from typing import Any, Callable
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 ENDPOINT = "http://127.0.0.1:11435/api/chat"
+RUNNER_VERSION = "1.1.0"
+PROTOCOL_ID = "a44_correction_target_contextual_review_v2"
 SAFE_RUN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}\Z")
 RESERVED = frozenset({"CON", "PRN", "AUX", "NUL"} | {f"COM{i}" for i in range(1, 10)} | {f"LPT{i}" for i in range(1, 10)})
 MAX_PACKET_BYTES = 2 * 1024 * 1024
@@ -119,7 +121,7 @@ def assert_target_only_delta(control: bytes, target: bytes, candidate: str) -> N
 def eligibility() -> dict[str, Any]:
     rows = load_cohort()
     bodies = [pair_requests(row) for row in rows]
-    return {"eligible": True, "cohort_count": len(rows), "fixture_sha256": base.FIXTURE_SHA256, "reply_act_fixture_sha256": base.REPLY_ACT_FIXTURE_SHA256, "oracle_sha256": targets.ORACLE_SHA256, "operational_adoption": False}
+    return {"eligible": True, "protocol_id": PROTOCOL_ID, "cohort_count": len(rows), "fixture_sha256": base.FIXTURE_SHA256, "reply_act_fixture_sha256": base.REPLY_ACT_FIXTURE_SHA256, "oracle_sha256": targets.ORACLE_SHA256, "operational_adoption": False}
 
 
 def _response(value: Any) -> str:
@@ -166,10 +168,25 @@ def build_packet(execution: dict[str, Any], *, randbelow: Callable[[int], int] =
         if draw: labels.reverse()
         mapping = dict(zip(labels, ("control", "target")))
         blank = {"target_grounding": None, "correction_direction": None, "act": None, "continuity": None, "safety": None, "notes": None}
-        packet_rows.append({"pair": ordinal + 1, "response_a": observed[ordinal][mapping["A"]], "response_b": observed[ordinal][mapping["B"]], "review_a": deepcopy(blank), "review_b": deepcopy(blank), "preference_or_tie": None})
+        turn = row["turn"]
+        packet_rows.append({
+            "pair": ordinal + 1,
+            "review_context": {
+                "prior_airi": turn["prior_airi"],
+                "selected_message": turn["selected_message"],
+                "screen": turn["context"]["screen"],
+                "topic": turn["context"]["topic"],
+                "expected_act": "correct",
+            },
+            "response_a": observed[ordinal][mapping["A"]],
+            "response_b": observed[ordinal][mapping["B"]],
+            "review_a": deepcopy(blank),
+            "review_b": deepcopy(blank),
+            "preference_or_tie": None,
+        })
         key_rows.append({"pair": ordinal + 1, "labels": mapping, "target_id": row["candidate"]["target_id"], "direction": row["candidate"]["direction"]})
-    packet={"schema_version":"airi.correction-target-blinded-review.v1","local_only":True,"synthetic_only":True,"locked_review_overlay_required":True,"pairs":packet_rows}
-    key={"schema_version":"airi.correction-target-operator-key.v1","local_only":True,"pair_mappings":key_rows,"execution_pair_orders":execution["orders"],"execution_row_order":execution["row_order"]}
+    packet={"schema_version":"airi.correction-target-blinded-review.v2","local_only":True,"synthetic_only":True,"locked_review_overlay_required":True,"pairs":packet_rows}
+    key={"schema_version":"airi.correction-target-operator-key.v2","protocol_id":PROTOCOL_ID,"local_only":True,"pair_mappings":key_rows,"execution_pair_orders":execution["orders"],"execution_row_order":execution["row_order"]}
     return packet,key
 
 
@@ -193,11 +210,22 @@ _REVIEW_KEYS = {"target_grounding", "correction_direction", "act", "continuity",
 
 
 def validate_packet(value: Any) -> dict[str, Any]:
-    if type(value) is not dict or set(value)!={"schema_version","local_only","synthetic_only","locked_review_overlay_required","pairs"} or value["schema_version"]!="airi.correction-target-blinded-review.v1" or value["local_only"] is not True or value["synthetic_only"] is not True or value["locked_review_overlay_required"] is not True or type(value["pairs"]) is not list or len(value["pairs"])!=8:
+    if type(value) is not dict or set(value)!={"schema_version","local_only","synthetic_only","locked_review_overlay_required","pairs"} or value["schema_version"]!="airi.correction-target-blinded-review.v2" or value["local_only"] is not True or value["synthetic_only"] is not True or value["locked_review_overlay_required"] is not True or type(value["pairs"]) is not list or len(value["pairs"])!=8:
         raise EvalError("review packet schema is malformed")
+    source_rows = load_cohort()
     for ordinal,pair in enumerate(value["pairs"],1):
-        if type(pair) is not dict or set(pair)!={"pair","response_a","response_b","review_a","review_b","preference_or_tie"} or pair["pair"]!=ordinal or pair["preference_or_tie"] is not None:
+        if type(pair) is not dict or set(pair)!={"pair","review_context","response_a","response_b","review_a","review_b","preference_or_tie"} or pair["pair"]!=ordinal or pair["preference_or_tie"] is not None:
             raise EvalError("review packet pair is malformed")
+        source_turn = source_rows[ordinal - 1]["turn"]
+        expected_context = {
+            "prior_airi": source_turn["prior_airi"],
+            "selected_message": source_turn["selected_message"],
+            "screen": source_turn["context"]["screen"],
+            "topic": source_turn["context"]["topic"],
+            "expected_act": "correct",
+        }
+        if pair["review_context"] != expected_context:
+            raise EvalError("review packet context is not the pinned synthetic source")
         for name in ("response_a","response_b"):
             if not isinstance(pair[name],str) or not 1<=len(pair[name])<=MAX_RESPONSE_CHARS: raise EvalError("review packet response is malformed")
         for name in ("review_a","review_b"):
@@ -207,7 +235,7 @@ def validate_packet(value: Any) -> dict[str, Any]:
 
 def validate_locked_overlay(value: Any, packet: Any) -> dict[str, Any]:
     clean_packet=validate_packet(packet)
-    if type(value) is not dict or set(value)!={"schema_version","locked","packet_sha256","reviews"} or value.get("schema_version")!="airi.correction-target-review-overlay.v1" or value.get("locked") is not True or not re.fullmatch(r"[0-9a-f]{64}", value.get("packet_sha256", "")) or not isinstance(value.get("reviews"), list) or len(value["reviews"])!=8:
+    if type(value) is not dict or set(value)!={"schema_version","locked","packet_sha256","reviews"} or value.get("schema_version")!="airi.correction-target-review-overlay.v2" or value.get("locked") is not True or not re.fullmatch(r"[0-9a-f]{64}", value.get("packet_sha256", "")) or not isinstance(value.get("reviews"), list) or len(value["reviews"])!=8:
         raise EvalError("a locked review overlay is required before unblinding")
     if value["packet_sha256"] != hashlib.sha256(canonical_bytes(clean_packet)).hexdigest(): raise EvalError("locked overlay packet binding is invalid")
     for index, review in enumerate(value["reviews"], 1):
@@ -277,9 +305,9 @@ def publish(run: str, execution: dict[str, Any], *, reservation: dict[str, Path]
             raise EvalError("reservation does not belong to the requested run")
         _revalidate_reservation(reservation)
         execution=validate_execution(execution); packet,key=build_packet(execution)
-        report={"schema_version":"airi.correction-target-public-report.v1","cohort_count":8,"model_call_count":16,"fixture_sha256":base.FIXTURE_SHA256,"reply_act_fixture_sha256":base.REPLY_ACT_FIXTURE_SHA256,"oracle_sha256":targets.ORACLE_SHA256,"eligibility":True,"transport_contract":execution["transport_contract"],"profile_sha256":hashlib.sha256(canonical_bytes(base.EVAL_PROFILE)).hexdigest(),"health_profile_sha256":execution["health_profile_sha256"],"operational_adoption":False}
+        report={"schema_version":"airi.correction-target-public-report.v2","runner_version":RUNNER_VERSION,"protocol_id":PROTOCOL_ID,"supersedes_packet_schema":"airi.correction-target-blinded-review.v1","superseded_schema_status":"obsolete_incomplete_review_context","cohort_count":8,"model_call_count":16,"fixture_sha256":base.FIXTURE_SHA256,"reply_act_fixture_sha256":base.REPLY_ACT_FIXTURE_SHA256,"oracle_sha256":targets.ORACLE_SHA256,"eligibility":True,"transport_contract":execution["transport_contract"],"profile_sha256":hashlib.sha256(canonical_bytes(base.EVAL_PROFILE)).hexdigest(),"health_profile_sha256":execution["health_profile_sha256"],"operational_adoption":False}
         encoded={"public-report.json":canonical_bytes(report),"private-review-packet.json":canonical_bytes(packet)}
-        receipt={"schema_version":"airi.correction-target-local-run-receipt.v1","integrity_only_not_authenticity":True,"hostile_local_authenticity_not_addressed":True,"artifacts":{n:hashlib.sha256(v).hexdigest() for n,v in encoded.items()}}
+        receipt={"schema_version":"airi.correction-target-local-run-receipt.v2","protocol_id":PROTOCOL_ID,"integrity_only_not_authenticity":True,"hostile_local_authenticity_not_addressed":True,"v1_review_artifacts_obsolete":True,"artifacts":{n:hashlib.sha256(v).hexdigest() for n,v in encoded.items()}}
         encoded["local-run-receipt.json"]=canonical_bytes(receipt)
         if any(len(v)>MAX_PACKET_BYTES for v in encoded.values()): raise EvalError("artifact exceeds bound")
         _revalidate_reservation(reservation)

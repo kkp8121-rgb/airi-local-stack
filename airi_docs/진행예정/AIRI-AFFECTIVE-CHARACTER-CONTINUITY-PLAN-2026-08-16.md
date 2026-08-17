@@ -507,8 +507,10 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
 - explicit run은 8쌍·16 POST, frozen Mi:dm profile, 4 CT/4 TC, row/order/label CSPRNG,
   content-free public report, separate ignored operator key, packet-bound locked review overlay를
   사용한다. historical A4.1/A4.2 응답·점수·사람이 쓴 예시 대사는 재사용하지 않는다.
-- foundation 구현과 독립 검토는 완료했다. 현재 stack이 내려가 있어 fresh run/human review는
-  대기 중이고 operational gate는 계속 FAIL/OFF다.
+- 최초 v1 packet은 review context가 없어 grounding 판정이 불가능하므로 obsolete다. v2는
+  pinned prior AIRI·selected viewer·screen·topic을 제공하며, target 의미가 아닌 A/B arm
+  mapping만 blinded다. foundation 구현과 독립 검토는 완료했고 새 v2 fresh run/review가
+  대기 중이며 operational gate는 계속 FAIL/OFF다.
 - 근거: `../완료/AIRI-G1A-CORRECTION-TARGET-AB-FOUNDATION-2026-08-17.md`
 
 ### A5. 표현 계층

@@ -46,8 +46,13 @@ frozen Mi:dm profile을 pre/post health로 확인한다.
 - 8 control + 8 target = 16 model calls
 - pair order는 정확히 CT 4개 / TC 4개이며 CSPRNG로 섞는다.
 - row 실행 순서와 A/B label도 별도로 섞고 mapping은 ignored operator key에만 둔다.
-- blinded packet에는 두 응답과 빈 검토 rubric만 있고 target ID/direction/arm mapping/seed가 없다.
-- unblind 전에는 exact packet SHA-256에 결합된 완전한 locked review overlay가 필요하다.
+- v2 blinded packet에는 두 응답, pinned prior AIRI·selected viewer·screen·topic과 빈 검토
+  rubric이 있고 target ID/direction/arm mapping/seed는 없다. 이 문맥은 grounding 판정에
+  필요하지만 tracked oracle까지 열면 target 의미는 추론할 수 있으므로 A/B arm mapping만
+  blinded라고 주장한다.
+- 문맥이 없던 v1 packet/overlay/receipt/key는 `obsolete_incomplete_review_context`이며 결과
+  증거로 쓰지 않는다. unblind 전에는 exact v2 packet SHA-256에 결합된 완전한 v2 locked
+  review overlay가 필요하다.
 - public report는 count, pinned source hash, profile/health hash와 normal CLI transport contract만
   기록하고 응답·target·mapping·선호 점수를 기록하지 않는다.
 
@@ -59,7 +64,7 @@ frozen Mi:dm profile을 pre/post health로 확인한다.
 
 - shared correction-target unit tests: PASS
 - proxy synthetic-target focused tests: PASS
-- A4.4 runner tests: 16/16 PASS
+- A4.4 runner tests: 18/18 PASS
 - full proxy suite: 311/312 PASS; 1건은 기존 Python 3.14 raw-watchdog metadata
   `upstream_response_headers_timeout` KeyError이며 변경 경로의 synthetic-target tests는 PASS
 - `py_compile`: PASS
@@ -70,10 +75,11 @@ frozen Mi:dm profile을 pre/post health로 확인한다.
 
 ## 아직 완료가 아닌 것
 
-현재 로컬 11435와 Ollama가 내려가 있어 이 foundation 배치에서는 Mi:dm 16회 실측을 아직
-수행하지 않았다. 따라서 target-aware가 실제로 더 자연스럽거나 정확하다는 결과는 없다.
-다음은 reviewed foundation을 커밋한 뒤 stack을 올리고 새 run name으로 16회를 실행하고,
-key를 열기 전에 packet-bound review를 끝내는 것이다.
+foundation 커밋 뒤 로컬 11435와 Ollama를 올려 첫 16회 실행을 완료했지만, 그 실행의 v1
+review packet은 prior AIRI·viewer·screen·topic이 없어 target grounding을 판정할 수 없었다.
+따라서 첫 실행은 명시적으로 obsolete이며 열람·unblind·품질 집계하지 않는다. target-aware가
+실제로 더 자연스럽거나 정확하다는 결과는 아직 없다. 다음은 독립 검토된 v2로 새 run name의
+16회를 다시 실행하고, key를 열기 전에 packet-bound review를 끝내는 것이다.
 
 이 seam은 합성 평가 전용이다. production event mapper, director/B4a/B4b, renderer fallback,
 TTS/Live2D, operational affect/reply-act ON은 모두 변경하지 않았고 자동 승격하지 않는다.

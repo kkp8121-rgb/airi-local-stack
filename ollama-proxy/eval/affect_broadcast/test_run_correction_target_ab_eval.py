@@ -52,7 +52,10 @@ class CorrectionTargetABTests(unittest.TestCase):
         self.assertNotIn("target_id", text)
         self.assertNotIn('"direction"', text)
         self.assertTrue(packet["locked_review_overlay_required"])
+        self.assertEqual("correct", packet["pairs"][0]["review_context"]["expected_act"])
+        self.assertIn("selected_message", packet["pairs"][0]["review_context"])
         self.assertIn("target_id", json.dumps(key))
+        self.assertEqual(runner.PROTOCOL_ID, key["protocol_id"])
         with self.assertRaises(runner.EvalError): runner.validate_locked_overlay({}, packet)
 
     def test_fake_transport_makes_exactly_sixteen_posts_and_two_health_checks(self) -> None:
@@ -83,7 +86,7 @@ class CorrectionTargetABTests(unittest.TestCase):
     def test_overlay_requires_exact_packet_hash_and_complete_reviews(self) -> None:
         packet,_=runner.build_packet(self._execution(), randbelow=lambda n: 0)
         fields={"target_grounding":True,"correction_direction":True,"act":True,"continuity":True,"safety":True,"notes":""}
-        overlay={"schema_version":"airi.correction-target-review-overlay.v1","locked":True,"packet_sha256":hashlib.sha256(runner.canonical_bytes(packet)).hexdigest(),"reviews":[{"pair":i,"review_a":fields,"review_b":fields,"preference_or_tie":"tie"} for i in range(1,9)]}
+        overlay={"schema_version":"airi.correction-target-review-overlay.v2","locked":True,"packet_sha256":hashlib.sha256(runner.canonical_bytes(packet)).hexdigest(),"reviews":[{"pair":i,"review_a":fields,"review_b":fields,"preference_or_tie":"tie"} for i in range(1,9)]}
         runner.validate_locked_overlay(overlay, packet)
         overlay["packet_sha256"]="0"*64
         with self.assertRaises(runner.EvalError): runner.validate_locked_overlay(overlay,packet)
@@ -108,6 +111,19 @@ class CorrectionTargetABTests(unittest.TestCase):
         packet,_=runner.build_packet(self._execution(), randbelow=lambda n: 0)
         packet["pairs"][0]["review_a"]["act"]=True
         with self.assertRaises(runner.EvalError): runner.validate_packet(packet)
+
+    def test_packet_validator_rejects_context_drift(self) -> None:
+        packet,_=runner.build_packet(self._execution(), randbelow=lambda n: 0)
+        packet["pairs"][0]["review_context"]["screen"]="바뀐 화면"
+        with self.assertRaises(runner.EvalError): runner.validate_packet(packet)
+
+    def test_v1_review_packet_and_overlay_are_obsolete(self) -> None:
+        packet,_=runner.build_packet(self._execution(), randbelow=lambda n: 0)
+        packet["schema_version"]="airi.correction-target-blinded-review.v1"
+        with self.assertRaises(runner.EvalError): runner.validate_packet(packet)
+        current,_=runner.build_packet(self._execution(), randbelow=lambda n: 0)
+        overlay={"schema_version":"airi.correction-target-review-overlay.v1","locked":True,"packet_sha256":"0"*64,"reviews":[]}
+        with self.assertRaises(runner.EvalError): runner.validate_locked_overlay(overlay,current)
 
     def test_packet_rejects_invalid_label_draw(self) -> None:
         with self.assertRaises(runner.EvalError): runner.build_packet(self._execution(), randbelow=lambda n: 2)
