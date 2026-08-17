@@ -17,6 +17,18 @@
 
 최종 갱신: 2026-08-17
 
+- **2026-08-17** (G1a A3 broadcast outcome candidate mapper foundation): 미래 B4b가
+  실제 전달 완료 뒤 내놓을 content-free outcome candidate를 A1 `airi.affect-event.v1`로 바꾸는
+  순수 mapper를 추가했다. `accepted/queued/selected/scheduled/ACK/partial/error/control/failed`는
+  모두 거부하고 donation/callback/game/silence/repair의 exact 7개 evidence-outcome pair만
+  허용한다. 이름·채팅·후원액·provider/event/viewer ID·lease token은 입력 schema에 없고
+  extra field로도 거부한다. B4a action shape·selection, proxy runtime, endpoint, env/launcher,
+  B4b/TTS에는 배선하지 않았다. 현재 `delivered`는 인증된 사실이 아닌 candidate field이며,
+  A4 synthetic oracle에서 고정한 provisional appraisal만
+  재사용했다. 따라서 A3는 **foundation만 부분 완료**, exactly-once B4b observer와 실제
+  delivery evidence·A0 사용자 확정·운영 ON은 계속 대기다.
+  (`완료/AIRI-G1A-AFFECT-EVENT-MAPPER-FOUNDATION-2026-08-17.md`)
+
 - **2026-08-17** (G1a A4.5 correction-realization postcondition): A4.4 protocol v2의
   exact 8-pair response를 새 model/proxy 호출 없이 닫힌 target별 lexical postcondition으로
   재검사했다. target 3/8, control 2/8, target-only 2/control-only 1/both 1/neither 4로
@@ -527,9 +539,10 @@
       OFF full-route byte identity, explicit-session request-local tail·content-free
       health·11435 reuse fail-closed — 2026-08-16
       (`완료/AIRI-G1A-AFFECT-PROXY-GREYBOX-2026-08-16.md`)
-    - [ ] A3 미래 B4b adapter event source: B4a frozen action shape를 유지하고
-      delivery-confirmed callback/donation/game/silence/repair outcome만 개인정보
-      없는 authoritative stimulus로 변환
+    - [~] A3 미래 B4b adapter event source: B4a frozen action shape를 유지하는
+      content-free delivery-confirmed outcome candidate → A1 event 순수 mapper foundation 완료.
+      실제 B4b exactly-once observer·runtime 적용·delivery evidence는 대기
+      (`완료/AIRI-G1A-AFFECT-EVENT-MAPPER-FOUNDATION-2026-08-17.md`)
     - [~] A4 독립 합성 6 scenario×24 turn OFF/ON·blind human review: 한국어
       인과 fixture, reducer oracle, paired request/transport, content-free report,
       실제 Mi:dm 122쌍·blind review 완료. ON은 OFF보다 causal/repair/safety가
@@ -729,8 +742,9 @@
   - [ ] B1b live adapter/quota/OAuth 및 실제 AIRI 주입 (보류: 외부 YouTube 자격증명·쿼터 실측·운영 승인)
   - [~] G1a A0~A4 typed affect core/proxy/eval — A1/A2, A4 Mi:dm A/B 및
     A4.1 reply-act 3조건 blind review, A4.4 fresh target A/B와 A4.5 zero-call lexical
-    postcondition 완료, 하지만 품질 gate FAIL. A0 constitution v2·metric·A4.5 wording
-    사용자 확정, A4.2/A4.3/A4.5 fresh human review 및 A3 event source 대기(기본 OFF)
+    postcondition과 A3 content-free candidate mapper foundation 완료, 하지만 품질 gate
+    FAIL. A0 constitution v2·metric·A4.5 wording 사용자 확정, A4.2/A4.3/A4.5 fresh
+    human review 및 B4b authoritative exactly-once event observer 대기(기본 OFF)
 - [~] **M3** (B2 송출 + B3 안전)
   - [x] B3 모더레이션 게이트 코드 (사전 113항목+패턴 7, 기본 off) — 2026-08-12 (`932eae6`)
   - [x] B3 배선 3종 — TTS 폴백 7/7·런처 env·Electron "필터당함" 배지,
@@ -760,7 +774,7 @@
   - [~] G1a A3~A5 — A4 Mi:dm/사람 A/B와 A4.1 reply-act 3조건은 완료했지만
     텍스트 품질 FAIL. A4.4 target A/B도 불안정했고 A4.5 strict lexical check는 target
     3/8 vs control 2/8이다. fixed wording 사용자·fresh human review, runtime selection
-    계약, A3 B4 content-free affect event source와 텍스트 PASS 뒤 TTS/Live2D 표현 배선 대기
+    계약, A3의 B4b authoritative observer/runtime 적용과 텍스트 PASS 뒤 TTS/Live2D 표현 배선 대기
 - [ ] **M5** (리허설 → 데뷔 → I4 플라이휠)
 
 ## 모델 SSoT 게이트 (전환 고정 선언의 전제)

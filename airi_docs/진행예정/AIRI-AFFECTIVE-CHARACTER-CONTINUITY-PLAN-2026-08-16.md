@@ -2,7 +2,7 @@
 
 - 로드맵 위치: **G1a** (G1 캐릭터 루프의 신규 하위 트랙)
 - 연결 트랙: 방송 계획 C1·C2·C5, G3 평가, G5/B4 방송 디렉터, M2·M4·M5
-- 상태: **진행중 — A1 pure core·A2 default-OFF greybox·A4 offline foundation 완료 / A0 승인·A3·A4 실측 이후 미완료**
+- 상태: **진행중 — A1 core·A2 greybox·A3 candidate mapper·A4/A4.1/A4.4/A4.5 평가 완료 / A0 승인·B4b observer·품질 PASS 이후 미완료**
 - 운영 영향: 없음. 이 문서는 어떤 환경 변수나 런타임 게이트도 켜지 않는다.
 - 원칙: 외부 프로젝트는 설계 근거로만 인용한다. 1단계 구현에는 새 런타임
   의존성, 외부 서비스, 원격 모델을 추가하지 않는다.
@@ -127,6 +127,11 @@ screened/director event
   "version": 17
 }
 ```
+
+위 `game_failure` JSON은 2026-08-16 계획 작성 시점의 설명용 provisional 예시다.
+후속 A4 합성 oracle은 `agency=none`, `novelty=1`, `weight=2`를 고정했고 A3 mapper
+foundation은 재현성을 위해 후속 oracle 값을 사용한다. 어느 쪽도 A0 사용자 확정이나
+운영 파라미터 승격을 뜻하지 않으며, authoritative B4b 배선 전 A0에서 다시 확정한다.
 
 ### 4.1 후보 enum
 
@@ -378,10 +383,17 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
 
 ### A3. 방송 디렉터 event source
 
-- 신규 후보: 미래 B4b adapter의 별도 affect event mapper와 colocated tests
-- B4a core action shape·selection은 그대로 유지하고 delivery-confirmed
-  donation/callback/game/silence/repair outcome만 content-free typed event로 변환
-- B4b adapter가 없을 때 foundation은 계속 inert/default OFF
+- 상태: **순수 candidate mapper foundation 완료 / B4b observer·runtime 배선 대기 — 2026-08-17**
+- 신규: `ollama-proxy/broadcast_affect_event_mapper.py`와 colocated tests
+- B4a core action shape·selection은 그대로 유지하고 exact `delivered`를 주장하는
+  donation/callback/game/silence/repair candidate 7종만 content-free typed event로 변환
+- accepted/queued/selected/scheduled/ACK/partial/error/control/failed 및 raw action/private
+  field는 fail-closed한다. appraisal은 A4 synthetic oracle의 provisional 값을 재사용하며
+  A0 사용자 확정 또는 운영 채택을 뜻하지 않는다.
+- B4b adapter가 없으므로 `delivery_status=delivered`도 현재는 인증 증거가 아닌 strict
+  candidate field다. module은 어느 runtime에서도 import되지 않고 inert/default OFF이며,
+  exactly-once delivery observer·provenance 인증과 session application은 후속 gate다.
+- 근거: `../완료/AIRI-G1A-AFFECT-EVENT-MAPPER-FOUNDATION-2026-08-17.md`
 
 ### A4. 합성 방송 평가
 

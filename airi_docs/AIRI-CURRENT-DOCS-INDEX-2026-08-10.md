@@ -120,6 +120,12 @@
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+- `AIRI-G1A-AFFECT-EVENT-MAPPER-FOUNDATION-2026-08-17.md` — A3의
+  content-free outcome candidate를 A1 typed event로 바꾸는 순수 mapper 기반.
+  candidate 자체는 delivery를 인증하지 않는다. B4a shape·selection과 runtime은 건드리지
+  않았고 B4b observer·실제 delivery·운영 ON은
+  아직 없다.
+
 - `AIRI-G1A-CORRECTION-REALIZATION-POSTCONDITION-2026-08-17.md` — A4.5의 exact
   A4.4 response zero-call lexical 재검사. target 3/8, control 2/8이고 고정 제안문
   8/8은 self-conformance일 뿐이다. 사용자 검토용 여덟 문장과 no-runtime/no-adoption
