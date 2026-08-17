@@ -17,6 +17,18 @@
 
 최종 갱신: 2026-08-17
 
+- **2026-08-17** (G1a A4.5 correction-realization postcondition): A4.4 protocol v2의
+  exact 8-pair response를 새 model/proxy 호출 없이 닫힌 target별 lexical postcondition으로
+  재검사했다. target 3/8, control 2/8, target-only 2/control-only 1/both 1/neither 4로
+  target prompt만의 개선은 작고 불안정했다. evaluator-only 고정 제안문 8개는 8/8
+  self-conformance였지만 이는 사람 선호·자연스러움·사실 grounding 증거가 아니다. source
+  packet pin 우회, 부정·조건·양보문 false pass, 한글/혼합 경쟁 숫자, receipt code binding을
+  독립 검토에서 찾아 닫았다. 최종 판정은 target cue와 단정형 종결이 같은 문장에 있어야 하는
+  closed target-linked grammar를 사용하며 actual zero-call run
+  `a45-retrospective-20260817-06`으로 재산출했다.
+  production/runtime/director/B4b/TTS 배선은 없고 사용자 wording 판단 전 품질/운영 gate는
+  **FAIL/OFF**다. (`완료/AIRI-G1A-CORRECTION-REALIZATION-POSTCONDITION-2026-08-17.md`)
+
 - **2026-08-17** (G1a A4.4 correction-target fresh A/B result): protocol v2로 pinned
   synthetic correction 8쌍·16 POST를 새로 실행하고, 두 separate model-review session의
   판정을 exact packet hash에 잠근 뒤 unblind했다. pair 합의는 target 3, control 2, tie 2,
@@ -498,8 +510,10 @@
     못해 품질 gate FAIL. A4.2 zero-call guarded delta는 thank·최초 deescalate·repair에
     탐색적 양성 신호, generic correct에는 음성 신호를 보였다. human review, A0 사용자
     결정과 A3 이후 대기. A4.3은 8개 synthetic correction target/direction의 offline
-    human-review eligibility를 완료했고, A4.4는 같은 8행의 fresh 16-call blinded A/B
-    foundation까지 구현·검토했다. 실제 Mi:dm 실행과 human review는 대기 중이다.
+    human-review eligibility를 완료했고, A4.4 same 8-row fresh 16-call A/B와 두 model
+    review도 완료했다. A4.5 zero-call strict realization check는 target 3/8 vs control 2/8로
+    target prompt만의 안정적 개선을 확인하지 못했고 fixed 8/8은 self-conformance뿐이다.
+    사용자 wording 판단·fresh human review, A0 결정과 A3 이후는 대기 중이다.
     (`진행예정/AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`)
     - [~] A0 constitution v2: 확정 이월과 미정 likes/dislikes/pride/
       embarrassment/conflict/repair/fatigue 선택지를 분리한 결정 시트 작성,
@@ -523,15 +537,19 @@
       affect-only 대비 act/grounding/reversal을 개선했으나 OFF를 넘지 못했고
       thank 0/3·pathology 증가로 다시 FAIL. A4.2 deterministic guarded delta의
       22행 zero-call model review는 좁은 fallback에만 탐색 신호를 보였고 human review와
-      runtime selection은 미완료. A4.3 closed correction target 8행 structural eligibility와
-      A4.4 fresh control/target 16-call evaluation foundation은 완료했지만 실제 실행·human
-      review는 대기 — 2026-08-17
+      runtime selection은 미완료. A4.3 closed correction target 8행, A4.4 fresh
+      control/target 16-call과 두 model review, A4.5 zero-call lexical postcondition까지
+      완료했다. A4.5는 target 3/8 vs control 2/8이고 fixed proposals 8/8은 구조적
+      self-conformance라 quality gate FAIL/OFF, 사용자 wording 판단·fresh human review 대기
+      — 2026-08-17
       (`완료/AIRI-G1A-AFFECT-BROADCAST-EVAL-FOUNDATION-2026-08-16.md`,
       `완료/AIRI-G1A-AFFECT-BROADCAST-AB-2026-08-17.md`,
       `완료/AIRI-G1A-REPLY-ACT-TRIPLET-2026-08-17.md`,
       `완료/AIRI-G1A-GUARDED-DELTA-REVIEW-2026-08-17.md`,
       `완료/AIRI-G1A-CORRECTION-TARGET-FOUNDATION-2026-08-17.md`,
-      `완료/AIRI-G1A-CORRECTION-TARGET-AB-FOUNDATION-2026-08-17.md`)
+      `완료/AIRI-G1A-CORRECTION-TARGET-AB-FOUNDATION-2026-08-17.md`,
+      `완료/AIRI-G1A-CORRECTION-TARGET-AB-RESULTS-2026-08-17.md`,
+      `완료/AIRI-G1A-CORRECTION-REALIZATION-POSTCONDITION-2026-08-17.md`)
     - [ ] A5 trusted state→TTS/Live2D 표현 배선 (보류: 텍스트 게이트 PASS)
     - [ ] A6 B1b/B4b 설치 AIRI 30~120분 비공개 리허설과 운영 ON 사용자 결정
 - [~] **G2. 장기 기억**
@@ -710,9 +728,9 @@
   - [x] I2a viewer-memory foundation — separate opt-in SQLite, strict `yt:v1`/`viewer:v1`/`broadcast:v1` HMAC pseudonyms, content-free B1 observation boundary, manual capped tiers, bounded explicit facts, retention/deletion, count-only donations, and untrusted callback candidates; no runtime wiring or AIRI injection. I2 remains partial pending an authorized next-broadcast callback smoke — 2026-08-13 (`완료/AIRI-I2A-VIEWER-MEMORY-FOUNDATION-2026-08-13.md`)
   - [ ] B1b live adapter/quota/OAuth 및 실제 AIRI 주입 (보류: 외부 YouTube 자격증명·쿼터 실측·운영 승인)
   - [~] G1a A0~A4 typed affect core/proxy/eval — A1/A2, A4 Mi:dm A/B 및
-    A4.1 reply-act 3조건 blind review 완료, 하지만 품질 gate FAIL. A0 constitution
-    v2·metric 사용자 확정, A4.2 guarded delta와 A4.3 correction-target eligibility의
-    human review 및 A3 event source 대기(기본 OFF)
+    A4.1 reply-act 3조건 blind review, A4.4 fresh target A/B와 A4.5 zero-call lexical
+    postcondition 완료, 하지만 품질 gate FAIL. A0 constitution v2·metric·A4.5 wording
+    사용자 확정, A4.2/A4.3/A4.5 fresh human review 및 A3 event source 대기(기본 OFF)
 - [~] **M3** (B2 송출 + B3 안전)
   - [x] B3 모더레이션 게이트 코드 (사전 113항목+패턴 7, 기본 off) — 2026-08-12 (`932eae6`)
   - [x] B3 배선 3종 — TTS 폴백 7/7·런처 env·Electron "필터당함" 배지,
@@ -740,9 +758,9 @@
     B4b 런타임 어댑터와 실제 비공개 리허설은 미착수
     (`완료/AIRI-B4A-BROADCAST-DIRECTOR-FOUNDATION-2026-08-13.md`)
   - [~] G1a A3~A5 — A4 Mi:dm/사람 A/B와 A4.1 reply-act 3조건은 완료했지만
-    텍스트 품질 FAIL. A4.2 zero-call 결과와 A4.3 correction target의 human review·
-    runtime selection 계약, A3 B4 content-free affect event source와 텍스트 PASS 뒤
-    TTS/Live2D 표현 배선 대기
+    텍스트 품질 FAIL. A4.4 target A/B도 불안정했고 A4.5 strict lexical check는 target
+    3/8 vs control 2/8이다. fixed wording 사용자·fresh human review, runtime selection
+    계약, A3 B4 content-free affect event source와 텍스트 PASS 뒤 TTS/Live2D 표현 배선 대기
 - [ ] **M5** (리허설 → 데뷔 → I4 플라이휠)
 
 ## 모델 SSoT 게이트 (전환 고정 선언의 전제)

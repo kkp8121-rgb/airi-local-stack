@@ -69,8 +69,9 @@
   canonical A4.1 bundle의 exact historical `reply_act` response와 fixed 22행의 실제
   zero-call composition 및 두 model review도 완료했다. thank·최초 deescalate·repair에는
   탐색적 양성 신호, generic correct에는 음성 신호가 나왔으며, fresh human review·A0
-  사용자 승인·A3·운영 ON은 미완료다. A4.3은 generic correction 승격 대신 여덟 synthetic
-  target/direction의 closed offline eligibility까지만 추가했다.
+  사용자 승인·A3·운영 ON은 미완료다. A4.3 closed target, A4.4 fresh 8-pair target A/B,
+  A4.5 zero-call lexical postcondition까지 이어졌으며 A4.5는 target 3/8 vs control 2/8,
+  fixed proposal 8/8 self-conformance로 품질 gate FAIL/OFF다.
 - `AIRI-CHARACTER-CONSTITUTION-V2-DECISION-2026-08-16.md` — G1a A0 사용자
   결정 시트. 기존 확정 정체성·말투·안전 경계와 미정 likes/dislikes/pride/
   embarrassment/conflict/repair/fatigue 및 metric threshold 선택지를 분리한다.
@@ -118,6 +119,11 @@
   `아카이브/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-pre-midm.md`.
 
 ## 완료 — 유효한 증거 기록 (최신순)
+
+- `AIRI-G1A-CORRECTION-REALIZATION-POSTCONDITION-2026-08-17.md` — A4.5의 exact
+  A4.4 response zero-call lexical 재검사. target 3/8, control 2/8이고 고정 제안문
+  8/8은 self-conformance일 뿐이다. 사용자 검토용 여덟 문장과 no-runtime/no-adoption
+  경계를 함께 기록한다.
 
 - `AIRI-G1A-CORRECTION-TARGET-AB-RESULTS-2026-08-17.md` — A4.4 protocol v2 fresh
   8-pair/16-call 실제 대사와 두 model-review 결과. target 3/control 2/tie 2/split 1의 합의와

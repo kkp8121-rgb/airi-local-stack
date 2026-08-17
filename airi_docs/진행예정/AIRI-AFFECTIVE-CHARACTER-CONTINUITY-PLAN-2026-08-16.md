@@ -516,6 +516,31 @@ v2를 별도 변경으로 기록하고 C5 회귀를 거친다.
 - 근거: `../완료/AIRI-G1A-CORRECTION-TARGET-AB-FOUNDATION-2026-08-17.md`,
   `../완료/AIRI-G1A-CORRECTION-TARGET-AB-RESULTS-2026-08-17.md`
 
+### A4.5. closed correction-realization postcondition
+
+- A4.4 protocol v2 exact 8-pair response를 다시 모델에 묻지 않고 target별 lexical/
+  structural postcondition으로 검사한다. default runner는 tracked oracle만 읽고, explicit
+  retrospective도 새 proxy POST와 model call이 각각 0이다.
+- target cue, 현재 판단의 긍정형, prior-error cue 부재, replacement/confirmation/hedged
+  direction을 닫힌 규칙으로 검사한다. 질문·인용·메타·명시적 target 부정·가정형·경쟁 숫자는
+  fail-closed한다. 결과에는 원문이 없고 pass와 failure bitmask만 남긴다.
+- actual run `a45-retrospective-20260817-06`은 target **3/8**, control **2/8**,
+  target-only 2/control-only 1/both 1/neither 4다. target prompt만으로 안정적 realization을
+  보장하지 못했다.
+- 사람이 검토할 evaluator-only 고정 proposal 8개는 exact rule self-conformance 8/8이다.
+  이는 truth, 화면 grounding, 자연스러움, 캐릭터성, 사람 선호나 operational adoption의
+  증거가 아니다. 특히 자연스러운 부정형 정정을 보수적으로 놓칠 수 있다.
+- source packet은 exact A4.4 digest로 고정하며 test override는 없다. receipt는 source
+  report/packet/receipt/operator key와 realization oracle/checker, A4.5 runner, A4.4
+  validator/base, A4.3 oracle code를 결합한다. A4.4 key가 원 source receipt에 결합되지 않은
+  honest-local authenticity 한계는 그대로 공개한다.
+- 다음 A4.6은 사용자 wording 판단 뒤에만 검토한다. 기존 non-stream hidden retry와 겹치지
+  않도록 upstream attempt/postcondition outcome을 관찰하는 평가 전용 prepublication seam과
+  total-attempt cap이 먼저 필요하다. 그 전에는 retry/fixed fallback 전략을 선택하지 않는다.
+- production proxy/runtime/director/B4b/TTS에는 import·endpoint·toggle·배선이 없고 quality/
+  operational gate는 **FAIL/OFF**다.
+- 근거: `../완료/AIRI-G1A-CORRECTION-REALIZATION-POSTCONDITION-2026-08-17.md`
+
 ### A5. 표현 계층
 
 - trusted state → ACT/TTS/Live2D mapping
