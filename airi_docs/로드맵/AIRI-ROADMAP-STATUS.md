@@ -914,7 +914,13 @@
   `--protocol operational` 분리 채점 옵션을 정식화했다(기본 raw 바이트
   불변, 체크포인트 증거는 raw 전용 가드, 83 tests PASS). 문서 인덱스도
   현행화했다(신설 17건 등재·stale 0).
-  (`완료/AIRI-B4C-GATE-PATH-AB-2026-08-18.md`)
+  이어 판정 4항(과단문)의 원인을 코드 정독 + 결과 JSON 재집계로
+  규명했다 — 주원인은 존댓말 드롭 반토막이 아니라 **빈 응답을 7자
+  `음, 잠깐만.`으로 전면 대체하는 침묵 폴백**(172응답 중 58건 33.7%,
+  <10자 89건의 65.2%)이며, 폴백을 걷어낸 모델 발화 97건은 p50 15·
+  10~45자 적중 64.9%로 계약 정합이다.
+  (`완료/AIRI-B4C-GATE-PATH-AB-2026-08-18.md`,
+  `완료/AIRI-GATE-SHORT-RESPONSE-ANALYSIS-2026-08-18.md`)
 - **2026-08-18** (클로드 PC, 사용자 결정 23항목): 사용자가 캐릭터 헌법 v2
   7행(baseline=C / dislikes·pride·embarrassment·conflict·fatigue=A /
   repair=짧은 자조 메타 개그→인정→정정 직접 기입, 예시 문장은 톤 예시라
