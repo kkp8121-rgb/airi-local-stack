@@ -1152,6 +1152,21 @@ class MemoryStore:
                 # normalization.  The metadata window retains established
                 # recency semantics while its content is never full-scanned.
                 if fts_exists:
+                    match_query = self._fts_match_query(terms)
+                    # The FTS query matches prefixes, but exact-token rescoring
+                    # below cannot see that: a question token "포지" finds the
+                    # stored "포지야" here and then scores zero overlap, so the
+                    # turn the index just found gets dropped.  Keep FTS's own
+                    # bm25 relevance for exactly those rows.
+                    ranks = {
+                        int(row[0]): float(row[1])
+                        for row in c.execute(
+                            "SELECT message_id,bm25(conversation_message_fts) FROM conversation_message_fts "
+                            "WHERE conversation_message_fts MATCH ? AND session_id=? AND message_id>? "
+                            "ORDER BY rowid DESC LIMIT ?",
+                            (match_query, session_id, fts_start, JOURNAL_FTS_CANDIDATE_MESSAGES),
+                        ).fetchall()
+                    }
                     rows = c.execute(
                     "WITH recent_meta AS MATERIALIZED ("
                     "  SELECT id,turn_no,role,recall_chars AS chars FROM conversation_message "
@@ -1172,16 +1187,17 @@ class MemoryStore:
                     "     AND SUM(CASE WHEN role='user' THEN 1 ELSE 0 END)=1 "
                     "     AND SUM(CASE WHEN role='assistant' THEN 1 ELSE 0 END)=1 "
                     "     AND SUM(chars)<=?"
-                    ") SELECT message.turn_no,message.role,message.content "
+                    ") SELECT message.id,message.turn_no,message.role,message.content "
                     "FROM conversation_message message JOIN candidate_meta USING(id) "
                     "JOIN complete_turns ON complete_turns.turn_no=message.turn_no "
                     "ORDER BY message.id DESC",
-                    (session_id, JOURNAL_RECALL_WINDOW_MESSAGES, self._fts_match_query(terms), session_id,
+                    (session_id, JOURNAL_RECALL_WINDOW_MESSAGES, match_query, session_id,
                      fts_start, JOURNAL_FTS_CANDIDATE_MESSAGES, fts_start, JOURNAL_RECALL_MAX_PAIR_CHARS),
                     ).fetchall()
                 else:
                     # An SQLite build without FTS5 preserves the old bounded
                     # behavior rather than failing recall entirely.
+                    ranks = {}
                     rows = c.execute(
                     "WITH recent_meta AS MATERIALIZED ("
                     "  SELECT id,turn_no,role,recall_chars AS chars FROM conversation_message "
@@ -1194,7 +1210,7 @@ class MemoryStore:
                     "     AND SUM(CASE WHEN role='user' THEN 1 ELSE 0 END)=1 "
                     "     AND SUM(CASE WHEN role='assistant' THEN 1 ELSE 0 END)=1 "
                     "     AND SUM(chars)<=?"
-                    ") SELECT message.turn_no,message.role,message.content "
+                    ") SELECT message.id,message.turn_no,message.role,message.content "
                     "FROM conversation_message message JOIN recent_meta USING(id) "
                     "JOIN complete_turns ON complete_turns.turn_no=message.turn_no "
                     "ORDER BY message.id DESC",
@@ -1206,7 +1222,7 @@ class MemoryStore:
         grouped: dict[int, list[sqlite3.Row]] = {}
         for row in rows:
             grouped.setdefault(int(row["turn_no"]), []).append(row)
-        scored: list[tuple[int, int, list[sqlite3.Row]]] = []
+        scored: list[tuple[float, int, list[sqlite3.Row]]] = []
         for turn, pair in grouped.items():
             roles = [str(row["role"]) for row in pair]
             if turn in excluded or len(pair) != 2 or set(roles) != {"user", "assistant"}:
@@ -1217,8 +1233,15 @@ class MemoryStore:
                 for row in pair
             )
             overlap = len(terms & self._journal_tokens(searchable))
-            if overlap:
-                scored.append((overlap, turn, pair))
+            # bm25 is negative and lower is better; fold its strength into (0,1)
+            # so a prefix-only turn is recalled but always ranks below every
+            # exact-token turn.  Turns that already scored keep their integer
+            # overlap, and with it the established recency tiebreak.
+            strength = max((-ranks.get(int(row["id"]), 0.0) for row in pair), default=0.0)
+            relevance = strength / (1.0 + strength) if strength > 0 else 0.0
+            score = float(overlap) if overlap else relevance
+            if score:
+                scored.append((score, turn, pair))
         selected = sorted(scored, key=lambda item: (item[0], item[1]), reverse=True)[:4]
         messages: list[dict[str, str]] = []
         used = 0

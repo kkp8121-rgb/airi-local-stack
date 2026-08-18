@@ -345,6 +345,31 @@ class MemoryTests(unittest.TestCase):
         self.assertIn('제 별명은 반짝이야', [message['content'] for message in recalled])
         self.assertTrue(any('CONVERSATION_MESSAGE_FTS MATCH' in query.upper() for query in queries))
 
+    def test_journal_recall_keeps_prefix_matched_turns_below_exact_ones(self):
+        # 질문 토큰 '포지'는 저장된 '포지야'와 완전일치하지 않는다 — FTS 접두
+        # 후보를 완전일치 재점수가 버리던 회귀(회상 0건)를 막는다.
+        self.s.append_turn('s', '포지야 오늘 방송 재밌었어', '나도 즐거웠어', 1)
+        for turn in range(2, 6):
+            self.s.append_turn('s', f'포지 얘기 {turn}', f'응 {turn}', turn)
+        queries = []
+        original_connect = self.s._connect
+        def traced_connect():
+            connection = original_connect(); connection.set_trace_callback(queries.append); return connection
+        self.s._connect = traced_connect
+        try:
+            crowded = self.s.journal_recall('s', '포지 기억나?', ())
+            alone = self.s.journal_recall('s', '포지 기억나?', retained_turns=[2, 3, 4, 5])
+        finally:
+            self.s._connect = original_connect
+        # 완전일치 4턴이 상한을 채우면 접두 전용 턴은 밀려난다.
+        self.assertNotIn('포지야 오늘 방송 재밌었어', [message['content'] for message in crowded])
+        self.assertEqual(len(crowded), 8)
+        # 완전일치 후보가 없으면 접두 전용 턴이 회상된다.
+        self.assertEqual([message['content'] for message in alone],
+                         ['포지야 오늘 방송 재밌었어', '나도 즐거웠어'])
+        self.assertTrue(any('BM25(' in query.upper() for query in queries))
+        self.assertEqual(self.s.journal_recall('s', '라면 기억나?', ()), [])
+
     def test_retention_bounds_session_journal_and_memory_without_base_deletion(self):
         self.s.add_item(kind='entity', subtype='person', name='base', content='base', source='base')
         with self.s._session() as c:
