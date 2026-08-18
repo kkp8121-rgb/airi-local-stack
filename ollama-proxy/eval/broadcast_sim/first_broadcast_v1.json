@@ -1,0 +1,314 @@
+{
+  "schema_version": "airi.broadcast-sim-fixture.v1",
+  "synthetic_only": true,
+  "note": "합성 시청자 100명과 고정 주제 대본. 실제 시청자·채팅·후원 데이터가 아니다.",
+  "topic": {
+    "title": "AIRI의 첫 방송 — 자기소개와 AI 버튜버 잡담",
+    "signature_greeting": "다들 안녕! 나 AIRI야. 오늘 첫 방송이야.",
+    "beats": [
+      {
+        "id": "opening",
+        "label": "오프닝 — 시그니처 인사와 자기소개",
+        "start_minute": 0,
+        "end_minute": 4,
+        "anchors": ["첫 방송", "자기소개", "이름", "인사", "AIRI"],
+        "airi_cue": "첫 방송 인사와 짧은 자기소개를 하고 있어."
+      },
+      {
+        "id": "main",
+        "label": "메인 — AI 버튜버 잡담",
+        "start_minute": 4,
+        "end_minute": 13,
+        "anchors": ["AI 버튜버", "로컬 모델", "목소리", "반응 속도", "기억"],
+        "airi_cue": "AI 버튜버로 산다는 게 어떤 건지 잡담하고 있어."
+      },
+      {
+        "id": "anchor",
+        "label": "앵커 파생 — 채팅에서 나온 이야기",
+        "start_minute": 13,
+        "end_minute": 17,
+        "anchors": ["채팅", "질문", "시청자", "이야기"],
+        "airi_cue": "채팅에서 나온 이야기를 이어받아 말하고 있어."
+      },
+      {
+        "id": "closing",
+        "label": "클로징 — 마무리 인사",
+        "start_minute": 17,
+        "end_minute": 20,
+        "anchors": ["마무리", "다음 방송", "고마워", "끝인사"],
+        "airi_cue": "방송을 마무리하며 끝인사를 준비하고 있어."
+      }
+    ]
+  },
+  "rates": {
+    "broadcast_minutes": 20,
+    "window_seconds": 5,
+    "turn_cooldown_seconds": 20,
+    "active_viewers_min": 10,
+    "active_viewers_max": 20,
+    "active_churn_per_minute": 2,
+    "messages_per_minute_min": 3,
+    "messages_per_minute_max": 8,
+    "burst_minutes": [4, 12, 18],
+    "burst_multiplier": 3,
+    "donation_minutes": [3, 7, 11, 15, 18],
+    "offtopic_ratio": 0.08,
+    "opinion_wave_minutes": [9, 16],
+    "opinion_wave_size": 5,
+    "opinion_aggregate_threshold": 3,
+    "memory_probe_minutes": [8, 14, 19],
+    "pending_stale_seconds": 120
+  },
+  "pickup_priority": ["donation", "memory_probe", "opinion", "question", "reaction", "offtopic"],
+  "archetypes": {
+    "greeter": {
+      "kind": "reaction",
+      "templates": [
+        "안녕 AIRI!",
+        "첫 방송 축하해!",
+        "오늘 처음 왔어",
+        "방송 시작했다!"
+      ]
+    },
+    "question_tech": {
+      "kind": "question",
+      "templates": [
+        "AIRI는 무슨 모델로 돌아가?",
+        "대답이 왜 이렇게 빨라?",
+        "목소리는 어떻게 만든 거야?",
+        "컴퓨터 사양 어떻게 돼?",
+        "인터넷 없이도 돼?"
+      ]
+    },
+    "question_persona": {
+      "kind": "question",
+      "templates": [
+        "이름 뜻이 뭐야?",
+        "취미 같은 게 있어?",
+        "좋아하는 음식 있어?",
+        "잠은 자?",
+        "기분이라는 게 있어?"
+      ]
+    },
+    "teaser": {
+      "kind": "question",
+      "templates": [
+        "사실 사람이 뒤에서 치는 거 아냐?",
+        "대본 읽는 거지?",
+        "이거 사장님 부계정이지",
+        "방금 버벅였다 ㅋㅋ"
+      ]
+    },
+    "supporter": {
+      "kind": "reaction",
+      "templates": [
+        "잘한다!",
+        "목소리 좋다",
+        "오래 해줘",
+        "귀엽다 진짜",
+        "응원할게"
+      ]
+    },
+    "lurker_reactor": {
+      "kind": "reaction",
+      "templates": [
+        "ㅋㅋㅋㅋ",
+        "오",
+        "헐",
+        "ㅇㅈ",
+        "?"
+      ]
+    },
+    "offtopic_chatter": {
+      "kind": "offtopic",
+      "templates": [
+        "오늘 점심 뭐 먹지",
+        "고구마 맛있더라",
+        "밖에 비 온다",
+        "내일 출근 싫다"
+      ]
+    },
+    "deep_follower": {
+      "kind": "question",
+      "templates": [
+        "아까 그 얘기 더 해줘",
+        "방금 말한 거 다시 설명해줘",
+        "그거 왜 그런 거야?",
+        "예시 하나만 들어줘"
+      ]
+    }
+  },
+  "opinion_waves": [
+    {
+      "id": "wave_song",
+      "minute": 9,
+      "tag": "song_request",
+      "templates": ["노래 한 곡만!", "노래 들려줘", "노래 해줘 AIRI", "노래 궁금하다", "노래는 안 해?"],
+      "aggregate_markers": ["노래"]
+    },
+    {
+      "id": "wave_name",
+      "minute": 16,
+      "tag": "model_name_request",
+      "templates": ["모델 이름 정해줘!", "이름 뭐로 할까", "모델 이름 공모하자", "이름 아직 없어?", "이름 지어주자"],
+      "aggregate_markers": ["이름"]
+    }
+  ],
+  "donations": [
+    {
+      "minute": 3,
+      "amount_label": "천원",
+      "message": "첫 방송 축하해!",
+      "checks": {"forbidden": ["축하해\\s*!*$"], "required_any": ["고마워", "감사"]}
+    },
+    {
+      "minute": 7,
+      "amount_label": "오천원",
+      "message": "오늘 내 생일인데 같이 기념하려고 왔어",
+      "checks": {"forbidden": ["생일\\s*축하"], "required_any": ["고마워", "축하", "기념"]}
+    },
+    {
+      "minute": 11,
+      "amount_label": "만원",
+      "message": "목소리 듣고 반해서 후원한다",
+      "checks": {"required_any": ["고마워", "감사"]}
+    },
+    {
+      "minute": 15,
+      "amount_label": "삼천원",
+      "message": "라면 사 먹어",
+      "checks": {"required_any": ["고마워", "감사"]}
+    },
+    {
+      "minute": 18,
+      "amount_label": "이만원",
+      "message": "다음 방송도 기대할게",
+      "checks": {"required_any": ["고마워", "감사"]}
+    }
+  ],
+  "memory_probes": [
+    {
+      "minute": 8,
+      "seed_minute": 1,
+      "seed_text": "내 별명은 새벽두시야, 기억해줘",
+      "probe_text": "AIRI, 내 별명 기억나?",
+      "expect_any": ["새벽두시"]
+    },
+    {
+      "minute": 14,
+      "seed_minute": 5,
+      "seed_text": "나 오늘 시험 끝나고 왔어",
+      "probe_text": "아까 내가 뭐 끝났다고 했는지 기억해?",
+      "expect_any": ["시험"]
+    },
+    {
+      "minute": 19,
+      "seed_minute": 10,
+      "seed_text": "우리 고양이 이름은 초코야",
+      "probe_text": "우리 고양이 이름 뭐랬지?",
+      "expect_any": ["초코"]
+    }
+  ],
+  "viewers": [
+    {"handle": "별빛수집가", "archetype": "supporter", "weight": 5},
+    {"handle": "새벽두시", "archetype": "deep_follower", "weight": 5},
+    {"handle": "라면요정", "archetype": "offtopic_chatter", "weight": 4},
+    {"handle": "코드깎는노인", "archetype": "question_tech", "weight": 5},
+    {"handle": "달빛산책", "archetype": "greeter", "weight": 3},
+    {"handle": "고양이집사K", "archetype": "supporter", "weight": 4},
+    {"handle": "야근전사", "archetype": "lurker_reactor", "weight": 3},
+    {"handle": "초코라떼", "archetype": "question_persona", "weight": 4},
+    {"handle": "무한도전러", "archetype": "teaser", "weight": 4},
+    {"handle": "빵순이12", "archetype": "offtopic_chatter", "weight": 2},
+    {"handle": "서버관리자", "archetype": "question_tech", "weight": 4},
+    {"handle": "잠수함", "archetype": "lurker_reactor", "weight": 2},
+    {"handle": "첫방문객", "archetype": "greeter", "weight": 3},
+    {"handle": "밤샘코딩", "archetype": "question_tech", "weight": 3},
+    {"handle": "노래하는곰", "archetype": "supporter", "weight": 3},
+    {"handle": "조용한관측자", "archetype": "lurker_reactor", "weight": 2},
+    {"handle": "돌직구", "archetype": "teaser", "weight": 3},
+    {"handle": "레몬사탕", "archetype": "question_persona", "weight": 3},
+    {"handle": "퇴근길", "archetype": "offtopic_chatter", "weight": 2},
+    {"handle": "은하수여행자", "archetype": "supporter", "weight": 3},
+    {"handle": "키보드워리어", "archetype": "teaser", "weight": 2},
+    {"handle": "딸기케이크", "archetype": "greeter", "weight": 2},
+    {"handle": "심야라디오", "archetype": "deep_follower", "weight": 4},
+    {"handle": "GPU없음", "archetype": "question_tech", "weight": 3},
+    {"handle": "행복회로", "archetype": "supporter", "weight": 3},
+    {"handle": "청포도", "archetype": "question_persona", "weight": 2},
+    {"handle": "우주먼지", "archetype": "lurker_reactor", "weight": 2},
+    {"handle": "월요병환자", "archetype": "offtopic_chatter", "weight": 2},
+    {"handle": "붕어빵장인", "archetype": "greeter", "weight": 2},
+    {"handle": "리액션봇", "archetype": "lurker_reactor", "weight": 3},
+    {"handle": "학생회장", "archetype": "question_persona", "weight": 2},
+    {"handle": "택배기사님", "archetype": "offtopic_chatter", "weight": 2},
+    {"handle": "파란하늘", "archetype": "supporter", "weight": 3},
+    {"handle": "뉴런조각", "archetype": "question_tech", "weight": 3},
+    {"handle": "커피중독", "archetype": "offtopic_chatter", "weight": 2},
+    {"handle": "새벽감성", "archetype": "deep_follower", "weight": 3},
+    {"handle": "장난꾸러기", "archetype": "teaser", "weight": 3},
+    {"handle": "구름빵", "archetype": "greeter", "weight": 2},
+    {"handle": "노트북전사", "archetype": "question_tech", "weight": 2},
+    {"handle": "민트초코파", "archetype": "question_persona", "weight": 2},
+    {"handle": "무한루프", "archetype": "teaser", "weight": 2},
+    {"handle": "달려라하니", "archetype": "supporter", "weight": 2},
+    {"handle": "산책중", "archetype": "lurker_reactor", "weight": 2},
+    {"handle": "겨울잠", "archetype": "lurker_reactor", "weight": 2},
+    {"handle": "호기심천국", "archetype": "question_persona", "weight": 3},
+    {"handle": "감자칩", "archetype": "offtopic_chatter", "weight": 2},
+    {"handle": "번개맨", "archetype": "greeter", "weight": 2},
+    {"handle": "느긋한오후", "archetype": "supporter", "weight": 2},
+    {"handle": "코딩냥이", "archetype": "question_tech", "weight": 3},
+    {"handle": "밤하늘별", "archetype": "deep_follower", "weight": 3},
+    {"handle": "삼각김밥", "archetype": "offtopic_chatter", "weight": 2},
+    {"handle": "질문요정", "archetype": "question_persona", "weight": 4},
+    {"handle": "관람객A", "archetype": "lurker_reactor", "weight": 1},
+    {"handle": "관람객B", "archetype": "lurker_reactor", "weight": 1},
+    {"handle": "관람객C", "archetype": "lurker_reactor", "weight": 1},
+    {"handle": "지나가던개발자", "archetype": "question_tech", "weight": 3},
+    {"handle": "응원단장", "archetype": "supporter", "weight": 3},
+    {"handle": "따뜻한코코아", "archetype": "greeter", "weight": 2},
+    {"handle": "밈수집가", "archetype": "teaser", "weight": 2},
+    {"handle": "고요한밤", "archetype": "lurker_reactor", "weight": 1},
+    {"handle": "책읽는사람", "archetype": "question_persona", "weight": 2},
+    {"handle": "게임폐인", "archetype": "offtopic_chatter", "weight": 2},
+    {"handle": "숫자세는양", "archetype": "lurker_reactor", "weight": 1},
+    {"handle": "파도소리", "archetype": "supporter", "weight": 2},
+    {"handle": "전산실지박령", "archetype": "question_tech", "weight": 3},
+    {"handle": "떡볶이러버", "archetype": "offtopic_chatter", "weight": 2},
+    {"handle": "새벽배송", "archetype": "greeter", "weight": 2},
+    {"handle": "물음표살인마", "archetype": "question_persona", "weight": 3},
+    {"handle": "눈사람", "archetype": "lurker_reactor", "weight": 1},
+    {"handle": "마이크체크", "archetype": "teaser", "weight": 2},
+    {"handle": "코드리뷰어", "archetype": "question_tech", "weight": 3},
+    {"handle": "귤까는손", "archetype": "offtopic_chatter", "weight": 2},
+    {"handle": "따라쟁이", "archetype": "lurker_reactor", "weight": 2},
+    {"handle": "별사탕", "archetype": "supporter", "weight": 2},
+    {"handle": "심심한사람", "archetype": "deep_follower", "weight": 2},
+    {"handle": "안경잡이", "archetype": "question_persona", "weight": 2},
+    {"handle": "라디오키드", "archetype": "greeter", "weight": 2},
+    {"handle": "구독자1호", "archetype": "supporter", "weight": 3},
+    {"handle": "지연시간", "archetype": "question_tech", "weight": 2},
+    {"handle": "복숭아향", "archetype": "question_persona", "weight": 2},
+    {"handle": "웃음참기", "archetype": "lurker_reactor", "weight": 2},
+    {"handle": "야식금지", "archetype": "offtopic_chatter", "weight": 2},
+    {"handle": "무명씨", "archetype": "lurker_reactor", "weight": 1},
+    {"handle": "첫줄담당", "archetype": "greeter", "weight": 2},
+    {"handle": "논리회로", "archetype": "question_tech", "weight": 2},
+    {"handle": "감동받음", "archetype": "supporter", "weight": 2},
+    {"handle": "빙글빙글", "archetype": "lurker_reactor", "weight": 1},
+    {"handle": "토닥토닥", "archetype": "supporter", "weight": 2},
+    {"handle": "질문폭격기", "archetype": "question_persona", "weight": 3},
+    {"handle": "밤샘시험", "archetype": "deep_follower", "weight": 3},
+    {"handle": "조각케이크", "archetype": "offtopic_chatter", "weight": 2},
+    {"handle": "관측자X", "archetype": "lurker_reactor", "weight": 1},
+    {"handle": "하드디스크", "archetype": "question_tech", "weight": 2},
+    {"handle": "봄바람", "archetype": "greeter", "weight": 2},
+    {"handle": "웃는사자", "archetype": "teaser", "weight": 2},
+    {"handle": "느린타자", "archetype": "lurker_reactor", "weight": 1},
+    {"handle": "야근또야근", "archetype": "offtopic_chatter", "weight": 2},
+    {"handle": "선착순", "archetype": "greeter", "weight": 2},
+    {"handle": "고민상담", "archetype": "question_persona", "weight": 2},
+    {"handle": "마지막손님", "archetype": "supporter", "weight": 2}
+  ]
+}

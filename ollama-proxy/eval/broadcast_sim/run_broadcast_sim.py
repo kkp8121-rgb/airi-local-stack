@@ -1,0 +1,303 @@
+"""Replay a synthetic 100-viewer first broadcast against the local proxy.
+
+The stream, the pickup order, and the scoring live in `broadcast_sim.py`; this file
+only does I/O. Given the same seed every arm sees the identical chat, so a memory
+arm's numbers can be read as a difference in the proxy, not in the crowd.
+
+Two input formats are supported on purpose. `runtime` sends exactly what
+`chat-ingress/airi-event.mjs` sends today — `[YouTube] {text}`, with no author —
+so any nickname in a reply is invented rather than recalled. `named` prefixes the
+handle as a greybox probe of what a name-carrying client would change. Default is
+`runtime`, because that is the path that actually exists.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+from typing import Any, Sequence
+
+import broadcast_sim as sim
+
+
+HERE = Path(__file__).resolve().parent
+CHAT_DIR = HERE.parent / "broadcast_chat"
+sys.path.insert(0, str(CHAT_DIR))
+import run_broadcast_chat_ab as ab  # noqa: E402
+
+sys.path.insert(0, str(HERE.parent.parent))
+from broadcast_contract import BROADCAST_CONTRACT_VERSION, apply_broadcast_contract  # noqa: E402
+
+# ollama_proxy 의 침묵 폴백 풀과 같은 문구여야 폴백률이 의미를 갖는다.
+FALLBACK_POOL = (
+    "음, 잠깐만.",
+    "어, 그건 잠깐 생각해 볼게.",
+    "잠깐, 나 정리 좀 하고!",
+    "음… 뭐라고 하지?",
+    "아, 잠깐 헷갈렸어.",
+    "그건 좀 있다가 다시 말해 줄게.",
+)
+DEFAULT_BASE_URL = "http://127.0.0.1:11435/v1"
+DEFAULT_MODEL = "midm-airi:2.0-mini"
+DEFAULT_HISTORY_TURNS = 8
+SESSION_HEADER = "x-airi-session-id"
+
+
+def build_system_content(fixture: dict[str, Any], beat: dict[str, Any], contract: str) -> str:
+    """A/B 러너의 시스템 문구에 고정 주제 블록을 덧붙인다."""
+    base = apply_broadcast_contract(ab.build_system_content(), contract == "on")
+    topic = fixture["topic"]
+    return (
+        f"{base}\n\n[오늘 방송]\n"
+        f"- 주제: {topic['title']}\n"
+        f"- 지금 구간: {beat['label']}\n"
+        f"- 상황: {beat['airi_cue']}\n"
+        "- 주제에서 벗어난 채팅에는 짧게 받아치고 주제로 돌아와."
+    )
+
+
+def format_user_content(message: dict[str, Any], author_format: str) -> str:
+    if author_format == "named":
+        marker = "[후원] " if message["kind"] == "donation" else ""
+        return f"{ab.USER_PREFIX}{marker}{message['author']}: {message['text']}"
+    return f"{ab.USER_PREFIX}{message['text']}"
+
+
+def run_arm(
+    transport: Any,
+    fixture: dict[str, Any],
+    stream: dict[str, Any],
+    picks: Sequence[dict[str, Any]],
+    *,
+    model: str,
+    contract: str,
+    protocol: str,
+    author_format: str,
+    history_turns: int,
+    max_tokens: int,
+    timeout: float,
+    pre_session_seeds: bool,
+) -> dict[str, Any]:
+    roster = [viewer["handle"] for viewer in fixture["viewers"]]
+    drift_terms = sorted(sim.offtopic_terms(fixture))
+    history: list[tuple[str, str]] = []
+    rows: list[dict[str, Any]] = []
+    transcript: list[dict[str, Any]] = []
+    failures = 0
+
+    if pre_session_seeds:
+        # 이전 세션에서 이미 들은 사실로 만든다 — 방송 시작 전에 한 번 오간다.
+        for probe in fixture.get("memory_probes", []):
+            beat = fixture["topic"]["beats"][0]
+            content = f"{ab.USER_PREFIX}{probe['seed_text']}"
+            record = ab.call_once(
+                transport, model=model,
+                messages=[{"role": "system", "content": build_system_content(fixture, beat, contract)},
+                          {"role": "user", "content": content}],
+                max_tokens=max_tokens, timeout=timeout,
+            )
+            body = ab.scoring_body(record, record.get("response", "") or "", protocol)
+            transcript.append({"stage": "pre_session", "user": content, "airi": body})
+
+    transcript.append({"stage": "scripted_opening", "airi": fixture["topic"]["signature_greeting"]})
+
+    for pick in picks:
+        message = pick["message"]
+        beat = sim.beat_at(fixture, message["minute"])
+        system_content = build_system_content(fixture, beat, contract)
+        user_content = format_user_content(message, author_format)
+        kept = history[-history_turns:] if history_turns > 0 else []
+        messages = [{"role": "system", "content": system_content}]
+        for past_user, past_assistant in kept:
+            messages.extend(({"role": "user", "content": past_user},
+                             {"role": "assistant", "content": past_assistant}))
+        messages.append({"role": "user", "content": user_content})
+
+        record = ab.call_once(transport, model=model, messages=messages,
+                              max_tokens=max_tokens, timeout=timeout)
+        raw = record.get("response", "") or ""
+        body = ab.scoring_body(record, raw, protocol)
+        if not record.get("ok"):
+            failures += 1
+
+        register = ab.score_response(body)
+        row = sim.score_turn(pick, body, beat=beat, fallback_pool=FALLBACK_POOL,
+                             roster_handles=roster, drift_terms=drift_terms)
+        row.update({
+            "beat": beat["id"],
+            "backlog_size": pick["backlog_size"],
+            "polite_violation": "v_polite_response" in register.get("violations", []),
+            "banmal": bool(register.get("markers", {}).get("banmal")),
+            "ttft_ms": record.get("ttft_ms"),
+            "complete_ms": record.get("complete_ms"),
+            "failure": record.get("failure"),
+        })
+        rows.append(row)
+        transcript.append({
+            "stage": "turn", "turn_index": pick["turn_index"], "minute": message["minute"],
+            "beat": beat["id"], "kind": pick["effective_kind"], "author": message["author"],
+            "chat": message["text"], "user_sent": user_content, "airi": body, "raw": raw,
+            "backlog_size": pick["backlog_size"], "backlog_ids": pick["backlog_ids"],
+        })
+        history.append((user_content, body))
+
+    transcript.append({"stage": "scripted_closing", "airi": "오늘 여기까지야. 와줘서 고마워, 다음에 또 보자!"})
+    summary = sim.summarize_turns(rows)
+    summary["polite_violation"] = {"hits": sum(1 for row in rows if row["polite_violation"]), "of": len(rows)}
+    summary["banmal"] = {"hits": sum(1 for row in rows if row["banmal"]), "of": len(rows)}
+    summary["transport_failures"] = failures
+    return {"summary": summary, "rows": rows, "transcript": transcript}
+
+
+def rescore_report(payload: dict[str, Any]) -> dict[str, Any]:
+    """Re-run scoring over a finished report's transcript, spending no model time.
+
+    The stream is deterministic, so the picks — and with them every check the
+    scorer needs — are rebuilt from the recorded seed rather than stored twice.
+    This exists so a scoring change can be applied to arms that already ran,
+    instead of leaving them incomparable.
+    """
+    fixture = sim.load_fixture()
+    stream = sim.generate_stream(fixture, seed=payload["seed"])
+    if stream["fixture_sha256"] != payload["fixture_sha256"]:
+        raise SystemExit("픽스처가 그때와 다르다 — 재채점하면 arm 비교가 깨진다")
+    picks = {pick["turn_index"]: pick for pick in sim.plan_pickups(stream, fixture)}
+    roster = [viewer["handle"] for viewer in fixture["viewers"]]
+    drift_terms = sorted(sim.offtopic_terms(fixture))
+    bodies = {entry["turn_index"]: entry["airi"] for entry in payload["transcript"]
+              if entry["stage"] == "turn"}
+    previous = {row["turn_index"]: row for row in payload["rows"]}
+    rows = []
+    for turn_index in sorted(bodies):
+        pick = picks[turn_index]
+        beat = sim.beat_at(fixture, pick["message"]["minute"])
+        row = sim.score_turn(pick, bodies[turn_index], beat=beat, fallback_pool=FALLBACK_POOL,
+                             roster_handles=roster, drift_terms=drift_terms)
+        carried = previous.get(turn_index, {})
+        row.update({key: carried[key] for key in
+                    ("beat", "backlog_size", "polite_violation", "banmal", "ttft_ms", "complete_ms", "failure")
+                    if key in carried})
+        rows.append(row)
+    summary = sim.summarize_turns(rows)
+    summary["polite_violation"] = {"hits": sum(1 for row in rows if row.get("polite_violation")), "of": len(rows)}
+    summary["banmal"] = {"hits": sum(1 for row in rows if row.get("banmal")), "of": len(rows)}
+    summary["transport_failures"] = payload["summary"].get("transport_failures")
+    return {**payload, "summary": summary, "rows": rows, "rescored": True}
+
+
+def render_packet(payload: dict[str, Any]) -> str:
+    """사람이 원문을 읽고 판단할 수 있게 전체 대화를 그대로 편다."""
+    lines = [f"# 방송 시뮬레이션 원문 검토 packet — {payload['topic_title']}", ""]
+    lines += [
+        f"- arm: `{payload['memory_arm']}` | 계약: `{payload['contract']}` | 입력형식: `{payload['author_format']}`",
+        f"- 모델: `{payload['model']}` | seed: `{payload['seed']}` | 턴: {payload['summary']['turns']}",
+        f"- 채팅 총 {payload['stream_messages']}건 중 픽업 {payload['summary']['turns']}건",
+        "",
+        "> 채점은 전부 어휘 휴리스틱이다. 아래 원문이 근거이고 수치는 요약일 뿐이다.",
+        "",
+    ]
+    for entry in payload["transcript"]:
+        if entry["stage"] == "scripted_opening":
+            lines += ["## 오프닝 (대본)", "", f"**AIRI**: {entry['airi']}", ""]
+        elif entry["stage"] == "scripted_closing":
+            lines += ["## 클로징 (대본)", "", f"**AIRI**: {entry['airi']}", ""]
+        elif entry["stage"] == "pre_session":
+            lines += [f"- (이전 세션) **시청자**: {entry['user']}", f"  **AIRI**: {entry['airi']}", ""]
+        else:
+            head = (f"### T{entry['turn_index']:02d} · {entry['minute']}분 · {entry['beat']} · "
+                    f"{entry['kind']} · 대기 {entry['backlog_size']}건")
+            lines += [head, "", f"**{entry['author']}**: {entry['chat']}", "",
+                      f"**AIRI**: {entry['airi'] or '(빈 응답)'}", ""]
+    return "\n".join(lines) + "\n"
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="100-viewer first-broadcast simulation")
+    parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
+    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--token", default=None)
+    parser.add_argument("--memory-arm", choices=sim.MEMORY_ARMS, default="off")
+    parser.add_argument("--session-id", default=None, help="proxy 의 x-airi-session-id 값")
+    parser.add_argument("--contract", choices=("off", "on"), default="on")
+    parser.add_argument("--protocol", choices=("raw", "operational"), default="operational")
+    parser.add_argument("--author-format", choices=("runtime", "named"), default="runtime")
+    parser.add_argument("--seed", type=int, default=20260818)
+    parser.add_argument("--max-turns", type=int, default=None)
+    parser.add_argument("--history-turns", type=int, default=DEFAULT_HISTORY_TURNS)
+    parser.add_argument("--max-tokens", type=int, default=220)
+    parser.add_argument("--timeout", type=float, default=180.0)
+    parser.add_argument("--stream-only", action="store_true", help="모델 호출 없이 스트림/픽업만 낸다")
+    parser.add_argument("--rescore", type=Path, help="기존 리포트를 모델 호출 없이 재채점한다")
+    parser.add_argument("--report", type=Path)
+    parser.add_argument("--packet", type=Path)
+    args = parser.parse_args(argv)
+
+    if args.rescore:
+        payload = rescore_report(json.loads(args.rescore.read_text(encoding="utf-8")))
+        output = json.dumps(payload, ensure_ascii=False, indent=2)
+        (args.report or args.rescore).write_text(output + "\n", encoding="utf-8")
+        if args.packet:
+            args.packet.write_text(render_packet(payload), encoding="utf-8")
+        print(json.dumps({"rescored": payload["summary"]}, ensure_ascii=False, indent=2))
+        return 0
+
+    fixture = sim.load_fixture()
+    stream = sim.generate_stream(fixture, seed=args.seed)
+    picks = sim.plan_pickups(stream, fixture, max_turns=args.max_turns)
+
+    if args.stream_only:
+        payload = {"schema_version": sim.REPORT_SCHEMA_VERSION, "mode": "stream_only", "seed": args.seed,
+                   "fixture_sha256": stream["fixture_sha256"], "stream_messages": len(stream["messages"]),
+                   "picks": [{"turn_index": pick["turn_index"], "kind": pick["effective_kind"],
+                              "minute": pick["message"]["minute"], "author": pick["message"]["author"],
+                              "text": pick["message"]["text"], "backlog_size": pick["backlog_size"]}
+                             for pick in picks]}
+        output = json.dumps(payload, ensure_ascii=False, indent=2)
+        if args.report:
+            args.report.write_text(output + "\n", encoding="utf-8")
+        print(output)
+        return 0
+
+    transport = ab.HttpTransport(args.base_url, args.token)
+    session_id = args.session_id or f"broadcast-sim-{args.memory_arm}-{args.seed}"
+    transport.client.headers[SESSION_HEADER] = session_id
+    try:
+        result = run_arm(
+            transport, fixture, stream, picks,
+            model=args.model, contract=args.contract, protocol=args.protocol,
+            author_format=args.author_format, history_turns=args.history_turns,
+            max_tokens=args.max_tokens, timeout=args.timeout,
+            pre_session_seeds=args.memory_arm == "seeded",
+        )
+    finally:
+        transport.close()
+
+    payload = {
+        "schema_version": sim.REPORT_SCHEMA_VERSION,
+        "topic_title": stream["topic_title"],
+        "model": args.model,
+        "memory_arm": args.memory_arm,
+        "session_id": session_id,
+        "contract": args.contract,
+        "contract_version": BROADCAST_CONTRACT_VERSION if args.contract == "on" else None,
+        "protocol": args.protocol,
+        "author_format": args.author_format,
+        "seed": args.seed,
+        "fixture_sha256": stream["fixture_sha256"],
+        "stream_messages": len(stream["messages"]),
+        "history_turns": args.history_turns,
+        **result,
+    }
+    output = json.dumps(payload, ensure_ascii=False, indent=2)
+    if args.report:
+        args.report.write_text(output + "\n", encoding="utf-8")
+    if args.packet:
+        args.packet.write_text(render_packet(payload), encoding="utf-8")
+    print(json.dumps({"summary": payload["summary"], "report": str(args.report or ""),
+                      "packet": str(args.packet or "")}, ensure_ascii=False, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

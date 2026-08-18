@@ -149,6 +149,7 @@ jobs:
               ollama-proxy/eval/affect_broadcast/test_correction_prepublication_policy.py
               ollama-proxy/eval/affect_broadcast/test_run_correction_prepublication_eval.py
               ollama-proxy/eval/broadcast_chat/test_run_broadcast_rehearsal.py
+              ollama-proxy/eval/broadcast_sim/test_broadcast_sim.py
               ollama-proxy/eval/embedding_ab/test_run_embedding_ab.py
               ollama-proxy/eval/input_safety/test_airi_ko_input_safety_eval.py
               ollama-proxy/eval/chat_replay/test_chat_replay.py
