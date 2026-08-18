@@ -15,7 +15,7 @@
 - G1a 감정·캐릭터 연속성 상세:
   `진행예정/AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`
 
-최종 갱신: 2026-08-17
+최종 갱신: 2026-08-18
 
 - **2026-08-17** (G1a A4.6 승인 표현 정책 / prepublication evaluator foundation):
   사용자가 구체 원인의 짧은 감정, 같은 턴 회복, 차분하고 분명한 skeptical
@@ -561,6 +561,20 @@
   원격 방송 채팅 A/B 실측 — 완료 p50 357.8ms vs 9,842.6ms(27.5배), 형식
   규격(10~45자) 55% vs 0%, Motif는 접두사 누수·반복 루프 아티팩트
   (`완료/AIRI-REMOTE-BROADCAST-CHAT-AB-2026-08-14.md`)
+- [x] 결정 7 — 캐릭터 헌법 v2·통과선·thank 렌더러 B안·장시간 채팅 A —
+  2026-08-18 (사용자 회신 23항목). 헌법 v2 7행 확정: baseline=C, dislikes=A,
+  pride=A, embarrassment=A, conflict=A, fatigue=A, repair=직접 기입(짧은
+  자조 메타 개그 → 인정 → 정정; 회신 예시 문장은 톤 예시이며 확정 이월에
+  맞춰 반말로 정규화). 평가 통과선 8지표는 **전체 승인**이라 character
+  specificity 채점이 가능해졌다. thank 고정 렌더러는 **B안**
+  (`{닉네임}, 고마워! {한마디}` — 초기 한마디 3종 고정), 장시간 채팅은
+  **A(기반 완료 승인)**이며 캠페인 착수·운영 ON은 아니다. 2026-08-15 텍스트
+  시뮬레이션은 검토 근거 **불인정**이고 11435 스타일 게이트(+TTS) 경유
+  재검증이 필요하며, addressee 검토 3항(v3 채택 근거 인정·dn04/gr01류
+  결정론 렌더러 이관·코덱스 원격 재실측 필요)은 모두 승인이다. 운영 ON·env·
+  prompt 주입은 여전히 별도 승인이다
+  (`진행예정/AIRI-CHARACTER-CONSTITUTION-V2-DECISION-2026-08-16.md`,
+  `진행예정/AIRI-THANK-RENDERER-CANDIDATE-SHEET-2026-08-18.md`)
 
 ## G축 — 성장 로드맵
 
@@ -574,18 +588,23 @@
     A1 core·A2 default-OFF greybox·A4 실제 Mi:dm/blind review와 A4.1 3조건
     reply-act 실측 완료. reply-act는 affect-only보다 일부 개선했지만 OFF를 넘지
     못해 품질 gate FAIL. A4.2 zero-call guarded delta는 thank·최초 deescalate·repair에
-    탐색적 양성 신호, generic correct에는 음성 신호를 보였다. human review와 A0 사용자
-    결정은 대기다. A3 candidate mapper foundation은 완료했지만 B4b authoritative observer는
+    탐색적 양성 신호, generic correct에는 음성 신호를 보였다. A0 사용자 결정은
+    2026-08-18 완료됐고 human review는 대기다.
+    A3 candidate mapper foundation은 완료했지만 B4b authoritative observer는
     없다. A4.3은 8개 synthetic correction target/direction의 offline
     human-review eligibility를 완료했고, A4.4 same 8-row fresh 16-call A/B와 두 model
     review도 완료했다. A4.5 zero-call strict realization check는 target 3/8 vs control 2/8로
     target prompt만의 안정적 개선을 확인하지 못했고 fixed 8/8은 self-conformance뿐이다.
     A4.6 표현 원칙은 사용자 승인됐고 evaluator-only retry-vs-fallback attempt foundation을
-    완료했지만 fresh model/human review, A0 결정과 B4b observer는 대기 중이다.
+    완료했지만 fresh model/human review와 B4b observer는 대기 중이다
+    (A0 결정은 2026-08-18 완료).
     (`진행예정/AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md`)
-    - [~] A0 constitution v2: 확정 이월과 미정 likes/dislikes/pride/
-      embarrassment/conflict/repair/fatigue 선택지를 분리한 결정 시트 작성,
-      state/event enum·metric threshold 사용자 확정 대기
+    - [x] A0 constitution v2: 확정 이월과 미정 likes/dislikes/pride/
+      embarrassment/conflict/repair/fatigue 선택지를 분리한 결정 시트 작성 후
+      **사용자 결정 완료 2026-08-18** — 7행 확정(baseline=C, 나머지 A,
+      repair는 짧은 자조→인정→정정 직접 기입)·통과선 8지표 전체 승인.
+      이로써 character specificity 채점이 가능해졌다. 운영 ON·env·prompt
+      주입은 별도 승인이다
       (`진행예정/AIRI-CHARACTER-CONSTITUTION-V2-DECISION-2026-08-16.md`)
     - [x] A1 순수 typed affect reducer: strict schema, kind weight cap,
       one-step inertia·decay·hysteresis·recovery·safety lock, bounded in-memory
@@ -678,8 +697,11 @@
     YouTube 공식 API→safe-envelope 수집 경로와 per-capture authorization/allowlist
     offline preparer는 구현·합성 검증했지만 실제 API key/권한 방송 실측은 하지
     않았다. 무단 scraping하지 않으며 offline selector 수치는 B1b/B4a 실선택
-    성능이 아니다.
-    상세: `진행예정/AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md`.
+    성능이 아니다. 2026-08-18 사용자가 `long_chat=A`를 선택해 **기반 완료만
+    승인**했다 — 선택 B(실제 장시간 캠페인 착수)와 선택 C(운영 gate ON)는
+    미선택이므로 이 항목은 계속 `[~]`다.
+    상세: `진행예정/AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md`,
+    `진행중/AIRI-LONG-CHAT-TEST-DECISION-BRIEF-2026-08-15.md`.
   - [ ] 인간 검수 100건 수집 (dev PC)
   - [ ] 16케이스 자동 게이트 PASS (현재 양 모델 FAIL)
 - [ ] **G4. 성격 파인튜닝 (QLoRA)** — (보류: G3 인간 검수 데이터 축적)
@@ -716,6 +738,12 @@
     계약 v3 + addressee 사이드카 28케이스, 리허설 93%·단발 77%,
     잔여는 결정론 계층(A4.2 합류)
     (`완료/AIRI-B4C-ADDRESSEE-CONTRACT-V3-2026-08-18.md`).
+    2026-08-18 사용자가 addressee 검토 3항을 모두 승인했다 — 검토 PC 로컬
+    실측을 계약 v3 채택 근거로 인정, dn04·gr01류는 결정론 렌더러(B4a) 경로로
+    이관, 계약 v3의 코덱스(GPU dev PC) 원격 재실측 필요. 반면 2026-08-15
+    텍스트 시뮬레이션 검토본은 사람 검토 근거로 **불인정**됐으므로, 향후
+    검토 근거는 11435 스타일 게이트(가능하면 TTS 포함) 경유 재검증으로
+    생산한다.
   - [~] 스타일 게이트 방송 경로 배선 확인 — 코드 실측 완료 2026-08-14: 게이트는
     치환(`normalize_korean_register`)+미해결 존댓말 문장 드롭(fail-closed)이며
     proxy `chat/completions` 출력 전부에 적용, 우회 플래그 없음. 레포 내 방송
@@ -809,7 +837,8 @@
   - [~] G1a A0~A4 typed affect core/proxy/eval — A1/A2, A4 Mi:dm A/B 및
     A4.1 reply-act 3조건 blind review, A4.4 fresh target A/B와 A4.5 zero-call lexical
     postcondition, A4.6 승인 표현 policy/attempt evaluator와 A3 content-free candidate mapper
-    foundation 완료, 하지만 품질 gate FAIL. A0 constitution v2·metric, A4.2~A4.6 fresh
+    foundation 완료, 하지만 품질 gate FAIL. A0 constitution v2·metric은 2026-08-18
+    사용자 확정 완료이며, A4.2~A4.6 fresh
     human review 및 B4b authoritative exactly-once event observer 대기(기본 OFF)
 - [~] **M3** (B2 송출 + B3 안전)
   - [x] B3 모더레이션 게이트 코드 (사전 113항목+패턴 7, 기본 off) — 2026-08-12 (`932eae6`)
@@ -865,6 +894,19 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-18** (클로드 PC, 사용자 결정 23항목): 사용자가 캐릭터 헌법 v2
+  7행(baseline=C / dislikes·pride·embarrassment·conflict·fatigue=A /
+  repair=짧은 자조 메타 개그→인정→정정 직접 기입, 예시 문장은 톤 예시라
+  반말로 정규화)과 평가 통과선 8지표 전체 승인을 회신해 G1a A0을 완료로
+  올렸고 character specificity 채점이 가능해졌다. thank 고정 렌더러는
+  B안(`{닉네임}, 고마워! {한마디}` — 초기 한마디 3종 고정), 장시간 채팅은
+  A(기반 완료 승인 — 캠페인 착수·운영 ON 아님)로 확정했다. 2026-08-15 텍스트
+  시뮬레이션은 사람 검토 근거로 불인정돼 향후 근거는 11435 스타일 게이트
+  (+TTS) 재검증으로 생산하며, addressee 검토 3항(v3 채택 근거 인정·
+  dn04/gr01류 결정론 렌더러 이관·코덱스 원격 재실측 필요)은 모두 승인됐다.
+  이번 배치는 문서 반영만이고 코드·env·운영 설정 변경은 없다. PC 호칭도
+  확정됐다 — 이 PC가 **클로드**(구 검토 PC, dev로 승격), 다른 PC가
+  **코덱스**다.
 - **2026-08-18** (검토 PC, 수신자 인지 축 + 로컬 Mi:dm 실측 체계):
   사용자가 2026-08-15 시뮬레이션 검토본 원문에서 수신자 자기 인지
   실패(dn04 축하 반사·gr01 주체 반전·tk04 자백 등)를 직접 발견해
