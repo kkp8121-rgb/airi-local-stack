@@ -1,0 +1,16 @@
+{
+  "schema_version": "airi.must-act-thank-callout-oracle.v1",
+  "synthetic_only": true,
+  "realization_oracle_sha256": "cec3f9b8c2fc797da8a73b4b35632d9fd7b9305d4e5537812c8d263fb0ffc997",
+  "template": "{nickname}, 고마워! {closer}",
+  "closers": [
+    "덕분에 오늘도 달린다!",
+    "이 힘으로 조금 더 해볼게!",
+    "사장님한테 자랑해야지!"
+  ],
+  "entries": [
+    {"turn_id":"callback-04","callout_available":false,"direction":"fixed_korean_template","postcondition":"exact_template_only"},
+    {"turn_id":"callback-11","callout_available":false,"direction":"fixed_korean_template","postcondition":"exact_template_only"},
+    {"turn_id":"callback-20","callout_available":false,"direction":"fixed_korean_template","postcondition":"exact_template_only"}
+  ]
+}

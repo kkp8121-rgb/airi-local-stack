@@ -120,6 +120,132 @@ class MustActRealizationTests(unittest.TestCase):
                 json.loads((HERE / "synthetic_reply_act_v1.json").read_text(encoding="utf-8")),
             )
 
+    def test_callout_is_inert_until_a_verified_name_arrives(self) -> None:
+        default = realization.render_must_act(candidate("thank"))
+        self.assertEqual(default["text"], "고마워. 함께해줘서 힘이 돼.")
+        self.assertEqual(default["direction"], "fixed_korean_template")
+        self.assertEqual(default["postcondition"], "exact_template_only")
+        self.assertEqual(
+            realization.canonical_bytes(default),
+            realization.canonical_bytes({
+                "schema_version": "airi.must-act-realization.v1",
+                "act": "thank",
+                "direction": "fixed_korean_template",
+                "postcondition": "exact_template_only",
+                "text": "고마워. 함께해줘서 힘이 돼.",
+            }),
+        )
+
+    def test_callout_fills_only_the_two_approved_slots(self) -> None:
+        self.assertEqual(realization.THANK_CALLOUT_TEMPLATE, "{nickname}, 고마워! {closer}")
+        self.assertEqual(
+            realization.THANK_CALLOUT_CLOSERS,
+            ("덕분에 오늘도 달린다!", "이 힘으로 조금 더 해볼게!", "사장님한테 자랑해야지!"),
+        )
+        for index, closer in enumerate(realization.THANK_CALLOUT_CLOSERS):
+            rendered = realization.render_must_act(
+                candidate("thank"), callout_context={"nickname": "별빛수집가", "closer_index": index}
+            )
+            self.assertEqual(rendered["text"], f"별빛수집가, 고마워! {closer}")
+            self.assertEqual(rendered["direction"], "fixed_korean_template_with_verified_callout")
+            self.assertEqual(rendered["postcondition"], "exact_template_with_single_callout_only")
+            self.assertEqual(realization.validate_rendered_artifact(rendered, expected_act="thank"), rendered)
+            self.assertEqual(realization.decompose_thank_callout(rendered["text"]), ("별빛수집가", index))
+            self.assertEqual(rendered["text"].count("별빛수집가"), 1)
+        longest = "가" * realization.MAX_CALLOUT_NICKNAME_CHARS
+        worst = realization.render_must_act(candidate("thank"), callout_context={"nickname": longest, "closer_index": 1})
+        self.assertLessEqual(len(realization.canonical_bytes(worst)), realization.MAX_RENDERED_BYTES)
+
+    def test_callout_context_fails_closed(self) -> None:
+        invalid_contexts = [
+            {"nickname": "별빛"}, {"closer_index": 0},
+            {"nickname": "별빛", "closer_index": 0, "amount": 1000},
+            {"nickname": "별빛", "closer_index": True},
+            {"nickname": "별빛", "closer_index": 3}, {"nickname": "별빛", "closer_index": -1},
+            {"nickname": "별빛", "closer_index": "0"},
+            {"nickname": "", "closer_index": 0},
+            {"nickname": "가" * (realization.MAX_CALLOUT_NICKNAME_CHARS + 1), "closer_index": 0},
+            {"nickname": "별, 빛", "closer_index": 0}, {"nickname": "별빛!", "closer_index": 0},
+            {"nickname": "별\n빛", "closer_index": 0}, {"nickname": "별" + chr(0x202E) + "빛", "closer_index": 0},
+            {"nickname": "별" + chr(0x00A0) + "빛", "closer_index": 0}, {"nickname": "별  빛", "closer_index": 0},
+            {"nickname": " 별빛", "closer_index": 0}, {"nickname": "별빛 ", "closer_index": 0},
+            {"nickname": chr(0x1100) + chr(0x1161), "closer_index": 0},
+            {"nickname": 1000, "closer_index": 0}, {"nickname": None, "closer_index": 0},
+            "별빛", ["별빛", 0], {},
+        ]
+        for context in invalid_contexts:
+            with self.assertRaises(realization.MustActRealizationError):
+                realization.render_must_act(candidate("thank"), callout_context=context)
+        for act in ("close", "correct", "repair"):
+            with self.assertRaises(realization.MustActRealizationError):
+                realization.render_must_act(candidate(act), callout_context={"nickname": "별빛", "closer_index": 0})
+        with self.assertRaises(realization.MustActRealizationError):
+            realization.render_must_act(
+                candidate("deescalate"),
+                oracle_context={"emergency_context": True},
+                callout_context={"nickname": "별빛", "closer_index": 0},
+            )
+
+    def test_callout_artifacts_reject_tampering(self) -> None:
+        rendered = realization.render_must_act(
+            candidate("thank"), callout_context={"nickname": "별빛", "closer_index": 0}
+        )
+        tampered = [
+            {**rendered, "direction": "fixed_korean_template", "postcondition": "exact_template_only"},
+            {**rendered, "postcondition": "exact_template_only"},
+            {**rendered, "direction": "fixed_korean_template"},
+            {**rendered, "text": "별빛, 고마워! 아무 말이나 붙인다!"},
+            {**rendered, "text": "별빛, 고마워! 덕분에 오늘도 달린다!, 고마워! 덕분에 오늘도 달린다!"},
+            {**rendered, "text": "고마워! 덕분에 오늘도 달린다!"},
+            {**rendered, "text": "별, 빛, 고마워! 덕분에 오늘도 달린다!"},
+            {**rendered, "act": "close"},
+        ]
+        for value in tampered:
+            with self.assertRaises(realization.MustActRealizationError):
+                realization.validate_rendered_artifact(value)
+        for text in ("고마워. 함께해줘서 힘이 돼.", "별빛, 고마워! ", "", "별빛, 고마워! 덕분에 오늘도 달린다"):
+            with self.assertRaises(realization.MustActRealizationError):
+                realization.decompose_thank_callout(text)
+
+    def test_callout_sidecar_oracle_is_content_free_and_pinned(self) -> None:
+        sidecar = realization.load_thank_callout_oracle()
+        oracle = realization.load_oracle()
+        self.assertEqual(realization.validate_thank_callout_oracle(sidecar, oracle), sidecar)
+        self.assertEqual(sidecar["template"], realization.THANK_CALLOUT_TEMPLATE)
+        self.assertEqual(sidecar["closers"], list(realization.THANK_CALLOUT_CLOSERS))
+        self.assertEqual(
+            [entry["turn_id"] for entry in sidecar["entries"]],
+            [entry["turn_id"] for entry in oracle["entries"] if entry["expected_act"] == "thank"],
+        )
+        forbidden = {"text", "viewer", "source", "name", "nickname", "amount", "event_id", "runtime_state"}
+        for entry in sidecar["entries"]:
+            self.assertFalse(forbidden & set(entry))
+            # 합성 코퍼스의 후원 턴에는 검증된 표시 이름이 없다 — 기대 경로는 v1 고정 템플릿이다.
+            self.assertIs(entry["callout_available"], False)
+            self.assertEqual((entry["direction"], entry["postcondition"]), ("fixed_korean_template", "exact_template_only"))
+        for mutate in (
+            lambda value: {**value, "closers": ["아무 말이나!"]},
+            lambda value: {**value, "template": "{nickname} 고마워"},
+            lambda value: {**value, "realization_oracle_sha256": "0" * 64},
+            lambda value: {**value, "entries": value["entries"][:1]},
+            lambda value: {**value, "entries": [{**value["entries"][0], "callout_available": True}] + value["entries"][1:]},
+        ):
+            with self.assertRaises(realization.MustActRealizationError):
+                realization.validate_thank_callout_oracle(mutate(copy.deepcopy(sidecar)), oracle)
+
+    def test_callout_never_invents_a_name(self) -> None:
+        fixture = json.loads((HERE / "synthetic_affect_broadcast_v1.json").read_text(encoding="utf-8"))
+        sidecar = json.loads((HERE / "synthetic_reply_act_v1.json").read_text(encoding="utf-8"))
+        raw = json.dumps(fixture, ensure_ascii=False) + json.dumps(sidecar, ensure_ascii=False)
+        for closer in realization.THANK_CALLOUT_CLOSERS:
+            self.assertNotIn(closer, raw)
+        rendered = realization.render_must_act(
+            candidate("thank"), callout_context={"nickname": "별빛", "closer_index": 0}
+        )
+        self.assertTrue(rendered["text"].startswith("별빛, "))
+        default = realization.render_must_act(candidate("thank"))
+        self.assertNotIn(", 고마워! ", default["text"])
+
     def test_module_stays_pure(self) -> None:
         tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
         banned = {"socket", "requests", "urllib", "subprocess", "random", "time", "datetime"}
