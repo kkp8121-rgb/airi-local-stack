@@ -160,13 +160,19 @@ class PickupTests(unittest.TestCase):
         for pick in picks:
             self.assertNotIn(pick["message"]["id"], pick["backlog_ids"])
 
-    def test_every_donation_and_probe_is_answered(self) -> None:
+    def test_every_donation_seed_and_probe_is_answered(self) -> None:
         stream = sim.generate_stream(self.fixture, seed=20260818)
         picks = sim.plan_pickups(stream, self.fixture)
         picked = {pick["message"]["id"] for pick in picks}
         for item in stream["messages"]:
-            if item["kind"] in ("donation", "memory_probe"):
+            # 시드를 읽지 않으면 프로브는 기억이 아니라 못 들은 말을 묻는 것이 된다.
+            if item["kind"] in ("donation", "memory_probe", "memory_seed"):
                 self.assertIn(item["id"], picked, f"{item['kind']} {item['id']} 를 놓쳤다")
+        order = {pick["message"]["id"]: pick["turn_index"] for pick in picks}
+        seeds = {item["probe_index"]: item for item in stream["messages"] if item["kind"] == "memory_seed"}
+        for item in stream["messages"]:
+            if item["kind"] == "memory_probe":
+                self.assertLess(order[seeds[item["probe_index"]]["id"]], order[item["id"]])
 
     def test_max_turns_truncates_without_reordering(self) -> None:
         stream = sim.generate_stream(self.fixture, seed=20260818)

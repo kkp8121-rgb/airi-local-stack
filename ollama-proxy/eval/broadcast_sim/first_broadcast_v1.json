@@ -59,7 +59,7 @@
     "memory_probe_minutes": [8, 14, 19],
     "pending_stale_seconds": 120
   },
-  "pickup_priority": ["donation", "memory_probe", "opinion", "question", "reaction", "offtopic"],
+  "pickup_priority": ["donation", "memory_probe", "memory_seed", "opinion", "question", "reaction", "offtopic"],
   "archetypes": {
     "greeter": {
       "kind": "reaction",
