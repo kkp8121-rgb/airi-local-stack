@@ -1,0 +1,167 @@
+{
+  "schema_version": "airi.embedding-ab-report.v1",
+  "fixture_sha256": "1c2d295c7200739f19619cac6a9323c9367f2b5be490c040a1367c4ef6ab17ac",
+  "corpus_size": 48,
+  "query_count": 24,
+  "network_allowed": true,
+  "models": [
+    {
+      "status": "measured",
+      "path": "nlpai-lab/KURE-v1",
+      "name": "kure",
+      "overall": {
+        "queries": 24,
+        "mrr": 0.9213,
+        "recall_at_1": 0.875,
+        "recall_at_3": 0.9583,
+        "recall_at_5": 0.9583,
+        "median_rank": 1.0
+      },
+      "by_category": {
+        "lexical": {
+          "queries": 6,
+          "mrr": 0.9167,
+          "recall_at_1": 0.8333,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "median_rank": 1.0
+        },
+        "paraphrase": {
+          "queries": 6,
+          "mrr": 0.8519,
+          "recall_at_1": 0.8333,
+          "recall_at_3": 0.8333,
+          "recall_at_5": 0.8333,
+          "median_rank": 1.0
+        },
+        "disambiguation": {
+          "queries": 6,
+          "mrr": 1.0,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "median_rank": 1.0
+        },
+        "supersede": {
+          "queries": 6,
+          "mrr": 0.9167,
+          "recall_at_1": 0.8333,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "median_rank": 1.0
+        }
+      },
+      "misses": [
+        {
+          "query_id": "q03",
+          "category": "lexical",
+          "rank": 2,
+          "expected": [
+            "c07"
+          ],
+          "top_id": "c21",
+          "top_score": 0.8387
+        },
+        {
+          "query_id": "q11",
+          "category": "paraphrase",
+          "rank": 9,
+          "expected": [
+            "c41"
+          ],
+          "top_id": "c28",
+          "top_score": 0.5493
+        },
+        {
+          "query_id": "q19",
+          "category": "supersede",
+          "rank": 2,
+          "expected": [
+            "c19"
+          ],
+          "top_id": "c18",
+          "top_score": 0.8166
+        }
+      ],
+      "latency": {
+        "corpus_encode_ms": 1545.175,
+        "query_encode_p50_ms": 124.631,
+        "query_encode_p95_ms": 159.29
+      }
+    },
+    {
+      "status": "measured",
+      "path": "BAAI/bge-m3",
+      "name": "bgem3",
+      "overall": {
+        "queries": 24,
+        "mrr": 0.9421,
+        "recall_at_1": 0.9167,
+        "recall_at_3": 0.9583,
+        "recall_at_5": 0.9583,
+        "median_rank": 1.0
+      },
+      "by_category": {
+        "lexical": {
+          "queries": 6,
+          "mrr": 0.9167,
+          "recall_at_1": 0.8333,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "median_rank": 1.0
+        },
+        "paraphrase": {
+          "queries": 6,
+          "mrr": 0.8519,
+          "recall_at_1": 0.8333,
+          "recall_at_3": 0.8333,
+          "recall_at_5": 0.8333,
+          "median_rank": 1.0
+        },
+        "disambiguation": {
+          "queries": 6,
+          "mrr": 1.0,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "median_rank": 1.0
+        },
+        "supersede": {
+          "queries": 6,
+          "mrr": 1.0,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "median_rank": 1.0
+        }
+      },
+      "misses": [
+        {
+          "query_id": "q03",
+          "category": "lexical",
+          "rank": 2,
+          "expected": [
+            "c07"
+          ],
+          "top_id": "c21",
+          "top_score": 0.7818
+        },
+        {
+          "query_id": "q11",
+          "category": "paraphrase",
+          "rank": 9,
+          "expected": [
+            "c41"
+          ],
+          "top_id": "c28",
+          "top_score": 0.5498
+        }
+      ],
+      "latency": {
+        "corpus_encode_ms": 1684.781,
+        "query_encode_p50_ms": 115.692,
+        "query_encode_p95_ms": 125.428
+      }
+    }
+  ]
+}
