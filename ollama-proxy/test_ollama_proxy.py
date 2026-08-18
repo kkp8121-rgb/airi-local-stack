@@ -7677,5 +7677,83 @@ class RegisterSubstitutionAugmentationTests(unittest.TestCase):
                 )
 
 
+class HumbleMalsseumStemRepairTests(unittest.TestCase):
+    """``말씀드리-`` is a humble verb, not the noun ``말씀`` plus a stem.
+
+    The bare ``말씀``->``말`` rule used to cut across that boundary and
+    produce the non-word ``말드렸어``/``말드립니다``, which the ending rules
+    then let through as plain speech.  Over the 39 stored result JSONs in
+    ``eval/results`` the fragment ``말드`` appeared in 4 normalized outputs;
+    the repair takes that to 0 while leaving every other sentence byte
+    identical.
+    """
+
+    # Every conjugating syllable of 드리다, mapped to its 말하다 counterpart.
+    CONJUGATIONS = (
+        ("말씀드리고 싶어요.", "말하고 싶어."),
+        ("말씀드릴게요.", "말할게."),
+        ("말씀드릴까요?", "말할까?"),
+        ("말씀드려요.", "말해."),
+        ("말씀드렸어요.", "말했어."),
+        ("아까 말씀드린 거 있잖아.", "아까 말한 거 있잖아."),
+        ("말씀드립니다.", "말해."),
+        ("말씀드리겠습니다.", "말할게."),
+        # The spaced spelling the small models also write.
+        ("말씀 드릴게요.", "말할게."),
+    )
+
+    # Quoted from the stored arms; ``말드…`` was the pre-repair output.
+    MEASURED_BREAKAGE = (
+        ("rehearsal", "아니에요, 정확히 말씀드렸어요.", "아니야, 정확히 말했어."),
+        ("rehearsal", "[YouTube] 네, 말씀드릴게요.", "[YouTube] 네, 말할게."),
+        ("rehearsal", "앞으로는 미리 말씀드릴게요.", "앞으로는 미리 말할게."),
+    )
+
+    # The inputs the bare ``말씀``->``말`` rule was written for.  The noun is
+    # honorific vocabulary the soak evaluator flags on sight, so these must
+    # keep converting exactly as before the repair.
+    BARE_NOUN_INTENT = (
+        ("언제든 말씀해 주세요!", "언제든 말해 줘!"),
+        ("다시 말씀해주시면 좋겠어요!", "다시 말해주시면 좋겠어!"),
+        ("좋게 말씀해 주셔서 감사해요.", "좋게 말해 주셔서 감사해."),
+        ("그 말씀 정말 큰 힘이 돼요!", "그 말 정말 큰 힘이 돼!"),
+        ("그런 말씀 감사해요!", "그런 말 감사해!"),
+        ("시청자분 말씀 잘 들었어요.", "시청자분 말 잘 들었어."),
+        ("한 말씀 부탁해.", "한 말 부탁해."),
+    )
+
+    def test_humble_stem_reaches_a_plain_word(self) -> None:
+        for polite, plain in self.CONJUGATIONS + tuple(
+            (p, q) for _, p, q in self.MEASURED_BREAKAGE
+        ):
+            with self.subTest(text=polite):
+                normalized = ollama_proxy.normalize_korean_register(polite)
+                self.assertEqual(normalized, plain)
+                self.assertNotIn("말드", normalized)
+                self.assertIsNone(
+                    ollama_proxy._POLITE_REGISTER_RE.search(normalized)
+                )
+
+    def test_bare_noun_rule_is_unchanged(self) -> None:
+        for polite, plain in self.BARE_NOUN_INTENT:
+            with self.subTest(text=polite):
+                self.assertEqual(
+                    ollama_proxy.normalize_korean_register(polite), plain
+                )
+
+    def test_subject_honorific_after_the_repair_still_fails_closed(self) -> None:
+        # Repairing the humble stem must not smuggle a 시-honorific past the
+        # detector: this stored line stays dropped, now for the right reason.
+        polite = "네, 방금 말씀드린 대로 해보셨나요?"
+        normalized = ollama_proxy.normalize_korean_register(polite)
+        self.assertEqual(normalized, "응, 방금 말한 대로 해보셨나요?")
+        self.assertIsNotNone(
+            ollama_proxy._POLITE_REGISTER_RE.search(normalized)
+        )
+        boundary = ollama_proxy.IncrementalAiriOutputBoundary(require_korean=True)
+        self.assertEqual(boundary.feed(polite, final=True), "")
+        self.assertTrue(boundary.register_normalization_failed)
+
+
 if __name__ == "__main__":
     unittest.main()

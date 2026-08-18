@@ -1635,6 +1635,19 @@ def normalize_korean_register(text: str) -> str:
         (r"하시길", "하길"),
         (r"그러시다니", "그렇다니"),
         (r"친구분", "친구"),
+        # ``말씀드리-`` is the humble verb 말하다, not the noun ``말씀`` plus a
+        # separate stem.  The bare ``말씀``->``말`` rule below cuts across that
+        # morpheme boundary and leaves the non-word ``말드렸어``/``말드립니다``,
+        # which the ending rules then let through as plain speech.  Rewrite the
+        # whole humble stem to its plain 말하- counterpart first, one entry per
+        # conjugating syllable, so the ``요``/``습니다`` rules further down
+        # reach a real word.
+        (r"말씀\s*드리", "말하"),
+        (r"말씀\s*드릴", "말할"),
+        (r"말씀\s*드려", "말해"),
+        (r"말씀\s*드렸", "말했"),
+        (r"말씀\s*드린", "말한"),
+        (r"말씀\s*드립", "말합"),
         (r"말씀", "말"),
         (r"마음에 드시나요" + _REGISTER_TERMINAL, "마음에 들어?"),
         (r"싶으신 건가요" + _REGISTER_TERMINAL, "싶은 거야?"),

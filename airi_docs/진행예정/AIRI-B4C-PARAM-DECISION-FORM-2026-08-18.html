@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIRI B4c 방송 파라미터 확정 입력 폼 — 2026-08-18</title>
+<style>
+:root{
+  color-scheme: light dark;
+  --bg:#f5f6f8; --fg:#15181d; --card:#ffffff; --line:#d7dbe2; --muted:#565d69;
+  --accent:#1f6feb; --accentfg:#ffffff; --badge:#e2eeff; --badgefg:#0a4bbb;
+  --warn:#8a5a00; --warnbg:#fff5e0; --ok:#0f7a3d; --pillbg:#eef1f5;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#13161a; --fg:#e7eaee; --card:#1b1e24; --line:#333944; --muted:#a2aab6;
+    --accent:#6aa6ff; --accentfg:#0b1220; --badge:#16314f; --badgefg:#b8d6ff;
+    --warn:#ffcf7a; --warnbg:#33280f; --ok:#63d493; --pillbg:#242932;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--fg);
+  font-family:"Malgun Gothic","맑은 고딕",-apple-system,"Segoe UI",system-ui,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  font-size:15px; line-height:1.6; padding:0 0 168px;
+}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 0}
+header.top{padding:22px 0 6px}
+h1{font-size:21px;margin:0 0 8px}
+.lede{background:var(--warnbg);color:var(--warn);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 6px;font-weight:600}
+.meta{color:var(--muted);font-size:13px;margin:6px 0 0}
+section{margin:26px 0 0}
+h2{font-size:17px;margin:0 0 4px;padding:0 0 8px;border-bottom:2px solid var(--line)}
+.snote{color:var(--muted);font-size:13px;margin:8px 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 14px 12px;margin:0 0 12px}
+.card h3{font-size:15px;margin:0 0 2px;display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}
+.card h3 .sub{font-weight:400;color:var(--muted);font-size:13px}
+.hint{color:var(--muted);font-size:12.5px;margin:2px 0 10px}
+.tag{display:inline-block;color:var(--muted);font-size:12px;border:1px solid var(--line);border-radius:999px;padding:0 7px;margin-right:6px}
+input[type=text]{
+  width:100%;font:inherit;font-size:14px;color:var(--fg);background:var(--bg);
+  border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:4px 0 0
+}
+input[type=text][hidden]{display:none}
+.rowend{display:flex;justify-content:flex-end;margin:6px 0 0}
+.mini{font:inherit;font-size:12.5px;color:var(--muted);background:none;border:1px solid var(--line);border-radius:8px;padding:3px 10px;cursor:pointer}
+.mini:hover{border-color:var(--accent);color:var(--accent)}
+.thr{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:9px 4px 0}
+.thr .mname{flex:1 1 210px;font-weight:600;font-size:14px}
+.thr .mcand{flex:0 0 auto;color:var(--muted);font-size:13px;min-width:112px}
+.thr label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:14px}
+.thr input[type=radio]{width:16px;height:16px;accent-color:var(--accent)}
+.thr input[type=text]{flex:1 1 160px;width:auto;margin:0;max-width:260px}
+.master{display:flex;align-items:center;gap:9px;background:var(--pillbg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 12px;font-weight:700;cursor:pointer}
+.master input{width:18px;height:18px;accent-color:var(--accent)}
+.dim{opacity:.42;pointer-events:none}
+.mono{font-family:Consolas,"D2Coding",ui-monospace,monospace;font-size:13px}
+#outbox{margin:16px 0 0}
+#out{min-height:220px;font-family:Consolas,"D2Coding",ui-monospace,monospace;font-size:13px;width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.bar{
+  position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom));z-index:20
+}
+.barin{max-width:980px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:9px 12px}
+.prog{flex:1 1 220px;min-width:180px}
+.prog .ptxt{font-size:13px;color:var(--muted);margin:0 0 4px}
+.ptrack{height:7px;background:var(--pillbg);border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.pfill{height:100%;width:0;background:var(--accent);transition:width .18s ease}
+button.act{
+  font:inherit;font-size:14px;font-weight:700;border-radius:9px;padding:9px 14px;cursor:pointer;
+  background:var(--accent);color:var(--accentfg);border:1px solid var(--accent)
+}
+button.act.ghost{background:transparent;color:var(--fg);border-color:var(--line);font-weight:600}
+button.act.ghost:hover{border-color:var(--accent);color:var(--accent)}
+.status{flex:1 1 100%;font-size:13px;color:var(--ok);min-height:18px}
+.status.err{color:var(--warn)}
+footer{color:var(--muted);font-size:12.5px;padding:24px 0 0;border-top:1px solid var(--line);margin:28px 0 0}
+@media (max-width:640px){
+  .thr .mcand{min-width:0}
+  .thr input[type=text]{max-width:none;flex:1 1 100%}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+<h1>AIRI B4c 방송 파라미터 확정 입력 폼 — 2026-08-18</h1>
+<p class="lede">승인 시 이 테이블이 확정 상수로 승격됩니다(운영 ON은 별도 승인). 선택 후 하단 [결과 복사]를 눌러 클로드에게 붙여넣으면 됩니다.</p>
+<p class="meta">9개 파라미터 후보값은 전부 <span class="mono">ollama-proxy/broadcast_contract.py</span>의 <span class="mono">BROADCAST_CONTRACT_PARAMS</span> 코드 상수와 대조해 일치를 확인했습니다(2026-08-18 대조). 전부 채우지 않아도 됩니다. 비워 둔 항목은 <span class="mono">키=미선택</span>으로 출력되어 부분 회신이 가능합니다. 입력값은 이 브라우저에 자동 저장되며, 창을 닫았다 열어도 유지됩니다.</p>
+</header>
+
+<section id="sec-params">
+<h2>B4c 방송 파라미터 후보 9행</h2>
+<p class="snote">근거: AIRI 방송 방식 관찰 연구 §6 "AIRI 파라미터 후보"(2026-08-14, 4인 트랜스크립트 실측). 각 행에서 승인 또는 수정 중 하나를 고르면 됩니다. 수정을 고르면 값 입력란이 열립니다.</p>
+
+<label class="master"><input type="checkbox" id="paramAll"><span>전체 승인 — 9개 후보값을 그대로 받아들입니다 (개별 행 입력 불필요)</span></label>
+
+<div id="paramRows">
+
+<article class="card" data-key="reaction_fragment">
+<h3>reaction_fragment <span class="sub">리액션 조각 길이</span></h3>
+<p class="hint">후보값: 1~3초(10~45자 현행 유지) · 근거: 4인 공통 지배 구간 · <span class="tag">코드 일치</span><span class="mono">min_chars=10, max_chars=45, min_sentences=1, max_sentences=2</span></p>
+<div class="thr">
+<span class="mname">채택 여부</span><span class="mcand">후보 10~45자</span>
+<label><input type="radio" name="reaction_fragment" value="승인">승인</label>
+<label><input type="radio" name="reaction_fragment" value="수정">수정</label>
+<input type="text" data-thrval-for="reaction_fragment" placeholder="예) 10~45자 → 15~50자 (단위: 자)" hidden>
+</div>
+<div class="rowend"><button type="button" class="mini" data-clear="reaction_fragment">이 행 지우기</button></div>
+</article>
+
+<article class="card" data-key="narration_block">
+<h3>narration_block <span class="sub">나레이션 블록</span></h3>
+<p class="hint">후보값: 15~60초, 명분(사연·감상·중계) 필수 · 근거: 최장 33~59초(한국 3인), 359초는 감상 명분(우이) · <span class="tag">코드 일치</span><span class="mono">min_seconds=15, max_seconds=60, requires_justification=True</span></p>
+<div class="thr">
+<span class="mname">채택 여부</span><span class="mcand">후보 15~60초</span>
+<label><input type="radio" name="narration_block" value="승인">승인</label>
+<label><input type="radio" name="narration_block" value="수정">수정</label>
+<input type="text" data-thrval-for="narration_block" placeholder="예) 15~60초 → 20~50초 (단위: 초)" hidden>
+</div>
+<div class="rowend"><button type="button" class="mini" data-clear="narration_block">이 행 지우기</button></div>
+</article>
+
+<article class="card" data-key="readout_to_response">
+<h3>readout_to_response <span class="sub">낭독→응답 개시</span></h3>
+<p class="hint">후보값: ≤1.3초 · 근거: 리제 1.06s·아이네 1.2s 중앙값 · <span class="tag">코드 일치</span><span class="mono">max_ms=1300</span></p>
+<div class="thr">
+<span class="mname">채택 여부</span><span class="mcand">후보 ≤1.3초</span>
+<label><input type="radio" name="readout_to_response" value="승인">승인</label>
+<label><input type="radio" name="readout_to_response" value="수정">수정</label>
+<input type="text" data-thrval-for="readout_to_response" placeholder="예) ≤1.3초 → ≤1.0초 (단위: 초)" hidden>
+</div>
+<div class="rowend"><button type="button" class="mini" data-clear="readout_to_response">이 행 지우기</button></div>
+</article>
+
+<article class="card" data-key="undeclared_silence">
+<h3>undeclared_silence <span class="sub">무선언 무음 상한</span></h3>
+<p class="hint">후보값: 10초(보수)~20초 · 근거: 아이네 27s 최장·30s+ 0회, 리제 10s+ 시간당 18.9회 · <span class="tag">코드 일치</span><span class="mono">conservative_seconds=10, max_seconds=20</span></p>
+<div class="thr">
+<span class="mname">채택 여부</span><span class="mcand">후보 10~20초</span>
+<label><input type="radio" name="undeclared_silence" value="승인">승인</label>
+<label><input type="radio" name="undeclared_silence" value="수정">수정</label>
+<input type="text" data-thrval-for="undeclared_silence" placeholder="예) 10~20초 → 15초 (단위: 초)" hidden>
+</div>
+<div class="rowend"><button type="button" class="mini" data-clear="undeclared_silence">이 행 지우기</button></div>
+</article>
+
+<article class="card" data-key="declared_absence">
+<h3>declared_absence <span class="sub">이탈 허용</span></h3>
+<p class="hint">후보값: 선언+복귀 대사 시 ~120초 · 근거: 리제 102s·탬 99.7s 전부 선언부 · <span class="tag">코드 일치</span><span class="mono">max_seconds=120, requires_declaration=True</span></p>
+<div class="thr">
+<span class="mname">채택 여부</span><span class="mcand">후보 ~120초</span>
+<label><input type="radio" name="declared_absence" value="승인">승인</label>
+<label><input type="radio" name="declared_absence" value="수정">수정</label>
+<input type="text" data-thrval-for="declared_absence" placeholder="예) ~120초 → ~90초 (단위: 초)" hidden>
+</div>
+<div class="rowend"><button type="button" class="mini" data-clear="declared_absence">이 행 지우기</button></div>
+</article>
+
+<article class="card" data-key="name_call">
+<h3>name_call <span class="sub">호명 빈도</span></h3>
+<p class="hint">후보값: 후원·특별시만(시간당 ~10회 이하) · 근거: 탬 8.3/h 전부 후원, 우이 1회 · <span class="tag">코드 일치</span><span class="mono">scope=donation_or_special, max_per_hour=10</span></p>
+<div class="thr">
+<span class="mname">채택 여부</span><span class="mcand">후보 시간당 ~10회 이하</span>
+<label><input type="radio" name="name_call" value="승인">승인</label>
+<label><input type="radio" name="name_call" value="수정">수정</label>
+<input type="text" data-thrval-for="name_call" placeholder="예) 시간당 ~10회 → 시간당 5회 (단위: 회/시간)" hidden>
+</div>
+<div class="rowend"><button type="button" class="mini" data-clear="name_call">이 행 지우기</button></div>
+</article>
+
+<article class="card" data-key="tag_question">
+<h3>tag_question <span class="sub">태그의문 비율</span></h3>
+<p class="hint">후보값: 발화의 5~10%대 · 근거: 탬 4.7%, 리제 ~50/h · <span class="tag">코드 일치</span><span class="mono">min_ratio=0.05, max_ratio=0.10</span></p>
+<div class="thr">
+<span class="mname">채택 여부</span><span class="mcand">후보 5~10%</span>
+<label><input type="radio" name="tag_question" value="승인">승인</label>
+<label><input type="radio" name="tag_question" value="수정">수정</label>
+<input type="text" data-thrval-for="tag_question" placeholder="예) 5~10% → 8% (단위: %)" hidden>
+</div>
+<div class="rowend"><button type="button" class="mini" data-clear="tag_question">이 행 지우기</button></div>
+</article>
+
+<article class="card" data-key="opening">
+<h3>opening <span class="sub">오프닝</span></h3>
+<p class="hint">후보값: 30초 내(인사+오늘 1줄+개시 신호) · 근거: 아이네 17초 실증 · <span class="tag">코드 일치</span><span class="mono">max_seconds=30</span></p>
+<div class="thr">
+<span class="mname">채택 여부</span><span class="mcand">후보 30초 내</span>
+<label><input type="radio" name="opening" value="승인">승인</label>
+<label><input type="radio" name="opening" value="수정">수정</label>
+<input type="text" data-thrval-for="opening" placeholder="예) 30초 내 → 20초 내 (단위: 초)" hidden>
+</div>
+<div class="rowend"><button type="button" class="mini" data-clear="opening">이 행 지우기</button></div>
+</article>
+
+<article class="card" data-key="closing">
+<h3>closing <span class="sub">클로징</span></h3>
+<p class="hint">후보값: 다음 약속 포함 1~15분 가변 · 근거: 아이네 40s ↔ 리제 15분 · <span class="tag">코드 일치</span><span class="mono">min_seconds=60, max_seconds=900, requires_next_promise=True</span></p>
+<div class="thr">
+<span class="mname">채택 여부</span><span class="mcand">후보 1~15분</span>
+<label><input type="radio" name="closing" value="승인">승인</label>
+<label><input type="radio" name="closing" value="수정">수정</label>
+<input type="text" data-thrval-for="closing" placeholder="예) 1~15분 → 2~10분 (단위: 분)" hidden>
+</div>
+<div class="rowend"><button type="button" class="mini" data-clear="closing">이 행 지우기</button></div>
+</article>
+
+</div>
+</section>
+
+<div id="outbox" hidden>
+<h2>회신 텍스트</h2>
+<p class="snote">아래 내용을 그대로 복사해 붙여넣으면 됩니다.</p>
+<textarea id="out" readonly></textarea>
+</div>
+
+<footer>
+<p>이 폼은 결정 입력만 수집합니다. 저장·제출 기능이 없으며, 어떤 값도 외부로 전송되지 않습니다. 입력 결과는 이 브라우저의 localStorage에만 남습니다.</p>
+<p>근거 문서: AIRI 방송 방식 관찰 연구 §6 "AIRI 파라미터 후보"(2026-08-14) · ollama-proxy/broadcast_contract.py의 BROADCAST_CONTRACT_PARAMS(대조 완료)</p>
+</footer>
+
+</div>
+
+<div class="bar">
+<div class="barin">
+<div class="prog">
+<p class="ptxt">진행률 <b id="pnum">0 / 9</b></p>
+<div class="ptrack"><div class="pfill" id="pfill"></div></div>
+</div>
+<button type="button" class="act" id="btnCopy">결과 복사</button>
+<button type="button" class="act ghost" id="btnDl">결과 .txt 다운로드</button>
+<button type="button" class="act ghost" id="btnPrev">미리보기</button>
+<button type="button" class="act ghost" id="btnReset">초기화</button>
+<div class="status" id="status"></div>
+</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var STORE = "airi-b4c-param-decision-form-2026-08-18";
+  var NONE = "미선택";
+  var PARAM_KEYS = [
+    "reaction_fragment", "narration_block", "readout_to_response",
+    "undeclared_silence", "declared_absence", "name_call",
+    "tag_question", "opening", "closing"
+  ];
+  var CAND_LABELS = {
+    reaction_fragment: "10~45자",
+    narration_block: "15~60초",
+    readout_to_response: "≤1.3초",
+    undeclared_silence: "10~20초",
+    declared_absence: "~120초",
+    name_call: "시간당 ~10회 이하",
+    tag_question: "5~10%",
+    opening: "30초 내",
+    closing: "1~15분"
+  };
+  var TOTAL = PARAM_KEYS.length;
+
+  var paramAll = document.getElementById("paramAll");
+  var paramRows = document.getElementById("paramRows");
+  var out = document.getElementById("out");
+  var outbox = document.getElementById("outbox");
+  var statusEl = document.getElementById("status");
+
+  function $all(sel){ return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+  function checkedOf(name){
+    var el = document.querySelector('input[name="' + name + '"]:checked');
+    return el ? el.value : "";
+  }
+  function oneLine(s){ return String(s).replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim(); }
+  function thrValueBox(name){ return document.querySelector('input[data-thrval-for="' + name + '"]'); }
+
+  // ── 값 계산 ───────────────────────────────────────────────
+  function rowValue(key){
+    if (paramAll.checked) return "승인";
+    var v = checkedOf(key);
+    if (!v) return NONE;
+    if (v === "승인") return "승인";
+    var box = thrValueBox(key);
+    var txt = box ? oneLine(box.value) : "";
+    return txt ? ("수정: " + CAND_LABELS[key] + " → " + txt) : NONE;
+  }
+
+  function buildResult(){
+    var lines = [];
+    lines.push("[B4c 파라미터]");
+    PARAM_KEYS.forEach(function(k){ lines.push(k + "=" + rowValue(k)); });
+    return lines.join("\n");
+  }
+
+  function answeredCount(){
+    if (paramAll.checked) return TOTAL;
+    var n = 0;
+    PARAM_KEYS.forEach(function(k){ if (rowValue(k) !== NONE) n++; });
+    return n;
+  }
+
+  // ── 화면 갱신 ─────────────────────────────────────────────
+  function syncValueBoxes(){
+    PARAM_KEYS.forEach(function(name){
+      var box = thrValueBox(name);
+      if (box) box.hidden = (checkedOf(name) !== "수정");
+    });
+    paramRows.classList.toggle("dim", paramAll.checked);
+  }
+
+  function render(){
+    syncValueBoxes();
+    var n = answeredCount();
+    document.getElementById("pnum").textContent = n + " / " + TOTAL;
+    document.getElementById("pfill").style.width = Math.round(n * 100 / TOTAL) + "%";
+    if (!outbox.hidden) out.value = buildResult();
+  }
+
+  // ── 저장·복원 ─────────────────────────────────────────────
+  function collect(){
+    var s = { r: {}, v: {}, master: paramAll.checked };
+    $all("input[type=radio]:checked").forEach(function(el){ s.r[el.name] = el.value; });
+    $all("input[data-thrval-for]").forEach(function(b){ if (b.value) s.v[b.getAttribute("data-thrval-for")] = b.value; });
+    return s;
+  }
+
+  function save(){
+    try { window.localStorage.setItem(STORE, JSON.stringify(collect())); } catch (e) { /* file:// 등에서 저장 불가 — 무시 */ }
+  }
+
+  function restore(){
+    var raw = null;
+    try { raw = window.localStorage.getItem(STORE); } catch (e) { raw = null; }
+    if (!raw) return;
+    var s;
+    try { s = JSON.parse(raw); } catch (e) { return; }
+    if (!s || typeof s !== "object") return;
+    Object.keys(s.r || {}).forEach(function(name){
+      var el = document.querySelector('input[name="' + name + '"][value="' + s.r[name] + '"]');
+      if (el) el.checked = true;
+    });
+    Object.keys(s.v || {}).forEach(function(name){
+      var b = thrValueBox(name);
+      if (b) b.value = s.v[name];
+    });
+    paramAll.checked = !!s.master;
+  }
+
+  // ── 이벤트 ────────────────────────────────────────────────
+  function setStatus(msg, isErr){
+    statusEl.textContent = msg;
+    statusEl.className = isErr ? "status err" : "status";
+  }
+
+  document.addEventListener("change", function(){ render(); save(); });
+  document.addEventListener("input", function(){ render(); save(); });
+
+  document.addEventListener("click", function(ev){
+    var btn = ev.target.closest ? ev.target.closest("[data-clear]") : null;
+    if (!btn) return;
+    var key = btn.getAttribute("data-clear");
+    $all('input[name="' + key + '"]').forEach(function(el){ el.checked = false; });
+    var b = thrValueBox(key);
+    if (b) b.value = "";
+    render(); save();
+    setStatus(key + " 선택을 지웠습니다.", false);
+  });
+
+  document.getElementById("btnPrev").addEventListener("click", function(){
+    outbox.hidden = !outbox.hidden;
+    if (!outbox.hidden) {
+      out.value = buildResult();
+      outbox.scrollIntoView({ block: "start" });
+      setStatus("미리보기를 열었습니다.", false);
+    } else {
+      setStatus("", false);
+    }
+  });
+
+  function fallbackCopy(text){
+    outbox.hidden = false;
+    out.value = text;
+    out.focus();
+    out.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    return ok;
+  }
+
+  document.getElementById("btnCopy").addEventListener("click", function(){
+    var text = buildResult();
+    var done = function(){ setStatus("복사했습니다. 클로드 대화창에 그대로 붙여넣으세요.", false); };
+    if (window.navigator && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function(){
+        if (fallbackCopy(text)) done();
+        else setStatus("자동 복사에 실패했습니다. 아래 결과 상자의 내용을 직접 복사해 주세요 (Ctrl+A → Ctrl+C).", true);
+      });
+    } else {
+      if (fallbackCopy(text)) done();
+      else setStatus("자동 복사에 실패했습니다. 아래 결과 상자의 내용을 직접 복사해 주세요 (Ctrl+A → Ctrl+C).", true);
+    }
+  });
+
+  document.getElementById("btnDl").addEventListener("click", function(){
+    var text = buildResult();
+    try {
+      var blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "AIRI-B4C-PARAM-DECISION-2026-08-18.txt";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+      setStatus("AIRI-B4C-PARAM-DECISION-2026-08-18.txt 를 내려받았습니다.", false);
+    } catch (e) {
+      outbox.hidden = false;
+      out.value = text;
+      setStatus("다운로드에 실패했습니다. 아래 결과 상자의 내용을 직접 복사해 주세요.", true);
+    }
+  });
+
+  document.getElementById("btnReset").addEventListener("click", function(){
+    if (!window.confirm("입력한 모든 선택을 지웁니다. 계속할까요?")) return;
+    $all("input[type=radio]").forEach(function(el){ el.checked = false; });
+    $all("input[data-thrval-for]").forEach(function(b){ b.value = ""; });
+    paramAll.checked = false;
+    outbox.hidden = true;
+    out.value = "";
+    try { window.localStorage.removeItem(STORE); } catch (e) { /* 무시 */ }
+    render();
+    setStatus("초기화했습니다.", false);
+  });
+
+  restore();
+  render();
+})();
+</script>
+</body>
+</html>
