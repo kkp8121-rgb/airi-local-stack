@@ -17,6 +17,19 @@
 
 최종 갱신: 2026-08-18
 
+- **2026-08-18** (클로드 PC, 침묵 폴백 조치): 분석 문서 5+1 조치안 중
+  사용자 goal 승인분 ②b(결정론 폴백 register 정규화 수리)와 ⑤(침묵
+  폴백 문구 다양화 greybox, `AIRI_SILENCE_FALLBACK_POOL` default-deny)를
+  이행했다. 인용 밖 존댓말 에코 5건 중 3건은 반말화, 치환표 미커버
+  2건(`ms04`)은 fail-closed 폴스루로 침묵 폴백 소폭(+1.2%p) 증가와
+  맞바꿨다. 풀 ON 게이트 단발 38콜 재실측에서 침묵 폴백 19건이 6문구
+  4/3/3/3/3/3으로 분산됐고 존댓말 위반은 0건(수리 전 2~3건)이다.
+  test_ollama_proxy.py +11(신규 클래스 2종), 로컬 323 passed 재확인,
+  CI ollama-proxy-api 샤드 424 passed·checkpoint PASS(같은 세션 기록,
+  CI 자체는 billing 차단). 풀 문구 6종은 사용자 미승인 — 승인 전까지
+  운영 경로는 기존 단일 문구 그대로다.
+  (`완료/AIRI-SILENCE-FALLBACK-REMEDIATION-2026-08-18.md`)
+
 - **2026-08-17** (G1a A4.6 승인 표현 정책 / prepublication evaluator foundation):
   사용자가 구체 원인의 짧은 감정, 같은 턴 회복, 차분하고 분명한 skeptical
   자기수정, 불확실할 때 한 번의 질문, fixed fallback의 공개 전 최후 사용이라는

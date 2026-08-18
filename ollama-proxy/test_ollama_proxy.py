@@ -7282,5 +7282,231 @@ class AffectContinuityGreyboxTests(unittest.TestCase):
             ollama_proxy.affect_continuity_ready = original_ready
 
 
+class SilenceFallbackPoolGreyboxTests(unittest.TestCase):
+    """``AIRI_SILENCE_FALLBACK_POOL`` — default-deny rotation of one line."""
+
+    @staticmethod
+    @contextlib.contextmanager
+    def _pool_enabled(enabled: bool):
+        """Enable the pool from a known cursor and leave the cursor as found."""
+        original_cursor = ollama_proxy._silence_fallback_cursor
+        try:
+            ollama_proxy._silence_fallback_cursor = 0
+            with mock.patch.object(
+                ollama_proxy, "SILENCE_FALLBACK_POOL_ENABLED", enabled
+            ):
+                yield
+        finally:
+            ollama_proxy._silence_fallback_cursor = original_cursor
+
+    def test_default_off_keeps_the_audited_line_and_holds_no_cursor(self) -> None:
+        self.assertFalse(ollama_proxy.SILENCE_FALLBACK_POOL_ENABLED)
+        self.assertFalse(ollama_proxy.silence_fallback_pool_enabled())
+        cursor = ollama_proxy._silence_fallback_cursor
+        for _ in range(8):
+            self.assertEqual(
+                ollama_proxy.next_grounding_silence_fallback(),
+                ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+            )
+        self.assertEqual(ollama_proxy._silence_fallback_cursor, cursor)
+
+    def test_enabled_pool_rotates_deterministically_from_slot_zero(self) -> None:
+        pool = ollama_proxy.GROUNDING_SILENCE_FALLBACK_POOL
+        with self._pool_enabled(True):
+            observed = [
+                ollama_proxy.next_grounding_silence_fallback()
+                for _ in range(len(pool) * 2 + 1)
+            ]
+        expected = [pool[index % len(pool)] for index in range(len(pool) * 2 + 1)]
+        self.assertEqual(observed, expected)
+        self.assertEqual(observed[0], ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE)
+        self.assertEqual(len(set(observed)), len(pool))
+
+    def test_configuration_is_default_deny(self) -> None:
+        for value in ("1", "true", "yes", "on", "ON", " On ", "TRUE"):
+            with self.subTest(value=value):
+                self.assertTrue(ollama_proxy.configured_silence_fallback_pool(value))
+        for value in (None, "", "0", "off", "no", "false", "pool", [], object()):
+            with self.subTest(value=value):
+                self.assertFalse(ollama_proxy.configured_silence_fallback_pool(value))
+
+    def test_pool_lines_hold_the_broadcast_safety_properties(self) -> None:
+        pool = ollama_proxy.GROUNDING_SILENCE_FALLBACK_POOL
+        self.assertGreater(len(pool), 1)
+        self.assertEqual(len(set(pool)), len(pool))
+        self.assertEqual(pool[0], ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE)
+        for line in pool:
+            with self.subTest(line=line):
+                # Plain speech: the register contract must leave it untouched.
+                self.assertEqual(
+                    ollama_proxy.normalize_fallback_dialogue_register(line), line
+                )
+                self.assertIsNone(ollama_proxy._POLITE_REGISTER_RE.search(line))
+                self.assertLessEqual(len(line), 20)
+                self.assertEqual(ollama_proxy.remove_emoji(line), line)
+                # A fact-free listening line carries no number, no foreign
+                # word, and no quoted material taken from the user.
+                self.assertIsNone(re.search(r"[0-9A-Za-z]", line))
+                # One spoken beat: the only sentence terminal is the last
+                # character, so nothing before it can be read as a claim of
+                # its own.
+                terminals = list(ollama_proxy._SENTENCE_END_RE.finditer(line))
+                self.assertEqual(len(terminals), 1)
+                self.assertEqual(terminals[0].end(), len(line))
+        for line in pool[1:]:
+            with self.subTest(line=line):
+                self.assertGreaterEqual(len(line), 10)
+
+    def test_stream_rotates_the_spoken_fallback_only_when_enabled(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        user = "창문 손잡이가 헐거워져서 잘 안 돌아가."
+        drafts = [[event("창문이 이상해.")], [event("The window handle is loose.")]]
+
+        def spoken() -> str:
+            chat = _QueuedApiStreamClient([list(chunk) for chunk in drafts])
+            with grounding_mode(ollama_proxy.GROUNDING_MODE_STRICT), mock.patch.object(
+                ollama_proxy, "client", chat
+            ), mock.patch.object(ollama_proxy, "memory_runtime", _FakeMemoryRuntime()):
+                return openai_sse_dialogue(post_stream(user).text)
+
+        with self._pool_enabled(True):
+            first, second = spoken(), spoken()
+        self.assertEqual(first, ollama_proxy.GROUNDING_SILENCE_FALLBACK_POOL[0])
+        self.assertEqual(second, ollama_proxy.GROUNDING_SILENCE_FALLBACK_POOL[1])
+        with self._pool_enabled(False):
+            self.assertEqual(spoken(), ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE)
+            self.assertEqual(spoken(), ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE)
+
+
+class DeterministicFallbackRegisterTests(unittest.TestCase):
+    """Deterministic fallbacks must obey the same spoken register contract."""
+
+    # Measured on 2026-08-18 in the gate arms of
+    # ``eval/results/broadcast-chat-gate-{off,on}-local-2026-08-18.json``:
+    # five polite residues, all of them observation echoes that bypassed the
+    # output boundary.  None of them sat inside a quotation, so all five are
+    # narration the banmal contract covers.
+    MEASURED_ECHO_USER_TEXTS = {
+        "sp01": "[YouTube] 하시는 일이 지구 폭파만 아니면 다 응원할게요.",
+        "ms04": "[YouTube] 줍다가 한 번씩 허리 펴고 하늘 봐 주세요.",
+        "rx03": "[YouTube] 아기 토끼가 겨울잠 자려고 낙엽 모으네요.",
+    }
+
+    def test_measured_polite_echoes_are_normalized_or_rejected(self) -> None:
+        expected = {
+            "sp01": "[YouTube] 하시는 일이 지구 폭파만 아니면 다 응원할게!",
+            # ``주세요`` has no morphology-preserving plain form in the
+            # substitution table, so the line fails closed instead of being
+            # spoken in honorific register.
+            "ms04": "",
+            "rx03": "[YouTube] 아기 토끼가 겨울잠 자려고 낙엽 모으네!",
+        }
+        for case, user in self.MEASURED_ECHO_USER_TEXTS.items():
+            with self.subTest(case=case):
+                echo = ollama_proxy.grounded_observation_fallback(user)
+                self.assertTrue(echo)
+                self.assertIsNotNone(ollama_proxy._POLITE_REGISTER_RE.search(echo))
+                self.assertEqual(
+                    ollama_proxy.normalize_fallback_dialogue_register(echo),
+                    expected[case],
+                )
+
+    def test_quoted_viewer_speech_keeps_its_honorific(self) -> None:
+        quoted = '시청자가 "오늘도 화이팅이에요!"라고 했어.'
+        self.assertEqual(
+            ollama_proxy.normalize_fallback_dialogue_register(quoted), quoted
+        )
+        self.assertEqual(
+            ollama_proxy.normalize_fallback_dialogue_register(
+                '시청자가 "오늘도 화이팅이에요!" 라고 했어요.'
+            ),
+            '시청자가 "오늘도 화이팅이에요!" 라고 했어.',
+        )
+        self.assertEqual(
+            ollama_proxy.normalize_fallback_dialogue_register(
+                "그 사람이 「정말 감사합니다」라고 적었어."
+            ),
+            "그 사람이 「정말 감사합니다」라고 적었어.",
+        )
+
+    def test_unbalanced_or_empty_quotation_is_rejected(self) -> None:
+        for text in ('시청자가 "고마워요 라고 했어.', '고마워” 라고 했어.', ""):
+            with self.subTest(text=text):
+                self.assertEqual(
+                    ollama_proxy.normalize_fallback_dialogue_register(text), ""
+                )
+
+    def test_plain_deterministic_lines_pass_through_byte_for_byte(self) -> None:
+        lines = [
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+            ollama_proxy.UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE,
+            ollama_proxy.grounded_question_fallback("오늘 점심 뭐 먹을까?"),
+            ollama_proxy.grounded_question_fallback("주말에 볼만한 거 추천해줘?"),
+            ollama_proxy.grounded_conversational_fallback("오늘 진짜 기분 좋아."),
+            ollama_proxy.grounded_conversational_fallback("요즘 너무 피곤해."),
+            *ollama_proxy.GROUNDING_SILENCE_FALLBACK_POOL,
+        ]
+        for line in lines:
+            with self.subTest(line=line):
+                self.assertTrue(line)
+                self.assertEqual(
+                    ollama_proxy.normalize_fallback_dialogue_register(line), line
+                )
+
+    @staticmethod
+    def _rejected_drafts(draft: str) -> list[list[bytes]]:
+        payload = (json.dumps(
+            {"message": {"role": "assistant", "content": draft}, "done": True},
+            ensure_ascii=False,
+        ) + "\n").encode("utf-8")
+        return [[payload], [payload]]
+
+    def test_stream_speaks_the_normalized_observation_echo(self) -> None:
+        user = self.MEASURED_ECHO_USER_TEXTS["rx03"]
+        draft = "지구 방위대가 벌써 출동했네."
+        self.assertTrue(ollama_proxy.needs_grounding_retry(user, draft))
+        chat = _QueuedApiStreamClient(self._rejected_drafts(draft))
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_stream(user)
+
+        echo = ollama_proxy.grounded_observation_fallback(user)
+        expected = ollama_proxy.normalize_fallback_dialogue_register(echo)
+        self.assertTrue(expected)
+        self.assertNotEqual(expected, echo)
+        spoken = openai_sse_dialogue(response.text)
+        self.assertEqual(spoken, expected)
+        self.assertIsNone(ollama_proxy._POLITE_REGISTER_RE.search(spoken))
+        self.assertNotIn("모으네요", response.text)
+        self.assertEqual(memory.completed[0]["assistant"], expected)
+
+    def test_unresolvable_polite_echo_falls_through_to_the_silence_line(self) -> None:
+        user = self.MEASURED_ECHO_USER_TEXTS["ms04"]
+        draft = "지구 방위대가 벌써 출동했네."
+        self.assertTrue(ollama_proxy.needs_grounding_retry(user, draft))
+        self.assertTrue(ollama_proxy.grounded_observation_fallback(user))
+        chat = _QueuedApiStreamClient(self._rejected_drafts(draft))
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_stream(user)
+
+        spoken = openai_sse_dialogue(response.text)
+        self.assertEqual(spoken, ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE)
+        self.assertNotIn("주세요", response.text)
+        self.assertEqual(
+            memory.completed[0]["assistant"],
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

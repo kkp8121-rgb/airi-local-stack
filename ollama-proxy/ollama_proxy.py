@@ -2034,6 +2034,71 @@ UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE = "답이 늦어져서 잠깐 멈췄어."
 # no executed action, and repeats nothing from the user, so it is safe to emit
 # after every grounding/quality rejection in every mode.
 GROUNDING_SILENCE_FALLBACK_DIALOGUE = "음, 잠깐만."
+# Greybox pool for the same silence fallback.  A measured gate run spent
+# 58 of 172 answers (33.7%) on the single line above, which reads as one
+# repeated sentence on air rather than as a length problem.  Every entry has
+# to keep the properties that make the single line safe: plain speech
+# (banmal), no emoji, no world fact, no claimed action, nothing echoed back
+# from the user.  The first entry stays byte-identical to the audited
+# constant so the switched-off default and rotation slot 0 are the same
+# string.
+# NOTE: this wording is a PROPOSAL and is not user-approved yet.  Until it
+# is, ``AIRI_SILENCE_FALLBACK_POOL`` stays off by default and the audited
+# single line is what production speaks.
+GROUNDING_SILENCE_FALLBACK_POOL = (
+    GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+    "어, 그건 잠깐 생각해 볼게.",
+    "잠깐, 나 정리 좀 하고!",
+    "음… 뭐라고 하지?",
+    "아, 잠깐 헷갈렸어.",
+    "그건 좀 있다가 다시 말해 줄게.",
+)
+
+
+def configured_silence_fallback_pool(value: object) -> bool:
+    """Return whether the silence fallback may rotate through its pool.
+
+    Default-deny: an unset, empty, malformed, or explicitly disabled value
+    keeps the single audited constant, so a machine that only pulls this
+    change speaks exactly what it spoke before.
+    """
+    try:
+        flag = unicodedata.normalize("NFKC", str(value)).strip().casefold()
+    except (TypeError, ValueError):
+        return False
+    return flag in {"1", "true", "yes", "on"}
+
+
+SILENCE_FALLBACK_POOL_ENABLED = configured_silence_fallback_pool(
+    os.environ.get("AIRI_SILENCE_FALLBACK_POOL", "")
+)
+_silence_fallback_cursor = 0
+_silence_fallback_cursor_lock = threading.Lock()
+
+
+def silence_fallback_pool_enabled() -> bool:
+    """Read the module-level switch at call time so tests can patch it."""
+    return SILENCE_FALLBACK_POOL_ENABLED
+
+
+def next_grounding_silence_fallback() -> str:
+    """Return the silence fallback line to speak for this rejection.
+
+    Selection is a deterministic round robin, never random: an A/B run, a
+    replayed rehearsal, and a regression test all observe the same order,
+    and a restarted process simply resumes at slot 0 instead of drifting
+    toward one phrase.  With the pool switched off the cursor is not even
+    read, so the disabled path holds no rotation state at all.
+    """
+    global _silence_fallback_cursor
+    if not silence_fallback_pool_enabled():
+        return GROUNDING_SILENCE_FALLBACK_DIALOGUE
+    with _silence_fallback_cursor_lock:
+        line = GROUNDING_SILENCE_FALLBACK_POOL[
+            _silence_fallback_cursor % len(GROUNDING_SILENCE_FALLBACK_POOL)
+        ]
+        _silence_fallback_cursor += 1
+    return line
 
 
 def configured_upstream_raw_progress_timeout(value: object) -> float:
@@ -2708,6 +2773,78 @@ def _outside_balanced_grounding_quotes(text: str) -> str | None:
             return None
         rendered.append(" " if expected_closers else character)
     return None if expected_closers else "".join(rendered)
+
+
+def _split_grounding_quote_segments(text: str) -> list[tuple[bool, str]] | None:
+    """Split text into quoted and unquoted runs, keeping the quote marks.
+
+    Balance is judged exactly as ``_outside_balanced_grounding_quotes`` judges
+    it, so a stray or unclosed quotation yields ``None`` instead of a guess.
+    """
+    segments: list[tuple[bool, str]] = []
+    expected_closers: list[str] = []
+    buffer: list[str] = []
+    closers = set(_GROUNDING_QUOTE_PAIRS.values())
+
+    def flush(quoted: bool) -> None:
+        if buffer:
+            segments.append((quoted, "".join(buffer)))
+            buffer.clear()
+
+    for character in text:
+        if expected_closers and character == expected_closers[-1]:
+            buffer.append(character)
+            expected_closers.pop()
+            if not expected_closers:
+                flush(True)
+            continue
+        if character in _GROUNDING_QUOTE_PAIRS:
+            if not expected_closers:
+                flush(False)
+            buffer.append(character)
+            expected_closers.append(_GROUNDING_QUOTE_PAIRS[character])
+            continue
+        if character in closers:
+            return None
+        buffer.append(character)
+    if expected_closers:
+        return None
+    flush(False)
+    return segments
+
+
+def normalize_fallback_dialogue_register(text: str) -> str:
+    """Put a deterministic fallback under the same spoken register contract.
+
+    Deterministic fallbacks are assigned straight to the public dialogue, so
+    they never reach ``IncrementalAiriOutputBoundary`` where model text has
+    its register normalized and an unresolved honorific sentence dropped.  A
+    fallback that echoes the user's own sentence could therefore speak an
+    honorific ending that generated text is never allowed to keep.
+
+    Quoted spans are viewer speech read back on air, where an honorific is
+    correct, so they are preserved byte for byte; only the surrounding
+    narration is rewritten.  An honorific the substitution table cannot
+    resolve rejects the whole line (empty result) rather than speaking it,
+    which is the boundary's fail-closed rule and lets the caller fall through
+    to the next fallback.  A line that is already plain speech is returned
+    unchanged.
+    """
+    if not text:
+        return ""
+    segments = _split_grounding_quote_segments(text)
+    if segments is None:
+        return ""
+    rendered: list[str] = []
+    for quoted, chunk in segments:
+        if quoted:
+            rendered.append(chunk)
+            continue
+        normalized = normalize_korean_register(chunk)
+        if _POLITE_REGISTER_RE.search(normalized):
+            return ""
+        rendered.append(normalized)
+    return "".join(rendered)
 
 
 def has_exactly_one_complete_sentence(text: str) -> bool:
@@ -7309,8 +7446,12 @@ async def stream_local_with_ack(
             and not grounding_retry_invalid
             and not grounding_retry_language_blocked
         ):
-            conversational_fallback = grounded_conversational_fallback(
-                context.last_user_text
+            # Every deterministic fallback below bypasses the output
+            # boundary, so each one is put under the same register contract
+            # before it can be accepted as public dialogue.  An already plain
+            # line passes through byte for byte.
+            conversational_fallback = normalize_fallback_dialogue_register(
+                grounded_conversational_fallback(context.last_user_text)
             )
             if (
                 conversational_fallback
@@ -7330,7 +7471,9 @@ async def stream_local_with_ack(
             and not grounding_retry_invalid
             and not grounding_retry_language_blocked
         ):
-            grounded_fallback = grounded_observation_fallback(context.last_user_text)
+            grounded_fallback = normalize_fallback_dialogue_register(
+                grounded_observation_fallback(context.last_user_text)
+            )
             if (
                 grounded_fallback
                 and enforce_tool_truth(context.original_messages, grounded_fallback)
@@ -7348,7 +7491,9 @@ async def stream_local_with_ack(
             and not grounding_retry_invalid
             and not grounding_retry_language_blocked
         ):
-            question_fallback = grounded_question_fallback(context.last_user_text)
+            question_fallback = normalize_fallback_dialogue_register(
+                grounded_question_fallback(context.last_user_text)
+            )
             if (
                 question_fallback
                 and enforce_tool_truth(context.original_messages, question_fallback)
@@ -7373,7 +7518,7 @@ async def stream_local_with_ack(
             # A proactive turn is excluded because saying nothing is its
             # designed outcome when no approved topic exists.
             dialogue = enforce_tool_truth(
-                context.original_messages, GROUNDING_SILENCE_FALLBACK_DIALOGUE
+                context.original_messages, next_grounding_silence_fallback()
             )
             grounding_silence_fallback_used = True
         if dialogue and not public_dialogue_emitted:
@@ -8728,7 +8873,7 @@ async def proxy(path: str, request: Request):
                 # public response and completed-turn journal share one
                 # canonical, safe dialogue value.
                 sanitized = enforce_tool_truth(
-                    original_messages, GROUNDING_SILENCE_FALLBACK_DIALOGUE
+                    original_messages, next_grounding_silence_fallback()
                 )
             if requested_stream:
                 # unreached - kept for non-stream fallback reference (streaming
@@ -9022,7 +9167,7 @@ async def proxy(path: str, request: Request):
                 # Rejected control-only, incomplete, or language-blocked
                 # drafts must not become an apparently successful empty turn.
                 plain = enforce_tool_truth(
-                    original_messages, GROUNDING_SILENCE_FALLBACK_DIALOGUE
+                    original_messages, next_grounding_silence_fallback()
                 )
             message = native_payload.get("message")
             if not isinstance(message, dict):
