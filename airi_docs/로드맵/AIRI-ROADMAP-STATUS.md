@@ -26,8 +26,9 @@
   4/3/3/3/3/3으로 분산됐고 존댓말 위반은 0건(수리 전 2~3건)이다.
   test_ollama_proxy.py +11(신규 클래스 2종), 로컬 323 passed 재확인,
   CI ollama-proxy-api 샤드 424 passed·checkpoint PASS(같은 세션 기록,
-  CI 자체는 billing 차단). 풀 문구 6종은 사용자 미승인 — 승인 전까지
-  운영 경로는 기존 단일 문구 그대로다.
+  CI 자체는 billing 차단). **풀 문구 6종은 같은 날 사용자 원안 승인**
+  — soak 러너 `NON_SUBSTANTIVE_RESPONSES`도 동기화했다. env 게이트는
+  계속 기본 OFF이며 런처 ON은 별도 운영 채택 결정이다.
   (`완료/AIRI-SILENCE-FALLBACK-REMEDIATION-2026-08-18.md`)
 
 - **2026-08-17** (G1a A4.6 승인 표현 정책 / prepublication evaluator foundation):

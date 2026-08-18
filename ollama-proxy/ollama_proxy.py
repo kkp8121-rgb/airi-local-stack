@@ -2042,9 +2042,9 @@ GROUNDING_SILENCE_FALLBACK_DIALOGUE = "음, 잠깐만."
 # from the user.  The first entry stays byte-identical to the audited
 # constant so the switched-off default and rotation slot 0 are the same
 # string.
-# NOTE: this wording is a PROPOSAL and is not user-approved yet.  Until it
-# is, ``AIRI_SILENCE_FALLBACK_POOL`` stays off by default and the audited
-# single line is what production speaks.
+# NOTE: this wording was user-approved on 2026-08-18.  The env gate still
+# defaults to off; turning ``AIRI_SILENCE_FALLBACK_POOL`` on in a launcher
+# remains a separate operational adoption decision.
 GROUNDING_SILENCE_FALLBACK_POOL = (
     GROUNDING_SILENCE_FALLBACK_DIALOGUE,
     "어, 그건 잠깐 생각해 볼게.",

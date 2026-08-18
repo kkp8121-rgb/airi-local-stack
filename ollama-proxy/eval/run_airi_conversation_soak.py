@@ -35,7 +35,16 @@ IMMEDIATE_ACKS: tuple[tuple[Literal["local", "search"], str], ...] = (
 )
 # This is the proxy's deliberately content-free last-resort line. It is a
 # useful audible recovery, but it is not a substantive answer for this soak.
-NON_SUBSTANTIVE_RESPONSES = frozenset({"음, 잠깐만."})
+# 침묵 폴백 풀(ollama_proxy.GROUNDING_SILENCE_FALLBACK_POOL)과 동기 유지 —
+# 풀 문구는 2026-08-18 사용자 승인. 어느 문구든 비실질 응답으로 센다.
+NON_SUBSTANTIVE_RESPONSES = frozenset({
+    "음, 잠깐만.",
+    "어, 그건 잠깐 생각해 볼게.",
+    "잠깐, 나 정리 좀 하고!",
+    "음… 뭐라고 하지?",
+    "아, 잠깐 헷갈렸어.",
+    "그건 좀 있다가 다시 말해 줄게.",
+})
 META_RE = re.compile(
     r"(?:^|\n)\s*[\"'“‘]?\s*(?:\[?(?:사용자|아이리)\]?|너|AIRI|assistant|user|user input|stage execution plan)\s*:"
     r"|(?:대화|답변|질문|사용자\s*입력)\s*예시"
