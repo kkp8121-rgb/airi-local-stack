@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 
 import httpx
 
@@ -953,6 +953,333 @@ class AddresseeWiringTests(unittest.TestCase):
         evidence = runner.project_checkpoint_evidence(payload)
         runner.validate_checkpoint_evidence(evidence)
         self.assertNotIn("addressee", json.dumps(evidence, ensure_ascii=False))
+
+
+# ---------------------------------------------------------------------------
+# 운영 프로토콜 분리 (--protocol operational)
+# ---------------------------------------------------------------------------
+# 게이트 경로(11435 proxy) 실측 응답 원문 — results/broadcast-chat-gate-*-local-
+# 2026-08-18.json 에서 그대로 인용한다. 이 형태를 분리하지 못하면 control_leak·
+# 자수·length_fit 이 다시 왜곡된다(AIRI-B4C-GATE-PATH-AB-2026-08-18).
+GATE_OFF_Q01 = (
+    '<|ACT {"emotion":"think"}|> 응! <|ACT {"emotion":"think"}|>'
+    "1월 초에 첫 직장이라니, 설레기도 하고 긴장되겠다!"
+)
+GATE_ON_Q01 = (
+    '<|ACT {"emotion":"think"}|> 응! <|ACT {"emotion":"think"}|>응, 첫 직장은 누구나 긴장되니까!'
+)
+GATE_OFF_TE01 = '<|ACT {"emotion":"think"}|> 응! <|ACT {"emotion":"think"}|>음, 잠깐만.'
+GATE_OFF_RX01 = '<|ACT {"emotion":"think"}|> 응! <|ACT {"emotion":"think"}|>고마워!'
+
+
+class OperationalProtocolSplitTests(unittest.TestCase):
+    """분리 규칙 자체 — 마커 개수·선두 ACK·비정형 토큰."""
+
+    def test_removes_every_act_marker_wherever_it_sits(self) -> None:
+        cases = [
+            ("마커 없는 본문이야.", "마커 없는 본문이야.", 0),
+            ('<|ACT {"emotion":"joy"}|>본문 하나.', "본문 하나.", 1),
+            ('본문 앞뒤로 <|ACT {"emotion":"joy"}|>낀 경우.', "본문 앞뒤로 낀 경우.", 1),
+            (
+                '<|ACT {"emotion":"joy"}|>둘 <|ACT {"emotion":"sad"}|>이야.',
+                "둘 이야.",
+                2,
+            ),
+            (
+                '<|ACT {"a"}|><|ACT {"b"}|><|ACT {"c"}|>셋이야.',
+                "셋이야.",
+                3,
+            ),
+        ]
+        for raw, expected_body, expected_count in cases:
+            with self.subTest(raw=raw):
+                body, meta = ab.split_operational_protocol(raw)
+                self.assertEqual(expected_body, body)
+                self.assertEqual(expected_count, meta["act_marker_count"])
+                self.assertFalse(meta["ack_stripped"])
+                self.assertIsNone(meta["ack_text"])
+
+    def test_strips_the_leading_ack_exactly_once(self) -> None:
+        body, meta = ab.split_operational_protocol("응! 응! 두 번은 지우지 않는다.")
+        self.assertEqual("응! 두 번은 지우지 않는다.", body)
+        self.assertTrue(meta["ack_stripped"])
+        self.assertEqual("응!", meta["ack_text"])
+
+    def test_accepts_conservative_ack_variants(self) -> None:
+        for ack in ("응!", "어!", "오!", "아!", "우!", "응응!", "어어!", "오오!", "응!!"):
+            with self.subTest(ack=ack):
+                body, meta = ab.split_operational_protocol(f"{ack} 본문이 이어진다.")
+                self.assertEqual("본문이 이어진다.", body)
+                self.assertTrue(meta["ack_stripped"])
+                self.assertEqual(ack, meta["ack_text"])
+
+    def test_does_not_treat_ordinary_short_sentences_as_ack(self) -> None:
+        """'고마워!'·'맞아!' 를 ACK 로 지우면 채점이 조용히 왜곡된다."""
+        for text in ("고마워! 나도 즐거웠어.", "맞아! 그건 그래.", "미안! 늦었어.", "좋아! 해보자."):
+            with self.subTest(text=text):
+                body, meta = ab.split_operational_protocol(text)
+                self.assertEqual(text, body)
+                self.assertFalse(meta["ack_stripped"])
+                self.assertIsNone(meta["ack_text"])
+
+    def test_does_not_strip_an_ack_shaped_span_inside_the_body(self) -> None:
+        body, meta = ab.split_operational_protocol("그래서 말인데 응! 하고 대답했어.")
+        self.assertEqual("그래서 말인데 응! 하고 대답했어.", body)
+        self.assertFalse(meta["ack_stripped"])
+
+    def test_keeps_a_response_that_is_only_an_ack(self) -> None:
+        for raw, expected_body, expected_count in [
+            ("응!", "응!", 0),
+            ("  응!  ", "응!", 0),
+            ('<|ACT {"emotion":"joy"}|> 응!', "응!", 1),
+        ]:
+            with self.subTest(raw=raw):
+                body, meta = ab.split_operational_protocol(raw)
+                self.assertEqual(expected_body, body)
+                self.assertEqual(expected_count, meta["act_marker_count"])
+                self.assertFalse(meta["ack_stripped"])
+
+    def test_unclosed_act_token_stays_in_the_body_and_trips_control_leak(self) -> None:
+        """열린 `<|ACT` 는 예기치 못한 제어 토큰이다 — 지우지 말고 잡아야 한다."""
+        raw = '<|ACT {"emotion":"think"} 응! 닫히지 않았어.'
+        body, meta = ab.split_operational_protocol(raw)
+        self.assertEqual(raw, body)
+        self.assertEqual(0, meta["act_marker_count"])
+        self.assertFalse(meta["ack_stripped"])
+        self.assertIn("v_control_leak", ab.score_response(body)["violations"])
+
+    def test_empty_and_blank_input_is_an_empty_body(self) -> None:
+        for raw in ("", "   ", '<|ACT {"emotion":"joy"}|>'):
+            with self.subTest(raw=raw):
+                body, meta = ab.split_operational_protocol(raw)
+                self.assertEqual("", body)
+                self.assertFalse(meta["ack_stripped"])
+
+
+class GateResponseProtocolRegressionTests(unittest.TestCase):
+    """게이트 실측 응답 회귀 — 분리 결과와 채점 영향까지 못 박는다."""
+
+    def test_measured_gate_responses_split_into_body_and_protocol(self) -> None:
+        cases = [
+            (GATE_OFF_Q01, "1월 초에 첫 직장이라니, 설레기도 하고 긴장되겠다!"),
+            (GATE_ON_Q01, "응, 첫 직장은 누구나 긴장되니까!"),
+            (GATE_OFF_TE01, "음, 잠깐만."),
+            (GATE_OFF_RX01, "고마워!"),
+        ]
+        for raw, expected_body in cases:
+            with self.subTest(raw=raw):
+                body, meta = ab.split_operational_protocol(raw)
+                self.assertEqual(expected_body, body)
+                self.assertEqual(2, meta["act_marker_count"])
+                self.assertTrue(meta["ack_stripped"])
+                self.assertEqual("응!", meta["ack_text"])
+
+    def test_separation_removes_the_control_leak_and_restores_length_fit(self) -> None:
+        raw_score = ab.score_response(GATE_OFF_Q01)
+        body, _ = ab.split_operational_protocol(GATE_OFF_Q01)
+        body_score = ab.score_response(body)
+        self.assertIn("v_control_leak", raw_score["violations"])
+        self.assertNotIn("v_control_leak", body_score["violations"])
+        self.assertFalse(raw_score["markers"]["length_fit"])
+        self.assertTrue(body_score["markers"]["length_fit"])
+        self.assertEqual(len(body), body_score["char_count"])
+        self.assertLess(body_score["char_count"], raw_score["char_count"])
+
+
+class ProtocolScoringWiringTests(unittest.TestCase):
+    """러너 배선 — raw 는 손대지 않고, operational 은 본문으로 채점한다."""
+
+    def _marked(self, body: str) -> str:
+        return '<|ACT {"emotion":"think"}|> 응! <|ACT {"emotion":"think"}|>' + body
+
+    def test_raw_scoring_body_returns_the_response_and_adds_no_keys(self) -> None:
+        record: dict = {}
+        self.assertEqual(GATE_OFF_Q01, ab.scoring_body(record, GATE_OFF_Q01, "raw"))
+        self.assertEqual({}, record)
+
+    def test_operational_scoring_body_records_the_body_and_meta(self) -> None:
+        record: dict = {}
+        body = ab.scoring_body(record, GATE_OFF_TE01, "operational")
+        self.assertEqual("음, 잠깐만.", body)
+        self.assertEqual("음, 잠깐만.", record["response_body"])
+        self.assertEqual(
+            {"act_marker_count": 2, "ack_stripped": True, "ack_text": "응!"}, record["protocol"]
+        )
+
+    def _run_scenario(self, bodies: list[str], protocol: str | None):
+        transport = RecordingTransport([self._marked(body) for body in bodies])
+        kwargs = {} if protocol is None else {"protocol": protocol}
+        with redirect_stderr(io.StringIO()):
+            result = runner.run_scenario(
+                transport,
+                "synthetic-model",
+                minimal_fixture()["scenarios"][0],
+                system_content=runner.build_system_content("off"),
+                max_tokens=128,
+                timeout=5.0,
+                history_turns=runner.DEFAULT_HISTORY_TURNS,
+                **kwargs,
+            )
+        return transport, result
+
+    def test_operational_scores_flow_and_history_with_the_separated_body(self) -> None:
+        bodies = [
+            "국밥 먹었구나, 부럽다.",
+            "치킨 쪽이 많네, 나도 좋아.",
+            "밤샘노동자 고마워!",
+            "비 오면 좀 눅눅하지.",
+            "아까 국밥 얘기였지.",
+        ]
+        transport, result = self._run_scenario(bodies, "operational")
+        for turn, body in zip(result["turns"], bodies):
+            with self.subTest(turn=turn["turn_id"]):
+                self.assertEqual(self._marked(body), turn["response"])
+                self.assertEqual(body, turn["response_body"])
+                self.assertEqual(
+                    {"act_marker_count": 2, "ack_stripped": True, "ack_text": "응!"},
+                    turn["protocol"],
+                )
+                self.assertEqual(ab.score_response(body), turn["score"])
+                self.assertNotIn("v_control_leak", turn["score"]["violations"])
+        aggregate = result["turns"][1]["flow"]["details"]["aggregate"]
+        self.assertEqual(len(bodies[1]), aggregate["char_count"])
+        self.assertTrue(result["turns"][2]["flow"]["markers"]["donation_name_call"])
+        assistants = [m["content"] for m in transport.calls[-1] if m["role"] == "assistant"]
+        self.assertEqual(bodies[:-1], assistants)
+
+    def test_raw_keeps_the_original_response_in_scoring_and_history(self) -> None:
+        bodies = ["국밥 먹었구나, 부럽다.", "치킨 쪽이 많네.", "밤샘노동자 고마워!", "비 오네.", "국밥이었지."]
+        transport, result = self._run_scenario(bodies, None)
+        for turn, body in zip(result["turns"], bodies):
+            with self.subTest(turn=turn["turn_id"]):
+                self.assertNotIn("response_body", turn)
+                self.assertNotIn("protocol", turn)
+                self.assertEqual(ab.score_response(self._marked(body)), turn["score"])
+                self.assertIn("v_control_leak", turn["score"]["violations"])
+        assistants = [m["content"] for m in transport.calls[-1] if m["role"] == "assistant"]
+        self.assertEqual([self._marked(body) for body in bodies[:-1]], assistants)
+
+    def _run_model(self, response: str, protocol: str | None) -> dict:
+        items = [
+            {
+                "id": "rx04",
+                "category": "reaction",
+                "source": "test",
+                "text": "좋게 말씀해 주셔서 감사해요.",
+            }
+        ]
+        transport = RecordingTransport(["워밍업 응답이야.", response])
+        kwargs = {} if protocol is None else {"protocol": protocol}
+        with redirect_stderr(io.StringIO()):
+            result = ab.run_model(
+                transport,
+                "synthetic-model",
+                items,
+                reps=1,
+                timeout=5.0,
+                max_tokens=128,
+                baseline_reps=0,
+                **kwargs,
+            )
+        return result["runs"][0]
+
+    def test_ab_run_model_scores_the_separated_body(self) -> None:
+        """addressee 도 본문 기준 — 원문이면 `^\\s*고마워` 금지어가 마커에 가려 통과한다."""
+        raw = '<|ACT {"emotion":"joy"}|> 응! <|ACT {"emotion":"joy"}|>고마워, 나도 즐거웠어!'
+        run = self._run_model(raw, "operational")
+        self.assertEqual(raw, run["response"])
+        self.assertEqual("고마워, 나도 즐거웠어!", run["response_body"])
+        self.assertEqual(2, run["protocol"]["act_marker_count"])
+        self.assertTrue(run["protocol"]["ack_stripped"])
+        self.assertNotIn("v_control_leak", run["score"]["violations"])
+        self.assertFalse(run["addressee"]["ok"])
+        self.assertTrue(ab.score_addressee("rx04", raw)["ok"])
+
+    def test_ab_run_model_raw_default_is_unchanged(self) -> None:
+        raw = '<|ACT {"emotion":"joy"}|> 응! <|ACT {"emotion":"joy"}|>고마워, 나도 즐거웠어!'
+        run = self._run_model(raw, None)
+        self.assertNotIn("response_body", run)
+        self.assertNotIn("protocol", run)
+        self.assertEqual(ab.score_response(raw), run["score"])
+        self.assertIn("v_control_leak", run["score"]["violations"])
+        self.assertTrue(run["addressee"]["ok"])
+
+
+class ProtocolCliTests(unittest.TestCase):
+    """CLI 배선 — 기본 raw 는 결과·리포트에 흔적을 남기지 않는다."""
+
+    def _run_main(self, module, directory: str, name: str, extra: list[str]) -> tuple[dict, str]:
+        output = Path(directory) / name
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), redirect_stderr(io.StringIO()):
+            code = module.main(["--dry-run", "--output", str(output)] + extra)
+        self.assertEqual(0, code)
+        return json.loads(output.read_text(encoding="utf-8")), buffer.getvalue()
+
+    def _rehearsal(self, directory: str, extra: list[str]) -> tuple[dict, str]:
+        return self._run_main(
+            runner, directory, "rehearsal.json", ["--scenarios", "autumn_leaves"] + extra
+        )
+
+    def _ab(self, directory: str, extra: list[str]) -> tuple[dict, str]:
+        return self._run_main(
+            ab,
+            directory,
+            "ab.json",
+            ["--models", "dry-midm", "--limit", "2", "--baseline-reps", "0"] + extra,
+        )
+
+    def test_rehearsal_defaults_to_raw_without_touching_config_or_report(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            payload, report = self._rehearsal(directory, [])
+        self.assertNotIn("protocol", payload["config"])
+        self.assertNotIn("[프로토콜]", report)
+        turn = payload["results"][0]["scenarios"][0]["turns"][0]
+        self.assertNotIn("response_body", turn)
+
+    def test_rehearsal_operational_records_protocol_in_config_and_report(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            payload, report = self._rehearsal(directory, ["--protocol", "operational"])
+        self.assertEqual("operational", payload["config"]["protocol"])
+        self.assertIn("[프로토콜] operational — ACT 마커·선반응 ACK 분리 채점", report)
+        turn = payload["results"][0]["scenarios"][0]["turns"][0]
+        self.assertEqual(turn["response"].strip(), turn["response_body"])
+        self.assertEqual(0, turn["protocol"]["act_marker_count"])
+
+    def test_ab_defaults_to_raw_and_records_protocol_only_when_operational(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            raw_payload, raw_report = self._ab(directory, [])
+            op_payload, op_report = self._ab(directory, ["--protocol", "operational"])
+        self.assertNotIn("protocol", raw_payload["config"])
+        self.assertNotIn("[프로토콜]", raw_report)
+        self.assertNotIn("response_body", raw_payload["results"][0]["runs"][0])
+        self.assertEqual("operational", op_payload["config"]["protocol"])
+        self.assertIn("[프로토콜] operational — ACT 마커·선반응 ACK 분리 채점", op_report)
+        run = op_payload["results"][0]["runs"][0]
+        self.assertEqual(run["response"].strip(), run["response_body"])
+        self.assertEqual(
+            {"act_marker_count": 0, "ack_stripped": False, "ack_text": None}, run["protocol"]
+        )
+
+    def test_unknown_protocol_is_rejected_by_both_runners(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "never.json"
+            for module in (runner, ab):
+                with self.subTest(module=module.__name__), self.assertRaises(SystemExit):
+                    with redirect_stderr(io.StringIO()):
+                        module.main(
+                            ["--dry-run", "--protocol", "nope", "--output", str(output)]
+                        )
+
+    def test_checkpoint_evidence_rejects_operational_protocol_payloads(self) -> None:
+        """체크포인트 증거는 raw 채점 경로 전용이다."""
+        with tempfile.TemporaryDirectory() as directory:
+            payload = DryRunMainTests()._run_main(directory, "off", scenarios=None)
+        runner.validate_checkpoint_evidence(runner.project_checkpoint_evidence(payload))
+        operational = json.loads(json.dumps(payload))
+        operational["config"]["protocol"] = "operational"
+        with self.assertRaises(ValueError):
+            runner.project_checkpoint_evidence(operational)
 
 
 if __name__ == "__main__":

@@ -13,7 +13,11 @@
 오프라인 검증:
   python run_broadcast_chat_ab.py --dry-run --output /tmp/dry.json
   python run_broadcast_chat_ab.py --dry-run --contract on --output /tmp/dry-contract.json
+  python run_broadcast_chat_ab.py --dry-run --protocol operational --output /tmp/dry-op.json
   python mock_openai_server.py &  # 그 후 --base-url http://127.0.0.1:PORT/v1
+
+게이트 경로(11435 proxy) 응답처럼 `<|ACT ...|>` 마커·선반응 ACK 가 섞여 오면
+`--protocol operational` 로 그 요소를 분리한 본문만 채점한다. 기본은 raw(원문)다.
 """
 from __future__ import annotations
 
@@ -113,6 +117,23 @@ EMOJI = re.compile(
 )
 CONTROL_LEAK = re.compile(r"<\|(?:ACT|CALL|DELAY)\b|^\s*(?:ACT|CALL|DELAY)\s*\{")
 BROKEN = re.compile(r"�")
+
+# ---------------------------------------------------------------------------
+# 운영 프로토콜 분리 (--protocol operational)
+# ---------------------------------------------------------------------------
+# 게이트 경로(11435 proxy) 응답에는 시청자에게 나갈 본문 말고 운영 프로토콜 요소가
+# 섞여 나온다(AIRI-B4C-GATE-PATH-AB-2026-08-18):
+#   · `<|ACT {"emotion":...}|>` — Live2D 감정 마커. 한 응답에 여러 개 올 수 있고
+#     선두가 아닌 위치에도 낀다.
+#   · 선반응 ACK — 본문을 만들기 전에 먼저 내보내는 짧은 감탄(현재 관측형은 "응!").
+# 둘 다 클라이언트가 소비하는 제어 신호라 자수·length_fit·control_leak 채점에
+# 본문으로 섞이면 안 된다.
+PROTOCOL_CHOICES = ("raw", "operational")
+ACT_MARKER = re.compile(r"<\|ACT [^|]*\|>")
+# ACK 로 인정할 감탄 음절. 보수적으로 좁게 유지한다 — "고마워!"·"맞아!" 같은 실제
+# 본문 첫 문장을 ACK 로 오인해 지우면 채점이 조용히 왜곡된다.
+ACK_SYLLABLES = "응웅엉어으오아우"
+LEADING_ACK = re.compile(rf"^\s*(?P<ack>[{ACK_SYLLABLES}]{{1,3}}!+)\s*")
 
 MARKER_ORDER = [
     "length_fit",
@@ -351,6 +372,47 @@ def score_response(text: str) -> dict[str, Any]:
         and markers["no_violation"]
         and markers["not_empty"],
     }
+
+
+def split_operational_protocol(text: str) -> tuple[str, dict[str, Any]]:
+    """운영 프로토콜 요소를 본문과 분리한다. 원문은 호출자가 그대로 보관한다.
+
+    규칙:
+      1. `<|ACT ...|>` 마커는 위치와 무관하게 전부 제거하고 개수를 센다. 닫는
+         `|>` 가 없는 비정형 토큰은 건드리지 않는다 — 본문에 남겨 control_leak
+         으로 잡히게 두는 것이 맞다.
+      2. 그다음 선두 ACK 를 최대 1회 제거한다. 떼고 나서 본문이 비면 되돌린다
+         (응답 전체가 ACK 뿐이면 그게 본문이다).
+
+    반환 body 는 strip() 한 문자열이고, meta 는 act_marker_count·ack_stripped·
+    ack_text 다.
+    """
+    raw = text or ""
+    body, act_count = ACT_MARKER.subn("", raw)
+    ack_text: str | None = None
+    match = LEADING_ACK.match(body)
+    if match and body[match.end() :].strip():
+        ack_text = match.group("ack")
+        body = body[match.end() :]
+    return body.strip(), {
+        "act_marker_count": act_count,
+        "ack_stripped": ack_text is not None,
+        "ack_text": ack_text,
+    }
+
+
+def scoring_body(record: dict[str, Any], response: str, protocol: str) -> str:
+    """채점 대상 본문을 고르고, operational 이면 분리 결과를 레코드에 남긴다.
+
+    raw(기본)에서는 레코드에 어떤 키도 더하지 않고 원문을 그대로 돌려준다 —
+    기존 결과 JSON 과 바이트 동일하게 유지해 체크포인트·회귀 게이트를 지킨다.
+    """
+    if protocol != "operational":
+        return response
+    body, meta = split_operational_protocol(response)
+    record["response_body"] = body
+    record["protocol"] = meta
+    return body
 
 
 # ---------------------------------------------------------------------------
@@ -727,6 +789,7 @@ def run_model(
     max_tokens: int,
     baseline_reps: int,
     contract_block: str = "",
+    protocol: str = "raw",
 ) -> dict[str, Any]:
     print(f"[{model}] warmup...", file=sys.stderr)
     warmup = call_once(
@@ -767,10 +830,11 @@ def run_model(
                     "synthetic": bool(item.get("synthetic")),
                     "input_text": item["text"],
                     "rep": rep + 1,
-                    "score": score_response(record.get("response", "")),
-                    "addressee": score_addressee(item["id"], record.get("response", "")),
                 }
             )
+            body = scoring_body(record, record.get("response", ""), protocol)
+            record["score"] = score_response(body)
+            record["addressee"] = score_addressee(item["id"], body)
             runs.append(record)
             done += 1
             status = "ok" if record.get("ok") else record.get("failure", "fail")
@@ -926,7 +990,11 @@ def _fmt(value: Any, width: int = 9) -> str:
 
 
 def print_report(
-    summaries: list[dict[str, Any]], fixtures: dict[str, Any], reps: int, contract: str = "off"
+    summaries: list[dict[str, Any]],
+    fixtures: dict[str, Any],
+    reps: int,
+    contract: str = "off",
+    protocol: str = "raw",
 ) -> None:
     line = "=" * 96
     print(line)
@@ -939,6 +1007,8 @@ def print_report(
         f"[발화 계약] B4c 방송 발화 계약 {contract}"
         + (" — 시스템 메시지 끝에 계약 블록을 덧붙였다" if contract == "on" else " (기존 프롬프트 그대로)")
     )
+    if protocol != "raw":
+        print(f"[프로토콜] {protocol} — ACT 마커·선반응 ACK 분리 채점")
 
     non_streaming = [s for s in summaries if not s.get("streaming", True)]
     fallbacks = [
@@ -1128,6 +1198,15 @@ def main(argv: list[str] | None = None) -> int:
         default="off",
         help="B4c 방송 발화 계약 블록 부착 여부. off(기본)=기존 프롬프트 그대로",
     )
+    parser.add_argument(
+        "--protocol",
+        choices=PROTOCOL_CHOICES,
+        default="raw",
+        help=(
+            "채점 대상. raw(기본)=응답 원문 그대로 / operational=게이트 경로 운영 프로토콜"
+            "(<|ACT ...|> 마커·선반응 ACK)을 분리한 본문으로 채점"
+        ),
+    )
     args = parser.parse_args(argv)
 
     contract_block = build_broadcast_contract_block() if args.contract == "on" else ""
@@ -1183,6 +1262,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_tokens=args.max_tokens,
                 baseline_reps=max(0, args.baseline_reps),
                 contract_block=contract_block,
+                protocol=args.protocol,
             )
         finally:
             if hasattr(transport, "close"):
@@ -1241,9 +1321,13 @@ def main(argv: list[str] | None = None) -> int:
         "summaries": summaries,
         "results": results,
     }
+    if args.protocol != "raw":
+        # raw 는 키를 남기지 않는다 — 기존 결과 JSON 을 바이트 그대로 유지한다.
+        # 키 부재 = raw 로 읽는다.
+        payload["config"]["protocol"] = args.protocol
     output = Path(args.output)
     atomic_write(output, payload)
-    print_report(summaries, {"items": items}, args.reps, args.contract)
+    print_report(summaries, {"items": items}, args.reps, args.contract, args.protocol)
     print(f"\n원 응답 전문 포함 결과: {output.resolve()}")
     return 0
 

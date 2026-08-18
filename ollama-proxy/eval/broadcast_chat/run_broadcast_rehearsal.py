@@ -20,6 +20,12 @@
 오프라인 검증:
   python run_broadcast_rehearsal.py --dry-run --output /tmp/dry-rehearsal.json
   python run_broadcast_rehearsal.py --dry-run --contract on --output /tmp/dry-contract.json
+  python run_broadcast_rehearsal.py --dry-run --protocol operational --output /tmp/dry-op.json
+
+`--protocol operational` 은 게이트 경로 응답의 운영 프로토콜 요소(`<|ACT ...|>`
+마커·선반응 ACK)를 분리한 본문으로 채점하고, 히스토리 되먹임에도 그 본문을 쓴다
+— 운영 클라이언트 히스토리에 남는 발화가 마커를 뗀 형태이기 때문이다. 기본은
+raw(원문 그대로)다.
 """
 from __future__ import annotations
 
@@ -365,8 +371,13 @@ def run_scenario(
     max_tokens: int,
     timeout: float,
     history_turns: int,
+    protocol: str = "raw",
 ) -> dict[str, Any]:
-    """시나리오 하나를 턴 순서대로 돌린다. 응답은 히스토리에 되먹인다."""
+    """시나리오 하나를 턴 순서대로 돌린다. 응답은 히스토리에 되먹인다.
+
+    protocol="operational" 이면 운영 프로토콜 요소를 뗀 본문으로 채점하고
+    히스토리에도 그 본문을 넣는다(운영 클라이언트 히스토리와 같은 형태).
+    """
     turns = scenario["turns"]
     user_by_id = {turn["id"]: ab.USER_PREFIX + turn["input"] for turn in turns}
     index_by_id = {turn["id"]: position for position, turn in enumerate(turns, start=1)}
@@ -408,22 +419,24 @@ def run_scenario(
                 "synthetic": bool(turn.get("synthetic")),
                 "history_pairs": max(0, (len(messages) - 2) // 2),
                 "seed_distance": seed_distance,
-                "score": ab.score_response(response),
-                "addressee": ab.score_addressee(turn["id"], response),
-                "flow": score_turn_flow(
-                    turn,
-                    response,
-                    seed_in_context=seed_in_context,
-                    prior_names=prior_names,
-                ),
             }
+        )
+        scored = ab.scoring_body(record, response, protocol)
+        record["score"] = ab.score_response(scored)
+        record["addressee"] = ab.score_addressee(turn["id"], scored)
+        record["flow"] = score_turn_flow(
+            turn,
+            scored,
+            seed_in_context=seed_in_context,
+            prior_names=prior_names,
         )
         rows.append(record)
 
         if current_name:
             donation_names.append(current_name)
-        if record.get("ok") and response.strip():
-            history.append((user_content, response))
+        # raw 에서 scored 는 response 그대로다 — 되먹임 동작이 바뀌지 않는다.
+        if record.get("ok") and scored.strip():
+            history.append((user_content, scored))
 
         status = "ok" if record.get("ok") else record.get("failure", "fail")
         print(
@@ -662,6 +675,8 @@ def project_checkpoint_evidence(payload: dict[str, Any]) -> dict[str, Any]:
         or config.get("max_tokens") != PRODUCTION_MAX_TOKENS
         or config.get("history_turns") != DEFAULT_HISTORY_TURNS
         or config.get("streaming") is not False
+        # 체크포인트 증거는 raw 채점 경로에만 해당한다(키 부재 = raw).
+        or config.get("protocol", "raw") != "raw"
         or contract not in ("off", "on")
         or any(prompt.get(key) != value for key, value in expected_hashes.items())
         or fixtures.get("selected_scenarios") != expected_ids
@@ -951,7 +966,13 @@ def _ratio(bucket: dict[str, Any], key: str = "turns", width: int = 11) -> str:
     return f"{bucket['hits']}/{total}".rjust(width)
 
 
-def print_report(summaries: list[dict[str, Any]], *, contract: str, history_turns: int) -> None:
+def print_report(
+    summaries: list[dict[str, Any]],
+    *,
+    contract: str,
+    history_turns: int,
+    protocol: str = "raw",
+) -> None:
     line = "=" * 100
     print(line)
     print("AIRI 멀티턴 방송 리허설 — 흐름 축 (낭독 연쇄·콜백·여론 집계·후원·화제 전환)")
@@ -963,6 +984,8 @@ def print_report(summaries: list[dict[str, Any]], *, contract: str, history_turn
         f"[발화 계약] B4c 방송 발화 계약 {contract}"
         + (" — 시스템 메시지 끝에 계약 블록을 덧붙였다" if contract == "on" else " (기존 프롬프트 그대로)")
     )
+    if protocol != "raw":
+        print(f"[프로토콜] {protocol} — ACT 마커·선반응 ACK 분리 채점 (히스토리 되먹임도 분리 본문)")
     print(f"[히스토리] 최근 {history_turns}쌍(유저·어시스턴트)만 유지 — 운영 num_ctx 2048 제약 존중")
     print()
 
@@ -1115,6 +1138,15 @@ def main(argv: list[str] | None = None) -> int:
         help="B4c 방송 발화 계약 블록 부착 여부. off(기본)=기존 프롬프트 그대로",
     )
     parser.add_argument(
+        "--protocol",
+        choices=ab.PROTOCOL_CHOICES,
+        default="raw",
+        help=(
+            "채점 대상. raw(기본)=응답 원문 그대로 / operational=게이트 경로 운영 프로토콜"
+            "(<|ACT ...|> 마커·선반응 ACK)을 분리한 본문으로 채점하고 히스토리에도 그 본문을 넣는다"
+        ),
+    )
+    parser.add_argument(
         "--max-tokens",
         type=int,
         default=PRODUCTION_MAX_TOKENS,
@@ -1209,6 +1241,7 @@ def main(argv: list[str] | None = None) -> int:
                     max_tokens=args.max_tokens,
                     timeout=args.timeout,
                     history_turns=args.history_turns,
+                    protocol=args.protocol,
                 )
                 for scenario in scenarios
             ]
@@ -1268,9 +1301,18 @@ def main(argv: list[str] | None = None) -> int:
         "summaries": summaries,
         "results": results,
     }
+    if args.protocol != "raw":
+        # raw 는 키를 남기지 않는다 — 기존 결과 JSON 을 바이트 그대로 유지한다.
+        # 키 부재 = raw 로 읽는다(체크포인트 증거도 그 규칙을 따른다).
+        payload["config"]["protocol"] = args.protocol
     output = Path(args.output)
     ab.atomic_write(output, payload)
-    print_report(summaries, contract=args.contract, history_turns=args.history_turns)
+    print_report(
+        summaries,
+        contract=args.contract,
+        history_turns=args.history_turns,
+        protocol=args.protocol,
+    )
     print(f"\n원 응답 전문 포함 결과: {output.resolve()}")
     return 0
 
