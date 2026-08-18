@@ -712,6 +712,10 @@
     (`완료/AIRI-B4C-CONTRACT-AB-2026-08-14.md`). 남은 것: 파라미터
     확정·운영 ON 채택(사용자 확인 경유). 후원 호명은 B4c 문구가 아니라
     B4a explicit action으로 정리했으며 B4b 실제 호명 실증은 남는다.
+    수신자 자기 인지 축 신규 발견(2026-08-18, 사용자 원문 검토) —
+    계약 v3 + addressee 사이드카 28케이스, 리허설 93%·단발 77%,
+    잔여는 결정론 계층(A4.2 합류)
+    (`완료/AIRI-B4C-ADDRESSEE-CONTRACT-V3-2026-08-18.md`).
   - [~] 스타일 게이트 방송 경로 배선 확인 — 코드 실측 완료 2026-08-14: 게이트는
     치환(`normalize_korean_register`)+미해결 존댓말 문장 드롭(fail-closed)이며
     proxy `chat/completions` 출력 전부에 적용, 우회 플래그 없음. 레포 내 방송
@@ -861,6 +865,21 @@
 
 ## 갱신 로그 (최신이 위)
 
+- **2026-08-18** (검토 PC, 수신자 인지 축 + 로컬 Mi:dm 실측 체계):
+  사용자가 2026-08-15 시뮬레이션 검토본 원문에서 수신자 자기 인지
+  실패(dn04 축하 반사·gr01 주체 반전·tk04 자백 등)를 직접 발견해
+  전수 재검토로 4유형·28건(수신 반전/행위 주체 반전/상황·자기
+  존재 인지 실패/역방향 오귀속)을 분류했다. 계약 블록을 v2(추상
+  규칙 4행)·v3(구체 예시·해석 규칙 5행, 600자)로 2회 반복하고
+  addressee 채점 사이드카를 만들었다. 검토 PC에 dev PC와 동일
+  digest의 `midm-airi:2.0-mini` 로컬 실측 체계를 신설했다(CPU
+  전용 — 지연 비대표, 품질 축 전용). 실측 결과 리허설 addressee
+  통과가 12/15→14/15(93%)로, 단발은 11/13→20/26(77%)로 올랐으나
+  dn04·gr01류는 v3에서도 재발해 잔여는 결정론 계층(G1a A4.2 고정
+  렌더러)으로 넘긴다는 판정을 내렸다. OFF 리허설에서 호명누출
+  1건(a11, 후원자 아닌 이름)도 새로 발견했다. CI billing 차단이
+  지속돼 로컬 검증으로 대체했다(로컬 테스트 87 PASS·체크포인트
+  회귀 PASS). 상세: `완료/AIRI-B4C-ADDRESSEE-CONTRACT-V3-2026-08-18.md`.
 - **2026-08-15** (dev PC, G3/B3-f 3-source paired campaign 기반): receipt v2의
   local-key source identity와 exact capture HMAC, replay report/response/human score
   HMAC binding, bounded 사람 source observation을 추가했다. fresh operator

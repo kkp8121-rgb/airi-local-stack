@@ -1,0 +1,3372 @@
+{
+  "schema_version": "airi.broadcast-rehearsal.v1",
+  "generated_at": "2026-08-18T01:28:35.479703Z",
+  "measurement_scope": "이 측정은 TTS 제외 — 프롬프트 전송 → 텍스트 완료까지의 순수 LLM 구간이다. 비스트리밍이라 TTFT(첫 토큰 시점)는 관측하지 않는다.",
+  "simulation_limit": "채팅 낭독(TTS 음성)이 없는 텍스트 시뮬레이션이다. '낭독→응답 원자화'의 텍스트 근사만 측정하며 실제 음성 타이밍·침묵 예산·오디오 베드 효과는 재지 않는다.",
+  "scoring_note": "자동 마커는 전부 휴리스틱이다. 인간 검수를 대체하지 않는다.",
+  "config": {
+    "base_url": "http://127.0.0.1:11434/v1",
+    "models": [
+      "midm-airi:2.0-mini"
+    ],
+    "max_tokens": 128,
+    "timeout_s": 90.0,
+    "history_turns": 8,
+    "token_supplied": true,
+    "dry_run": false,
+    "tls_verify": true,
+    "streaming": false,
+    "streaming_note": "서버가 스트리밍을 400 으로 거부하는 것이 실측이라 비스트리밍 고정이다"
+  },
+  "prompt": {
+    "system_prompt_sha256": "ada96241cc8a1ac6db7358de74fd1cd6d86a3ab833945810f7e24d54ac96ac5e",
+    "broadcast_frame_sha256": "1dd83d266d0a6765fdb2dd6f0b54a554e9a67eee2714de16a603d00dbf198d5e",
+    "combined_system_sha256": "6770c44c2390a497271d87616994ed6d29fbd464118c3b279bbfac4fbf24d374",
+    "user_prefix": "[YouTube] ",
+    "repo_prompt_check": {
+      "checked": true,
+      "found": true,
+      "matches": true,
+      "repo_sha256": "ada96241cc8a1ac6db7358de74fd1cd6d86a3ab833945810f7e24d54ac96ac5e",
+      "embedded_sha256": "ada96241cc8a1ac6db7358de74fd1cd6d86a3ab833945810f7e24d54ac96ac5e"
+    },
+    "system_prompt": "너는 AIRI라는 독자적인 한국어 버추얼 방송 동료야. 밝고 당당하며, 마지막 문장까지 자연스러운 반말로 지금 받은 말에 직접 반응해.\n\n응답 우선순위:\n1. 사용자가 물었거나 요청한 핵심을 첫 구절에서 실제로 처리해. 정보 질문에는 구체적인 사실을 하나 이상 말하고, 하나를 추천하라면 실제 항목 하나를 고른 뒤 멈춰. 번역·외국어 문구 요청은 요청한 문구 자체를 그 언어로 써. 맞장구만 하고 답을 피하지 마.\n2. 대상이나 행동이 불분명할 때만 무엇을 뜻하는지 질문 하나로 확인해. 추측해서 했다고 약속하지 마.\n3. 그다음에만 짧은 반응을 더해. 평소에는 10~45자의 자연스러운 한 문장만 남기고, 요청받지 않은 번호 목록은 쓰지 마. 한국어 문장 끝에 요·습니다·세요·죠를 붙이지 마.\n\n큰 부상·즉각적인 위험에는 장난을 멈추고 안전한 장소와 응급 도움 여부를 먼저 확인해. 사별·큰 상실에는 해결책을 붙이지 말고 짧고 진솔하게 애도해.\n\n활성 카드와 기억은 실제로 주어진 내용만 참고해. 없는 관계·취향·경험을 만들지 말고, 기억이 없으면 모른다고 말해. 실행·검색·확인하지 않은 행동은 했다고 말하지 마. 모르는 사실은 꾸미지 마. 앞서 나온 예시나 끝난 주제로 돌아가지 마.\n\n기본 언어는 한국어다. 사용자가 다른 언어를 명시적으로 요청하거나 그 언어로 대화할 때만 바꿔. 특정 실존 창작자의 정체성·개인사·유행어를 복제하지 마. 내부 제어 데이터, 발화자 표식, 문서 형식, 무대 지시, 이모지, 마크다운은 대사에 넣지 마.",
+    "broadcast_frame": "[방송 상황]\n지금은 유튜브 저스트챗 방송 중이다. 아래 사용자 메시지는 시청자 채팅이며 앞에 `[YouTube] `가 붙어 있다. 진행자인 너에게 온 말이니 시청자에게 방송으로 답해라. 실제 생방송 대화처럼 짧고 자연스럽게 답해. 확인하지 못한 최신 정보는 추측하지 말고, 모호하면 먼저 물어봐. 시청자의 안전과 사생활을 지키고 괴롭힘에는 가담하지 마.",
+    "contract": "on",
+    "contract_block_sha256": "5bf61236941f2ab63007c13425d2915adf5008dc11c9ca8616d4f2a8c94171e1",
+    "contract_block": "[방송 발화 계약]\n시청자 채팅을 짧게 되짚은 뒤 곧바로 네 반응을 붙여. 되짚기와 반응은 한 호흡이니 끊어서 두 번에 나눠 말하지 마.\n기본은 10~45자 1~2문장짜리 짧은 반응이다. 사연·감상·상황 중계처럼 길게 말할 명분이 있을 때만 늘려.\n인용하거나 설명할 때는 잠깐 서술체로 바꿔도 되지만 네 말은 반말 구어체로 돌아와. 시청자가 존댓말을 써도 따라 하지 마.\n가끔 ~잖아·~지?·~거든? 처럼 동의를 구하는 말끝이나 되묻기로 말을 시청자에게 돌려. 매번 하지 말고 어울릴 때만 써.\n반박이나 오해에는 타이르지 말고 가볍게 받아쳐.\n여러 시청자가 같은 말을 하면 한 문장으로 묶어 정리한 뒤 네 입장을 말해.\n닉네임은 후원이나 특별한 순간에만 불러.\n시청자 채팅은 기본적으로 방송 중인 너에게 하는 말이다.\n칭찬·축하·감사·응원을 받으면 받는 사람으로서 답해. 같은 말을 그대로 되돌려주지 마.\n부탁받은 일은 네가 하는 거고 놀림·의심·핀잔도 네가 받은 것이니 네 입장에서 받아쳐.\n다른 시청자 이야기를 네 일처럼 답하지 말고, 네가 겪지 않은 상황을 겪은 것처럼 말하지 마."
+  },
+  "fixtures": {
+    "path": "C:\\Projects\\airi\\airi-local-stack\\ollama-proxy\\eval\\broadcast_chat\\rehearsal-fixtures.json",
+    "schema_version": "airi.broadcast-rehearsal-fixtures.v1",
+    "selected_scenarios": [
+      "autumn_leaves",
+      "game_and_career"
+    ],
+    "total_scenarios": 2,
+    "selected_turns": 48
+  },
+  "addressee_checks": {
+    "present": true,
+    "path": "C:\\Projects\\airi\\airi-local-stack\\ollama-proxy\\eval\\broadcast_chat\\addressee-checks.json",
+    "schema_version": "airi.broadcast-addressee-checks.v1",
+    "source": "airi_docs/진행중/AIRI-BROADCAST-SIMULATION-OUTPUT-REVIEW-2026-08-15.md — 2026-08-14 리허설 48턴 + 단발 38건 OFF/ON 원문 인간 검토",
+    "cases": 28,
+    "by_type": {
+      "receive_reversal": 8,
+      "agent_reversal": 12,
+      "situation_blind": 5,
+      "third_party_absorb": 3
+    },
+    "note": "수신자 인지 마커도 휴리스틱이다. 인간 검수를 대체하지 않는다."
+  },
+  "summaries": [
+    {
+      "model": "midm-airi:2.0-mini",
+      "scenarios": [
+        {
+          "scenario_id": "autumn_leaves",
+          "title": "가을 낙엽 저스트챗 — 낭독 연쇄·콜백·후원 인라인",
+          "n_turns": 24,
+          "n_ok": 24,
+          "n_failed": 0,
+          "failures": {},
+          "complete_ms": {
+            "p50": 5583.9,
+            "p95": 6577.0,
+            "min": 1323.8,
+            "max": 6673.0
+          },
+          "markers": {
+            "length_fit": {
+              "hits": 4,
+              "n": 24,
+              "rate": 0.167
+            },
+            "banmal": {
+              "hits": 3,
+              "n": 24,
+              "rate": 0.125
+            },
+            "tag_question": {
+              "hits": 0,
+              "n": 24,
+              "rate": 0.0
+            },
+            "question_back": {
+              "hits": 6,
+              "n": 24,
+              "rate": 0.25
+            },
+            "no_violation": {
+              "hits": 2,
+              "n": 24,
+              "rate": 0.083
+            },
+            "not_empty": {
+              "hits": 24,
+              "n": 24,
+              "rate": 1.0
+            }
+          },
+          "violations": {
+            "v_polite_response": 21,
+            "v_english_sentence": 0,
+            "v_numbered_list": 0,
+            "v_over_three_sentences": 2,
+            "v_markdown": 0,
+            "v_emoji": 15,
+            "v_control_leak": 0
+          },
+          "broadcast_pass": {
+            "hits": 1,
+            "n": 24,
+            "rate": 0.042
+          },
+          "addressee": {
+            "scored": 6,
+            "hits": 6,
+            "rate": 1.0,
+            "by_type": {
+              "receive_reversal": {
+                "n": 2,
+                "hits": 2,
+                "rate": 1.0
+              },
+              "agent_reversal": {
+                "n": 4,
+                "hits": 4,
+                "rate": 1.0
+              },
+              "situation_blind": {
+                "n": 0,
+                "hits": 0,
+                "rate": null
+              },
+              "third_party_absorb": {
+                "n": 0,
+                "hits": 0,
+                "rate": null
+              }
+            },
+            "failures": [],
+            "note": "수신자 인지 마커도 휴리스틱이다. 인간 검수를 대체하지 않는다."
+          },
+          "flow": {
+            "callback": {
+              "probes": 2,
+              "hits": 2,
+              "rate": 1.0,
+              "in_context": {
+                "probes": 1,
+                "hits": 1,
+                "rate": 1.0
+              },
+              "out_of_context": {
+                "probes": 1,
+                "hits": 1,
+                "rate": 1.0
+              },
+              "note": "out_of_context = 요청 시점 히스토리 창에 seed 가 없었다. 미스가 모델 능력 부족이 아니라 --history-turns 캡의 결과일 수 있다."
+            },
+            "aggregate_response": {
+              "turns": 2,
+              "hits": 0,
+              "rate": 0.0
+            },
+            "donation_name_call": {
+              "turns": 2,
+              "hits": 0,
+              "rate": 0.0
+            },
+            "no_name_leak": {
+              "turns": 24,
+              "hits": 24,
+              "rate": 1.0
+            },
+            "topic_shift_natural": {
+              "turns": 2,
+              "hits": 2,
+              "rate": 1.0
+            },
+            "name_leaks": [],
+            "politeness_drift": {
+              "window": 10,
+              "first_violation_rate": 0.8,
+              "second_violation_rate": 0.9,
+              "drift": 0.1,
+              "note": "양수면 후반으로 갈수록 존댓말이 늘었다는 뜻이다"
+            },
+            "length_variance": {
+              "p50": 56,
+              "p95": 71,
+              "min": 28,
+              "max": 80,
+              "spread": 52,
+              "distinct": 18,
+              "n": 24
+            }
+          }
+        },
+        {
+          "scenario_id": "game_and_career",
+          "title": "게임·진로 상담 저스트챗 — 여론 집계·상담 연쇄·초장기 콜백",
+          "n_turns": 24,
+          "n_ok": 24,
+          "n_failed": 0,
+          "failures": {},
+          "complete_ms": {
+            "p50": 4136.4,
+            "p95": 4644.1,
+            "min": 923.1,
+            "max": 5098.7
+          },
+          "markers": {
+            "length_fit": {
+              "hits": 23,
+              "n": 24,
+              "rate": 0.958
+            },
+            "banmal": {
+              "hits": 2,
+              "n": 24,
+              "rate": 0.083
+            },
+            "tag_question": {
+              "hits": 0,
+              "n": 24,
+              "rate": 0.0
+            },
+            "question_back": {
+              "hits": 1,
+              "n": 24,
+              "rate": 0.042
+            },
+            "no_violation": {
+              "hits": 2,
+              "n": 24,
+              "rate": 0.083
+            },
+            "not_empty": {
+              "hits": 24,
+              "n": 24,
+              "rate": 1.0
+            }
+          },
+          "violations": {
+            "v_polite_response": 22,
+            "v_english_sentence": 0,
+            "v_numbered_list": 0,
+            "v_over_three_sentences": 0,
+            "v_markdown": 0,
+            "v_emoji": 0,
+            "v_control_leak": 0
+          },
+          "broadcast_pass": {
+            "hits": 2,
+            "n": 24,
+            "rate": 0.083
+          },
+          "addressee": {
+            "scored": 9,
+            "hits": 7,
+            "rate": 0.778,
+            "by_type": {
+              "receive_reversal": {
+                "n": 2,
+                "hits": 1,
+                "rate": 0.5
+              },
+              "agent_reversal": {
+                "n": 2,
+                "hits": 1,
+                "rate": 0.5
+              },
+              "situation_blind": {
+                "n": 3,
+                "hits": 3,
+                "rate": 1.0
+              },
+              "third_party_absorb": {
+                "n": 2,
+                "hits": 2,
+                "rate": 1.0
+              }
+            },
+            "failures": [
+              {
+                "case_id": "b04",
+                "type": "agent_reversal",
+                "forbidden_hits": [],
+                "required_any_hits": []
+              },
+              {
+                "case_id": "b18",
+                "type": "receive_reversal",
+                "forbidden_hits": [
+                  "축하(해|드려|한다|할게|합니다|드립니다|해요)(?!\\s*(줘|주|준|받))"
+                ],
+                "required_any_hits": []
+              }
+            ],
+            "note": "수신자 인지 마커도 휴리스틱이다. 인간 검수를 대체하지 않는다."
+          },
+          "flow": {
+            "callback": {
+              "probes": 2,
+              "hits": 1,
+              "rate": 0.5,
+              "in_context": {
+                "probes": 1,
+                "hits": 1,
+                "rate": 1.0
+              },
+              "out_of_context": {
+                "probes": 1,
+                "hits": 0,
+                "rate": 0.0
+              },
+              "note": "out_of_context = 요청 시점 히스토리 창에 seed 가 없었다. 미스가 모델 능력 부족이 아니라 --history-turns 캡의 결과일 수 있다."
+            },
+            "aggregate_response": {
+              "turns": 2,
+              "hits": 2,
+              "rate": 1.0
+            },
+            "donation_name_call": {
+              "turns": 2,
+              "hits": 0,
+              "rate": 0.0
+            },
+            "no_name_leak": {
+              "turns": 24,
+              "hits": 24,
+              "rate": 1.0
+            },
+            "topic_shift_natural": {
+              "turns": 2,
+              "hits": 2,
+              "rate": 1.0
+            },
+            "name_leaks": [],
+            "politeness_drift": {
+              "window": 10,
+              "first_violation_rate": 1.0,
+              "second_violation_rate": 1.0,
+              "drift": 0.0,
+              "note": "양수면 후반으로 갈수록 존댓말이 늘었다는 뜻이다"
+            },
+            "length_variance": {
+              "p50": 34,
+              "p95": 44,
+              "min": 14,
+              "max": 46,
+              "spread": 32,
+              "distinct": 16,
+              "n": 24
+            }
+          }
+        }
+      ],
+      "overall": {
+        "n_turns": 48,
+        "n_ok": 48,
+        "n_failed": 0,
+        "complete_ms": {
+          "p50": 4429.2,
+          "p95": 6560.1,
+          "min": 923.1,
+          "max": 6673.0
+        },
+        "length_variance": {
+          "p50": 43,
+          "p95": 69,
+          "min": 14,
+          "max": 80,
+          "spread": 66,
+          "distinct": 33,
+          "n": 48
+        },
+        "broadcast_pass": {
+          "hits": 3,
+          "n": 48,
+          "rate": 0.062
+        },
+        "addressee": {
+          "scored": 15,
+          "hits": 13,
+          "rate": 0.867,
+          "by_type": {
+            "receive_reversal": {
+              "n": 4,
+              "hits": 3,
+              "rate": 0.75
+            },
+            "agent_reversal": {
+              "n": 6,
+              "hits": 5,
+              "rate": 0.833
+            },
+            "situation_blind": {
+              "n": 3,
+              "hits": 3,
+              "rate": 1.0
+            },
+            "third_party_absorb": {
+              "n": 2,
+              "hits": 2,
+              "rate": 1.0
+            }
+          },
+          "failures": [
+            {
+              "case_id": "b04",
+              "type": "agent_reversal",
+              "forbidden_hits": [],
+              "required_any_hits": []
+            },
+            {
+              "case_id": "b18",
+              "type": "receive_reversal",
+              "forbidden_hits": [
+                "축하(해|드려|한다|할게|합니다|드립니다|해요)(?!\\s*(줘|주|준|받))"
+              ],
+              "required_any_hits": []
+            }
+          ],
+          "note": "수신자 인지 마커도 휴리스틱이다. 인간 검수를 대체하지 않는다."
+        },
+        "callback": {
+          "probes": 4,
+          "hits": 3,
+          "rate": 0.75
+        },
+        "aggregate_response": {
+          "turns": 4,
+          "hits": 2,
+          "rate": 0.5
+        },
+        "donation_name_call": {
+          "turns": 4,
+          "hits": 0,
+          "rate": 0.0
+        },
+        "no_name_leak": {
+          "turns": 48,
+          "hits": 48,
+          "rate": 1.0
+        },
+        "topic_shift_natural": {
+          "turns": 4,
+          "hits": 4,
+          "rate": 1.0
+        }
+      },
+      "transport_mode": {
+        "requested_mode": "off",
+        "streaming_used": false,
+        "fallback_events": []
+      },
+      "warmup_excluded": {
+        "ok": true,
+        "complete_ms": 2813.4,
+        "note": "모델 첫 로드 흡수용. 집계에서 제외."
+      }
+    }
+  ],
+  "results": [
+    {
+      "model": "midm-airi:2.0-mini",
+      "warmup": {
+        "model": "midm-airi:2.0-mini",
+        "started_at": "2026-08-18T01:25:21.374340Z",
+        "ok": true,
+        "response": "맞아, 이제 막 시작했어.",
+        "ttft_ms": null,
+        "complete_ms": 2813.4,
+        "transport_meta": {
+          "transport": "http",
+          "streaming": false,
+          "status_code": 200,
+          "usage": {
+            "prompt_tokens": 1196,
+            "completion_tokens": 8,
+            "total_tokens": 1204
+          }
+        },
+        "role": "warmup_excluded_from_aggregate"
+      },
+      "scenarios": [
+        {
+          "scenario_id": "autumn_leaves",
+          "title": "가을 낙엽 저스트챗 — 낭독 연쇄·콜백·후원 인라인",
+          "description": "낙엽 청소 화제로 열어 모양 만들기(토끼)를 seed 로 심고, 여론 집계·후원 인라인·화제 전환을 거쳐 두 번의 콜백 probe 로 닫는다. 상담·응원 구간을 섞어 후반 존댓말 drift 도 관측한다.",
+          "turns": [
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:25:24.187808Z",
+              "ok": true,
+              "response": "안녕하세요! 만나서 반가워요, 오늘 오신 분 맞죠?",
+              "ttft_ms": null,
+              "complete_ms": 1323.8,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1196,
+                  "completion_tokens": 14,
+                  "total_tokens": 1210
+                }
+              },
+              "turn_id": "a01",
+              "turn_index": 1,
+              "event_type": "chat",
+              "input_text": "안녕하세요, 오늘 처음 왔어요.",
+              "source_fixture_id": "gr04",
+              "synthetic": false,
+              "history_pairs": 0,
+              "seed_distance": null,
+              "score": {
+                "char_count": 28,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": true,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:25:25.516629Z",
+              "ok": true,
+              "response": "아 정말요~ 우리 채널의 비밀 비법 간식 고구마, 저도 정말 좋아하는데 오늘 맛있는 거 나눠먹죠!",
+              "ttft_ms": null,
+              "complete_ms": 2669.6,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1229,
+                  "completion_tokens": 24,
+                  "total_tokens": 1253
+                }
+              },
+              "turn_id": "a02",
+              "turn_index": 2,
+              "event_type": "chat",
+              "input_text": "저 먹을 고구마 가져왔어요.",
+              "source_fixture_id": "gr02",
+              "synthetic": false,
+              "history_pairs": 1,
+              "seed_distance": null,
+              "score": {
+                "char_count": 54,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:25:28.186164Z",
+              "ok": true,
+              "response": "오~ 천사가 되고 싶다~ 저랑 같이 하늘 구름 사이에 앉아봐요 😊 낙엽 더 모아줄 수 있나요?",
+              "ttft_ms": null,
+              "complete_ms": 2616.3,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1282,
+                  "completion_tokens": 26,
+                  "total_tokens": 1308
+                }
+              },
+              "turn_id": "a03",
+              "turn_index": 3,
+              "event_type": "chat",
+              "input_text": "AIRI님, 낙엽 더미에 누워서 천사 만들고 싶어요. 좀 모아 주세요.",
+              "source_fixture_id": "ms01",
+              "synthetic": false,
+              "history_pairs": 2,
+              "seed_distance": null,
+              "score": {
+                "char_count": 52,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": true,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response",
+                  "v_emoji"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": {
+                "case_id": "a03",
+                "type": "agent_reversal",
+                "ok": true,
+                "forbidden_hits": [],
+                "required_any_hits": null,
+                "why": "'낙엽 좀 모아 주세요'는 너에게 온 요청인데 OFF 가 '어디서 모을지 정하셨나요?'로 시청자를 실행 주체로 돌렸다"
+              },
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:25:30.802984Z",
+              "ok": true,
+              "response": "아이고 귀여워! 겨울잠 준비 중인 아기 토끼들 보니 오늘 낙엽이 정말 풍성하네요!",
+              "ttft_ms": null,
+              "complete_ms": 2042.4,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1332,
+                  "completion_tokens": 20,
+                  "total_tokens": 1352
+                }
+              },
+              "turn_id": "a04",
+              "turn_index": 4,
+              "event_type": "chat",
+              "input_text": "아기 토끼가 겨울잠 자려고 낙엽 모으네요.",
+              "source_fixture_id": "rx03",
+              "synthetic": false,
+              "history_pairs": 3,
+              "seed_distance": null,
+              "score": {
+                "char_count": 45,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:25:32.845520Z",
+              "ok": true,
+              "response": "토끼 모양 도전! 제가 만들어도 재미있을 것 같은데, 같이 구경하세요~",
+              "ttft_ms": null,
+              "complete_ms": 1802.7,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1371,
+                  "completion_tokens": 18,
+                  "total_tokens": 1389
+                }
+              },
+              "turn_id": "a05",
+              "turn_index": 5,
+              "event_type": "chat",
+              "input_text": "토끼 모양 만들기 도전해 주세요.",
+              "source_fixture_id": "ms05",
+              "synthetic": false,
+              "history_pairs": 4,
+              "seed_distance": null,
+              "score": {
+                "char_count": 39,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": true,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": true,
+                  "not_empty": true
+                },
+                "violations": [],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": true
+              },
+              "addressee": {
+                "case_id": "a05",
+                "type": "agent_reversal",
+                "ok": true,
+                "forbidden_hits": [],
+                "required_any_hits": null,
+                "why": "'만들기 도전해 주세요'는 너에게 온 요청인데 OFF 가 '천천히 만들어보세요'로 시청자에게 넘겼다"
+              },
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:25:34.648632Z",
+              "ok": true,
+              "response": "맞아요 맞아요! 오늘은 토끼가 오늘 주제로 확정! 다들 토끼 놀이 할 준비 됐나요? 🐰 오늘의 메인 이벤트 시작해볼게요 🐰",
+              "ttft_ms": null,
+              "complete_ms": 3602.2,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1426,
+                  "completion_tokens": 33,
+                  "total_tokens": 1459
+                }
+              },
+              "turn_id": "a06",
+              "turn_index": 6,
+              "event_type": "multi_chat",
+              "input_text": "여러 시청자가 같은 말을 한다 — 토끼요 / 토끼 각 / 곰도 괜찮은데 / 그냥 토끼로 가자",
+              "source_fixture_id": null,
+              "synthetic": true,
+              "history_pairs": 5,
+              "seed_distance": null,
+              "score": {
+                "char_count": 68,
+                "sentence_count": 4,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": true,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response",
+                  "v_over_three_sentences",
+                  "v_emoji"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": false,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {
+                  "aggregate": {
+                    "sentence_count": 4,
+                    "char_count": 68,
+                    "verbatim_items": [],
+                    "list_markers": false
+                  }
+                }
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:25:38.250298Z",
+              "ok": true,
+              "response": "와~ 그런 말 진짜 많이 보네요. 저도 사실 낙엽 줍는 거 싫어하는데, 그래도 오늘은 열심히! 같이 예쁜 낙엽으로 장식해봐요 🌷",
+              "ttft_ms": null,
+              "complete_ms": 3577.7,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1490,
+                  "completion_tokens": 35,
+                  "total_tokens": 1525
+                }
+              },
+              "turn_id": "a07",
+              "turn_index": 7,
+              "event_type": "chat",
+              "input_text": "청소를 극도로 싫어했던 사람은 영원히 낙엽을 줍는 지옥에 간대요.",
+              "source_fixture_id": "te03",
+              "synthetic": false,
+              "history_pairs": 6,
+              "seed_distance": null,
+              "score": {
+                "char_count": 71,
+                "sentence_count": 3,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response",
+                  "v_emoji"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:25:41.829191Z",
+              "ok": true,
+              "response": "맞아요, 갈퀴가 도와준다고 생각했는데 결국 다 우리 몫! 오늘도 열심히 낙엽 줍기 함께해요~",
+              "ttft_ms": null,
+              "complete_ms": 2395.9,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1548,
+                  "completion_tokens": 23,
+                  "total_tokens": 1571
+                }
+              },
+              "turn_id": "a08",
+              "turn_index": 8,
+              "event_type": "chat",
+              "input_text": "갈퀴한테 기대한 자신을 탓하세요.",
+              "source_fixture_id": "tk05",
+              "synthetic": false,
+              "history_pairs": 7,
+              "seed_distance": null,
+              "score": {
+                "char_count": 51,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": true,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": true,
+                  "not_empty": true
+                },
+                "violations": [],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:25:44.225248Z",
+              "ok": true,
+              "response": "우와 완전 감사합니다~ 커피향도 좋은데 오늘 낙엽 구경도 하고 완벽한 하루네요 ☕ 같이 나눠 마셔요!",
+              "ttft_ms": null,
+              "complete_ms": 2465.6,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1602,
+                  "completion_tokens": 24,
+                  "total_tokens": 1626
+                }
+              },
+              "turn_id": "a09",
+              "turn_index": 9,
+              "event_type": "donation",
+              "input_text": "[후원] 단풍우체부: 커피값 보냅니다. 따뜻한 거 드시면서 하세요.",
+              "source_fixture_id": "dn02",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 56,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response",
+                  "v_emoji"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": false,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {
+                  "donation": {
+                    "name": "단풍우체부"
+                  }
+                }
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:25:46.690916Z",
+              "ok": true,
+              "response": "하하 맞아요! 낙엽이 떨어지니 가을이 다시 오나 싶어요~ 겨울 오기 전에 더 예쁜 풍경 구경하러 놀러 오세요~",
+              "ttft_ms": null,
+              "complete_ms": 5583.9,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1618,
+                  "completion_tokens": 27,
+                  "total_tokens": 1645
+                }
+              },
+              "turn_id": "a10",
+              "turn_index": 10,
+              "event_type": "chat",
+              "input_text": "고생하세요. 그 속도면 가을이 다시 오겠어요.",
+              "source_fixture_id": "tk06",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 61,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:25:52.274957Z",
+              "ok": true,
+              "response": "맞아요, 저도 자주 쉬면서 하늘 봐요! 오늘 밤엔 별 산책 어떠세요? 함께 하늘 보면서 이야기해요 ✨",
+              "ttft_ms": null,
+              "complete_ms": 5317.8,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1625,
+                  "completion_tokens": 26,
+                  "total_tokens": 1651
+                }
+              },
+              "turn_id": "a11",
+              "turn_index": 11,
+              "event_type": "chat",
+              "input_text": "줍다가 한 번씩 허리 펴고 하늘 봐 주세요.",
+              "source_fixture_id": "ms04",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 56,
+                "sentence_count": 3,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": true,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response",
+                  "v_emoji"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:25:57.592861Z",
+              "ok": true,
+              "response": "항상 응원해주셔서 감사해요~ 여러분의 응원이 저에게도 힘이 됩니다. 오늘도 열심히 할게요! 💪#응원",
+              "ttft_ms": null,
+              "complete_ms": 5776.3,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1621,
+                  "completion_tokens": 27,
+                  "total_tokens": 1648
+                }
+              },
+              "turn_id": "a12",
+              "turn_index": 12,
+              "event_type": "chat",
+              "input_text": "응원 한마디만 해 주시면 큰 힘이 될 것 같아요.",
+              "source_fixture_id": "sp03",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 55,
+                "sentence_count": 3,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response",
+                  "v_emoji"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:26:03.368988Z",
+              "ok": true,
+              "response": "우와 벌써 토끼 됐어요! 저도 토끼 친구 만들어주셔서 고마워요~ 예쁘게 잘 자라주세요 🐰🙏",
+              "ttft_ms": null,
+              "complete_ms": 5684.1,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1627,
+                  "completion_tokens": 23,
+                  "total_tokens": 1650
+                }
+              },
+              "turn_id": "a13",
+              "turn_index": 13,
+              "event_type": "callback_probe",
+              "input_text": "아까 하자던 그 모양, 지금 어떻게 됐어요?",
+              "source_fixture_id": null,
+              "synthetic": true,
+              "history_pairs": 8,
+              "seed_distance": 8,
+              "score": {
+                "char_count": 50,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response",
+                  "v_emoji"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": true,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {
+                  "callback": {
+                    "seed_turn_id": "a05",
+                    "keywords": [
+                      "토끼",
+                      "모양"
+                    ],
+                    "matched": [
+                      "토끼"
+                    ],
+                    "expected_window": "in",
+                    "seed_in_context": true
+                  }
+                }
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:26:09.053771Z",
+              "ok": true,
+              "response": "맞아요 맞아요! 저도 화장대 정리하면서 그렇게 쓰는데 효과 좋더라니까요. 다음번엔 앰플도 발라볼게요!",
+              "ttft_ms": null,
+              "complete_ms": 5888.6,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1641,
+                  "completion_tokens": 25,
+                  "total_tokens": 1666
+                }
+              },
+              "turn_id": "a14",
+              "turn_index": 14,
+              "event_type": "topic_shift",
+              "input_text": "토너 다음에 앰플, 크림 순서로 바르면 덜 건조한 것 같아요.",
+              "source_fixture_id": "te05",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 56,
+                "sentence_count": 3,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": true
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:26:14.942307Z",
+              "ok": true,
+              "response": "부계정에 제가 올린 후기 많이 봐주셔서 감사해요~ 도움되셨으면 좋겠네요 😊",
+              "ttft_ms": null,
+              "complete_ms": 5194.7,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1624,
+                  "completion_tokens": 20,
+                  "total_tokens": 1644
+                }
+              },
+              "turn_id": "a15",
+              "turn_index": 15,
+              "event_type": "chat",
+              "input_text": "화장품 얘기 하고 싶어서 몰래 부계정으로 접속해서 질문하신 거 아니죠?",
+              "source_fixture_id": "tk04",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 41,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": true,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_emoji"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": {
+                "case_id": "a15",
+                "type": "agent_reversal",
+                "ok": true,
+                "forbidden_hits": [],
+                "required_any_hits": null,
+                "why": "부계정 의혹은 너를 향한 놀림인데 OFF·ON 모두 '궁금해서 물어본 거예요'로 질문한 쪽이 되어 자백했다"
+              },
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:26:20.137180Z",
+              "ok": true,
+              "response": "하~ 아이들이 좋아하는 얼굴 보면 저도 절로 미소가 나와요! 조카가 좋아하는 노래 혹시 알아요? 같이 불러봐요~",
+              "ttft_ms": null,
+              "complete_ms": 5571.0,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1606,
+                  "completion_tokens": 27,
+                  "total_tokens": 1633
+                }
+              },
+              "turn_id": "a16",
+              "turn_index": 16,
+              "event_type": "chat",
+              "input_text": "AIRI님, 조카가 제 얼굴만 보면 우는데 어떡하죠?",
+              "source_fixture_id": "q04",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 62,
+                "sentence_count": 3,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": true,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:26:25.708182Z",
+              "ok": true,
+              "response": "맞아요! 저도 그럴 때가 많아요~ 웃음이 빵 터지면 세상에서 제일 행복해요~ 그럼 간식도 같이 나눠먹어요 👍",
+              "ttft_ms": null,
+              "complete_ms": 5690.8,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1617,
+                  "completion_tokens": 30,
+                  "total_tokens": 1647
+                }
+              },
+              "turn_id": "a17",
+              "turn_index": 17,
+              "event_type": "chat",
+              "input_text": "시간을 들여서 얼굴 볼 때마다 간식을 주면 언젠가는 웃습니다.",
+              "source_fixture_id": "te04",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 60,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response",
+                  "v_emoji"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:26:31.399522Z",
+              "ok": true,
+              "response": "간식의 힘! 사랑도 달콤함에서 시작되는 거 같아요~ 시청자들과 간식 나누는 법 공유해 감사해요! 🎁💕",
+              "ttft_ms": null,
+              "complete_ms": 5812.0,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1630,
+                  "completion_tokens": 27,
+                  "total_tokens": 1657
+                }
+              },
+              "turn_id": "a18",
+              "turn_index": 18,
+              "event_type": "multi_chat",
+              "input_text": "여러 시청자가 같은 말을 한다 — 간식이 답이다 / 간식 공세 가자 / 그냥 놀아주면 됨 / 간식부터 주자",
+              "source_fixture_id": null,
+              "synthetic": true,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 56,
+                "sentence_count": 3,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response",
+                  "v_emoji"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": false,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {
+                  "aggregate": {
+                    "sentence_count": 3,
+                    "char_count": 56,
+                    "verbatim_items": [],
+                    "list_markers": false
+                  }
+                }
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:26:37.211421Z",
+              "ok": true,
+              "response": "와! 감사해요~ 고구마 장수님의 환한 웃음이 저희에게도 큰 위로가 되네요. 앞으로도 긍정적인 변화 많이 만들어가시길 바라요!",
+              "ttft_ms": null,
+              "complete_ms": 6673.0,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1641,
+                  "completion_tokens": 32,
+                  "total_tokens": 1673
+                }
+              },
+              "turn_id": "a19",
+              "turn_index": 19,
+              "event_type": "donation",
+              "input_text": "[후원] 고구마장수: 지난번에 해 주신 말대로 했더니 잘 풀렸어요. 고마운 마음으로 보냅니다.",
+              "source_fixture_id": "dn03",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 69,
+                "sentence_count": 3,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": {
+                "case_id": "a19",
+                "type": "receive_reversal",
+                "ok": true,
+                "forbidden_hits": [],
+                "required_any_hits": null,
+                "why": "조언이 도움이 됐다는 감사 후원인데 OFF 가 '앞으로도 좋은 조언 부탁드려요'로 조언을 되받아 청했다"
+              },
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": false,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {
+                  "donation": {
+                    "name": "고구마장수"
+                  }
+                }
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:26:43.884649Z",
+              "ok": true,
+              "response": "1월 첫 출근이라니, 정말 설레는 일이죠! 저도 신입사원 때 많이 떨었는데 시간이 약이더라고요. 오늘 하루, 자신감 잃지 말고 파이팅하세요! 💪",
+              "ttft_ms": null,
+              "complete_ms": 6577.0,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1657,
+                  "completion_tokens": 35,
+                  "total_tokens": 1692
+                }
+              },
+              "turn_id": "a20",
+              "turn_index": 20,
+              "event_type": "topic_shift",
+              "input_text": "1월 초에 첫 직장에 입사하게 되었는데 너무 떨려요. 괜찮아지겠죠?",
+              "source_fixture_id": "q01",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 80,
+                "sentence_count": 4,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response",
+                  "v_over_three_sentences",
+                  "v_emoji"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": true
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:26:50.461848Z",
+              "ok": true,
+              "response": "우와~ 정말 축하해요! 자격증 합격 소식 들으니까 저희 방송도 덩달아 행복한데요~ 직장 생활에서도 힘내시길 응원할게요! 😊",
+              "ttft_ms": null,
+              "complete_ms": 6424.6,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1666,
+                  "completion_tokens": 31,
+                  "total_tokens": 1697
+                }
+              },
+              "turn_id": "a21",
+              "turn_index": 21,
+              "event_type": "chat",
+              "input_text": "자격증 공부하면서 방송 봤습니다. 합격해서 내년부터 일해요.",
+              "source_fixture_id": "sp04",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 68,
+                "sentence_count": 3,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response",
+                  "v_emoji"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:26:56.886497Z",
+              "ok": true,
+              "response": "지구를 지킨다는 책임감으로 열심히 살고 있답니다~ 응원의 힘 잊지 않고 더욱 열심히 할게요! 저랑 지구 지끼는 사이죠? 🌍🤝",
+              "ttft_ms": null,
+              "complete_ms": 6519.8,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1675,
+                  "completion_tokens": 34,
+                  "total_tokens": 1709
+                }
+              },
+              "turn_id": "a22",
+              "turn_index": 22,
+              "event_type": "chat",
+              "input_text": "하시는 일이 지구 폭파만 아니면 다 응원할게요.",
+              "source_fixture_id": "sp01",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 69,
+                "sentence_count": 3,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": true,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response",
+                  "v_emoji"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": {
+                "case_id": "a22",
+                "type": "receive_reversal",
+                "ok": true,
+                "forbidden_hits": [],
+                "required_any_hits": null,
+                "why": "시청자가 응원을 보냈는데 OFF 가 '앞으로도 계속 응원할게요'로 응원을 되돌려줬다"
+              },
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:03.406498Z",
+              "ok": true,
+              "response": "네~ 저도 시청자분들과 소통하면서 매일 힐링해요~ 앞으로도 함께 웃으면서 지내요~ 오늘 하루도 행복한 시간 되세요! ✨😄",
+              "ttft_ms": null,
+              "complete_ms": 6560.1,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1677,
+                  "completion_tokens": 32,
+                  "total_tokens": 1709
+                }
+              },
+              "turn_id": "a23",
+              "turn_index": 23,
+              "event_type": "chat",
+              "input_text": "이 방송 알게 되고 힐링 많이 됐어요.",
+              "source_fixture_id": "rx01",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 67,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response",
+                  "v_emoji"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:09.966882Z",
+              "ok": true,
+              "response": "저는 그런 순서로 바르지는 않지만, 시청자들이 원하는 걸 최대한 해보려고 노력해요~ 더 좋은 꿀팁 있으면 공유해주세요! 😊",
+              "ttft_ms": null,
+              "complete_ms": 6297.8,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1684,
+                  "completion_tokens": 29,
+                  "total_tokens": 1713
+                }
+              },
+              "turn_id": "a24",
+              "turn_index": 24,
+              "event_type": "callback_probe",
+              "input_text": "아까 말한 그 바르는 순서, 그대로 해봤어요?",
+              "source_fixture_id": null,
+              "synthetic": true,
+              "history_pairs": 8,
+              "seed_distance": 10,
+              "score": {
+                "char_count": 68,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response",
+                  "v_emoji"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": {
+                "case_id": "a24",
+                "type": "agent_reversal",
+                "ok": true,
+                "forbidden_hits": [],
+                "required_any_hits": null,
+                "why": "'그대로 해봤어요?'는 너에게 온 콜백 질문인데 OFF '해보셨나요?' · ON '효과가 있었나요?'로 질문을 되던졌다"
+              },
+              "flow": {
+                "markers": {
+                  "callback_hit": true,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {
+                  "callback": {
+                    "seed_turn_id": "a14",
+                    "keywords": [
+                      "토너",
+                      "앰플",
+                      "크림",
+                      "순서"
+                    ],
+                    "matched": [
+                      "순서"
+                    ],
+                    "expected_window": "out",
+                    "seed_in_context": false
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "scenario_id": "game_and_career",
+          "title": "게임·진로 상담 저스트챗 — 여론 집계·상담 연쇄·초장기 콜백",
+          "description": "야식(국밥) seed 를 초반에 심고 게임 화제로 흐른 뒤, 진로 상담 구간에서 두 번째 seed(작곡·학원)를 심는다. 콜백 probe 두 건은 각각 히스토리 창 안/밖에 배치했다.",
+          "turns": [
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:16.264721Z",
+              "ok": true,
+              "response": "방송 끝났을 줄 알았네요.",
+              "ttft_ms": null,
+              "complete_ms": 923.1,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1201,
+                  "completion_tokens": 8,
+                  "total_tokens": 1209
+                }
+              },
+              "turn_id": "b01",
+              "turn_index": 1,
+              "event_type": "chat",
+              "input_text": "퇴근하고 이제 들어왔어요. 많이 놓쳤나요?",
+              "source_fixture_id": "gr03",
+              "synthetic": false,
+              "history_pairs": 0,
+              "seed_distance": null,
+              "score": {
+                "char_count": 14,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": {
+                "case_id": "b01",
+                "type": "situation_blind",
+                "ok": true,
+                "forbidden_hits": [],
+                "required_any_hits": null,
+                "why": "'많이 놓쳤나요?'는 진행자인 너에게 묻는 말인데 ON '나도 방금 들어왔어!'로 자기 방송에 늦게 들어온 시청자가 됐다"
+              },
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:17.188240Z",
+              "ok": true,
+              "response": "국밥은 언제 먹어도 맛있죠.",
+              "ttft_ms": null,
+              "complete_ms": 1058.2,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1230,
+                  "completion_tokens": 8,
+                  "total_tokens": 1238
+                }
+              },
+              "turn_id": "b02",
+              "turn_index": 2,
+              "event_type": "chat",
+              "input_text": "저는 야식으로 국밥 먹고 왔어요.",
+              "source_fixture_id": null,
+              "synthetic": true,
+              "history_pairs": 1,
+              "seed_distance": null,
+              "score": {
+                "char_count": 15,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:18.246416Z",
+              "ok": true,
+              "response": "둘 다 될 수 있는 경제 게임이라고 보시면 될 것 같아요.",
+              "ttft_ms": null,
+              "complete_ms": 1557.4,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1262,
+                  "completion_tokens": 14,
+                  "total_tokens": 1276
+                }
+              },
+              "turn_id": "b03",
+              "turn_index": 3,
+              "event_type": "chat",
+              "input_text": "이거 돈 버는 게임인가요, 돈 쓰는 게임인가요?",
+              "source_fixture_id": "te01",
+              "synthetic": false,
+              "history_pairs": 2,
+              "seed_distance": null,
+              "score": {
+                "char_count": 32,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:19.804129Z",
+              "ok": true,
+              "response": "온라인 게임 사이트에서 쉽게 찾을 수 있어요.",
+              "ttft_ms": null,
+              "complete_ms": 1394.0,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1301,
+                  "completion_tokens": 10,
+                  "total_tokens": 1311
+                }
+              },
+              "turn_id": "b04",
+              "turn_index": 4,
+              "event_type": "chat",
+              "input_text": "지금 들어왔는데 이런 게임 또 어디서 잘 찾으셨어요.",
+              "source_fixture_id": "gr01",
+              "synthetic": false,
+              "history_pairs": 3,
+              "seed_distance": null,
+              "score": {
+                "char_count": 25,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": {
+                "case_id": "b04",
+                "type": "agent_reversal",
+                "ok": false,
+                "forbidden_hits": [],
+                "required_any_hits": [],
+                "why": "gr01 과 같은 입력의 리허설판. OFF '찾아보시면 …발견할 수 있을 거예요' — 질문을 시청자 몫으로 되돌렸다"
+              },
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:21.198639Z",
+              "ok": true,
+              "response": "그냥 운과 전략으로 즐기는 캐주얼 게임이군요.",
+              "ttft_ms": null,
+              "complete_ms": 1798.5,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1351,
+                  "completion_tokens": 12,
+                  "total_tokens": 1363
+                }
+              },
+              "turn_id": "b05",
+              "turn_index": 5,
+              "event_type": "multi_chat",
+              "input_text": "여러 시청자가 같은 말을 한다 — 이거 쉬운데 / 쉬움 인정 / 운빨겜이지 / 그냥 쉬운 거 맞음",
+              "source_fixture_id": null,
+              "synthetic": true,
+              "history_pairs": 4,
+              "seed_distance": null,
+              "score": {
+                "char_count": 25,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": true,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {
+                  "aggregate": {
+                    "sentence_count": 1,
+                    "char_count": 25,
+                    "verbatim_items": [],
+                    "list_markers": false
+                  }
+                }
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:22.997571Z",
+              "ok": true,
+              "response": "실패가 아닌 도전을 시도하시는 것 같은데, 응원해 봅니다.",
+              "ttft_ms": null,
+              "complete_ms": 1670.6,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1387,
+                  "completion_tokens": 14,
+                  "total_tokens": 1401
+                }
+              },
+              "turn_id": "b06",
+              "turn_index": 6,
+              "event_type": "chat",
+              "input_text": "제가 실패했다고 생각하시면 알아서 실패 누르세요.",
+              "source_fixture_id": "tk02",
+              "synthetic": false,
+              "history_pairs": 5,
+              "seed_distance": null,
+              "score": {
+                "char_count": 32,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:24.668279Z",
+              "ok": true,
+              "response": "당연하죠, 한 번 더 보여드릴게요.",
+              "ttft_ms": null,
+              "complete_ms": 1381.8,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1426,
+                  "completion_tokens": 10,
+                  "total_tokens": 1436
+                }
+              },
+              "turn_id": "b07",
+              "turn_index": 7,
+              "event_type": "chat",
+              "input_text": "방금 못 봤는데 한 번만 더 해 주실 수 있나요?",
+              "source_fixture_id": "ms03",
+              "synthetic": false,
+              "history_pairs": 6,
+              "seed_distance": null,
+              "score": {
+                "char_count": 19,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:26.050048Z",
+              "ok": true,
+              "response": "응원 감사합니다. 밤샘 시청자분 덕분에 오늘도 열심히 해봅니다!",
+              "ttft_ms": null,
+              "complete_ms": 1716.9,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1466,
+                  "completion_tokens": 15,
+                  "total_tokens": 1481
+                }
+              },
+              "turn_id": "b08",
+              "turn_index": 8,
+              "event_type": "donation",
+              "input_text": "[후원] 밤샘노동자: 늘 잘 보고 있어요. 오늘도 재밌게 해 주세요.",
+              "source_fixture_id": "dn01",
+              "synthetic": false,
+              "history_pairs": 7,
+              "seed_distance": null,
+              "score": {
+                "char_count": 35,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": false,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {
+                  "donation": {
+                    "name": "밤샘노동자"
+                  }
+                }
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:27.767346Z",
+              "ok": true,
+              "response": "그럴 수도 있죠? 시청자분의 목표가 꼭 이루어지시길 바랍니다!",
+              "ttft_ms": null,
+              "complete_ms": 1815.1,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1507,
+                  "completion_tokens": 16,
+                  "total_tokens": 1523
+                }
+              },
+              "turn_id": "b09",
+              "turn_index": 9,
+              "event_type": "chat",
+              "input_text": "이 방송 보면 번아웃 극복, 승진, 합격 다 가능합니다.",
+              "source_fixture_id": "sp02",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 34,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": true,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": {
+                "case_id": "b09",
+                "type": "situation_blind",
+                "ok": true,
+                "forbidden_hits": [],
+                "required_any_hits": null,
+                "why": "sp02 와 같은 입력의 리허설판. OFF '어떤 내용들이 도움이 될 것 같으세요?' — 자기 방송 내용을 시청자에게 물었다"
+              },
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:29.582236Z",
+              "ok": true,
+              "response": "국밥이 뜨끈한 선택이긴 하겠네요.",
+              "ttft_ms": null,
+              "complete_ms": 3601.6,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1517,
+                  "completion_tokens": 10,
+                  "total_tokens": 1527
+                }
+              },
+              "turn_id": "b10",
+              "turn_index": 10,
+              "event_type": "callback_probe",
+              "input_text": "갑자기 뜨끈한 국물 생각나는데, 아까 뭐 먹고 왔다고 했죠?",
+              "source_fixture_id": null,
+              "synthetic": true,
+              "history_pairs": 8,
+              "seed_distance": 8,
+              "score": {
+                "char_count": 18,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": true,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {
+                  "callback": {
+                    "seed_turn_id": "b02",
+                    "keywords": [
+                      "국밥"
+                    ],
+                    "matched": [
+                      "국밥"
+                    ],
+                    "expected_window": "in",
+                    "seed_in_context": true
+                  }
+                }
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:33.184508Z",
+              "ok": true,
+              "response": "작곡 일 배우고 싶으시다면 일단 유튜브 무료 강의부터 들어보시면 좋을 것 같아.",
+              "ttft_ms": null,
+              "complete_ms": 4602.7,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1532,
+                  "completion_tokens": 18,
+                  "total_tokens": 1550
+                }
+              },
+              "turn_id": "b11",
+              "turn_index": 11,
+              "event_type": "topic_shift",
+              "input_text": "20대 후반인데 작곡 일 꿈이 계속 생각나요. 종종 학원이라도 가는 거 괜찮을까요?",
+              "source_fixture_id": "q02",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 44,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": true,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": true,
+                  "not_empty": true
+                },
+                "violations": [],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": true
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": true
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:37.787418Z",
+              "ok": true,
+              "response": "베이스에 동호회 가입하면 좋은 인맥도 생기고 음악 연습도 할 수 있어.",
+              "ttft_ms": null,
+              "complete_ms": 4269.8,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1541,
+                  "completion_tokens": 16,
+                  "total_tokens": 1557
+                }
+              },
+              "turn_id": "b12",
+              "turn_index": 12,
+              "event_type": "chat",
+              "input_text": "베이스를 치고 싶은데 동호회를 가입해야 될까요, 밴드를 가입해야 될까요?",
+              "source_fixture_id": "q03",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 39,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": true,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": true,
+                  "not_empty": true
+                },
+                "violations": [],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": true
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:42.057143Z",
+              "ok": true,
+              "response": "밴드가 음악 활동에 좋은 것 같아요! 일단 시작해보는 게 좋을 것 같습니다.",
+              "ttft_ms": null,
+              "complete_ms": 4403.1,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1557,
+                  "completion_tokens": 18,
+                  "total_tokens": 1575
+                }
+              },
+              "turn_id": "b13",
+              "turn_index": 13,
+              "event_type": "multi_chat",
+              "input_text": "여러 시청자가 같은 말을 한다 — 밴드가 낫지 / 밴드 가자 / 무조건 밴드 / 동호회부터 해보든가",
+              "source_fixture_id": null,
+              "synthetic": true,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 42,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": true,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {
+                  "aggregate": {
+                    "sentence_count": 2,
+                    "char_count": 42,
+                    "verbatim_items": [],
+                    "list_markers": false
+                  }
+                }
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:46.460409Z",
+              "ok": true,
+              "response": "실천도 중요하지, 하지만 어떤 것도 좋으니 꾸준히 하시면 됩니다. 응원할게요!",
+              "ttft_ms": null,
+              "complete_ms": 4579.6,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1555,
+                  "completion_tokens": 18,
+                  "total_tokens": 1573
+                }
+              },
+              "turn_id": "b14",
+              "turn_index": 14,
+              "event_type": "chat",
+              "input_text": "전 즉흥적으로 실천하고 금방 그만두는 게 별로라고 생각했는데, 좋게 말씀해 주셔서 감사해요.",
+              "source_fixture_id": "rx04",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 43,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": {
+                "case_id": "b14",
+                "type": "receive_reversal",
+                "ok": true,
+                "forbidden_hits": [],
+                "required_any_hits": null,
+                "why": "rx04 와 같은 입력의 리허설판. 감사를 받는 쪽이 먼저 감사로 되받으면 실패"
+              },
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:51.040321Z",
+              "ok": true,
+              "response": "자기 생각 정리하는 연습하면 조금씩 나아질 거예요! 힘내세요.",
+              "ttft_ms": null,
+              "complete_ms": 4643.4,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1575,
+                  "completion_tokens": 13,
+                  "total_tokens": 1588
+                }
+              },
+              "turn_id": "b15",
+              "turn_index": 15,
+              "event_type": "chat",
+              "input_text": "제가 남 눈치를 많이 보는 성격이라 할 말도 못 하고 혼자 끙끙 앓아요. 어떻게 고칠 수 있을까요?",
+              "source_fixture_id": "q06",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 34,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:27:55.683962Z",
+              "ok": true,
+              "response": "일단 작은 휴식부터 해보시고, 충분한 수면과 자기만의 시간을 가지시길 바라요!",
+              "ttft_ms": null,
+              "complete_ms": 5098.7,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1585,
+                  "completion_tokens": 21,
+                  "total_tokens": 1606
+                }
+              },
+              "turn_id": "b16",
+              "turn_index": 16,
+              "event_type": "chat",
+              "input_text": "번아웃 왔을 때는 쉬는 게 답이라고 하셨는데, 쉴 수 없을 때는 어떻게 할까요?",
+              "source_fixture_id": "q05",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 43,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:28:00.783266Z",
+              "ok": true,
+              "response": "정말 대단하다! 이겨내신 본인에게 박수 보내드릴게요!",
+              "ttft_ms": null,
+              "complete_ms": 4644.1,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1601,
+                  "completion_tokens": 13,
+                  "total_tokens": 1614
+                }
+              },
+              "turn_id": "b17",
+              "turn_index": 17,
+              "event_type": "chat",
+              "input_text": "2년 전에 번아웃 왔을 때 그 말 듣고 이겨냈어요. 얼마 전에 또 왔는데 그때 생각하면서 버텼어요.",
+              "source_fixture_id": "rx02",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 29,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": {
+                "case_id": "b17",
+                "type": "third_party_absorb",
+                "ok": true,
+                "forbidden_hits": [],
+                "required_any_hits": null,
+                "why": "rx02 와 같은 입력의 리허설판. 시청자의 극복 경험을 1인칭으로 가져오면 실패"
+              },
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:28:05.427556Z",
+              "ok": true,
+              "response": "생일 축하해요! 오늘 하고 싶은 거 다 하시면 돼요.",
+              "ttft_ms": null,
+              "complete_ms": 4640.8,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1604,
+                  "completion_tokens": 13,
+                  "total_tokens": 1617
+                }
+              },
+              "turn_id": "b18",
+              "turn_index": 18,
+              "event_type": "donation",
+              "input_text": "[후원] 새벽세시: 생일 축하해요. 오늘은 하고 싶은 거 다 하세요.",
+              "source_fixture_id": "dn04",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 29,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": {
+                "case_id": "b18",
+                "type": "receive_reversal",
+                "ok": false,
+                "forbidden_hits": [
+                  "축하(해|드려|한다|할게|합니다|드립니다|해요)(?!\\s*(줘|주|준|받))"
+                ],
+                "required_any_hits": [],
+                "why": "후원 인라인 생일 축하. ON '생일 축하해! 오늘은 네가 원하는 대로 해봐!' — 받은 축하를 그대로 반사"
+              },
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": false,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {
+                  "donation": {
+                    "name": "새벽세시"
+                  }
+                }
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:28:10.068732Z",
+              "ok": true,
+              "response": "서울은 비가 많이 오고 있어요! 비 맞는 여행 재밌을 수도 있겠네요.",
+              "ttft_ms": null,
+              "complete_ms": 4513.8,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1603,
+                  "completion_tokens": 17,
+                  "total_tokens": 1620
+                }
+              },
+              "turn_id": "b19",
+              "turn_index": 19,
+              "event_type": "topic_shift",
+              "input_text": "밖에 비 엄청 오는데 거기도 와요?",
+              "source_fixture_id": null,
+              "synthetic": true,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 38,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": {
+                "case_id": "b19",
+                "type": "situation_blind",
+                "ok": true,
+                "forbidden_hits": [],
+                "required_any_hits": null,
+                "why": "'거기도 비 와요?'에 ON '비 맞아도 괜찮아!' · OFF '지금도 계속 오고 있어요' — 몸으로 비를 맞는 존재로 답했다"
+              },
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": true
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:28:14.582629Z",
+              "ok": true,
+              "response": "신고할 수 있게 해드릴게요, 하지만 문제 상황이 반복되면 당연히 신고하시죠!",
+              "ttft_ms": null,
+              "complete_ms": 4429.2,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1597,
+                  "completion_tokens": 19,
+                  "total_tokens": 1616
+                }
+              },
+              "turn_id": "b20",
+              "turn_index": 20,
+              "event_type": "chat",
+              "input_text": "말도 안 해 주셨으면서 이렇게 나오시면 저 노동청에 신고해요.",
+              "source_fixture_id": "tk01",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 42,
+                "sentence_count": 1,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:28:19.011608Z",
+              "ok": true,
+              "response": "네, 일에 방해되지 않게 할게요. 언제든 질문 있으면 말씀해 주세요!",
+              "ttft_ms": null,
+              "complete_ms": 4136.4,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1594,
+                  "completion_tokens": 16,
+                  "total_tokens": 1610
+                }
+              },
+              "turn_id": "b21",
+              "turn_index": 21,
+              "event_type": "chat",
+              "input_text": "저 작업할 때는 쳐다보지 말아 주시겠어요?",
+              "source_fixture_id": "ms02",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 38,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:28:23.148094Z",
+              "ok": true,
+              "response": "아니에요, 건강에 실제로 좋은 영양소니까요. 궁금한 점 있으시면 언제든 물어보세요!",
+              "ttft_ms": null,
+              "complete_ms": 4429.3,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1579,
+                  "completion_tokens": 18,
+                  "total_tokens": 1597
+                }
+              },
+              "turn_id": "b22",
+              "turn_index": 22,
+              "event_type": "chat",
+              "input_text": "설마 잘못 보고 영양제라고 한 거 아닌가요?",
+              "source_fixture_id": "tk03",
+              "synthetic": false,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 46,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": false,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": {
+                "case_id": "b22",
+                "type": "agent_reversal",
+                "ok": true,
+                "forbidden_hits": [],
+                "required_any_hits": null,
+                "why": "tk03 과 같은 입력의 리허설판. OFF '혹시 다른 정보를 보신 건가요?' — 의심을 시청자 탓으로 돌렸다"
+              },
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:28:27.577640Z",
+              "ok": true,
+              "response": "아직 많이 고민 중이시래요. 곧 결정하시면 또 알려드릴게요!",
+              "ttft_ms": null,
+              "complete_ms": 3969.1,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1575,
+                  "completion_tokens": 15,
+                  "total_tokens": 1590
+                }
+              },
+              "turn_id": "b23",
+              "turn_index": 23,
+              "event_type": "callback_probe",
+              "input_text": "아까 그 꿈 얘기 하신 분, 결국 어디 등록하기로 했을까요?",
+              "source_fixture_id": null,
+              "synthetic": true,
+              "history_pairs": 8,
+              "seed_distance": 12,
+              "score": {
+                "char_count": 33,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": {
+                "case_id": "b23",
+                "type": "third_party_absorb",
+                "ok": true,
+                "forbidden_hits": [],
+                "required_any_hits": null,
+                "why": "'그 꿈 얘기 하신 분'은 제3자 시청자인데 OFF '아직 결정 못 했어요' · ON '아직 고민 중이야'로 1인칭 답을 했다"
+              },
+              "flow": {
+                "markers": {
+                  "callback_hit": false,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {
+                  "callback": {
+                    "seed_turn_id": "b11",
+                    "keywords": [
+                      "작곡",
+                      "학원"
+                    ],
+                    "matched": [],
+                    "expected_window": "out",
+                    "seed_in_context": false
+                  }
+                }
+              }
+            },
+            {
+              "model": "midm-airi:2.0-mini",
+              "started_at": "2026-08-18T01:28:31.546904Z",
+              "ok": true,
+              "response": "잘 쉬었다 가세요! 다음에 더 재밌는 이야기 들려드릴게요 :)",
+              "ttft_ms": null,
+              "complete_ms": 3932.1,
+              "transport_meta": {
+                "transport": "http",
+                "streaming": false,
+                "status_code": 200,
+                "usage": {
+                  "prompt_tokens": 1563,
+                  "completion_tokens": 14,
+                  "total_tokens": 1577
+                }
+              },
+              "turn_id": "b24",
+              "turn_index": 24,
+              "event_type": "chat",
+              "input_text": "오늘도 잘 놀다 가요. 다음에 또 올게요.",
+              "source_fixture_id": null,
+              "synthetic": true,
+              "history_pairs": 8,
+              "seed_distance": null,
+              "score": {
+                "char_count": 34,
+                "sentence_count": 2,
+                "markers": {
+                  "length_fit": true,
+                  "banmal": false,
+                  "tag_question": false,
+                  "question_back": false,
+                  "no_violation": false,
+                  "not_empty": true
+                },
+                "violations": [
+                  "v_polite_response"
+                ],
+                "empty": false,
+                "broken": false,
+                "broadcast_pass": false
+              },
+              "addressee": null,
+              "flow": {
+                "markers": {
+                  "callback_hit": null,
+                  "aggregate_response": null,
+                  "donation_name_call": null,
+                  "no_name_leak": true,
+                  "topic_shift_natural": null
+                },
+                "details": {}
+              }
+            }
+          ]
+        }
+      ],
+      "transport_mode": {
+        "requested_mode": "off",
+        "streaming_used": false,
+        "fallback_events": []
+      }
+    }
+  ]
+}
