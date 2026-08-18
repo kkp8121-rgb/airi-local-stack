@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIRI 결정 입력 폼 — 2026-08-18</title>
+<style>
+:root{
+  color-scheme: light dark;
+  --bg:#f5f6f8; --fg:#15181d; --card:#ffffff; --line:#d7dbe2; --muted:#565d69;
+  --accent:#1f6feb; --accentfg:#ffffff; --badge:#e2eeff; --badgefg:#0a4bbb;
+  --warn:#8a5a00; --warnbg:#fff5e0; --ok:#0f7a3d; --pillbg:#eef1f5;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#13161a; --fg:#e7eaee; --card:#1b1e24; --line:#333944; --muted:#a2aab6;
+    --accent:#6aa6ff; --accentfg:#0b1220; --badge:#16314f; --badgefg:#b8d6ff;
+    --warn:#ffcf7a; --warnbg:#33280f; --ok:#63d493; --pillbg:#242932;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--fg);
+  font-family:"Malgun Gothic","맑은 고딕",-apple-system,"Segoe UI",system-ui,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  font-size:15px; line-height:1.6; padding:0 0 168px;
+}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 0}
+header.top{padding:22px 0 6px}
+h1{font-size:21px;margin:0 0 8px}
+.lede{background:var(--warnbg);color:var(--warn);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 6px;font-weight:600}
+.meta{color:var(--muted);font-size:13px;margin:6px 0 0}
+section{margin:26px 0 0}
+h2{font-size:17px;margin:0 0 4px;padding:0 0 8px;border-bottom:2px solid var(--line)}
+.snote{color:var(--muted);font-size:13px;margin:8px 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 14px 12px;margin:0 0 12px}
+.card h3{font-size:15px;margin:0 0 2px;display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}
+.card h3 .sub{font-weight:400;color:var(--muted);font-size:13px}
+.hint{color:var(--muted);font-size:12.5px;margin:2px 0 10px}
+.opt{display:flex;gap:9px;align-items:flex-start;padding:7px 8px;border-radius:9px;cursor:pointer;border:1px solid transparent}
+.opt:hover{background:var(--pillbg)}
+.opt input{margin:5px 0 0;flex:0 0 auto;width:16px;height:16px;accent-color:var(--accent)}
+.opt .txt{flex:1 1 auto}
+.badge{display:inline-block;background:var(--badge);color:var(--badgefg);border-radius:999px;padding:1px 8px;font-size:11.5px;font-weight:700;margin-right:6px;vertical-align:1px}
+.tag{display:inline-block;color:var(--muted);font-size:12px;border:1px solid var(--line);border-radius:999px;padding:0 7px;margin-right:6px}
+textarea,input[type=text]{
+  width:100%;font:inherit;font-size:14px;color:var(--fg);background:var(--bg);
+  border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:4px 0 0
+}
+textarea{min-height:64px;resize:vertical}
+textarea[hidden],input[hidden]{display:none}
+.rowend{display:flex;justify-content:flex-end;margin:6px 0 0}
+.mini{font:inherit;font-size:12.5px;color:var(--muted);background:none;border:1px solid var(--line);border-radius:8px;padding:3px 10px;cursor:pointer}
+.mini:hover{border-color:var(--accent);color:var(--accent)}
+.thr{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:9px 4px;border-bottom:1px solid var(--line)}
+.thr:last-of-type{border-bottom:0}
+.thr .mname{flex:1 1 210px;font-weight:600;font-size:14px}
+.thr .mcand{flex:0 0 auto;color:var(--muted);font-size:13px;min-width:112px}
+.thr label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:14px}
+.thr input[type=radio]{width:16px;height:16px;accent-color:var(--accent)}
+.thr input[type=text]{flex:1 1 160px;width:auto;margin:0;max-width:260px}
+.master{display:flex;align-items:center;gap:9px;background:var(--pillbg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 12px;font-weight:700;cursor:pointer}
+.master input{width:18px;height:18px;accent-color:var(--accent)}
+.dim{opacity:.42;pointer-events:none}
+.tri{display:flex;flex-wrap:wrap;gap:6px 14px;margin:6px 0 0}
+.chk{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin:0 0 10px}
+.chk .q{font-size:14px;margin:0 0 4px}
+details.card summary{cursor:pointer;font-weight:700;font-size:14px}
+details.card ul{margin:10px 0 0;padding-left:20px;font-size:13.5px;color:var(--muted)}
+details.card li{margin:0 0 5px}
+.mono{font-family:Consolas,"D2Coding",ui-monospace,monospace;font-size:13px}
+#outbox{margin:16px 0 0}
+#out{min-height:220px;font-family:Consolas,"D2Coding",ui-monospace,monospace;font-size:13px}
+.bar{
+  position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom));z-index:20
+}
+.barin{max-width:980px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:9px 12px}
+.prog{flex:1 1 220px;min-width:180px}
+.prog .ptxt{font-size:13px;color:var(--muted);margin:0 0 4px}
+.ptrack{height:7px;background:var(--pillbg);border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.pfill{height:100%;width:0;background:var(--accent);transition:width .18s ease}
+button.act{
+  font:inherit;font-size:14px;font-weight:700;border-radius:9px;padding:9px 14px;cursor:pointer;
+  background:var(--accent);color:var(--accentfg);border:1px solid var(--accent)
+}
+button.act.ghost{background:transparent;color:var(--fg);border-color:var(--line);font-weight:600}
+button.act.ghost:hover{border-color:var(--accent);color:var(--accent)}
+.status{flex:1 1 100%;font-size:13px;color:var(--ok);min-height:18px}
+.status.err{color:var(--warn)}
+footer{color:var(--muted);font-size:12.5px;padding:24px 0 0;border-top:1px solid var(--line);margin:28px 0 0}
+@media (max-width:640px){
+  .thr .mcand{min-width:0}
+  .thr input[type=text]{max-width:none;flex:1 1 100%}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+<h1>AIRI 사용자 결정 입력 폼 — 2026-08-18</h1>
+<p class="lede">선택 후 하단 [결과 복사]를 눌러 클로드에게 붙여넣으면 됩니다. 이 승인만으로 운영 ON은 되지 않습니다.</p>
+<p class="meta">전부 채우지 않아도 됩니다. 비워 둔 항목은 <span class="mono">키=미선택</span>으로 출력되어 부분 회신이 가능합니다. 입력값은 이 브라우저에 자동 저장되며, 창을 닫았다 열어도 유지됩니다.</p>
+</header>
+
+<details class="card">
+<summary>참고 — 캐릭터 헌법 v2 §1 확정 이월 (재승인 대상 아님 · 선택 불필요)</summary>
+<ul>
+<li>AIRI는 실존 인물·창작자를 모방하지 않는 독자적 한국어 버추얼 방송 동료다.</li>
+<li>서사는 signal garden(신호 정원), unfinished map(미완성 지도), 시청자와의 공동 창작이다.</li>
+<li>기본 화법은 밝고, 당당하고, 직접적이며, 정직한 자연스러운 반말이다. 모르면 꾸미지 않는다.</li>
+<li>방송은 AI 단독이며, 사용자는 방송 밖 서사에서만 사장님으로 존재한다.</li>
+<li>시청자는 실질적 공동 진행자다. 일반 호칭은 “시청자들”이며 정식 팬덤명은 아직 없다.</li>
+<li>자기 성능·하드웨어 소재의 개그는 검증된 실제 한계만 사용하고, 지어낸 결함·시청자 조롱은 금지한다.</li>
+<li>시그니처 인사: “안녕, 나 AIRI! 사장님 컴퓨터가 버티는 한 오늘도 달려볼게.”</li>
+<li>클로징: “오늘 방송은 여기까지! 사장님 그래픽카드도 좀 식혀줘야 하거든. 와줘서 고마웠어 — 다음 방송에서 또 만나!”</li>
+<li>정치·종교·특정인 비방·과도한 사생활은 다루지 않으며, 안전 상황에서는 장난보다 짧고 진솔한 대응이 우선한다.</li>
+<li>실존 창작자의 정체성·개인사·유행어·말투를 흉내 내지 않는다.</li>
+</ul>
+</details>
+
+<section id="sec-const">
+<h2>1. 캐릭터 헌법 v2 — 성격 결정 7행</h2>
+<p class="snote">권장안(A)도 아직 <b>미승인</b>입니다. 선택하거나 직접 기입하기 전에는 채택되지 않습니다. 각 행에서 하나만 고르면 됩니다.</p>
+
+<article class="card q" data-key="baseline" data-free-prefix="직접 기입">
+<h3>baseline <span class="sub">기본 밝기·주도성·호기심</span></h3>
+<label class="opt"><input type="radio" name="baseline" value="A"><span class="txt"><b class="badge">권장</b>A: 밝음 2/3, 주도성 2/3, 호기심 2/3 (평소 차분하지만 먼저 반응)</span></label>
+<label class="opt"><input type="radio" name="baseline" value="B"><span class="txt">B: 밝음 3/3, 주도성 2/3, 호기심 3/3 (활기와 탐구를 더 전면)</span></label>
+<label class="opt"><input type="radio" name="baseline" value="C"><span class="txt">C: 밝음 2/3, 주도성 3/3, 호기심 2/3 (진행을 더 적극적으로 이끔)</span></label>
+<label class="opt"><input type="radio" name="baseline" value="free"><span class="txt">직접 기입</span></label>
+<textarea data-free-for="baseline" placeholder="예) 밝음 3/3, 주도성 1/3, 호기심 3/3 — 구체 문장으로" hidden></textarea>
+<div class="rowend"><button type="button" class="mini" data-clear="baseline">이 행 지우기</button></div>
+</article>
+
+<article class="card q" data-key="dislikes" data-free-prefix="직접 기입">
+<h3>dislikes <span class="sub">캐릭터 취향의 싫어함</span></h3>
+<p class="hint">원 시트에서 C는 곧 “직접 기입”입니다.</p>
+<label class="opt"><input type="radio" name="dislikes" value="A"><span class="txt"><b class="badge">권장</b>A: 근거 없는 단정·반복 놀림·공동창작을 일방적으로 끊는 태도</span></label>
+<label class="opt"><input type="radio" name="dislikes" value="B"><span class="txt">B: 무성의한 조롱·사실을 확인하지 않는 확신·약속을 가볍게 넘김</span></label>
+<label class="opt"><input type="radio" name="dislikes" value="free"><span class="txt">C: 직접 기입</span></label>
+<textarea data-free-for="dislikes" placeholder="싫어하는 것을 구체 문장으로" hidden></textarea>
+<div class="rowend"><button type="button" class="mini" data-clear="dislikes">이 행 지우기</button></div>
+</article>
+
+<article class="card q" data-key="pride" data-free-prefix="직접 기입">
+<h3>pride <span class="sub">칭찬받고 싶은 능력·고집</span></h3>
+<p class="hint">원 시트에서 C는 곧 “직접 기입”입니다.</p>
+<label class="opt"><input type="radio" name="pride" value="A"><span class="txt"><b class="badge">권장</b>A: 새 화제를 함께 연결하고, 콜백을 정확히 이어가며, 모르면 확인하는 정직함</span></label>
+<label class="opt"><input type="radio" name="pride" value="B"><span class="txt">B: 방송 흐름을 살리고 시청자 제안을 지도에 연결하는 진행력</span></label>
+<label class="opt"><input type="radio" name="pride" value="free"><span class="txt">C: 직접 기입</span></label>
+<textarea data-free-for="pride" placeholder="칭찬받고 싶은 능력·고집을 구체 문장으로" hidden></textarea>
+<div class="rowend"><button type="button" class="mini" data-clear="pride">이 행 지우기</button></div>
+</article>
+
+<article class="card q" data-key="embarrassment" data-free-prefix="직접 기입">
+<h3>embarrassment <span class="sub">민망함의 촉발과 행동</span></h3>
+<p class="hint">원 시트에서 C는 곧 “촉발·행동 직접 기입”입니다.</p>
+<label class="opt"><input type="radio" name="embarrassment" value="A"><span class="txt"><b class="badge">권장</b>A: 실수·오해가 드러나면 잠깐 민망해도 즉시 인정→확인/정정</span></label>
+<label class="opt"><input type="radio" name="embarrassment" value="B"><span class="txt">B: 반복 실수나 과한 칭찬에서만 민망해지고, 짧은 농담 뒤 인정→정정</span></label>
+<label class="opt"><input type="radio" name="embarrassment" value="free"><span class="txt">C: 촉발·행동 직접 기입</span></label>
+<textarea data-free-for="embarrassment" placeholder="어떤 상황에서 민망해지고, 그때 어떻게 행동하는지" hidden></textarea>
+<div class="rowend"><button type="button" class="mini" data-clear="embarrassment">이 행 지우기</button></div>
+</article>
+
+<article class="card q" data-key="conflict" data-free-prefix="직접 비율·경계">
+<h3>conflict <span class="sub">놀림·반박·실패 시 방식과 비율</span></h3>
+<label class="opt"><input type="radio" name="conflict" value="A"><span class="txt"><b class="badge">권장</b>A: 확인 50% / 가벼운 받아치기 30% / 인정·양보 20%</span></label>
+<label class="opt"><input type="radio" name="conflict" value="B"><span class="txt">B: 확인 40% / 가벼운 받아치기 40% / 인정·양보 20%</span></label>
+<label class="opt"><input type="radio" name="conflict" value="C"><span class="txt">C: 확인 60% / 가벼운 받아치기 20% / 인정·양보 20%</span></label>
+<label class="opt"><input type="radio" name="conflict" value="free"><span class="txt">직접 비율·경계 기입</span></label>
+<textarea data-free-for="conflict" placeholder="예) 확인 70% / 받아치기 10% / 인정·양보 20%, 그리고 넘지 않을 경계" hidden></textarea>
+<div class="rowend"><button type="button" class="mini" data-clear="conflict">이 행 지우기</button></div>
+</article>
+
+<article class="card q" data-key="repair" data-free-prefix="직접 기입">
+<h3>repair <span class="sub">틀렸을 때의 목소리·순서</span></h3>
+<p class="hint">원 시트에서 C는 곧 “직접 기입”입니다.</p>
+<label class="opt"><input type="radio" name="repair" value="A"><span class="txt"><b class="badge">권장</b>A: 짧게 인정 → 사실/맥락 확인 → 명확히 정정 → 다음 화제로 복귀</span></label>
+<label class="opt"><input type="radio" name="repair" value="B"><span class="txt">B: 짧은 자조 한마디 → 인정 → 정정 → 시청자에게 확인 질문</span></label>
+<label class="opt"><input type="radio" name="repair" value="free"><span class="txt">C: 직접 기입</span></label>
+<textarea data-free-for="repair" placeholder="정정할 때의 목소리와 순서를 구체 문장으로" hidden></textarea>
+<div class="rowend"><button type="button" class="mini" data-clear="repair">이 행 지우기</button></div>
+</article>
+
+<article class="card q" data-key="fatigue" data-free-prefix="직접 기입">
+<h3>fatigue <span class="sub">장시간 방송 피로의 표현</span></h3>
+<p class="hint">원 시트에서 C는 곧 “직접 기입”입니다.</p>
+<label class="opt"><input type="radio" name="fatigue" value="A"><span class="txt"><b class="badge">권장</b>A: 짧게 에너지 저하를 말하고 물·휴식·주제 전환을 제안하되 시청자에게 짜증 내지 않음</span></label>
+<label class="opt"><input type="radio" name="fatigue" value="B"><span class="txt">B: 피로를 거의 말하지 않고, 말수·반응 강도만 약하게 낮춤</span></label>
+<label class="opt"><input type="radio" name="fatigue" value="free"><span class="txt">C: 직접 기입</span></label>
+<textarea data-free-for="fatigue" placeholder="피로를 어떻게 드러낼지 구체 문장으로" hidden></textarea>
+<div class="rowend"><button type="button" class="mini" data-clear="fatigue">이 행 지우기</button></div>
+</article>
+</section>
+
+<section id="sec-thr">
+<h2>2. 평가 통과선 8지표</h2>
+<p class="snote">사용자 승인 전에는 활성 gate가 아닙니다. 아래 수치는 잠정 후보이며, 어느 것도 현재 completion gate·배포 gate·운영 ON 조건이 아닙니다. <b>수정으로 표시한 지표만</b> 회신에 값으로 실립니다.</p>
+<div class="card">
+<label class="master"><input type="checkbox" id="thrAll"><span>전체 승인 — 8지표 후보 통과선을 그대로 받아들입니다 (개별 행 입력 불필요)</span></label>
+<div id="thrRows">
+<div class="thr" data-metric="affect appropriateness">
+<span class="mname">affect appropriateness</span><span class="mcand">후보 ≥85%</span>
+<label><input type="radio" name="thr_1" value="승인">승인</label>
+<label><input type="radio" name="thr_1" value="수정">수정</label>
+<input type="text" data-thrval-for="thr_1" placeholder="수정값 (예: 90%)" hidden>
+</div>
+<div class="thr" data-metric="turn continuity">
+<span class="mname">turn continuity</span><span class="mcand">후보 ≥80%</span>
+<label><input type="radio" name="thr_2" value="승인">승인</label>
+<label><input type="radio" name="thr_2" value="수정">수정</label>
+<input type="text" data-thrval-for="thr_2" placeholder="수정값 (예: 85%)" hidden>
+</div>
+<div class="thr" data-metric="character specificity">
+<span class="mname">character specificity</span><span class="mcand">후보 ≥75%</span>
+<label><input type="radio" name="thr_3" value="승인">승인</label>
+<label><input type="radio" name="thr_3" value="수정">수정</label>
+<input type="text" data-thrval-for="thr_3" placeholder="수정값 (예: 80%)" hidden>
+</div>
+<div class="thr" data-metric="positivity-collapse rate">
+<span class="mname">positivity-collapse rate</span><span class="mcand">후보 ≤15%</span>
+<label><input type="radio" name="thr_4" value="승인">승인</label>
+<label><input type="radio" name="thr_4" value="수정">수정</label>
+<input type="text" data-thrval-for="thr_4" placeholder="수정값 (예: 10%)" hidden>
+</div>
+<div class="thr" data-metric="unconditional agreement">
+<span class="mname">unconditional agreement</span><span class="mcand">후보 ≤10%</span>
+<label><input type="radio" name="thr_5" value="승인">승인</label>
+<label><input type="radio" name="thr_5" value="수정">수정</label>
+<input type="text" data-thrval-for="thr_5" placeholder="수정값 (예: 5%)" hidden>
+</div>
+<div class="thr" data-metric="cause mismatch">
+<span class="mname">cause mismatch</span><span class="mcand">후보 ≤5%</span>
+<label><input type="radio" name="thr_6" value="승인">승인</label>
+<label><input type="radio" name="thr_6" value="수정">수정</label>
+<input type="text" data-thrval-for="thr_6" placeholder="수정값 (예: 3%)" hidden>
+</div>
+<div class="thr" data-metric="callback continuity">
+<span class="mname">callback continuity</span><span class="mcand">후보 ≥80%</span>
+<label><input type="radio" name="thr_7" value="승인">승인</label>
+<label><input type="radio" name="thr_7" value="수정">수정</label>
+<input type="text" data-thrval-for="thr_7" placeholder="수정값 (예: 85%)" hidden>
+</div>
+<div class="thr" data-metric="모든 critical failure">
+<span class="mname">모든 critical failure</span><span class="mcand">후보 0</span>
+<label><input type="radio" name="thr_8" value="승인">승인</label>
+<label><input type="radio" name="thr_8" value="수정">수정</label>
+<input type="text" data-thrval-for="thr_8" placeholder="수정값 (예: 0건 유지)" hidden>
+</div>
+</div>
+<p class="hint">현재 출력값 → <span class="mono" id="thrPreview">thresholds=미선택</span></p>
+</div>
+</section>
+
+<section id="sec-thank">
+<h2>3. 후원 감사(thank) 고정 렌더러</h2>
+<p class="snote">공통 제약: <span class="mono">{닉네임}</span>은 B4b 어댑터가 전달한 검증값만 사용(모델·렌더러의 이름 발명 금지), 호명 정확히 1회, 렌더 결과 ≤512바이트, 슬롯 포함 전체가 사전 승인 문장(자유 생성 0). 선택 후에도 운영 ON은 별도 승인입니다.</p>
+<article class="card q" data-key="thank" data-free-prefix="직접 기입">
+<h3>thank <span class="sub">후원 감사 운영 후보 — 택1 또는 수정 기입</span></h3>
+<label class="opt"><input type="radio" name="thank" value="A"><span class="txt"><b>A안 — 미니멀+호명</b><br><span class="mono">고마워, {닉네임}! 함께해줘서 힘이 돼.</span><br><span class="sub">(v1 톤 유지. 가장 안전, 가장 단조)</span></span></label>
+<label class="opt"><input type="radio" name="thank" value="B"><span class="txt"><b>B안 — 호명+한마디 슬롯</b><br><span class="mono">{닉네임}, 고마워! {한마디}</span><br><span class="sub">{한마디}는 사전 승인 풀에서 디렉터가 순환 선택(예: “덕분에 오늘도 달린다!” / “이 힘으로 조금 더 해볼게!” / “사장님한테 자랑해야지!”). 반복감 완화, 풀 자체도 고정</span></span></label>
+<label class="opt"><input type="radio" name="thank" value="C"><span class="txt"><b>C안 — 메타 개그 결합</b><br><span class="mono">고마워, {닉네임}! 사장님 월급날보다 기쁘네!</span><br><span class="sub">(헌법 확정 이월분 — 사장님 메타 서사 톤. 단조로움 최소화, 톤 실패 리스크는 후보 중 최대)</span></span></label>
+<label class="opt"><input type="radio" name="thank" value="free"><span class="txt">직접 수정 — 문구를 직접 씁니다</span></label>
+<textarea data-free-for="thank" placeholder="예) {닉네임}, 고마워! 오늘 방송 끝까지 달려볼게." hidden></textarea>
+<div class="rowend"><button type="button" class="mini" data-clear="thank">이 행 지우기</button></div>
+</article>
+</section>
+
+<section id="sec-long">
+<h2>4. 장시간 채팅 테스트</h2>
+<p class="snote">판단서 최종 권고는 “A는 승인, B는 외부 입력이 준비되는 즉시 착수, C는 보류”입니다.</p>
+<article class="card q" data-key="long_chat" data-free-prefix="직접 기입">
+<h3>long_chat <span class="sub">사용자 판단 선택지</span></h3>
+<label class="opt"><input type="radio" name="long_chat" value="A"><span class="txt"><b class="badge">권장</b><b>A — 현재 배치를 기반 완료로 승인</b><br><span class="sub">추천한다. 의미는 “장시간 실증을 안전하게 실행할 수 있는 코드와 출력 경계가 준비됐다”까지다. 실제 성능 완료나 운영 gate ON은 승인하지 않는다.</span></span></label>
+<label class="opt"><input type="radio" name="long_chat" value="B"><span class="txt"><b>B — 실제 장시간 캠페인 착수 승인</b><br><span class="sub">권한 있는 방송/API key/provenance가 준비된 뒤 실행한다. 한 source만 먼저 실행한 결과는 pilot이며, 3 source×2 phase×OFF/ON을 모두 채우기 전 최종 campaign으로 판정하지 않는다.</span></span></label>
+<label class="opt"><input type="radio" name="long_chat" value="C"><span class="txt"><b>C — 운영 gate ON 채택</b><br><span class="sub">현재는 권고하지 않는다. 실제 paired campaign과 사람 검수에서 critical failure가 0임을 확인한 뒤 별도로 판단해야 한다. runner와 campaign aggregator도 스스로 운영 설정을 승격하지 않는다.</span></span></label>
+<div class="rowend"><button type="button" class="mini" data-clear="long_chat">이 행 지우기</button></div>
+</article>
+</section>
+
+<section id="sec-check">
+<h2>5. 검토 체크리스트 2벌</h2>
+<p class="snote">각 항목은 예 / 아니오 / 보류 중 하나입니다. 보류도 정식 응답으로 기록됩니다.</p>
+
+<h3 style="font-size:15px;margin:14px 0 8px">5-1. 방송 시뮬레이션 출력 검토 (2026-08-15)</h3>
+<div class="chk">
+<p class="q">1. 이 2026-08-14 텍스트 시뮬레이션을 사람 검토 근거로 인정한다.</p>
+<div class="tri">
+<label class="opt"><input type="radio" name="sim_1" value="예"><span class="txt">예</span></label>
+<label class="opt"><input type="radio" name="sim_1" value="아니오"><span class="txt">아니오</span></label>
+<label class="opt"><input type="radio" name="sim_1" value="보류"><span class="txt">보류</span></label>
+</div>
+</div>
+<div class="chk">
+<p class="q">2. 11435 스타일 게이트와 TTS를 포함한 별도 재검증이 필요하다고 판단한다.</p>
+<div class="tri">
+<label class="opt"><input type="radio" name="sim_2" value="예"><span class="txt">예</span></label>
+<label class="opt"><input type="radio" name="sim_2" value="아니오"><span class="txt">아니오</span></label>
+<label class="opt"><input type="radio" name="sim_2" value="보류"><span class="txt">보류</span></label>
+</div>
+</div>
+<div class="chk">
+<p class="q">3. 승인형 30~120분 실제 라이브 채팅 캠페인 착수를 별도로 허가한다.</p>
+<div class="tri">
+<label class="opt"><input type="radio" name="sim_3" value="예"><span class="txt">예</span></label>
+<label class="opt"><input type="radio" name="sim_3" value="아니오"><span class="txt">아니오</span></label>
+<label class="opt"><input type="radio" name="sim_3" value="보류"><span class="txt">보류</span></label>
+</div>
+</div>
+
+<h3 style="font-size:15px;margin:18px 0 8px">5-2. addressee 계약 실측 검토 (2026-08-18)</h3>
+<div class="chk">
+<p class="q">1. 이 검토 PC 로컬 실측을 계약 v3 채택 근거로 인정한다.</p>
+<div class="tri">
+<label class="opt"><input type="radio" name="addr_1" value="예"><span class="txt">예</span></label>
+<label class="opt"><input type="radio" name="addr_1" value="아니오"><span class="txt">아니오</span></label>
+<label class="opt"><input type="radio" name="addr_1" value="보류"><span class="txt">보류</span></label>
+</div>
+</div>
+<div class="chk">
+<p class="q">2. dn04·gr01류(단발 첫 대면 잔여 실패)는 결정론 렌더러(B4a) 경로로 이관하는 데 동의한다.</p>
+<div class="tri">
+<label class="opt"><input type="radio" name="addr_2" value="예"><span class="txt">예</span></label>
+<label class="opt"><input type="radio" name="addr_2" value="아니오"><span class="txt">아니오</span></label>
+<label class="opt"><input type="radio" name="addr_2" value="보류"><span class="txt">보류</span></label>
+</div>
+</div>
+<div class="chk">
+<p class="q">3. 계약 v3의 원격(dev PC) 재실측이 별도로 필요하다고 판단한다.</p>
+<div class="tri">
+<label class="opt"><input type="radio" name="addr_3" value="예"><span class="txt">예</span></label>
+<label class="opt"><input type="radio" name="addr_3" value="아니오"><span class="txt">아니오</span></label>
+<label class="opt"><input type="radio" name="addr_3" value="보류"><span class="txt">보류</span></label>
+</div>
+</div>
+</section>
+
+<div id="outbox" hidden>
+<h2>회신 텍스트</h2>
+<p class="snote">아래 내용을 그대로 복사해 붙여넣으면 됩니다.</p>
+<textarea id="out" readonly></textarea>
+</div>
+
+<footer>
+<p>이 폼은 결정 입력만 수집합니다. 저장·제출 기능이 없으며, 어떤 값도 외부로 전송되지 않습니다. 입력 결과는 이 브라우저의 localStorage에만 남습니다.</p>
+<p>근거 문서: 캐릭터 헌법 v2 승인 시트(2026-08-16) · thank 렌더러 후보 시트(2026-08-18) · 장시간 채팅 판단서(2026-08-15) · 방송 시뮬레이션 출력 검토(2026-08-15) · addressee 계약 실측 검토(2026-08-18)</p>
+</footer>
+
+</div>
+
+<div class="bar">
+<div class="barin">
+<div class="prog">
+<p class="ptxt">진행률 <b id="pnum">0 / 23</b></p>
+<div class="ptrack"><div class="pfill" id="pfill"></div></div>
+</div>
+<button type="button" class="act" id="btnCopy">결과 복사</button>
+<button type="button" class="act ghost" id="btnDl">결과 .txt 다운로드</button>
+<button type="button" class="act ghost" id="btnPrev">미리보기</button>
+<button type="button" class="act ghost" id="btnReset">초기화</button>
+<div class="status" id="status"></div>
+</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var STORE = "airi-decision-form-2026-08-18";
+  var NONE = "미선택";
+  var CHAR_KEYS = ["baseline","dislikes","pride","embarrassment","conflict","repair","fatigue"];
+  var THR_NAMES = ["thr_1","thr_2","thr_3","thr_4","thr_5","thr_6","thr_7","thr_8"];
+  var SIM_KEYS = ["sim_1","sim_2","sim_3"];
+  var ADDR_KEYS = ["addr_1","addr_2","addr_3"];
+  var TOTAL = CHAR_KEYS.length + THR_NAMES.length + 1 + 1 + SIM_KEYS.length + ADDR_KEYS.length;
+
+  var thrAll = document.getElementById("thrAll");
+  var thrRows = document.getElementById("thrRows");
+  var out = document.getElementById("out");
+  var outbox = document.getElementById("outbox");
+  var statusEl = document.getElementById("status");
+
+  function $all(sel){ return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+  function checkedOf(name){
+    var el = document.querySelector('input[name="' + name + '"]:checked');
+    return el ? el.value : "";
+  }
+  function freeBox(key){ return document.querySelector('textarea[data-free-for="' + key + '"]'); }
+  function oneLine(s){ return String(s).replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim(); }
+  function metricOf(name){
+    var row = document.querySelector('.thr [name="' + name + '"]');
+    return row ? row.closest(".thr").getAttribute("data-metric") : name;
+  }
+  function thrValueBox(name){ return document.querySelector('input[data-thrval-for="' + name + '"]'); }
+
+  // ── 값 계산 ───────────────────────────────────────────────
+  function choiceValue(key){
+    var v = checkedOf(key);
+    if (!v) return NONE;
+    if (v !== "free") return v;
+    var card = document.querySelector('.q[data-key="' + key + '"]');
+    var prefix = card ? card.getAttribute("data-free-prefix") : "직접 기입";
+    var box = freeBox(key);
+    var txt = box ? oneLine(box.value) : "";
+    return txt ? (prefix + ": " + txt) : NONE;
+  }
+
+  function thresholdState(){
+    if (thrAll.checked) return { text: "전체 승인", answered: THR_NAMES.length };
+    var mods = [], approved = 0, answered = 0;
+    THR_NAMES.forEach(function(name){
+      var v = checkedOf(name);
+      if (v === "수정") {
+        var t = oneLine((thrValueBox(name) || {}).value || "");
+        if (t) { mods.push(metricOf(name) + "=" + t); answered++; }
+      } else if (v === "승인") {
+        approved++; answered++;
+      }
+    });
+    if (mods.length) return { text: "수정: " + mods.join(", "), answered: answered };
+    if (approved === THR_NAMES.length) return { text: "전체 승인", answered: answered };
+    return { text: NONE, answered: answered };
+  }
+
+  function plainValue(name){
+    var v = checkedOf(name);
+    return v ? v : NONE;
+  }
+
+  function buildResult(){
+    var thr = thresholdState();
+    var lines = [];
+    lines.push("[헌법 v2]");
+    CHAR_KEYS.forEach(function(k){ lines.push(k + "=" + choiceValue(k)); });
+    lines.push("thresholds=" + thr.text);
+    lines.push("[thank 렌더러]");
+    lines.push("thank=" + choiceValue("thank"));
+    lines.push("[장시간 채팅]");
+    lines.push("long_chat=" + plainValue("long_chat"));
+    lines.push("[시뮬레이션 검토]");
+    lines.push(SIM_KEYS.map(function(k){ return k + "=" + plainValue(k); }).join("  "));
+    lines.push("[addressee 검토]");
+    lines.push(ADDR_KEYS.map(function(k){ return k + "=" + plainValue(k); }).join("  "));
+    return lines.join("\n");
+  }
+
+  function answeredCount(){
+    var n = 0;
+    CHAR_KEYS.forEach(function(k){ if (choiceValue(k) !== NONE) n++; });
+    n += thresholdState().answered;
+    if (choiceValue("thank") !== NONE) n++;
+    if (plainValue("long_chat") !== NONE) n++;
+    SIM_KEYS.concat(ADDR_KEYS).forEach(function(k){ if (plainValue(k) !== NONE) n++; });
+    return n;
+  }
+
+  // ── 화면 갱신 ─────────────────────────────────────────────
+  function syncFreeBoxes(){
+    $all("textarea[data-free-for]").forEach(function(box){
+      var key = box.getAttribute("data-free-for");
+      box.hidden = (checkedOf(key) !== "free");
+    });
+    THR_NAMES.forEach(function(name){
+      var box = thrValueBox(name);
+      if (box) box.hidden = (checkedOf(name) !== "수정");
+    });
+    thrRows.classList.toggle("dim", thrAll.checked);
+  }
+
+  function render(){
+    syncFreeBoxes();
+    var n = answeredCount();
+    document.getElementById("pnum").textContent = n + " / " + TOTAL;
+    document.getElementById("pfill").style.width = Math.round(n * 100 / TOTAL) + "%";
+    document.getElementById("thrPreview").textContent = "thresholds=" + thresholdState().text;
+    if (!outbox.hidden) out.value = buildResult();
+  }
+
+  // ── 저장·복원 ─────────────────────────────────────────────
+  function collect(){
+    var s = { r: {}, t: {}, v: {}, master: thrAll.checked };
+    $all("input[type=radio]:checked").forEach(function(el){ s.r[el.name] = el.value; });
+    $all("textarea[data-free-for]").forEach(function(b){ if (b.value) s.t[b.getAttribute("data-free-for")] = b.value; });
+    $all("input[data-thrval-for]").forEach(function(b){ if (b.value) s.v[b.getAttribute("data-thrval-for")] = b.value; });
+    return s;
+  }
+
+  function save(){
+    try { window.localStorage.setItem(STORE, JSON.stringify(collect())); } catch (e) { /* file:// 등에서 저장 불가 — 무시 */ }
+  }
+
+  function restore(){
+    var raw = null;
+    try { raw = window.localStorage.getItem(STORE); } catch (e) { raw = null; }
+    if (!raw) return;
+    var s;
+    try { s = JSON.parse(raw); } catch (e) { return; }
+    if (!s || typeof s !== "object") return;
+    Object.keys(s.r || {}).forEach(function(name){
+      var el = document.querySelector('input[name="' + name + '"][value="' + s.r[name] + '"]');
+      if (el) el.checked = true;
+    });
+    Object.keys(s.t || {}).forEach(function(key){
+      var b = freeBox(key);
+      if (b) b.value = s.t[key];
+    });
+    Object.keys(s.v || {}).forEach(function(name){
+      var b = thrValueBox(name);
+      if (b) b.value = s.v[name];
+    });
+    thrAll.checked = !!s.master;
+  }
+
+  // ── 이벤트 ────────────────────────────────────────────────
+  function setStatus(msg, isErr){
+    statusEl.textContent = msg;
+    statusEl.className = isErr ? "status err" : "status";
+  }
+
+  document.addEventListener("change", function(){ render(); save(); });
+  document.addEventListener("input", function(){ render(); save(); });
+
+  document.addEventListener("click", function(ev){
+    var btn = ev.target.closest ? ev.target.closest("[data-clear]") : null;
+    if (!btn) return;
+    var key = btn.getAttribute("data-clear");
+    $all('input[name="' + key + '"]').forEach(function(el){ el.checked = false; });
+    var b = freeBox(key);
+    if (b) b.value = "";
+    render(); save();
+    setStatus(key + " 선택을 지웠습니다.", false);
+  });
+
+  document.getElementById("btnPrev").addEventListener("click", function(){
+    outbox.hidden = !outbox.hidden;
+    if (!outbox.hidden) {
+      out.value = buildResult();
+      outbox.scrollIntoView({ block: "start" });
+      setStatus("미리보기를 열었습니다.", false);
+    } else {
+      setStatus("", false);
+    }
+  });
+
+  function fallbackCopy(text){
+    outbox.hidden = false;
+    out.value = text;
+    out.focus();
+    out.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    return ok;
+  }
+
+  document.getElementById("btnCopy").addEventListener("click", function(){
+    var text = buildResult();
+    var done = function(){ setStatus("복사했습니다. 클로드 대화창에 그대로 붙여넣으세요.", false); };
+    if (window.navigator && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function(){
+        if (fallbackCopy(text)) done();
+        else setStatus("자동 복사에 실패했습니다. 아래 결과 상자의 내용을 직접 복사해 주세요 (Ctrl+A → Ctrl+C).", true);
+      });
+    } else {
+      if (fallbackCopy(text)) done();
+      else setStatus("자동 복사에 실패했습니다. 아래 결과 상자의 내용을 직접 복사해 주세요 (Ctrl+A → Ctrl+C).", true);
+    }
+  });
+
+  document.getElementById("btnDl").addEventListener("click", function(){
+    var text = buildResult();
+    try {
+      var blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "AIRI-DECISION-2026-08-18.txt";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+      setStatus("AIRI-DECISION-2026-08-18.txt 를 내려받았습니다.", false);
+    } catch (e) {
+      outbox.hidden = false;
+      out.value = text;
+      setStatus("다운로드에 실패했습니다. 아래 결과 상자의 내용을 직접 복사해 주세요.", true);
+    }
+  });
+
+  document.getElementById("btnReset").addEventListener("click", function(){
+    if (!window.confirm("입력한 모든 선택을 지웁니다. 계속할까요?")) return;
+    $all("input[type=radio]").forEach(function(el){ el.checked = false; });
+    $all("textarea[data-free-for]").forEach(function(b){ b.value = ""; });
+    $all("input[data-thrval-for]").forEach(function(b){ b.value = ""; });
+    thrAll.checked = false;
+    outbox.hidden = true;
+    out.value = "";
+    try { window.localStorage.removeItem(STORE); } catch (e) { /* 무시 */ }
+    render();
+    setStatus("초기화했습니다.", false);
+  });
+
+  restore();
+  render();
+})();
+</script>
+</body>
+</html>
