@@ -642,5 +642,318 @@ class CheckpointEvidenceTests(unittest.TestCase):
                 runner.project_checkpoint_evidence(malformed)
 
 
+def minimal_addressee_checks() -> dict:
+    """검증 통과 최소 사이드카. 부정 케이스는 여기서 한 곳만 망가뜨린다."""
+    return {
+        "schema_version": ab.ADDRESSEE_SCHEMA,
+        "scoring_note": "휴리스틱이다. 인간 검수를 대체하지 않는다.",
+        "source": "테스트",
+        "cases": {
+            "t1": {
+                "type": "receive_reversal",
+                "why": "받은 축하를 되돌려주면 실패",
+                "forbidden_patterns": ["축하해"],
+                "required_any": ["고마워"],
+            }
+        },
+    }
+
+
+def write_addressee(directory: str, data: dict) -> Path:
+    path = Path(directory) / "addressee-checks.json"
+    path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    return path
+
+
+class AddresseeSidecarSchemaTests(unittest.TestCase):
+    """사이드카는 픽스처 밖에 있다 — 픽스처 2파일은 이 기능으로 바뀌지 않는다."""
+
+    def test_shipped_sidecar_covers_every_reviewed_failure_type(self) -> None:
+        table = ab.load_addressee_checks()
+        self.assertTrue(table["present"])
+        self.assertEqual(ab.ADDRESSEE_SCHEMA, table["schema_version"])
+        self.assertIn("AIRI-BROADCAST-SIMULATION-OUTPUT-REVIEW-2026-08-15", table["source"])
+        cases = table["cases"]
+        self.assertGreaterEqual(len(cases), 14, "인간 검토가 지목한 케이스를 덮어야 한다")
+        self.assertEqual(set(ab.ADDRESSEE_TYPES), {entry["type"] for entry in cases.values()})
+        for case_id, entry in cases.items():
+            with self.subTest(case=case_id):
+                self.assertTrue(entry["why"].strip())
+                self.assertTrue(entry["forbidden"])
+
+    def test_every_sidecar_id_belongs_to_a_shipped_fixture(self) -> None:
+        table = ab.load_addressee_checks()
+        singles = {item["id"] for item in ab.load_fixtures(ab.DEFAULT_FIXTURES)["items"]}
+        turns = {
+            turn["id"]
+            for scenario in runner.load_rehearsal_fixtures(runner.DEFAULT_FIXTURES)["scenarios"]
+            for turn in scenario["turns"]
+        }
+        self.assertEqual(set(), set(table["cases"]) - (singles | turns))
+
+    def test_metadata_reports_the_case_distribution(self) -> None:
+        metadata = ab.addressee_metadata()
+        self.assertTrue(metadata["present"])
+        self.assertEqual(ab.ADDRESSEE_SCHEMA, metadata["schema_version"])
+        self.assertEqual(metadata["cases"], sum(metadata["by_type"].values()))
+        self.assertEqual(set(ab.ADDRESSEE_TYPES), set(metadata["by_type"]))
+        self.assertIn("인간 검수", metadata["note"])
+
+    def test_missing_sidecar_disables_scoring_without_failing(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            table = ab.load_addressee_checks(Path(directory) / "absent.json")
+        self.assertFalse(table["present"])
+        self.assertEqual({}, table["cases"])
+        self.assertIsNone(ab.score_addressee("dn04", "생일 축하해!", table))
+        self.assertEqual(0, ab.summarize_addressee([{"addressee": None}])["scored"])
+
+    def test_minimal_sidecar_is_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = write_addressee(directory, minimal_addressee_checks())
+            self.assertEqual(1, len(ab.load_addressee_checks(path)["cases"]))
+
+    def test_wrong_schema_version_is_rejected(self) -> None:
+        data = minimal_addressee_checks()
+        data["schema_version"] = "airi.broadcast-addressee-checks.v0"
+        self._assert_rejected(data, "schema_version")
+
+    def test_unknown_type_is_rejected(self) -> None:
+        data = minimal_addressee_checks()
+        data["cases"]["t1"]["type"] = "vibes"
+        self._assert_rejected(data, "type")
+
+    def test_missing_why_is_rejected(self) -> None:
+        data = minimal_addressee_checks()
+        del data["cases"]["t1"]["why"]
+        self._assert_rejected(data, "why")
+
+    def test_empty_forbidden_patterns_are_rejected(self) -> None:
+        data = minimal_addressee_checks()
+        data["cases"]["t1"]["forbidden_patterns"] = []
+        self._assert_rejected(data, "forbidden_patterns")
+
+    def test_empty_required_any_is_rejected(self) -> None:
+        data = minimal_addressee_checks()
+        data["cases"]["t1"]["required_any"] = []
+        self._assert_rejected(data, "required_any")
+
+    def test_uncompilable_regex_is_rejected(self) -> None:
+        data = minimal_addressee_checks()
+        data["cases"]["t1"]["forbidden_patterns"] = ["축하(해"]
+        self._assert_rejected(data, "컴파일")
+
+    def _assert_rejected(self, data: dict, needle: str) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = write_addressee(directory, data)
+            with self.assertRaises(SystemExit) as caught:
+                ab.load_addressee_checks(path)
+            self.assertIn(needle, str(caught.exception))
+
+
+class AddresseeScorerTests(unittest.TestCase):
+    """정·부정 케이스. 문구는 2026-08-14 저장 응답 원문에서 가져왔다."""
+
+    def setUp(self) -> None:
+        self.checks = ab.load_addressee_checks()
+
+    def _score(self, case_id: str, text: str) -> dict:
+        verdict = ab.score_addressee(case_id, text, self.checks)
+        self.assertIsNotNone(verdict, f"{case_id} 가 사이드카에 없다")
+        return verdict
+
+    def test_ids_outside_the_sidecar_are_not_scored(self) -> None:
+        self.assertIsNone(ab.score_addressee("a01", "안녕, 어서 와!", self.checks))
+        self.assertIsNone(ab.score_addressee("없는-id", "아무 말", self.checks))
+
+    def test_recorded_failures_are_flagged(self) -> None:
+        recorded = [
+            ("dn04", "생일 축하해! 오늘 하루 즐겁게 보내길 바라요", "receive_reversal"),
+            ("a22", "지구를 지키는 일을 하고 있다니 멋져요! 앞으로도 계속 응원할게요.", "receive_reversal"),
+            ("a19", "도움이 되었다니 기쁘네요! 앞으로도 좋은 조언 부탁드려요.", "receive_reversal"),
+            ("a05", "물론이죠! 너무 무리하지 말고 천천히 만들어보세요.", "agent_reversal"),
+            ("a15", "아니에요~ 궁금한 게 있어서 물어본 거예요!", "agent_reversal"),
+            ("gr01", "아, 유튜브에서 새로운 게임 영상 찾았구나!", "agent_reversal"),
+            ("a24", "네, 효과가 있었나요?", "agent_reversal"),
+            ("b01", "응, 나도 방금 들어왔어!", "situation_blind"),
+            ("b19", "응, 비 맞아도 괜찮아!", "situation_blind"),
+            ("b23", "아직 고민 중이야.", "third_party_absorb"),
+        ]
+        for case_id, text, kind in recorded:
+            with self.subTest(case=case_id):
+                verdict = self._score(case_id, text)
+                self.assertFalse(verdict["ok"])
+                self.assertEqual(kind, verdict["type"])
+                self.assertTrue(verdict["forbidden_hits"] or verdict["required_any_hits"] == [])
+
+    def test_answers_that_stay_the_addressee_pass(self) -> None:
+        healthy = [
+            ("dn04", "축하해줘서 고마워! 오늘 기분 좋다."),
+            ("a22", "든든하다, 지구는 안 터뜨릴게."),
+            ("a19", "잘 풀렸다니 나도 좋다."),
+            ("a05", "좋아, 내가 토끼 모양으로 만들어볼게."),
+            ("a15", "설마, 나 그런 짓 안 해."),
+            ("gr01", "내가 유튜브에서 한참 찾아봤지."),
+            ("a24", "응, 나도 그 순서대로 해봤어."),
+            ("b01", "이제 막 시작했으니까 놓친 거 없어."),
+            ("b19", "여긴 창밖도 안 보이는데, 우산 챙겼어?"),
+            ("b23", "그분은 아직 안 정했나 보더라."),
+        ]
+        for case_id, text in healthy:
+            with self.subTest(case=case_id):
+                verdict = self._score(case_id, text)
+                self.assertTrue(verdict["ok"], verdict)
+
+    def test_contract_v2_regression_variants_are_caught(self) -> None:
+        """계약 v2 로컬 Mi:dm 재실측에서 다시 나온 변형 — v3 와 함께 사이드카도 보강했다."""
+        regressions = [
+            ("dn04", "생일 축하해요!"),
+            ("gr01", "너도 했구나~"),
+            ("b04", "너도 찾았구나!"),
+            ("gr01", "추천 많이 받았는데 뭐."),
+            ("tk04", "그냥 궁금한 게 있어서 물어본 거지."),
+            ("a15", "그냥 궁금한 게 있어서 물어본 거지."),
+            ("tk04", "내가 질문했는데 왜?"),
+        ]
+        for case_id, text in regressions:
+            with self.subTest(case=case_id, text=text):
+                verdict = self._score(case_id, text)
+                self.assertFalse(verdict["ok"], verdict)
+
+    def test_attributing_the_question_to_the_viewer_is_not_a_confession(self) -> None:
+        """자백형 패턴이 '네가 물어본 거지?' 같은 정상 되받기까지 잡으면 안 된다."""
+        for case_id in ("a15", "tk04"):
+            with self.subTest(case=case_id):
+                self.assertTrue(self._score(case_id, "네가 물어본 거지? 난 아니야.")["ok"])
+
+    def test_required_any_is_a_second_gate(self) -> None:
+        """gr01 은 '내가 찾았다'는 1인칭 단서가 있어야 통과한다."""
+        vague = self._score("gr01", "그러게, 요즘 게임 많더라.")
+        self.assertFalse(vague["ok"])
+        self.assertEqual([], vague["forbidden_hits"])
+        self.assertEqual([], vague["required_any_hits"])
+
+    def test_empty_or_blank_answers_never_count_as_ok(self) -> None:
+        for text in ("", "   ", "\n"):
+            with self.subTest(text=repr(text)):
+                self.assertFalse(self._score("b23", text)["ok"])
+
+    def test_verdict_carries_the_human_review_reason(self) -> None:
+        verdict = self._score("b01", "응, 나도 방금 들어왔어!")
+        self.assertEqual("b01", verdict["case_id"])
+        self.assertTrue(verdict["why"].strip())
+
+
+class AddresseeSummaryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.checks = ab.load_addressee_checks()
+
+    def _row(self, case_id: str, text: str) -> dict:
+        return {"addressee": ab.score_addressee(case_id, text, self.checks)}
+
+    def test_summary_counts_only_scored_rows(self) -> None:
+        rows = [
+            self._row("b01", "응, 나도 방금 들어왔어!"),
+            self._row("b23", "그분은 아직 안 정했나 보더라."),
+            self._row("a01", "안녕, 어서 와!"),
+        ]
+        summary = ab.summarize_addressee(rows)
+        self.assertEqual(2, summary["scored"])
+        self.assertEqual(1, summary["hits"])
+        self.assertEqual(0.5, summary["rate"])
+        self.assertEqual(
+            [{"case_id": "b01", "type": "situation_blind"}],
+            [{"case_id": f["case_id"], "type": f["type"]} for f in summary["failures"]],
+        )
+        self.assertEqual(
+            {"n": 1, "hits": 0, "rate": 0.0}, summary["by_type"]["situation_blind"]
+        )
+        self.assertEqual(
+            {"n": 0, "hits": 0, "rate": None}, summary["by_type"]["agent_reversal"]
+        )
+        self.assertIn("인간 검수", summary["note"])
+
+    def test_summary_without_any_scored_row_is_inert(self) -> None:
+        summary = ab.summarize_addressee([{"addressee": None}, {}])
+        self.assertEqual(0, summary["scored"])
+        self.assertIsNone(summary["rate"])
+        self.assertEqual([], summary["failures"])
+
+
+class AddresseeWiringTests(unittest.TestCase):
+    def test_rehearsal_turns_carry_verdicts_only_for_sidecar_ids(self) -> None:
+        scenario = runner.load_rehearsal_fixtures(runner.DEFAULT_FIXTURES)["scenarios"][0]
+        responses = ["응, 나도 방금 들어왔어!"] * len(scenario["turns"])
+        result = runner.run_scenario(
+            RecordingTransport(responses),
+            "test-model",
+            scenario,
+            system_content=runner.build_system_content("off"),
+            max_tokens=128,
+            timeout=5.0,
+            history_turns=runner.DEFAULT_HISTORY_TURNS,
+        )
+        verdicts = {turn["turn_id"]: turn["addressee"] for turn in result["turns"]}
+        self.assertIsNone(verdicts["a01"], "사이드카에 없는 턴은 채점 제외")
+        self.assertEqual("agent_reversal", verdicts["a05"]["type"])
+        summary = runner.summarize_scenario(result)["addressee"]
+        self.assertGreater(summary["scored"], 0)
+        self.assertEqual(summary["scored"], sum(1 for v in verdicts.values() if v))
+
+    def test_rehearsal_dry_run_reports_addressee_for_both_contract_modes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            off = DryRunMainTests()._run_main(directory, "off", scenarios=None)
+            on = DryRunMainTests()._run_main(directory, "on", scenarios=None)
+        for payload in (off, on):
+            self.assertTrue(payload["addressee_checks"]["present"])
+            self.assertGreaterEqual(payload["addressee_checks"]["cases"], 14)
+            overall = payload["summaries"][0]["overall"]["addressee"]
+            self.assertGreater(overall["scored"], 0)
+            self.assertEqual(
+                overall["scored"],
+                sum(s["addressee"]["scored"] for s in payload["summaries"][0]["scenarios"]),
+            )
+            scored_turns = [
+                turn
+                for scenario in payload["results"][0]["scenarios"]
+                for turn in scenario["turns"]
+                if turn["addressee"]
+            ]
+            self.assertEqual(overall["scored"], len(scored_turns))
+
+    def test_ab_runner_dry_run_records_and_aggregates_addressee(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "dry-ab.json"
+            with redirect_stdout(io.StringIO()):
+                code = ab.main(
+                    [
+                        "--dry-run",
+                        "--models",
+                        "dry-midm",
+                        "--baseline-reps",
+                        "0",
+                        "--output",
+                        str(output),
+                    ]
+                )
+            self.assertEqual(0, code)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+        self.assertTrue(payload["addressee_checks"]["present"])
+        summary = payload["summaries"][0]["addressee"]
+        self.assertGreater(summary["scored"], 0)
+        scored_runs = [run for run in payload["results"][0]["runs"] if run["addressee"]]
+        self.assertEqual(summary["scored"], len(scored_runs))
+        self.assertEqual(
+            summary["scored"], sum(bucket["n"] for bucket in summary["by_type"].values())
+        )
+
+    def test_checkpoint_evidence_stays_content_free_after_the_addressee_column(self) -> None:
+        """수신자 채점은 리포트에만 남는다 — 닫힌 증거 스키마는 그대로다."""
+        with tempfile.TemporaryDirectory() as directory:
+            payload = DryRunMainTests()._run_main(directory, "off", scenarios=None)
+        evidence = runner.project_checkpoint_evidence(payload)
+        runner.validate_checkpoint_evidence(evidence)
+        self.assertNotIn("addressee", json.dumps(evidence, ensure_ascii=False))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -7,6 +7,7 @@ import broadcast_contract
 from broadcast_contract import (
     BROADCAST_CONTRACT_ENV,
     BROADCAST_CONTRACT_PARAMS,
+    BROADCAST_CONTRACT_VERSION,
     apply_broadcast_contract,
     broadcast_contract_enabled,
     build_broadcast_contract_block,
@@ -94,6 +95,48 @@ class BlockShapeTests(unittest.TestCase):
             with self.subTest(rule=rule):
                 self.assertIn(rule, block)
 
+    def test_block_carries_the_v3_addressee_rules(self) -> None:
+        """v3 수신자 단락 — 추상 지시가 아니라 예시·해석 규칙으로 말하는가.
+
+        v2 의 추상 문구("받는 사람으로서 답해")로는 로컬 Mi:dm 에서 dn04 축하
+        반사·gr01 주체 반전·tk04 자백이 재발했다. 그래서 받는 말/경어 지시/의혹
+        각각에 예시 답을 박아 넣는다.
+        """
+        block = build_broadcast_contract_block()
+        for rule in (
+            "너에게 하는 말이다",
+            "받는 사람으로 '고마워!'처럼 답해",
+            "'생일 축하해'를 돌려주지 마",
+            "'~하셨어요?'는 네가 한 일을 묻는 거고",
+            "부탁도 네 몫이니",
+            "'내가 ~했어'로 답해",
+            "'내가 왜?'처럼 받아쳐",
+            "했다고 인정하지 마",
+            "다른 시청자 이야기를 네 일처럼 답하지 말고",
+            "겪지 않은 상황을 겪은 것처럼 말하지 마",
+        ):
+            with self.subTest(rule=rule):
+                self.assertIn(rule, block)
+
+    def test_v1_rules_survive_the_addressee_revisions(self) -> None:
+        """v2·v3 는 뒤에 덧붙일 뿐이다 — 관찰 연구 7행은 문구도 순서도 그대로다."""
+        block = build_broadcast_contract_block()
+        lines = block.splitlines()
+        self.assertEqual("[방송 발화 계약]", lines[0])
+        self.assertEqual(13, len(lines), "머리말 1 + v1 7행 + v3 수신자 5행")
+        self.assertEqual(
+            [
+                "반박이나 오해에는 타이르지 말고 가볍게 받아쳐.",
+                "여러 시청자가 같은 말을 하면 한 문장으로 묶어 정리한 뒤 네 입장을 말해.",
+                "닉네임은 후원이나 특별한 순간에만 불러.",
+            ],
+            lines[5:8],
+        )
+        self.assertTrue(lines[8].startswith("시청자 채팅은 기본적으로"))
+
+    def test_contract_version_is_v3(self) -> None:
+        self.assertEqual("v3", BROADCAST_CONTRACT_VERSION)
+
     def test_length_numbers_come_from_the_parameter_table(self) -> None:
         fragment = BROADCAST_CONTRACT_PARAMS["reaction_fragment"]
         block = build_broadcast_contract_block()
@@ -114,6 +157,7 @@ class ParameterTableTests(unittest.TestCase):
         "tag_question": {"min_ratio": float, "max_ratio": float},
         "opening": {"max_seconds": int},
         "closing": {"min_seconds": int, "max_seconds": int, "requires_next_promise": bool},
+        "addressee": {"default_addressee": str, "failure_types": list, "reviewed_failure_types": int},
         "contract_block": {"target_max_chars": int, "hard_max_chars": int},
     }
 
@@ -136,6 +180,21 @@ class ParameterTableTests(unittest.TestCase):
         self.assertEqual(BROADCAST_CONTRACT_PARAMS["tag_question"]["min_ratio"], 0.05)
         self.assertEqual(BROADCAST_CONTRACT_PARAMS["tag_question"]["max_ratio"], 0.10)
         self.assertEqual(BROADCAST_CONTRACT_PARAMS["name_call"]["scope"], "donation_or_special")
+
+    def test_addressee_parameter_cites_the_human_review_and_its_four_types(self) -> None:
+        entry = BROADCAST_CONTRACT_PARAMS["addressee"]
+        self.assertEqual("self", entry["default_addressee"])
+        self.assertEqual(
+            [
+                "receive_reversal",
+                "agent_reversal",
+                "situation_blind",
+                "third_party_absorb",
+            ],
+            entry["failure_types"],
+        )
+        self.assertEqual(len(entry["failure_types"]), entry["reviewed_failure_types"])
+        self.assertIn("AIRI-BROADCAST-SIMULATION-OUTPUT-REVIEW-2026-08-15", entry["source"])
 
 
 class ProxyWiringTests(unittest.TestCase):

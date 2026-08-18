@@ -409,6 +409,7 @@ def run_scenario(
                 "history_pairs": max(0, (len(messages) - 2) // 2),
                 "seed_distance": seed_distance,
                 "score": ab.score_response(response),
+                "addressee": ab.score_addressee(turn["id"], response),
                 "flow": score_turn_flow(
                     turn,
                     response,
@@ -518,6 +519,8 @@ def summarize_scenario(scenario_result: dict[str, Any]) -> dict[str, Any]:
             "n": len(ok),
             "rate": round(passes / len(ok), 3) if ok else None,
         },
+        # 흐름 마커와 같은 이유로 응답이 온 턴에서만 채점한다.
+        "addressee": ab.summarize_addressee(ok),
         "flow": {
             "callback": {
                 **probe_bucket(probes),
@@ -568,6 +571,7 @@ def summarize_model(model_result: dict[str, Any]) -> dict[str, Any]:
                 "n": len(ok),
                 "rate": round(passes / len(ok), 3) if ok else None,
             },
+            "addressee": ab.summarize_addressee(ok),
             "callback": {
                 "probes": len(probes),
                 "hits": probe_hits,
@@ -1046,6 +1050,41 @@ def print_report(summaries: list[dict[str, Any]], *, contract: str, history_turn
     print("  · 마커 정의는 A/B 러너와 동일하다 (run_broadcast_chat_ab.score_response)")
     print()
 
+    print("── 수신자 인지 (addressee — 사이드카 채점) " + "─" * 57)
+    scored_any = any(
+        scenario["addressee"]["scored"] for summary in summaries for scenario in summary["scenarios"]
+    )
+    if not scored_any:
+        print("  · 사이드카(addressee-checks.json)가 없거나 대상 턴이 없어 채점하지 않았다")
+    else:
+        header = "model / scenario".ljust(38) + _fmt("채점", 7) + _fmt("통과", 7) + _fmt("통과율", 9)
+        for name in ab.ADDRESSEE_TYPES:
+            header += name.replace("_", "")[:11].rjust(13)
+        print(header)
+        for summary in summaries:
+            print(summary["model"])
+            for scenario in summary["scenarios"]:
+                bucket = scenario["addressee"]
+                row = ("  " + scenario["scenario_id"])[:38].ljust(38)
+                row += _fmt(bucket["scored"], 7) + _fmt(bucket["hits"], 7)
+                row += ("-" if bucket["rate"] is None else f"{bucket['rate']:.0%}").rjust(9)
+                for name in ab.ADDRESSEE_TYPES:
+                    counts = bucket["by_type"][name]
+                    row += ("-" if not counts["n"] else f"{counts['hits']}/{counts['n']}").rjust(13)
+                print(row)
+        for summary in summaries:
+            for scenario in summary["scenarios"]:
+                failures = scenario["addressee"]["failures"]
+                ids = ", ".join(f"{f['case_id']}({f['type']})" for f in failures)
+                print(
+                    f"  {summary['model']}/{scenario['scenario_id']}: "
+                    f"수신자 실패 {len(failures)}건 — {ids or '없음'}"
+                )
+    print("  · receive_reversal=받은 축하·감사·응원 되돌려주기 / agent_reversal=요청·핀잔을 시청자에게 넘기기")
+    print("  · situation_blind=자기 방송·자기 존재 상황 오인 / third_party_absorb=제3자 이야기 1인칭 흡수")
+    print(f"  · {ab.ADDRESSEE_NOTE} 사이드카에 없는 턴은 채점 대상이 아니다")
+    print()
+
     print("── 금지 위반 / 실패 " + "─" * 80)
     for summary in summaries:
         for scenario in summary["scenarios"]:
@@ -1225,6 +1264,7 @@ def main(argv: list[str] | None = None) -> int:
             "total_scenarios": len(fixtures["scenarios"]),
             "selected_turns": sum(len(s["turns"]) for s in scenarios),
         },
+        "addressee_checks": ab.addressee_metadata(),
         "summaries": summaries,
         "results": results,
     }

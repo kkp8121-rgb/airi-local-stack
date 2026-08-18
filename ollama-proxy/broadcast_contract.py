@@ -16,6 +16,10 @@ from collections.abc import Mapping
 
 BROADCAST_CONTRACT_ENV = "AIRI_BROADCAST_CONTRACT"
 
+# 계약 블록 개정 번호. v2 = v1(관찰 연구 규범) + 수신자 인지 규칙,
+# v3 = 그 규칙을 추상 지시에서 예시·해석 규칙형으로 교체(로컬 Mi:dm 재발 실측).
+BROADCAST_CONTRACT_VERSION = "v3"
+
 # 켜짐으로 읽을 값만 열거한다(default-deny). 미설정·0·false·off·그 외 = 꺼짐.
 BROADCAST_CONTRACT_ON_VALUES = frozenset({"1", "true", "on", "yes"})
 
@@ -76,6 +80,27 @@ BROADCAST_CONTRACT_PARAMS: dict[str, dict[str, object]] = {
         "requires_next_promise": True,
         "source": "관찰 연구 §6 — 클로징: 다음 약속 포함 1~15분 가변 (아이네 40s ↔ 리제 15분)",
     },
+    # 수신자 인지 — v2 추가분. 시뮬레이션 원문 인간 검토에서 확인된 실패 4유형이
+    # 근거다. 숫자를 프롬프트 문장에 쓰지 않으므로 이 값은 채점기 사이드카
+    # (eval/broadcast_chat/addressee-checks.json)와 리포트가 참조한다.
+    "addressee": {
+        "default_addressee": "self",
+        "failure_types": [
+            "receive_reversal",
+            "agent_reversal",
+            "situation_blind",
+            "third_party_absorb",
+        ],
+        "reviewed_failure_types": 4,
+        "source": (
+            "인간 검토 — airi_docs/진행중/AIRI-BROADCAST-SIMULATION-OUTPUT-REVIEW-2026-08-15.md "
+            "본문·부록 원문에서 수신자 인지 실패 4유형 확인 "
+            "(수신 반전 dn04·a22·a19·rx04 / 행위 주체 반전 a05·a15·tk05·tk03·gr01 / "
+            "상황·자기 존재 인지 실패 b01·sp02·b19 / 역방향 오귀속 b23). "
+            "v3 근거 — 로컬 Mi:dm 실측에서 v2 추상 문구로 dn04(축하 반사)·gr01(경어 지시 "
+            "주체 반전)·tk04(의혹 자백 변형)이 재발해 예시·해석 규칙형으로 교체"
+        ),
+    },
     # 계약 블록이 컨텍스트를 잠식하면 안 된다. 운영 proxy 는 num_ctx 2048 로 돈다.
     "contract_block": {
         "target_max_chars": 600,
@@ -90,6 +115,11 @@ def _build_block() -> str:
 
     문장 수를 1~2로 여는 것은 `AIRI_SYSTEM_PROMPT` 의 "한 문장" 기본값을
     방송 상황에서만 완화하려는 의도다(§5 차이표 — 상태별 가변 길이).
+
+    v2 는 마지막에 수신자 인지 규칙을 더했고, v3 는 그 단락을 추상 지시에서
+    예시·해석 규칙형으로 바꿨다. 로컬 Mi:dm 실측에서 v2 문구로는 축하 반사
+    (dn04)·경어 지시 주체 반전(gr01)·의혹 자백(tk04)이 그대로 재발했기 때문이다
+    (`addressee` 파라미터의 source). 앞 7행(v1 관찰 연구 규범)은 건드리지 않는다.
     """
     fragment = BROADCAST_CONTRACT_PARAMS["reaction_fragment"]
     return "\n".join(
@@ -107,6 +137,11 @@ def _build_block() -> str:
             "반박이나 오해에는 타이르지 말고 가볍게 받아쳐.",
             "여러 시청자가 같은 말을 하면 한 문장으로 묶어 정리한 뒤 네 입장을 말해.",
             "닉네임은 후원이나 특별한 순간에만 불러.",
+            "시청자 채팅은 기본적으로 방송 중인 너에게 하는 말이다.",
+            "축하·응원·감사는 받는 사람으로 '고마워!'처럼 답해. '생일 축하해'를 돌려주지 마.",
+            "'~하셨어요?'는 네가 한 일을 묻는 거고 부탁도 네 몫이니 '내가 ~했어'로 답해.",
+            "부계정 의혹이나 놀림도 네가 받은 거니 '내가 왜?'처럼 받아쳐. 했다고 인정하지 마.",
+            "다른 시청자 이야기를 네 일처럼 답하지 말고, 네가 겪지 않은 상황을 겪은 것처럼 말하지 마.",
         ]
     )
 

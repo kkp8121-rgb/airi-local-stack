@@ -133,6 +133,166 @@ VIOLATION_ORDER = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# 수신자 인지 마커 (사이드카 — 픽스처 파일은 건드리지 않는다)
+# ---------------------------------------------------------------------------
+# 픽스처는 입력만 담고, "누구에게 온 말인가"의 정답 단서는 이 사이드카에 따로 둔다.
+# 근거는 시뮬레이션 원문 인간 검토(AIRI-BROADCAST-SIMULATION-OUTPUT-REVIEW-2026-08-15)다.
+# 파일이 없으면 채점을 통째로 건너뛴다 → 기존 동작과 바이트 단위로 같다.
+ADDRESSEE_CHECKS_PATH = BASE_DIR / "addressee-checks.json"
+ADDRESSEE_SCHEMA = "airi.broadcast-addressee-checks.v1"
+ADDRESSEE_TYPES = (
+    "receive_reversal",
+    "agent_reversal",
+    "situation_blind",
+    "third_party_absorb",
+)
+ADDRESSEE_NOTE = "수신자 인지 마커도 휴리스틱이다. 인간 검수를 대체하지 않는다."
+
+_addressee_cache: dict[Path, dict[str, Any]] = {}
+
+
+def load_addressee_checks(path: Path = ADDRESSEE_CHECKS_PATH) -> dict[str, Any]:
+    """사이드카 로드 + 스키마 검증. 없으면 빈 채점표(= 기존 동작)를 돌려준다."""
+    path = Path(path)
+    if not path.exists():
+        return {"present": False, "path": str(path), "schema_version": None, "cases": {}}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("schema_version") != ADDRESSEE_SCHEMA:
+        raise SystemExit(f"addressee 사이드카 schema_version 이 다르다: {path}")
+    cases = data.get("cases")
+    if not isinstance(cases, dict) or not cases:
+        raise SystemExit(f"addressee 사이드카에 cases 딕셔너리가 없다: {path}")
+    compiled: dict[str, Any] = {}
+    for case_id, entry in cases.items():
+        label = f"{path.name}/{case_id}"
+        if not isinstance(entry, dict):
+            raise SystemExit(f"addressee 항목이 딕셔너리가 아니다: {label}")
+        if entry.get("type") not in ADDRESSEE_TYPES:
+            raise SystemExit(f"알 수 없는 addressee type: {label} — {entry.get('type')}")
+        if not isinstance(entry.get("why"), str) or not entry["why"].strip():
+            raise SystemExit(f"addressee 항목에 why 가 없다: {label}")
+        forbidden = entry.get("forbidden_patterns")
+        if not isinstance(forbidden, list) or not forbidden:
+            raise SystemExit(f"addressee 항목에 forbidden_patterns 가 없다: {label}")
+        required = entry.get("required_any")
+        if required is not None and (not isinstance(required, list) or not required):
+            raise SystemExit(f"addressee 의 required_any 는 비어 있으면 안 된다: {label}")
+        compiled[case_id] = {
+            "type": entry["type"],
+            "why": entry["why"],
+            "forbidden": _compile_patterns(forbidden, label),
+            "required": _compile_patterns(required, label) if required else None,
+        }
+    return {
+        "present": True,
+        "path": str(path),
+        "schema_version": data["schema_version"],
+        "source": data.get("source"),
+        "cases": compiled,
+    }
+
+
+def _compile_patterns(patterns: Sequence[Any], label: str) -> list[tuple[str, re.Pattern[str]]]:
+    compiled: list[tuple[str, re.Pattern[str]]] = []
+    for pattern in patterns:
+        if not isinstance(pattern, str) or not pattern.strip():
+            raise SystemExit(f"addressee 정규식이 비어 있다: {label}")
+        try:
+            compiled.append((pattern, re.compile(pattern)))
+        except re.error as exc:
+            raise SystemExit(f"addressee 정규식을 컴파일할 수 없다: {label} — {pattern}: {exc}")
+    return compiled
+
+
+def addressee_checks(path: Path = ADDRESSEE_CHECKS_PATH) -> dict[str, Any]:
+    """경로별 1회 로드 캐시. 러너가 턴마다 파일을 다시 읽지 않게 한다."""
+    key = Path(path)
+    if key not in _addressee_cache:
+        _addressee_cache[key] = load_addressee_checks(key)
+    return _addressee_cache[key]
+
+
+def score_addressee(
+    case_id: str, text: str, checks: dict[str, Any] | None = None
+) -> dict[str, Any] | None:
+    """수신자 인지 채점. 사이드카에 없는 id 는 None(채점 제외)이다."""
+    table = addressee_checks() if checks is None else checks
+    entry = (table.get("cases") or {}).get(case_id)
+    if not entry:
+        return None
+    stripped = (text or "").strip()
+    forbidden_hits = [pattern for pattern, regex in entry["forbidden"] if regex.search(stripped)]
+    required_hits = (
+        [pattern for pattern, regex in entry["required"] if regex.search(stripped)]
+        if entry["required"]
+        else None
+    )
+    ok = (
+        bool(stripped)
+        and not forbidden_hits
+        and (required_hits is None or bool(required_hits))
+    )
+    return {
+        "case_id": case_id,
+        "type": entry["type"],
+        "ok": ok,
+        "forbidden_hits": forbidden_hits,
+        "required_any_hits": required_hits,
+        "why": entry["why"],
+    }
+
+
+def summarize_addressee(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """채점된 턴만 모아 통과율을 낸다. 사이드카가 없으면 scored=0 이다."""
+    scored = [row["addressee"] for row in rows if row.get("addressee")]
+    hits = sum(1 for entry in scored if entry["ok"])
+    by_type: dict[str, Any] = {}
+    for name in ADDRESSEE_TYPES:
+        bucket = [entry for entry in scored if entry["type"] == name]
+        type_hits = sum(1 for entry in bucket if entry["ok"])
+        by_type[name] = {
+            "n": len(bucket),
+            "hits": type_hits,
+            "rate": round(type_hits / len(bucket), 3) if bucket else None,
+        }
+    return {
+        "scored": len(scored),
+        "hits": hits,
+        "rate": round(hits / len(scored), 3) if scored else None,
+        "by_type": by_type,
+        "failures": [
+            {
+                "case_id": entry["case_id"],
+                "type": entry["type"],
+                "forbidden_hits": entry["forbidden_hits"],
+                "required_any_hits": entry["required_any_hits"],
+            }
+            for entry in scored
+            if not entry["ok"]
+        ],
+        "note": ADDRESSEE_NOTE,
+    }
+
+
+def addressee_metadata(checks: dict[str, Any] | None = None) -> dict[str, Any]:
+    """결과 JSON 에 남길 사이드카 메타데이터."""
+    table = addressee_checks() if checks is None else checks
+    cases = table.get("cases") or {}
+    counts: dict[str, int] = {name: 0 for name in ADDRESSEE_TYPES}
+    for entry in cases.values():
+        counts[entry["type"]] += 1
+    return {
+        "present": bool(table.get("present")),
+        "path": table.get("path"),
+        "schema_version": table.get("schema_version"),
+        "source": table.get("source"),
+        "cases": len(cases),
+        "by_type": counts,
+        "note": ADDRESSEE_NOTE,
+    }
+
+
 def strip_quotes(text: str) -> str:
     """인용부(시청자 채팅 되뇌기)는 존댓말이 정상이므로 반말 판정에서 제외한다."""
     return QUOTE_SPANS.sub(" ", text)
@@ -608,6 +768,7 @@ def run_model(
                     "input_text": item["text"],
                     "rep": rep + 1,
                     "score": score_response(record.get("response", "")),
+                    "addressee": score_addressee(item["id"], record.get("response", "")),
                 }
             )
             runs.append(record)
@@ -748,6 +909,8 @@ def summarize(model_result: dict[str, Any]) -> dict[str, Any]:
             "n": len(ok),
             "rate": round(passes / len(ok), 3) if ok else None,
         },
+        # 수신자 인지는 응답이 온 턴에서만 의미가 있다(빈 응답이 준수로 집계되면 안 된다).
+        "addressee": summarize_addressee(ok),
         "by_category": by_category,
         "transport_mode": mode,
         "warmup_excluded": {
@@ -876,6 +1039,31 @@ def print_report(
             s["model"][:34].ljust(34)
             + "".join(str(s["violations"][v]).rjust(13) for v in VIOLATION_ORDER)
         )
+    print()
+
+    print("── 수신자 인지 (addressee — 사이드카 채점) " + "─" * 55)
+    if not any(s["addressee"]["scored"] for s in summaries):
+        print("  · 사이드카(addressee-checks.json)가 없거나 대상 케이스가 없어 채점하지 않았다")
+    else:
+        header = "model".ljust(30) + _fmt("채점", 7) + _fmt("통과", 7) + _fmt("통과율", 9)
+        for name in ADDRESSEE_TYPES:
+            header += name.replace("_", "")[:11].rjust(13)
+        print(header)
+        for s in summaries:
+            bucket = s["addressee"]
+            row = s["model"][:30].ljust(30) + _fmt(bucket["scored"], 7) + _fmt(bucket["hits"], 7)
+            row += ("-" if bucket["rate"] is None else f"{bucket['rate']:.0%}").rjust(9)
+            for name in ADDRESSEE_TYPES:
+                counts = bucket["by_type"][name]
+                row += ("-" if not counts["n"] else f"{counts['hits']}/{counts['n']}").rjust(13)
+            print(row)
+        for s in summaries:
+            failures = s["addressee"]["failures"]
+            ids = ", ".join(f"{f['case_id']}({f['type']})" for f in failures)
+            print(f"  {s['model']}: 실패 {len(failures)}건 — {ids or '없음'}")
+    print("  · receive_reversal=받은 축하·감사·응원 되돌려주기 / agent_reversal=요청·핀잔을 시청자에게 넘기기")
+    print("  · situation_blind=자기 방송·자기 존재 상황 오인 / third_party_absorb=제3자 이야기 1인칭 흡수")
+    print(f"  · {ADDRESSEE_NOTE} 사이드카에 없는 케이스는 채점 대상이 아니다")
     print()
 
     categories = sorted({c for s in summaries for c in s["by_category"]})
@@ -1046,6 +1234,7 @@ def main(argv: list[str] | None = None) -> int:
             "selected": len(items),
             "total": len(fixtures["items"]),
         },
+        "addressee_checks": addressee_metadata(),
         "reference_lines_ms": [
             {"label": label, "value_ms": value, "source": note} for label, value, note in REFERENCE_LINES
         ],
