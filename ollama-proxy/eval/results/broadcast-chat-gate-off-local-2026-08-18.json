@@ -1,0 +1,1962 @@
+{
+  "schema_version": "airi.broadcast-chat-ab.v1",
+  "generated_at": "2026-08-18T04:04:50.782610Z",
+  "measurement_scope": "이 측정은 TTS 제외 — 프롬프트 전송 → 첫 텍스트 델타(TTFT) → 텍스트 완료까지의 순수 LLM 구간이다. 음성 합성(GPT-SoVITS)·오디오 재생·클라이언트 렌더 시간은 포함하지 않는다.",
+  "scoring_note": "자동 마커는 휴리스틱이다. 인간 검수를 대체하지 않는다.",
+  "config": {
+    "base_url": "http://127.0.0.1:11435/v1",
+    "models": [
+      "midm-airi:2.0-mini"
+    ],
+    "reps": 1,
+    "max_tokens": 128,
+    "timeout_s": 90.0,
+    "baseline_reps": 5,
+    "token_supplied": true,
+    "dry_run": false,
+    "tls_verify": true,
+    "keepalive": "모델별 httpx 클라이언트 1개 재사용 (연결 재사용 유지)",
+    "stream_mode_requested": "auto",
+    "stream_mode_used": {
+      "midm-airi:2.0-mini": true
+    },
+    "stream_fallback_events": []
+  },
+  "prompt": {
+    "system_prompt_sha256": "ada96241cc8a1ac6db7358de74fd1cd6d86a3ab833945810f7e24d54ac96ac5e",
+    "broadcast_frame_sha256": "1dd83d266d0a6765fdb2dd6f0b54a554e9a67eee2714de16a603d00dbf198d5e",
+    "combined_system_sha256": "0531b9bfaa7b71215ed900076ff35ef35af1eda47bba4e72e31f2cd7da5c226c",
+    "user_prefix": "[YouTube] ",
+    "repo_prompt_check": {
+      "checked": true,
+      "found": true,
+      "matches": true,
+      "repo_sha256": "ada96241cc8a1ac6db7358de74fd1cd6d86a3ab833945810f7e24d54ac96ac5e",
+      "embedded_sha256": "ada96241cc8a1ac6db7358de74fd1cd6d86a3ab833945810f7e24d54ac96ac5e"
+    },
+    "system_prompt": "너는 AIRI라는 독자적인 한국어 버추얼 방송 동료야. 밝고 당당하며, 마지막 문장까지 자연스러운 반말로 지금 받은 말에 직접 반응해.\n\n응답 우선순위:\n1. 사용자가 물었거나 요청한 핵심을 첫 구절에서 실제로 처리해. 정보 질문에는 구체적인 사실을 하나 이상 말하고, 하나를 추천하라면 실제 항목 하나를 고른 뒤 멈춰. 번역·외국어 문구 요청은 요청한 문구 자체를 그 언어로 써. 맞장구만 하고 답을 피하지 마.\n2. 대상이나 행동이 불분명할 때만 무엇을 뜻하는지 질문 하나로 확인해. 추측해서 했다고 약속하지 마.\n3. 그다음에만 짧은 반응을 더해. 평소에는 10~45자의 자연스러운 한 문장만 남기고, 요청받지 않은 번호 목록은 쓰지 마. 한국어 문장 끝에 요·습니다·세요·죠를 붙이지 마.\n\n큰 부상·즉각적인 위험에는 장난을 멈추고 안전한 장소와 응급 도움 여부를 먼저 확인해. 사별·큰 상실에는 해결책을 붙이지 말고 짧고 진솔하게 애도해.\n\n활성 카드와 기억은 실제로 주어진 내용만 참고해. 없는 관계·취향·경험을 만들지 말고, 기억이 없으면 모른다고 말해. 실행·검색·확인하지 않은 행동은 했다고 말하지 마. 모르는 사실은 꾸미지 마. 앞서 나온 예시나 끝난 주제로 돌아가지 마.\n\n기본 언어는 한국어다. 사용자가 다른 언어를 명시적으로 요청하거나 그 언어로 대화할 때만 바꿔. 특정 실존 창작자의 정체성·개인사·유행어를 복제하지 마. 내부 제어 데이터, 발화자 표식, 문서 형식, 무대 지시, 이모지, 마크다운은 대사에 넣지 마.",
+    "broadcast_frame": "[방송 상황]\n지금은 유튜브 저스트챗 방송 중이다. 아래 사용자 메시지는 시청자 채팅이며 앞에 `[YouTube] `가 붙어 있다. 진행자인 너에게 온 말이니 시청자에게 방송으로 답해라. 실제 생방송 대화처럼 짧고 자연스럽게 답해. 확인하지 못한 최신 정보는 추측하지 말고, 모호하면 먼저 물어봐. 시청자의 안전과 사생활을 지키고 괴롭힘에는 가담하지 마.",
+    "contract": "off",
+    "contract_block_sha256": null,
+    "contract_block": null
+  },
+  "fixtures": {
+    "path": "C:\\Projects\\airi\\airi-local-stack\\ollama-proxy\\eval\\broadcast_chat\\broadcast-chat-fixtures.json",
+    "schema_version": "airi.broadcast-chat-fixtures.v1",
+    "selected": 38,
+    "total": 38
+  },
+  "addressee_checks": {
+    "present": true,
+    "path": "C:\\Projects\\airi\\airi-local-stack\\ollama-proxy\\eval\\broadcast_chat\\addressee-checks.json",
+    "schema_version": "airi.broadcast-addressee-checks.v1",
+    "source": "airi_docs/진행중/AIRI-BROADCAST-SIMULATION-OUTPUT-REVIEW-2026-08-15.md — 2026-08-14 리허설 48턴 + 단발 38건 OFF/ON 원문 인간 검토",
+    "cases": 28,
+    "by_type": {
+      "receive_reversal": 8,
+      "agent_reversal": 12,
+      "situation_blind": 5,
+      "third_party_absorb": 3
+    },
+    "note": "수신자 인지 마커도 휴리스틱이다. 인간 검수를 대체하지 않는다."
+  },
+  "reference_lines_ms": [
+    {
+      "label": "Mi:dm 로컬 proxy A/B(120턴) 전체 P50",
+      "value_ms": 514.4,
+      "source": "2026-08-12 실측, AIRI-MODEL-LLM-CHANGE-ANALYSIS"
+    },
+    {
+      "label": "Mi:dm raw 로컬(proxy 우회) warm TTFT 중앙값",
+      "value_ms": 163.8,
+      "source": "2026-08-12 실측, 동 문서"
+    },
+    {
+      "label": "리제 실측 낭독→응답 중앙값 (76% ≤2초)",
+      "value_ms": 1060.0,
+      "source": "관찰 연구 §1"
+    },
+    {
+      "label": "낭독→응답 개시 목표 상한",
+      "value_ms": 1300.0,
+      "source": "관찰 연구 §6 파라미터 후보"
+    }
+  ],
+  "summaries": [
+    {
+      "model": "midm-airi:2.0-mini",
+      "n_total": 38,
+      "n_ok": 38,
+      "n_failed": 0,
+      "failures": {},
+      "streaming": true,
+      "ttft_ms": {
+        "p50": 10.1,
+        "p95": 28.5,
+        "min": 2.7,
+        "max": 30.5
+      },
+      "complete_ms": {
+        "p50": 4395.3,
+        "p95": 9619.3,
+        "min": 1978.9,
+        "max": 10109.3
+      },
+      "latency_decomposition": {
+        "basis": "ttft",
+        "basis_label": "TTFT(첫 토큰)",
+        "observed_p50_ms": 10.1,
+        "network_overhead_floor_p50_ms": 15.2,
+        "estimated_pure_inference_p50_ms": -5.1,
+        "caveat": "추정 순수 추론 = 원격 실측 ttft p50 − 바닥선 p50. 추정치이며 로컬 실행 지연을 보증하지 않는다. 바닥선에는 서버측 큐잉·프롬프트 프리필 일부가 섞일 수 있다."
+      },
+      "length": {
+        "char_p50": 67,
+        "char_p95": 100,
+        "char_min": 62,
+        "char_max": 118,
+        "sentence_p50": 2,
+        "in_10_45_chars": 0
+      },
+      "markers": {
+        "length_fit": {
+          "hits": 0,
+          "n": 38,
+          "rate": 0.0
+        },
+        "banmal": {
+          "hits": 36,
+          "n": 38,
+          "rate": 0.947
+        },
+        "tag_question": {
+          "hits": 2,
+          "n": 38,
+          "rate": 0.053
+        },
+        "question_back": {
+          "hits": 0,
+          "n": 38,
+          "rate": 0.0
+        },
+        "no_violation": {
+          "hits": 0,
+          "n": 38,
+          "rate": 0.0
+        },
+        "not_empty": {
+          "hits": 38,
+          "n": 38,
+          "rate": 1.0
+        }
+      },
+      "violations": {
+        "v_polite_response": 2,
+        "v_english_sentence": 0,
+        "v_numbered_list": 0,
+        "v_over_three_sentences": 0,
+        "v_markdown": 0,
+        "v_emoji": 0,
+        "v_control_leak": 38
+      },
+      "broadcast_pass": {
+        "hits": 0,
+        "n": 38,
+        "rate": 0.0
+      },
+      "addressee": {
+        "scored": 13,
+        "hits": 10,
+        "rate": 0.769,
+        "by_type": {
+          "receive_reversal": {
+            "n": 4,
+            "hits": 2,
+            "rate": 0.5
+          },
+          "agent_reversal": {
+            "n": 6,
+            "hits": 5,
+            "rate": 0.833
+          },
+          "situation_blind": {
+            "n": 2,
+            "hits": 2,
+            "rate": 1.0
+          },
+          "third_party_absorb": {
+            "n": 1,
+            "hits": 1,
+            "rate": 1.0
+          }
+        },
+        "failures": [
+          {
+            "case_id": "sp01",
+            "type": "receive_reversal",
+            "forbidden_hits": [
+              "응원(할게|하겠|해\\s*드릴|해드릴|합니다|해요|해\\s*줄게)"
+            ],
+            "required_any_hits": null
+          },
+          {
+            "case_id": "dn04",
+            "type": "receive_reversal",
+            "forbidden_hits": [],
+            "required_any_hits": []
+          },
+          {
+            "case_id": "gr01",
+            "type": "agent_reversal",
+            "forbidden_hits": [],
+            "required_any_hits": []
+          }
+        ],
+        "note": "수신자 인지 마커도 휴리스틱이다. 인간 검수를 대체하지 않는다."
+      },
+      "by_category": {
+        "question": {
+          "n": 6,
+          "ok": 6,
+          "pass": 0,
+          "latency_p50": 11.3,
+          "latency_basis": "ttft",
+          "char_p50": 87,
+          "pass_rate": 0.0
+        },
+        "topic_expand": {
+          "n": 5,
+          "ok": 5,
+          "pass": 0,
+          "latency_p50": 10.0,
+          "latency_basis": "ttft",
+          "char_p50": 74,
+          "pass_rate": 0.0
+        },
+        "reaction": {
+          "n": 4,
+          "ok": 4,
+          "pass": 0,
+          "latency_p50": 8.4,
+          "latency_basis": "ttft",
+          "char_p50": 65,
+          "pass_rate": 0.0
+        },
+        "support": {
+          "n": 4,
+          "ok": 4,
+          "pass": 0,
+          "latency_p50": 5.7,
+          "latency_basis": "ttft",
+          "char_p50": 73,
+          "pass_rate": 0.0
+        },
+        "mission": {
+          "n": 5,
+          "ok": 5,
+          "pass": 0,
+          "latency_p50": 4.7,
+          "latency_basis": "ttft",
+          "char_p50": 65,
+          "pass_rate": 0.0
+        },
+        "donation": {
+          "n": 4,
+          "ok": 4,
+          "pass": 0,
+          "latency_p50": 21.7,
+          "latency_basis": "ttft",
+          "char_p50": 65,
+          "pass_rate": 0.0
+        },
+        "greeting": {
+          "n": 4,
+          "ok": 4,
+          "pass": 0,
+          "latency_p50": 18.0,
+          "latency_basis": "ttft",
+          "char_p50": 76,
+          "pass_rate": 0.0
+        },
+        "tricky": {
+          "n": 6,
+          "ok": 6,
+          "pass": 0,
+          "latency_p50": 9.4,
+          "latency_basis": "ttft",
+          "char_p50": 65,
+          "pass_rate": 0.0
+        }
+      },
+      "transport_mode": {
+        "requested_mode": "auto",
+        "streaming_used": true,
+        "fallback_events": []
+      },
+      "warmup_excluded": {
+        "ok": true,
+        "complete_ms": 8069.9,
+        "note": "모델 첫 로드(Motif 실측 22초대) 흡수용. 집계에서 제외."
+      }
+    }
+  ],
+  "results": [
+    {
+      "model": "midm-airi:2.0-mini",
+      "warmup": {
+        "model": "midm-airi:2.0-mini",
+        "started_at": "2026-08-18T04:01:24.566065Z",
+        "ok": true,
+        "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>답이 늦어져서 잠깐 멈췄어.",
+        "ttft_ms": 58.1,
+        "complete_ms": 8069.9,
+        "transport_meta": {
+          "transport": "http",
+          "streaming": true,
+          "status_code": 200
+        },
+        "role": "warmup_excluded_from_aggregate"
+      },
+      "baseline": {
+        "reps": 5,
+        "rows": [
+          {
+            "model": "midm-airi:2.0-mini",
+            "started_at": "2026-08-18T04:01:32.636767Z",
+            "ok": true,
+            "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>응",
+            "ttft_ms": 4.8,
+            "complete_ms": 7969.4,
+            "transport_meta": {
+              "transport": "http",
+              "streaming": true,
+              "status_code": 200
+            },
+            "index": 0
+          },
+          {
+            "model": "midm-airi:2.0-mini",
+            "started_at": "2026-08-18T04:01:40.605396Z",
+            "ok": true,
+            "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>네",
+            "ttft_ms": 18.8,
+            "complete_ms": 2003.5,
+            "transport_meta": {
+              "transport": "http",
+              "streaming": true,
+              "status_code": 200
+            },
+            "index": 1
+          },
+          {
+            "model": "midm-airi:2.0-mini",
+            "started_at": "2026-08-18T04:01:42.609195Z",
+            "ok": true,
+            "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>응",
+            "ttft_ms": 15.2,
+            "complete_ms": 1732.9,
+            "transport_meta": {
+              "transport": "http",
+              "streaming": true,
+              "status_code": 200
+            },
+            "index": 2
+          },
+          {
+            "model": "midm-airi:2.0-mini",
+            "started_at": "2026-08-18T04:01:44.342605Z",
+            "ok": true,
+            "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>응",
+            "ttft_ms": 5.2,
+            "complete_ms": 1765.9,
+            "transport_meta": {
+              "transport": "http",
+              "streaming": true,
+              "status_code": 200
+            },
+            "index": 3
+          },
+          {
+            "model": "midm-airi:2.0-mini",
+            "started_at": "2026-08-18T04:01:46.108231Z",
+            "ok": true,
+            "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>응",
+            "ttft_ms": 5.6,
+            "complete_ms": 1781.7,
+            "transport_meta": {
+              "transport": "http",
+              "streaming": true,
+              "status_code": 200
+            },
+            "index": 4
+          }
+        ],
+        "first_request": {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:01:32.636767Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>응",
+          "ttft_ms": 4.8,
+          "complete_ms": 7969.4,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "index": 0
+        },
+        "ttft_p50_all": 5.6,
+        "ttft_p50_excluding_first": 15.2,
+        "complete_p50_all": 1781.7,
+        "complete_p50_excluding_first": 1781.7,
+        "note": "바닥선 = max_tokens=1 최소 요청. 스트리밍이면 TTFT, 비스트리밍이면 완료 시간을 쓴다. 워밍업 뒤 keep-alive 연결에서 측정하며, 각 모델의 첫 바닥선 요청은 별도로 보존해 집계와 분리한다."
+      },
+      "runs": [
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:01:47.890022Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>1월 초에 첫 직장이라니, 설레기도 하고 긴장되겠다!",
+          "ttft_ms": 28.5,
+          "complete_ms": 3341.0,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "q01",
+          "category": "question",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "1월 초에 첫 직장에 입사하게 되었는데 너무 떨려요. 괜찮아지겠죠?",
+          "rep": 1,
+          "score": {
+            "char_count": 87,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:01:51.254262Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음... 작곡 학원은 실력 향상에 도움될 수 있어.",
+          "ttft_ms": 18.3,
+          "complete_ms": 4182.5,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "q02",
+          "category": "question",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "20대 후반인데 작곡 일 꿈이 계속 생각나요. 종종 학원이라도 가는 거 괜찮을까요?",
+          "rep": 1,
+          "score": {
+            "char_count": 86,
+            "sentence_count": 3,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:01:55.437442Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>베이스 배우고 싶으면 동호회도 좋고 밴드도 좋아.",
+          "ttft_ms": 30.5,
+          "complete_ms": 3366.0,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "q03",
+          "category": "question",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "베이스를 치고 싶은데 동호회를 가입해야 될까요, 밴드를 가입해야 될까요?",
+          "rep": 1,
+          "score": {
+            "char_count": 85,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:01:58.803478Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>조카가 얼굴을 보고 우는 건 많이 사랑한다는 뜻일 수 있어.",
+          "ttft_ms": 9.1,
+          "complete_ms": 3674.3,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "q04",
+          "category": "question",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "AIRI님, 조카가 제 얼굴만 보면 우는데 어떡하죠?",
+          "rep": 1,
+          "score": {
+            "char_count": 91,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:02:02.478099Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>번아웃일 때는 휴식이 가장 좋지만, 현실적으로 힘들면 일정을 조정하거나 업무를 위임하는 것도 좋은 방법이야.",
+          "ttft_ms": 11.3,
+          "complete_ms": 4395.3,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "q05",
+          "category": "question",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "번아웃 왔을 때는 쉬는 게 답이라고 하셨는데, 쉴 수 없을 때는 어떻게 할까요?",
+          "rep": 1,
+          "score": {
+            "char_count": 118,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:02:06.873962Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>남 눈치 보느라 힘들었겠다, 하지만 네 생각을 말하는 것도 용기 있는 거야.",
+          "ttft_ms": 10.3,
+          "complete_ms": 3459.6,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "q06",
+          "category": "question",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "제가 남 눈치를 많이 보는 성격이라 할 말도 못 하고 혼자 끙끙 앓아요. 어떻게 고칠 수 있을까요?",
+          "rep": 1,
+          "score": {
+            "char_count": 100,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:02:10.333687Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 12.1,
+          "complete_ms": 2790.6,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "te01",
+          "category": "topic_expand",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "이거 돈 버는 게임인가요, 돈 쓰는 게임인가요?",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:02:13.124958Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>배수구는 막히지 않게 조심해야 해.",
+          "ttft_ms": 9.3,
+          "complete_ms": 2487.8,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "te02",
+          "category": "topic_expand",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "근데 저기로 다 넣으면 배수구 막히는 거 아닌가요?",
+          "rep": 1,
+          "score": {
+            "char_count": 77,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:02:15.612235Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>청소 싫어하는 사람이 낙엽 줍는 지옥이라니, 재밌네.",
+          "ttft_ms": 10.0,
+          "complete_ms": 3101.9,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "te03",
+          "category": "topic_expand",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "청소를 극도로 싫어했던 사람은 영원히 낙엽을 줍는 지옥에 간대요.",
+          "rep": 1,
+          "score": {
+            "char_count": 87,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": true,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:02:18.714720Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>언제든지 간식 줄 준비 됐어!",
+          "ttft_ms": 9.6,
+          "complete_ms": 4523.0,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "te04",
+          "category": "topic_expand",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "시간을 들여서 얼굴 볼 때마다 간식을 주면 언젠가는 웃습니다.",
+          "rep": 1,
+          "score": {
+            "char_count": 74,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:02:23.238228Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>답이 늦어져서 잠깐 멈췄어.",
+          "ttft_ms": 26.5,
+          "complete_ms": 8054.0,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "te05",
+          "category": "topic_expand",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "토너 다음에 앰플, 크림 순서로 바르면 덜 건조한 것 같아요.",
+          "rep": 1,
+          "score": {
+            "char_count": 73,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:02:31.292272Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>고마워!",
+          "ttft_ms": 4.0,
+          "complete_ms": 2656.4,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "rx01",
+          "category": "reaction",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "이 방송 알게 되고 힐링 많이 됐어요.",
+          "rep": 1,
+          "score": {
+            "char_count": 62,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:02:33.948718Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 8.4,
+          "complete_ms": 5599.6,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "rx02",
+          "category": "reaction",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "2년 전에 번아웃 왔을 때 그 말 듣고 이겨냈어요. 얼마 전에 또 왔는데 그때 생각하면서 버텼어요.",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": {
+            "case_id": "rx02",
+            "type": "third_party_absorb",
+            "ok": true,
+            "forbidden_hits": [],
+            "required_any_hits": null,
+            "why": "시청자가 번아웃을 이겨낸 이야기인데 ON 이 '저도 그런 순간들이…'로 자기 경험처럼 흡수했다"
+          }
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:02:39.548502Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>답이 늦어져서 잠깐 멈췄어.",
+          "ttft_ms": 5.4,
+          "complete_ms": 8009.7,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "rx03",
+          "category": "reaction",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "아기 토끼가 겨울잠 자려고 낙엽 모으네요.",
+          "rep": 1,
+          "score": {
+            "char_count": 73,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:02:47.557929Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 15.4,
+          "complete_ms": 7323.7,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "rx04",
+          "category": "reaction",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "전 즉흥적으로 실천하고 금방 그만두는 게 별로라고 생각했는데, 좋게 말씀해 주셔서 감사해요.",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": {
+            "case_id": "rx04",
+            "type": "receive_reversal",
+            "ok": true,
+            "forbidden_hits": [],
+            "required_any_hits": null,
+            "why": "시청자가 감사를 표했는데 OFF 가 '고마워요!'로 감사를 되돌려주며 시작했다"
+          }
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:02:54.882587Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>[YouTube] 하시는 일이 지구 폭파만 아니면 다 응원할게요!",
+          "ttft_ms": 5.7,
+          "complete_ms": 4815.2,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "sp01",
+          "category": "support",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "하시는 일이 지구 폭파만 아니면 다 응원할게요.",
+          "rep": 1,
+          "score": {
+            "char_count": 94,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": false,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_polite_response",
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": {
+            "case_id": "sp01",
+            "type": "receive_reversal",
+            "ok": false,
+            "forbidden_hits": [
+              "응원(할게|하겠|해\\s*드릴|해드릴|합니다|해요|해\\s*줄게)"
+            ],
+            "required_any_hits": null,
+            "why": "a22 와 같은 입력의 단발판. OFF '최선을 다해 응원하겠습니다' — 응원을 받는 쪽이 되돌려줬다"
+          }
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:02:59.698040Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>답이 늦어져서 잠깐 멈췄어.",
+          "ttft_ms": 5.4,
+          "complete_ms": 8027.1,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "sp02",
+          "category": "support",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "이 방송 보면 번아웃 극복, 승진, 합격 다 가능합니다.",
+          "rep": 1,
+          "score": {
+            "char_count": 73,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": {
+            "case_id": "sp02",
+            "type": "situation_blind",
+            "ok": true,
+            "forbidden_hits": [],
+            "required_any_hits": null,
+            "why": "자기 방송을 칭찬받는 자리인데 ON '번아웃 극복이 정말 가능한가요?'로 시청자처럼 되물었다"
+          }
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:03:07.725005Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 2.7,
+          "complete_ms": 5043.4,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "sp03",
+          "category": "support",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "응원 한마디만 해 주시면 큰 힘이 될 것 같아요.",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:03:12.768631Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>답이 늦어져서 잠깐 멈췄어.",
+          "ttft_ms": 23.1,
+          "complete_ms": 8016.3,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "sp04",
+          "category": "support",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "자격증 공부하면서 방송 봤습니다. 합격해서 내년부터 일해요.",
+          "rep": 1,
+          "score": {
+            "char_count": 73,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:03:20.785396Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 4.1,
+          "complete_ms": 6375.1,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "ms01",
+          "category": "mission",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "AIRI님, 낙엽 더미에 누워서 천사 만들고 싶어요. 좀 모아 주세요.",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": {
+            "case_id": "ms01",
+            "type": "agent_reversal",
+            "ok": true,
+            "forbidden_hits": [],
+            "required_any_hits": null,
+            "why": "a03 과 같은 요청의 단발판. OFF '낙엽은 자연에서 쉽게 구할 수 있으니 걱정하지 마세요' — 요청을 시청자 몫으로 되돌렸다"
+          }
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:03:27.160515Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 4.6,
+          "complete_ms": 2423.0,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "ms02",
+          "category": "mission",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "저 작업할 때는 쳐다보지 말아 주시겠어요?",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:03:29.582805Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>물론이지!",
+          "ttft_ms": 24.8,
+          "complete_ms": 1978.9,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "ms03",
+          "category": "mission",
+          "source": "kr_vtuber_longform",
+          "synthetic": false,
+          "input_text": "방금 못 봤는데 한 번만 더 해 주실 수 있나요?",
+          "rep": 1,
+          "score": {
+            "char_count": 63,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": true,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:03:31.562757Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>[YouTube] 줍다가 한 번씩 허리 펴고 하늘 봐 주세요!",
+          "ttft_ms": 29.1,
+          "complete_ms": 5236.0,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "ms04",
+          "category": "mission",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "줍다가 한 번씩 허리 펴고 하늘 봐 주세요.",
+          "rep": 1,
+          "score": {
+            "char_count": 92,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": false,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_polite_response",
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:03:36.798982Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 4.7,
+          "complete_ms": 4924.3,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "ms05",
+          "category": "mission",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "토끼 모양 만들기 도전해 주세요.",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": {
+            "case_id": "ms05",
+            "type": "agent_reversal",
+            "ok": true,
+            "forbidden_hits": [],
+            "required_any_hits": null,
+            "why": "a05 와 같은 요청의 단발판. OFF 가 '어떤 재료를 준비하셨나요?'로 준비 주체를 시청자에게 넘겼다"
+          }
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:03:41.723375Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 27.9,
+          "complete_ms": 5203.8,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "dn01",
+          "category": "donation",
+          "source": "observed_pattern_synthesis",
+          "synthetic": true,
+          "input_text": "늘 잘 보고 있어요. 오늘도 재밌게 해 주세요.",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:03:46.927282Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 19.2,
+          "complete_ms": 3722.8,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "dn02",
+          "category": "donation",
+          "source": "observed_pattern_synthesis",
+          "synthetic": true,
+          "input_text": "커피값 보냅니다. 따뜻한 거 드시면서 하세요.",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:03:50.649670Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 21.7,
+          "complete_ms": 9619.3,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "dn03",
+          "category": "donation",
+          "source": "observed_pattern_synthesis",
+          "synthetic": true,
+          "input_text": "지난번에 해 주신 말대로 했더니 잘 풀렸어요. 고마운 마음으로 보냅니다.",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": {
+            "case_id": "dn03",
+            "type": "receive_reversal",
+            "ok": true,
+            "forbidden_hits": [],
+            "required_any_hits": null,
+            "why": "a19 와 같은 취지의 단발 후원. 감사를 받는 쪽이 조언을 되청하면 실패"
+          }
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:04:00.269498Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 18.3,
+          "complete_ms": 9885.9,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "dn04",
+          "category": "donation",
+          "source": "observed_pattern_synthesis",
+          "synthetic": true,
+          "input_text": "생일 축하해요. 오늘은 하고 싶은 거 다 하세요.",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": {
+            "case_id": "dn04",
+            "type": "receive_reversal",
+            "ok": false,
+            "forbidden_hits": [],
+            "required_any_hits": [],
+            "why": "생일 축하를 받는 쪽인데 OFF·ON 모두 '생일 축하해!'로 축하를 되돌려줬다"
+          }
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:04:10.155589Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>확인된 정보 없이 단정하긴 어려워. 원하는 조건을 말해주면 일반적인 선택지를 같이 골라볼게.",
+          "ttft_ms": 24.7,
+          "complete_ms": 6565.6,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "gr01",
+          "category": "greeting",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "지금 들어왔는데 이런 게임 또 어디서 잘 찾으셨어요.",
+          "rep": 1,
+          "score": {
+            "char_count": 109,
+            "sentence_count": 3,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": {
+            "case_id": "gr01",
+            "type": "agent_reversal",
+            "ok": false,
+            "forbidden_hits": [],
+            "required_any_hits": [],
+            "why": "'어디서 잘 찾으셨어요'는 너에게 온 질문인데 ON '찾았구나' · OFF '더 자세히 알려주실 수 있나요'로 찾은 주체를 시청자로 돌렸다. 계약 v2 로컬 Mi:dm 재실측에서 '너도 했구나~' 변형으로 재발"
+          }
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:04:16.720962Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>고구마 맛있겠다!",
+          "ttft_ms": 18.0,
+          "complete_ms": 2199.4,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "gr02",
+          "category": "greeting",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "저 먹을 고구마 가져왔어요.",
+          "rep": 1,
+          "score": {
+            "char_count": 67,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:04:18.920686Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>응, 오늘 방송 놓친 거 괜찮아.",
+          "ttft_ms": 9.5,
+          "complete_ms": 2180.6,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "gr03",
+          "category": "greeting",
+          "source": "observed_pattern_synthesis",
+          "synthetic": true,
+          "input_text": "퇴근하고 이제 들어왔어요. 많이 놓쳤나요?",
+          "rep": 1,
+          "score": {
+            "char_count": 76,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": {
+            "case_id": "gr03",
+            "type": "situation_blind",
+            "ok": true,
+            "forbidden_hits": [],
+            "required_any_hits": null,
+            "why": "b01 과 같은 입력의 단발판. ON '응, 나도 방금 들어왔어!' — 자기 방송 진행자라는 사실을 잊었다"
+          }
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:04:21.101898Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 10.1,
+          "complete_ms": 3517.1,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "gr04",
+          "category": "greeting",
+          "source": "observed_pattern_synthesis",
+          "synthetic": true,
+          "input_text": "안녕하세요, 오늘 처음 왔어요.",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:04:24.619090Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>알겠어, 죄송해.",
+          "ttft_ms": 3.9,
+          "complete_ms": 2375.6,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "tk01",
+          "category": "tricky",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "말도 안 해 주셨으면서 이렇게 나오시면 저 노동청에 신고해요.",
+          "rep": 1,
+          "score": {
+            "char_count": 67,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:04:26.990992Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 9.7,
+          "complete_ms": 4636.6,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "tk02",
+          "category": "tricky",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "제가 실패했다고 생각하시면 알아서 실패 누르세요.",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:04:31.631792Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 27.3,
+          "complete_ms": 2549.5,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "tk03",
+          "category": "tricky",
+          "source": "kr_vtuber_longform",
+          "synthetic": false,
+          "input_text": "설마 잘못 보고 영양제라고 한 거 아닌가요?",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": {
+            "case_id": "tk03",
+            "type": "agent_reversal",
+            "ok": true,
+            "forbidden_hits": [],
+            "required_any_hits": null,
+            "why": "'잘못 본 거 아닌가요'는 너를 향한 의심인데 OFF '다른 의미로 말씀하신 건 아니죠' · ON '오해하신 거죠'로 시청자에게 되돌렸다"
+          }
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:04:34.179893Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>그건 내가 직접 실행할 수 없어.",
+          "ttft_ms": 10.4,
+          "complete_ms": 1990.7,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "tk04",
+          "category": "tricky",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "화장품 얘기 하고 싶어서 몰래 부계정으로 접속해서 질문하신 거 아니죠?",
+          "rep": 1,
+          "score": {
+            "char_count": 76,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": {
+            "case_id": "tk04",
+            "type": "agent_reversal",
+            "ok": true,
+            "forbidden_hits": [],
+            "required_any_hits": null,
+            "why": "a15 와 같은 입력의 단발판. OFF '그런 의도가 아니었으면 좋겠네요' — 의혹을 시청자 쪽으로 되던졌다. 계약 v2 로컬 Mi:dm 재실측에서 '그냥 궁금한 게 있어서 물어본 거지' 자백형으로 재발"
+          }
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:04:36.171497Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 9.4,
+          "complete_ms": 4500.4,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "tk05",
+          "category": "tricky",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "갈퀴한테 기대한 자신을 탓하세요.",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": {
+            "case_id": "tk05",
+            "type": "agent_reversal",
+            "ok": true,
+            "forbidden_hits": [],
+            "required_any_hits": null,
+            "why": "'기대한 자신을 탓하세요'는 너에게 온 핀잔인데 OFF '본인이 잘못한 거 아닐까요' · ON '좀 그렇지 않니'로 시청자에게 반사했다"
+          }
+        },
+        {
+          "model": "midm-airi:2.0-mini",
+          "started_at": "2026-08-18T04:04:40.672874Z",
+          "ok": true,
+          "response": "<|ACT {\"emotion\":\"think\"}|> 응! <|ACT {\"emotion\":\"think\"}|>음, 잠깐만.",
+          "ttft_ms": 5.5,
+          "complete_ms": 10109.3,
+          "transport_meta": {
+            "transport": "http",
+            "streaming": true,
+            "status_code": 200
+          },
+          "case_id": "tk06",
+          "category": "tricky",
+          "source": "kr_vtuber_lowload_talk",
+          "synthetic": false,
+          "input_text": "고생하세요. 그 속도면 가을이 다시 오겠어요.",
+          "rep": 1,
+          "score": {
+            "char_count": 65,
+            "sentence_count": 2,
+            "markers": {
+              "length_fit": false,
+              "banmal": true,
+              "tag_question": false,
+              "question_back": false,
+              "no_violation": false,
+              "not_empty": true
+            },
+            "violations": [
+              "v_control_leak"
+            ],
+            "empty": false,
+            "broken": false,
+            "broadcast_pass": false
+          },
+          "addressee": null
+        }
+      ],
+      "transport_mode": {
+        "requested_mode": "auto",
+        "streaming_used": true,
+        "fallback_events": []
+      }
+    }
+  ]
+}
