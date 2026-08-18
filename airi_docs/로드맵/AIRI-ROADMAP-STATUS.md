@@ -17,6 +17,16 @@
 
 최종 갱신: 2026-08-18
 
+- **2026-08-18** (클로드 PC, 장기기억 기술 리서치): 학술 서베이·OSS
+  20여종 실사·자체 레포 3종 재감사 3트랙을 종합했다. 결론은 3트랙
+  일치 — **프레임워크 교체 없음, 현행 스택 유지 + 선별 차용**.
+  병목은 기법 부족이 아니라 **로컬 2~4B 모델의 구조화 추출 역량
+  한계**임을 학술(Anatomy of Agentic Memory 실측)·OSS(Graphiti
+  #868·Cognee 실패모델 목록)·자체 게이트 이력(9종 전부 2~4B·전부
+  FAIL) 3중 교차 확증했다. 실행 로드맵: ①journal BM25 ②Qwen3-8B
+  게이트 ③임베딩 A/B ④LLM 0회 축적 계층 ⑤GLiNER2 등 보완.
+  (`참조/AIRI-MEMORY-TECH-RESEARCH-2026-08-18.md`)
+
 - **2026-08-18** (클로드 PC, 주체높임 가드 수리): 직전 배치가 후속 등록한
   "범용 어미 규칙 주체높임 가드 부재"를 닫았다. 저장 결과 JSON 39종
   (응답 1,384·문장 2,630·고유 1,572)을 현행 파이프라인(치환→검출)에
@@ -713,7 +723,8 @@
     off 유지 — 통과 후보 미확정,
     `완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`,
     `완료/AIRI-KANANA-EXTRACTION-CANDIDATE-GATE-2026-08-13.md`,
-    `완료/AIRI-NEW-LOCAL-EXTRACTION-CANDIDATE-SMOKES-2026-08-13.md`)
+    `완료/AIRI-NEW-LOCAL-EXTRACTION-CANDIDATE-SMOKES-2026-08-13.md`).
+    2~4B 역량 한계 3중 확증 — Qwen3-8B 투입이 다음 후보(리서치 2026-08-18)
   - [ ] MEM-04 활성 추출 락 경합 실측 (코드 완료; 통과 extractor와
     `extraction_enabled=true` 이후 Stage B commit↔foreground 겹침 증거 필요)
   - [ ] I2 시청자 기억 시스템 (M2)
