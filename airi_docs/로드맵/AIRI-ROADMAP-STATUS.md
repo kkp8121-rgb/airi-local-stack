@@ -912,7 +912,8 @@
   어떤 조합에도 불변이라 결정론 렌더러(A4.2) 이관 최종 근거로
   확정했다. TTS 포함 재검증은 코덱스(GPU) 잔여. 후속으로 양 러너에
   `--protocol operational` 분리 채점 옵션을 정식화했다(기본 raw 바이트
-  불변, 체크포인트 증거는 raw 전용 가드, 83 tests PASS).
+  불변, 체크포인트 증거는 raw 전용 가드, 83 tests PASS). 문서 인덱스도
+  현행화했다(신설 17건 등재·stale 0).
   (`완료/AIRI-B4C-GATE-PATH-AB-2026-08-18.md`)
 - **2026-08-18** (클로드 PC, 사용자 결정 23항목): 사용자가 캐릭터 헌법 v2
   7행(baseline=C / dislikes·pride·embarrassment·conflict·fatigue=A /

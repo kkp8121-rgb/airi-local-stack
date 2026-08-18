@@ -1,5 +1,7 @@
 # AIRI Documentation Index
 
+최종 현행화 2026-08-18 (클로드 PC).
+
 문서는 상태별 폴더로 분류한다 (2026-08-12 재구성). 파일명은 유지했으므로
 과거 문서가 언급하는 파일은 이름으로 검색하면 찾을 수 있다.
 
@@ -18,6 +20,18 @@
 
 ## 진행중 — 현행 계약
 
+- `AIRI-ADDRESSEE-CONTRACT-TEST-REVIEW-2026-08-18.md` — B4c 계약 addressee
+  실측 검토본(검토 PC 로컬 CPU, 296건, OFF/v2 ON/v3 ON). 지연은 방송
+  비대표이며 품질(마커) 축 전용, 인간 검수 대체 아님.
+- `AIRI-BROADCAST-SIMULATION-OUTPUT-REVIEW-2026-08-15.md` — 가상 방송 응답
+  원문 검토본(2026-08-14 raw 원격 비스트리밍 시뮬레이션). 11435 스타일
+  게이트·TTS 미개입이며 승인형 실제 라이브 캠페인이 아니다.
+- `AIRI-LONG-CHAT-TEST-DECISION-BRIEF-2026-08-15.md` — 장시간 방송 채팅
+  테스트 판단서. 기반 구현·Mi:dm 출력 경계는 조건부 승인이나 실제 장시간
+  채팅 실증은 0%로 epistemic/B4c 운영 ON은 계속 채택 금지.
+- `AIRI-MIDM-MOTIF-NATIVE-BROADCAST-RERUN-2026-08-14.md` — Mi:dm–Motif
+  native 방송 재실행. 이전 Motif 결론은 방법론 결함(EOS override·기존
+  대화 유래 fixture)으로 무효화 후 대체했으며 사람 점수·최종 승자는 보류.
 - `AIRI-LOCAL-LLM-CANDIDATE-AB-RESULT-2026-08-14.md` — 여섯 후보 exact
   provenance, P0–P7 실제 실행, 방송 지능 리허설, foreground 결정과 검토-PC
   인간 packet SSoT.
@@ -55,6 +69,11 @@
 
 ## 진행예정 — 계획
 
+- `AIRI-THANK-RENDERER-CANDIDATE-SHEET-2026-08-18.md` — 후원 감사(thank)
+  고정 렌더러 운영 후보 시트. B안(호명+한마디 슬롯) 사용자 채택 완료
+  (2026-08-18)이나 운영 ON은 B4b 어댑터·비공개 리허설 이후 별도 승인.
+- `AIRI-DECISION-FORM-2026-08-18.html` — 사용자 결정 입력용 HTML 폼
+  (2026-08-18). 배치 결정 사항을 체크박스형으로 정리해 제시한 산출물.
 - `AIRI-G1A-CORRECTION-WORDING-DECISION-2026-08-17.md` — A4.3의 8개 synthetic
   correction 장면을 최후 fallback과 정상 캐릭터 발화 목표로 나눈 사용자 검토 시트.
   2026-08-17 권장 표현 원칙은 승인됐고 A4.6 evaluator 계약에 반영했지만 exact 운영
@@ -124,6 +143,16 @@
   `아카이브/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-pre-midm.md`.
 
 ## 완료 — 유효한 증거 기록 (최신순)
+
+- `AIRI-B4C-GATE-PATH-AB-2026-08-18.md` — B4c 방송 발화 계약의 첫 게이트
+  경로(11435 스타일 게이트 경유, 검토 PC 로컬) 실측. 사용자 결정 sim_2로
+  raw 경로 시뮬레이션은 검토 근거 불인정이 됐고, 프로토콜 마커·ACK 분리
+  재집계로 게이트 경로 자체의 OFF/ON을 확인했다. TTS 포함 축은 dev PC
+  몫으로 남는다.
+- `AIRI-B4C-ADDRESSEE-CONTRACT-V3-2026-08-18.md` — 사용자가 시뮬레이션
+  검토본에서 발견한 수신자 자기 인지 실패 4유형(수신 반전·행위 주체
+  반전·상황 인지 실패·역방향 오귀속) 28건을 계약에 반영해 v2·v3로
+  개정하고 검토 PC 로컬 Mi:dm으로 2회 실측했다.
 
 - `AIRI-G1A-CORRECTION-PREPUBLICATION-FOUNDATION-2026-08-17.md` — 사용자 승인
   표현 원칙을 exact 8-row synthetic policy와 lexical prepublication checker로 고정한
@@ -217,6 +246,35 @@
   기본 OFF, explicit-session typed snapshot의 384-byte request-local projection,
   평가/quality/proactive 비변이, content-free enabled/ready health와 launcher reuse
   fail-closed를 고정한다. 운영 event source·Mi:dm A/B·운영 ON은 포함하지 않는다.
+
+- `AIRI-AUTHORIZED-CHAT-REPLAY-ANALYSIS-FOUNDATION-2026-08-15.md` — 승인 실제
+  채팅 replay 분석의 오프라인 normalizer·HMAC·report 기반 완료. 실제 세 채널
+  캡처와 Mi:dm OFF/ON 실측은 미완료.
+- `AIRI-AUTHORIZED-CHAT-REPLAY-CAMPAIGN-CONTROL-2026-08-15.md` — 승인 실제
+  채팅 3-source campaign control plane(HMAC 증거 체인·fail-closed 검증)
+  오프라인 완료. 실제 캡처·Mi:dm OFF/ON 실측은 미완료.
+- `AIRI-LONG-STREAM-CHAT-REPLAY-SAMPLER-2026-08-15.md` — 장시간 채팅
+  replay용 5초 창 fixed sampler 오프라인 실행 계약 완료. 승인 실제 장시간
+  캡처·Mi:dm OFF/ON 실측은 미완료.
+- `AIRI-LONG-STREAM-REPLAY-LOAD-BOUNDS-2026-08-15.md` — 장시간 채팅 replay의
+  최대 경계(300~20,000 event·30~120분)와 실행 상한 오프라인 완료. 승인
+  실제 campaign은 미완료.
+- `AIRI-MIDM-REPLAY-OUTPUT-BOUNDARY-2026-08-15.md` — Mi:dm replay
+  output-boundary(audible ACK 분리, 비스트리밍 빈 응답 방지) 로컬 readiness
+  완료. 승인 실제 장시간 캠페인·B1b/TTS 종단 증거는 아니다.
+- `AIRI-YOUTUBE-LIVE-CHAT-CAPTURE-FOUNDATION-2026-08-15.md` — YouTube LIVE
+  채팅 승인형 수집기(공식 API 전용, safe envelope 최소화) 구현. 합성
+  provider 응답으로 계약만 검증했고 실제 채팅·API key는 수집하지 않았다.
+- `AIRI-YOUTUBE-LIVE-CAPTURE-PREPARATION-2026-08-15.md` — YouTube LIVE 실측
+  준비 자동화(provenance·HMAC·allowlist 생성). 방송 검색·API 접속·채팅
+  읽기는 하지 않는다.
+- `AIRI-REMOTE-BROADCAST-CHAT-AB-2026-08-14.md` — 원격 방송 채팅 A/B Mi:dm
+  vs Motif(실제 방송 트랜스크립트 38건, 검토 PC→dev PC Tailscale). Mi:dm이
+  27.5배 빠르고 형식 규격도 압승 — 로컬 LLM을 Mi:dm으로 확정한 결정 6의
+  근거.
+- `AIRI-B4C-CONTRACT-AB-2026-08-14.md` — B4c 방송 발화 계약 전/후 Mi:dm
+  원격(dev PC raw 서버) A/B 실측. 계약 ON에서 존댓말 위반 35→13건, 방송통과
+  0→50%로 개선하나 raw 경로 단독 효과이며 운영 proxy 게이트는 미개입.
 
 - `AIRI-B4C-DEV-PC-FOLLOWUP-2026-08-14.md` — 검토 PC B4c 배치와 직전
   로컬 자산 통합의 dev PC 인수 기록. retired 11439 gateway의 정확한
