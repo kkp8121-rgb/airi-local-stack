@@ -5590,7 +5590,9 @@ class LocalStreamSafetyTests(unittest.TestCase):
     def test_unresolved_polite_tail_is_dropped_after_valid_banmal_sentence(self) -> None:
         boundary = ollama_proxy.IncrementalAiriOutputBoundary(require_korean=True)
         self.assertEqual(
-            boundary.feed("좋은 아침이야! 오늘도 밝은 하루 보내세요!", final=True),
+            # ``드세요`` has no stem-independent plain imperative, so it is
+            # deliberately absent from the substitution table and still drops.
+            boundary.feed("좋은 아침이야! 오늘도 맛있게 드세요!", final=True),
             "좋은 아침이야!",
         )
         self.assertTrue(boundary.register_normalization_failed)
@@ -7397,13 +7399,16 @@ class DeterministicFallbackRegisterTests(unittest.TestCase):
         "rx03": "[YouTube] 아기 토끼가 겨울잠 자려고 낙엽 모으네요.",
     }
 
+    # An ending the augmented table deliberately does not cover: ``드세요``
+    # has no stem-independent plain imperative, so the echo must fail closed.
+    UNCOVERED_ECHO_USER_TEXT = "[YouTube] 낙엽 줍다가 따뜻한 차 한 잔 드세요."
+
     def test_measured_polite_echoes_are_normalized_or_rejected(self) -> None:
         expected = {
             "sp01": "[YouTube] 하시는 일이 지구 폭파만 아니면 다 응원할게!",
-            # ``주세요`` has no morphology-preserving plain form in the
-            # substitution table, so the line fails closed instead of being
-            # spoken in honorific register.
-            "ms04": "",
+            # ``주세요`` resolves to ``줘`` since the 2026-08-18 augmentation,
+            # so this echo is now spoken instead of falling through.
+            "ms04": "[YouTube] 줍다가 한 번씩 허리 펴고 하늘 봐 줘!",
             "rx03": "[YouTube] 아기 토끼가 겨울잠 자려고 낙엽 모으네!",
         }
         for case, user in self.MEASURED_ECHO_USER_TEXTS.items():
@@ -7488,7 +7493,7 @@ class DeterministicFallbackRegisterTests(unittest.TestCase):
         self.assertEqual(memory.completed[0]["assistant"], expected)
 
     def test_unresolvable_polite_echo_falls_through_to_the_silence_line(self) -> None:
-        user = self.MEASURED_ECHO_USER_TEXTS["ms04"]
+        user = self.UNCOVERED_ECHO_USER_TEXT
         draft = "지구 방위대가 벌써 출동했네."
         self.assertTrue(ollama_proxy.needs_grounding_retry(user, draft))
         self.assertTrue(ollama_proxy.grounded_observation_fallback(user))
@@ -7501,11 +7506,175 @@ class DeterministicFallbackRegisterTests(unittest.TestCase):
 
         spoken = openai_sse_dialogue(response.text)
         self.assertEqual(spoken, ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE)
-        self.assertNotIn("주세요", response.text)
+        self.assertNotIn("드세요", response.text)
         self.assertEqual(
             memory.completed[0]["assistant"],
             ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
         )
+
+
+class RegisterSubstitutionAugmentationTests(unittest.TestCase):
+    """The 2026-08-18 substitution-table augmentation.
+
+    Every ending below was ranked by frequency over the stored arms in
+    ``eval/results`` (gate x4, pool, raw v2/v3 x6, remote 2026-08-14 x5):
+    1712 sentences, of which 444 still carried an honorific after the
+    pre-augmentation table ran and were therefore dropped whole.
+    """
+
+    # One representative per adopted rule family.
+    ADOPTED = {
+        "축하드려요": ("정말 축하드려요!", "정말 축하해!"),
+        "감사드려요": ("정말 감사드려요!", "정말 고마워!"),
+        "부탁드려요": ("좋은 조언 부탁드려요.", "좋은 조언 부탁해."),
+        "드릴게요": ("나중에 도와드릴게요.", "나중에 도와줄게."),
+        "드릴까요": ("어떤 토끼를 만들어드릴까요?", "어떤 토끼를 만들어줄까?"),
+        "드리겠습니다": ("천사 만들기를 도와드리겠습니다.", "천사 만들기를 도와줄게."),
+        "아니에요": ("그런 거 아니에요.", "그런 거 아니야."),
+        "어때요": ("실력 키우는 게 어때요?", "실력 키우는 게 어때?"),
+        "주세요": ("언제든 질문 있으면 말해 주세요!", "언제든 질문 있으면 말해 줘!"),
+        "마세요": ("너무 걱정하지 마세요.", "너무 걱정하지 마."),
+        "보세요": ("언제든 물어보세요!", "언제든 물어봐!"),
+        "하세요": ("화이팅하세요!", "화이팅해!"),
+        "내세요": ("좋은 하루 보내세요!", "좋은 하루 보내!"),
+        "하겠습니다": ("최선을 다해 응원하겠습니다.", "최선을 다해 응원할게."),
+        "았습니다": ("저도 오늘 힐링 많이 받았습니다!", "저도 오늘 힐링 많이 받았어!"),
+        "같습니다": ("시작해보는 게 좋을 것 같습니다.", "시작해보는 게 좋을 것 같아."),
+        "ㄴ가요": ("번아웃 극복이 정말 가능한가요?", "번아웃 극복이 정말 가능한가?"),
+        "ㄹ까요": ("작은 목표로 시작해보는 건 어떨까요?", "작은 목표로 시작해보는 건 어떨까?"),
+        "니까요": ("각각의 장점이 다르니까요!", "각각의 장점이 다르니까!"),
+        "나요": ("그 영상 또 봐도 되나요?", "그 영상 또 봐도 되나?"),
+        "는데요": ("와, 정말 기쁘겠는데요!", "와, 정말 기쁘겠는데!"),
+        "래요": ("ㅋㅋ 아 그래요, 더 열심히 해야겠네요.", "ㅋㅋ 아 그래, 더 열심히 해야겠네."),
+        "ㄹ게요": ("작업하는 모습 방해하지 않을게요.", "작업하는 모습 방해하지 않을게."),
+        "거든요": ("많이 배우고 있거든요.", "많이 배우고 있거든."),
+        "더라고요": ("시간이 약이더라고요.", "시간이 약이더라고."),
+        "워요": ("만나서 반가워요.", "만나서 반가워."),
+        "져요": ("노력하면 분명 좋아져요!", "노력하면 분명 좋아져!"),
+        "겨요": ("10분이라도 쉬면 에너지가 생겨요.", "10분이라도 쉬면 에너지가 생겨."),
+        "줘요": ("그 마음 충분히 이해해줘요.", "그 마음 충분히 이해해줘."),
+        "돼요": ("오늘 하고 싶은 거 다 하시면 돼요.", "오늘 하고 싶은 거 다 하시면 돼."),
+        "봐요": ("앞으로도 오래오래 함께해봐요.", "앞으로도 오래오래 함께해봐."),
+        "려요": ("종료될 때까지 기다려주세요!", "종료될 때까지 기다려줘!"),
+        "공백 뒤 해요": ("조심해서 사용해야 해요.", "조심해서 사용해야 해."),
+    }
+
+    # Counter-examples: the plain form depends on the stem, the stem is
+    # humble, or a subject honorific sits on the ending.  All of these must
+    # keep failing closed instead of being guessed.
+    WITHHELD = (
+        "고구마 맛있게 드세요!",          # 드시다: plain form is lexical, not morphological
+        "충분한 휴식을 가지세요.",         # 가지세요 -> 가져 needs a stem-specific contraction
+        "좋은 하루 되시길 바라요!",        # 바라요: ``라요`` collides with ``아니라요``
+        "어떤 재료를 준비하셨나요?",       # subject honorific directly on the ending
+        "아직 많이 고민 중이시래요.",      # subject honorific directly on the ending
+        "국밥이요!",                   # particle ``요`` on a noun, not a verb ending
+        "화장품 정보도 공유드릴게요!",      # noun stem: "공유줄게" is not a word
+        "오늘도 더 좋은 방송으로 찾아뵐게요.",  # 뵙다 is humble and has no plain counterpart
+        "혹시 그 이야기의 출처를 아시는 분 계신가요?",
+        "잠시 기다리세요.",
+    )
+
+    # Sentences measured as dropped on 2026-08-18 that the augmentation now
+    # resolves, quoted from the stored result JSONs.
+    MEASURED_DROPS = (
+        ("gate ms04", "[YouTube] 줍다가 한 번씩 허리 펴고 하늘 봐 주세요!",
+         "[YouTube] 줍다가 한 번씩 허리 펴고 하늘 봐 줘!"),
+        ("raw q01", "화이팅하세요!", "화이팅해!"),
+        ("raw rx01", "고마워요!", "고마워!"),
+        ("raw ms02", "지금 작업 중이라면 나중에 도와드릴게요.",
+         "지금 작업 중이라면 나중에 도와줄게."),
+        ("raw q03", "각각의 장점이 다르니까요!", "각각의 장점이 다르니까!"),
+        ("raw ms03", "그 영상 또 봐도 되나요?", "그 영상 또 봐도 되나?"),
+        ("raw ms04", "[YouTube] 네, 가끔 스트레칭도 하는 게 좋다고 하더라고요.",
+         "[YouTube] 네, 가끔 스트레칭도 하는 게 좋다고 하더라고."),
+        ("rehearsal autumn_leaves#22", "저도 오늘 힐링 많이 받았습니다!",
+         "저도 오늘 힐링 많이 받았어!"),
+    )
+
+    def test_adopted_endings_reach_a_plain_form(self) -> None:
+        for label, (polite, plain) in self.ADOPTED.items():
+            with self.subTest(ending=label):
+                self.assertIsNotNone(ollama_proxy._POLITE_REGISTER_RE.search(polite))
+                normalized = ollama_proxy.normalize_korean_register(polite)
+                self.assertEqual(normalized, plain)
+                self.assertIsNone(
+                    ollama_proxy._POLITE_REGISTER_RE.search(normalized)
+                )
+
+    def test_withheld_endings_still_fail_closed(self) -> None:
+        for polite in self.WITHHELD:
+            with self.subTest(text=polite):
+                normalized = ollama_proxy.normalize_korean_register(polite)
+                self.assertIsNotNone(
+                    ollama_proxy._POLITE_REGISTER_RE.search(normalized)
+                )
+                boundary = ollama_proxy.IncrementalAiriOutputBoundary(
+                    require_korean=True
+                )
+                self.assertEqual(boundary.feed(polite, final=True), "")
+                self.assertTrue(boundary.register_normalization_failed)
+
+    def test_measured_dropped_sentences_are_recovered(self) -> None:
+        for case, polite, plain in self.MEASURED_DROPS:
+            with self.subTest(case=case):
+                self.assertEqual(
+                    ollama_proxy.normalize_korean_register(polite), plain
+                )
+                self.assertIsNone(ollama_proxy._POLITE_REGISTER_RE.search(plain))
+
+    def test_tone_lengthener_no_longer_hides_an_honorific(self) -> None:
+        # 41 measured occurrences of ``요~``; before the terminal accepted the
+        # wave, 27 sentences kept an honorific the detector never saw.
+        for polite, plain in (
+            ("고마워요~", "고마워~"),
+            ("좋은 방법이네요~", "좋은 방법이네~"),
+            ("맞아요~ 단계별로 발라야 피부가 촉촉해져요!", "맞아~ 단계별로 발라야 피부가 촉촉해져!"),
+        ):
+            with self.subTest(text=polite):
+                self.assertIsNotNone(
+                    ollama_proxy._POLITE_REGISTER_RE.search(polite)
+                )
+                self.assertEqual(
+                    ollama_proxy.normalize_korean_register(polite), plain
+                )
+
+    def test_plain_speech_is_never_rewritten(self) -> None:
+        # The B3-d Korean corpus is already plain; the augmentation must be a
+        # no-op on all 120 lines.
+        corpus = json.loads(
+            (Path(__file__).resolve().parent
+             / "eval" / "input_safety" / "airi_ko_input_safety_corpus.json")
+            .read_text(encoding="utf-8")
+        )
+        cases = corpus["cases"]
+        self.assertEqual(len(cases), 120)
+        for case in cases:
+            with self.subTest(case=case["id"]):
+                self.assertEqual(
+                    ollama_proxy.normalize_korean_register(case["text"]),
+                    case["text"],
+                )
+
+    def test_existing_rules_are_unchanged(self) -> None:
+        for polite, plain in (
+            ("안녕하세요!", "안녕!"),
+            ("감사합니다.", "고마워."),
+            ("반갑습니다.", "반가워."),
+            ("아니요, 괜찮아.", "아니, 괜찮아."),
+            ("축하드립니다!", "축하해!"),
+            ("마음에 드시나요?", "마음에 들어?"),
+            ("궁금한 거 있나요?", "궁금한 거 있어?"),
+            ("오늘도 활기차게 시작하자구요.", "오늘도 활기차게 시작하자."),
+            (
+                "필요해요. 괜찮네요. 그 말이죠? 사실입니다. 회사예요. 추천할게요!",
+                "필요해. 괜찮네. 그 말이지? 사실이야. 회사야. 추천할게!",
+            ),
+        ):
+            with self.subTest(text=polite):
+                self.assertEqual(
+                    ollama_proxy.normalize_korean_register(polite), plain
+                )
 
 
 if __name__ == "__main__":
