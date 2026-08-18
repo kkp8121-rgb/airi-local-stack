@@ -207,7 +207,15 @@ RRF/가중합이 아니라 프롬프트 섹션 concat(스코어는 버려짐).
 소관: dev PC 구현, 회귀 테스트 4케이스 + 컨텍스트 게이트
 재실행(dialogue_marker 0/12 변화 확인)으로 검증.
 
-② **Qwen3-8B를 M0 게이트에 투입** — 근거: OSS 실사(TeleMem이
+② **Qwen3-8B를 M0 게이트에 투입** — **실행 완료(2026-08-18), 결과
+FAIL.** `persistent_trait` 단일 스모크는 만점 통과(2~4B 후보 9종은
+전부 실패했던 지점)했으나 full balanced는 recall 0.429·alias 0.286로
+불통과. 같은 하네스 3점 계열(2.4B/4B/8B) 대조에서 **크기는
+unexpected를 9→2로 줄였지만 critical recall은 0.43~0.50에서 정체**해,
+아래 "2~4B 역량 한계" 가설은 recall 축에서는 성립하지 않는다.
+다음 수순은 모델 확대가 아니라 ⑤의 Stage A 재설계다 —
+`완료/AIRI-QWEN3-8B-EXTRACTION-GATE-2026-08-18.md`. 원래 근거는 아래와 같았다:
+OSS 실사(TeleMem이
 Qwen3-8B로 ZH-4O 86.33% 실증, LogicKor 8.71 vs Qwen3-4B 7.77·
 Llama-3.2-3B 3.11) + 학술(LightMem — "더 큰 모델"이 아니라
 "태스크를 좁힌 모델"이 정공이라는 반직관적 실증, 단 Qwen3-8B는
@@ -312,8 +320,13 @@ JSON 제약이 추론형 태스크를 파괴함을 보임, Claude-3-Haiku GSM8K
 - **GLiNER2 한국어 미실측**: GLiNER-Multi의 다국어(Multiconer
   11개 언어) 실측은 ChatGPT를 상회하나, **한국어 개별 수치는
   확인하지 못했다**. §3 ⑤의 다음 액션 대상.
-- **Qwen3-8B 게이트 미실측**: OSS 실사가 §3 ②로 권고했으나 AIRI
-  M0 게이트에서 아직 실행되지 않았다 — 실제 통과 여부는 미검증.
+- ~~**Qwen3-8B 게이트 미실측**~~ — **2026-08-18 해소.** 실측 결과
+  full balanced FAIL(스모크는 PASS). 이로써 §1 표의 "2~4B 역량 한계"
+  3중 확증은 **스키마·포맷 축에 한정**됨이 드러났다 — AIRI는
+  constrained decoding으로 2.4B에서도 `schema_pass_rate` 1.0이라 학술·
+  OSS가 보고한 그 실패 모드가 애초에 발생하지 않으며, 실제 병목인
+  recall/alias는 8B에서도 개선되지 않았다.
+  (`완료/AIRI-QWEN3-8B-EXTRACTION-GATE-2026-08-18.md`)
 - **한국어 OpenIE/트리플 추출 품질**: 저하가 강하게 의심되나(조사·
   주어 생략 취약) 정량 근거를 찾지 못했다.
 - **talkain `cb_chat_session.summary` 최초 기록 주체 미확인**:

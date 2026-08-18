@@ -17,6 +17,17 @@
 
 최종 갱신: 2026-08-18
 
+- **2026-08-18** (클로드 PC, Qwen3-8B 추출 게이트): 리서치 실행 로드맵 ②
+  이행. **full balanced FAIL** — 다만 2~4B 후보 9종이 전부 실패했던
+  `persistent_trait` 스모크는 만점 통과했다. 같은 하네스로 2.4B/4B/8B
+  3점 계열을 돌린 결과 **크기는 unexpected를 9→2로 줄이고 구조적 실패
+  코드를 0으로 만들지만 critical recall은 0.43~0.50에서 정체**한다.
+  실패 2건 원문 진단 결과 원인은 능력이 아니라 계약 미전달(상태 변화
+  주체 선택, `{{user}}` 플레이스홀더 등록)이었다. **다음 수순은 모델
+  확대가 아니라 Stage A 재설계(생성→스팬 선택+코드 검증)**로 정정한다.
+  extraction 계속 OFF, 격리 11436 실행 후 중지(active runner 0).
+  (`완료/AIRI-QWEN3-8B-EXTRACTION-GATE-2026-08-18.md`)
+
 - **2026-08-18** (클로드 PC, journal recall bm25): 리서치 실행 로드맵 ①
   이행. FTS5 접두 질의로 뽑은 후보를 완전일치 교집합 재점수가 도로
   버리던 결함을 재현(`포지 기억나?` → 회상 0건)하고 `bm25()` 랭크를
@@ -744,7 +755,10 @@
     `완료/AIRI-NEW-EXTRACTION-CANDIDATE-GATE-2026-08-12.md`,
     `완료/AIRI-KANANA-EXTRACTION-CANDIDATE-GATE-2026-08-13.md`,
     `완료/AIRI-NEW-LOCAL-EXTRACTION-CANDIDATE-SMOKES-2026-08-13.md`).
-    2~4B 역량 한계 3중 확증 — Qwen3-8B 투입이 다음 후보(리서치 2026-08-18)
+    Qwen3-8B 실측 완료(2026-08-18): full balanced FAIL·스모크 PASS.
+    크기는 unexpected만 줄이고 recall은 정체 — 다음 후보는 더 큰 모델이
+    아니라 Stage A 재설계
+    (`완료/AIRI-QWEN3-8B-EXTRACTION-GATE-2026-08-18.md`)
   - [ ] MEM-04 활성 추출 락 경합 실측 (코드 완료; 통과 extractor와
     `extraction_enabled=true` 이후 Stage B commit↔foreground 겹침 증거 필요)
   - [ ] I2 시청자 기억 시스템 (M2)
