@@ -7755,5 +7755,186 @@ class HumbleMalsseumStemRepairTests(unittest.TestCase):
         self.assertTrue(boundary.register_normalization_failed)
 
 
+class SubjectHonorificPrefinalGuardTests(unittest.TestCase):
+    """``-(으)시-`` must not survive a productive register rule.
+
+    ``_HONORIFIC_STEM_GUARD`` only covered the six literal ``까요``/``나요``/
+    ``데요``/``대요``/``래요``/``게요`` rules, so the productive
+    ``([가-힣]+)어요``/``네요``/``군요``/``죠``/``습니까`` rules and the bare
+    ``거든요``/``더라고요`` rules still stripped the polite ending off a
+    subject-honorific stem and spoke the result: ``말씀이셨군요``->``말이셨군``.
+    Re-processing the 39 stored result JSONs under ``eval/results`` (2630
+    sentences, 1572 unique) measured 22 such sentences reaching the wire.
+    ``_HONORIFIC_PREFINAL_GUARD`` takes that to 0 while every other sentence
+    stays byte identical: paired old-vs-new over the same corpus is 22 newly
+    dropped, 0 newly spoken, 0 rewritten, and the B3-d 120 corpus unchanged.
+    """
+
+    # All 22 measured leaks, quoted from the stored arms.  The second element
+    # is what used to be spoken with ``시``/``셨`` intact.
+    MEASURED_LEAKS = (
+        ("[YouTube] 그런 경험을 이겨내셨군요.", "[YouTube] 그런 경험을 이겨내셨군."),
+        ("[방송 발화 계약] 아, 그런 말씀이셨군요.", "[방송 발화 계약] 아, 그런 말이셨군."),
+        ("[방송 발화] 아, 들어오셨군요.", "[방송 발화] 아, 들어오셨군."),
+        ("곰도 귀엽지만, 귀엽고 친근한 토끼로 결정되셨죠?",
+         "곰도 귀엽지만, 귀엽고 친근한 토끼로 결정되셨지?"),
+        ("그 경험에서 배운 게 많으셨겠어요!", "그 경험에서 배운 게 많으셨겠어!"),
+        ("그때의 경험이 큰 도움이 되셨군요.", "그때의 경험이 큰 도움이 되셨군."),
+        ("그런 경험 많으시죠.", "그런 경험 많으시지."),
+        ("네, 걱정 많으시겠네요.", "응, 걱정 많으시겠네."),
+        ("신고할 수 있게 해드릴게요, 하지만 문제 상황이 반복되면 당연히 신고하시죠!",
+         "신고할 수 있게 해줄게, 하지만 문제 상황이 반복되면 당연히 신고하시지!"),
+        ("아, 다들 토끼 모양으로 만들고 싶어 하시는군요!",
+         "아, 다들 토끼 모양으로 만들고 싶어 하시는군!"),
+        ("여러 시청자분들이 토끼 만들기에 동의해 주시네요!",
+         "여러 시청자분들이 토끼 만들기에 동의해 주시네!"),
+        ("오늘 무슨 일 있으셨어요?", "오늘 무슨 일 있으셨어?"),
+        ("오늘 방송 잘 보고 계셨어요.", "오늘 방송 잘 보고 계셨어."),
+        ("우와, 단풍우체부님 커피값 후원해주셨네요!", "우와, 단풍우체부님 커피값 후원해주셨네!"),
+        ("작곡에 관심이 많으시군요!", "작곡에 관심이 많으시군!"),
+        ("저도 궁금하시죠?", "저도 궁금하시지?"),
+        ("저를 노동청에 신고하려고 하시네요.", "저를 노동청에 신고하려고 하시네."),
+        ("정말 대단하시네요!", "정말 대단하시네!"),
+        ("정말 축하드려요~ 내년부터 멋진 일 시작하시겠네요!",
+         "정말 축하해~ 내년부터 멋진 일 시작하시겠네!"),
+        ("퇴근 후 돌아오셨군요.", "퇴근 후 돌아오셨군."),
+        ("혹시 관련 링크나 자료 있으면 공유해주시겠어요?",
+         "혹시 관련 링크나 자료 있으면 공유해주시겠어?"),
+        ("효과 잘 나오는지 궁금해서 직접 시도해보셨군요.",
+         "효과 잘 나오는지 궁금해서 직접 시도해보셨군."),
+    )
+
+    # The honorific does not have to touch the ending: one pre-final (``겠``)
+    # or adnominal (``는``/``던``) syllable may sit between, which a
+    # single-character lookbehind would miss.
+    SPACED_HONORIFICS = (
+        "많으셨겠어요!",
+        "시작하시겠네요!",
+        "공유해주시겠어요?",
+        "만들고 싶어 하시는군요!",
+        "예전에도 그러시던데요.",
+    )
+
+    # Ordinary stems that merely end in 시, plus the 신/실 syllables that are
+    # never honorific before these endings.  All of them converted before the
+    # guard and must keep converting: the guard is not allowed to buy leak
+    # closure with a regression.
+    PRESERVED = (
+        ("좋은 커피 마셨어요", "좋은 커피 마셨어"),
+        ("우리 같이 마시죠", "우리 같이 마시지"),
+        ("다들 잘 마시네요", "다들 잘 마시네"),
+        ("부모님을 모셨어요.", "부모님을 모셨어."),
+        ("갈퀴에게 기대만 하고 본인은 안 도와준 것도 사실이에요!",
+         "갈퀴에게 기대만 하고 본인은 안 도와준 것도 사실이야!"),
+        ("새 신발을 신어요.", "새 신발을 신어."),
+        ("짐을 트럭에 실어요.", "짐을 트럭에 실어."),
+    )
+
+    # The guarded rules themselves must still fire on plain stems.
+    GUARDED_RULES_STILL_FIRE = (
+        ("많이 배웠어요.", "많이 배웠어."),
+        ("정말 기쁘겠어요!", "정말 기쁘겠어!"),
+        ("괜찮네요.", "괜찮네."),
+        ("같이 가는군요.", "같이 가는군."),
+        ("그 말이죠?", "그 말이지?"),
+        ("벌써 도착했습니까?", "벌써 도착했?"),
+        ("그건 몰랐거든요.", "그건 몰랐거든."),
+        ("오늘 진짜 덥더라고요.", "오늘 진짜 덥더라고."),
+    )
+
+    def test_measured_leaks_now_fail_closed(self) -> None:
+        for polite, spoken_before in self.MEASURED_LEAKS:
+            with self.subTest(text=polite):
+                normalized = ollama_proxy.normalize_korean_register(polite)
+                self.assertNotEqual(normalized, spoken_before)
+                self.assertIsNotNone(
+                    ollama_proxy._POLITE_REGISTER_RE.search(normalized)
+                )
+
+    def test_leaked_sentence_is_dropped_by_the_boundary(self) -> None:
+        for polite, _spoken_before in self.MEASURED_LEAKS:
+            if polite.startswith("["):
+                # Bracketed transcript prefixes are a separate sanitizer path.
+                continue
+            with self.subTest(text=polite):
+                boundary = ollama_proxy.IncrementalAiriOutputBoundary(
+                    require_korean=True
+                )
+                self.assertEqual(boundary.feed(polite, final=True), "")
+                self.assertTrue(boundary.register_normalization_failed)
+
+    def test_honorific_one_syllable_from_the_ending_is_guarded(self) -> None:
+        for polite in self.SPACED_HONORIFICS:
+            with self.subTest(text=polite):
+                self.assertIsNotNone(
+                    ollama_proxy._POLITE_REGISTER_RE.search(
+                        ollama_proxy.normalize_korean_register(polite)
+                    )
+                )
+
+    def test_ordinary_si_final_stems_are_not_over_blocked(self) -> None:
+        for polite, plain in self.PRESERVED:
+            with self.subTest(text=polite):
+                normalized = ollama_proxy.normalize_korean_register(polite)
+                self.assertEqual(normalized, plain)
+                self.assertIsNone(
+                    ollama_proxy._POLITE_REGISTER_RE.search(normalized)
+                )
+
+    def test_guarded_rules_still_convert_plain_stems(self) -> None:
+        for polite, plain in self.GUARDED_RULES_STILL_FIRE:
+            with self.subTest(text=polite):
+                self.assertEqual(
+                    ollama_proxy.normalize_korean_register(polite), plain
+                )
+
+    def test_stored_arms_never_speak_a_normalized_honorific(self) -> None:
+        # Recomputed from the stored JSONs rather than asserted from memory:
+        # a sentence the detector would have caught before normalization must
+        # never come out of the table as plain speech that still carries the
+        # honorific.  22 sentences did before the guard; the ``마시``/``모시``
+        # carve-out (``마셨어요``->``마셨어``) is excluded by the lookbehind.
+        results = Path(__file__).resolve().parent / "eval" / "results"
+        ending = re.compile(
+            r"(?<![마모부])(?:시|셨)(?:겠|는|던)?"
+            r"(?:어|네|군|지|거든|더라고)(?=[.!?。！？~〜\"'”’)\]]*\s*$)"
+        )
+        texts: list[str] = []
+
+        def collect(node: object) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    if key in {"response", "answer", "output", "response_body"}:
+                        if isinstance(value, str) and value.strip():
+                            texts.append(value)
+                    collect(value)
+            elif isinstance(node, list):
+                for value in node:
+                    collect(value)
+
+        for path in sorted(results.glob("*.json")):
+            collect(json.loads(path.read_text(encoding="utf-8")))
+        self.assertGreater(len(texts), 1000)
+
+        sentences: set[str] = set()
+        for raw in texts:
+            plain = ollama_proxy.IncrementalAiriOutputBoundary._plain(raw)
+            for piece in re.split(r"(?<=[.!?。！？])\s*", plain):
+                if piece.strip():
+                    sentences.add(piece.strip())
+        self.assertGreater(len(sentences), 1000)
+
+        leaked = []
+        for sentence in sorted(sentences):
+            if not ollama_proxy._POLITE_REGISTER_RE.search(sentence):
+                continue
+            normalized = ollama_proxy.normalize_korean_register(sentence)
+            if ollama_proxy._POLITE_REGISTER_RE.search(normalized):
+                continue  # dropped, fail-closed
+            if ending.search(normalized):
+                leaked.append((sentence, normalized))
+        self.assertEqual(leaked, [])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1616,7 +1616,26 @@ _KOREAN_PREFINAL_STEM_RE = re.compile(r"(?:셨|겠|았|었|였)\s*$")
 # A subject-honorific stem directly before a polite ending.  The productive
 # register rules must not fire across it: turning ``준비하셨나요?`` into
 # ``준비하셨나?`` would speak the honorific instead of dropping the sentence.
-_HONORIFIC_STEM_GUARD = r"(?<![시신실셔셨])"
+# The second lookbehind covers the pre-final/adnominal syllable that can sit
+# between the honorific and the ending (``그러시던데요``, ``가시는데요``).
+_HONORIFIC_STEM_GUARD = r"(?<![시신실셔셨])(?<![시신실셔셨][겠는던])"
+# The same protection for the productive ``([가-힣]+)`` rules, which the guard
+# above cannot serve: their stem class swallows the honorific, so the guard has
+# to sit on the ending instead.  Three differences are measured, not stylistic.
+# 1. Only ``시``/``셨`` reach these endings as an honorific (``신``/``실``/``셔``
+#    only precede ``ㄴ가요``/``ㄹ까요``-shaped endings, which keep the guard
+#    above), so ``신어요``/``실어요``/``사실이에요`` stay convertible.
+# 2. One pre-final or adnominal syllable may sit between: ``하시겠네요``,
+#    ``많으셨겠어요``, ``하시는군요`` all speak the honorific otherwise.
+# 3. ``마시``/``모시``/``부시`` are ordinary stems that merely end in 시, so
+#    ``마셨어요``->``마셨어`` must keep converting.  A subject honorific on a
+#    noun ending in those syllables (``엄마시죠``) is re-admitted by the same
+#    carve-out; none occurs in the stored arms and the copula honorific is
+#    normally written ``이세요``.
+_HONORIFIC_PREFINAL_GUARD = (
+    r"(?:(?<![시셨])(?<![시셨][겠는던])"
+    r"|(?<=[마모부][시셨])|(?<=[마모부][시셨][겠는던]))"
+)
 
 
 def normalize_korean_register(text: str) -> str:
@@ -1663,22 +1682,24 @@ def normalize_korean_register(text: str) -> str:
         (r"(볼|줄|할)게요" + _REGISTER_TERMINAL, r"\1게"),
         (r"([가-힣]+)해요" + _REGISTER_TERMINAL, r"\1해"),
         (r"([가-힣]+)아요" + _REGISTER_TERMINAL, r"\1아"),
-        (r"([가-힣]+)어요" + _REGISTER_TERMINAL, r"\1어"),
-        (r"([가-힣]+)네요" + _REGISTER_TERMINAL, r"\1네"),
-        (r"([가-힣]+)군요" + _REGISTER_TERMINAL, r"\1군"),
+        (r"([가-힣]+)" + _HONORIFIC_PREFINAL_GUARD + r"어요" + _REGISTER_TERMINAL, r"\1어"),
+        (r"([가-힣]+)" + _HONORIFIC_PREFINAL_GUARD + r"네요" + _REGISTER_TERMINAL, r"\1네"),
+        (r"([가-힣]+)" + _HONORIFIC_PREFINAL_GUARD + r"군요" + _REGISTER_TERMINAL, r"\1군"),
         (r"(뭐|어떤|어떻)나요" + _REGISTER_TERMINAL, r"\1?"),
         (r"거예요" + _REGISTER_TERMINAL, "거야"),
-        (r"([가-힣]+)습니까" + _REGISTER_TERMINAL, r"\1?"),
+        (r"([가-힣]+)" + _HONORIFIC_PREFINAL_GUARD + r"습니까" + _REGISTER_TERMINAL, r"\1?"),
         (r"([가-힣]+)자구요" + _REGISTER_TERMINAL, r"\1자"),
-        (r"([가-힣]+)죠" + _REGISTER_TERMINAL, r"\1지"),
+        (r"([가-힣]+)" + _HONORIFIC_PREFINAL_GUARD + r"죠" + _REGISTER_TERMINAL, r"\1지"),
         # --- Endings measured as unresolved on 2026-08-18 -------------------
         # Frequency-ranked from the stored gate/pool/raw/remote arms.  Only
         # forms with a single unambiguous plain counterpart are listed; an
         # ending whose plain form depends on the stem (``드세요``, ``가지세요``,
         # ``바라요``, ``이세요``) is deliberately absent so it keeps failing
-        # closed.  ``_HONORIFIC_STEM_GUARD`` keeps a subject-honorific stem
-        # (``하셨나요``, ``이시래요``) out of every productive rule below: those
-        # must stay dropped rather than be spoken with ``시`` intact.
+        # closed.  ``_HONORIFIC_STEM_GUARD`` (here) and
+        # ``_HONORIFIC_PREFINAL_GUARD`` (on the ``([가-힣]+)`` rules above) keep a
+        # subject-honorific stem (``하셨나요``, ``이시래요``, ``하셨어요``,
+        # ``말씀이셨군요``) out of every productive rule: those must stay dropped
+        # rather than be spoken with ``시`` intact.
         # 드리- is humble, so it is rewritten to its plain 주- counterpart
         # before any generic rule can strip only the ``요``.
         (r"축하드려요" + _REGISTER_TERMINAL, "축하해"),
@@ -1718,8 +1739,8 @@ def normalize_korean_register(text: str) -> str:
         # ``릴``/``뵐`` keep the humble ``드릴게요``/``찾아뵐게요`` out: the
         # first is handled above, the second has no plain counterpart.
         (r"(?<![릴뵐시신실셔셨])게요" + _REGISTER_TERMINAL, "게"),
-        (r"거든요" + _REGISTER_TERMINAL, "거든"),
-        (r"더라고요" + _REGISTER_TERMINAL, "더라고"),
+        (_HONORIFIC_PREFINAL_GUARD + r"거든요" + _REGISTER_TERMINAL, "거든"),
+        (_HONORIFIC_PREFINAL_GUARD + r"더라고요" + _REGISTER_TERMINAL, "더라고"),
         # Contracted 해요체 stems.  ``고마워요``→``고마워`` and friends are
         # invisible to the ``아요``/``어요``/``해요`` rules above because the
         # vowel is already fused into the stem syllable.
