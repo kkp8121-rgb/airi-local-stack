@@ -38,6 +38,13 @@ assert _THANK_SPEC is not None and _THANK_SPEC.loader is not None
 thank_renderer = _importlib_util.module_from_spec(_THANK_SPEC)
 _THANK_SPEC.loader.exec_module(thank_renderer)
 
+# 브리핑에 되먹이면 안 되는 결정론 문구 가족 — absence 폴백·기억 가드·
+# 오류 안내. 침묵 폴백 풀(FALLBACK_POOL)과 합쳐 에코 차단에 쓴다.
+DEGENERATE_ECHO_PREFIXES = (
+    "아직 기록", "아직 그건", "음… 그건 확실하게 기억 안 나",
+    "답이 늦어져서", "답을 만들다가", "답이 너무 늦어서",
+)
+
 # ollama_proxy 의 침묵 폴백 풀과 같은 문구여야 폴백률이 의미를 갖는다.
 FALLBACK_POOL = (
     "음, 잠깐만.",
