@@ -165,9 +165,16 @@ def run_arm(
             elif guard_fired:
                 deterministic_act = "memory_guard"
 
+        fact_tokens = None
+        if briefing == "on":
+            token_pool: set[str] = set()
+            for item in sim.select_viewer_lines(fixture, stream, pick):
+                token_pool |= sim._tokens(item["text"])
+            fact_tokens = sorted(token_pool)
         register = ab.score_response(body)
         row = sim.score_turn(pick, body, beat=beat, fallback_pool=FALLBACK_POOL,
-                             roster_handles=roster, drift_terms=drift_terms)
+                             roster_handles=roster, drift_terms=drift_terms,
+                             briefing_fact_tokens=fact_tokens)
         row.update({
             "beat": beat["id"],
             "backlog_size": pick["backlog_size"],
@@ -219,8 +226,15 @@ def rescore_report(payload: dict[str, Any]) -> dict[str, Any]:
     for turn_index in sorted(bodies):
         pick = picks[turn_index]
         beat = sim.beat_at(fixture, pick["message"]["minute"])
+        fact_tokens = None
+        if payload.get("briefing") == "on":
+            token_pool: set[str] = set()
+            for item in sim.select_viewer_lines(fixture, stream, pick):
+                token_pool |= sim._tokens(item["text"])
+            fact_tokens = sorted(token_pool)
         row = sim.score_turn(pick, bodies[turn_index], beat=beat, fallback_pool=FALLBACK_POOL,
-                             roster_handles=roster, drift_terms=drift_terms)
+                             roster_handles=roster, drift_terms=drift_terms,
+                             briefing_fact_tokens=fact_tokens)
         carried = previous.get(turn_index, {})
         row.update({key: carried[key] for key in
                     ("beat", "backlog_size", "polite_violation", "banmal", "ttft_ms", "complete_ms", "failure")

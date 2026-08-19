@@ -68,6 +68,8 @@ param(
     [string]$SilenceFallbackPool = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_SILENCE_FALLBACK_POOL)) { 'on' } else { $env:AIRI_SILENCE_FALLBACK_POOL }),
     # 방송 발화 계약 v3 — 파라미터 9행 원안 승인과 함께 운영 ON(2026-08-19).
     [string]$BroadcastContract = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_BROADCAST_CONTRACT)) { 'on' } else { $env:AIRI_BROADCAST_CONTRACT }),
+    # 근거 없는 기억 단정 가드 — 도입 승인(2026-08-19).
+    [string]$MemoryClaimGuard = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_MEMORY_CLAIM_GUARD)) { 'on' } else { $env:AIRI_MEMORY_CLAIM_GUARD }),
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
@@ -103,6 +105,7 @@ if ($OutputModeration -notin @('on', 'off')) {
 $onValues = @('on', '1', 'true', 'yes')
 $SilenceFallbackPool = if ($SilenceFallbackPool.Trim().ToLowerInvariant() -in $onValues) { 'on' } else { 'off' }
 $BroadcastContract = if ($BroadcastContract.Trim().ToLowerInvariant() -in $onValues) { 'on' } else { 'off' }
+$MemoryClaimGuard = if ($MemoryClaimGuard.Trim().ToLowerInvariant() -in $onValues) { 'on' } else { 'off' }
 $InputScreening = $InputScreening.ToLowerInvariant()
 if ($InputScreening -notin @('on', 'off')) {
     throw 'InputScreening must be on or off. Check the parameter or AIRI_INPUT_SCREENING.'
@@ -437,6 +440,7 @@ $memoryEnvironment = @{
     AIRI_IMMEDIATE_ACK = $ImmediateAck
     AIRI_SILENCE_FALLBACK_POOL = $SilenceFallbackPool
     AIRI_BROADCAST_CONTRACT = $BroadcastContract
+    AIRI_MEMORY_CLAIM_GUARD = $MemoryClaimGuard
     AIRI_OLLAMA_KEEP_ALIVE = $OllamaKeepAlive
     AIRI_OLLAMA_TEMPERATURE = $OllamaTemperature.ToString([Globalization.CultureInfo]::InvariantCulture)
     AIRI_OLLAMA_TOP_P = $OllamaTopP.ToString([Globalization.CultureInfo]::InvariantCulture)

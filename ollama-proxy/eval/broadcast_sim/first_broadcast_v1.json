@@ -160,7 +160,8 @@
     "max_viewer_lines": 2,
     "max_recent_picks": 2,
     "max_line_chars": 40,
-    "recent_donation_window_ms": 120000
+    "recent_donation_window_ms": 120000,
+    "min_echo_response_chars": 8
   },
   "aggregation_openers": [
     "지금 {주제} 얘기 진짜 많네!",

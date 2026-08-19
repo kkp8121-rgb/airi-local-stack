@@ -211,6 +211,51 @@ class BriefingTests(unittest.TestCase):
         self.assertLessEqual(briefing.count("이 시청자가 아까 한 말"), config["max_viewer_lines"])
         self.assertLessEqual(briefing.count("방금 흐름"), config["max_recent_picks"])
 
+    def test_viewer_lines_prefer_relevance_over_recency(self) -> None:
+        # T21 실측 재현: 시드가 최신 발언들에 밀려 사라지던 결함 — 지금 질문과
+        # 토큰이 겹치는 과거 발언이 최근성보다 먼저 자리를 차지해야 한다.
+        probe = next(pick for pick in self.picks if pick["message"]["kind"] == "memory_probe"
+                     and pick["message"].get("probe_index") == 0)
+        chosen = sim.select_viewer_lines(self.fixture, self.stream, probe)
+        texts = [item["text"] for item in chosen]
+        self.assertTrue(any("별명" in text or "새벽두시" in text for text in texts), texts)
+        briefing = sim.build_turn_briefing(self.fixture, self.stream, probe, [])
+        self.assertIn("새벽두시", briefing)
+
+    def test_low_content_replies_are_not_echoed_back(self) -> None:
+        # T35 실측 재현: "아직 기록 없어" 같은 저품질 응답을 되먹이면 모델이
+        # 그 문형을 따라 한다 — 짧은 응답의 에코는 빠져야 한다.
+        pick = self.picks[6]
+        prior_short = [{**self.picks[5], "response": "응!"}]
+        prior_long = [{**self.picks[5], "response": "오늘 첫 방송이라 진짜 떨리는데 재밌다!"}]
+        without_echo = sim.build_turn_briefing(self.fixture, self.stream, pick, prior_short)
+        with_echo = sim.build_turn_briefing(self.fixture, self.stream, pick, prior_long)
+        self.assertNotIn("→ 나:", without_echo)
+        self.assertIn("→ 나:", with_echo)
+        self.assertIn("방금 흐름", without_echo)  # 채팅 자체는 남는다
+
+    def test_fact_usage_scores_only_briefed_novel_tokens(self) -> None:
+        probe = next(pick for pick in self.picks if pick["message"]["kind"] == "memory_probe"
+                     and pick["message"].get("probe_index") == 0)
+        tokens = set()
+        for item in sim.select_viewer_lines(self.fixture, self.stream, probe):
+            tokens |= sim._tokens(item["text"])
+        beat = sim.beat_at(self.fixture, probe["message"]["minute"])
+        roster = [viewer["handle"] for viewer in self.fixture["viewers"]]
+        used = sim.score_turn(probe, "새벽두시였지!", beat=beat, fallback_pool=(),
+                              roster_handles=roster, briefing_fact_tokens=sorted(tokens))
+        self.assertTrue(used["fact_usage"])
+        self.assertTrue(any(token.startswith("새벽두시") for token in used["fact_tokens_used"]), used["fact_tokens_used"])
+        unused = sim.score_turn(probe, "음, 뭐였더라?", beat=beat, fallback_pool=(),
+                                roster_handles=roster, briefing_fact_tokens=sorted(tokens))
+        self.assertFalse(unused["fact_usage"])
+        # 브리핑이 없던 턴은 분모에서 빠진다.
+        none_row = sim.score_turn(probe, "새벽두시였지!", beat=beat, fallback_pool=(),
+                                  roster_handles=roster, briefing_fact_tokens=None)
+        self.assertIsNone(none_row["fact_usage"])
+        summary = sim.summarize_turns([used, unused, none_row])
+        self.assertEqual(summary["viewer_fact_usage"], {"hits": 1, "of": 2, "rate": 0.5})
+
     def test_briefing_reports_wave_pressure_from_the_backlog(self) -> None:
         wave_pick = next(pick for pick in self.picks
                          if pick["effective_kind"] == "opinion" and pick["backlog_ids"])

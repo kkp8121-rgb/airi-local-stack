@@ -290,6 +290,56 @@ def _tokens(text: str) -> set[str]:
 AGGREGATE_MARKERS = ("다들", "여러", "많이", "다 같이", "모두", "전부", "너희", "여기저기", "많네", "몰리")
 
 
+# 한국어 조사·어미 굴절("별명"↔"별명은", "새벽두시야"↔"새벽두시였지") 때문에
+# 완전일치는 관련 발언을 놓친다 — journal recall bm25 수리와 같은 교훈.
+# 공통 접두가 2자 이상이고 짧은 쪽의 6할 이상이면 같은 어간으로 본다.
+_TOKEN_MATCH_MIN_PREFIX = 2
+_TOKEN_MATCH_RATIO = 0.6
+
+
+def _token_match(left: str, right: str) -> bool:
+    prefix = 0
+    for a, b in zip(left, right):
+        if a != b:
+            break
+        prefix += 1
+    return prefix >= _TOKEN_MATCH_MIN_PREFIX and prefix >= _TOKEN_MATCH_RATIO * min(len(left), len(right))
+
+
+def _matching_tokens(candidates: set[str], references: set[str]) -> set[str]:
+    return {token for token in candidates
+            if any(_token_match(token, reference) for reference in references)}
+
+
+def select_viewer_lines(
+    fixture: dict[str, Any],
+    stream: dict[str, Any],
+    pick: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Pick this viewer's earlier lines for the briefing — relevance before recency.
+
+    Recency alone loses the one line that matters (measured on T21: the planted
+    fact was pushed out by two later "아까 그 얘기 더 해줘"). Lines sharing a
+    token with the current message fill the budget first — the deterministic
+    twin of journal recall's relevance-first principle — and any remaining slots
+    take the newest lines.
+    """
+    config = fixture.get("briefing") or {}
+    budget = int(config.get("max_viewer_lines", 2))
+    message = pick["message"]
+    earlier = [item for item in stream["messages"]
+               if item["author"] == message["author"] and item["t_ms"] < message["t_ms"]]
+    probe_tokens = _tokens(message["text"])
+    chosen = [item for item in earlier
+              if _matching_tokens(_tokens(item["text"]), probe_tokens)][-budget:]
+    for item in reversed(earlier):
+        if len(chosen) >= budget:
+            break
+        if item not in chosen:
+            chosen.append(item)
+    return sorted(chosen, key=lambda entry: entry["t_ms"])
+
+
 def build_turn_briefing(
     fixture: dict[str, Any],
     stream: dict[str, Any],
@@ -309,6 +359,7 @@ def build_turn_briefing(
     max_recent_picks = int(config.get("max_recent_picks", 2))
     max_line_chars = int(config.get("max_line_chars", 40))
     donation_window_ms = int(config.get("recent_donation_window_ms", 120_000))
+    min_echo_chars = int(config.get("min_echo_response_chars", 8))
 
     message = pick["message"]
     clip = lambda text: text if len(text) <= max_line_chars else text[: max_line_chars - 1] + "…"
@@ -318,14 +369,16 @@ def build_turn_briefing(
                if item["author"] == message["author"] and item["t_ms"] < message["t_ms"]]
     lines.append(f"- 지금 말한 시청자: {message['author']}"
                  + (f" (이번 방송 {len(earlier) + 1}번째 발언)" if earlier else " (첫 발언)"))
-    for item in earlier[-max_viewer_lines:]:
+    for item in select_viewer_lines(fixture, stream, pick):
         lines.append(f"- 이 시청자가 아까 한 말: \"{clip(item['text'])}\"")
 
     for prior in list(prior_picks)[-max_recent_picks:]:
         prior_message = prior["message"]
         response = (prior.get("response") or "").strip()
         flow = f"- 방금 흐름: {prior_message['author']} \"{clip(prior_message['text'])}\""
-        if response:
+        # 짧은 저품질 응답을 되먹이면 모델이 그 문형을 따라 한다(T35 실측 —
+        # "아직 기록 없어" 전염).  내용이 있는 응답만 에코한다.
+        if len(response) >= min_echo_chars:
             flow += f" → 나: \"{clip(response)}\""
         lines.append(flow)
 
@@ -374,6 +427,7 @@ def score_turn(
     fallback_pool: Sequence[str],
     roster_handles: Sequence[str],
     drift_terms: Sequence[str] = (),
+    briefing_fact_tokens: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Score one reply against the message it answered. Lexical and conservative.
 
@@ -401,6 +455,17 @@ def score_turn(
         "topic_anchored": bool(shared) or any(anchor in text for anchor in anchors),
         "drift": sorted((_tokens(text) & set(drift_terms)) - _tokens(message["text"])),
     }
+    # P1-3 시청자 사실 활용: 브리핑이 준 과거 발언의 고유 토큰(지금 채팅에는
+    # 없는 것)을 응답이 실제로 집어 썼는가.  브리핑이 줄 게 없던 턴은 None.
+    if briefing_fact_tokens is None:
+        row["fact_usage"] = None
+    else:
+        message_tokens = _tokens(message["text"])
+        fact_tokens = {token for token in briefing_fact_tokens
+                       if not _matching_tokens({token}, message_tokens)}
+        used = _matching_tokens(_tokens(text), fact_tokens)
+        row["fact_usage"] = bool(used) if fact_tokens else None
+        row["fact_tokens_used"] = sorted(used)
 
     called = [handle for handle in roster_handles if handle and handle in text]
     row["called_handles"] = called
@@ -447,6 +512,7 @@ def summarize_turns(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
         "topic_anchored": rate(rows, "topic_anchored"),
         "drift_turns": sum(1 for row in rows if row["drift"]),
         "addressee": rate([row for row in rows if row.get("addressee_ok") is not None], "addressee_ok"),
+        "viewer_fact_usage": rate([row for row in rows if row.get("fact_usage") is not None], "fact_usage"),
         "donation_callout_correct": rate(donations, "callout_correct"),
         "invented_handle_turns": sum(1 for row in rows if row["invented_handles"]),
         "memory_probe": rate(probes, "probe_hit"),

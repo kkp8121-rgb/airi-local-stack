@@ -87,6 +87,7 @@ from input_screening import (
 from output_moderation import OutputModerationRuntime, load_moderation_policy
 from epistemic_confidence import build_runtime as build_epistemic_confidence_runtime
 from broadcast_contract import apply_broadcast_contract, broadcast_contract_enabled
+from memory_claim_guard import guard_memory_claim
 
 
 def emit_substantive_content(trace_id: str, request_started: float) -> None:
@@ -2139,6 +2140,13 @@ def configured_immediate_ack(value: object) -> str:
 
 
 IMMEDIATE_ACK_MODE = configured_immediate_ack(os.environ.get("AIRI_IMMEDIATE_ACK"))
+
+# 근거 없는 "응, 기억해" 단정을 승인된 정직 회피로 교체한다(2026-08-19 사용자
+# 승인 — 결정 큐 3).  내용을 말하는 응답은 사실 여부와 무관하게 통과한다.
+MEMORY_CLAIM_GUARD_ENABLED = str(os.environ.get("AIRI_MEMORY_CLAIM_GUARD", "")).strip().lower() in {
+    "1", "true", "yes", "on",
+}
+MEMORY_CLAIM_GUARD_FALLBACK = "음… 그건 확실하게 기억 안 나. 다시 알려줄래?"
 
 
 def immediate_ack_payload(spoken: str, marker: str) -> str:
@@ -7180,6 +7188,12 @@ async def stream_local_with_ack(
                 # buffered for the existing corrective retry path.
                 if clean and not public_dialogue_emitted:
                     early_candidate = boundary.output.strip()
+                    if MEMORY_CLAIM_GUARD_ENABLED and early_candidate:
+                        early_candidate, memory_claim_guarded = guard_memory_claim(
+                            context.last_user_text, early_candidate, MEMORY_CLAIM_GUARD_FALLBACK
+                        )
+                        if memory_claim_guarded:
+                            print(json.dumps({"event": "memory_claim_guard", "replaced": 1}), flush=True)
                     early_candidate_is_safe = bool(
                         early_candidate
                         # Open questions may use a second sentence for a
