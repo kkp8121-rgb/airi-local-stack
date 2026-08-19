@@ -1,0 +1,39 @@
+{
+  "schema_version": "airi.extraction-synthesis-config.v1",
+  "synthetic_only": true,
+  "note": "Stage A 스팬 계약 학습쌍 상수 테이블. 인물·조직·물건은 게이트 픽스처(하린·달빛 길드·별빛 나침반 등)·행동 SFT 값 풀과 겹치지 않는다 — 게이트가 held-out 평가로 남아야 하므로.",
+  "split_cycle": ["train", "train", "train", "train", "train", "train", "train", "train", "dev", "test"],
+  "persons": ["세라", "유노", "민재", "다온", "리안", "하람"],
+  "partners": ["도윤", "가온"],
+  "organizations": ["은빛 상단", "노을 극단", "새벽 공방"],
+  "roles": ["단장", "서기", "요리장", "파수꾼"],
+  "items": ["바람 피리", "청동 열쇠", "유리 등불"],
+  "events": ["요리 대회", "낚시 대회", "합창제"],
+  "traits": ["매운 음식을 못 먹는다", "높은 곳을 무서워한다", "아침마다 달리기를 한다"],
+  "scenes": {
+    "state_change": {
+      "turns": "[turn 9] {p}은 이제 {org}의 {role}이 되었다.",
+      "note": "상태가 바뀐 주체를 뽑는다 — 문장에 등장한 다른 이름이 아니라. (update_alias 실측 실패의 학습 표적)"
+    },
+    "placeholder_add": {
+      "turns": "[turn 1] {p}은 {org} 소속의 {role}다. {{user}}는 {p}의 조수이며 {item}을 사용한다.",
+      "note": "{{user}} 플레이스홀더 등록 + 전체 커버리지. (placeholder_connectivity 실측 실패의 학습 표적)"
+    },
+    "skip_chatter": {
+      "turns": "[turn 3] 오늘 방송 진짜 재밌다. [turn 4] 다들 와줘서 고마워, 다음에 또 보자.",
+      "note": "추출 0건이 정답 — 과추출(unexpected) 억제 학습."
+    },
+    "trait_fact": {
+      "turns": "[turn 5] {p}은 {trait}.",
+      "note": "지속 특성 fact."
+    },
+    "moment_event": {
+      "turns": "[turn 6] {p}이 어제 {event}에서 우승했다.",
+      "note": "일회성 사건 moment fact."
+    },
+    "relation_pair": {
+      "turns": "[turn 7] {p}와 {q}는 어릴 때부터 친구 사이다.",
+      "note": "인물 간 관계."
+    }
+  }
+}

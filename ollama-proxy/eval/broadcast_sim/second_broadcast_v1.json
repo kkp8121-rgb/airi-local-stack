@@ -1,0 +1,827 @@
+{
+  "schema_version": "airi.broadcast-sim-fixture.v1",
+  "synthetic_only": true,
+  "note": "held-out 2차 방송 — 주제·시청자·프로브 사실이 1차 방송·학습 데이터와 분리돼 있다. T3 과적합 검출 전용.",
+  "topic": {
+    "title": "AIRI의 게임 방송 준비 — 어떤 게임부터 해볼까",
+    "signature_greeting": "다들 안녕! 나 AIRI야. 오늘은 게임 방송 준비 얘기 해보자!",
+    "beats": [
+      {
+        "id": "opening",
+        "label": "오프닝 — 게임 방송 예고",
+        "start_minute": 0,
+        "end_minute": 4,
+        "anchors": [
+          "게임",
+          "준비",
+          "예고",
+          "인사"
+        ],
+        "airi_cue": "게임 방송을 준비 중이라고 소개하고 있어."
+      },
+      {
+        "id": "main",
+        "label": "메인 — 장르·후보 게임 잡담",
+        "start_minute": 4,
+        "end_minute": 13,
+        "anchors": [
+          "장르",
+          "퍼즐",
+          "액션",
+          "공포",
+          "후보"
+        ],
+        "airi_cue": "어떤 장르부터 해볼지 시청자들과 잡담하고 있어."
+      },
+      {
+        "id": "anchor",
+        "label": "앵커 파생 — 채팅에서 나온 게임 이야기",
+        "start_minute": 13,
+        "end_minute": 17,
+        "anchors": [
+          "채팅",
+          "추천",
+          "이야기",
+          "시청자"
+        ],
+        "airi_cue": "채팅에서 나온 게임 이야기를 이어받고 있어."
+      },
+      {
+        "id": "closing",
+        "label": "클로징 — 첫 게임 예고",
+        "start_minute": 17,
+        "end_minute": 20,
+        "anchors": [
+          "다음",
+          "예고",
+          "고마워",
+          "끝인사"
+        ],
+        "airi_cue": "다음 방송에서 할 게임을 예고하며 마무리하고 있어."
+      }
+    ]
+  },
+  "rates": {
+    "broadcast_minutes": 20,
+    "window_seconds": 5,
+    "turn_cooldown_seconds": 20,
+    "active_viewers_min": 10,
+    "active_viewers_max": 20,
+    "active_churn_per_minute": 2,
+    "messages_per_minute_min": 3,
+    "messages_per_minute_max": 8,
+    "burst_minutes": [
+      5,
+      12,
+      18
+    ],
+    "burst_multiplier": 3,
+    "donation_minutes": [
+      3,
+      8,
+      12,
+      15,
+      18
+    ],
+    "offtopic_ratio": 0.08,
+    "opinion_wave_minutes": [
+      9,
+      16
+    ],
+    "opinion_wave_size": 5,
+    "opinion_aggregate_threshold": 3,
+    "memory_probe_minutes": [
+      8,
+      14,
+      19
+    ],
+    "pending_stale_seconds": 120
+  },
+  "pickup_priority": [
+    "donation",
+    "memory_probe",
+    "memory_seed",
+    "opinion",
+    "question",
+    "reaction",
+    "offtopic"
+  ],
+  "archetypes": {
+    "greeter": {
+      "kind": "reaction",
+      "templates": [
+        "안녕 AIRI!",
+        "게임 방송 기대했어!",
+        "오늘 처음 왔어",
+        "왔다!"
+      ]
+    },
+    "question_tech": {
+      "kind": "question",
+      "templates": [
+        "게임은 어떻게 플레이할 거야?",
+        "화면은 어떻게 보는 거야?",
+        "조작은 누가 해?",
+        "반응 속도로 액션 되겠어?",
+        "게임 화면 인식할 수 있어?"
+      ]
+    },
+    "question_persona": {
+      "kind": "question",
+      "templates": [
+        "무서운 게임도 할 수 있어?",
+        "게임 져도 안 울어?",
+        "제일 하고 싶은 장르 뭐야?",
+        "지면 화낼 거야?",
+        "밤새 게임 해본 적 있어?"
+      ]
+    },
+    "teaser": {
+      "kind": "question",
+      "templates": [
+        "AI면 게임 다 잘하는 거 아냐?",
+        "치트 쓰는 거잖아",
+        "지는 척하는 거지?",
+        "버그 나면 네 탓이다"
+      ]
+    },
+    "supporter": {
+      "kind": "reaction",
+      "templates": [
+        "게임 방송 무조건 본다!",
+        "기대된다!",
+        "뭘 해도 응원해",
+        "재밌겠다",
+        "화이팅!"
+      ]
+    },
+    "lurker_reactor": {
+      "kind": "reaction",
+      "templates": [
+        "ㅋㅋㅋㅋ",
+        "오",
+        "헐",
+        "ㄱㄱ",
+        "?"
+      ]
+    },
+    "offtopic_chatter": {
+      "kind": "offtopic",
+      "templates": [
+        "저녁 뭐 먹지",
+        "라면 끓여야겠다",
+        "밖에 바람 분다",
+        "내일 월요일이라니"
+      ]
+    },
+    "deep_follower": {
+      "kind": "question",
+      "templates": [
+        "아까 그 장르 얘기 더 해줘",
+        "방금 말한 게임 제목 뭐야?",
+        "그거 왜 어려운 거야?",
+        "예시 하나만 들어줘"
+      ]
+    }
+  },
+  "opinion_waves": [
+    {
+      "id": "wave_horror",
+      "minute": 9,
+      "tag": "horror_request",
+      "label": "공포 게임",
+      "templates": [
+        "공포 게임 해줘!",
+        "공포부터 가자",
+        "공포 게임 리액션 보고 싶다",
+        "공포 ㄱㄱ",
+        "공포 게임은 안 해?"
+      ],
+      "aggregate_markers": [
+        "공포"
+      ]
+    },
+    {
+      "id": "wave_collab",
+      "minute": 16,
+      "tag": "collab_request",
+      "label": "합방",
+      "templates": [
+        "다른 버튜버랑 합방 해줘!",
+        "합방 보고 싶다",
+        "합방 계획 없어?",
+        "합방 언제 해?",
+        "합방 기원"
+      ],
+      "aggregate_markers": [
+        "합방"
+      ]
+    }
+  ],
+  "donations": [
+    {
+      "minute": 3,
+      "amount_label": "이천원",
+      "message": "게임 방송 준비 응원한다!",
+      "checks": {
+        "required_any": [
+          "고마워",
+          "감사"
+        ]
+      }
+    },
+    {
+      "minute": 8,
+      "amount_label": "오천원",
+      "message": "나 오늘 이직 성공해서 쏜다!",
+      "checks": {
+        "forbidden": [
+          "이직\\s*성공\\s*축하해\\s*!*$"
+        ],
+        "required_any": [
+          "고마워",
+          "축하",
+          "잘됐"
+        ]
+      }
+    },
+    {
+      "minute": 12,
+      "amount_label": "만원",
+      "message": "게임기 사는 데 보태",
+      "checks": {
+        "required_any": [
+          "고마워",
+          "감사"
+        ]
+      }
+    },
+    {
+      "minute": 15,
+      "amount_label": "삼천원",
+      "message": "지난 방송부터 보고 있었어",
+      "checks": {
+        "required_any": [
+          "고마워",
+          "감사"
+        ]
+      }
+    },
+    {
+      "minute": 18,
+      "amount_label": "만원",
+      "message": "첫 게임 기대할게",
+      "checks": {
+        "required_any": [
+          "고마워",
+          "감사"
+        ]
+      }
+    }
+  ],
+  "memory_probes": [
+    {
+      "minute": 8,
+      "seed_minute": 1,
+      "seed_text": "내 동생 이름은 하늘이야, 게임 엄청 잘해",
+      "probe_text": "내 동생 이름 기억나?",
+      "expect_any": [
+        "하늘"
+      ]
+    },
+    {
+      "minute": 14,
+      "seed_minute": 5,
+      "seed_text": "나 다음 주에 제주도 여행 가",
+      "probe_text": "나 어디 여행 간다고 했지?",
+      "expect_any": [
+        "제주"
+      ]
+    },
+    {
+      "minute": 19,
+      "seed_minute": 10,
+      "seed_text": "우리 회사 과제가 드디어 끝났어",
+      "probe_text": "아까 나 뭐 끝났다고 했게?",
+      "expect_any": [
+        "과제"
+      ]
+    }
+  ],
+  "briefing": {
+    "max_viewer_lines": 2,
+    "max_recent_picks": 2,
+    "max_line_chars": 40,
+    "recent_donation_window_ms": 120000,
+    "min_echo_response_chars": 8,
+    "relevant_line_directive": "- 이 시청자가 아까 \"{line}\"라고 했어. 지금 그 얘기를 묻는 거니까 그 내용을 그대로 써서 답해."
+  },
+  "aggregation_openers": [
+    "지금 {주제} 얘기 진짜 많네!",
+    "다들 {주제} 궁금하구나?",
+    "{주제} 요청 몰리는 거 봐."
+  ],
+  "memory_guard_fallback": "음… 그건 확실하게 기억 안 나. 다시 알려줄래?",
+  "viewers": [
+    {
+      "handle": "별빛수집가",
+      "archetype": "supporter",
+      "weight": 4
+    },
+    {
+      "handle": "코드깎는노인",
+      "archetype": "question_tech",
+      "weight": 4
+    },
+    {
+      "handle": "심야라디오",
+      "archetype": "deep_follower",
+      "weight": 4
+    },
+    {
+      "handle": "라면요정",
+      "archetype": "offtopic_chatter",
+      "weight": 3
+    },
+    {
+      "handle": "질문요정",
+      "archetype": "question_persona",
+      "weight": 3
+    },
+    {
+      "handle": "게임패드장인",
+      "archetype": "question_tech",
+      "weight": 1
+    },
+    {
+      "handle": "픽셀아트",
+      "archetype": "supporter",
+      "weight": 2
+    },
+    {
+      "handle": "스피드러너",
+      "archetype": "lurker_reactor",
+      "weight": 3
+    },
+    {
+      "handle": "도트여왕",
+      "archetype": "question_persona",
+      "weight": 4
+    },
+    {
+      "handle": "레트로덕후",
+      "archetype": "greeter",
+      "weight": 1
+    },
+    {
+      "handle": "콘솔수집가",
+      "archetype": "offtopic_chatter",
+      "weight": 2
+    },
+    {
+      "handle": "PC방죽돌이",
+      "archetype": "teaser",
+      "weight": 3
+    },
+    {
+      "handle": "타임어택",
+      "archetype": "deep_follower",
+      "weight": 4
+    },
+    {
+      "handle": "세이브포인트",
+      "archetype": "lurker_reactor",
+      "weight": 1
+    },
+    {
+      "handle": "보스전문가",
+      "archetype": "supporter",
+      "weight": 2
+    },
+    {
+      "handle": "힐러본능",
+      "archetype": "question_tech",
+      "weight": 3
+    },
+    {
+      "handle": "탱커기질",
+      "archetype": "supporter",
+      "weight": 4
+    },
+    {
+      "handle": "만렙찍은자",
+      "archetype": "lurker_reactor",
+      "weight": 1
+    },
+    {
+      "handle": "쪼렙유망주",
+      "archetype": "question_persona",
+      "weight": 2
+    },
+    {
+      "handle": "가챠운없음",
+      "archetype": "greeter",
+      "weight": 3
+    },
+    {
+      "handle": "인디게임러",
+      "archetype": "offtopic_chatter",
+      "weight": 4
+    },
+    {
+      "handle": "공략가",
+      "archetype": "teaser",
+      "weight": 1
+    },
+    {
+      "handle": "스토리파",
+      "archetype": "deep_follower",
+      "weight": 2
+    },
+    {
+      "handle": "액션파",
+      "archetype": "lurker_reactor",
+      "weight": 3
+    },
+    {
+      "handle": "퍼즐마니아",
+      "archetype": "supporter",
+      "weight": 4
+    },
+    {
+      "handle": "리듬게임러",
+      "archetype": "question_tech",
+      "weight": 1
+    },
+    {
+      "handle": "농장경영자",
+      "archetype": "supporter",
+      "weight": 2
+    },
+    {
+      "handle": "건축왕",
+      "archetype": "lurker_reactor",
+      "weight": 3
+    },
+    {
+      "handle": "샌드박스",
+      "archetype": "question_persona",
+      "weight": 4
+    },
+    {
+      "handle": "로그라이크",
+      "archetype": "greeter",
+      "weight": 1
+    },
+    {
+      "handle": "메트로배니아",
+      "archetype": "offtopic_chatter",
+      "weight": 2
+    },
+    {
+      "handle": "플래티넘헌터",
+      "archetype": "teaser",
+      "weight": 3
+    },
+    {
+      "handle": "도전과제봇",
+      "archetype": "deep_follower",
+      "weight": 4
+    },
+    {
+      "handle": "튜토리얼스킵",
+      "archetype": "lurker_reactor",
+      "weight": 1
+    },
+    {
+      "handle": "엔딩수집가",
+      "archetype": "supporter",
+      "weight": 2
+    },
+    {
+      "handle": "뉴게임플러스",
+      "archetype": "question_tech",
+      "weight": 3
+    },
+    {
+      "handle": "이지모드",
+      "archetype": "supporter",
+      "weight": 4
+    },
+    {
+      "handle": "하드코어",
+      "archetype": "lurker_reactor",
+      "weight": 1
+    },
+    {
+      "handle": "노데스런",
+      "archetype": "question_persona",
+      "weight": 2
+    },
+    {
+      "handle": "타임루프",
+      "archetype": "greeter",
+      "weight": 3
+    },
+    {
+      "handle": "체크포인트",
+      "archetype": "offtopic_chatter",
+      "weight": 4
+    },
+    {
+      "handle": "퀘스트로그",
+      "archetype": "teaser",
+      "weight": 1
+    },
+    {
+      "handle": "인벤정리왕",
+      "archetype": "deep_follower",
+      "weight": 2
+    },
+    {
+      "handle": "포션과다",
+      "archetype": "lurker_reactor",
+      "weight": 3
+    },
+    {
+      "handle": "맵제작자",
+      "archetype": "supporter",
+      "weight": 4
+    },
+    {
+      "handle": "모드매니아",
+      "archetype": "question_tech",
+      "weight": 1
+    },
+    {
+      "handle": "프레임수호자",
+      "archetype": "supporter",
+      "weight": 2
+    },
+    {
+      "handle": "옵치했던사람",
+      "archetype": "lurker_reactor",
+      "weight": 3
+    },
+    {
+      "handle": "롤은안해",
+      "archetype": "question_persona",
+      "weight": 4
+    },
+    {
+      "handle": "스팀세일러",
+      "archetype": "greeter",
+      "weight": 1
+    },
+    {
+      "handle": "얼리액세스",
+      "archetype": "offtopic_chatter",
+      "weight": 2
+    },
+    {
+      "handle": "데모사냥꾼",
+      "archetype": "teaser",
+      "weight": 3
+    },
+    {
+      "handle": "패치노트정독",
+      "archetype": "deep_follower",
+      "weight": 4
+    },
+    {
+      "handle": "버그제보자",
+      "archetype": "lurker_reactor",
+      "weight": 1
+    },
+    {
+      "handle": "핫픽스대기",
+      "archetype": "supporter",
+      "weight": 2
+    },
+    {
+      "handle": "서버점검러",
+      "archetype": "question_tech",
+      "weight": 3
+    },
+    {
+      "handle": "새벽게이머",
+      "archetype": "supporter",
+      "weight": 4
+    },
+    {
+      "handle": "주말게이머",
+      "archetype": "lurker_reactor",
+      "weight": 1
+    },
+    {
+      "handle": "출퇴근모바일",
+      "archetype": "question_persona",
+      "weight": 2
+    },
+    {
+      "handle": "거치대유저",
+      "archetype": "greeter",
+      "weight": 3
+    },
+    {
+      "handle": "듀얼모니터",
+      "archetype": "offtopic_chatter",
+      "weight": 4
+    },
+    {
+      "handle": "키마파",
+      "archetype": "teaser",
+      "weight": 1
+    },
+    {
+      "handle": "패드파",
+      "archetype": "deep_follower",
+      "weight": 2
+    },
+    {
+      "handle": "휠체어게이머",
+      "archetype": "lurker_reactor",
+      "weight": 3
+    },
+    {
+      "handle": "왼손잡이버튼",
+      "archetype": "supporter",
+      "weight": 4
+    },
+    {
+      "handle": "연사버튼",
+      "archetype": "question_tech",
+      "weight": 1
+    },
+    {
+      "handle": "명작탐험가",
+      "archetype": "supporter",
+      "weight": 2
+    },
+    {
+      "handle": "고전명작파",
+      "archetype": "lurker_reactor",
+      "weight": 3
+    },
+    {
+      "handle": "신작알림",
+      "archetype": "question_persona",
+      "weight": 4
+    },
+    {
+      "handle": "예약구매러",
+      "archetype": "greeter",
+      "weight": 1
+    },
+    {
+      "handle": "한정판수집",
+      "archetype": "offtopic_chatter",
+      "weight": 2
+    },
+    {
+      "handle": "OST수집가",
+      "archetype": "teaser",
+      "weight": 3
+    },
+    {
+      "handle": "사운드트랙",
+      "archetype": "deep_follower",
+      "weight": 4
+    },
+    {
+      "handle": "게임음악당",
+      "archetype": "lurker_reactor",
+      "weight": 1
+    },
+    {
+      "handle": "칩튠러버",
+      "archetype": "supporter",
+      "weight": 2
+    },
+    {
+      "handle": "멜로디헌터",
+      "archetype": "question_tech",
+      "weight": 3
+    },
+    {
+      "handle": "도전자김",
+      "archetype": "supporter",
+      "weight": 4
+    },
+    {
+      "handle": "관전전문",
+      "archetype": "lurker_reactor",
+      "weight": 1
+    },
+    {
+      "handle": "리플레이러",
+      "archetype": "question_persona",
+      "weight": 2
+    },
+    {
+      "handle": "클립제조기",
+      "archetype": "greeter",
+      "weight": 3
+    },
+    {
+      "handle": "하이라이트",
+      "archetype": "offtopic_chatter",
+      "weight": 4
+    },
+    {
+      "handle": "채팅단속반",
+      "archetype": "teaser",
+      "weight": 1
+    },
+    {
+      "handle": "이모지연발",
+      "archetype": "deep_follower",
+      "weight": 2
+    },
+    {
+      "handle": "풀케미지향",
+      "archetype": "lurker_reactor",
+      "weight": 3
+    },
+    {
+      "handle": "협동전문",
+      "archetype": "supporter",
+      "weight": 4
+    },
+    {
+      "handle": "배신전문",
+      "archetype": "question_tech",
+      "weight": 1
+    },
+    {
+      "handle": "평화주의빌드",
+      "archetype": "supporter",
+      "weight": 2
+    },
+    {
+      "handle": "스텔스장인",
+      "archetype": "lurker_reactor",
+      "weight": 3
+    },
+    {
+      "handle": "정면돌파",
+      "archetype": "question_persona",
+      "weight": 4
+    },
+    {
+      "handle": "회피탄생",
+      "archetype": "greeter",
+      "weight": 1
+    },
+    {
+      "handle": "패링마스터",
+      "archetype": "offtopic_chatter",
+      "weight": 2
+    },
+    {
+      "handle": "저사양유저",
+      "archetype": "teaser",
+      "weight": 3
+    },
+    {
+      "handle": "옵션타협러",
+      "archetype": "deep_follower",
+      "weight": 4
+    },
+    {
+      "handle": "그래픽최상",
+      "archetype": "lurker_reactor",
+      "weight": 1
+    },
+    {
+      "handle": "가성비셋팅",
+      "archetype": "supporter",
+      "weight": 2
+    },
+    {
+      "handle": "쿨러소음",
+      "archetype": "question_tech",
+      "weight": 3
+    },
+    {
+      "handle": "롱플레이어",
+      "archetype": "supporter",
+      "weight": 4
+    },
+    {
+      "handle": "숏플레이어",
+      "archetype": "lurker_reactor",
+      "weight": 1
+    },
+    {
+      "handle": "엔드콘텐츠",
+      "archetype": "question_persona",
+      "weight": 2
+    },
+    {
+      "handle": "시즌권러",
+      "archetype": "greeter",
+      "weight": 3
+    }
+  ]
+}

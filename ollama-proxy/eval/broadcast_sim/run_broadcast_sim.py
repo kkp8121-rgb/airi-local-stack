@@ -221,7 +221,7 @@ def rescore_report(payload: dict[str, Any]) -> dict[str, Any]:
     This exists so a scoring change can be applied to arms that already ran,
     instead of leaving them incomparable.
     """
-    fixture = sim.load_fixture()
+    fixture = sim.load_fixture(args.fixture) if args.fixture else sim.load_fixture()
     stream = sim.generate_stream(fixture, seed=payload["seed"])
     if stream["fixture_sha256"] != payload["fixture_sha256"]:
         raise SystemExit("픽스처가 그때와 다르다 — 재채점하면 arm 비교가 깨진다")
@@ -292,6 +292,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--contract", choices=("off", "on"), default="on")
     parser.add_argument("--protocol", choices=("raw", "operational"), default="operational")
     parser.add_argument("--author-format", choices=("runtime", "named"), default="runtime")
+    parser.add_argument("--fixture", type=Path, default=None,
+                        help="대체 픽스처 경로 (기본: first_broadcast_v1.json)")
     parser.add_argument("--seed", type=int, default=20260818)
     parser.add_argument("--max-turns", type=int, default=None)
     parser.add_argument("--history-turns", type=int, default=DEFAULT_HISTORY_TURNS)
@@ -316,7 +318,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps({"rescored": payload["summary"]}, ensure_ascii=False, indent=2))
         return 0
 
-    fixture = sim.load_fixture()
+    fixture = sim.load_fixture(args.fixture) if args.fixture else sim.load_fixture()
     stream = sim.generate_stream(fixture, seed=args.seed)
     picks = sim.plan_pickups(stream, fixture, max_turns=args.max_turns)
 

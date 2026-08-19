@@ -61,6 +61,51 @@ class FixtureTests(unittest.TestCase):
             sim.validate_fixture(inverted)
 
 
+class HeldOutFixtureTests(unittest.TestCase):
+    """2차 방송은 T3 과적합 검출기다 — 유효하면서 1차·학습 데이터와 분리."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.first = sim.load_fixture()
+        cls.second = sim.load_fixture(HERE / "second_broadcast_v1.json")
+
+    def test_second_fixture_is_valid_and_full_scale(self) -> None:
+        sim.validate_fixture(self.second)
+        self.assertEqual(len(self.second["viewers"]), 100)
+        stream = sim.generate_stream(self.second, seed=20260818)
+        picks = sim.plan_pickups(stream, self.second)
+        self.assertGreater(len(picks), 10)
+        picked = {pick["message"]["id"] for pick in picks}
+        for item in stream["messages"]:
+            if item["kind"] in ("donation", "memory_probe", "memory_seed"):
+                self.assertIn(item["id"], picked)
+
+    def test_topic_and_probe_facts_are_disjoint_from_the_first_broadcast(self) -> None:
+        self.assertNotEqual(self.first["topic"]["title"], self.second["topic"]["title"])
+        first_expect = {token for probe in self.first["memory_probes"] for token in probe["expect_any"]}
+        second_expect = {token for probe in self.second["memory_probes"] for token in probe["expect_any"]}
+        self.assertFalse(first_expect & second_expect)
+        first_tags = {wave["tag"] for wave in self.first["opinion_waves"]}
+        second_tags = {wave["tag"] for wave in self.second["opinion_waves"]}
+        self.assertFalse(first_tags & second_tags)
+
+    def test_probe_facts_do_not_appear_in_the_training_config(self) -> None:
+        # 학습 데이터(행동 SFT config)에 있는 사실값으로 프로브를 만들면
+        # 암기를 일반화로 오판한다 — 값 풀과 겹치지 않아야 한다.
+        config_path = HERE.parent.parent / "training" / "behavior_synthesis_config_v1.json"
+        config_text = config_path.read_text(encoding="utf-8")
+        for probe in self.second["memory_probes"]:
+            for token in probe["expect_any"]:
+                self.assertNotIn(token, config_text, token)
+
+    def test_returning_viewers_are_few_and_the_rest_are_new(self) -> None:
+        first_handles = {viewer["handle"] for viewer in self.first["viewers"]}
+        second_handles = {viewer["handle"] for viewer in self.second["viewers"]}
+        returning = first_handles & second_handles
+        self.assertLessEqual(len(returning), 10)
+        self.assertGreaterEqual(len(second_handles - first_handles), 90)
+
+
 class StreamTests(unittest.TestCase):
     def setUp(self) -> None:
         self.fixture = sim.load_fixture()
