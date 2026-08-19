@@ -122,7 +122,9 @@ def run_arm(
         beat = sim.beat_at(fixture, message["minute"])
         system_content = build_system_content(fixture, beat, contract)
         if briefing == "on":
-            system_content += "\n\n" + sim.build_turn_briefing(fixture, stream, pick, answered_picks)
+            echo_safe = sim.blank_degenerate_echo(
+                answered_picks, FALLBACK_POOL + DEGENERATE_ECHO_PREFIXES)
+            system_content += "\n\n" + sim.build_turn_briefing(fixture, stream, pick, echo_safe)
         user_content = format_user_content(message, author_format)
 
         deterministic_act = None

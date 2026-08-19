@@ -222,6 +222,38 @@ class BriefingTests(unittest.TestCase):
         briefing = sim.build_turn_briefing(self.fixture, self.stream, probe, [])
         self.assertIn("새벽두시", briefing)
 
+    def test_relevant_lines_become_directives_and_filler_lines_stay_memos(self) -> None:
+        # 수동 메모의 활용률 7% 실측 이후: 관련 줄은 지시형으로 요구한다.
+        probe = next(pick for pick in self.picks if pick["message"]["kind"] == "memory_probe"
+                     and pick["message"].get("probe_index") == 0)
+        briefing = sim.build_turn_briefing(self.fixture, self.stream, probe, [])
+        self.assertIn("그대로 써서 답해", briefing)
+        self.assertIn("새벽두시", briefing)
+        tagged = sim.select_viewer_lines_tagged(self.fixture, self.stream, probe)
+        self.assertTrue(any(relevant for _item, relevant in tagged))
+        # 관련이 하나도 없는 픽업은 지시형이 나오지 않는다.
+        plain = next(pick for pick in self.picks
+                     if not any(relevant for _item, relevant
+                                in sim.select_viewer_lines_tagged(self.fixture, self.stream, pick))
+                     and sim.select_viewer_lines(self.fixture, self.stream, pick))
+        memo_briefing = sim.build_turn_briefing(self.fixture, self.stream, plain, [])
+        self.assertNotIn("그대로 써서 답해", memo_briefing)
+        self.assertIn("이 시청자가 아까 한 말", memo_briefing)
+
+    def test_degenerate_fixed_lines_are_blanked_before_echo(self) -> None:
+        # 8자 필터를 통과하는 고정 폴백("아직 기록이 없어." 11자)의 전염 차단.
+        prior = [
+            {**self.picks[0], "response": "아직 기록이 없어. 어떻게 부르면 돼?"},
+            {**self.picks[1], "response": "음… 그건 확실하게 기억 안 나. 다시 알려줄래?"},
+            {**self.picks[2], "response": "오늘 첫 방송이라 진짜 신난다!"},
+        ]
+        sanitized = sim.blank_degenerate_echo(prior, ("아직 기록", "음… 그건 확실하게 기억 안 나"))
+        self.assertEqual(sanitized[0]["response"], "")
+        self.assertEqual(sanitized[1]["response"], "")
+        self.assertEqual(sanitized[2]["response"], "오늘 첫 방송이라 진짜 신난다!")
+        # 원본은 무변경(전사에는 원문이 남아야 한다).
+        self.assertTrue(prior[0]["response"].startswith("아직 기록"))
+
     def test_low_content_replies_are_not_echoed_back(self) -> None:
         # T35 실측 재현: "아직 기록 없어" 같은 저품질 응답을 되먹이면 모델이
         # 그 문형을 따라 한다 — 짧은 응답의 에코는 빠져야 한다.

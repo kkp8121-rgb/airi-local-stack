@@ -324,20 +324,54 @@ def select_viewer_lines(
     twin of journal recall's relevance-first principle — and any remaining slots
     take the newest lines.
     """
+    return [item for item, _relevant in select_viewer_lines_tagged(fixture, stream, pick)]
+
+
+def select_viewer_lines_tagged(
+    fixture: dict[str, Any],
+    stream: dict[str, Any],
+    pick: dict[str, Any],
+) -> list[tuple[dict[str, Any], bool]]:
+    """Like ``select_viewer_lines`` but marks which lines matched by relevance."""
     config = fixture.get("briefing") or {}
     budget = int(config.get("max_viewer_lines", 2))
     message = pick["message"]
     earlier = [item for item in stream["messages"]
                if item["author"] == message["author"] and item["t_ms"] < message["t_ms"]]
     probe_tokens = _tokens(message["text"])
-    chosen = [item for item in earlier
-              if _matching_tokens(_tokens(item["text"]), probe_tokens)][-budget:]
+    relevant = [item for item in earlier
+                if _matching_tokens(_tokens(item["text"]), probe_tokens)][-budget:]
+    chosen = list(relevant)
     for item in reversed(earlier):
         if len(chosen) >= budget:
             break
         if item not in chosen:
             chosen.append(item)
-    return sorted(chosen, key=lambda entry: entry["t_ms"])
+    marked = {id(item) for item in relevant}
+    return [(item, id(item) in marked)
+            for item in sorted(chosen, key=lambda entry: entry["t_ms"])]
+
+
+def blank_degenerate_echo(
+    prior_picks: Sequence[dict[str, Any]],
+    block_prefixes: Sequence[str],
+) -> list[dict[str, Any]]:
+    """Blank responses that must never be echoed back into a briefing.
+
+    The eight-character floor misses fixed fallback lines like "아직 기록이
+    없어." (11 chars), and echoing those teaches the model the very pattern
+    the briefing exists to break (measured on T35). The caller supplies the
+    deterministic families it knows about — the silence pool, the memory
+    guard line, the absence fallbacks.
+    """
+    prefixes = tuple(prefix for prefix in block_prefixes if prefix)
+    sanitized = []
+    for prior in prior_picks:
+        response = (prior.get("response") or "").strip()
+        if response.startswith(prefixes):
+            prior = {**prior, "response": ""}
+        sanitized.append(prior)
+    return sanitized
 
 
 def build_turn_briefing(
@@ -369,8 +403,17 @@ def build_turn_briefing(
                if item["author"] == message["author"] and item["t_ms"] < message["t_ms"]]
     lines.append(f"- 지금 말한 시청자: {message['author']}"
                  + (f" (이번 방송 {len(earlier) + 1}번째 발언)" if earlier else " (첫 발언)"))
-    for item in select_viewer_lines(fixture, stream, pick):
-        lines.append(f"- 이 시청자가 아까 한 말: \"{clip(item['text'])}\"")
+    directive = config.get(
+        "relevant_line_directive",
+        "- 이 시청자가 아까 \"{line}\"라고 했어. 지금 그 얘기를 묻는 거니까 그 내용을 그대로 써서 답해.",
+    )
+    for item, relevant in select_viewer_lines_tagged(fixture, stream, pick):
+        if relevant:
+            # 수동 메모("아까 한 말")는 7%밖에 안 쓰였다 — 관련 줄은 무엇을
+            # 하라는 지시형으로 바꿔 활용을 직접 요구한다(P1 마지막 지렛대).
+            lines.append(directive.format(line=clip(item["text"])))
+        else:
+            lines.append(f"- 이 시청자가 아까 한 말: \"{clip(item['text'])}\"")
 
     for prior in list(prior_picks)[-max_recent_picks:]:
         prior_message = prior["message"]

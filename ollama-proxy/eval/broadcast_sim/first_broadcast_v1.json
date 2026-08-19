@@ -161,7 +161,8 @@
     "max_recent_picks": 2,
     "max_line_chars": 40,
     "recent_donation_window_ms": 120000,
-    "min_echo_response_chars": 8
+    "min_echo_response_chars": 8,
+    "relevant_line_directive": "- 이 시청자가 아까 \"{line}\"라고 했어. 지금 그 얘기를 묻는 거니까 그 내용을 그대로 써서 답해."
   },
   "aggregation_openers": [
     "지금 {주제} 얘기 진짜 많네!",
