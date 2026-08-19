@@ -19,6 +19,7 @@ from typing import Any, Callable, Iterable
 from airi_memory import MemoryStore, pack_vector
 
 from memory_prompts import STAGE_A_SCHEMA, STAGE_A_CONVERSATION_SYSTEM_PROMPT, STAGE_A_SYSTEM_PROMPT, STAGE_B_DECISION_SYSTEM_PROMPT
+from memory_prompts import STAGE_A_SPAN_SCHEMA, STAGE_A_SPAN_SYSTEM_PROMPT
 from memory_stage_b import DECISION_SCHEMA_TEMPLATE, DecisionContractError, compile_decisions, decision_factory_probe_sha256, decision_schema_for_items, format_stage_b_input, parse_stage_b_decisions
 from verify_extraction_gate import GATE_PROFILES, gate_metrics_pass, resolve_gate_thresholds
 
@@ -87,6 +88,53 @@ def parse_stage_a(raw: str | bytes | dict[str, Any]) -> dict[str, Any]:
     return value
 
 
+def parse_stage_a_span(raw: str | bytes | dict[str, Any], turns_text: str) -> tuple[dict[str, Any], int]:
+    """Parse the span contract and code-verify every evidence quote.
+
+    An item survives only when its evidence is a verbatim substring of the
+    turns and every name it references appears inside that evidence. Failing
+    items are dropped (and counted) rather than fatal: the point of the
+    contract is that hallucination becomes structurally impossible, so a bad
+    quote silently costs the model recall instead of poisoning the store.
+    Surviving items are returned in the classic shape (evidence stripped) so
+    scoring and Stage B stay byte-compatible.
+    """
+    try:
+        value = json.loads(raw) if isinstance(raw, (str, bytes)) else raw
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise ValidationError("invalid JSON") from exc
+    if not isinstance(value, dict):
+        raise ValidationError("root must be object")
+    _exact_keys(value, {"extracted"})
+    if not isinstance(value["extracted"], list):
+        raise ValidationError("extracted must be array")
+
+    def names_of(item: dict[str, Any]) -> list[str]:
+        if item.get("kind") == "entity":
+            return [item.get("name", "")]
+        if item.get("kind") == "fact":
+            return list(item.get("subjectNames") or [])
+        return [item.get("sourceName", ""), item.get("targetName", "")]
+
+    survivors: list[dict[str, Any]] = []
+    dropped = 0
+    for item in value["extracted"]:
+        if not isinstance(item, dict) or not isinstance(item.get("evidence"), str) or not item["evidence"]:
+            raise ValidationError("every span item needs a non-empty evidence string")
+        evidence = item["evidence"]
+        stripped = {key: item[key] for key in item if key != "evidence"}
+        # 구조 검증은 기존 파서를 그대로 재사용한다 — 계약 이중화 방지.
+        parse_stage_a({"extracted": [stripped]})
+        if evidence not in turns_text:
+            dropped += 1
+            continue
+        if any(name != "{{user}}" and name not in evidence for name in names_of(stripped)) or                 any(name == "{{user}}" and "{{user}}" not in evidence for name in names_of(stripped)):
+            dropped += 1
+            continue
+        survivors.append(stripped)
+    return {"extracted": survivors}, dropped
+
+
 _ADD_OR_UPDATE = {"ADD_ENTITY", "ADD_FACT", "ADD_RELATION", "UPDATE_ENTITY", "UPDATE_FACT", "UPDATE_RELATION"}
 _SUPERSEDE = {"SUPERSEDE_ENTITY", "SUPERSEDE_FACT", "SUPERSEDE_RELATION"}
 
@@ -151,7 +199,9 @@ def stage_a_prompt_for_contract(contract: str) -> str:
         return STAGE_A_SYSTEM_PROMPT
     if contract == "conversation-v2b":
         return STAGE_A_CONVERSATION_SYSTEM_PROMPT
-    raise ValueError("stage_a_contract must be legacy or conversation-v2b")
+    if contract == "conversation-v3-span":
+        return STAGE_A_SPAN_SYSTEM_PROMPT
+    raise ValueError("stage_a_contract must be legacy, conversation-v2b, or conversation-v3-span")
 
 
 def comparison_contract_for_stage_a(contract: str) -> str:
@@ -159,7 +209,9 @@ def comparison_contract_for_stage_a(contract: str) -> str:
         return "v2_to_v2.1_same_options"
     if contract == "conversation-v2b":
         return "v2.1_stage_a_legacy_to_conversation_v2b_same_options"
-    raise ValueError("stage_a_contract must be legacy or conversation-v2b")
+    if contract == "conversation-v3-span":
+        return "v2.1_stage_a_conversation_v2b_to_v3_span_same_options"
+    raise ValueError("stage_a_contract must be legacy, conversation-v2b, or conversation-v3-span")
 
 
 def reproducibility_metadata(fixture_path: Path, stage_a_contract: str = "conversation-v2b") -> dict[str, str]:
@@ -381,9 +433,15 @@ def run_extraction(args: argparse.Namespace, fixtures: dict[str, Any], chat: Cal
     for _ in range(args.runs):
      for item in extraction_fixtures:
             user_a = "<character>%s</character>\n<turns>%s</turns>" % (item["character"], item["turns"])
+            stage_a_schema = STAGE_A_SPAN_SCHEMA if args.stage_a_contract == "conversation-v3-span" else STAGE_A_SCHEMA
+            span_dropped = 0
             total0 = time.perf_counter(); a0 = total0
             try:
-                a = parse_stage_a(_benchmark_chat(chat, args, stage_a_prompt, user_a, STAGE_A_SCHEMA))
+                raw_a = _benchmark_chat(chat, args, stage_a_prompt, user_a, stage_a_schema)
+                if args.stage_a_contract == "conversation-v3-span":
+                    a, span_dropped = parse_stage_a_span(raw_a, item["turns"])
+                else:
+                    a = parse_stage_a(raw_a)
                 a_ms = (time.perf_counter() - a0) * 1000
             except (ValidationError, ValueError, KeyError, json.JSONDecodeError):
                 a_ms = (time.perf_counter() - a0) * 1000; b_ms = 0.0
@@ -397,6 +455,8 @@ def run_extraction(args: argparse.Namespace, fixtures: dict[str, Any], chat: Cal
                              stage_a_count=len(a["extracted"]), decision_count=0, stage_b_count=0,
                              stage_a_critical_recall=stage_a_quality["critical_recall"], stage_a_unexpected=stage_a_quality["unexpected"],
                              stage_a_placeholder_preserved=stage_a_quality["placeholder_preserved"], connectivity=_connectivity(a,item["candidates"]), stage_b_coverage=False, failure_codes=[])
+                if args.stage_a_contract == "conversation-v3-span":
+                    score["stage_a_span_dropped"] = span_dropped
                 score["stage_b_decision_schema_sha256"] = schema_sha256(decision_schema_for_items(a["extracted"], item["candidates"]))
                 if not a["extracted"]:
                     b={"operations":[]}; diagnostics=[]; b_ms=0.0; score.update(stage_b_schema_pass=True,stage_b_count=0,stage_b_coverage=True)
@@ -672,7 +732,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--fixtures", type=Path, default=FIXTURES); p.add_argument("--runs", type=int, default=1); p.add_argument("--model", default="exaone-airi:2.4b"); p.add_argument("--model-digest",type=model_digest,default=""); p.add_argument("--ollama-url", default=DEFAULT_OLLAMA); p.add_argument("--timeout", type=float, default=60); p.add_argument("--num-ctx", type=int, default=8192); p.add_argument("--num-gpu", type=int, default=0); p.add_argument("--seed", type=int, default=42); p.add_argument("--max-tokens", type=int, default=2048)
     p.add_argument("--fixture-id", action="append", default=[], help="Run only the named extraction fixture; repeat to select more than one.")
     p.add_argument("--fail-fast", action="store_true", help="Stop extraction after the first row that fails a gate condition.")
-    p.add_argument("--stage-a-contract", choices=["legacy", "conversation-v2b"], default="conversation-v2b")
+    p.add_argument("--stage-a-contract", choices=["legacy", "conversation-v2b", "conversation-v3-span"], default="conversation-v2b")
     p.add_argument("--gate-profile", choices=sorted(GATE_PROFILES), default=None,
                    help="Extraction gate thresholds; defaults to $AIRI_MEMORY_EXTRACTION_GATE_PROFILE.")
     p.add_argument("--embedding-model", action="append", default=[]); p.add_argument("--embedding-device", choices=["auto","cpu","cuda"], default="auto"); p.add_argument("--embedding-dtype", choices=["float32","float16"], default="float32"); p.add_argument("--local-files-only", action=argparse.BooleanOptionalAction, default=True)

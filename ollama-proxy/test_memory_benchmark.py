@@ -463,4 +463,71 @@ class MemoryBenchmarkTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             bench.run_retrieval(bench.build_parser().parse_args(["--mode","retrieval","--retrieval-rows","9"]))
 
+class StageASpanContractTests(unittest.TestCase):
+    TURNS = "하린은 달빛 길드 소속의 마도사다. {{user}}는 하린의 조수이며 별빛 나침반을 사용한다."
+
+    def _item(self, **overrides):
+        base = {"turnNumber": 1, "kind": "entity", "subtype": "person",
+                "name": "하린", "content": "마도사",
+                "evidence": "하린은 달빛 길드 소속의 마도사다."}
+        base.update(overrides)
+        return base
+
+    def test_verified_items_survive_with_evidence_stripped(self):
+        value, dropped = bench.parse_stage_a_span({"extracted": [self._item()]}, self.TURNS)
+        self.assertEqual(dropped, 0)
+        self.assertEqual(value["extracted"][0]["name"], "하린")
+        self.assertNotIn("evidence", value["extracted"][0])
+
+    def test_fabricated_or_paraphrased_evidence_is_dropped_not_fatal(self):
+        value, dropped = bench.parse_stage_a_span(
+            {"extracted": [self._item(evidence="하린은 위대한 영웅이다."), self._item()]}, self.TURNS)
+        self.assertEqual(dropped, 1)
+        self.assertEqual(len(value["extracted"]), 1)
+
+    def test_names_must_live_inside_their_evidence(self):
+        # 증거는 실재하지만 이름이 그 안에 없으면 탈락 — update_alias 오귀속류 차단.
+        value, dropped = bench.parse_stage_a_span(
+            {"extracted": [self._item(name="달빛 길드", subtype="organization",
+                                      evidence="{{user}}는 하린의 조수이며")]}, self.TURNS)
+        self.assertEqual(dropped, 1)
+        self.assertEqual(value["extracted"], [])
+
+    def test_user_placeholder_requires_the_literal_in_evidence(self):
+        good, dropped = bench.parse_stage_a_span(
+            {"extracted": [self._item(name="{{user}}", content="조수",
+                                      evidence="{{user}}는 하린의 조수이며")]}, self.TURNS)
+        self.assertEqual(dropped, 0)
+        self.assertEqual(good["extracted"][0]["name"], "{{user}}")
+        _value, dropped = bench.parse_stage_a_span(
+            {"extracted": [self._item(name="{{user}}", content="조수",
+                                      evidence="하린은 달빛 길드 소속의 마도사다.")]}, self.TURNS)
+        self.assertEqual(dropped, 1)
+
+    def test_fact_and_relation_names_are_checked_too(self):
+        fact = {"turnNumber": 1, "kind": "fact", "subtype": "trait",
+                "subjectNames": ["하린"], "content": "마도사", "turnRange": [1, 1],
+                "evidence": "하린은 달빛 길드 소속의 마도사다."}
+        relation = {"turnNumber": 1, "kind": "relation", "subtype": "affiliation",
+                    "sourceName": "하린", "targetName": "달빛 길드", "content": "소속",
+                    "evidence": "{{user}}는 하린의 조수이며"}
+        value, dropped = bench.parse_stage_a_span({"extracted": [fact, relation]}, self.TURNS)
+        self.assertEqual(dropped, 1)  # relation 증거에 달빛 길드가 없다
+        self.assertEqual(value["extracted"][0]["kind"], "fact")
+
+    def test_missing_evidence_is_a_schema_failure(self):
+        bare = self._item()
+        del bare["evidence"]
+        with self.assertRaises(bench.ValidationError):
+            bench.parse_stage_a_span({"extracted": [bare]}, self.TURNS)
+
+    def test_contract_routing_includes_the_span_contract(self):
+        prompt = bench.stage_a_prompt_for_contract("conversation-v3-span")
+        self.assertIn("evidence", prompt)
+        self.assertIn("verbatim", prompt)
+        self.assertIn("v3_span", bench.comparison_contract_for_stage_a("conversation-v3-span"))
+        branch = bench.STAGE_A_SPAN_SCHEMA["properties"]["extracted"]["items"]["oneOf"][0]
+        self.assertIn("evidence", branch["required"])
+
+
 if __name__ == "__main__": unittest.main()

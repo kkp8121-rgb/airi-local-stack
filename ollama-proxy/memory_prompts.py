@@ -145,6 +145,38 @@ STAGE_A_SCHEMA = {
         {"type":"object","additionalProperties":False,"required":["turnNumber","kind","subtype","sourceName","targetName","content"],"properties":{"turnNumber":_POSITIVE_INT,"kind":{"const":"relation"},"subtype":_TEXT,"sourceName":_TEXT,"targetName":_TEXT,"content":_TEXT}}
     ]}}},
 }
+# Stage A span contract (conversation-v3-span): the model quotes evidence, the
+# code verifies it. The 8B gate measurement showed the recall/alias plateau is a
+# contract-transmission problem, not capability — every item must carry one
+# verbatim substring of <turns>, and any name must appear inside that evidence,
+# so a hallucinated item cannot survive the parser regardless of model size.
+STAGE_A_SPAN_SYSTEM_PROMPT = r'''You extract atomic memory items from conversation input by quoting evidence spans.
+Use <turns> as the only factual evidence. <character> is only for speaker/scope name resolution.
+Extract only information a future turn will likely reference: durable identity, trait, goal, boundary,
+consequential event, or relationship change. Skip ephemeral movement, emotion, routine utterances,
+restatements, [S], and [R-N]. Zero items is normal.
+Every item must include "evidence": one exact contiguous substring copied verbatim from <turns> that
+states the item. Never paraphrase, trim particles, or merge separate sentences inside evidence.
+Every name (name, subjectNames, sourceName, targetName) must appear verbatim inside that item's
+evidence, including the literal placeholder {{user}} when the turns use it. If you cannot quote
+evidence containing the names, do not output the item.
+When a sentence states a change about a subject, extract the subject whose state changed, not another
+name that merely appears in the sentence.
+Follow the exact JSON schema and output JSON only.'''
+
+
+def _with_evidence(schema: dict) -> dict:
+    """Derive the span schema from STAGE_A_SCHEMA so the two never drift."""
+    import copy as _copy
+    derived = _copy.deepcopy(schema)
+    for branch in derived["properties"]["extracted"]["items"]["oneOf"]:
+        branch["required"] = list(branch["required"]) + ["evidence"]
+        branch["properties"]["evidence"] = _TEXT
+    return derived
+
+
+STAGE_A_SPAN_SCHEMA = _with_evidence(STAGE_A_SCHEMA)
+
 STAGE_B_SCHEMA = {
     "type":"object", "additionalProperties":False, "required":["operations"],
     "properties":{"operations":{"type":"array","items":{"oneOf":[
