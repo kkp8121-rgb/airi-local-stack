@@ -2122,6 +2122,32 @@ SEARCH_IMMEDIATE_ACK = (
     '<|ACT {"emotion":"curious"}|> 응! 바로 찾아볼게. '
     '<|ACT {"emotion":"curious"}|>'
 )
+# marker 모드는 발화 없이 표정 전환만 남긴다.  100인 방송 시뮬레이션에서
+# 고정 "응!"이 모델의 문두 필러와 겹쳐 "응! 응," 이중 구조 19/48턴을
+# 만들었고(2026-08-19 사용자 결정 — C안), 즉시 반응의 실효 가치는 발화가
+# 아니라 Live2D 표정이므로 마커만 보내는 중간 모드를 기본 운영값으로 둔다.
+# 마커 전용 페이로드는 speech proxy에 도달할 문장이 없어 WAV 프리로드
+# 계약과 무관하다.
+LOCAL_IMMEDIATE_ACK_MARKER = '<|ACT {"emotion":"think"}|>'
+SEARCH_IMMEDIATE_ACK_MARKER = '<|ACT {"emotion":"curious"}|>'
+
+
+def configured_immediate_ack(value: object) -> str:
+    """Return the acknowledgement mode: audible (legacy), marker, or off."""
+    mode = str(value or "").strip().lower()
+    return mode if mode in ("audible", "marker", "off") else "audible"
+
+
+IMMEDIATE_ACK_MODE = configured_immediate_ack(os.environ.get("AIRI_IMMEDIATE_ACK"))
+
+
+def immediate_ack_payload(spoken: str, marker: str) -> str:
+    """Pick the acknowledgement for the configured mode; off opens silently."""
+    if IMMEDIATE_ACK_MODE == "audible":
+        return spoken
+    if IMMEDIATE_ACK_MODE == "marker":
+        return marker
+    return ""
 SEARCH_FALLBACK_PREFIX = "검색이 안 돼서 아는 만큼만 말할게."
 SEARCH_UNAVAILABLE_DIALOGUE = "검색 연결이 잠시 안 돼. 다시 한 번 말해줘."
 UPSTREAM_TIMEOUT_DIALOGUE = "답이 너무 늦어서 잠깐 멈췄어. 다시 말해줘."
@@ -6392,7 +6418,7 @@ async def health() -> dict[str, object]:
         # readings must not be interpreted as silence.  Only the branches that
         # answer nobody stay silent, and each response reports its own value
         # in ``X-AIRI-Immediate-Ack``.
-        "immediate_ack": "audible",
+        "immediate_ack": IMMEDIATE_ACK_MODE,
         "chat_model": chat_model_telemetry.health(),
         "system_prompt_overridden": False,
         "active_character_card_merge": True,
@@ -6803,7 +6829,8 @@ async def stream_local_with_ack(
         yield openai_sse_delta(
             context.completion_id,
             context.model,
-            "" if context.proactive_turn else LOCAL_IMMEDIATE_ACK,
+            "" if context.proactive_turn
+            else immediate_ack_payload(LOCAL_IMMEDIATE_ACK, LOCAL_IMMEDIATE_ACK_MARKER),
             include_role=True,
         )
         if context.proactive_turn:
@@ -8460,7 +8487,7 @@ async def proxy(path: str, request: Request):
                     yield openai_sse_delta(
                         completion_id,
                         model,
-                        SEARCH_IMMEDIATE_ACK,
+                        immediate_ack_payload(SEARCH_IMMEDIATE_ACK, SEARCH_IMMEDIATE_ACK_MARKER),
                         include_role=True,
                     )
                     # Keep the stream warm while the search runs so an idle
@@ -8590,7 +8617,7 @@ async def proxy(path: str, request: Request):
             return StreamingResponse(
                 stream_cloud_search(),
                 status_code=200,
-                headers={**immediate_headers, "X-AIRI-Immediate-Ack": "audible"},
+                headers={**immediate_headers, "X-AIRI-Immediate-Ack": IMMEDIATE_ACK_MODE},
                 media_type="text/event-stream",
             )
 
@@ -8704,7 +8731,7 @@ async def proxy(path: str, request: Request):
                 **immediate_headers,
                 # A proactive broadcast answers nobody and opens silently;
                 # every user-driven local turn speaks the acknowledgement.
-                "X-AIRI-Immediate-Ack": "silent" if proactive_turn else "audible",
+                "X-AIRI-Immediate-Ack": "silent" if proactive_turn else IMMEDIATE_ACK_MODE,
             },
             media_type="text/event-stream",
         )

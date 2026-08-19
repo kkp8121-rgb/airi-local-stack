@@ -59,6 +59,15 @@ param(
     # the caller supplies the exact supported mode.
     [ValidateSet('on', 'off')]
     [string]$AffectContinuity = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_AFFECT_CONTINUITY_ENABLED)) { 'off' } else { $env:AIRI_AFFECT_CONTINUITY_ENABLED }),
+    # 선반응 ACK 모드 — 2026-08-19 사용자 결정(C안): 운영 기본은 표정 마커만
+    # 남기는 marker다. audible은 구 동작 롤백용, off는 완전 무반응.
+    [ValidateSet('audible', 'marker', 'off')]
+    [string]$ImmediateAck = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_IMMEDIATE_ACK)) { 'marker' } else { $env:AIRI_IMMEDIATE_ACK }),
+    # 침묵 폴백 문구 풀 — 문구 6종·운영 채택 모두 사용자 승인(2026-08-19).
+    # env 계약이 1/true/yes/on을 받으므로 ValidateSet 대신 본문에서 정규화한다.
+    [string]$SilenceFallbackPool = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_SILENCE_FALLBACK_POOL)) { 'on' } else { $env:AIRI_SILENCE_FALLBACK_POOL }),
+    # 방송 발화 계약 v3 — 파라미터 9행 원안 승인과 함께 운영 ON(2026-08-19).
+    [string]$BroadcastContract = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_BROADCAST_CONTRACT)) { 'on' } else { $env:AIRI_BROADCAST_CONTRACT }),
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
@@ -91,6 +100,9 @@ $OutputModeration = $OutputModeration.ToLowerInvariant()
 if ($OutputModeration -notin @('on', 'off')) {
     throw 'OutputModeration must be on or off. Check the parameter or AIRI_OUTPUT_MODERATION.'
 }
+$onValues = @('on', '1', 'true', 'yes')
+$SilenceFallbackPool = if ($SilenceFallbackPool.Trim().ToLowerInvariant() -in $onValues) { 'on' } else { 'off' }
+$BroadcastContract = if ($BroadcastContract.Trim().ToLowerInvariant() -in $onValues) { 'on' } else { 'off' }
 $InputScreening = $InputScreening.ToLowerInvariant()
 if ($InputScreening -notin @('on', 'off')) {
     throw 'InputScreening must be on or off. Check the parameter or AIRI_INPUT_SCREENING.'
@@ -422,6 +434,9 @@ $memoryEnvironment = @{
     AIRI_EPISTEMIC_CONFIDENCE = $EpistemicConfidence
     AIRI_EPISTEMIC_CONFIDENCE_MODE = 'enforce'
     AIRI_AFFECT_CONTINUITY_ENABLED = $AffectContinuity
+    AIRI_IMMEDIATE_ACK = $ImmediateAck
+    AIRI_SILENCE_FALLBACK_POOL = $SilenceFallbackPool
+    AIRI_BROADCAST_CONTRACT = $BroadcastContract
     AIRI_OLLAMA_KEEP_ALIVE = $OllamaKeepAlive
     AIRI_OLLAMA_TEMPERATURE = $OllamaTemperature.ToString([Globalization.CultureInfo]::InvariantCulture)
     AIRI_OLLAMA_TOP_P = $OllamaTopP.ToString([Globalization.CultureInfo]::InvariantCulture)

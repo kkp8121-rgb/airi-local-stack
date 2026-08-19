@@ -7116,6 +7116,51 @@ class ImmediateAckMetadataTests(unittest.TestCase):
         reported = TestClient(ollama_proxy.app).get("/health").json()
         self.assertEqual(reported["immediate_ack"], "audible")
 
+    def test_marker_mode_keeps_the_expression_and_drops_the_spoken_ack(self) -> None:
+        # 2026-08-19 C안: "응!" 고정 발화가 모델 문두 필러와 겹쳐 "응! 응,"
+        # 이중 구조를 만들었다. marker 모드는 표정 전환만 남긴다.
+        chat = _CapturingChatClient("좋은 아침!")
+        with mock.patch.object(ollama_proxy, "IMMEDIATE_ACK_MODE", "marker"), \
+                mock.patch.object(ollama_proxy, "client", chat):
+            response = post_stream("안녕")
+        content = openai_sse_content(response.text)
+        self.assertEqual(response.headers["X-AIRI-Immediate-Ack"], "marker")
+        self.assertTrue(content.startswith(ollama_proxy.LOCAL_IMMEDIATE_ACK_MARKER), content)
+        self.assertNotIn("응!", content.split("좋은 아침!")[0])
+
+    def test_off_mode_opens_the_stream_with_no_acknowledgement_at_all(self) -> None:
+        chat = _CapturingChatClient("좋은 아침!")
+        with mock.patch.object(ollama_proxy, "IMMEDIATE_ACK_MODE", "off"), \
+                mock.patch.object(ollama_proxy, "client", chat):
+            response = post_stream("안녕")
+        content = openai_sse_content(response.text)
+        self.assertEqual(response.headers["X-AIRI-Immediate-Ack"], "off")
+        self.assertNotIn("응!", content.split("좋은 아침!")[0])
+        self.assertNotIn("<|ACT", content.split("좋은 아침!")[0])
+
+    def test_marker_mode_search_ack_is_expression_only(self) -> None:
+        async def search(user_text: str, query: str) -> tuple[str, float]:
+            return "검색 결과야.", 1.0
+
+        with mock.patch.object(ollama_proxy, "IMMEDIATE_ACK_MODE", "marker"), \
+                mock.patch.object(ollama_proxy, "ALLOW_EXTERNAL_SEARCH", True), \
+                mock.patch.object(ollama_proxy, "run_codex_search", search), \
+                mock.patch.object(ollama_proxy, "client", _StubClient(RuntimeError("unused"))):
+            response = post_stream("음유잉여 검색해줘")
+        content = openai_sse_content(response.text)
+        self.assertEqual(response.headers["X-AIRI-Immediate-Ack"], "marker")
+        self.assertTrue(content.startswith(ollama_proxy.SEARCH_IMMEDIATE_ACK_MARKER), content)
+        self.assertNotIn("바로 찾아볼게", content.split("검색 결과야.")[0])
+
+    def test_immediate_ack_mode_parses_conservatively(self) -> None:
+        for raw, expected in ((None, "audible"), ("", "audible"), ("MARKER", "marker"),
+                              (" off ", "off"), ("audible", "audible"), ("banana", "audible")):
+            self.assertEqual(ollama_proxy.configured_immediate_ack(raw), expected)
+        # 마커 전용 페이로드에는 발화가 없어야 한다 — TTS 프리로드 계약과 무관해지는 근거.
+        for marker in (ollama_proxy.LOCAL_IMMEDIATE_ACK_MARKER, ollama_proxy.SEARCH_IMMEDIATE_ACK_MARKER):
+            import re as _re
+            self.assertEqual(_re.sub(r"<\|ACT [^|]*\|>", "", marker).strip(), "")
+
 
 class AffectContinuityGreyboxTests(unittest.TestCase):
     @staticmethod
