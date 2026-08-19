@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIRI 통합 결정 폼 — 2026-08-19</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#ffffff; --ink:#1c2330; --sub:#5b6472; --line:#e3e6ea;
+          --accent:#3b6ef5; --accent-soft:#eef2ff; --ok:#1a7f4b; --warn:#b25e09; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px 16px 80px; background:var(--bg); color:var(--ink);
+         font-family:'Segoe UI','Malgun Gothic',system-ui,sans-serif; line-height:1.55; }
+  .wrap { max-width:860px; margin:0 auto; }
+  h1 { font-size:1.35rem; margin:0 0 4px; }
+  .lead { color:var(--sub); font-size:.9rem; margin-bottom:20px; }
+  h2 { font-size:1.05rem; margin:34px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--accent); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:14px 16px; margin-bottom:12px; }
+  .card h3 { margin:0 0 6px; font-size:.98rem; }
+  .card h3 .tag { font-size:.72rem; color:var(--accent); background:var(--accent-soft);
+                  border-radius:4px; padding:1px 7px; margin-right:6px; vertical-align:1px; }
+  .desc { font-size:.85rem; color:var(--sub); margin:0 0 10px; }
+  .desc b { color:var(--ink); }
+  .desc code { background:var(--bg); padding:0 4px; border-radius:3px; font-size:.82rem; }
+  label.opt { display:block; padding:7px 10px; margin:4px 0; border:1px solid var(--line);
+              border-radius:7px; cursor:pointer; font-size:.9rem; }
+  label.opt:hover { border-color:var(--accent); }
+  label.opt.checked { border-color:var(--accent); background:var(--accent-soft); }
+  label.opt input { margin-right:8px; }
+  .rec { color:var(--ok); font-size:.78rem; font-weight:600; }
+  input.free { width:100%; margin-top:6px; padding:7px 10px; border:1px solid var(--line);
+               border-radius:7px; font-size:.88rem; font-family:inherit; }
+  table.t { width:100%; border-collapse:collapse; font-size:.83rem; margin:8px 0 10px; }
+  table.t th, table.t td { border:1px solid var(--line); padding:4px 8px; text-align:left; }
+  table.t th { background:var(--bg); font-weight:600; }
+  .toolbar { position:fixed; bottom:0; left:0; right:0; background:var(--card);
+             border-top:1px solid var(--line); padding:10px 16px; display:flex; gap:10px;
+             justify-content:center; box-shadow:0 -2px 10px rgba(0,0,0,.06); }
+  button { padding:9px 22px; border-radius:8px; border:1px solid var(--line); background:var(--card);
+           font-size:.9rem; cursor:pointer; font-family:inherit; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+  button:hover { filter:brightness(.96); }
+  #out { width:100%; height:190px; margin-top:10px; font-family:Consolas,monospace;
+         font-size:.8rem; border:1px solid var(--line); border-radius:8px; padding:10px;
+         display:none; white-space:pre; }
+  .note { font-size:.8rem; color:var(--warn); }
+  .progress { font-size:.85rem; color:var(--sub); align-self:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>AIRI 통합 결정 폼 (2026-08-19)</h1>
+  <p class="lead">로드맵 v3 결정 큐 전체 — 11개 영역·19문항. 선택은 브라우저에 자동 저장됩니다.
+  다 고르신 뒤 하단 <b>[회신 텍스트 만들기]</b> → <b>[복사]</b>해서 채팅에 붙여넣어 주세요.
+  이 폼은 기존 B4c 파라미터 폼(2026-08-18)을 <b>대체</b>합니다.</p>
+
+  <h2>A. 다음 배치 개시 (2)</h2>
+
+  <div class="card" data-q="ack">
+    <h3><span class="tag">A1</span>선반응 ACK "응!" 제거 — 기본 모드 <span class="note">(C안 자체는 확정)</span></h3>
+    <p class="desc">근거: "응! 응," 이중 19/48턴 + 매 턴 동일 오프닝 48/48.
+    ACK의 실효 가치는 발화가 아니라 Live2D 표정 즉시 전환.</p>
+    <label class="opt"><input type="radio" name="ack" value="marker"><b>marker</b> — 표정 마커만 즉시, "응!" 발화 제거 <span class="rec">← 포지 권고</span></label>
+    <label class="opt"><input type="radio" name="ack" value="off"><b>off</b> — 마커까지 완전 제거 (첫 토큰까지 무반응)</label>
+    <label class="opt"><input type="radio" name="ack" value="기타"><b>직접 기입</b><input class="free" name="ack_memo" placeholder="예: 상황별 혼용 등"></label>
+  </div>
+
+  <div class="card" data-q="targets">
+    <h3><span class="tag">A2</span>주 지표 목표치 8종 (§1 제안값)</h3>
+    <table class="t">
+      <tr><th>지표</th><th>기준선(최고 arm)</th><th>제안 목표</th></tr>
+      <tr><td>단답률(5자 이하)</td><td>3/48</td><td>≤3/48 상시</td></tr>
+      <tr><td>주제 앵커 적중</td><td>50%</td><td>≥60%</td></tr>
+      <tr><td>응답 다양성(고유율)</td><td>75%</td><td>≥80%</td></tr>
+      <tr><td>기억 콜백</td><td>1/3</td><td>3/3</td></tr>
+      <tr><td>시청자 사실 활용</td><td>측정 불가</td><td>P1 후 신설</td></tr>
+      <tr><td>여론 집계 발화</td><td>0/6</td><td>≥4/6</td></tr>
+      <tr><td>후원 호명 정확</td><td>0/5</td><td>5/5</td></tr>
+      <tr><td>후원 수신자 정합</td><td>2/5</td><td>5/5</td></tr>
+    </table>
+    <label class="opt"><input type="radio" name="targets" value="승인">제안값 전체 승인 <span class="rec">← 권고 (실측 후 조정 가능)</span></label>
+    <label class="opt"><input type="radio" name="targets" value="수정">일부 수정<input class="free" name="targets_memo" placeholder="예: 앵커 70%로, 다양성 90%로"></label>
+    <label class="opt"><input type="radio" name="targets" value="보류">보류 — 일단 기준선 추적만</label>
+  </div>
+
+  <h2>B. P2 결정론 발화 계층 (3)</h2>
+
+  <div class="card" data-q="thank">
+    <h3><span class="tag">B1</span>thank 렌더러 운영 배선</h3>
+    <p class="desc">렌더러 자체는 완성(B안 <code>{닉네임}, 고마워! {한마디}</code>).
+    근거: 생일 후원 반사 4/4 arm, 호명 0/5(닉네임 줘도 0 — 입력 형식 가설 기각).</p>
+    <label class="opt"><input type="radio" name="thank" value="배선진행">배선 + 비공개 리허설 진행 (운영 ON은 리허설 결과 보고 후 재확인) <span class="rec">← 권고</span></label>
+    <label class="opt"><input type="radio" name="thank" value="보류">보류</label>
+  </div>
+
+  <div class="card" data-q="wave">
+    <h3><span class="tag">B2</span>여론 집계 발화 — 문구 풀</h3>
+    <p class="desc">같은 요청이 임계값(3건) 이상 몰리면 디렉터가 결정론 생산.
+    <code>{주제}</code>는 웨이브 태그 라벨(노래·이름 등). 후보 3종:</p>
+    <p class="desc">① "지금 <b>{주제}</b> 얘기 진짜 많네!"<br>
+    ② "다들 <b>{주제}</b> 궁금하구나?"<br>
+    ③ "<b>{주제}</b> 요청 몰리는 거 봐."</p>
+    <label class="opt"><input type="radio" name="wave" value="원안승인">3종 원안 승인 <span class="rec">← 권고</span></label>
+    <label class="opt"><input type="radio" name="wave" value="수정">문구 수정·추가<input class="free" name="wave_memo" placeholder="수정안 기입"></label>
+    <label class="opt"><input type="radio" name="wave" value="보류">도입 보류</label>
+  </div>
+
+  <div class="card" data-q="memguard">
+    <h3><span class="tag">B3</span>"기억나?" 가드 — 거짓 기억 주장 차단</h3>
+    <p class="desc">회상 근거가 없는데 "응, 기억해"라고 단정하는 문제(시뮬레이션 실측).
+    도입 시 근거 없으면 회피 발화로 대체 — 예: "음… 그건 확실하게 기억 안 나. 다시 알려줄래?"</p>
+    <label class="opt"><input type="radio" name="memguard" value="도입">도입 (예시 문구 포함 승인) <span class="rec">← 권고 (안전 성격)</span></label>
+    <label class="opt"><input type="radio" name="memguard" value="문구재출">도입하되 대체 문구는 후보 시트로 재제출</label>
+    <label class="opt"><input type="radio" name="memguard" value="보류">보류</label>
+  </div>
+
+  <h2>C. B4c 방송 파라미터 9행 <span class="note" style="font-size:.75rem">(기존 08-18 폼 대체)</span></h2>
+  <p class="desc" style="margin-top:-4px">4인 방송 관찰 연구 기반 후보값. 각 행 승인 또는 수정 기입.
+  <button type="button" onclick="approveAllB4c()" style="font-size:.8rem;padding:4px 12px">9행 전체 원안 승인</button></p>
+
+  <div class="card" data-q="b_reaction"><h3><span class="tag">C1</span>리액션 조각 길이</h3>
+    <p class="desc">후보 <b>10~45자</b>(1~3초, 현행 유지) — 4인 공통 지배 구간</p>
+    <label class="opt"><input type="radio" name="b_reaction" value="승인">승인</label>
+    <label class="opt"><input type="radio" name="b_reaction" value="수정">수정<input class="free" name="b_reaction_memo"></label></div>
+  <div class="card" data-q="b_narration"><h3><span class="tag">C2</span>나레이션 블록</h3>
+    <p class="desc">후보 <b>15~60초 + 명분(사연·감상·중계) 필수</b> — 실측 최장 33~59초</p>
+    <label class="opt"><input type="radio" name="b_narration" value="승인">승인</label>
+    <label class="opt"><input type="radio" name="b_narration" value="수정">수정<input class="free" name="b_narration_memo"></label></div>
+  <div class="card" data-q="b_readout"><h3><span class="tag">C3</span>낭독→응답 개시</h3>
+    <p class="desc">후보 <b>≤1.3초</b> — 리제 1.06s·아이네 1.2s 중앙값</p>
+    <label class="opt"><input type="radio" name="b_readout" value="승인">승인</label>
+    <label class="opt"><input type="radio" name="b_readout" value="수정">수정<input class="free" name="b_readout_memo"></label></div>
+  <div class="card" data-q="b_silence"><h3><span class="tag">C4</span>무선언 무음 상한</h3>
+    <p class="desc">후보 <b>10초(보수)~20초</b> — 아이네 27s 최장·30s+ 0회</p>
+    <label class="opt"><input type="radio" name="b_silence" value="승인">승인</label>
+    <label class="opt"><input type="radio" name="b_silence" value="수정">수정<input class="free" name="b_silence_memo"></label></div>
+  <div class="card" data-q="b_absence"><h3><span class="tag">C5</span>이탈 허용</h3>
+    <p class="desc">후보 <b>선언+복귀 대사 시 ~120초</b> — 리제 102s·탬 99.7s 전부 선언부</p>
+    <label class="opt"><input type="radio" name="b_absence" value="승인">승인</label>
+    <label class="opt"><input type="radio" name="b_absence" value="수정">수정<input class="free" name="b_absence_memo"></label></div>
+  <div class="card" data-q="b_namecall"><h3><span class="tag">C6</span>호명 빈도</h3>
+    <p class="desc">후보 <b>후원·특별시만, 시간당 ~10회 이하</b> — 탬 8.3/h 전부 후원</p>
+    <label class="opt"><input type="radio" name="b_namecall" value="승인">승인</label>
+    <label class="opt"><input type="radio" name="b_namecall" value="수정">수정<input class="free" name="b_namecall_memo"></label></div>
+  <div class="card" data-q="b_tagq"><h3><span class="tag">C7</span>태그의문 비율</h3>
+    <p class="desc">후보 <b>발화의 5~10%</b> — 탬 4.7%, 리제 ~50/h</p>
+    <label class="opt"><input type="radio" name="b_tagq" value="승인">승인</label>
+    <label class="opt"><input type="radio" name="b_tagq" value="수정">수정<input class="free" name="b_tagq_memo"></label></div>
+  <div class="card" data-q="b_opening"><h3><span class="tag">C8</span>오프닝</h3>
+    <p class="desc">후보 <b>30초 내</b>(인사+오늘 1줄+개시 신호) — 아이네 17초 실증</p>
+    <label class="opt"><input type="radio" name="b_opening" value="승인">승인</label>
+    <label class="opt"><input type="radio" name="b_opening" value="수정">수정<input class="free" name="b_opening_memo"></label></div>
+  <div class="card" data-q="b_closing"><h3><span class="tag">C9</span>클로징</h3>
+    <p class="desc">후보 <b>다음 약속 포함 1~15분 가변</b> — 아이네 40s ↔ 리제 15분</p>
+    <label class="opt"><input type="radio" name="b_closing" value="승인">승인</label>
+    <label class="opt"><input type="radio" name="b_closing" value="수정">수정<input class="free" name="b_closing_memo"></label></div>
+
+  <h2>D. 운영 ON · 기타 (5)</h2>
+
+  <div class="card" data-q="pool">
+    <h3><span class="tag">D1</span>침묵 폴백 풀 — 런처 운영 ON</h3>
+    <p class="desc">문구 6종은 승인 완료, env 기본 OFF. 실측: 풀 ON 시 폴백 4/3/3/3/3/3 분산·위반 0.</p>
+    <label class="opt"><input type="radio" name="pool" value="ON">런처 기본 ON <span class="rec">← 권고</span></label>
+    <label class="opt"><input type="radio" name="pool" value="OFF유지">OFF 유지 (평가에서만 사용)</label>
+  </div>
+
+  <div class="card" data-q="contract">
+    <h3><span class="tag">D2</span>방송 계약 v3 + 스타일 게이트 — 런처 운영 ON</h3>
+    <p class="desc">실측: 게이트 경로 위반 0·반말 100%, 계약 ON 추가 기여 유효. C절 파라미터 확정과 묶임.</p>
+    <label class="opt"><input type="radio" name="contract" value="ON">런처 기본 ON (C절 확정과 함께) <span class="rec">← 권고</span></label>
+    <label class="opt"><input type="radio" name="contract" value="보류">보류</label>
+  </div>
+
+  <div class="card" data-q="fandom">
+    <h3><span class="tag">D3</span>팬덤명</h3>
+    <label class="opt"><input type="radio" name="fandom" value="유보">유보 지속 ("시청자들" 일반 호칭) <span class="rec">← 현행</span></label>
+    <label class="opt"><input type="radio" name="fandom" value="방송공모">첫 방송에서 시청자 공모 이벤트로</label>
+    <label class="opt"><input type="radio" name="fandom" value="기입">직접 기입<input class="free" name="fandom_memo" placeholder="팬덤명"></label>
+  </div>
+
+  <div class="card" data-q="t05">
+    <h3><span class="tag">D4</span>T-05 한국어 음성 (126번 예비 후보)</h3>
+    <label class="opt"><input type="radio" name="t05" value="샘플요청">샘플 청취 준비 요청 (포지가 준비)</label>
+    <label class="opt"><input type="radio" name="t05" value="현행확정">현행 일본어 참조 음성 유지 확정</label>
+    <label class="opt"><input type="radio" name="t05" value="유보">유보 <span class="rec">← 현행</span></label>
+  </div>
+
+  <div class="card" data-q="deepl">
+    <h3><span class="tag">D5</span>DeepL API 키 회전 (보안 — talkain 구버전 확장에 평문)</h3>
+    <label class="opt"><input type="radio" name="deepl" value="회전완료">회전 완료했음</label>
+    <label class="opt"><input type="radio" name="deepl" value="회전예정">회전 예정 <span class="rec">← 권고</span></label>
+    <label class="opt"><input type="radio" name="deepl" value="보류">보류 (위험 인지함)</label>
+  </div>
+
+  <div class="card">
+    <h3>자유 메모 (선택)</h3>
+    <input class="free" name="global_memo" placeholder="추가 지시·의문 있으면 기입">
+  </div>
+
+  <textarea id="out" readonly></textarea>
+</div>
+
+<div class="toolbar">
+  <span class="progress" id="prog">0 / 19</span>
+  <button class="primary" onclick="buildResult()">회신 텍스트 만들기</button>
+  <button onclick="copyResult()">복사</button>
+  <button onclick="resetAll()">초기화</button>
+</div>
+
+<script>
+const KEY = 'airi-decision-2026-08-19';
+const QUESTIONS = ['ack','targets','thank','wave','memguard',
+  'b_reaction','b_narration','b_readout','b_silence','b_absence','b_namecall','b_tagq','b_opening','b_closing',
+  'pool','contract','fandom','t05','deepl'];
+
+function state() {
+  const s = {};
+  QUESTIONS.forEach(q => {
+    const checked = document.querySelector(`input[name="${q}"]:checked`);
+    if (checked) s[q] = checked.value;
+    const memo = document.querySelector(`input[name="${q}_memo"]`);
+    if (memo && memo.value.trim()) s[q + '_memo'] = memo.value.trim();
+  });
+  const g = document.querySelector('input[name="global_memo"]');
+  if (g && g.value.trim()) s.global_memo = g.value.trim();
+  return s;
+}
+function save() { localStorage.setItem(KEY, JSON.stringify(state())); refresh(); }
+function load() {
+  let s = {};
+  try { s = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
+  QUESTIONS.forEach(q => {
+    if (s[q]) {
+      const el = document.querySelector(`input[name="${q}"][value="${s[q]}"]`);
+      if (el) el.checked = true;
+    }
+    const memo = document.querySelector(`input[name="${q}_memo"]`);
+    if (memo && s[q + '_memo']) memo.value = s[q + '_memo'];
+  });
+  const g = document.querySelector('input[name="global_memo"]');
+  if (g && s.global_memo) g.value = s.global_memo;
+  refresh();
+}
+function refresh() {
+  document.querySelectorAll('label.opt').forEach(l => {
+    const input = l.querySelector('input[type="radio"]');
+    l.classList.toggle('checked', !!(input && input.checked));
+  });
+  const done = QUESTIONS.filter(q => document.querySelector(`input[name="${q}"]:checked`)).length;
+  document.getElementById('prog').textContent = done + ' / ' + QUESTIONS.length;
+}
+function approveAllB4c() {
+  QUESTIONS.filter(q => q.startsWith('b_')).forEach(q => {
+    const el = document.querySelector(`input[name="${q}"][value="승인"]`);
+    if (el) el.checked = true;
+  });
+  save();
+}
+function buildResult() {
+  const s = state();
+  const missing = QUESTIONS.filter(q => !s[q]);
+  const lines = ['[AIRI 결정 회신 2026-08-19]'];
+  const label = q => s[q] + (s[q + '_memo'] ? ` (${s[q + '_memo']})` : '');
+  ['ack','targets','thank','wave','memguard'].forEach(q => { if (s[q]) lines.push(q + '=' + label(q)); });
+  const b4c = QUESTIONS.filter(q => q.startsWith('b_') && s[q])
+    .map(q => q.replace('b_', '') + ':' + label(q));
+  if (b4c.length) lines.push('b4c=' + b4c.join(', '));
+  ['pool','contract','fandom','t05','deepl'].forEach(q => { if (s[q]) lines.push(q + '=' + label(q)); });
+  if (s.global_memo) lines.push('메모=' + s.global_memo);
+  if (missing.length) lines.push('(미선택: ' + missing.join(', ') + ')');
+  const out = document.getElementById('out');
+  out.style.display = 'block';
+  out.value = lines.join('\n');
+}
+function copyResult() {
+  const out = document.getElementById('out');
+  if (out.style.display === 'none' || !out.value) buildResult();
+  out.focus(); out.select();
+  try { navigator.clipboard.writeText(out.value); } catch (e) { document.execCommand('copy'); }
+}
+function resetAll() {
+  if (!confirm('모든 선택을 지울까요?')) return;
+  localStorage.removeItem(KEY);
+  document.querySelectorAll('input[type="radio"]').forEach(el => el.checked = false);
+  document.querySelectorAll('input.free').forEach(el => el.value = '');
+  document.getElementById('out').style.display = 'none';
+  refresh();
+}
+document.addEventListener('change', save);
+document.addEventListener('input', e => { if (e.target.classList.contains('free')) save(); });
+load();
+</script>
+</body>
+</html>
