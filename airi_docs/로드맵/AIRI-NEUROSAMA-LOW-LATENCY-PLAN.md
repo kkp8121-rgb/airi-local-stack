@@ -1,5 +1,8 @@
 # AIRI 저지연 한국어 AI 버튜버 개발 계획 (v2.1)
 
+> **[2026-08-19 v3 개편]** 이 문서는 부속 계획이다. 우선순위·지표·다음 작업은
+> `AIRI-ROADMAP-STATUS.md`(v3)가 최상위 SSoT이며, 충돌 시 그쪽이 우선한다.
+
 - 작성 기준일: 2026-08-06 (v2 코드 실측 반영 → v2.1 후보 D·기억 계층 추가)
 - 개정일: 2026-08-12 — 모델 중립 개정. 로컬 LLM을 EXAONE 고유명으로 고정하던 표기를 현행 SSoT 모델 참조로 치환했다(지연 예산 산술·Phase 정의·게이트 구조는 원문 유지). 개정 전 원본은 `아카이브/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-pre-midm.md`에 보존돼 있다.
 - 기반 LLM 표기 원칙: 로컬 LLM은 프록시 `resolve_chat_model()`(env `AIRI_CHAT_MODEL`)이 결정하는 **현행 SSoT 모델**로 참조한다 — 2026-08-12 기준 `midm-airi:2.0-mini`, 롤백 태그 `exaone-airi:2.4b`.

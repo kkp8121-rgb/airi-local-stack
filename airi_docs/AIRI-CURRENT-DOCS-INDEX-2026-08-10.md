@@ -1,6 +1,7 @@
 # AIRI Documentation Index
 
-최종 현행화 2026-08-18 (클로드 PC).
+최종 현행화 2026-08-19 (클로드 PC — 로드맵 v3 개편 + 레거시 정리:
+이동 22건 전부 `git mv`, 삭제 0건. 이동 사유는 각 항목 끝에 병기).
 
 문서는 상태별 폴더로 분류한다 (2026-08-12 재구성). 파일명은 유지했으므로
 과거 문서가 언급하는 파일은 이름으로 검색하면 찾을 수 있다.
@@ -11,7 +12,7 @@
 |---|---|---|
 | `진행중/` | 현행 계약·미해결 게이트가 남은 문서 | 여기 있는 문서의 주장은 현재 브랜치 상태로 취급한다 |
 | `진행예정/` | 승인됐거나 제안된 계획 (미실행 분량 존재) | 착수 전 반드시 정독 |
-| `로드맵/` | 전체 로드맵 지도 (방향 문서 3종 + 현황판) | **매 작업 배치마다 `AIRI-ROADMAP-STATUS.md` 갱신 의무** — 상태 폴더와 별개로 관리 |
+| `로드맵/` | 전체 로드맵 지도 (v3 현황판 + 로그 + 부속 3종) | **매 작업 배치마다 `AIRI-ROADMAP-LOG.md` 기록 의무** — STATUS 본문은 상태 변화 시에만 수정 |
 | `완료/` | 완료된 작업의 유효한 증거 기록 (실측·감사·구현 설계) | 수치 인용 가능. 단 이후 변경으로 stale해질 수 있으니 날짜 확인 |
 | `보류/` | 명시적으로 보류된 작업 흐름의 기록 | 재개 조건이 각 문서 또는 아래에 명시됨 |
 | `아카이브/` | 대체·과거 기록 | 현재 상태 검증에 사용 금지 (과거 해시·테스트 총계 포함) |
@@ -20,47 +21,10 @@
 
 ## 진행중 — 현행 계약
 
-- `AIRI-ADDRESSEE-CONTRACT-TEST-REVIEW-2026-08-18.md` — B4c 계약 addressee
-  실측 검토본(검토 PC 로컬 CPU, 296건, OFF/v2 ON/v3 ON). 지연은 방송
-  비대표이며 품질(마커) 축 전용, 인간 검수 대체 아님.
-- `AIRI-BROADCAST-SIMULATION-OUTPUT-REVIEW-2026-08-15.md` — 가상 방송 응답
-  원문 검토본(2026-08-14 raw 원격 비스트리밍 시뮬레이션). 11435 스타일
-  게이트·TTS 미개입이며 승인형 실제 라이브 캠페인이 아니다.
-- `AIRI-LONG-CHAT-TEST-DECISION-BRIEF-2026-08-15.md` — 장시간 방송 채팅
-  테스트 판단서. 기반 구현·Mi:dm 출력 경계는 조건부 승인이나 실제 장시간
-  채팅 실증은 0%로 epistemic/B4c 운영 ON은 계속 채택 금지.
-- `AIRI-MIDM-MOTIF-NATIVE-BROADCAST-RERUN-2026-08-14.md` — Mi:dm–Motif
-  native 방송 재실행. 이전 Motif 결론은 방법론 결함(EOS override·기존
-  대화 유래 fixture)으로 무효화 후 대체했으며 사람 점수·최종 승자는 보류.
-- `AIRI-LOCAL-LLM-CANDIDATE-AB-RESULT-2026-08-14.md` — 여섯 후보 exact
-  provenance, P0–P7 실제 실행, 방송 지능 리허설, foreground 결정과 검토-PC
-  인간 packet SSoT.
-- `AIRI-LOCAL-LLM-CANDIDATE-DIALOGUE-REVIEW-2026-08-14.md` — P6 실제 대화
-  140 turn과 common 방송 지능 리허설 60 prompt/response를 모델명으로 대조하는
-  UTF-8 원문 검토 자료. 로컬 실행·보존 경계와 빈 응답도 함께 고정한다.
-- `AIRI-NEXT-SESSION-HANDOFF-2026-08-13.md` — 최신 세션 진입점. B3-c/d의
-  정확한 완료 경계, Motif-2.6B v1.1-LC 평가 후보 승격 결정, 라이선스 표시·
-  `trust_remote_code` 보안 경계, 8 GB prove-or-stop 평가 순서와 금지 작업을
-  고정한다.
-- `AIRI-REVIEW-PC-HANDOFF-2026-08-13.md` — 검토 브랜치의 정확한 완료·미완료,
-  설치 AIRI 실기와 offline simulation의 경계, CI runner-allocation 실패, 검토
-  우선순위를 한곳에 고정한 review PC 인수 문서.
-- `AIRI-FINAL-HANDOFF-2026-08-10.md` — 패치·sender 계약과 검증 경계.
-- `AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md` — 취소·상관·
-  재생 시작 증명의 권위 문서.
-- `AIRI-GROUNDED-DIALOGUE-QUALITY-HANDOFF-2026-08-12.md` — 그라운딩 품질
-  후속 계약.
-- `AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md` — EXAONE→Mi:dm 전환 분석.
-  게이트 중 model SSoT 강제·eval provenance·ACK metadata·digest pin은
-  2026-08-12 코드·dev PC 실기 해소 완료(commit `932eae6`). 설치 Electron
-  matched 모델 A/B와 장문 context/memory/card 합성 비교도 완료했다. 장문
-  exact는 EXAONE 3/12, Mi:dm 0/12로 양 모델 FAIL이다. **남은 게이트**:
-  인간 검수 100건과 장문 회귀 개선.
-- `AIRI-DEV-PC-HANDOFF-2026-08-12.md` — **검토 PC 선행 작업 배치의
-  인수인계.** SSoT·I1 후보 실측 및 B3 배선 3종은 완료했지만 extraction은
-  통과 후보 부재로 off다. B0-1 offline 측정 코어는 완료됐으나 live quota 판정은
-  API key/OAuth/quota/project/test-broadcast 승인 및 수동 Cloud Console 실측 전
-  NOT COMPLETE다. 활성 추출 MEM-04, 사람·자격증명 게이트 등 잔여 작업을 관리한다.
+- `AIRI-BROADCAST-SIM-REVIEW-2026-08-18.md` — 100인 시청자 방송 시뮬레이션
+  원문 검토 packet(기억 3-arm + named 변형). 수치 요약·판단은
+  `완료/AIRI-BROADCAST-SIM-3ARM-2026-08-18.md`. 결정 큐 1~3(thank 배선·
+  여론 집계·기억나 가드)의 근거 원문.
 - `AIRI-CLOUD-CHAT-LATENCY-MEASUREMENT-2026-08-12.md` — cloud streaming
   latency 하네스·테스트와 live TTFT 보류(API key·외부 승인) 현황.
 - `AIRI-LOCAL-TECH-SPECS.md` — 현행 스펙 문서. 2026-08-12 갱신 완료
@@ -69,15 +33,6 @@
 
 ## 진행예정 — 계획
 
-- `AIRI-THANK-RENDERER-CANDIDATE-SHEET-2026-08-18.md` — 후원 감사(thank)
-  고정 렌더러 운영 후보 시트. B안(호명+한마디 슬롯) 사용자 채택 완료
-  (2026-08-18)이나 운영 ON은 B4b 어댑터·비공개 리허설 이후 별도 승인.
-- `AIRI-DECISION-FORM-2026-08-18.html` — 사용자 결정 입력용 HTML 폼
-  (2026-08-18). 배치 결정 사항을 체크박스형으로 정리해 제시한 산출물.
-- `AIRI-G1A-CORRECTION-WORDING-DECISION-2026-08-17.md` — A4.3의 8개 synthetic
-  correction 장면을 최후 fallback과 정상 캐릭터 발화 목표로 나눈 사용자 검토 시트.
-  2026-08-17 권장 표현 원칙은 승인됐고 A4.6 evaluator 계약에 반영했지만 exact 운영
-  대사·runtime/TTS 배선·운영 ON 채택은 아니다.
 - `AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md` — G1a 감정·
   캐릭터 연속성 엔진 상세 계획. 공개 MIT/Apache 프로젝트의 bounded affect,
   event-sourced reducer, memory-layer 패턴만 인용하고 repo-native typed reducer를
@@ -96,10 +51,6 @@
   prepublication policy와 retry-vs-fallback fake-transport attempt ledger로 고정했지만
   성공은 비공개 구조 검토 eligibility로만 분류한다. live/model 실행과 운영 배선은 없어
   품질 gate는 계속 FAIL/OFF다.
-- `AIRI-CHARACTER-CONSTITUTION-V2-DECISION-2026-08-16.md` — G1a A0 사용자
-  결정 시트. 기존 확정 정체성·말투·안전 경계와 미정 likes/dislikes/pride/
-  embarrassment/conflict/repair/fatigue 및 metric threshold 선택지를 분리한다.
-  문서 작성은 승인이나 운영값 채택을 뜻하지 않는다.
 - `AIRI-KOREAN-LIVE-CHAT-REPLAY-PLAN-2026-08-15.md` — G3/C0·M3의
   실제 한국 방송 채팅 흐름 평가 계획. 탬탬버린·아카네 리제·아이네의 공개
   채널을 관찰 대상으로 삼되 공식 권한 없는 수집은 금지한다. 승인된 비공개
@@ -107,28 +58,23 @@
   replay하고,
   원문은 git·일반 report·학습 데이터에 넣지 않는다. privacy replay 기반은
   구현됐고 실제 캡처·Mi:dm OFF/ON 실측은 권한 대기다.
-- `AIRI-LOCAL-LLM-CANDIDATE-AB-PLAN-2026-08-13.md` — 즉시 착수하는
-  G3/C0 최우선 배치. Mi:dm 대조군과 Motif·Ministral·Qwen3·Phi-4-mini·
-  Granite 전 후보에 대해 모델별 공식 사용법 manifest, official-native와
-  AIRI-common 이중 profile, raw/context/persona/proxy/인간 검수/full-stack
-  동일 조건 평가를 정의한다.
 - `AIRI-BROADCAST-CHARACTER-PLAN-2026-08-12.md` — 지능·캐릭터성·방송 통합
   계획. 사용자 결정 중 1·3·4 확정, 2 조건부. 결정 3은 정식 팬덤명 유보·
   일반 호칭 “시청자들” 사용, T-05 126번 예비 후보 보존·현행 음성 유지다.
   근거는
   `참조/AIRI-BROADCAST-RESEARCH-2026-08-12.md`.
-- `AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md` — C1 캐릭터 헌법
-  초안 v5. **결정 1·3 반영(2026-08-12), 코드 미반영**. 정체성(이름 AIRI
-  확정)·가치관·말버릇 후보·관계 규정(안 B 채택 + 메타 서사 "사장님"
-  절)·리액션 톤 3단계를 포함하며, `AIRI_SYSTEM_PROMPT`를 대체하지 않고
-  확장한다. 정식 팬덤명은 유보하고 “시청자들”을 일반 호칭으로 사용한다.
-  남은 확정: 인간 검수.
+- `AIRI-B4C-PARAM-DECISION-FORM-2026-08-18.html` — B4c 파라미터 확정
+  9항목 사용자 결정 입력용 HTML 폼. **회신 대기** (결정 큐 4).
 
 ## 로드맵 — 지도와 현황판 (상태 폴더와 별개 관리)
 
-- `AIRI-ROADMAP-STATUS.md` — **살아있는 현황판.** G0~G6(G1a 포함)·C0~C5·지연·M1~M5
-  전 축의 상태와 근거, 사용자 결정 차단 지점, 배치별 갱신 로그.
-  **매 작업 배치 커밋마다 갱신 의무** (검토 PC·dev PC 공통).
+- `AIRI-ROADMAP-STATUS.md` — **최상위 SSoT (v3, 2026-08-19 전면 개편).**
+  북극성=방송 품질(발화 실질 더하기 지표), 돌파 3축(P1 쇼 러너 브리핑 /
+  P2 결정론 발화 계층 / P3 조건부 생성 상한), 기존 트랙 매핑, 사용자
+  결정 큐. 부속 문서와 충돌 시 이 문서가 우선한다. v2 원문은
+  `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`.
+- `AIRI-ROADMAP-LOG.md` — 배치별 갱신 로그(최신이 위). **매 배치 커밋마다
+  이 파일에 기록 의무** (STATUS 본문은 상태 변화 시에만 수정).
 - `AIRI-GROWTH-STRATEGY.md` — **사용자 승인 방향.**
   G0~G6 성장 로드맵 정의 (G1/G1a 캐릭터·감정 연속성 루프 → G2 장기 기억 → G3 평가
   플라이휠 → G4 파인튜닝 → G5 자발 행동·방송 디렉터 → G6 게임 에이전트).
@@ -143,6 +89,56 @@
   `아카이브/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-pre-midm.md`.
 
 ## 완료 — 유효한 증거 기록 (최신순)
+
+- `AIRI-BROADCAST-SIM-3ARM-2026-08-18.md` — 100인 시청자 첫 방송
+  시뮬레이션 기억 3-arm 실측. 기억 ON이 창밖(22턴 전) 사실 회상 성공,
+  생일 후원 반사 4/4 arm·여론 집계 0/6·호명 0/5(닉네임 줘도 0) 재현.
+  로드맵 v3 개편의 실측 근거.
+- `AIRI-EMBEDDING-AB-KURE-BGEM3-2026-08-18.md` — 임베딩 A/B(신규 48문서
+  /24질의 한국어 셋). KURE-v1 vs BGE-M3 구분 불가(1문항 차) — 교체 없음.
+- `AIRI-QWEN3-8B-EXTRACTION-GATE-2026-08-18.md` — Qwen3-8B full balanced
+  FAIL(스모크는 PASS). 2.4B/4B/8B 3점 계열 대조로 recall 정체 실증 —
+  다음 수순은 모델 확대가 아니라 Stage A 재설계.
+- `AIRI-JOURNAL-RECALL-BM25-2026-08-18.md` — journal recall 완전일치
+  재점수 결함 수리(FTS5 bm25 도입, 접두 후보 복구, 최근성 계약 불변).
+- `AIRI-A42-THANK-CALLOUT-RENDERER-2026-08-18.md` — thank 렌더러 B안
+  구현(default-inert callout_context, v1 오라클 무수정+사이드카).
+  운영 배선(P2-1)은 별도.
+
+### 2026-08-19 정리로 이동해 온 결정·증거 기록
+
+- `AIRI-MODEL-LLM-CHANGE-ANALYSIS-2026-08-12.md` — EXAONE→Mi:dm 전환 분석.
+  게이트 중 model SSoT 강제·eval provenance·ACK metadata·digest pin은
+  2026-08-12 코드·dev PC 실기 해소 완료(commit `932eae6`). 설치 Electron
+  matched 모델 A/B와 장문 context/memory/card 합성 비교도 완료했다. 장문
+  exact는 EXAONE 3/12, Mi:dm 0/12로 양 모델 FAIL이다. **남은 게이트**:
+  인간 검수 100건과 장문 회귀 개선.
+- `AIRI-LOCAL-LLM-CANDIDATE-AB-RESULT-2026-08-14.md` — 여섯 후보 exact
+  provenance, P0–P7 실제 실행, 방송 지능 리허설, foreground 결정과 검토-PC
+  인간 packet SSoT.
+- `AIRI-LOCAL-LLM-CANDIDATE-DIALOGUE-REVIEW-2026-08-14.md` — P6 실제 대화
+  140 turn과 common 방송 지능 리허설 60 prompt/response를 모델명으로 대조하는
+  UTF-8 원문 검토 자료. 로컬 실행·보존 경계와 빈 응답도 함께 고정한다.
+- `AIRI-MIDM-MOTIF-NATIVE-BROADCAST-RERUN-2026-08-14.md` — Mi:dm–Motif
+  native 방송 재실행. 이전 Motif 결론은 방법론 결함(EOS override·기존
+  대화 유래 fixture)으로 무효화 후 대체했으며 사람 점수·최종 승자는 보류.
+- `AIRI-ADDRESSEE-CONTRACT-TEST-REVIEW-2026-08-18.md` — B4c 계약 addressee
+  실측 검토본(검토 PC 로컬 CPU, 296건, OFF/v2 ON/v3 ON). 지연은 방송
+  비대표이며 품질(마커) 축 전용, 인간 검수 대체 아님.
+- `AIRI-LONG-CHAT-TEST-DECISION-BRIEF-2026-08-15.md` — 장시간 방송 채팅
+  테스트 판단서. 기반 구현·Mi:dm 출력 경계는 조건부 승인이나 실제 장시간
+  채팅 실증은 0%로 epistemic/B4c 운영 ON은 계속 채택 금지.
+- `AIRI-THANK-RENDERER-CANDIDATE-SHEET-2026-08-18.md` — 후원 감사(thank)
+  고정 렌더러 운영 후보 시트. B안(호명+한마디 슬롯) 사용자 채택 완료
+  (2026-08-18)이나 운영 ON은 B4b 어댑터·비공개 리허설 이후 별도 승인.
+- `AIRI-CHARACTER-CONSTITUTION-V2-DECISION-2026-08-16.md` — G1a A0 사용자
+  결정 시트. 기존 확정 정체성·말투·안전 경계와 미정 likes/dislikes/pride/
+  embarrassment/conflict/repair/fatigue 및 metric threshold 선택지를 분리한다.
+  문서 작성은 승인이나 운영값 채택을 뜻하지 않는다.
+- `AIRI-G1A-CORRECTION-WORDING-DECISION-2026-08-17.md` — A4.3의 8개 synthetic
+  correction 장면을 최후 fallback과 정상 캐릭터 발화 목표로 나눈 사용자 검토 시트.
+  2026-08-17 권장 표현 원칙은 승인됐고 A4.6 evaluator 계약에 반영했지만 exact 운영
+  대사·runtime/TTS 배선·운영 ON 채택은 아니다.
 
 - `AIRI-B4C-GATE-PATH-AB-2026-08-18.md` — B4c 방송 발화 계약의 첫 게이트
   경로(11435 스타일 게이트 경유, 검토 PC 로컬) 실측. 사용자 결정 sim_2로
@@ -433,6 +429,9 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 
 ## 참조
 
+- `AIRI-MEMORY-TECH-RESEARCH-2026-08-18.md` — 장기기억 기술 3트랙
+  리서치 종합(학술·OSS 20여종·자체 레포). 결론: 교체 없음 + 선별 차용,
+  실행 로드맵 5단계. Qwen3-8B·임베딩 A/B 실측으로 일부 정정 반영됨.
 - `AIRI-BROADCAST-OBSERVATION-STUDY-2026-08-14.md` — 저스트챗 방송 방식
   관찰 연구 (사용자 지정 4인 트랜스크립트 1차 실측). 공통 패턴 10종·차이
   스펙트럼·기존 설계 수정 지점 7건·B4c 파라미터 후보. 2차 자료 기반이던
@@ -455,6 +454,49 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
   아카이브의 과거 SHA-256은 현재 설치본 판정에 사용하지 말 것.
 - `아카이브/AIRI-NARRATIVE-CHECKPOINT-2026-08-09.md` — AIRI 고유 서사
   (signal garden 등) 결정 기록. 캐릭터 헌법(C1) 작업 시 참조.
+
+
+### 2026-08-19 정리 이동분 (소화된 인계·체크포인트·소진 계획)
+
+전부 소화 완료(인계 이행·결정 반영·계획 실행)로 판정해 이동했다.
+루트에서 이동: `AIRI-LOCAL-TECH-SPECS-2026-08-07-root.md`(구본 중복 —
+현행은 `진행중/AIRI-LOCAL-TECH-SPECS.md`), `AIRI-VOICE-INPUT-ISSUE-2026-08-05.md`,
+`airi-setup-codex-2026-08-04.md`. 로드맵 v2 원문:
+`AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`.
+
+- `AIRI-FINAL-HANDOFF-2026-08-10.md` — 패치·sender 계약과 검증 경계.
+- `AIRI-NEXT-SESSION-HANDOFF-2026-08-13.md` — 최신 세션 진입점. B3-c/d의
+  정확한 완료 경계, Motif-2.6B v1.1-LC 평가 후보 승격 결정, 라이선스 표시·
+  `trust_remote_code` 보안 경계, 8 GB prove-or-stop 평가 순서와 금지 작업을
+  고정한다.
+- `AIRI-REVIEW-PC-HANDOFF-2026-08-13.md` — 검토 브랜치의 정확한 완료·미완료,
+  설치 AIRI 실기와 offline simulation의 경계, CI runner-allocation 실패, 검토
+  우선순위를 한곳에 고정한 review PC 인수 문서.
+- `AIRI-DEV-PC-HANDOFF-2026-08-12.md` — **검토 PC 선행 작업 배치의
+  인수인계.** SSoT·I1 후보 실측 및 B3 배선 3종은 완료했지만 extraction은
+  통과 후보 부재로 off다. B0-1 offline 측정 코어는 완료됐으나 live quota 판정은
+  API key/OAuth/quota/project/test-broadcast 승인 및 수동 Cloud Console 실측 전
+  NOT COMPLETE다. 활성 추출 MEM-04, 사람·자격증명 게이트 등 잔여 작업을 관리한다.
+- `AIRI-SERVER-CHANNEL-PLAYBACK-CHECKPOINT-2026-08-10.md` — 취소·상관·
+  재생 시작 증명의 권위 문서.
+- `AIRI-GROUNDED-DIALOGUE-QUALITY-HANDOFF-2026-08-12.md` — 그라운딩 품질
+  후속 계약.
+- `AIRI-BROADCAST-SIMULATION-OUTPUT-REVIEW-2026-08-15.md` — 가상 방송 응답
+  원문 검토본(2026-08-14 raw 원격 비스트리밍 시뮬레이션). 11435 스타일
+  게이트·TTS 미개입이며 승인형 실제 라이브 캠페인이 아니다.
+- `AIRI-DECISION-FORM-2026-08-18.html` — 사용자 결정 입력용 HTML 폼
+  (2026-08-18). 배치 결정 사항을 체크박스형으로 정리해 제시한 산출물.
+- `AIRI-CHARACTER-CONSTITUTION-DRAFT-2026-08-12.md` — C1 캐릭터 헌법
+  초안 v5. **결정 1·3 반영(2026-08-12), 코드 미반영**. 정체성(이름 AIRI
+  확정)·가치관·말버릇 후보·관계 규정(안 B 채택 + 메타 서사 "사장님"
+  절)·리액션 톤 3단계를 포함하며, `AIRI_SYSTEM_PROMPT`를 대체하지 않고
+  확장한다. 정식 팬덤명은 유보하고 “시청자들”을 일반 호칭으로 사용한다.
+  남은 확정: 인간 검수.
+- `AIRI-LOCAL-LLM-CANDIDATE-AB-PLAN-2026-08-13.md` — 즉시 착수하는
+  G3/C0 최우선 배치. Mi:dm 대조군과 Motif·Ministral·Qwen3·Phi-4-mini·
+  Granite 전 후보에 대해 모델별 공식 사용법 manifest, official-native와
+  AIRI-common 이중 profile, raw/context/persona/proxy/인간 검수/full-stack
+  동일 조건 평가를 정의한다.
 
 ## patches/ — 런타임 패치 계약 (이동 금지)
 

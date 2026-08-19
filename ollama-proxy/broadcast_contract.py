@@ -93,7 +93,7 @@ BROADCAST_CONTRACT_PARAMS: dict[str, dict[str, object]] = {
         ],
         "reviewed_failure_types": 4,
         "source": (
-            "인간 검토 — airi_docs/진행중/AIRI-BROADCAST-SIMULATION-OUTPUT-REVIEW-2026-08-15.md "
+            "인간 검토 — airi_docs/아카이브/AIRI-BROADCAST-SIMULATION-OUTPUT-REVIEW-2026-08-15.md "
             "본문·부록 원문에서 수신자 인지 실패 4유형 확인 "
             "(수신 반전 dn04·a22·a19·rx04 / 행위 주체 반전 a05·a15·tk05·tk03·gr01 / "
             "상황·자기 존재 인지 실패 b01·sp02·b19 / 역방향 오귀속 b23). "
