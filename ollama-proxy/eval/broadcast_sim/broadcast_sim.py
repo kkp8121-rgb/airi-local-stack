@@ -286,7 +286,67 @@ def _tokens(text: str) -> set[str]:
     return {token for token in re.findall(r"[0-9a-z가-힣]+", (text or "").lower()) if len(token) >= 2}
 
 
-AGGREGATE_MARKERS = ("다들", "여러", "많이", "다 같이", "모두", "전부", "너희", "여기저기")
+# 승인된 집계 오프너 풀(2026-08-19)의 표지어 "많네"·"몰리"를 포함한다.
+AGGREGATE_MARKERS = ("다들", "여러", "많이", "다 같이", "모두", "전부", "너희", "여기저기", "많네", "몰리")
+
+
+def build_turn_briefing(
+    fixture: dict[str, Any],
+    stream: dict[str, Any],
+    pick: dict[str, Any],
+    prior_picks: Sequence[dict[str, Any]],
+) -> str:
+    """Assemble the show-runner briefing for one turn — deterministic, zero LLM calls.
+
+    Everything here is information the director already holds at pickup time:
+    what this viewer said earlier in the broadcast, what AIRI just answered,
+    how the backlog leans, and any donation still in the air. This is the P1
+    counterpart of the seeded-arm measurement: the model talks when its context
+    holds material, so the director's job is to put material there every turn.
+    """
+    config = fixture.get("briefing") or {}
+    max_viewer_lines = int(config.get("max_viewer_lines", 2))
+    max_recent_picks = int(config.get("max_recent_picks", 2))
+    max_line_chars = int(config.get("max_line_chars", 40))
+    donation_window_ms = int(config.get("recent_donation_window_ms", 120_000))
+
+    message = pick["message"]
+    clip = lambda text: text if len(text) <= max_line_chars else text[: max_line_chars - 1] + "…"
+    lines = ["[턴 브리핑 — 방송 스태프가 주는 메모야. 자연스럽게 참고만 해.]"]
+
+    earlier = [item for item in stream["messages"]
+               if item["author"] == message["author"] and item["t_ms"] < message["t_ms"]]
+    lines.append(f"- 지금 말한 시청자: {message['author']}"
+                 + (f" (이번 방송 {len(earlier) + 1}번째 발언)" if earlier else " (첫 발언)"))
+    for item in earlier[-max_viewer_lines:]:
+        lines.append(f"- 이 시청자가 아까 한 말: \"{clip(item['text'])}\"")
+
+    for prior in list(prior_picks)[-max_recent_picks:]:
+        prior_message = prior["message"]
+        response = (prior.get("response") or "").strip()
+        flow = f"- 방금 흐름: {prior_message['author']} \"{clip(prior_message['text'])}\""
+        if response:
+            flow += f" → 나: \"{clip(response)}\""
+        lines.append(flow)
+
+    backlog_ids = set(pick.get("backlog_ids") or [])
+    if backlog_ids:
+        by_id = {item["id"]: item for item in stream["messages"]}
+        tags: dict[str, int] = {}
+        for backlog_id in backlog_ids:
+            tag = by_id.get(backlog_id, {}).get("tag")
+            if tag:
+                tags[tag] = tags.get(tag, 0) + 1
+        labels = {wave["tag"]: wave.get("label", wave["tag"]) for wave in fixture.get("opinion_waves", [])}
+        wave_note = "".join(f", {labels.get(tag, tag)} 요청 {count}건" for tag, count in sorted(tags.items()))
+        lines.append(f"- 대기 채팅 {len(backlog_ids)}건{wave_note}")
+
+    for prior in reversed(list(prior_picks)):
+        prior_message = prior["message"]
+        if prior_message["kind"] == "donation" and message["t_ms"] - prior_message["t_ms"] <= donation_window_ms:
+            lines.append(f"- 직전 후원: {prior_message['author']} \"{clip(prior_message['text'])}\"")
+            break
+    return "\n".join(lines)
 
 
 def offtopic_terms(fixture: dict[str, Any]) -> set[str]:

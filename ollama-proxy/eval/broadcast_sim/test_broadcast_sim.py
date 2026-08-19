@@ -183,6 +183,61 @@ class PickupTests(unittest.TestCase):
                          [pick["message"]["id"] for pick in full[:5]])
 
 
+class BriefingTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.fixture = sim.load_fixture()
+        self.stream = sim.generate_stream(self.fixture, seed=20260818)
+        self.picks = sim.plan_pickups(self.stream, self.fixture)
+
+    def test_briefing_is_deterministic_and_carries_the_viewer_history(self) -> None:
+        # 같은 시청자의 두 번째 이후 픽업을 찾아 그 사람의 과거 발언이 실리는지 본다.
+        seen: dict[str, dict] = {}
+        target = None
+        for pick in self.picks:
+            author = pick["message"]["author"]
+            if author in seen:
+                target = pick
+                break
+            seen[author] = pick
+        assert target is not None
+        prior = [{**pick, "response": "응답"} for pick in self.picks[: target["turn_index"] - 1]]
+        briefing = sim.build_turn_briefing(self.fixture, self.stream, target, prior)
+        again = sim.build_turn_briefing(self.fixture, self.stream, target, prior)
+        self.assertEqual(briefing, again)
+        self.assertIn(target["message"]["author"], briefing)
+        self.assertIn("이 시청자가 아까 한 말", briefing)
+        self.assertIn("방금 흐름", briefing)
+        config = self.fixture["briefing"]
+        self.assertLessEqual(briefing.count("이 시청자가 아까 한 말"), config["max_viewer_lines"])
+        self.assertLessEqual(briefing.count("방금 흐름"), config["max_recent_picks"])
+
+    def test_briefing_reports_wave_pressure_from_the_backlog(self) -> None:
+        wave_pick = next(pick for pick in self.picks
+                         if pick["effective_kind"] == "opinion" and pick["backlog_ids"])
+        briefing = sim.build_turn_briefing(self.fixture, self.stream, wave_pick, [])
+        self.assertIn("대기 채팅", briefing)
+        labels = [wave.get("label") for wave in self.fixture["opinion_waves"]]
+        self.assertTrue(any(f"{label} 요청" in briefing for label in labels), briefing)
+
+    def test_briefing_surfaces_a_recent_donation(self) -> None:
+        donation_pick = next(pick for pick in self.picks if pick["effective_kind"] == "donation")
+        index = donation_pick["turn_index"]
+        following = next(pick for pick in self.picks if pick["turn_index"] > index)
+        prior = [{**pick, "response": "응답"} for pick in self.picks[: following["turn_index"] - 1]]
+        briefing = sim.build_turn_briefing(self.fixture, self.stream, following, prior)
+        self.assertIn("직전 후원", briefing)
+
+    def test_briefing_clips_lines_to_the_configured_budget(self) -> None:
+        config = self.fixture["briefing"]
+        pick = self.picks[5]
+        prior = [{**earlier, "response": "가" * 200} for earlier in self.picks[:5]]
+        briefing = sim.build_turn_briefing(self.fixture, self.stream, pick, prior)
+        for line in briefing.splitlines():
+            if "→ 나:" in line:
+                quoted = line.split("→ 나: ")[1].strip('"')
+                self.assertLessEqual(len(quoted), config["max_line_chars"] + 1)
+
+
 class ScoringTests(unittest.TestCase):
     def setUp(self) -> None:
         self.fixture = sim.load_fixture()

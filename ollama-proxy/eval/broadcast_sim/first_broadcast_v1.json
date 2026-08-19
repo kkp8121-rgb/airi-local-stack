@@ -143,6 +143,7 @@
       "id": "wave_song",
       "minute": 9,
       "tag": "song_request",
+      "label": "노래",
       "templates": ["노래 한 곡만!", "노래 들려줘", "노래 해줘 AIRI", "노래 궁금하다", "노래는 안 해?"],
       "aggregate_markers": ["노래"]
     },
@@ -150,10 +151,23 @@
       "id": "wave_name",
       "minute": 16,
       "tag": "model_name_request",
+      "label": "이름",
       "templates": ["모델 이름 정해줘!", "이름 뭐로 할까", "모델 이름 공모하자", "이름 아직 없어?", "이름 지어주자"],
       "aggregate_markers": ["이름"]
     }
   ],
+  "briefing": {
+    "max_viewer_lines": 2,
+    "max_recent_picks": 2,
+    "max_line_chars": 40,
+    "recent_donation_window_ms": 120000
+  },
+  "aggregation_openers": [
+    "지금 {주제} 얘기 진짜 많네!",
+    "다들 {주제} 궁금하구나?",
+    "{주제} 요청 몰리는 거 봐."
+  ],
+  "memory_guard_fallback": "음… 그건 확실하게 기억 안 나. 다시 알려줄래?",
   "donations": [
     {
       "minute": 3,

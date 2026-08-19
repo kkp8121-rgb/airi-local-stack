@@ -28,6 +28,15 @@ import run_broadcast_chat_ab as ab  # noqa: E402
 
 sys.path.insert(0, str(HERE.parent.parent))
 from broadcast_contract import BROADCAST_CONTRACT_VERSION, apply_broadcast_contract  # noqa: E402
+from memory_claim_guard import guard_memory_claim  # noqa: E402
+
+import importlib.util as _importlib_util  # noqa: E402
+
+_THANK_SPEC = _importlib_util.spec_from_file_location(
+    "sim_thank_renderer", HERE.parent / "affect_broadcast" / "must_act_realization.py")
+assert _THANK_SPEC is not None and _THANK_SPEC.loader is not None
+thank_renderer = _importlib_util.module_from_spec(_THANK_SPEC)
+_THANK_SPEC.loader.exec_module(thank_renderer)
 
 # ollama_proxy 의 침묵 폴백 풀과 같은 문구여야 폴백률이 의미를 갖는다.
 FALLBACK_POOL = (
@@ -78,12 +87,18 @@ def run_arm(
     max_tokens: int,
     timeout: float,
     pre_session_seeds: bool,
+    briefing: str = "off",
+    acts: str = "off",
 ) -> dict[str, Any]:
     roster = [viewer["handle"] for viewer in fixture["viewers"]]
     drift_terms = sorted(sim.offtopic_terms(fixture))
+    openers = list(fixture.get("aggregation_openers", []))
+    guard_fallback = fixture.get("memory_guard_fallback", "")
     history: list[tuple[str, str]] = []
     rows: list[dict[str, Any]] = []
     transcript: list[dict[str, Any]] = []
+    answered_picks: list[dict[str, Any]] = []
+    wave_counter = 0
     failures = 0
 
     if pre_session_seeds:
@@ -106,20 +121,49 @@ def run_arm(
         message = pick["message"]
         beat = sim.beat_at(fixture, message["minute"])
         system_content = build_system_content(fixture, beat, contract)
+        if briefing == "on":
+            system_content += "\n\n" + sim.build_turn_briefing(fixture, stream, pick, answered_picks)
         user_content = format_user_content(message, author_format)
-        kept = history[-history_turns:] if history_turns > 0 else []
-        messages = [{"role": "system", "content": system_content}]
-        for past_user, past_assistant in kept:
-            messages.extend(({"role": "user", "content": past_user},
-                             {"role": "assistant", "content": past_assistant}))
-        messages.append({"role": "user", "content": user_content})
 
-        record = ab.call_once(transport, model=model, messages=messages,
-                              max_tokens=max_tokens, timeout=timeout)
-        raw = record.get("response", "") or ""
-        body = ab.scoring_body(record, raw, protocol)
-        if not record.get("ok"):
-            failures += 1
+        deterministic_act = None
+        record: dict[str, Any] = {}
+        raw = ""
+        opener = ""
+        if acts == "on" and pick["effective_kind"] == "donation":
+            # P2-1: 후원 감사는 승인된 결정론 렌더러가 말한다 — 자유 생성 0.
+            closer_index = int(message.get("donation_index", 0)) % len(thank_renderer.THANK_CALLOUT_CLOSERS)
+            body = thank_renderer.render_thank_callout_text(message["author"], closer_index)
+            deterministic_act = "thank_renderer"
+        else:
+            if acts == "on" and pick.get("aggregate_expected") and openers:
+                # P2-2: 여론임을 먼저 결정론으로 짚고, 내용은 모델이 잇는다.
+                labels = {wave["tag"]: wave.get("label", wave["tag"])
+                          for wave in fixture.get("opinion_waves", [])}
+                opener = openers[wave_counter % len(openers)].format(
+                    주제=labels.get(message.get("tag"), "이"))
+                wave_counter += 1
+            kept = history[-history_turns:] if history_turns > 0 else []
+            messages = [{"role": "system", "content": system_content}]
+            for past_user, past_assistant in kept:
+                messages.extend(({"role": "user", "content": past_user},
+                                 {"role": "assistant", "content": past_assistant}))
+            messages.append({"role": "user", "content": user_content})
+
+            record = ab.call_once(transport, model=model, messages=messages,
+                                  max_tokens=max_tokens, timeout=timeout)
+            raw = record.get("response", "") or ""
+            body = ab.scoring_body(record, raw, protocol)
+            if not record.get("ok"):
+                failures += 1
+            guard_fired = False
+            if acts == "on" and guard_fallback:
+                # P2-3: 근거 없는 "응, 기억해" 단정을 정직한 회피로 교체.
+                body, guard_fired = guard_memory_claim(message["text"], body, guard_fallback)
+            if opener:
+                body = f"{opener} {body}".strip() if body else opener
+                deterministic_act = "wave_opener"
+            elif guard_fired:
+                deterministic_act = "memory_guard"
 
         register = ab.score_response(body)
         row = sim.score_turn(pick, body, beat=beat, fallback_pool=FALLBACK_POOL,
@@ -127,6 +171,7 @@ def run_arm(
         row.update({
             "beat": beat["id"],
             "backlog_size": pick["backlog_size"],
+            "deterministic_act": deterministic_act,
             "polite_violation": "v_polite_response" in register.get("violations", []),
             "banmal": bool(register.get("markers", {}).get("banmal")),
             "ttft_ms": record.get("ttft_ms"),
@@ -138,9 +183,11 @@ def run_arm(
             "stage": "turn", "turn_index": pick["turn_index"], "minute": message["minute"],
             "beat": beat["id"], "kind": pick["effective_kind"], "author": message["author"],
             "chat": message["text"], "user_sent": user_content, "airi": body, "raw": raw,
+            "deterministic_act": deterministic_act,
             "backlog_size": pick["backlog_size"], "backlog_ids": pick["backlog_ids"],
         })
         history.append((user_content, body))
+        answered_picks.append({**pick, "response": body})
 
     transcript.append({"stage": "scripted_closing", "airi": "오늘 여기까지야. 와줘서 고마워, 다음에 또 보자!"})
     summary = sim.summarize_turns(rows)
@@ -227,6 +274,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--history-turns", type=int, default=DEFAULT_HISTORY_TURNS)
     parser.add_argument("--max-tokens", type=int, default=220)
     parser.add_argument("--timeout", type=float, default=180.0)
+    parser.add_argument("--briefing", choices=("off", "on"), default="off",
+                        help="P1 쇼 러너 턴 브리핑 조립 (기본 off = 기존과 동일)")
+    parser.add_argument("--acts", choices=("off", "on"), default="off",
+                        help="P2 결정론 발화 (thank 렌더러·여론 오프너·기억 가드)")
     parser.add_argument("--stream-only", action="store_true", help="모델 호출 없이 스트림/픽업만 낸다")
     parser.add_argument("--rescore", type=Path, help="기존 리포트를 모델 호출 없이 재채점한다")
     parser.add_argument("--report", type=Path)
@@ -269,6 +320,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             author_format=args.author_format, history_turns=args.history_turns,
             max_tokens=args.max_tokens, timeout=args.timeout,
             pre_session_seeds=args.memory_arm == "seeded",
+            briefing=args.briefing,
+            acts=args.acts,
         )
     finally:
         transport.close()
@@ -278,6 +331,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "topic_title": stream["topic_title"],
         "model": args.model,
         "memory_arm": args.memory_arm,
+        "briefing": args.briefing,
+        "acts": args.acts,
         "session_id": session_id,
         "contract": args.contract,
         "contract_version": BROADCAST_CONTRACT_VERSION if args.contract == "on" else None,
