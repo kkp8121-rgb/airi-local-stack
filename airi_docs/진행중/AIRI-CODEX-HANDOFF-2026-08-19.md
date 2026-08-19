@@ -29,13 +29,19 @@
   → [코덱스] QLoRA 학습 ← ★여기부터
 ```
 
-**주의 — 기존 트레이너는 그대로 못 쓴다**:
-`train_airi_style_qlora.py`는 **EXAONE config에 하드 핀**돼 있다
-(`expected_exaone_config`, 08-07 시절). 필요 작업:
-- Mi:dm(`K-intelligence/Midm-2.0-Mini-Instruct`) 재핀 + config 계약 교체
-- 입력을 chat-format JSONL(`messages` 배열)로 — 익스포터 산출물 그대로
-- 기존 fail-closed 계약(로컬 전용·어댑터 전용·CUDA 필수·해시 검증)은
-  유지할 가치가 있다 — 구조를 버리지 말고 모델 계약만 바꿀 것
+**트레이너도 준비돼 있다 — `train_airi_behavior_lora.py`** (2026-08-19
+클로드 작성·CPU 스모크 검증 완료). 기존 style 트레이너는 EXAONE 핀이라
+쓰지 않는다. 새 트레이너 계약:
+- 입력 = 익스포터 chat JSONL + `--dataset-sha256` 핀 (검수 우회 불가)
+- `--model-dir` = **로컬 HF 스냅샷 디렉터리만** (허브 이름·네트워크 경로
+  거부) — Mi:dm 스냅샷을 로컬에 받아 지정할 것
+- `--mode cuda-qlora` = 프로덕션(4bit NF4·CUDA 필수·어댑터만 저장) /
+  `cpu-smoke` = 배관 검증 전용(16샘플·20스텝 캡, `-SMOKE` 접미)
+- 라벨은 assistant 구간만(프롬프트 마스킹) — 운영 프롬프트 모양을
+  입력으로, 검수된 답만 정답으로 학습
+- 학습 루프는 tiny 모델 CPU 스모크로 loss 하강·어댑터 저장까지 검증됨
+  (`training/tests/test_train_airi_behavior_lora.py`) — 코덱스는 CUDA
+  경로(bitsandbytes 로드·VRAM)만 검증하면 된다
 - 학습 후 어댑터를 Ollama 태그로 만들어 T3 게이트에 넣는다
 
 **T3 게이트 (학습 전/후)**: `eval/broadcast_sim/run_broadcast_sim.py`

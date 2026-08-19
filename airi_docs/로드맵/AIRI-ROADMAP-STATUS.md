@@ -120,8 +120,9 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   (fact 126·addressee 15·register 10·substance 30), 운영 브리핑 포맷
   그대로, 전 정답 방송 채점기 통과, pending·eligible:false
   (`완료/AIRI-P3T1-BEHAVIOR-SFT-SYNTHESIS-2026-08-19.md`)
-- [ ] **P3-T2 인간 검수 + QLoRA 학습** (검수=사용자, 학습=코덱스 GPU) —
-  기존 governance 경유, Mi:dm 2.3B + LoRA 어댑터
+- [~] **P3-T2 인간 검수 + QLoRA 학습** — 트레이너 준비 완료 2026-08-19
+  (`train_airi_behavior_lora.py` — sha 핀·로컬 전용·assistant 마스킹,
+  CPU 스모크로 루프 검증). 잔여: 검수 회신(사용자)·CUDA 실행(코덱스)
 - [ ] **P3-T3 전/후 게이트** — 시뮬 하네스 그대로. **캘리브레이션 완료
   (2026-08-19 4-시드)**: 사실 활용은 12% 노이즈 천장 상회 필수, 결정론
   축 만점·존댓말 0 유지, 앵커·다양성은 3시드 평균 비교
