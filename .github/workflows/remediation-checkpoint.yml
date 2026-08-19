@@ -165,6 +165,7 @@ jobs:
               ollama-proxy/training/tests/test_compile_airi_style_reviewed.py
               ollama-proxy/training/tests/test_review_airi_style_pending.py
               ollama-proxy/training/tests/test_synthesize_behavior_pending.py
+              ollama-proxy/training/tests/test_build_behavior_review_form.py
               ollama-proxy/training/tests/test_validate_airi_style_pending.py
               ollama-proxy/training/tests/test_verify_airi_style_dataset.py
           - shard: latency-trace
