@@ -1163,5 +1163,160 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ValueError):
                 MemoryConfig.from_env()
 
+    # --- alias 결정론화 + 고정 택소노미 (greybox, 기본 OFF) -------------------
+
+    @staticmethod
+    def _stage_a(*items):
+        return json.dumps({"extracted": list(items)}, ensure_ascii=False)
+
+    @staticmethod
+    def _decisions(count):
+        return json.dumps({"decisions": [
+            {"sourceItemIndex": index, "action": "add", "candidateAlias": None, "reason": None}
+            for index in range(count)
+        ]})
+
+    def _person(self, name, turn=1):
+        return {"turnNumber": turn, "kind": "entity", "subtype": "person", "name": name, "content": "설명"}
+
+    def _fact_about(self, name, turn=2):
+        return {"turnNumber": turn, "kind": "fact", "subtype": "moment", "subjectNames": [name],
+                "content": "새 사건", "turnRange": [turn, turn]}
+
+    async def _seed_entity(self, runtime, name):
+        runtime.http_client.replies.extend([self._stage_a(self._person(name)), self._decisions(1)])
+        await runtime.schedule_completed_turn("s", "u1", "a1", 1)
+        await runtime._extract("s", "x", force=True)
+
+    def test_extraction_gate_env_flags_default_off(self):
+        with patch.dict(os.environ, {}, clear=True):
+            config = MemoryConfig.from_env()
+        self.assertFalse(config.extraction_alias_resolution)
+        self.assertFalse(config.extraction_taxonomy_gate)
+        with patch.dict(os.environ, {"AIRI_MEMORY_EXTRACTION_ALIAS_RESOLUTION": "on",
+                                     "AIRI_MEMORY_EXTRACTION_TAXONOMY_GATE": "1"}, clear=True):
+            config = MemoryConfig.from_env()
+        self.assertTrue(config.extraction_alias_resolution)
+        self.assertTrue(config.extraction_taxonomy_gate)
+        with patch.dict(os.environ, {"AIRI_MEMORY_EXTRACTION_TAXONOMY_GATE": "maybe"}, clear=True):
+            with self.assertRaises(ValueError):
+                MemoryConfig.from_env()
+
+    async def test_gate_off_leaves_the_shipped_extraction_path_unchanged(self):
+        """OFF 경로는 자유 문자열 subtype과 지칭 변형을 오늘 그대로 저장한다."""
+        r = await self.runtime()
+        await self._seed_entity(r, "세라")
+        r.http_client.replies.extend([
+            self._stage_a(self._person("세라야", turn=2),
+                          {"turnNumber": 2, "kind": "relation", "subtype": "그냥 아무 말",
+                           "sourceName": "세라야", "targetName": "세라야", "content": "내용"}),
+            self._decisions(2),
+        ])
+        with patch("memory_runtime.emit_latency_event") as emit:
+            await r.schedule_completed_turn("s", "u2", "a2", 2)
+            await r._extract("s", "x", force=True)
+        self.assertEqual(sorted(row["name"] for row in r.store.active_rows("s", "entity")), ["세라", "세라야"])
+        self.assertEqual([row["subtype"] for row in r.store.active_rows("s", "relation")], ["그냥 아무 말"])
+        metas = [call.kwargs.get("meta", {}) for call in emit.call_args_list]
+        gate_keys = {"alias_entity_renamed", "alias_reference_bound", "taxonomy_dropped"}
+        self.assertTrue(all(gate_keys.isdisjoint(meta) for meta in metas))
+        await r.shutdown()
+
+    async def test_alias_resolution_on_binds_a_mention_to_the_known_entity(self):
+        """OFF면 지칭 변형이 참조 해소 실패로 배치를 통째로 떨어뜨린다."""
+        from dataclasses import replace
+
+        r = await self.runtime()
+        await self._seed_entity(r, "세라")
+        r.http_client.replies.extend([self._stage_a(self._fact_about("세라야")), self._decisions(1)])
+        await r.schedule_completed_turn("s", "u2", "a2", 2)
+        await r._extract("s", "x", force=True)
+        self.assertEqual(r.store.active_rows("s", "fact"), [])
+        self.assertEqual(r.store.job_state("s")["fail_count"], 1)
+        await r.shutdown()
+
+        on = MemoryRuntime(replace(self.config, extraction_alias_resolution=True), http_client=FakeClient(()))
+        await on.startup()
+        await self._seed_entity(on, "세라")
+        on.http_client.replies.extend([self._stage_a(self._fact_about("세라야")), self._decisions(1)])
+        with patch("memory_runtime.emit_latency_event") as emit:
+            await on.schedule_completed_turn("s", "u2", "a2", 2)
+            await on._extract("s", "x", force=True)
+        facts = on.store.active_rows("s", "fact")
+        self.assertEqual([row["content"] for row in facts], ["새 사건"])
+        self.assertEqual([row["name"] for row in on.store.active_rows("s", "entity")], ["세라"])
+        end_meta = next(call.kwargs["meta"] for call in emit.call_args_list if call.args[1] == "extract_end")
+        # 참조 결속만 일어났고 엔티티 재작성(위험 축)은 0이어야 한다.
+        self.assertEqual((end_meta["alias_reference_bound"], end_meta["alias_entity_renamed"]), (1, 0))
+        await on.shutdown()
+
+    async def test_taxonomy_gate_on_drops_a_free_form_relation_before_stage_b(self):
+        from dataclasses import replace
+
+        r = MemoryRuntime(replace(self.config, extraction_taxonomy_gate=True), http_client=FakeClient(()))
+        await r.startup()
+        r.http_client.replies.extend([
+            self._stage_a(self._person("하린"),
+                          {"turnNumber": 1, "kind": "entity", "subtype": "organization",
+                           "name": "은빛 상단", "content": "상단"},
+                          {"turnNumber": 1, "kind": "relation", "subtype": "그냥 아무 말",
+                           "sourceName": "하린", "targetName": "은빛 상단", "content": "내용"}),
+            self._decisions(2),
+        ])
+        with patch("memory_runtime.emit_latency_event") as emit:
+            await r.schedule_completed_turn("s", "u1", "a1", 1)
+            await r._extract("s", "x", force=True)
+        self.assertEqual(sorted(row["name"] for row in r.store.active_rows("s", "entity")), ["은빛 상단", "하린"])
+        self.assertEqual(r.store.active_rows("s", "relation"), [])
+        end_meta = next(call.kwargs["meta"] for call in emit.call_args_list if call.args[1] == "extract_end")
+        self.assertEqual((end_meta["extracted"], end_meta["taxonomy_dropped"]), (2, 1))
+        await r.shutdown()
+
+    async def test_known_limitation_full_taxonomy_drop_advances_the_watermark(self):
+        """알려진 한계 — 전량 드롭돼도 워터마크는 조용히 전진한다.
+
+        게이트가 배치의 모든 항목을 떨구면 빈 추출과 구분되지 않아
+        ``extraction_success``가 그대로 실행된다(해당 턴은 다시 추출되지
+        않는다). span 계약이 남긴 것과 같은 성질이며, 고칠 목표가 아니라
+        **현재 동작의 상한**을 고정한 것이다. 활성화 전 해결 조건:
+        drop>0이면서 생존 0인 배치를 워터마크 전진에서 제외하거나, 최소한
+        ``taxonomy_dropped`` 임계 초과 시 운영 알람을 붙일 것.
+        """
+        from dataclasses import replace
+
+        r = MemoryRuntime(replace(self.config, extraction_taxonomy_gate=True), http_client=FakeClient(()))
+        await r.startup()
+        r.http_client.replies.append(self._stage_a(
+            {"turnNumber": 1, "kind": "relation", "subtype": "그냥 아무 말",
+             "sourceName": "하린", "targetName": "은빛 상단", "content": "내용"}))
+        with patch("memory_runtime.emit_latency_event") as emit:
+            await r.schedule_completed_turn("s", "u1", "a1", 1)
+            await r._extract("s", "x", force=True)
+        self.assertEqual(len(r.http_client.calls), 1)  # Stage B 호출 없음
+        state = r.store.job_state("s")
+        self.assertEqual((state["extracted_up_to_msg"], state["pending_msgs"], state["fail_count"]), (1, 0, 0))
+        self.assertEqual(r.store.active_rows("s"), [])
+        end_meta = next(call.kwargs["meta"] for call in emit.call_args_list if call.args[1] == "extract_end")
+        self.assertEqual((end_meta["extracted"], end_meta["taxonomy_dropped"]), (0, 1))
+        await r.shutdown()
+
+    async def test_taxonomy_gate_on_keeps_a_registered_relation(self):
+        from dataclasses import replace
+
+        r = MemoryRuntime(replace(self.config, extraction_taxonomy_gate=True), http_client=FakeClient(()))
+        await r.startup()
+        r.http_client.replies.extend([
+            self._stage_a(self._person("하린"),
+                          {"turnNumber": 1, "kind": "entity", "subtype": "organization",
+                           "name": "은빛 상단", "content": "상단"},
+                          {"turnNumber": 1, "kind": "relation", "subtype": "소속",
+                           "sourceName": "하린", "targetName": "은빛 상단", "content": "내용"}),
+            self._decisions(3),
+        ])
+        await r.schedule_completed_turn("s", "u1", "a1", 1)
+        await r._extract("s", "x", force=True)
+        self.assertEqual([row["subtype"] for row in r.store.active_rows("s", "relation")], ["소속"])
+        await r.shutdown()
+
 
 if __name__ == "__main__": unittest.main()

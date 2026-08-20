@@ -31,6 +31,7 @@ from benchmark_memory_track import (
 )
 from memory_prompts import STAGE_A_SCHEMA, STAGE_A_SPAN_SCHEMA, STAGE_B_DECISION_SYSTEM_PROMPT
 from memory_stage_b import compile_decisions, decision_schema_for_items, format_stage_b_input, parse_stage_b_decisions
+from memory_taxonomy import AliasResolver, apply_taxonomy_gate
 from latency_trace import emit_latency_event
 from memory_extraction_provider import (
     ExtractionUnavailableError,
@@ -176,6 +177,8 @@ class MemoryConfig:
     extraction_max_tokens: int = 2048
     extraction_seed: int = 42
     extraction_stage_a_contract: str = "conversation-v2b"
+    extraction_alias_resolution: bool = False
+    extraction_taxonomy_gate: bool = False
     user_display_name: str = ""
     character_name: str = "아이리"
     canon_bundle_path: str = ""
@@ -234,6 +237,8 @@ class MemoryConfig:
             extraction_max_tokens=_positive("AIRI_MEMORY_EXTRACTION_MAX_TOKENS", 2048, minimum=64),
             extraction_seed=_positive("AIRI_MEMORY_EXTRACTION_SEED", 42, minimum=0),
             extraction_stage_a_contract=stage_a_contract,
+            extraction_alias_resolution=_bool("AIRI_MEMORY_EXTRACTION_ALIAS_RESOLUTION", False),
+            extraction_taxonomy_gate=_bool("AIRI_MEMORY_EXTRACTION_TAXONOMY_GATE", False),
             user_display_name=_display_name("AIRI_MEMORY_USER_NAME"),
             character_name=_display_name("AIRI_MEMORY_CHARACTER_NAME", "아이리"),
             canon_bundle_path=os.getenv("AIRI_MEMORY_CANON_BUNDLE", "").strip(),
@@ -832,11 +837,25 @@ class MemoryRuntime:
                 parsed_a, span_meta = parse_stage_a(raw_a), {}
             ids, watermark = [r["id"] for r in rows], rows[-1]["turn_no"]
             extracted = parsed_a["extracted"]
+            # Deterministic layer between Stage A and Stage B.  Both halves are
+            # opt-in, and neither runs a model: alias resolution binds a mention
+            # to a name the store already holds, and the taxonomy gate refuses
+            # subtypes outside the fixed slots.  Existing rows are never
+            # rewritten; only this batch is affected.
+            gate_meta: dict[str, int] = {}
+            if self.config.extraction_alias_resolution:
+                resolver = AliasResolver(await self._store_call(self.store.known_names, sid))
+                # Entity renames and reference bindings stay separate counters:
+                # only the rename axis can merge two identities.
+                extracted, alias_counts = resolver.apply(extracted)
+                gate_meta.update(alias_counts)
+            if self.config.extraction_taxonomy_gate:
+                extracted, gate_meta["taxonomy_dropped"] = apply_taxonomy_gate(extracted)
             if not extracted:
                 await self._store_call(self.store.extraction_success, sid, ids, watermark, 0)
                 self._extraction_retry_sessions.pop(sid, None)
                 self._extraction_retry_delay = 1.0
-                self._emit("extract_end", trace_id, (time.perf_counter()-started)*1000, extracted=0, operations=0, **span_meta)
+                self._emit("extract_end", trace_id, (time.perf_counter()-started)*1000, extracted=0, operations=0, **span_meta, **gate_meta)
                 return
             candidates, aliases = await self._store_call(self.store.build_stage_b_candidates, sid, extracted, 5)
             prompt = format_stage_b_input(extracted, candidates)
@@ -855,7 +874,7 @@ class MemoryRuntime:
             )
             self._extraction_retry_sessions.pop(sid, None)
             self._extraction_retry_delay = 1.0
-            self._emit("extract_end", trace_id, (time.perf_counter()-started)*1000, extracted=len(extracted), operations=len(operations), **span_meta)
+            self._emit("extract_end", trace_id, (time.perf_counter()-started)*1000, extracted=len(extracted), operations=len(operations), **span_meta, **gate_meta)
         except ExtractionUnavailableError:
             self._extract_dirty.discard(sid)
             self._extract_force.discard(sid)

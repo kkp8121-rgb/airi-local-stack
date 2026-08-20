@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "_comment": "Fixed extraction taxonomy and deterministic alias tables. Values here are data, not magic literals in code: memory_taxonomy.py reads only this file. Entity/fact slots must stay identical to the STAGE_A_SCHEMA enums (test_memory_taxonomy.py enforces it); relation slots are the only place where the free-form Stage A subtype is constrained.",
+  "normalization": {
+    "_comment": "Suffix stripping is lookup-only: a stripped form is used to find an already known name and never becomes a new name by itself.",
+    "suffixes": ["에게", "한테", "님", "씨", "쨩", "짱", "야", "아", "은", "는", "이", "가", "을", "를", "의", "도", "과", "와"],
+    "min_stem_length": 2,
+    "max_suffix_strips": 2,
+    "edge_punctuation": ".,!?~…·:;\"'`()[]<>「」『』“”‘’"
+  },
+  "protected_names": ["{{user}}"],
+  "alias_registry": [
+    {
+      "canonical": "아이리",
+      "aliases": ["airi", "에어리"]
+    }
+  ],
+  "taxonomy": {
+    "entity": {
+      "person": [],
+      "location": [],
+      "item": [],
+      "organization": [],
+      "event": []
+    },
+    "fact": {
+      "trait": [],
+      "moment": []
+    },
+    "relation": {
+      "family": ["가족", "부모", "자식", "형제", "자매", "남매", "엄마", "아빠", "형", "누나", "오빠", "언니", "동생", "family", "parent", "child", "sibling"],
+      "friendship": ["친구", "우정", "친구관계", "friend", "friendship"],
+      "rivalry": ["라이벌", "경쟁자", "적", "적대", "enemy", "rival"],
+      "romance": ["연인", "애인", "사랑", "lover", "romance"],
+      "affiliation": ["소속", "가입", "입학", "등록", "enrollment", "membership"],
+      "residence": ["거주", "거주지", "사는곳", "home", "lives_in"],
+      "visit": ["방문", "출입", "접근", "visited", "access_point"],
+      "ownership": ["소유", "보유", "소지", "owns", "owner"],
+      "uses": ["사용", "이용", "use"]
+    }
+  }
+}
