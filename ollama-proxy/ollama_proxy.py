@@ -398,6 +398,40 @@ class SessionHeaderTelemetry:
 session_header_telemetry = SessionHeaderTelemetry()
 
 
+class BriefingEvidenceTelemetry:
+    """Content-free counters for the director's briefing-evidence signal.
+
+    Only the marker's presence and the number of absence-fallback preemptions
+    it released are retained.  The briefing itself never reaches telemetry.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._signalled = 0
+        self._absence_bypass = 0
+
+    def signalled(self) -> None:
+        with self._lock:
+            self._signalled += 1
+
+    def absence_bypass(self) -> None:
+        with self._lock:
+            self._absence_bypass += 1
+
+    def health(self) -> dict[str, object]:
+        with self._lock:
+            signalled = self._signalled
+            bypasses = self._absence_bypass
+        return {
+            "observed": signalled > 0,
+            "signalled_requests": signalled,
+            "absence_bypasses": bypasses,
+        }
+
+
+briefing_evidence_telemetry = BriefingEvidenceTelemetry()
+
+
 class MemoryJournalTelemetry:
     """Content-free lifecycle counters for completed-turn persistence."""
 
@@ -1143,6 +1177,26 @@ def is_local_quality_probe_turn(request: Request) -> bool:
         return False
     peer = request.client.host if request.client is not None else ""
     return peer in {"127.0.0.1", "::1", "localhost"}
+
+
+# 디렉터(방송 시뮬 러너, 이후 운영 디렉터)가 이 턴 브리핑에 실은 회상 근거의
+# 종류.  값은 확장 가능한 토큰이며 지금 아는 것은 대화 기억 하나뿐이다.
+BRIEFING_EVIDENCE_TOKENS = frozenset({"memory"})
+
+
+def briefing_evidence_signal(request: Request) -> str:
+    """Return the director's briefing-evidence token, from a loopback peer only.
+
+    The absence gate can only read this request's history, so recall material
+    the director placed in the system prompt is invisible to it.  This marker
+    is how the director says "this turn already carries the evidence", and like
+    every other behaviour-changing marker it is accepted on loopback only.
+    """
+    value = request.headers.get("x-airi-briefing-evidence")
+    if value not in BRIEFING_EVIDENCE_TOKENS:
+        return ""
+    peer = request.client.host if request.client is not None else ""
+    return value if peer in {"127.0.0.1", "::1", "localhost"} else ""
 
 
 AIRI_NARRATIVE_CANON = """AIRI는 특정 실존 인물을 흉내 내지 않는 독자적인 가상 방송 동료다.
@@ -6432,6 +6486,7 @@ async def health() -> dict[str, object]:
         "active_character_card_merge": True,
         "system_prompt_mode": "merge",
         "session_header": session_header_telemetry.health(),
+        "briefing_evidence": briefing_evidence_telemetry.health(),
         "journal_completion": memory_journal_telemetry.health(),
         "proactive_output": proactive_output_telemetry.health(),
         "topic_board": topic_board_runtime.health(),
@@ -6812,6 +6867,7 @@ class LocalStreamRequestContext:
     user_prefers_korean: bool
     proactive_turn: bool
     nonmutating_turn: bool
+    briefing_evidence: str
     synthetic_evaluation_turn: bool
     quality_probe_turn: bool
     topic_board_runtime: object
@@ -6911,12 +6967,16 @@ async def stream_local_with_ack(
                 question=context.memory_question,
                 trace_id=context.trace_id,
             )
-        if (
-            not context.proactive_turn
-            and memory_absence_fallback_required(
-                context.memory_question, _memory_result, context.original_messages
-            )
-        ):
+        absence_required = not context.proactive_turn and memory_absence_fallback_required(
+            context.memory_question, _memory_result, context.original_messages
+        )
+        if absence_required and context.briefing_evidence:
+            # 디렉터가 이 턴 프롬프트에 이 세션의 과거 발언을 이미 실었다.
+            # 그 자리는 폴백이 검사하는 히스토리 바깥이라 프록시에는 보이지
+            # 않으므로, 신호가 있으면 선점하지 않고 모델이 답하게 둔다.
+            briefing_evidence_telemetry.absence_bypass()
+            absence_required = False
+        if absence_required:
             fallback = memory_absence_dialogue(context.memory_question)
             emit_substantive_content(context.trace_id, context.request_started)
             schedule_completed_turn(
@@ -8014,8 +8074,12 @@ async def proxy(path: str, request: Request):
     memory_session_id = request.headers.get("x-airi-session-id") or None
     if proactive_turn:
         proactive_output_telemetry.request()
+    briefing_evidence = ""
     if is_chat_request:
         session_header_telemetry.record(memory_session_id is not None)
+        briefing_evidence = briefing_evidence_signal(request)
+        if briefing_evidence:
+            briefing_evidence_telemetry.signalled()
 
     character_sid = character_session_id(memory_session_id)
     continuity_block = ""
@@ -8733,7 +8797,7 @@ async def proxy(path: str, request: Request):
             original_messages=original_messages, memory_session_id=memory_session_id,
             memory_question=memory_question, last_user_text=last_user_text,
             user_prefers_korean=user_prefers_korean, proactive_turn=proactive_turn,
-            nonmutating_turn=nonmutating_turn,
+            nonmutating_turn=nonmutating_turn, briefing_evidence=briefing_evidence,
             synthetic_evaluation_turn=synthetic_evaluation_turn,
             quality_probe_turn=quality_probe_turn, topic_board_runtime=topic_board_runtime,
         )

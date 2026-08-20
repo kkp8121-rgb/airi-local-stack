@@ -7191,6 +7191,84 @@ class ImmediateAckMetadataTests(unittest.TestCase):
             self.assertEqual(_re.sub(r"<\|ACT [^|]*\|>", "", marker).strip(), "")
 
 
+class BriefingEvidenceSignalTests(unittest.TestCase):
+    """디렉터가 브리핑에 회상 근거를 실었다고 알릴 때만 absence 선점을 건너뛴다."""
+
+    @staticmethod
+    def _post(text: str, headers: dict[str, str] | None, host: str = "127.0.0.1") -> object:
+        return TestClient(ollama_proxy.app, client=(host, 9)).post(
+            "/v1/chat/completions",
+            headers=headers,
+            json={
+                "model": "exaone-airi:2.4b",
+                "stream": True,
+                "messages": [{"role": "user", "content": text}],
+            },
+        )
+
+    def test_signal_requires_a_known_token_and_a_loopback_peer(self) -> None:
+        def request(value: str, host: str) -> Request:
+            return Request({"type": "http",
+                            "headers": [(b"x-airi-briefing-evidence", value.encode())],
+                            "client": (host, 9)})
+        self.assertEqual(
+            ollama_proxy.briefing_evidence_signal(request("memory", "127.0.0.1")), "memory")
+        # 값은 확장 가능한 토큰이지만 지금 아는 것은 memory 하나뿐이고,
+        # 다른 X-AIRI 마커와 같이 정확히 일치할 때만 인정한다.
+        self.assertEqual(ollama_proxy.briefing_evidence_signal(request("MEMORY", "127.0.0.1")), "")
+        self.assertEqual(ollama_proxy.briefing_evidence_signal(request("journal", "127.0.0.1")), "")
+        self.assertEqual(ollama_proxy.briefing_evidence_signal(request("memory", "10.0.0.8")), "")
+        self.assertEqual(
+            ollama_proxy.briefing_evidence_signal(Request({"type": "http", "headers": [],
+                                                           "client": ("127.0.0.1", 9)})),
+            "",
+        )
+
+    def test_absence_fallback_still_preempts_without_the_signal(self) -> None:
+        # 헤더가 없으면 기존 판정 그대로다 — 이 경로는 바이트 동일해야 한다.
+        with mock.patch.object(ollama_proxy, "client", _CapturingChatClient("응, 새벽두시야!")):
+            response = self._post("내 별명 기억나?", None)
+        content = openai_sse_content(response.text)
+        self.assertIn(ollama_proxy.memory_absence_dialogue("내 별명 기억나?"), content)
+        self.assertNotIn("새벽두시", content)
+
+    def test_signalled_turn_reaches_the_model_and_counts_the_bypass(self) -> None:
+        telemetry = ollama_proxy.BriefingEvidenceTelemetry()
+        chat = _CapturingChatClient("응, 새벽두시야!")
+        with mock.patch.object(ollama_proxy, "briefing_evidence_telemetry", telemetry), \
+                mock.patch.object(ollama_proxy, "client", chat):
+            response = self._post("내 별명 기억나?",
+                                  {"x-airi-briefing-evidence": "memory"})
+        content = openai_sse_content(response.text)
+        self.assertIn("새벽두시", content)
+        self.assertNotIn(ollama_proxy.memory_absence_dialogue("내 별명 기억나?"), content)
+        health = telemetry.health()
+        self.assertEqual(health["signalled_requests"], 1)
+        self.assertEqual(health["absence_bypasses"], 1)
+
+    def test_signal_alone_does_not_bypass_a_turn_the_gate_would_have_allowed(self) -> None:
+        # 폴백이 애초에 발동하지 않는 턴은 우회 카운터를 올리지 않는다.
+        telemetry = ollama_proxy.BriefingEvidenceTelemetry()
+        with mock.patch.object(ollama_proxy, "briefing_evidence_telemetry", telemetry), \
+                mock.patch.object(ollama_proxy, "client", _CapturingChatClient("오늘 날씨 좋네!")):
+            response = self._post("오늘 뭐 하고 놀까?",
+                                  {"x-airi-briefing-evidence": "memory"})
+        self.assertIn("오늘 날씨 좋네!", openai_sse_content(response.text))
+        health = telemetry.health()
+        self.assertEqual(health["signalled_requests"], 1)
+        self.assertEqual(health["absence_bypasses"], 0)
+
+    def test_health_reports_the_signal_without_any_content(self) -> None:
+        telemetry = ollama_proxy.BriefingEvidenceTelemetry()
+        self.assertEqual(
+            telemetry.health(),
+            {"observed": False, "signalled_requests": 0, "absence_bypasses": 0},
+        )
+        with mock.patch.object(ollama_proxy, "briefing_evidence_telemetry", telemetry):
+            health = asyncio.run(ollama_proxy.health())
+        self.assertEqual(health["briefing_evidence"], telemetry.health())
+
+
 class AffectContinuityGreyboxTests(unittest.TestCase):
     @staticmethod
     def _event() -> dict[str, object]:
