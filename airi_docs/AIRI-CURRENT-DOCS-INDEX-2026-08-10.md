@@ -1,7 +1,9 @@
 # AIRI Documentation Index
 
-최종 현행화 2026-08-19 (클로드 PC — 로드맵 v3 개편 + 레거시 정리:
-이동 22건 전부 `git mv`, 삭제 0건. 이동 사유는 각 항목 끝에 병기).
+최종 현행화 2026-08-20 (클로드 PC — 17커밋 배치 산출 문서 6종 등록:
+인계문 신설·근거 계약 2종·토큰 예산·GLiNER 실측·추출 검수 폼).
+직전 현행화 2026-08-19 (로드맵 v3 개편 + 레거시 정리: 이동 22건 전부
+`git mv`, 삭제 0건. 이동 사유는 각 항목 끝에 병기).
 
 문서는 상태별 폴더로 분류한다 (2026-08-12 재구성). 파일명은 유지했으므로
 과거 문서가 언급하는 파일은 이름으로 검색하면 찾을 수 있다.
@@ -21,6 +23,20 @@
 
 ## 진행중 — 현행 계약
 
+- `AIRI-CODEX-HANDOFF-2026-08-20.md` — **현행 코덱스(GPU) 인계 단일 SSoT.**
+  2026-08-20 배치(17커밋) 소화본. 오늘의 구조 변화(브리핑 근거 신호 계약·
+  좁힌 정의·검수 폼 v2 큐 결속·v3-span greybox·alias/택소노미 greybox·
+  결정론 발화 격리·사전 결함 3건 수리), 최우선 순서(검수 회신 → T2-b QLoRA →
+  T3 양방송 게이트), GPU 재실측 큐 7건, **활성화 선행 조건 8건**(span 4·
+  taxonomy 2·동시 ON 1·런처 노출 1), 실측 함정(워치독 클램프·백그라운드
+  stall·루프백 전용 계약), 최종 리뷰 추적 항목 6건.
+  08-19판(`AIRI-CODEX-HANDOFF-2026-08-19.md`)을 **대체**한다 — 08-19판은
+  아카이브 이동 예정이며 현재 상태 검증에 쓰지 말 것.
+- `AIRI-CODEX-SERENA-TOKEN-ORDER-2026-08-20.md` — 코덱스 PC 앞 작업 명령
+  (병행). Codex CLI에 Serena MCP를 붙여 파일 통짜 read·grep 반복 체인을 심볼
+  단위 조회로 대체하는 토큰 절감 도입 절차 — 설치·등록·인덱싱·AGENTS.md 정책·
+  A/B 실측 의무·롤백 경계. **변경 허용 범위는 코덱스 PC 환경 4가지뿐이며 AIRI
+  레포 코드·운영 설정은 무접촉.** §7 결과표를 코덱스가 채우면 종결.
 - `AIRI-BROADCAST-SIM-REVIEW-2026-08-18.md` — 100인 시청자 방송 시뮬레이션
   원문 검토 packet(기억 3-arm + named 변형). 수치 요약·판단은
   `완료/AIRI-BROADCAST-SIM-3ARM-2026-08-18.md`. 결정 큐 1~3(thank 배선·
@@ -33,6 +49,15 @@
 
 ## 진행예정 — 계획
 
+- `AIRI-EXTRACTION-REVIEW-FORM-2026-08-20.html` — **현행 추출 SFT 검수 폼
+  (회신 대기).** 스팬 계약(`conversation-v3-span`) 학습쌍 102건·추출 항목
+  144건 전량 렌더, 클릭형 승인/수정/거부 + 예외만 회신. rewrite는 브라우저
+  사전 검증(JSON 형태·evidence ⊂ turns·이름 ⊂ evidence)을 타이핑 중 실시간
+  수행하며, 위반 건은 회신에서 `(미결정)`으로 빠져 서버 fail-closed와 정합한다.
+  회신 헤더에 **큐 sha256(`2988a82bd738`)이 결속**되므로 **구 폼 회신은 적용기가
+  거부**하고 최신 폼을 안내한다. 회신이 오면 `apply_extraction_review_reply.py` →
+  `export_extraction_sft_dataset.py` 순으로 처리(P3-T2 2차 학습 입력).
+  행동 SFT 쪽 대응물은 `AIRI-BEHAVIOR-REVIEW-FORM-2026-08-19.html`.
 - `AIRI-AFFECTIVE-CHARACTER-CONTINUITY-PLAN-2026-08-16.md` — G1a 감정·
   캐릭터 연속성 엔진 상세 계획. 공개 MIT/Apache 프로젝트의 bounded affect,
   event-sourced reducer, memory-layer 패턴만 인용하고 repo-native typed reducer를
@@ -91,6 +116,25 @@
   `아카이브/AIRI-NEUROSAMA-LOW-LATENCY-PLAN-pre-midm.md`.
 
 ## 완료 — 유효한 증거 기록 (최신순)
+
+### 2026-08-20 배치 산출 (17커밋)
+
+- `AIRI-BRIEFING-EVIDENCE-SIGNAL-2026-08-20.md` — 디렉터→프록시 브리핑 근거
+  신호 계약(`X-AIRI-Briefing-Evidence: memory`, 정확 일치·**루프백 전용**).
+  absence 폴백이 모델 호출 전에 선점한다는 것을 라이브로 확정(헤더 없이
+  218 ms 결정론 폴백 vs 헤더 있으면 11,299 ms 모델 응답). 6런에서 선점 4건
+  해제·결정론 축 만점, **기억 프로브 2/9 불변**(선점 해소 ≠ 모델 활용).
+  코덱스 B4a 운영 이식이 그대로 의존하는 계약이다.
+- `AIRI-BRIEFING-EVIDENCE-NARROW-2026-08-20.md` — 위 계약의 근거 정의를
+  "관련도 매칭 줄 존재"로 좁힌 재실측(부착 68.1%→23.6%·해제 4→2, 둘 다
+  결정론적 감소) + 행 단위 해제 관측성(`briefing_evidence_released`) 신설.
+  §6에 **워치독 env 클램프 사고**(`=90`이 조용히 8초가 된다) 기록.
+- `AIRI-CTX-BUDGET-TRADEOFF-2026-08-20.md` — 히스토리 vs 브리핑 토큰 예산
+  9런(`--history-turns {4,8,12}` × 시드 3종). **확정은 둘뿐** — 결정론 축
+  무영향, `num_ctx 4096`이 history_turns=12까지 수용. 앵커·다양성·fact_usage·
+  프로브는 **CPU 스로틀 epoch와 완전 교락**돼 원 권고("히스토리 4가 최고")를
+  **폐기**했다. §3-가에 다양성 산출식·재현 커맨드, §0-가에 워치독 클램프
+  정정 추기. 후속 = 코덱스 GPU 단일조건 재실측.
 
 - `AIRI-BROADCAST-SIM-3ARM-2026-08-18.md` — 100인 시청자 첫 방송
   시뮬레이션 기억 3-arm 실측. 기억 ON이 창밖(22턴 전) 사실 회상 성공,
@@ -434,6 +478,15 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 - `AIRI-MEMORY-TECH-RESEARCH-2026-08-18.md` — 장기기억 기술 3트랙
   리서치 종합(학술·OSS 20여종·자체 레포). 결론: 교체 없음 + 선별 차용,
   실행 로드맵 5단계. Qwen3-8B·임베딩 A/B 실측으로 일부 정정 반영됨.
+  **2026-08-20 용어 정정 있음** — 아래 GLiNER 실측 문서 §0 참조.
+- `AIRI-GLINER-KO-EVAL-2026-08-20.md` — LLM 0회(LLM-free) 엔티티 프리필터
+  후보 실측. **용어 정정**: `gliner2`(Fastino)는 영어 전용이라 한국어 후보에서
+  배제, 원조 GLiNER 계열의 한국어 파인튜닝 `taeminlee/gliner_ko` 채택 —
+  두 계열을 문서에서 혼용하지 말 것. 추출 학습쌍 102건(144 gold 항목) 전수:
+  겹침률 72.9%(`{{user}}` 제외 87.5%), person 실명 **100%**, organization 75%,
+  **item 0%(취약점)**, 잡담 과추출 0/6. **판정: 조건부 채택** — person/org
+  한정 프리필터로 유효, item 제외, `{{user}}`는 규칙 기반 별도 처리, 조사 잔차
+  흡수 후처리 필수, CC-BY-NC-4.0은 상용 배포 시 재검토.
 - `AIRI-BROADCAST-OBSERVATION-STUDY-2026-08-14.md` — 저스트챗 방송 방식
   관찰 연구 (사용자 지정 4인 트랜스크립트 1차 실측). 공통 패턴 10종·차이
   스펙트럼·기존 설계 수정 지점 7건·B4c 파라미터 후보. 2차 자료 기반이던

@@ -1,11 +1,20 @@
 # AIRI 다음 세션 안내
 
-**진입점은 두 개다** (2026-08-19 로드맵 v3 개편 이후):
+**진입점은 세 개다** (2026-08-20 갱신):
 
-1. `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md` — **최상위 SSoT.** 북극성·
+1. `airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-08-20.md` — **현행 인계 단일
+   SSoT (2026-08-20 배치 17커밋 소화본).** 최우선 순서(검수 회신 → T2-b
+   QLoRA → T3 양방송 게이트), GPU 재실측 큐, **greybox 활성화 선행 조건**,
+   실측 함정이 전부 여기 있다. 코덱스든 클로드든 먼저 이 문서부터 읽는다.
+   08-19판 인계문은 이 문서로 대체됐다(아카이브 이동 예정 — 현재 상태
+   검증에 쓰지 말 것).
+2. `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md` — **최상위 SSoT.** 북극성·
    주 지표(발화 실질)·돌파 3축(P1 쇼 러너 브리핑 / P2 결정론 발화 /
    P3 조건부 생성 상한)·사용자 결정 큐·코덱스 대기열이 전부 여기 있다.
-2. `airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md` — 문서 지도.
+3. `airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md` — 문서 지도.
+
+병행 지시서: `airi_docs/진행중/AIRI-CODEX-SERENA-TOKEN-ORDER-2026-08-20.md`
+(코덱스 PC Serena MCP 도입 — 이 인계문과 독립).
 
 최근 배치 이력은 `airi_docs/로드맵/AIRI-ROADMAP-LOG.md`(최신이 위).
 **매 배치 커밋마다 LOG에 기록**하고, STATUS는 상태 변화 시에만 고친다.
@@ -21,7 +30,13 @@
   "마이크 테스트 시작" 요청 시에만 `-Stt on`)
 - 기억 추출 OFF (통과 extractor 없음 — 다음 수순은 Stage A 재설계이지
   모델 확대가 아님)
-- output moderation·침묵 폴백 풀·방송 계약 env 기본 OFF (운영 ON은 결정 큐)
+- 런처 기본 ON (2026-08-19 `3ead135`, 사용자 결정 5·6 완료): `AIRI_IMMEDIATE_ACK=marker`·
+  침묵 폴백 풀·방송 계약 v3·기억 가드(`AIRI_MEMORY_CLAIM_GUARD`).
+  output moderation은 기본 OFF 유지
+- 기억 추출 greybox 3종 기본 OFF·런처 미노출 (`AIRI_MEMORY_EXTRACTION_STAGE_A_CONTRACT`·
+  `_ALIAS_RESOLUTION`·`_TAXONOMY_GATE`) — 켜기 전 선행 조건은 인계문 §3
+- `AIRI_UPSTREAM_FIRST_RAW_TIMEOUT_SECONDS`는 **유효 범위 1~30초**, 벗어나면
+  경고 없이 8초로 클램프된다 (2026-08-20 실측 함정)
 - 음성: 현행 일본어 참조 유지, T-05 126번 예비. 팬덤명 유보("시청자들")
 
 ## 작업 원칙 (v3)

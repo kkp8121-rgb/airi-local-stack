@@ -40,6 +40,42 @@
    런). 아래 지표는 이 두 번의 재개를 거쳐 만들어졌다는 것을 전제로
    읽는다.
 
+### 0-가. 정정 추기 — "워치독 90초"는 실효 8초였다 (2026-08-20 사후)
+
+> **이 절은 사후 정정이다. 아래 §2-나를 포함한 본문 원문은 당시 기록
+> 그대로 두고, 사실 정정만 여기에 추기한다.**
+
+위 2번과 §2-나에 적힌 재기동 env `AIRI_UPSTREAM_FIRST_RAW_TIMEOUT_SECONDS=90`
+은 **실제로는 적용되지 않았다.** 프록시 코드의
+`configured_upstream_first_raw_timeout`(`ollama-proxy/ollama_proxy.py`)은
+유효 범위를 **1.0~30.0초**로 두고 범위 밖 값을 **경고 없이 기본값 8.0초로
+클램프**한다:
+
+```python
+def configured_upstream_first_raw_timeout(value: object) -> float:
+    """Bound a warm foreground request that never produces its first token."""
+    default = 8.0
+    ...
+    return seconds if math.isfinite(seconds) and 1.0 <= seconds <= 30.0 else default
+```
+
+즉 5~9런(h8-seed22/33 · h12 전체)은 "워치독 90초"가 아니라 **실효 8초 워치독**
+아래에서 실행됐다. 이 사실은 같은 날 다른 태스크(브리핑 근거 정의 좁히기)가
+같은 env를 지정했다가 첫 3런이 거의 전 턴 8초 폴백으로 오염되는 것을
+실측하면서 발견됐다(`완료/AIRI-BRIEFING-EVIDENCE-NARROW-2026-08-20.md` §6).
+
+**실측 영향 판정: 미미하다.** 이 배치의 침묵 폴백(= 워치독 발동 건수)은
+h4 2/144 · h8 2/144 · h12 0/144로, 8초 클램프가 걸린 epoch B 구간에서
+오히려 0~2건에 그쳤다(전 런 `transport_failures=0`). 따라서 §4 표의 수치를
+수정하지 않는다.
+
+**단, epoch 해석에는 이 사실을 반드시 병기한다.** §5-가/나의 epoch A/B 구분은
+"CPU 전원 캡 70% + affinity 8코어"만이 아니라 **워치독 실효값 30초(epoch A) vs
+8초(epoch B)**의 차이도 포함한다. 두 변화가 같은 경계에서 동시에 일어났으므로,
+epoch 교락의 내용물은 스로틀 단독이 아니라 "스로틀 + 워치독 단축"의 묶음이다.
+§6이 권고하는 코덱스 GPU 단일조건 재실측에서는 **워치독을 유효 범위 안의 단일
+값(예: 30)으로 고정**해 이 축까지 함께 제거해야 한다.
+
 ## 1. 재사용 검증 내역 — `h4-seed11`, `h4-seed22`
 
 두 파일의 내장 메타데이터를 지정 구성과 대조했다(전부 일치, 재사용 확정):
