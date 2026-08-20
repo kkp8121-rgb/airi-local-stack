@@ -592,6 +592,82 @@ class BriefingEvidenceReleaseObservabilityTests(unittest.TestCase):
         self.assertIsNone(runner.read_absence_bypasses(broken, "http://proxy.invalid/health"))
 
 
+class _RecordingTransport(_FakeTransport):
+    """`_FakeTransport` 확장 — 매 호출에 실제로 전송된 messages 를 그대로 기록한다."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls: list[list[dict[str, str]]] = []
+
+    def stream_chat(self, *, model, messages, max_tokens, timeout):
+        self.calls.append(messages)
+        return super().stream_chat(model=model, messages=messages, max_tokens=max_tokens, timeout=timeout)
+
+
+class DeterministicActHistoryIsolationTests(unittest.TestCase):
+    """Task 13: 결정론 렌더러(후원 thank 호명) 발화가 히스토리·브리핑으로 되먹여져
+    이후 모델 턴이 그 이름을 재호명하는 결함(Task 9 실측 — 15런 19턴 중 16건이
+    직전 후원 렌더러 이름, B4a "이름 발명 금지" 계약 위반)을 고정한다.
+
+    누출 경로 둘 다 한 번에 잡는다 — ①`history.append` 가 렌더러 문구를
+    assistant 턴으로 다음 모델 호출에 그대로 넣는 것, ②`answered_picks`
+    에 실린 응답이 브리핑 "방금 흐름" 줄에 에코되는 것(`min_echo_response_chars`
+    보다 길어 항상 통과). 격리는 되먹임 사본만 손대야 하므로, 렌더러가 실제로
+    말한 트랜스크립트·채점 행은 이름이 그대로 남는지도 함께 확인한다.
+    """
+
+    def setUp(self) -> None:
+        self.fixture = sim.load_fixture()
+        self.stream = sim.generate_stream(self.fixture, seed=20260818)
+        self.picks = sim.plan_pickups(self.stream, self.fixture)[:10]
+        donation = next(pick for pick in self.picks if pick["effective_kind"] == "donation")
+        self.donor = donation["message"]["author"]
+        # 고정 seed 전제 — 깨지면 아래 인덱싱 가정이 전부 무의미해진다.
+        self.assertEqual((donation["turn_index"], self.donor), (9, "파도소리"))
+
+    def _run(self) -> tuple[_RecordingTransport, dict[str, Any]]:
+        transport = _RecordingTransport()
+        result = runner.run_arm(
+            transport, self.fixture, self.stream, self.picks,
+            model="test-model", contract="on", protocol="operational",
+            author_format="runtime", history_turns=8, max_tokens=32, timeout=1.0,
+            pre_session_seeds=False, briefing="on", acts="on",
+        )
+        return transport, result
+
+    def test_renderer_callout_name_does_not_leak_into_the_next_model_call(self) -> None:
+        transport, _result = self._run()
+        # 후원 턴은 acts=on 이라 렌더러가 말한다 — 그 턴만 모델 호출이 없다.
+        self.assertEqual(len(transport.calls), len(self.picks) - 1)
+        next_call_messages = transport.calls[-1]
+
+        # 채널 1 — 히스토리: 렌더러 문구가 assistant 턴으로 되먹이면 안 된다.
+        assistant_turns = [m["content"] for m in next_call_messages if m["role"] == "assistant"]
+        self.assertTrue(assistant_turns, "히스토리에 assistant 턴이 없다 — 전제가 깨졌다")
+        self.assertFalse(
+            any(self.donor in content for content in assistant_turns),
+            f"렌더러 호명이 히스토리로 되먹였다: {assistant_turns}",
+        )
+
+        # 채널 2 — 브리핑 "방금 흐름": 렌더러 호명 문형이 그대로 에코되면 안 된다.
+        # ("- 직전 후원: {author} 는 실제 후원자 채팅을 그대로 인용하는 별개 줄이라
+        #  이름 자체는 남아도 된다 — 렌더러가 만든 "{이름}, 고마워!" 패턴만 문제다.)
+        system_content = next_call_messages[0]["content"]
+        callout_prefix = f"{self.donor}, 고마워!"
+        self.assertNotIn(callout_prefix, system_content, "브리핑 '방금 흐름'에 렌더러 호명이 에코됐다")
+
+    def test_the_rendered_callout_itself_stays_intact_for_transcript_and_scoring(self) -> None:
+        # 격리는 되먹임 사본만 손대야 한다 — 실제로 말한 트랜스크립트/채점은 그대로.
+        _transport, result = self._run()
+        donation_row = next(row for row in result["rows"] if row["kind"] == "donation")
+        self.assertEqual(donation_row["deterministic_act"], "thank_renderer")
+        self.assertIn(self.donor, donation_row["called_handles"])
+        self.assertEqual(donation_row["invented_handles"], [])
+        donation_entry = next(entry for entry in result["transcript"]
+                              if entry.get("stage") == "turn" and entry["kind"] == "donation")
+        self.assertIn(self.donor, donation_entry["airi"])
+
+
 class RescoreReportTests(unittest.TestCase):
     """rescore_report(): 모델 재호출 없이 채점만 다시 돈다.
 

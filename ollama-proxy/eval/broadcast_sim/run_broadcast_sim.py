@@ -265,8 +265,12 @@ def run_arm(
             "deterministic_act": deterministic_act,
             "backlog_size": pick["backlog_size"], "backlog_ids": pick["backlog_ids"],
         })
-        history.append((user_content, body))
-        answered_picks.append({**pick, "response": body})
+        # Task 13: 렌더러가 부른 이름이 되먹여지면 이후 모델 턴이 그 이름을 재호명한다
+        # (Task 9 실측 19턴 중 16건). 실제 발화(트랜스크립트·채점)는 그대로 두고,
+        # 히스토리·브리핑으로 되먹이는 사본만 이름 없는 A4.2 v1 문구로 치환한다.
+        fed_response = thank_renderer._TEMPLATES["thank"] if deterministic_act == "thank_renderer" else body
+        history.append((user_content, fed_response))
+        answered_picks.append({**pick, "response": fed_response})
 
     transcript.append({"stage": "scripted_closing", "airi": "오늘 여기까지야. 와줘서 고마워, 다음에 또 보자!"})
     summary = sim.summarize_turns(rows)
