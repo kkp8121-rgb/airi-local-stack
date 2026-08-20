@@ -204,6 +204,16 @@ def stage_a_prompt_for_contract(contract: str) -> str:
     raise ValueError("stage_a_contract must be legacy, conversation-v2b, or conversation-v3-span")
 
 
+def stage_a_user_input(character: str, turns: str) -> str:
+    """Assemble the Stage A user message exactly as the extractor receives it.
+
+    Extracted from the extraction loop so the training-side exporter can import
+    this shape instead of re-declaring it: a second copy would silently drift
+    and teach the model a prompt layout no run ever sends.
+    """
+    return "<character>%s</character>\n<turns>%s</turns>" % (character, turns)
+
+
 def comparison_contract_for_stage_a(contract: str) -> str:
     if contract == "legacy":
         return "v2_to_v2.1_same_options"
@@ -432,7 +442,7 @@ def run_extraction(args: argparse.Namespace, fixtures: dict[str, Any], chat: Cal
     stage_a_prompt = stage_a_prompt_for_contract(args.stage_a_contract)
     for _ in range(args.runs):
      for item in extraction_fixtures:
-            user_a = "<character>%s</character>\n<turns>%s</turns>" % (item["character"], item["turns"])
+            user_a = stage_a_user_input(item["character"], item["turns"])
             stage_a_schema = STAGE_A_SPAN_SCHEMA if args.stage_a_contract == "conversation-v3-span" else STAGE_A_SCHEMA
             span_dropped = 0
             total0 = time.perf_counter(); a0 = total0
