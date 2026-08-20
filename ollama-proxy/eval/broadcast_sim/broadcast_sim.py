@@ -388,6 +388,24 @@ def build_turn_briefing(
     counterpart of the seeded-arm measurement: the model talks when its context
     holds material, so the director's job is to put material there every turn.
     """
+    return build_turn_briefing_with_evidence(fixture, stream, pick, prior_picks)[0]
+
+
+def build_turn_briefing_with_evidence(
+    fixture: dict[str, Any],
+    stream: dict[str, Any],
+    pick: dict[str, Any],
+    prior_picks: Sequence[dict[str, Any]],
+) -> tuple[str, bool]:
+    """Like ``build_turn_briefing`` but also reports whether it carried recall.
+
+    "Recall material" means this viewer's own earlier lines from this broadcast
+    — the very session history the proxy's absence fallback checks for and
+    cannot see here, because the director writes it into the system prompt.
+    The flag is returned from the point that already knows the answer; reading
+    it back out of the finished string would silently break on any wording
+    change.
+    """
     config = fixture.get("briefing") or {}
     max_viewer_lines = int(config.get("max_viewer_lines", 2))
     max_recent_picks = int(config.get("max_recent_picks", 2))
@@ -407,7 +425,8 @@ def build_turn_briefing(
         "relevant_line_directive",
         "- 이 시청자가 아까 \"{line}\"라고 했어. 지금 그 얘기를 묻는 거니까 그 내용을 그대로 써서 답해.",
     )
-    for item, relevant in select_viewer_lines_tagged(fixture, stream, pick):
+    viewer_lines = select_viewer_lines_tagged(fixture, stream, pick)
+    for item, relevant in viewer_lines:
         if relevant:
             # 수동 메모("아까 한 말")는 7%밖에 안 쓰였다 — 관련 줄은 무엇을
             # 하라는 지시형으로 바꿔 활용을 직접 요구한다(P1 마지막 지렛대).
@@ -442,7 +461,7 @@ def build_turn_briefing(
         if prior_message["kind"] == "donation" and message["t_ms"] - prior_message["t_ms"] <= donation_window_ms:
             lines.append(f"- 직전 후원: {prior_message['author']} \"{clip(prior_message['text'])}\"")
             break
-    return "\n".join(lines)
+    return "\n".join(lines), bool(viewer_lines)
 
 
 def offtopic_terms(fixture: dict[str, Any]) -> set[str]:

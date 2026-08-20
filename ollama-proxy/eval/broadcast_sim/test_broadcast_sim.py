@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import sys
+import types
 import unittest
 from pathlib import Path
 
@@ -11,6 +13,13 @@ SPEC = importlib.util.spec_from_file_location("broadcast_sim_test", HERE / "broa
 assert SPEC is not None and SPEC.loader is not None
 sim = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(sim)
+
+sys.path.insert(0, str(HERE))
+RUNNER_SPEC = importlib.util.spec_from_file_location(
+    "broadcast_sim_runner_test", HERE / "run_broadcast_sim.py")
+assert RUNNER_SPEC is not None and RUNNER_SPEC.loader is not None
+runner = importlib.util.module_from_spec(RUNNER_SPEC)
+RUNNER_SPEC.loader.exec_module(runner)
 
 
 def message(**overrides):
@@ -358,6 +367,69 @@ class BriefingTests(unittest.TestCase):
             if "→ 나:" in line:
                 quoted = line.split("→ 나: ")[1].strip('"')
                 self.assertLessEqual(len(quoted), config["max_line_chars"] + 1)
+
+
+class _FakeTransport:
+    """헤더만 관찰하는 전송 스텁 — 모델도 네트워크도 쓰지 않는다."""
+
+    def __init__(self) -> None:
+        self.client = types.SimpleNamespace(headers={})
+        self.seen: list[dict[str, str]] = []
+
+    def stream_chat(self, *, model, messages, max_tokens, timeout):
+        self.seen.append(dict(self.client.headers))
+        return "응, 그렇구나!", 5.0, 10.0, {"status_code": 200}
+
+
+class BriefingEvidenceSignalTests(unittest.TestCase):
+    """디렉터→프록시 근거 신호: 브리핑이 회상 재료를 실은 턴에만 붙는다."""
+
+    def setUp(self) -> None:
+        self.fixture = sim.load_fixture()
+        self.stream = sim.generate_stream(self.fixture, seed=20260818)
+        self.picks = sim.plan_pickups(self.stream, self.fixture)
+
+    def test_assembly_reports_whether_it_carried_recall_material(self) -> None:
+        first_time = next(pick for pick in self.picks
+                          if not sim.select_viewer_lines(self.fixture, self.stream, pick))
+        returning = next(pick for pick in self.picks
+                         if sim.select_viewer_lines(self.fixture, self.stream, pick))
+        for pick, expected in ((first_time, False), (returning, True)):
+            text, evidence = sim.build_turn_briefing_with_evidence(
+                self.fixture, self.stream, pick, [])
+            self.assertIs(evidence, expected)
+            # 근거 여부는 조립 시점의 사실이고, 본문은 기존과 바이트 동일하다.
+            self.assertEqual(text, sim.build_turn_briefing(self.fixture, self.stream, pick, []))
+
+    def _run(self, briefing: str, briefing_evidence: str) -> tuple[_FakeTransport, list[bool]]:
+        transport = _FakeTransport()
+        picks = self.picks[:12]
+        runner.run_arm(
+            transport, self.fixture, self.stream, picks,
+            model="test-model", contract="on", protocol="operational",
+            author_format="runtime", history_turns=8, max_tokens=32, timeout=1.0,
+            pre_session_seeds=False, briefing=briefing, acts="off",
+            briefing_evidence=briefing_evidence,
+        )
+        expected = [bool(sim.select_viewer_lines(self.fixture, self.stream, pick))
+                    for pick in picks]
+        return transport, expected
+
+    def test_header_rides_only_the_turns_whose_briefing_holds_evidence(self) -> None:
+        transport, expected = self._run("on", "on")
+        attached = [runner.BRIEFING_EVIDENCE_HEADER in headers for headers in transport.seen]
+        self.assertEqual(attached, expected)
+        self.assertTrue(any(expected), "근거를 실은 턴이 하나도 없으면 검증이 성립하지 않는다")
+        values = {headers.get(runner.BRIEFING_EVIDENCE_HEADER) for headers in transport.seen
+                  if runner.BRIEFING_EVIDENCE_HEADER in headers}
+        self.assertEqual(values, {runner.BRIEFING_EVIDENCE_MEMORY})
+
+    def test_signal_stays_off_by_default_and_without_a_briefing(self) -> None:
+        for briefing, evidence in (("on", "off"), ("off", "on"), ("off", "off")):
+            with self.subTest(briefing=briefing, briefing_evidence=evidence):
+                transport, _expected = self._run(briefing, evidence)
+                self.assertFalse(any(runner.BRIEFING_EVIDENCE_HEADER in headers
+                                     for headers in transport.seen))
 
 
 class ScoringTests(unittest.TestCase):

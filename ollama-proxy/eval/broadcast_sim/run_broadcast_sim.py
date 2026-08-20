@@ -58,6 +58,10 @@ DEFAULT_BASE_URL = "http://127.0.0.1:11435/v1"
 DEFAULT_MODEL = "midm-airi:2.0-mini"
 DEFAULT_HISTORY_TURNS = 8
 SESSION_HEADER = "x-airi-session-id"
+# 디렉터→프록시 근거 신호. 프록시의 absence 폴백은 요청 히스토리만 보므로,
+# 시스템 프롬프트에 넣은 브리핑에 회상 재료가 있다는 사실을 이 헤더로 알린다.
+BRIEFING_EVIDENCE_HEADER = "x-airi-briefing-evidence"
+BRIEFING_EVIDENCE_MEMORY = "memory"
 
 
 def build_system_content(fixture: dict[str, Any], beat: dict[str, Any], contract: str) -> str:
@@ -71,6 +75,14 @@ def build_system_content(fixture: dict[str, Any], beat: dict[str, Any], contract
         f"- 상황: {beat['airi_cue']}\n"
         "- 주제에서 벗어난 채팅에는 짧게 받아치고 주제로 돌아와."
     )
+
+
+def set_briefing_evidence_header(transport: Any, attach: bool) -> None:
+    """이번 턴 요청에만 근거 신호를 싣는다 — 세션 헤더와 같은 자리에서 다룬다."""
+    if attach:
+        transport.client.headers[BRIEFING_EVIDENCE_HEADER] = BRIEFING_EVIDENCE_MEMORY
+    else:
+        transport.client.headers.pop(BRIEFING_EVIDENCE_HEADER, None)
 
 
 def format_user_content(message: dict[str, Any], author_format: str) -> str:
@@ -96,6 +108,7 @@ def run_arm(
     pre_session_seeds: bool,
     briefing: str = "off",
     acts: str = "off",
+    briefing_evidence: str = "off",
 ) -> dict[str, Any]:
     roster = [viewer["handle"] for viewer in fixture["viewers"]]
     drift_terms = sorted(sim.offtopic_terms(fixture))
@@ -128,10 +141,15 @@ def run_arm(
         message = pick["message"]
         beat = sim.beat_at(fixture, message["minute"])
         system_content = build_system_content(fixture, beat, contract)
+        carried_evidence = False
         if briefing == "on":
             echo_safe = sim.blank_degenerate_echo(
                 answered_picks, FALLBACK_POOL + DEGENERATE_ECHO_PREFIXES)
-            system_content += "\n\n" + sim.build_turn_briefing(fixture, stream, pick, echo_safe)
+            briefing_text, carried_evidence = sim.build_turn_briefing_with_evidence(
+                fixture, stream, pick, echo_safe)
+            system_content += "\n\n" + briefing_text
+        signalled = briefing_evidence == "on" and carried_evidence
+        set_briefing_evidence_header(transport, signalled)
         user_content = format_user_content(message, author_format)
 
         deterministic_act = None
@@ -187,6 +205,7 @@ def run_arm(
         row.update({
             "beat": beat["id"],
             "backlog_size": pick["backlog_size"],
+            "briefing_evidence": signalled,
             "deterministic_act": deterministic_act,
             "polite_violation": "v_polite_response" in register.get("violations", []),
             "banmal": bool(register.get("markers", {}).get("banmal")),
@@ -246,7 +265,8 @@ def rescore_report(payload: dict[str, Any]) -> dict[str, Any]:
                              briefing_fact_tokens=fact_tokens)
         carried = previous.get(turn_index, {})
         row.update({key: carried[key] for key in
-                    ("beat", "backlog_size", "polite_violation", "banmal", "ttft_ms", "complete_ms", "failure")
+                    ("beat", "backlog_size", "briefing_evidence", "polite_violation", "banmal",
+                     "ttft_ms", "complete_ms", "failure")
                     if key in carried})
         rows.append(row)
     summary = sim.summarize_turns(rows)
@@ -303,6 +323,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                         help="P1 쇼 러너 턴 브리핑 조립 (기본 off = 기존과 동일)")
     parser.add_argument("--acts", choices=("off", "on"), default="off",
                         help="P2 결정론 발화 (thank 렌더러·여론 오프너·기억 가드)")
+    parser.add_argument("--briefing-evidence", choices=("off", "on"), default="off",
+                        help="브리핑에 회상 재료가 실린 턴에 근거 신호 헤더 부착 (기본 off = 기존과 동일)")
     parser.add_argument("--stream-only", action="store_true", help="모델 호출 없이 스트림/픽업만 낸다")
     parser.add_argument("--rescore", type=Path, help="기존 리포트를 모델 호출 없이 재채점한다")
     parser.add_argument("--report", type=Path)
@@ -347,6 +369,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             pre_session_seeds=args.memory_arm == "seeded",
             briefing=args.briefing,
             acts=args.acts,
+            briefing_evidence=args.briefing_evidence,
         )
     finally:
         transport.close()
@@ -358,6 +381,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "memory_arm": args.memory_arm,
         "briefing": args.briefing,
         "acts": args.acts,
+        "briefing_evidence": args.briefing_evidence,
         "session_id": session_id,
         "contract": args.contract,
         "contract_version": BROADCAST_CONTRACT_VERSION if args.contract == "on" else None,
