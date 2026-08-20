@@ -26,8 +26,10 @@ from airi_memory import (
     assemble_context,
     render_memory_placeholders,
 )
-from benchmark_memory_track import parse_stage_a
-from memory_prompts import STAGE_A_SCHEMA, STAGE_A_CONVERSATION_SYSTEM_PROMPT, STAGE_B_DECISION_SYSTEM_PROMPT
+from benchmark_memory_track import (
+    parse_stage_a, parse_stage_a_span, stage_a_prompt_for_contract, stage_a_user_input,
+)
+from memory_prompts import STAGE_A_SCHEMA, STAGE_A_SPAN_SCHEMA, STAGE_B_DECISION_SYSTEM_PROMPT
 from memory_stage_b import compile_decisions, decision_schema_for_items, format_stage_b_input, parse_stage_b_decisions
 from latency_trace import emit_latency_event
 from memory_extraction_provider import (
@@ -35,6 +37,13 @@ from memory_extraction_provider import (
     MemoryExtractionProvider,
     approved_base_url,
 )
+
+# Stage A contracts the live extractor may serve.  The benchmark's ``legacy``
+# contract is a character-sheet control and is deliberately not offered here.
+STAGE_A_RUNTIME_CONTRACTS = ("conversation-v2b", "conversation-v3-span")
+STAGE_A_SPAN_CONTRACT = "conversation-v3-span"
+# Frozen orientation header for the live conversation extractor.
+STAGE_A_CHARACTER_BLOCK = "name: 아이리; scope: conversation"
 
 
 def _decorate_snapshot_messages(raw_messages: Iterable[dict[str, Any]], latest_turn: int) -> list[dict[str, Any]]:
@@ -166,6 +175,7 @@ class MemoryConfig:
     extraction_api_key: str = ""
     extraction_max_tokens: int = 2048
     extraction_seed: int = 42
+    extraction_stage_a_contract: str = "conversation-v2b"
     user_display_name: str = ""
     character_name: str = "아이리"
     canon_bundle_path: str = ""
@@ -184,6 +194,11 @@ class MemoryConfig:
         provider = os.getenv("AIRI_MEMORY_EXTRACTION_PROVIDER", "ollama").lower().strip()
         if provider not in {"ollama", "openai", "anthropic"}:
             raise ValueError("AIRI_MEMORY_EXTRACTION_PROVIDER must be ollama, openai, or anthropic")
+        stage_a_contract = os.getenv(
+            "AIRI_MEMORY_EXTRACTION_STAGE_A_CONTRACT", "conversation-v2b").strip() or "conversation-v2b"
+        if stage_a_contract not in STAGE_A_RUNTIME_CONTRACTS:
+            raise ValueError("AIRI_MEMORY_EXTRACTION_STAGE_A_CONTRACT must be "
+                             + " or ".join(STAGE_A_RUNTIME_CONTRACTS))
         allowlist = frozenset(host.strip().lower() for host in os.getenv(
             "AIRI_MEMORY_EXTERNAL_EXTRACTION_ALLOWLIST", "").split(",") if host.strip())
         defaults = {"openai": "https://api.openai.com/v1", "anthropic": "https://api.anthropic.com/v1"}
@@ -218,6 +233,7 @@ class MemoryConfig:
             extraction_api_key=api_key,
             extraction_max_tokens=_positive("AIRI_MEMORY_EXTRACTION_MAX_TOKENS", 2048, minimum=64),
             extraction_seed=_positive("AIRI_MEMORY_EXTRACTION_SEED", 42, minimum=0),
+            extraction_stage_a_contract=stage_a_contract,
             user_display_name=_display_name("AIRI_MEMORY_USER_NAME"),
             character_name=_display_name("AIRI_MEMORY_CHARACTER_NAME", "아이리"),
             canon_bundle_path=os.getenv("AIRI_MEMORY_CANON_BUNDLE", "").strip(),
@@ -742,7 +758,8 @@ class MemoryRuntime:
         return await self.extraction_provider.chat_json(system, user, schema)
 
     @staticmethod
-    def _turns(rows: list[Any], max_chars: int | None = None) -> str:
+    def _turns(rows: list[Any], max_chars: int | None = None, *, span: bool = False) -> str:
+        """Render the turn lines only; the caller's contract adds the wrapper."""
         contents = [str(row["content"]) for row in rows]
         if max_chars is not None and sum(map(len, contents)) > max_chars:
             # Preserve the beginning and end of both sides of an oversized turn.
@@ -757,10 +774,11 @@ class MemoryRuntime:
                 tail = max(0, per_row - head - 1)
                 clipped.append(content[:head] + "…" + (content[-tail:] if tail else ""))
             contents = clipped
-        return "<turns>" + "\n".join(
-            f'[{row["turn_no"]}:{row["role"]}] {content}'
-            for row, content in zip(rows, contents)
-        ) + "</turns>"
+        # The span contract is trained and measured on the benchmark's
+        # `[turn N]` lines, so role tags would be out-of-distribution there.
+        labels = [f'[turn {row["turn_no"]}]' if span else f'[{row["turn_no"]}:{row["role"]}]'
+                  for row in rows]
+        return "\n".join(f"{label} {content}" for label, content in zip(labels, contents))
 
     async def _extract(self, sid: str, trace_id: str, *, force: bool = False) -> None:
         """Serialize the local extractor and drain bounded message batches."""
@@ -795,17 +813,30 @@ class MemoryRuntime:
             )
             if not rows:
                 return
-            stage_a_input = "<character>name: 아이리; scope: conversation</character>" + self._turns(
-                rows, self.config.extraction_batch_chars
-            )
-            parsed_a = parse_stage_a(await self._chat_json(STAGE_A_CONVERSATION_SYSTEM_PROMPT, stage_a_input, STAGE_A_SCHEMA))
+            # Contract selection: the default reproduces the shipped v2b bytes,
+            # while the opt-in reuses the benchmark/training assembly verbatim so
+            # a fine-tuned extractor never meets a prompt no run ever measured.
+            contract = self.config.extraction_stage_a_contract
+            span = contract == STAGE_A_SPAN_CONTRACT
+            turns = self._turns(rows, self.config.extraction_batch_chars, span=span)
+            stage_a_input = (stage_a_user_input(STAGE_A_CHARACTER_BLOCK, turns) if span else
+                             "<character>%s</character><turns>%s</turns>" % (STAGE_A_CHARACTER_BLOCK, turns))
+            raw_a = await self._chat_json(stage_a_prompt_for_contract(contract), stage_a_input,
+                                          STAGE_A_SPAN_SCHEMA if span else STAGE_A_SCHEMA)
+            if span:
+                # A quote the turns do not contain costs recall instead of
+                # poisoning the store; record the loss so it stays visible.
+                parsed_a, dropped = parse_stage_a_span(raw_a, turns)
+                span_meta: dict[str, int] = {"span_dropped": dropped}
+            else:
+                parsed_a, span_meta = parse_stage_a(raw_a), {}
             ids, watermark = [r["id"] for r in rows], rows[-1]["turn_no"]
             extracted = parsed_a["extracted"]
             if not extracted:
                 await self._store_call(self.store.extraction_success, sid, ids, watermark, 0)
                 self._extraction_retry_sessions.pop(sid, None)
                 self._extraction_retry_delay = 1.0
-                self._emit("extract_end", trace_id, (time.perf_counter()-started)*1000, extracted=0, operations=0)
+                self._emit("extract_end", trace_id, (time.perf_counter()-started)*1000, extracted=0, operations=0, **span_meta)
                 return
             candidates, aliases = await self._store_call(self.store.build_stage_b_candidates, sid, extracted, 5)
             prompt = format_stage_b_input(extracted, candidates)
@@ -824,7 +855,7 @@ class MemoryRuntime:
             )
             self._extraction_retry_sessions.pop(sid, None)
             self._extraction_retry_delay = 1.0
-            self._emit("extract_end", trace_id, (time.perf_counter()-started)*1000, extracted=len(extracted), operations=len(operations))
+            self._emit("extract_end", trace_id, (time.perf_counter()-started)*1000, extracted=len(extracted), operations=len(operations), **span_meta)
         except ExtractionUnavailableError:
             self._extract_dirty.discard(sid)
             self._extract_force.discard(sid)

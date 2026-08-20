@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import sqlite3
 import sys
@@ -15,7 +16,10 @@ from memory_runtime import (
     assemble_payload_context_from_snapshot,
 )
 from memory_stage_b import decision_schema_for_items
-from memory_prompts import STAGE_A_CONVERSATION_SYSTEM_PROMPT
+from memory_prompts import (
+    STAGE_A_CONVERSATION_SYSTEM_PROMPT, STAGE_A_SCHEMA,
+    STAGE_A_SPAN_SCHEMA, STAGE_A_SPAN_SYSTEM_PROMPT,
+)
 
 
 class FakeResponse:
@@ -1087,6 +1091,77 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("old astronomy subject", contents)
         self.assertEqual(history[0]["content"], "old astronomy subject")
         await r.shutdown()
+
+    # --- Stage A contract selection (v2b default / v3-span opt-in) -----------
+
+    async def test_default_stage_a_assembly_is_byte_frozen(self):
+        """The default contract must keep the exact bytes the v2b run shipped."""
+        a = '{"extracted":[]}'
+        r = await self.runtime((a,))
+        with patch("memory_runtime.emit_latency_event") as emit:
+            await r.schedule_completed_turn("s", "u", "a", 1)
+            await r._extract("s", "x", force=True)
+        body = r.http_client.calls[0][1]
+        self.assertEqual(body["messages"][0]["content"], STAGE_A_CONVERSATION_SYSTEM_PROMPT)
+        self.assertEqual(
+            body["messages"][1]["content"],
+            "<character>name: 아이리; scope: conversation</character><turns>[1:user] u\n[1:assistant] a</turns>",
+        )
+        self.assertEqual(body["format"], STAGE_A_SCHEMA)
+        metas = [c.kwargs.get("meta", {}) for c in emit.call_args_list]
+        self.assertTrue(all("span_dropped" not in meta for meta in metas))
+        await r.shutdown()
+
+    async def test_span_contract_assembly_is_byte_identical_to_benchmark(self):
+        from dataclasses import replace
+        import benchmark_memory_track as bench
+
+        a = '{"extracted":[]}'
+        client = FakeClient((a,))
+        config = replace(self.config, extraction_stage_a_contract="conversation-v3-span")
+        r = MemoryRuntime(config, http_client=client)
+        await r.startup()
+        await r.schedule_completed_turn("s", "u", "a", 1)
+        await r._extract("s", "x", force=True)
+        body = client.calls[0][1]
+        self.assertEqual(body["messages"][0]["content"], STAGE_A_SPAN_SYSTEM_PROMPT)
+        self.assertEqual(
+            body["messages"][1]["content"],
+            bench.stage_a_user_input("name: 아이리; scope: conversation", "[turn 1] u\n[turn 1] a"),
+        )
+        self.assertEqual(body["format"], STAGE_A_SPAN_SCHEMA)
+        await r.shutdown()
+
+    async def test_span_contract_drops_items_whose_evidence_is_not_quoted(self):
+        from dataclasses import replace
+
+        a = json.dumps({"extracted": [
+            {"turnNumber": 1, "kind": "entity", "subtype": "person", "name": "하린",
+             "content": "달빛 길드의 마도사", "evidence": "하린은 달빛 길드의 마도사다"},
+            {"turnNumber": 1, "kind": "entity", "subtype": "person", "name": "루나",
+             "content": "지어낸 인물", "evidence": "루나는 북쪽 탑에 산다"},
+        ]}, ensure_ascii=False)
+        b = '{"decisions":[{"sourceItemIndex":0,"action":"add","candidateAlias":null,"reason":null}]}'
+        client = FakeClient((a, b))
+        config = replace(self.config, extraction_stage_a_contract="conversation-v3-span")
+        r = MemoryRuntime(config, http_client=client)
+        await r.startup()
+        with patch("memory_runtime.emit_latency_event") as emit:
+            await r.schedule_completed_turn("s", "하린은 달빛 길드의 마도사다", "그렇군요", 1)
+            await r._extract("s", "x", force=True)
+        self.assertEqual([row["name"] for row in r.store.active_rows("s", "entity")], ["하린"])
+        end_meta = next(c.kwargs["meta"] for c in emit.call_args_list if c.args[1] == "extract_end")
+        self.assertEqual((end_meta["extracted"], end_meta["span_dropped"]), (1, 1))
+        await r.shutdown()
+
+    def test_stage_a_contract_env_defaults_to_v2b_and_rejects_unknown(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(MemoryConfig.from_env().extraction_stage_a_contract, "conversation-v2b")
+        with patch.dict(os.environ, {"AIRI_MEMORY_EXTRACTION_STAGE_A_CONTRACT": "conversation-v3-span"}, clear=True):
+            self.assertEqual(MemoryConfig.from_env().extraction_stage_a_contract, "conversation-v3-span")
+        with patch.dict(os.environ, {"AIRI_MEMORY_EXTRACTION_STAGE_A_CONTRACT": "span"}, clear=True):
+            with self.assertRaises(ValueError):
+                MemoryConfig.from_env()
 
 
 if __name__ == "__main__": unittest.main()
