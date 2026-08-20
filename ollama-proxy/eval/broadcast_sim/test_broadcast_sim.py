@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import copy
 import importlib.util
 import sys
@@ -9,6 +10,7 @@ from pathlib import Path
 
 
 HERE = Path(__file__).resolve().parent
+PROXY_SOURCE = HERE.parent.parent / "ollama_proxy.py"  # ollama-proxy/ollama_proxy.py — read-only(부작용 무거운 import 금지)
 SPEC = importlib.util.spec_from_file_location("broadcast_sim_test", HERE / "broadcast_sim.py")
 assert SPEC is not None and SPEC.loader is not None
 sim = importlib.util.module_from_spec(SPEC)
@@ -320,6 +322,40 @@ class BriefingTests(unittest.TestCase):
         self.assertIn("→ 나:", with_echo)
         self.assertIn("방금 흐름", without_echo)  # 채팅 자체는 남는다
 
+    def test_live_absence_and_silence_fallbacks_are_blanked_regardless_of_length(self) -> None:
+        # 갭 등록(2026-08-19): 프록시 absence 폴백("아직 기록이 없어. 어떻게
+        # 부르면 돼?" 17자)은 8자 길이 필터만으로는 걸러지지 않는다. 실제로
+        # 전염을 막는 건 run_broadcast_sim.py 가 매 턴 앞서 돌리는
+        # blank_degenerate_echo(FALLBACK_POOL + DEGENERATE_ECHO_PREFIXES) 다 —
+        # 여기서 그 결합 필터를 실제로 통과시켜 규명한다(4-1).
+        pick = self.picks[6]
+        prior_slot = self.picks[5]
+        combined = runner.FALLBACK_POOL + runner.DEGENERATE_ECHO_PREFIXES
+        absence_lines = (
+            "아직 기록이 없어. 어떻게 부르면 돼?",  # ollama_proxy.memory_absence_dialogue (별명/이름 질문)
+            "아직 그건 기록이 없어. 다시 알려줄래?",  # ollama_proxy.memory_absence_dialogue (그 외)
+        )
+        for line in absence_lines:
+            # 원 갭 등록의 핵심 조건 — 8자 길이 필터'만'으로는 못 걸렀을 문구.
+            # 침묵 풀 6종 중 일부(예: "음, 잠깐만." 7자)는 원래도 길이 필터를
+            # 통과하므로 이 assert 대상이 아니다 — 결합 필터 자체는 아래에서
+            # 전체(absence + 침묵 풀)에 공통으로 검증한다.
+            self.assertGreaterEqual(len(line), 8, line)
+        live_fallback_lines = (*absence_lines, *runner.FALLBACK_POOL)
+        for response in live_fallback_lines:
+            with self.subTest(response=response):
+                prior = [{**prior_slot, "response": response}]
+                echo_safe = sim.blank_degenerate_echo(prior, combined)
+                briefing = sim.build_turn_briefing(self.fixture, self.stream, pick, echo_safe)
+                self.assertNotIn("→ 나:", briefing)
+                if len(response) >= 8:
+                    # 대조군: 8자 이상인데 blank_degenerate_echo 를 안 거치면
+                    # (수리 전 상태 재현) 길이 필터만으로는 못 걸러 새어 나간다
+                    # — 이 테스트가 회귀에 민감한지 증명한다. 8자 미만 문구는
+                    # 애초에 길이 필터 하나로도 막히므로 이 대조군 대상이 아니다.
+                    leaking = sim.build_turn_briefing(self.fixture, self.stream, pick, prior)
+                    self.assertIn("→ 나:", leaking)
+
     def test_fact_usage_scores_only_briefed_novel_tokens(self) -> None:
         probe = next(pick for pick in self.picks if pick["message"]["kind"] == "memory_probe"
                      and pick["message"].get("probe_index") == 0)
@@ -430,6 +466,67 @@ class BriefingEvidenceSignalTests(unittest.TestCase):
                 transport, _expected = self._run(briefing, evidence)
                 self.assertFalse(any(runner.BRIEFING_EVIDENCE_HEADER in headers
                                      for headers in transport.seen))
+
+
+class EchoFilterProxyContractTests(unittest.TestCase):
+    """ollama_proxy.py 의 결정론 폴백 문구와 run_broadcast_sim.py 의 에코 차단
+    상수가 어긋나지 않는지 확인한다. ollama_proxy 모듈은 import 부작용이
+    무거워(레포 관례) 여기서도 직접 import하지 않고, 소스를 AST로만 읽는다
+    (ollama-proxy/eval/test_run_airi_conversation_soak_transport.py 의
+    literal contract 테스트와 같은 방식)."""
+
+    def _proxy_tree(self) -> ast.Module:
+        return ast.parse(PROXY_SOURCE.read_text(encoding="utf-8"))
+
+    def _proxy_absence_fallback_lines(self) -> tuple[str, ...]:
+        tree = self._proxy_tree()
+        lines: list[str] = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == "memory_absence_dialogue":
+                for sub in ast.walk(node):
+                    if isinstance(sub, ast.Return) and isinstance(sub.value, ast.Constant):
+                        lines.append(sub.value.value)
+        return tuple(lines)
+
+    def _proxy_silence_fallback_pool(self) -> tuple[str, ...]:
+        tree = self._proxy_tree()
+        simple_values: dict[str, str] = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "GROUNDING_SILENCE_FALLBACK_DIALOGUE":
+                        simple_values[target.id] = ast.literal_eval(node.value)
+        pool_elts: list[ast.expr] | None = None
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "GROUNDING_SILENCE_FALLBACK_POOL":
+                        assert isinstance(node.value, ast.Tuple)
+                        pool_elts = list(node.value.elts)
+        assert pool_elts is not None, "GROUNDING_SILENCE_FALLBACK_POOL 을 프록시 소스에서 못 찾았다"
+        return tuple(
+            simple_values[elt.id] if isinstance(elt, ast.Name) else ast.literal_eval(elt)
+            for elt in pool_elts
+        )
+
+    def test_absence_fallback_wording_is_covered_by_the_runner_prefixes(self) -> None:
+        # ollama_proxy.memory_absence_dialogue() 의 두 문구 — 소스에서 직접 뽑아
+        # 하드코딩 중복 없이 대조한다.
+        absence_lines = self._proxy_absence_fallback_lines()
+        self.assertEqual(len(absence_lines), 2, absence_lines)
+        for line in absence_lines:
+            with self.subTest(line=line):
+                self.assertTrue(
+                    line.startswith(runner.DEGENERATE_ECHO_PREFIXES),
+                    f"{line!r} 가 run_broadcast_sim.DEGENERATE_ECHO_PREFIXES 에 안 걸린다 — 구멍",
+                )
+
+    def test_runner_fallback_pool_matches_the_live_silence_rotation(self) -> None:
+        # ollama_proxy.GROUNDING_SILENCE_FALLBACK_POOL(6종)과 러너 FALLBACK_POOL
+        # 이 같은 문구 집합이어야 침묵 폴백률 계산과 에코 차단이 의미를 갖는다.
+        live_pool = self._proxy_silence_fallback_pool()
+        self.assertEqual(len(live_pool), 6, live_pool)
+        self.assertEqual(set(live_pool), set(runner.FALLBACK_POOL))
 
 
 class ScoringTests(unittest.TestCase):
