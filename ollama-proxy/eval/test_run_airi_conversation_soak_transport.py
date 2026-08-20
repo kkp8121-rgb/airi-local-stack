@@ -49,6 +49,13 @@ class ConversationSoakTransportTests(unittest.TestCase):
             "GROUNDING_SILENCE_FALLBACK_DIALOGUE",
         }
         values: dict[str, str] = {}
+        # 침묵 폴백 풀(GROUNDING_SILENCE_FALLBACK_POOL, 6문구 결정론 순환)이 SSoT다.
+        # 첫 원소는 GROUNDING_SILENCE_FALLBACK_DIALOGUE 를 그대로 참조하는 Name
+        # 노드라서(중복 리터럴 방지) ast.literal_eval 이 통째로는 못 읽는다 —
+        # 순수 리터럴 원소만 개별 literal_eval 하고 Name 원소는 위에서 이미 뽑은
+        # 값으로 치환한다(ollama-proxy/eval/broadcast_sim/test_broadcast_sim.py 의
+        # EchoFilterProxyContractTests._proxy_silence_fallback_pool 과 동일 패턴).
+        pool_elts: list[ast.expr] | None = None
         for node in ast.parse(proxy_source.read_text(encoding="utf-8")).body:
             if not isinstance(node, (ast.Assign, ast.AnnAssign)):
                 continue
@@ -56,13 +63,18 @@ class ConversationSoakTransportTests(unittest.TestCase):
             for target in targets:
                 if isinstance(target, ast.Name) and target.id in wanted:
                     values[target.id] = ast.literal_eval(node.value)
+                elif isinstance(target, ast.Name) and target.id == "GROUNDING_SILENCE_FALLBACK_POOL":
+                    self.assertIsInstance(node.value, ast.Tuple)
+                    pool_elts = list(node.value.elts)
         self.assertEqual(values.keys(), wanted)
+        self.assertIsNotNone(pool_elts, "GROUNDING_SILENCE_FALLBACK_POOL 을 프록시 소스에서 못 찾았다")
+        pool = frozenset(
+            values[elt.id] if isinstance(elt, ast.Name) else ast.literal_eval(elt)
+            for elt in pool_elts
+        )
         self.assertEqual(runner.LOCAL_IMMEDIATE_ACK, values["LOCAL_IMMEDIATE_ACK"])
         self.assertEqual(runner.SEARCH_IMMEDIATE_ACK, values["SEARCH_IMMEDIATE_ACK"])
-        self.assertEqual(
-            runner.NON_SUBSTANTIVE_RESPONSES,
-            frozenset({values["GROUNDING_SILENCE_FALLBACK_DIALOGUE"]}),
-        )
+        self.assertEqual(runner.NON_SUBSTANTIVE_RESPONSES, pool)
 
     def _reply(self, content: str, header: str | None, *, fragment: bool = False) -> runner.StreamReply:
         def handler(request: httpx.Request) -> httpx.Response:
