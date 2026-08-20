@@ -37,10 +37,22 @@ REPLY_HEADER = "[AIRI 추출 SFT 검수 회신"
 _REJECTED_RE = re.compile(r"^rejected=(.+)$", re.M)
 _REWRITE_RE = re.compile(r"^rewrite:\s*(xseed-[a-z_]+-[0-9]{4})\s*=>\s*(.+)$", re.M)
 _APPROVED_RE = re.compile(r"^approved=(\d+)/(\d+)$", re.M)
+# 헤더 형식 확장: `... 회신 <날짜> queue=<sha256 앞 12자>]` — 큐 결속(Minor 9) 파싱용.
+_QUEUE_RE = re.compile(r"queue=([0-9a-f]{12})\]")
 
 
 class ReviewReplyError(ValueError):
     """Fail closed on an ambiguous, incomplete, or gate-violating reply."""
+
+
+def queue_digest(pending_path: Path) -> str:
+    """Pending 큐 파일 내용의 sha256 단축(12자).
+
+    회신이 어느 큐 스냅샷을 검수했는지 결속하는 값이다 — 큐가 재생성되면
+    (레코드 수·id 가 우연히 같더라도) 이 값이 달라져 구 회신이 새 큐에
+    적용되는 사고를 apply_reply 가 잡아낼 수 있다 (Task 2 리뷰 Minor 9).
+    """
+    return hashlib.sha256(pending_path.read_bytes()).hexdigest()[:12]
 
 
 def parse_reply(reply: str) -> dict[str, object]:
@@ -56,9 +68,11 @@ def parse_reply(reply: str) -> dict[str, object]:
     if rejected_match:
         rejected = [item.strip() for item in rejected_match.group(1).split(",") if item.strip()]
     rewrites = {match.group(1): match.group(2).strip() for match in _REWRITE_RE.finditer(reply)}
+    queue_match = _QUEUE_RE.search(reply)
     return {"approved_count": int(approved_match.group(1)),
             "total": int(approved_match.group(2)),
-            "rejected": rejected, "rewrites": rewrites}
+            "rejected": rejected, "rewrites": rewrites,
+            "queue_sha": queue_match.group(1) if queue_match else None}
 
 
 def verify_rewritten_target(record_id: str, target: str, turns: str) -> str:
@@ -87,8 +101,27 @@ def verify_rewritten_target(record_id: str, target: str, turns: str) -> str:
     return json.dumps(parsed, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
+_STALE_FORM_HINT = ("폼이 갱신되었습니다 — 최신 폼"
+                    "(AIRI-EXTRACTION-REVIEW-FORM-2026-08-20.html)으로 다시 검수해 주세요")
+
+
 def apply_reply(records: list[dict], reply: dict[str, object],
-                reviewer: str, approved_at: str) -> tuple[list[dict], dict[str, int]]:
+                reviewer: str, approved_at: str,
+                queue_sha: str) -> tuple[list[dict], dict[str, int]]:
+    """``queue_sha``(현재 큐의 sha256 단축 12자, ``queue_digest()`` 로 계산)로 회신을
+    그 큐 스냅샷에 결속한다(Task 2 리뷰 Minor 9).
+
+    이 인자는 필수다 — 레포의 fail-closed 원칙상 큐 결속을 조용히 건너뛸 수 있는
+    우회 경로(선택적 인자·기본값)를 두지 않는다. 회신에 queue= 세그먼트가 없거나
+    (구 형식 회신) 값이 현재 큐와 다르면(큐가 재생성됨) 무조건 거부한다.
+    """
+    reply_queue_sha = reply.get("queue_sha")
+    if reply_queue_sha is None:
+        raise ReviewReplyError(f"회신 헤더에 큐 sha가 없다 — {_STALE_FORM_HINT}")
+    if reply_queue_sha != queue_sha:
+        raise ReviewReplyError(
+            f"회신의 큐 sha({reply_queue_sha})가 현재 큐({queue_sha})와 다르다 "
+            f"— 큐가 재생성됐다, {_STALE_FORM_HINT}")
     known = {record["id"] for record in records}
     rejected = set(reply["rejected"])  # type: ignore[arg-type]
     rewrites: dict[str, str] = reply["rewrites"]  # type: ignore[assignment]
@@ -138,7 +171,8 @@ def main(argv: list[str] | None = None) -> int:
     records = [json.loads(line) for line in
                args.pending.read_text(encoding="utf-8").splitlines() if line.strip()]
     reply = parse_reply(args.reply.read_text(encoding="utf-8"))
-    reviewed, counts = apply_reply(records, reply, args.reviewer.strip(), args.approved_at.strip())
+    reviewed, counts = apply_reply(records, reply, args.reviewer.strip(), args.approved_at.strip(),
+                                    queue_digest(args.pending))
 
     payload = "\n".join(json.dumps(entry, ensure_ascii=False, sort_keys=True,
                                    separators=(",", ":")) for entry in reviewed) + "\n"

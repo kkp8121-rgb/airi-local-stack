@@ -14,6 +14,7 @@ compile step after the user pastes it back.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -57,6 +58,9 @@ PAGE = """<!DOCTYPE html>
   .item .body { font-size:.88rem; }
   .item .evid { font-size:.76rem; color:var(--sub); margin-top:2px; }
   .item.none { border-left-color:var(--sub); color:var(--sub); font-size:.85rem; }
+  .item.err { border-left-color:var(--bad); color:var(--bad); font-size:.85rem; }
+  .card.invalid-rewrite { border-left-color:var(--bad); }
+  .rw-err { font-size:.74rem; color:var(--bad); margin-top:4px; }
   .buttons { display:flex; gap:6px; margin-top:8px; }
   .buttons button { padding:5px 14px; border-radius:6px; border:1px solid var(--line);
                     background:var(--card); cursor:pointer; font-size:.84rem; font-family:inherit; }
@@ -103,6 +107,7 @@ PAGE = """<!DOCTYPE html>
 <script>
 const RECORDS = __RECORDS__;
 const SCENE_LABELS = __SCENE_LABELS__;
+const QUEUE_SHA = '__QUEUE_SHA__';
 const KEY = 'airi-extraction-review-__DATE__';
 const BY_ID = {};
 for (const record of RECORDS) BY_ID[record.id] = record;
@@ -125,6 +130,20 @@ function setDecision(id, kind) {
 function setRewriteText(id, text) {
   decisions[id] = { kind: 'rewrite', text: text };
   save();
+  updateRewriteFeedback(id);
+}
+function updateRewriteFeedback(id) {
+  // 카드 전체를 다시 그리면 타이핑 중 커서 위치를 잃는다 — 오류 배지만 직접 갱신한다.
+  const card = document.getElementById('card-' + id);
+  const err = document.getElementById('rwerr-' + id);
+  if (!card || !err) return;
+  const check = validateRewriteTarget(decisions[id].text || '', BY_ID[id].turns);
+  card.className = 'card' + (check.ok ? ' decided-rewrite' : ' invalid-rewrite');
+  if (check.ok) { err.style.display = 'none'; err.textContent = ''; }
+  else {
+    err.style.display = 'block';
+    err.textContent = '⚠ ' + check.reason + ' — 이 건은 미결정으로 취급됩니다(회신에 포함되지 않음)';
+  }
 }
 function approveVisible() {
   for (const record of RECORDS) {
@@ -157,10 +176,49 @@ function describeItem(item) {
   </div>`;
 }
 function renderItems(record) {
-  let items = [];
-  try { items = JSON.parse(record.target).extracted || []; } catch (e) { items = []; }
+  // target JSON 파싱 실패는 "추출 항목 없음(정답)" 과 다른 오류다 — 같은 문구로
+  // 렌더하면 검수자가 데이터 결함을 정상 케이스로 오인한다 (Task 2 리뷰 Minor 1).
+  let parsed;
+  try { parsed = JSON.parse(record.target); }
+  catch (e) {
+    return `<div class="item err">⚠ target JSON 파싱 실패 — 데이터 오류(정답 아님, 개발자에게 보고할 것): ${escapeHtml(e.message)}</div>`;
+  }
+  const items = (parsed && Array.isArray(parsed.extracted)) ? parsed.extracted : [];
   if (!items.length) return `<div class="item none">추출 항목 없음 — 아무것도 뽑지 않는 것이 정답</div>`;
   return items.map(describeItem).join('');
+}
+// (a) 수정(rewrite) 입력 사전 검증 — 서버(파이썬) `parse_stage_a_span` 이 최종 SSoT다.
+// 여기서는 그 게이트의 보수적 부분집합만 확인한다: JSON 파싱 가능·{"extracted":[...]}
+// 형태·evidence 가 해당 record.turns 의 부분 문자열·이름 필드(name/subjectNames/
+// sourceName/targetName)가 evidence 안에 포함. 통과해도 서버가 다시 전부 검증하며,
+// 서버가 잡는 위반(스키마 세부 규칙 등)을 여기서 전부 재현하지는 않는다 — 목적은
+// 흔한 실수를 왕복 없이 그 자리에서 잡아 재작업 비용을 줄이는 것이다.
+function validateRewriteTarget(text, turnsText) {
+  let parsed;
+  try { parsed = JSON.parse(text); }
+  catch (e) { return { ok: false, reason: 'JSON 파싱 실패: ' + e.message }; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !Array.isArray(parsed.extracted)) {
+    return { ok: false, reason: '{"extracted":[...]} 형태가 아니다' };
+  }
+  for (const item of parsed.extracted) {
+    if (!item || typeof item !== 'object' || typeof item.evidence !== 'string' || !item.evidence) {
+      return { ok: false, reason: '항목에 evidence 문자열이 없다' };
+    }
+    if (!turnsText.includes(item.evidence)) {
+      return { ok: false, reason: `근거 인용이 원문에 없다: "${item.evidence}"` };
+    }
+    const names = [];
+    if (typeof item.name === 'string') names.push(item.name);
+    if (Array.isArray(item.subjectNames)) names.push(...item.subjectNames);
+    if (typeof item.sourceName === 'string') names.push(item.sourceName);
+    if (typeof item.targetName === 'string') names.push(item.targetName);
+    for (const name of names) {
+      if (!item.evidence.includes(name)) {
+        return { ok: false, reason: `이름 "${name}" 이 근거 인용 안에 없다` };
+      }
+    }
+  }
+  return { ok: true };
 }
 function render() {
   renderTabs();
@@ -168,8 +226,14 @@ function render() {
   list.innerHTML = RECORDS.filter(record => activeTab === 'all' || record.scene === activeTab)
     .map(record => {
       const decision = decisions[record.id] || {};
-      const cls = decision.kind ? ' decided-' + decision.kind : '';
+      const rewriteCheck = decision.kind === 'rewrite'
+        ? validateRewriteTarget(decision.text || '', record.turns) : null;
+      const invalidRewrite = !!(rewriteCheck && !rewriteCheck.ok);
+      const cls = !decision.kind ? '' : (invalidRewrite ? ' invalid-rewrite' : ' decided-' + decision.kind);
       const rewriteShown = decision.kind === 'rewrite' ? 'style="display:block"' : '';
+      const errShown = invalidRewrite ? 'style="display:block"' : 'style="display:none"';
+      const errText = invalidRewrite
+        ? '⚠ ' + escapeHtml(rewriteCheck.reason) + ' — 이 건은 미결정으로 취급됩니다(회신에 포함되지 않음)' : '';
       return `<div class="card${cls}" id="card-${record.id}">
         <div class="meta"><code>${record.id}</code> · ${SCENE_LABELS[record.scene]} · ${escapeHtml(record.character)}</div>
         <div class="turns">${escapeHtml(record.turns)}</div>
@@ -181,6 +245,7 @@ function render() {
         </div>
         <textarea class="rw" ${rewriteShown} placeholder="수정 target JSON — 한 줄, {&quot;extracted&quot;:[…]} 형태"
           oninput="setRewriteText('${record.id}', this.value)">${escapeHtml(decision.text || '')}</textarea>
+        <div class="rw-err" id="rwerr-${record.id}" ${errShown}>${errText}</div>
       </div>`;
     }).join('');
   refresh();
@@ -194,14 +259,20 @@ function refresh() {
   document.getElementById('prog').textContent = `${done} / ${RECORDS.length} 결정`;
 }
 function buildResult() {
-  const lines = ['[AIRI 추출 SFT 검수 회신 __DATE__]'];
+  const lines = [`[AIRI 추출 SFT 검수 회신 __DATE__ queue=${QUEUE_SHA}]`];
   let approved = 0; const rejected = []; const rewritten = []; const undecided = [];
   for (const record of RECORDS) {
     const decision = decisions[record.id];
     if (!decision) { undecided.push(record.id); continue; }
     if (decision.kind === 'approve') approved += 1;
     else if (decision.kind === 'reject') rejected.push(record.id);
-    else if (decision.kind === 'rewrite') rewritten.push(record.id + ' => ' + (decision.text || '').trim());
+    else if (decision.kind === 'rewrite') {
+      // (a) 위반 시 이 건은 회신 텍스트에서 빠지고 미결정으로 취급된다 —
+      // 서버가 fail-closed 로 전체 회신을 거부하는 것과 결과가 정합한다.
+      const check = validateRewriteTarget(decision.text || '', record.turns);
+      if (check.ok) rewritten.push(record.id + ' => ' + (decision.text || '').trim());
+      else undecided.push(record.id);
+    }
   }
   lines.push(`approved=${approved}/${RECORDS.length}`);
   if (rejected.length) lines.push('rejected=' + rejected.join(', '));
@@ -239,6 +310,15 @@ SCENE_LABELS = {
 }
 
 
+def queue_digest(pending_path: Path) -> str:
+    """Pending 큐 파일 내용의 sha256 단축(12자).
+
+    apply_extraction_review_reply.py 의 동명 함수와 정의가 같아야 한다 — 폼이
+    임베드한 값과 적용기가 재계산한 값이 같은 큐 스냅샷일 때만 일치한다(Minor 9).
+    """
+    return hashlib.sha256(pending_path.read_bytes()).hexdigest()[:12]
+
+
 def build_form(pending_path: Path, date_label: str) -> str:
     records = []
     for line in pending_path.read_text(encoding="utf-8").splitlines():
@@ -258,6 +338,7 @@ def build_form(pending_path: Path, date_label: str) -> str:
             .replace("__RECORDS__", payload)
             .replace("__SCENE_LABELS__", json.dumps(SCENE_LABELS, ensure_ascii=False))
             .replace("__TOTAL__", str(len(records)))
+            .replace("__QUEUE_SHA__", queue_digest(pending_path))
             .replace("__DATE__", date_label))
 
 

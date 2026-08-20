@@ -29,10 +29,14 @@ PENDING = [json.loads(line) for line in
            PENDING_PATH.read_text(encoding="utf-8").splitlines() if line]
 
 
+QUEUE_SHA = applier.queue_digest(PENDING_PATH)
+
+
 def reviewed_records() -> list[dict]:
     reply = applier.parse_reply(
-        f"[AIRI 추출 SFT 검수 회신 2026-08-20]\napproved={len(PENDING)}/{len(PENDING)}")
-    reviewed, _counts = applier.apply_reply(PENDING, reply, "tester", "2026-08-20")
+        f"[AIRI 추출 SFT 검수 회신 2026-08-20 queue={QUEUE_SHA}]\n"
+        f"approved={len(PENDING)}/{len(PENDING)}")
+    reviewed, _counts = applier.apply_reply(PENDING, reply, "tester", "2026-08-20", QUEUE_SHA)
     return reviewed
 
 
