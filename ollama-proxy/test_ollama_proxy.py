@@ -7258,6 +7258,20 @@ class BriefingEvidenceSignalTests(unittest.TestCase):
         self.assertEqual(health["signalled_requests"], 1)
         self.assertEqual(health["absence_bypasses"], 0)
 
+    def test_non_loopback_signal_is_rejected_and_absence_fallback_still_preempts(self) -> None:
+        # 원격 피어가 보낸 신호는 briefing_evidence_signal에서 걸러지므로 absence 폴백이 그대로 선점한다.
+        telemetry = ollama_proxy.BriefingEvidenceTelemetry()
+        with mock.patch.object(ollama_proxy, "briefing_evidence_telemetry", telemetry), \
+                mock.patch.object(ollama_proxy, "client", _CapturingChatClient("응, 새벽두시야!")):
+            response = self._post("내 별명 기억나?",
+                                  {"x-airi-briefing-evidence": "memory"}, host="10.0.0.8")
+        content = openai_sse_content(response.text)
+        self.assertIn(ollama_proxy.memory_absence_dialogue("내 별명 기억나?"), content)
+        self.assertNotIn("새벽두시", content)
+        health = telemetry.health()
+        self.assertEqual(health["signalled_requests"], 0)
+        self.assertEqual(health["absence_bypasses"], 0)
+
     def test_health_reports_the_signal_without_any_content(self) -> None:
         telemetry = ollama_proxy.BriefingEvidenceTelemetry()
         self.assertEqual(

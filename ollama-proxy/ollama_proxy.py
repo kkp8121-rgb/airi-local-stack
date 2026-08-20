@@ -2297,21 +2297,31 @@ def configured_upstream_raw_progress_timeout(value: object) -> float:
     to the public streaming client.
     """
     default = 20.0
+    if value in (None, ""):
+        return default
     try:
         seconds = float(str(value).strip())
     except (TypeError, ValueError):
-        return default
-    return seconds if math.isfinite(seconds) and 1.0 <= seconds <= 120.0 else default
+        seconds = math.nan
+    if math.isfinite(seconds) and 1.0 <= seconds <= 120.0:
+        return seconds
+    print(json.dumps({"event": "watchdog_env_invalid", "setting": "AIRI_UPSTREAM_RAW_PROGRESS_TIMEOUT_SECONDS", "value": str(value), "default": default}), flush=True)
+    return default
 
 
 def configured_upstream_first_raw_timeout(value: object) -> float:
     """Bound a warm foreground request that never produces its first token."""
     default = 8.0
+    if value in (None, ""):
+        return default
     try:
         seconds = float(str(value).strip())
     except (TypeError, ValueError):
-        return default
-    return seconds if math.isfinite(seconds) and 1.0 <= seconds <= 30.0 else default
+        seconds = math.nan
+    if math.isfinite(seconds) and 1.0 <= seconds <= 30.0:
+        return seconds
+    print(json.dumps({"event": "watchdog_env_invalid", "setting": "AIRI_UPSTREAM_FIRST_RAW_TIMEOUT_SECONDS", "value": str(value), "default": default}), flush=True)
+    return default
 
 
 UPSTREAM_RAW_PROGRESS_TIMEOUT_SECONDS = configured_upstream_raw_progress_timeout(
