@@ -17,6 +17,7 @@ import json
 import sys
 from pathlib import Path
 from typing import Any, Sequence
+from urllib.parse import urlsplit, urlunsplit
 
 import broadcast_sim as sim
 
@@ -85,6 +86,37 @@ def set_briefing_evidence_header(transport: Any, attach: bool) -> None:
         transport.client.headers.pop(BRIEFING_EVIDENCE_HEADER, None)
 
 
+def proxy_health_url(base_url: str) -> str:
+    """Root ``/health`` URL for a proxy base URL that may carry a path (``/v1``).
+
+    The chat endpoint lives under a versioned path (``/v1/chat/completions``);
+    the health telemetry ``ollama_proxy.py`` serves does not.
+    """
+    parts = urlsplit(base_url)
+    return urlunsplit((parts.scheme, parts.netloc, "/health", "", ""))
+
+
+def read_absence_bypasses(transport: Any, health_url: str) -> int | None:
+    """Read the proxy's cumulative absence-guard-release counter, or None.
+
+    Minor 2 (Task 1 review): the row only knew whether *this* turn attached
+    the evidence header (``briefing_evidence``); whether the absence guard
+    actually released because of it lived only as a cumulative total on the
+    proxy (``/health`` → ``briefing_evidence.absence_bypasses``), content-free
+    by design (ollama_proxy.py 무수정 — no per-request marker was added).
+    Turns in this runner are answered strictly sequentially, so diffing that
+    total immediately before and after one signalled turn attributes any
+    increase to that turn, as long as nothing else talks to the same proxy
+    process concurrently during the run.
+    """
+    try:
+        response = transport.client.get(health_url, timeout=5.0)
+        response.raise_for_status()
+        return int(response.json()["briefing_evidence"]["absence_bypasses"])
+    except Exception:
+        return None
+
+
 def format_user_content(message: dict[str, Any], author_format: str) -> str:
     if author_format == "named":
         marker = "[후원] " if message["kind"] == "donation" else ""
@@ -109,6 +141,7 @@ def run_arm(
     briefing: str = "off",
     acts: str = "off",
     briefing_evidence: str = "off",
+    health_url: str | None = None,
 ) -> dict[str, Any]:
     roster = [viewer["handle"] for viewer in fixture["viewers"]]
     drift_terms = sorted(sim.offtopic_terms(fixture))
@@ -120,6 +153,10 @@ def run_arm(
     answered_picks: list[dict[str, Any]] = []
     wave_counter = 0
     failures = 0
+    # 해제(release) 관측성: 이 arm 이 근거 헤더를 실제로 쓸 때만 기준값을 잡는다.
+    last_bypass_total: int | None = None
+    if health_url and briefing_evidence == "on":
+        last_bypass_total = read_absence_bypasses(transport, health_url)
 
     if pre_session_seeds:
         # 이전 세션에서 이미 들은 사실로 만든다 — 방송 시작 전에 한 번 오간다.
@@ -156,6 +193,7 @@ def run_arm(
         record: dict[str, Any] = {}
         raw = ""
         opener = ""
+        released: bool | None = None
         if acts == "on" and pick["effective_kind"] == "donation":
             # P2-1: 후원 감사는 승인된 결정론 렌더러가 말한다 — 자유 생성 0.
             closer_index = int(message.get("donation_index", 0)) % len(thank_renderer.THANK_CALLOUT_CLOSERS)
@@ -182,6 +220,11 @@ def run_arm(
             body = ab.scoring_body(record, raw, protocol)
             if not record.get("ok"):
                 failures += 1
+            if signalled and health_url and last_bypass_total is not None:
+                current_bypass_total = read_absence_bypasses(transport, health_url)
+                if current_bypass_total is not None:
+                    released = current_bypass_total > last_bypass_total
+                    last_bypass_total = current_bypass_total
             guard_fired = False
             if acts == "on" and guard_fallback:
                 # P2-3: 근거 없는 "응, 기억해" 단정을 정직한 회피로 교체.
@@ -206,6 +249,7 @@ def run_arm(
             "beat": beat["id"],
             "backlog_size": pick["backlog_size"],
             "briefing_evidence": signalled,
+            "briefing_evidence_released": released,
             "deterministic_act": deterministic_act,
             "polite_violation": "v_polite_response" in register.get("violations", []),
             "banmal": bool(register.get("markers", {}).get("banmal")),
@@ -228,11 +272,16 @@ def run_arm(
     summary = sim.summarize_turns(rows)
     summary["polite_violation"] = {"hits": sum(1 for row in rows if row["polite_violation"]), "of": len(rows)}
     summary["banmal"] = {"hits": sum(1 for row in rows if row["banmal"]), "of": len(rows)}
+    release_observed = [row for row in rows if row.get("briefing_evidence_released") is not None]
+    summary["briefing_evidence_release"] = {
+        "hits": sum(1 for row in release_observed if row["briefing_evidence_released"]),
+        "of": len(release_observed),
+    }
     summary["transport_failures"] = failures
     return {"summary": summary, "rows": rows, "transcript": transcript}
 
 
-def rescore_report(payload: dict[str, Any]) -> dict[str, Any]:
+def rescore_report(payload: dict[str, Any], fixture_path: Path | None = None) -> dict[str, Any]:
     """Re-run scoring over a finished report's transcript, spending no model time.
 
     The stream is deterministic, so the picks — and with them every check the
@@ -240,7 +289,7 @@ def rescore_report(payload: dict[str, Any]) -> dict[str, Any]:
     This exists so a scoring change can be applied to arms that already ran,
     instead of leaving them incomparable.
     """
-    fixture = sim.load_fixture(args.fixture) if args.fixture else sim.load_fixture()
+    fixture = sim.load_fixture(fixture_path) if fixture_path else sim.load_fixture()
     stream = sim.generate_stream(fixture, seed=payload["seed"])
     if stream["fixture_sha256"] != payload["fixture_sha256"]:
         raise SystemExit("픽스처가 그때와 다르다 — 재채점하면 arm 비교가 깨진다")
@@ -265,13 +314,18 @@ def rescore_report(payload: dict[str, Any]) -> dict[str, Any]:
                              briefing_fact_tokens=fact_tokens)
         carried = previous.get(turn_index, {})
         row.update({key: carried[key] for key in
-                    ("beat", "backlog_size", "briefing_evidence", "polite_violation", "banmal",
-                     "ttft_ms", "complete_ms", "failure")
+                    ("beat", "backlog_size", "briefing_evidence", "briefing_evidence_released",
+                     "polite_violation", "banmal", "ttft_ms", "complete_ms", "failure")
                     if key in carried})
         rows.append(row)
     summary = sim.summarize_turns(rows)
     summary["polite_violation"] = {"hits": sum(1 for row in rows if row.get("polite_violation")), "of": len(rows)}
     summary["banmal"] = {"hits": sum(1 for row in rows if row.get("banmal")), "of": len(rows)}
+    release_observed = [row for row in rows if row.get("briefing_evidence_released") is not None]
+    summary["briefing_evidence_release"] = {
+        "hits": sum(1 for row in release_observed if row["briefing_evidence_released"]),
+        "of": len(release_observed),
+    }
     summary["transport_failures"] = payload["summary"].get("transport_failures")
     return {**payload, "summary": summary, "rows": rows, "rescored": True}
 
@@ -332,7 +386,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.rescore:
-        payload = rescore_report(json.loads(args.rescore.read_text(encoding="utf-8")))
+        payload = rescore_report(json.loads(args.rescore.read_text(encoding="utf-8")),
+                                 fixture_path=args.fixture)
         output = json.dumps(payload, ensure_ascii=False, indent=2)
         (args.report or args.rescore).write_text(output + "\n", encoding="utf-8")
         if args.packet:
@@ -370,6 +425,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             briefing=args.briefing,
             acts=args.acts,
             briefing_evidence=args.briefing_evidence,
+            health_url=proxy_health_url(args.base_url),
         )
     finally:
         transport.close()

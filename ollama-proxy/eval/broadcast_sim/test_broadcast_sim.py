@@ -7,6 +7,7 @@ import sys
 import types
 import unittest
 from pathlib import Path
+from typing import Any
 
 
 HERE = Path(__file__).resolve().parent
@@ -426,20 +427,31 @@ class BriefingEvidenceSignalTests(unittest.TestCase):
         self.picks = sim.plan_pickups(self.stream, self.fixture)
 
     def test_assembly_reports_whether_it_carried_recall_material(self) -> None:
+        # 좁힌 정의(Task 1 리뷰 Minor 1, 2026-08-20): 근거는 "관련 있는" 줄이 실린
+        # 턴에만 선다 — recency 로 채워진 무관 줄만 있는 턴은 이제 evidence=False.
         first_time = next(pick for pick in self.picks
                           if not sim.select_viewer_lines(self.fixture, self.stream, pick))
-        returning = next(pick for pick in self.picks
-                         if sim.select_viewer_lines(self.fixture, self.stream, pick))
-        for pick, expected in ((first_time, False), (returning, True)):
+        filler_only = next(
+            pick for pick in self.picks
+            if sim.select_viewer_lines(self.fixture, self.stream, pick)
+            and not any(relevant for _item, relevant
+                        in sim.select_viewer_lines_tagged(self.fixture, self.stream, pick)))
+        relevant_pick = next(
+            pick for pick in self.picks
+            if any(relevant for _item, relevant
+                   in sim.select_viewer_lines_tagged(self.fixture, self.stream, pick)))
+        for pick, expected in ((first_time, False), (filler_only, False), (relevant_pick, True)):
             text, evidence = sim.build_turn_briefing_with_evidence(
                 self.fixture, self.stream, pick, [])
-            self.assertIs(evidence, expected)
+            self.assertIs(evidence, expected, pick["turn_index"])
             # 근거 여부는 조립 시점의 사실이고, 본문은 기존과 바이트 동일하다.
             self.assertEqual(text, sim.build_turn_briefing(self.fixture, self.stream, pick, []))
 
     def _run(self, briefing: str, briefing_evidence: str) -> tuple[_FakeTransport, list[bool]]:
         transport = _FakeTransport()
-        picks = self.picks[:12]
+        # 좁힌 정의로는 관련 태그가 이 seed 의 turn_index 14 부터 처음 등장한다
+        # (12턴 슬라이스로는 실측 성립 불가) — 20턴까지 넓혀 최소 하나는 담는다.
+        picks = self.picks[:20]
         runner.run_arm(
             transport, self.fixture, self.stream, picks,
             model="test-model", contract="on", protocol="operational",
@@ -447,7 +459,9 @@ class BriefingEvidenceSignalTests(unittest.TestCase):
             pre_session_seeds=False, briefing=briefing, acts="off",
             briefing_evidence=briefing_evidence,
         )
-        expected = [bool(sim.select_viewer_lines(self.fixture, self.stream, pick))
+        # 좁힌 정의: recency 로 채워진 무관 줄이 아니라 관련 있는 줄이 있어야 근거다.
+        expected = [any(relevant for _item, relevant
+                        in sim.select_viewer_lines_tagged(self.fixture, self.stream, pick))
                     for pick in picks]
         return transport, expected
 
@@ -466,6 +480,164 @@ class BriefingEvidenceSignalTests(unittest.TestCase):
                 transport, _expected = self._run(briefing, evidence)
                 self.assertFalse(any(runner.BRIEFING_EVIDENCE_HEADER in headers
                                      for headers in transport.seen))
+
+
+class _FakeHealthResponse:
+    """httpx.Response 의 최소 부분집합 — /health JSON 만 흉내 낸다."""
+
+    def __init__(self, absence_bypasses: int) -> None:
+        self._absence_bypasses = absence_bypasses
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict[str, Any]:
+        return {"briefing_evidence": {"absence_bypasses": self._absence_bypasses}}
+
+
+class _FakeTransportWithHealth(_FakeTransport):
+    """_FakeTransport 확장 — /health 폴링을 스크립트로 재현한다.
+
+    ollama_proxy.py 는 이 신호 부착이 실제로 absence 가드를 해제했는지 요청별로
+    알려주지 않는다(content-free 텔레메트리, 무수정). 러너는 그 대신 누계
+    absence_bypasses 를 턴 전후로 대조해 해제 여부를 추정한다 — 이 페이크는
+    그 누계가 호출될 때마다 스크립트의 다음 값을 내놓도록 흉내 낸다.
+    """
+
+    def __init__(self, bypass_sequence: list[int]) -> None:
+        super().__init__()
+        self._bypass_sequence = list(bypass_sequence)
+        self.health_calls = 0
+        self.client.get = self._get  # SimpleNamespace 에 메서드 속성만 얹는다
+
+    def _get(self, url, timeout=None):  # noqa: ANN001 — httpx.Client.get 시그니처 흉내
+        self.health_calls += 1
+        return _FakeHealthResponse(self._bypass_sequence.pop(0))
+
+
+class BriefingEvidenceReleaseObservabilityTests(unittest.TestCase):
+    """Task 1 리뷰 Minor 2: 해제(release) 여부의 행 단위 관측성.
+
+    프록시의 absence_bypasses 는 누계뿐이라 어느 턴이 실제로 가드를 해제시켰는지
+    행만 봐서는 알 수 없었다. /health 를 턴 전후로 대조해 그 사실을 행에 싣는다.
+    """
+
+    def setUp(self) -> None:
+        self.fixture = sim.load_fixture()
+        self.stream = sim.generate_stream(self.fixture, seed=20260818)
+        self.picks = sim.plan_pickups(self.stream, self.fixture)[:20]
+        # 이 seed 에서 근거가 붙는(관련 태그 있는) 첫 세 턴: 14, 16, 19.
+        self.signalled_turns = [pick["turn_index"] for pick in self.picks
+                                if any(relevant for _item, relevant in
+                                       sim.select_viewer_lines_tagged(self.fixture, self.stream, pick))]
+        self.assertEqual(self.signalled_turns, [14, 16, 19], "고정 seed 실측 전제가 깨졌다")
+
+    def test_release_is_true_only_when_the_cumulative_counter_actually_moves(self) -> None:
+        # 기준값(0) + 3개 신호턴: 14→해제(1), 16→미해제(그대로 1), 19→해제(2).
+        transport = _FakeTransportWithHealth([0, 1, 1, 2])
+        result = runner.run_arm(
+            transport, self.fixture, self.stream, self.picks,
+            model="test-model", contract="on", protocol="operational",
+            author_format="runtime", history_turns=8, max_tokens=32, timeout=1.0,
+            pre_session_seeds=False, briefing="on", acts="off",
+            briefing_evidence="on", health_url="http://proxy.invalid/health",
+        )
+        by_turn = {row["turn_index"]: row["briefing_evidence_released"] for row in result["rows"]}
+        self.assertEqual(by_turn[14], True)
+        self.assertEqual(by_turn[16], False)
+        self.assertEqual(by_turn[19], True)
+        # 신호가 붙지 않은 턴은 애초에 해제될 수 없다 — 미관측(None), False 아님.
+        unsignalled = [row["briefing_evidence_released"] for row in result["rows"]
+                       if row["turn_index"] not in self.signalled_turns]
+        self.assertTrue(all(value is None for value in unsignalled))
+        self.assertEqual(result["summary"]["briefing_evidence_release"], {"hits": 2, "of": 3})
+        # 기준값 1회 + 신호턴 3회 = 4번만 폴링한다(매 턴 폴링하지 않는다).
+        self.assertEqual(transport.health_calls, 4)
+
+    def test_release_stays_unobserved_without_a_health_url(self) -> None:
+        transport = _FakeTransportWithHealth([0, 1, 1, 2])
+        result = runner.run_arm(
+            transport, self.fixture, self.stream, self.picks,
+            model="test-model", contract="on", protocol="operational",
+            author_format="runtime", history_turns=8, max_tokens=32, timeout=1.0,
+            pre_session_seeds=False, briefing="on", acts="off",
+            briefing_evidence="on",  # health_url 기본값(None) — 폴링 자체가 없어야 한다.
+        )
+        self.assertTrue(all(row["briefing_evidence_released"] is None for row in result["rows"]))
+        self.assertEqual(transport.health_calls, 0)
+        self.assertEqual(result["summary"]["briefing_evidence_release"], {"hits": 0, "of": 0})
+
+    def test_release_stays_unobserved_when_evidence_signal_is_off(self) -> None:
+        # health_url 은 있어도 briefing_evidence="off" 면 헤더 자체가 안 붙으니
+        # 해제도 있을 수 없다 — 폴링 낭비를 하지 않는다.
+        transport = _FakeTransportWithHealth([0, 1, 1, 2])
+        result = runner.run_arm(
+            transport, self.fixture, self.stream, self.picks,
+            model="test-model", contract="on", protocol="operational",
+            author_format="runtime", history_turns=8, max_tokens=32, timeout=1.0,
+            pre_session_seeds=False, briefing="on", acts="off",
+            briefing_evidence="off", health_url="http://proxy.invalid/health",
+        )
+        self.assertTrue(all(row["briefing_evidence_released"] is None for row in result["rows"]))
+        self.assertEqual(transport.health_calls, 0)
+
+    def test_health_url_derives_the_root_path_not_the_versioned_chat_path(self) -> None:
+        self.assertEqual(runner.proxy_health_url("http://127.0.0.1:11435/v1"),
+                         "http://127.0.0.1:11435/health")
+        self.assertEqual(runner.proxy_health_url("http://127.0.0.1:11435"),
+                         "http://127.0.0.1:11435/health")
+
+    def test_read_absence_bypasses_fails_soft_on_a_broken_transport(self) -> None:
+        broken = types.SimpleNamespace(client=types.SimpleNamespace())  # .get 없음
+        self.assertIsNone(runner.read_absence_bypasses(broken, "http://proxy.invalid/health"))
+
+
+class RescoreReportTests(unittest.TestCase):
+    """rescore_report(): 모델 재호출 없이 채점만 다시 돈다.
+
+    이 경로는 지금까지 테스트가 없었다 — 실행해 보니 정의 시점 자유변수 ``args``
+    를 참조해 호출할 때마다 NameError 로 죽는 잠재 버그였다(CLI ``--rescore`` 는
+    한 번도 성공한 적이 없다). 신규 행 필드(``briefing_evidence_released``) 를
+    캐리 키에 추가하는 김에 같이 고쳤다 — fixture_path 인자로 받게 시그니처를
+    바꿔 main() 의 지역변수 args 를 더는 참조하지 않는다.
+    """
+
+    def setUp(self) -> None:
+        self.fixture = sim.load_fixture()
+        self.stream = sim.generate_stream(self.fixture, seed=20260818)
+        self.picks = {pick["turn_index"]: pick for pick in sim.plan_pickups(self.stream, self.fixture)}
+
+    def _payload(self) -> dict[str, Any]:
+        turns = [1, 2, 3]
+        transcript = [{"stage": "turn", "turn_index": t, "airi": "응, 그렇구나!"} for t in turns]
+        rows = [
+            {"turn_index": 1, "beat": "opening", "backlog_size": 0, "briefing_evidence": True,
+             "briefing_evidence_released": True, "polite_violation": False, "banmal": True,
+             "ttft_ms": 5.0, "complete_ms": 10.0, "failure": None},
+            {"turn_index": 2, "beat": "opening", "backlog_size": 0, "briefing_evidence": True,
+             "briefing_evidence_released": False, "polite_violation": False, "banmal": True,
+             "ttft_ms": 5.0, "complete_ms": 10.0, "failure": None},
+            {"turn_index": 3, "beat": "opening", "backlog_size": 0, "briefing_evidence": False,
+             "briefing_evidence_released": None, "polite_violation": False, "banmal": True,
+             "ttft_ms": 5.0, "complete_ms": 10.0, "failure": None},
+        ]
+        return {
+            "schema_version": sim.REPORT_SCHEMA_VERSION, "seed": 20260818,
+            "fixture_sha256": self.stream["fixture_sha256"], "briefing": "on",
+            "transcript": transcript, "rows": rows,
+            "summary": {"transport_failures": 0},
+        }
+
+    def test_rescore_runs_without_a_module_level_args_global(self) -> None:
+        # 회귀 고정: 예전엔 이 호출 자체가 NameError 로 죽었다.
+        payload = runner.rescore_report(self._payload())
+        self.assertTrue(payload["rescored"])
+
+    def test_new_row_field_survives_rescore_via_the_carry_key_list(self) -> None:
+        payload = runner.rescore_report(self._payload())
+        by_turn = {row["turn_index"]: row["briefing_evidence_released"] for row in payload["rows"]}
+        self.assertEqual(by_turn, {1: True, 2: False, 3: None})
+        self.assertEqual(payload["summary"]["briefing_evidence_release"], {"hits": 1, "of": 2})
 
 
 class EchoFilterProxyContractTests(unittest.TestCase):

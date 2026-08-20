@@ -399,9 +399,19 @@ def build_turn_briefing_with_evidence(
 ) -> tuple[str, bool]:
     """Like ``build_turn_briefing`` but also reports whether it carried recall.
 
-    "Recall material" means this viewer's own earlier lines from this broadcast
-    — the very session history the proxy's absence fallback checks for and
-    cannot see here, because the director writes it into the system prompt.
+    "Recall material" means a line from this viewer's earlier history that is
+    actually *relevant* to the current message (the same relevance tag
+    ``select_viewer_lines_tagged`` computes for the directive-vs-memo wording
+    choice above) — not just any earlier line this viewer happened to say.
+    Narrowed 2026-08-20 (Task 1 review Minor 1): the proxy's own absence-gate
+    precedent only treats a *memory-shaped* utterance in history as evidence
+    (``MEMORY_QUERY_RE`` against the request history), so "this viewer said
+    literally anything before" was a broader bar than the signal it mirrors —
+    a recency-filled filler line (no token overlap with the current message)
+    must not count. This is a director-side narrowing only; the proxy's
+    ``X-AIRI-Briefing-Evidence`` header contract is unchanged (still a bare
+    token check).
+
     The flag is returned from the point that already knows the answer; reading
     it back out of the finished string would silently break on any wording
     change.
@@ -461,7 +471,8 @@ def build_turn_briefing_with_evidence(
         if prior_message["kind"] == "donation" and message["t_ms"] - prior_message["t_ms"] <= donation_window_ms:
             lines.append(f"- 직전 후원: {prior_message['author']} \"{clip(prior_message['text'])}\"")
             break
-    return "\n".join(lines), bool(viewer_lines)
+    narrow_evidence = any(relevant for _item, relevant in viewer_lines)
+    return "\n".join(lines), narrow_evidence
 
 
 def offtopic_terms(fixture: dict[str, Any]) -> set[str]:
