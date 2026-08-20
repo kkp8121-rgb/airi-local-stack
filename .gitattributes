@@ -6,3 +6,5 @@ ollama-proxy/eval/results/airi-production-context-*.json text eol=lf
 airi_docs/evidence/*.json text eol=lf
 ollama-proxy/eval/input_safety/airi_ko_input_safety_corpus.json text eol=lf
 airi_docs/evidence/source-archives/** -text
+# sha256으로 고정 검증되는 리플레이 픽스처 — Windows core.autocrlf가 CRLF로 바꾸면 해시 불일치로 테스트가 깨진다.
+ollama-proxy/eval/chat_replay/fixtures/*.jsonl text eol=lf

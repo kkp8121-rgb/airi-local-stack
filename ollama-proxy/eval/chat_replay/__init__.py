@@ -2,9 +2,15 @@
 
 from .chat_replay import (
     ALLOWED_KINDS,
+    ALLOWED_RESPONSE_OUTCOMES,
     CAPTURE_PHASES,
     MAX_EXPORT_BYTES,
+    MAX_PRIVATE_PACKET_BYTES,
+    MAX_REPLAY_EVENTS,
+    MAX_RESPONSE_CHARS,
     MAX_SAFE_INTEGER,
+    MIN_RESPONSE_CHARS,
+    REPORT_SCHEMA,
     ReplayAuthorizationError,
     ReplayEvent,
     ReplayFormatError,
@@ -15,6 +21,7 @@ from .chat_replay import (
     _DISALLOWED_CONTROL,
     _canonical,
     _parse_utc,
+    _sample_response_events,
     _surface_signals,
     authorize_capture,
     import_private_replay,
@@ -23,11 +30,21 @@ from .chat_replay import (
     run_replay,
 )
 
+# 이 패키지(__init__.py)가 동명 서브모듈 chat_replay.py를 가리는 이름 충돌 때문에
+# (테스트가 sys.path에 자기 디렉터리를 앞쪽 삽입해도 sys.modules 캐시가 먼저 잡힘),
+# 패키지 내부 소비자들이 절대 임포트(`from chat_replay import ...`)로 참조하는 이름은
+# 전부 여기서 재수출해야 한다 — 하나라도 빠지면 수집 단계에서 ImportError로 재발한다.
 __all__ = (
     "ALLOWED_KINDS",
+    "ALLOWED_RESPONSE_OUTCOMES",
     "CAPTURE_PHASES",
     "MAX_EXPORT_BYTES",
+    "MAX_PRIVATE_PACKET_BYTES",
+    "MAX_REPLAY_EVENTS",
+    "MAX_RESPONSE_CHARS",
     "MAX_SAFE_INTEGER",
+    "MIN_RESPONSE_CHARS",
+    "REPORT_SCHEMA",
     "ReplayAuthorizationError",
     "ReplayEvent",
     "ReplayFormatError",
