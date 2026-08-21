@@ -23,3 +23,9 @@ ollama-proxy/training/**/*.json text eol=lf
 # run_airi_native_{context_gate,baseline}.py hash these with raw read_bytes(); both pins were taken from CRLF-smudged bytes and are re-pinned to the LF blobs (task-18).
 ollama-proxy/eval/airi_context_cases.json text eol=lf
 ollama-proxy/eval/airi_baseline_cases.json text eol=lf
+# Repo-wide blanket for data/validation extensions (task-19): every tracked *.json/*.jsonl blob in
+# this repo is LF-only (scanned, 0 exceptions) and several are hash-pinned by raw read_bytes() —
+# pin individual paths above stay as documentation of *why*; this closes the gap for the rest.
+# *.ps1 is deliberately excluded — those scripts are committed CRLF on purpose for native Windows use.
+*.json text eol=lf
+*.jsonl text eol=lf
