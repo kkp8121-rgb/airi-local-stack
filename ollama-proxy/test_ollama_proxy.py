@@ -1,6 +1,7 @@
 import ast
 import asyncio
 import contextlib
+import hashlib
 import json
 import os
 import re
@@ -184,11 +185,9 @@ class SystemPromptContractTests(unittest.TestCase):
             "질문 하나로 확인",
             "정보 질문에는 구체적인 사실",
             "하나를 추천하라면 실제 항목 하나",
-            "단순 인사나 한 박자 반응은 10~45자 1~2문장",
-            "내용 있는 후원·구독",
-            "70~220자 2~4문장",
-            "매번 질문으로 끝내지 말고",
-            "감사 첫 구절만 자연스러운 존댓말",
+            # 확장 길이 규범(1~2문장 / 2~4문장, 후원 존댓말 허용)은 방송 턴
+            # 전용이라 기본 상수가 아니라 아래 방송 경로 테스트에서 본다.
+            "그다음에만 짧은 반응을 더해",
             "활성 카드와 기억",
             "실행·검색·확인하지 않은 행동",
             "실존 창작자",
@@ -202,6 +201,65 @@ class SystemPromptContractTests(unittest.TestCase):
 
         self.assertLessEqual(len(prompt), 1_200)
         self.assertFalse(hasattr(ollama_proxy, "_LEGACY_AIRI_SYSTEM_PROMPT"))
+
+    def test_base_prompt_bytes_match_the_pre_broadcast_baseline(self) -> None:
+        # ce82f2a(방송 코퍼스 배치 직전)의 AIRI_SYSTEM_PROMPT 원문 해시.
+        # 기본(비방송) chat 턴의 프롬프트는 그 시점과 바이트 동일해야 한다.
+        # 레포 SSoT 는 git blob(LF)이므로 CRLF 체크아웃을 정규화해 비교한다.
+        self.assertEqual(
+            hashlib.sha256(
+                ollama_proxy.AIRI_SYSTEM_PROMPT.replace("\r\n", "\n").encode("utf-8")
+            ).hexdigest(),
+            "ada96241cc8a1ac6db7358de74fd1cd6d86a3ab833945810f7e24d54ac96ac5e",
+        )
+
+    def test_broadcast_capability_turn_keeps_the_expanded_length_rule_bytes(self) -> None:
+        # 방송 계약이 켜진 턴의 프롬프트는 v4 코퍼스가 재현하는 값 그대로여야
+        # 한다(코덱스 배치 시점 ef67433 의 AIRI_SYSTEM_PROMPT 해시).
+        projected = ollama_proxy.apply_broadcast_response_length_rule(
+            ollama_proxy.AIRI_SYSTEM_PROMPT, True,
+        )
+        self.assertEqual(
+            hashlib.sha256(projected.replace("\r\n", "\n").encode("utf-8")).hexdigest(),
+            "54ab84ada875fc00a87d4bd73a2b222af34874161e7d5198523fe3b070c16e90",
+        )
+        for rule in (
+            "단순 인사나 한 박자 반응은 10~45자 1~2문장",
+            "내용 있는 후원·구독",
+            "70~220자 2~4문장",
+            "매번 질문으로 끝내지 말고",
+            "감사 첫 구절만 자연스러운 존댓말",
+        ):
+            with self.subTest(rule=rule):
+                self.assertIn(rule, projected)
+        self.assertEqual(
+            ollama_proxy.apply_broadcast_response_length_rule(
+                ollama_proxy.AIRI_SYSTEM_PROMPT, False,
+            ),
+            ollama_proxy.AIRI_SYSTEM_PROMPT,
+        )
+
+    def test_default_turn_projects_the_baseline_prompt_and_broadcast_turn_does_not(self) -> None:
+        body = json.dumps({"model": "local", "messages": [
+            {"role": "user", "content": "오늘 뭐 해?"},
+        ]}, ensure_ascii=False).encode()
+
+        default_system = json.loads(
+            ollama_proxy.transform_body("v1/chat/completions", body)[0]
+        )["messages"][0]["content"]
+        broadcast_system = json.loads(
+            ollama_proxy.transform_body(
+                "v1/chat/completions", body, broadcast_contract_override=True,
+            )[0]
+        )["messages"][0]["content"]
+
+        self.assertEqual(
+            default_system,
+            ollama_proxy.AIRI_SYSTEM_PROMPT + "\n\n" + ollama_proxy.AIRI_FINAL_CONTRACT,
+        )
+        self.assertNotIn("70~220자 2~4문장", default_system)
+        self.assertIn("70~220자 2~4문장", broadcast_system)
+        self.assertIn("[방송 발화 계약]", broadcast_system)
 
     def test_local_proactive_marker_requires_exact_value_and_loopback_peer(self) -> None:
         def request(value: str, host: str) -> Request:
@@ -2194,11 +2252,70 @@ class TraceReceiptLedgerTests(unittest.TestCase):
         self.assertEqual(second["journal_outcome"], "duplicate")
         self.assertNotEqual(first["user_sha256"], second["user_sha256"])
 
-    def test_pending_trace_reuse_requires_identical_hashes(self) -> None:
+    def test_pending_trace_reuse_keeps_identical_hashes_without_restarting(self) -> None:
         self.ledger.schedule_journal("same", "user", "answer")
         self.ledger.schedule_journal("same", "user", "answer")
-        with self.assertRaises(ValueError):
-            self.ledger.schedule_journal("same", "other user", "answer")
+        self.assertEqual(self.ledger.reused_id_resets, 0)
+        self.assertEqual(
+            self.ledger.receipt("same")["user_sha256"],
+            hashlib.sha256("user".encode("utf-8")).hexdigest(),
+        )
+
+    def test_reused_trace_id_with_new_content_restarts_the_entry(self) -> None:
+        # A renderer restart or an integration bug must never let one reused id
+        # discard a different completed turn.  The receipt restarts on the new
+        # content instead of raising into the request that produced it.
+        self.ledger.record_knowledge("same", "question one", "empty")
+        self.ledger.schedule_journal("same", "user one", "answer one")
+        self.ledger.complete_journal("same", "appended")
+
+        self.ledger.record_knowledge("same", "question two", "empty")
+        self.ledger.schedule_journal("same", "user two", "answer two")
+
+        receipt = self.ledger.receipt("same")
+        self.assertEqual(
+            receipt["query_sha256"], hashlib.sha256("question two".encode("utf-8")).hexdigest()
+        )
+        self.assertEqual(
+            receipt["user_sha256"], hashlib.sha256("user two".encode("utf-8")).hexdigest()
+        )
+        self.assertEqual(
+            receipt["answer_sha256"], hashlib.sha256("answer two".encode("utf-8")).hexdigest()
+        )
+        self.assertEqual(receipt["journal_outcome"], "pending")
+        self.assertFalse(receipt["durable"])
+        # 재사용 1회 = 재시작 1회. 뒤이은 schedule_journal 은 이미 새 엔트리를
+        # 보므로 같은 턴을 두 번 세지 않는다.
+        self.assertEqual(self.ledger.reused_id_resets, 1)
+
+    def test_reused_trace_id_regenerated_answer_keeps_the_knowledge_receipt(self) -> None:
+        self.ledger.record_knowledge("same", "question", "empty")
+        self.ledger.schedule_journal("same", "user", "first answer")
+        self.ledger.schedule_journal("same", "user", "second answer")
+
+        receipt = self.ledger.receipt("same")
+        self.assertEqual(receipt["knowledge_status"], "empty")
+        self.assertEqual(
+            receipt["answer_sha256"], hashlib.sha256("second answer".encode("utf-8")).hexdigest()
+        )
+        self.assertEqual(self.ledger.reused_id_resets, 0)
+
+    def test_invalid_trace_id_never_escapes_the_scheduling_boundary(self) -> None:
+        runtime = mock.Mock()
+        runtime.schedule_completed_turn = mock.AsyncMock(return_value="appended")
+
+        async def exercise() -> None:
+            with mock.patch.object(ollama_proxy, "trace_receipt_ledger", self.ledger), mock.patch.object(
+                ollama_proxy, "memory_runtime", runtime
+            ):
+                ollama_proxy.schedule_completed_memory_turn(
+                    [], session_id=None, user_text="user", assistant_text="answer",
+                    trace_id="",
+                )
+                await asyncio.gather(*tuple(ollama_proxy.memory_journal_tasks))
+
+        asyncio.run(exercise())
+        self.assertEqual(runtime.schedule_completed_turn.await_count, 1)
 
     def test_schedule_records_pending_before_memory_completion(self) -> None:
         runtime = mock.Mock()
@@ -2799,6 +2916,54 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
         self.assertEqual(openai_sse_dialogue(response.text), answer)
         self.assertEqual(len(memory.completed), 1)
         self.assertEqual(memory.completed[0]["assistant"], answer)
+
+    def test_reused_round_id_header_keeps_both_default_path_turns_alive(self) -> None:
+        # AIRI's renderer sends ``x-airi-round-id``.  A restart or an
+        # integration bug can repeat one id across two different turns; the
+        # default (capability OFF) chat path must still answer and journal both.
+        def event(content: str) -> bytes:
+            return (json.dumps(
+                {"message": {"role": "assistant", "content": content}, "done": True},
+                ensure_ascii=False,
+            ) + "\n").encode("utf-8")
+
+        chat = _QueuedApiStreamClient([[event("첫 답이야.")], [event("둘째 답이야.")]])
+        memory = _FakeMemoryRuntime()
+        ledger = ollama_proxy.TraceReceiptLedger(ttl_seconds=900, capacity=8)
+        http = TestClient(ollama_proxy.app)
+
+        def turn(text: str) -> object:
+            return http.post(
+                "/v1/chat/completions",
+                headers={"x-airi-round-id": "reused-round"},
+                json={
+                    "model": "exaone-airi:2.4b",
+                    "stream": True,
+                    "messages": [{"role": "user", "content": text}],
+                },
+            )
+
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ), mock.patch.object(ollama_proxy, "trace_receipt_ledger", ledger):
+            first = turn("첫 질문이야.")
+            second = turn("둘째 질문이야.")
+
+        self.assertEqual((first.status_code, second.status_code), (200, 200))
+        self.assertEqual(openai_sse_dialogue(first.text), "첫 답이야.")
+        self.assertEqual(openai_sse_dialogue(second.text), "둘째 답이야.")
+        self.assertEqual(
+            [(turn_record["user"], turn_record["assistant"]) for turn_record in memory.completed],
+            [("첫 질문이야.", "첫 답이야."), ("둘째 질문이야.", "둘째 답이야.")],
+        )
+        receipt = ledger.receipt("reused-round")
+        self.assertEqual(
+            receipt["user_sha256"], hashlib.sha256("둘째 질문이야.".encode("utf-8")).hexdigest()
+        )
+        self.assertEqual(
+            receipt["answer_sha256"], hashlib.sha256("둘째 답이야.".encode("utf-8")).hexdigest()
+        )
+        self.assertGreaterEqual(ledger.reused_id_resets, 1)
 
     def test_local_ndjson_streams_utf8_deltas_and_strips_only_leading_controls(self) -> None:
         def event(content: str = "", done: bool = False) -> bytes:

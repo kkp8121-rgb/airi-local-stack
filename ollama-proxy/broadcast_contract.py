@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Mapping
 
 BROADCAST_CONTRACT_ENV = "AIRI_BROADCAST_CONTRACT"
@@ -182,3 +183,46 @@ def apply_broadcast_contract(system_prompt: str, enabled: bool) -> str:
     if not enabled:
         return system_prompt
     return system_prompt + "\n\n" + build_broadcast_contract_block()
+
+
+# ---------------------------------------------------------------------------
+# 기본 시스템 프롬프트 3항(응답 길이 규범) 교체 — 방송 경로 전용
+# ---------------------------------------------------------------------------
+# v4 확장 길이 규범은 방송 턴에서만 성립한다. 비방송 chat 턴에까지 적용하면
+# 기본 OFF 경로의 프롬프트가 바뀌므로, 계약 게이트와 같은 스위치로만 교체한다.
+BASE_RESPONSE_LENGTH_RULE_PREFIX = "3. 그다음에만 짧은 반응을 더해."
+
+
+def _build_response_length_rule() -> str:
+    """방송 턴 3항. 숫자는 전부 파라미터 테이블에서 읽는다(매직넘버 금지)."""
+    fragment = BROADCAST_CONTRACT_PARAMS["reaction_fragment"]
+    expanded = BROADCAST_CONTRACT_PARAMS["expanded_response"]
+    return (
+        f"3. 단순 인사나 한 박자 반응은 {fragment['min_chars']}~{fragment['max_chars']}자"
+        f" {fragment['min_sentences']}~{fragment['max_sentences']}문장으로 짧게 해."
+        " 내용 있는 후원·구독, 여러 채팅 종합, 선택 이유, 지난 흐름의 회수나 주제 전환은"
+        f" {expanded['min_chars']}~{expanded['max_chars']}자"
+        f" {expanded['min_sentences']}~{expanded['max_sentences']}문장으로"
+        " 받은 말 처리→네 판단과 이유→하던 화면이나 다음 흐름 복귀를 이어."
+        " 매번 질문으로 끝내지 말고, 요청받지 않은 번호 목록은 쓰지 마."
+        " 한국어 문장 끝에 요·습니다·세요·죠를 붙이지 마."
+        " 단, 후원·구독 감사 첫 구절만 자연스러운 존댓말을 허용하고 본답변은 반말로 돌아와."
+    )
+
+
+BROADCAST_RESPONSE_LENGTH_RULE = _build_response_length_rule()
+
+# `[^\r\n]*` 로 줄 종결자를 건드리지 않는다 — CRLF 체크아웃에서 그 줄만
+# LF 로 바뀌어 방송 경로 바이트가 흔들리는 것을 막는다.
+_BASE_RESPONSE_LENGTH_RULE_RE = re.compile(
+    "^" + re.escape(BASE_RESPONSE_LENGTH_RULE_PREFIX) + "[^\r\n]*", re.MULTILINE
+)
+
+
+def apply_broadcast_response_length_rule(system_prompt: str, enabled: bool) -> str:
+    """꺼져 있으면 입력을 그대로 돌려준다(바이트 동일). 켜졌을 때만 3항을 바꾼다."""
+    if not enabled:
+        return system_prompt
+    return _BASE_RESPONSE_LENGTH_RULE_RE.sub(
+        lambda _match: BROADCAST_RESPONSE_LENGTH_RULE, system_prompt, count=1
+    )

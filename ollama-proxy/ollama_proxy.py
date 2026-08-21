@@ -86,7 +86,11 @@ from input_screening import (
 )
 from output_moderation import OutputModerationRuntime, load_moderation_policy
 from epistemic_confidence import build_runtime as build_epistemic_confidence_runtime
-from broadcast_contract import apply_broadcast_contract, broadcast_contract_enabled
+from broadcast_contract import (
+    apply_broadcast_contract,
+    apply_broadcast_response_length_rule,
+    broadcast_contract_enabled,
+)
 from memory_claim_guard import guard_memory_claim
 from broadcast_examples import (
     BROADCAST_EXAMPLES_MESSAGE_NAME,
@@ -585,6 +589,13 @@ class TraceReceiptLedger:
         self._capacity = max(1, int(capacity))
         self._lock = threading.RLock()
         self._entries: OrderedDict[str, dict[str, object]] = OrderedDict()
+        self._reused_id_resets = 0
+
+    @property
+    def reused_id_resets(self) -> int:
+        """How often a reused id was restarted on different content."""
+        with self._lock:
+            return self._reused_id_resets
 
     @staticmethod
     def _hash(value: str) -> str:
@@ -620,6 +631,20 @@ class TraceReceiptLedger:
             self._entries.move_to_end(trace_id)
         return entry
 
+    def _restart_locked(self, trace_id: str) -> dict[str, object]:
+        """Start a fresh turn under an id that a caller reused.
+
+        AIRI's ``x-airi-round-id`` comes from the renderer.  A restart or an
+        integration bug can repeat one id for a different turn, and refusing
+        that turn would kill a live request over telemetry bookkeeping.  The
+        entry is therefore rebuilt on the newer content: the ledger keeps
+        proving one lifecycle, and receipt validation still binds to the
+        hashes of the turn that is actually current.
+        """
+        self._entries.pop(trace_id, None)
+        self._reused_id_resets += 1
+        return self._entry_locked(trace_id)
+
     @staticmethod
     def _public(entry: dict[str, object]) -> dict[str, object]:
         return {key: entry[key] for key in (
@@ -645,7 +670,7 @@ class TraceReceiptLedger:
             query_hash = self._hash(query)
             existing = str(entry["query_sha256"])
             if existing and existing != query_hash:
-                raise ValueError("trace receipt query hash mismatch")
+                entry = self._restart_locked(trace_id)
             entry.update({
                 "query_sha256": query_hash, "knowledge_attempted": status != "skipped",
                 "knowledge_status": status, "document_ids": tuple(sorted(documents)),
@@ -656,10 +681,11 @@ class TraceReceiptLedger:
         user_hash, answer_hash = self._hash(user_text), self._hash(answer_text)
         with self._lock:
             entry = self._entry_locked(trace_id)
-            for key, expected in (("user_sha256", user_hash), ("answer_sha256", answer_hash)):
-                current = str(entry[key])
-                if current and current != expected:
-                    raise ValueError("trace receipt hash mismatch")
+            # Only a different *user* turn means the id was reused; a changed
+            # answer under the same user text is one turn being re-answered,
+            # so its knowledge receipt must survive.
+            if str(entry["user_sha256"]) not in {"", user_hash}:
+                entry = self._restart_locked(trace_id)
             if not entry["query_sha256"]:
                 entry["query_sha256"] = user_hash
             entry.update({"user_sha256": user_hash, "answer_sha256": answer_hash,
@@ -1637,7 +1663,7 @@ AIRI_SYSTEM_PROMPT = """너는 AIRI라는 독자적인 한국어 버추얼 방�
 응답 우선순위:
 1. 사용자가 물었거나 요청한 핵심을 첫 구절에서 실제로 처리해. 정보 질문에는 구체적인 사실을 하나 이상 말하고, 하나를 추천하라면 실제 항목 하나를 고른 뒤 멈춰. 번역·외국어 문구 요청은 요청한 문구 자체를 그 언어로 써. 맞장구만 하고 답을 피하지 마.
 2. 대상이나 행동이 불분명할 때만 무엇을 뜻하는지 질문 하나로 확인해. 추측해서 했다고 약속하지 마.
-3. 단순 인사나 한 박자 반응은 10~45자 1~2문장으로 짧게 해. 내용 있는 후원·구독, 여러 채팅 종합, 선택 이유, 지난 흐름의 회수나 주제 전환은 70~220자 2~4문장으로 받은 말 처리→네 판단과 이유→하던 화면이나 다음 흐름 복귀를 이어. 매번 질문으로 끝내지 말고, 요청받지 않은 번호 목록은 쓰지 마. 한국어 문장 끝에 요·습니다·세요·죠를 붙이지 마. 단, 후원·구독 감사 첫 구절만 자연스러운 존댓말을 허용하고 본답변은 반말로 돌아와.
+3. 그다음에만 짧은 반응을 더해. 평소에는 10~45자의 자연스러운 한 문장만 남기고, 요청받지 않은 번호 목록은 쓰지 마. 한국어 문장 끝에 요·습니다·세요·죠를 붙이지 마.
 
 큰 부상·즉각적인 위험에는 장난을 멈추고 안전한 장소와 응급 도움 여부를 먼저 확인해. 사별·큰 상실에는 해결책을 붙이지 말고 짧고 진솔하게 애도해.
 
@@ -6251,10 +6277,16 @@ async def remember_completed_turn(
             original_messages,
         )
         memory_journal_telemetry.completed(outcome, len(user_text), len(assistant_text))
-        trace_receipt_ledger.complete_journal(trace_id, outcome)
     except Exception as exc:
         memory_journal_telemetry.error(exc)
-        trace_receipt_ledger.complete_journal(trace_id, "error")
+        outcome = "error"
+    try:
+        trace_receipt_ledger.complete_journal(trace_id, outcome)
+    except Exception:
+        # Closing a receipt is bookkeeping about a turn that already ended.
+        # It must never raise out of this task, and the error branch above
+        # must not raise a second time while reporting the first failure.
+        pass
 
 
 def schedule_completed_memory_turn(
@@ -6268,7 +6300,13 @@ def schedule_completed_memory_turn(
     """Start final-answer journaling before yielding the final content chunk."""
     if not user_text or not assistant_text:
         return
-    trace_receipt_ledger.schedule_journal(trace_id, user_text, assistant_text)
+    try:
+        trace_receipt_ledger.schedule_journal(trace_id, user_text, assistant_text)
+    except Exception:
+        # The receipt is proof about a turn, never a precondition for it.
+        # An unusable id must not stop the durable journal or kill the
+        # in-flight response this boundary was called from.
+        pass
     memory_journal_telemetry.scheduled()
     task = asyncio.create_task(
         remember_completed_turn(
@@ -6340,13 +6378,19 @@ def schedule_completed_turn(
         except Exception:
             pass
     if durable:
-        schedule_completed_memory_turn(
-            original_messages,
-            session_id=session_id,
-            user_text=user_text,
-            assistant_text=assistant_text,
-            trace_id=trace_id,
-        )
+        # Same fail-soft rule as the state and evaluator blocks above: this
+        # boundary only observes a completion, so nothing it does may escape
+        # into the SSE generator that already spoke the answer.
+        try:
+            schedule_completed_memory_turn(
+                original_messages,
+                session_id=session_id,
+                user_text=user_text,
+                assistant_text=assistant_text,
+                trace_id=trace_id,
+            )
+        except Exception as exc:
+            memory_journal_telemetry.error(exc)
 
 
 def strip_leading_reaction(text: str) -> str:
@@ -7305,6 +7349,9 @@ async def health() -> dict[str, object]:
         "opener_resample": opener_resample_telemetry.health(),
         "pickup_batch": pickup_batch_telemetry.health(),
         "journal_completion": memory_journal_telemetry.health(),
+        # A content-free count only: a rising value means some caller is
+        # repeating one turn id across different turns.
+        "trace_reused_id_resets": trace_receipt_ledger.reused_id_resets,
         "proactive_output": proactive_output_telemetry.health(),
         "topic_board": topic_board_runtime.health(),
         "output_moderation": output_moderation_runtime.health(),
@@ -7422,16 +7469,22 @@ def transform_body(
                 if message.get("role") == "user" and message.get("content") == last_user_text
             ][:1]
             visible_history.reverse()
+        broadcast_capability = (
+            broadcast_contract_enabled()
+            if broadcast_contract_override is None
+            else broadcast_contract_override
+        )
         projected_messages: list[dict[str, object]] = [
-            # B4c 방송 발화 계약은 greybox 기본 OFF다. 꺼져 있으면 이 호출은
+            # B4c 방송 발화 계약은 greybox 기본 OFF다. 꺼져 있으면 두 호출 모두
             # 입력 문자열을 그대로 돌려주므로 요청 프롬프트가 바뀌지 않는다.
+            # 확장 길이 규범(3항 교체)도 방송 턴 전용이라 같은 스위치로만 걸린다.
             {
                 "role": "system",
                 "content": apply_broadcast_contract(
-                    base_system_prompt,
-                    broadcast_contract_enabled()
-                    if broadcast_contract_override is None
-                    else broadcast_contract_override,
+                    apply_broadcast_response_length_rule(
+                        base_system_prompt, broadcast_capability,
+                    ),
+                    broadcast_capability,
                 ),
             },
             *visible_history,

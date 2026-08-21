@@ -18,7 +18,10 @@ from typing import Any, Iterable
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
-from broadcast_contract import build_broadcast_contract_block  # noqa: E402
+from broadcast_contract import (  # noqa: E402
+    apply_broadcast_response_length_rule,
+    build_broadcast_contract_block,
+)
 SEED = HERE / "seed"
 CARD_PATHS = tuple(SEED / f"airi_broadcast_continuity_v3_cards_{part}.json" for part in "abc")
 V2_SOURCE = SEED / "airi_broadcast_behavior_v2.jsonl"
@@ -53,8 +56,11 @@ def _literal(path: Path, name: str) -> str:
 
 @cache
 def production_system_content() -> str:
+    # 방송 계약이 켜진 턴의 프롬프트다. 프로덕션과 같은 3항 교체를 적용한다.
     return (
-        _literal(PROXY_SOURCE, "AIRI_SYSTEM_PROMPT") + "\n\n"
+        apply_broadcast_response_length_rule(
+            _literal(PROXY_SOURCE, "AIRI_SYSTEM_PROMPT"), True,
+        ) + "\n\n"
         + _literal(PROXY_SOURCE, "AIRI_FINAL_CONTRACT") + "\n\n"
         + build_broadcast_contract_block()
     )

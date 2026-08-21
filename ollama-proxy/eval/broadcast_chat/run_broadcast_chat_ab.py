@@ -48,7 +48,10 @@ PROXY_DIR = BASE_DIR.parents[1]
 if str(PROXY_DIR) not in sys.path:
     sys.path.insert(0, str(PROXY_DIR))
 try:
-    from broadcast_contract import build_broadcast_contract_block
+    from broadcast_contract import (
+        apply_broadcast_response_length_rule,
+        build_broadcast_contract_block,
+    )
 except ImportError as exc:  # pragma: no cover - 배치 오류 가드
     raise SystemExit(
         f"broadcast_contract 모듈을 찾지 못했다 ({PROXY_DIR}): {exc}"
@@ -470,7 +473,9 @@ def verify_repo_prompt(proxy_source: Path) -> dict[str, Any]:
     match = re.search(r'^AIRI_SYSTEM_PROMPT = """(.*?)"""', source, re.MULTILINE | re.DOTALL)
     if not match:
         return {"checked": True, "found": False, "matches": False}
-    extracted = match.group(1)
+    # 임베드 사본은 방송 턴 프롬프트다. 레포 상수는 비방송 기본값이므로
+    # 프로덕션과 같은 3항 교체를 적용한 뒤에 대조한다.
+    extracted = apply_broadcast_response_length_rule(match.group(1), True)
     return {
         "checked": True,
         "found": True,

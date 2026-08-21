@@ -20,7 +20,10 @@ from typing import Any, Iterable
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
-from broadcast_contract import build_broadcast_contract_block  # noqa: E402
+from broadcast_contract import (  # noqa: E402
+    apply_broadcast_response_length_rule,
+    build_broadcast_contract_block,
+)
 
 SEED = HERE / "seed"
 PARTS = tuple(SEED / f"airi_broadcast_behavior_v2_part_{part}.json" for part in "abc")
@@ -96,8 +99,12 @@ def _production_constant(name: str) -> str:
 
 
 def production_system_content() -> str:
+    # 이 코퍼스는 방송 계약이 켜진 턴을 재현한다. 프로덕션이 그 턴에서만
+    # 3항을 확장 길이 규범으로 바꾸므로 여기서도 같은 변환을 적용한다.
     return (
-        _production_constant("AIRI_SYSTEM_PROMPT")
+        apply_broadcast_response_length_rule(
+            _production_constant("AIRI_SYSTEM_PROMPT"), True,
+        )
         + "\n\n"
         + _production_constant("AIRI_FINAL_CONTRACT")
         + "\n\n"

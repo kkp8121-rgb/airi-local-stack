@@ -9,6 +9,7 @@ from broadcast_contract import (
     BROADCAST_CONTRACT_PARAMS,
     BROADCAST_CONTRACT_VERSION,
     apply_broadcast_contract,
+    apply_broadcast_response_length_rule,
     broadcast_contract_enabled,
     build_broadcast_contract_block,
 )
@@ -35,6 +36,47 @@ class ApplyContractTests(unittest.TestCase):
 
     def test_block_is_stable_across_calls(self) -> None:
         self.assertEqual(build_broadcast_contract_block(), build_broadcast_contract_block())
+
+
+class ResponseLengthRuleTests(unittest.TestCase):
+    """확장 길이 규범 3항 교체 — 방송 턴 전용 스위치."""
+
+    PROMPT = "머리말\n\n응답 우선순위:\n1. 첫 항\n2. 둘째 항\n3. 그다음에만 짧은 반응을 더해. 평소에는 짧게.\n\n꼬리말"
+
+    def test_disabled_returns_the_exact_same_string(self) -> None:
+        for prompt in ("", "3. 그다음에만 짧은 반응을 더해.", self.PROMPT):
+            with self.subTest(prompt=prompt):
+                applied = apply_broadcast_response_length_rule(prompt, False)
+                self.assertEqual(applied.encode("utf-8"), prompt.encode("utf-8"))
+
+    def test_enabled_replaces_only_the_third_rule_line(self) -> None:
+        applied = apply_broadcast_response_length_rule(self.PROMPT, True)
+        self.assertIn("70~220자 2~4문장", applied)
+        self.assertNotIn("그다음에만 짧은 반응", applied)
+        self.assertTrue(applied.startswith("머리말\n\n응답 우선순위:\n1. 첫 항\n2. 둘째 항\n"))
+        self.assertTrue(applied.endswith("\n\n꼬리말"))
+        self.assertEqual(len(applied.splitlines()), len(self.PROMPT.splitlines()))
+
+    def test_enabled_preserves_crlf_terminators(self) -> None:
+        applied = apply_broadcast_response_length_rule(self.PROMPT.replace("\n", "\r\n"), True)
+        self.assertEqual(
+            applied, apply_broadcast_response_length_rule(self.PROMPT, True).replace("\n", "\r\n")
+        )
+
+    def test_missing_rule_line_is_left_untouched(self) -> None:
+        self.assertEqual(
+            apply_broadcast_response_length_rule("3항이 없는 프롬프트", True),
+            "3항이 없는 프롬프트",
+        )
+
+    def test_length_numbers_come_from_the_parameter_table(self) -> None:
+        fragment = BROADCAST_CONTRACT_PARAMS["reaction_fragment"]
+        expanded = BROADCAST_CONTRACT_PARAMS["expanded_response"]
+        rule = broadcast_contract.BROADCAST_RESPONSE_LENGTH_RULE
+        self.assertIn(f"{fragment['min_chars']}~{fragment['max_chars']}자", rule)
+        self.assertIn(f"{fragment['min_sentences']}~{fragment['max_sentences']}문장", rule)
+        self.assertIn(f"{expanded['min_chars']}~{expanded['max_chars']}자", rule)
+        self.assertIn(f"{expanded['min_sentences']}~{expanded['max_sentences']}문장", rule)
 
 
 class EnvGateTests(unittest.TestCase):
@@ -240,8 +282,14 @@ class ProxyWiringTests(unittest.TestCase):
                     self.assertEqual(self._system_content(messages), expected)
 
     def test_gate_on_appends_the_contract_block_once(self) -> None:
+        # 게이트가 켜지면 블록을 한 번 덧붙이고, 같은 스위치로 기본 프롬프트
+        # 3항을 방송 확장 길이 규범으로 바꾼다. 그 두 변환 외에는 손대지 않는다.
         messages = [{"role": "user", "content": "오늘 방송 뭐 해?"}]
-        base = self.proxy.AIRI_SYSTEM_PROMPT + "\n\n" + self.proxy.AIRI_FINAL_CONTRACT
+        base = (
+            apply_broadcast_response_length_rule(self.proxy.AIRI_SYSTEM_PROMPT, True)
+            + "\n\n"
+            + self.proxy.AIRI_FINAL_CONTRACT
+        )
         block = build_broadcast_contract_block()
         with mock.patch.dict("os.environ", {BROADCAST_CONTRACT_ENV: "1"}):
             content = self._system_content(messages)
@@ -251,6 +299,10 @@ class ProxyWiringTests(unittest.TestCase):
     def test_proxy_uses_the_shared_module_not_a_local_copy(self) -> None:
         self.assertIs(self.proxy.apply_broadcast_contract, apply_broadcast_contract)
         self.assertIs(self.proxy.broadcast_contract_enabled, broadcast_contract_enabled)
+        self.assertIs(
+            self.proxy.apply_broadcast_response_length_rule,
+            apply_broadcast_response_length_rule,
+        )
 
 
 class AbRunnerContractTests(unittest.TestCase):
