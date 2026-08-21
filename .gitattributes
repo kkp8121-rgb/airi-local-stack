@@ -8,3 +8,9 @@ ollama-proxy/eval/input_safety/airi_ko_input_safety_corpus.json text eol=lf
 airi_docs/evidence/source-archives/** -text
 # sha256으로 고정 검증되는 리플레이 픽스처 — Windows core.autocrlf가 CRLF로 바꾸면 해시 불일치로 테스트가 깨진다.
 ollama-proxy/eval/chat_replay/fixtures/*.jsonl text eol=lf
+# The blind T3 fixture and its manifest carry raw SHA-256 attestations.
+ollama-proxy/eval/broadcast_sim/t3_fixture_manifest_v2.json text eol=lf
+ollama-proxy/eval/broadcast_sim/third_long_broadcast_heldout_v1.json text eol=lf
+# Deterministic SFT exports are pinned by raw SHA-256 and must survive Windows checkout.
+ollama-proxy/training/seed/airi_broadcast_continuity_v4.jsonl text eol=lf
+ollama-proxy/training/seed/airi_broadcast_continuity_v4_chat.jsonl text eol=lf
