@@ -565,6 +565,10 @@ class DryRunTransport:
             "transport": "dry-run",
             "prompt_chars": len(chat),
             "streaming": self.streaming_enabled,
+            # The synthetic stream emitted every configured piece.  Mirror the
+            # real transport's explicit [DONE] evidence so terminal validation
+            # exercises the same successful contract instead of false-failing.
+            "terminal": self.streaming_enabled,
         }
 
 

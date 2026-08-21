@@ -2,7 +2,7 @@
 
 갱신: 2026-08-21 KST
 
-상태: **v4 corpus 확정, E1 QLoRA 완료, E2 사용자 요청으로 중단, T3 미실행**
+상태: **v4 corpus 확정, E1 QLoRA 완료, E2 사용자 요청으로 중단, T3 런처 검증 완료·실측 미실행**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
@@ -184,22 +184,49 @@ fixtures/seeds:
 --history-turns 8 --max-tokens 220 --briefing on --briefing-evidence on --acts on
 --live-broadcast-context on`이다.
 
-중요 blocker: `run-airi-live-broadcast-campaign.ps1`은 isolated DB와 digest pin을
-잘 만들지만 3×500 campaign runner용이지 broadcast T3 전용 launcher가 아니다.
-다음 세션은 세 모델 각각에 fresh isolated memory/knowledge DB와 exact model digest,
-ephemeral master/observer token을 제공하는 T3 wrapper를 먼저 만들거나 같은 계약을
-명시적으로 재현해야 한다. 현 comparator가 model/digest, memory arm, max tokens,
-timeout을 자체 비교하지 않으므로 외부 manifest에서 반드시 고정한다.
+전용 launcher `run-airi-broadcast-t3-matrix.ps1`과 오프라인 계약 테스트
+`test_broadcast_t3_matrix_launcher_contract.py`를 추가했다. 이전 반려 초안의 배열 비교,
+health schema, memory-arm confound, 반복 디렉터리 문제를 모두 제거했으며 다음을
+fail-closed로 고정한다.
 
-인계 직전 T3 wrapper 초안을 별도 작성해 감사했으나 다음 P0 때문에 **반려하고
-파일도 보존하지 않았다**: PowerShell 배열 비교 오류로 정상 manifest도 거부,
-`/health.chat_model` 스키마 오독, baseline/E1/E2에 서로 다른 memory arm을 배정한
-모델-기억 confound, 반복 run마다 동일 보고서 디렉터리를 다시 만들며 중단되는 경로.
-후속 구현은 세 모델 모두 `seeded`를 쓰고, `model`·digest
-`status=pinned`·`verified=true`·`num_ctx`·timeout·live receipt를 실제 health/report로
-증명해야 한다. 보고서는 모델별 디렉터리로 분리하고 baseline↔E1 및 baseline↔E2
-comparator를 각각 실행한다. T3에는 RAG corpus가 필요 없으므로 fresh knowledge DB는
-빈 상태를 attest하며, populated campaign fixture를 섞지 않는다.
+- model manifest는 exact `baseline/e1/e2` 세 태그와 서로 다른 64-hex digest만 허용
+- 승인 fixture manifest와 세 fixture raw/canonical SHA를 실행 전 retained copy에서 재검증
+- 세 모델 모두 공통 `seeded`, `max_tokens=220`, `timeout=180`, `num_ctx=2048`,
+  live context/briefing/evidence/acts ON
+- 매 run fresh empty memory/knowledge DB와 fresh master/observer capability
+- local provider, pinned+verified digest, memory/knowledge ready, knowledge 0문서/0청크,
+  screening/moderation/epistemic/affect/show-arc ready를 실행 전후 health로 증명
+- GPT-SoVITS cache wrapper 소유권, streaming mode 2, min chunk 16, WAV/nonparallel을
+  고정하고 하위 script가 바꾼 process 환경까지 최종 복원
+- fixture+seed별 immutable stream plan과 report의 exact turn 집합, unique action/trace,
+  모든 row의 live context + durable receipt를 검증
+- 36 reports가 모두 생긴 뒤 baseline↔E1과 baseline↔E2 두 12-pair comparator를 모두 실행
+- report/packet/health/run-contract/plan/comparison와 run별 SQLite/sidecar 전체를 해시 inventory;
+  성공 summary도 `adoption_authorized=false`
+- PID는 현재 launcher의 직접 자식이면서 exact command identity인 프로세스만 회수하고,
+  partial start도 listener 유무와 관계없이 종료를 기다린다
+
+모델 세 태그가 준비되면 다음 형식의 외부 manifest를 만든다. 이 파일과 실행 산출물은
+모델 디렉터리 아래에 두고 Git에 넣지 않는다.
+
+```json
+{"schema_version":"airi.broadcast-sim-t3-model-manifest.v2","arms":[
+  {"name":"baseline","tag":"<baseline tag>","digest":"<64-hex>"},
+  {"name":"e1","tag":"<E1 tag>","digest":"<64-hex>"},
+  {"name":"e2","tag":"<E2 tag>","digest":"<64-hex>"}
+]}
+```
+
+```powershell
+.\run-airi-broadcast-t3-matrix.ps1 `
+  -OutputDir D:\AIRI-Models\airi-broadcast-v4-20260821\t3-matrix `
+  -ModelManifest D:\AIRI-Models\airi-broadcast-v4-20260821\t3-model-manifest.json
+```
+
+현재 launcher는 실제 E2 adapter/tag가 없으므로 production matrix를 시작하지 않았고,
+이 상태에서는 model preflight에서 output/service 생성 전에 반드시 중단한다. T3에는
+RAG corpus가 필요 없으므로 fresh knowledge DB는 빈 상태를 attest하며 populated campaign
+fixture를 섞지 않는다.
 
 통과 기준은 기존 calibration 계약과 새 blind fixture를 모두 만족해야 하며,
 특히 v3의 memory 12/24→8/24, donation callout 40/40→38/40 회귀를 되돌려야 한다.
@@ -230,7 +257,13 @@ T3 우승 후보만 `run-airi-live-broadcast-campaign.ps1`로 3 seed × 500 turn
 - `git diff --check -- . ':(exclude)airi_docs/patches/*.patch'`: whitespace error 0
 - E1 artifact 독립 provenance audit: blocker 0
 - E2: 두 번 모두 사용자 인계 요청에 따라 checkpoint 전 중단, 불완전 산출물 0
-- T3 launcher 초안: 독립 감사 P0 4건으로 반려·삭제, 원격 반영 0
+- T3 matrix launcher: 계약 unittest 8 passed, 시뮬/비교기 unittest 75 passed
+  (1 skipped), PowerShell AST·py_compile·diff-check PASS
+- T3 matrix launcher 독립 최종 감사: P0/P1 0, READY. 실제 서비스/GPU 실행은 E2 부재로 0
+- `test-current-checkpoint.ps1`: PASS. 이 과정에서 기존 추적 방송 테스트 15개가 CI
+  matrix에서 빠진 불일치, 의도적으로 허용한 `AI` 토큰 뒤 B3-d policy hash pin 누락,
+  dry-run stream terminal 증적 누락을 발견해 각각 CI 등록·pin 재결속·synthetic terminal
+  회귀 수정했다. B3-d 16/16, B4c rehearsal 83/83 PASS
 
 다음 세션 첫 순서: **E2 재실행 → E1/E2 merge/package → isolated 36-report
 T3 → 승자만 3×500 live campaign → 사용자에게 실제 응답 묶음 제출**.

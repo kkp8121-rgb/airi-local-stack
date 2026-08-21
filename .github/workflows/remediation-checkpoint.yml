@@ -90,6 +90,7 @@ jobs:
               ollama-proxy/test_character_state.py ollama-proxy/test_character_state_evaluator.py
               ollama-proxy/test_affect_state.py ollama-proxy/test_affect_expression.py
               ollama-proxy/test_broadcast_affect_event_mapper.py
+              ollama-proxy/test_broadcast_arc_ledger.py ollama-proxy/test_live_broadcast_runtime.py
               ollama-proxy/test_continuity_ledger.py
               ollama-proxy/test_benchmark_cloud_chat_latency.py
               ollama-proxy/test_cloud_chat_provider.py
@@ -153,6 +154,11 @@ jobs:
               ollama-proxy/eval/affect_broadcast/test_run_correction_prepublication_eval.py
               ollama-proxy/eval/broadcast_chat/test_run_broadcast_rehearsal.py
               ollama-proxy/eval/broadcast_sim/test_broadcast_sim.py
+              ollama-proxy/eval/broadcast_sim/test_compare_broadcast_t3.py
+              ollama-proxy/eval/broadcast_sim/test_long_broadcast_continuity.py
+              ollama-proxy/eval/broadcast_sim/test_third_long_broadcast_heldout.py
+              ollama-proxy/eval/live_broadcast_campaign/test_live_campaign.py
+              ollama-proxy/eval/test_full_stack_broadcast_gate.py
               ollama-proxy/eval/embedding_ab/test_run_embedding_ab.py
               ollama-proxy/eval/input_safety/test_airi_ko_input_safety_eval.py
               ollama-proxy/eval/chat_replay/test_chat_replay.py
@@ -169,9 +175,17 @@ jobs:
               ollama-proxy/training/tests/test_synthesize_behavior_pending.py
               ollama-proxy/training/tests/test_synthesize_behavior_affect_pending.py
               ollama-proxy/training/tests/test_broadcast_reference_and_pilot_data.py
+              ollama-proxy/training/tests/test_aggregate_broadcast_patterns.py
+              ollama-proxy/training/tests/test_broadcast_response_quality_gate.py
               ollama-proxy/training/tests/test_build_behavior_review_form.py
               ollama-proxy/training/tests/test_behavior_review_pipeline.py
               ollama-proxy/training/tests/test_export_behavior_affect_dataset.py
+              ollama-proxy/training/tests/test_extract_broadcast_reference_candidates.py
+              ollama-proxy/training/tests/test_merge_airi_behavior_lora.py
+              ollama-proxy/training/tests/test_package_airi_gguf.py
+              ollama-proxy/training/tests/test_synthesize_broadcast_behavior_v2.py
+              ollama-proxy/training/tests/test_synthesize_broadcast_continuity_v3.py
+              ollama-proxy/training/tests/test_synthesize_broadcast_continuity_v4.py
               ollama-proxy/training/tests/test_train_airi_behavior_lora.py
               ollama-proxy/training/tests/test_synthesize_extraction_sft.py
               ollama-proxy/training/tests/test_build_extraction_review_form.py
@@ -183,6 +197,8 @@ jobs:
             tests: test_latency_trace.py
           - shard: startup
             tests: test_start_airi_background.py
+          - shard: broadcast-t3-launcher
+            tests: test_broadcast_t3_matrix_launcher_contract.py
           - shard: model-configuration
             tests: test_midm_model_configuration.py
           - shard: latency-monitor

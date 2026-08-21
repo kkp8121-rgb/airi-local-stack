@@ -7,6 +7,28 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-21 코덱스 PC 배치 (isolated T3 36-run launcher 확정)
+
+- `run-airi-broadcast-t3-matrix.ps1`을 새로 추가해 baseline/E1/E2 × 세 fixture ×
+  네 seed의 exact 36-run을 한 경로로 고정했다. 세 모델 모두 `seeded`와 동일 live
+  context/briefing/evidence/acts, max 220, timeout 180, num_ctx 2048를 사용한다.
+- exact tag/digest manifest, 승인 fixture raw/canonical retained-copy 검증, run별 fresh
+  empty memory/knowledge DB와 capability, 실행 전후 local/pinned/ready health, immutable
+  stream plan의 전체 turn 집합, unique action/trace와 durable receipt를 fail-closed로
+  검증한다. 두 12-pair 비교는 36 reports 이후 모두 실행하고 산출물 전체를 해시한다.
+- GPT-SoVITS reference-embedding cache wrapper, streaming mode 2/min chunk 16과 부모 PID+
+  exact command identity cleanup을 고정했다. 하위 시작 script가 바꾸는 reference audio,
+  NLTK/PYTHON 환경도 호출자 값으로 복원한다.
+- launcher 계약 8/8, 방송 sim/comparator 75/75(1 skip), PowerShell AST·py_compile·
+  diff-check가 통과했고 독립 최종 감사가 P0/P1 0 READY로 판정했다. E2 tag가 아직 없어
+  실제 서비스/GPU matrix는 시작하지 않았으며 운영 채택은 계속 금지다.
+- 전체 checkpoint에서 기존 추적 방송 테스트 15개의 CI matrix 누락을 발견해 해당
+  eval/runtime/training tests와 새 T3 launcher test를 shard에 등록했다. `AI` 허용 정책
+  변경(`06d68e1`) 뒤 stale했던 B3-d raw policy/corpus pin을 현 production bytes에
+  재결속했고 120-case verdict 100/100 불변을 확인했다. AB dry-run transport에도 실제
+  stream과 같은 terminal 증적을 추가했다. 최종 `test-current-checkpoint.ps1` PASS,
+  B3-d 16/16·B4c rehearsal 83/83 PASS다.
+
 ## 2026-08-21 코덱스 PC 배치 (broadcast continuity v4 확정 + E1 QLoRA)
 
 - runtime prompt seam으로 실제 proxy가 모델에 보내는 순서를 재현하는 v4 corpus
