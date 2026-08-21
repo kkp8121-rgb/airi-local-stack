@@ -34,6 +34,10 @@ milestone `2e61842`와 receipt `3dba3ca`는 origin/main에 push됐고 직후 loc
   GPU smoke다. 이 인계 배치에서는 `gpu_authorized=false`이며 smoke를 시작하지 않는다.
   E2-C1 GPU는 0/0이고 승자·채택 모델도 아니다.**
 
+> ⚠ 2026-08-21 클로드 PC 평가: 즉시 수리 6커밋 랜딩(`32947e9`~`889d4c2`, 내용은
+> `AIRI-CODEX-BATCH-EVAL-2026-08-21.md`). **재개 시 선결 목록(R1 F3~F7·R2 F5~F10·
+> R3 3건, 특히 R2 F5/F6/F7=T3 신뢰 필수 조건) 먼저 소화할 것.**
+
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
 기계 판독 계약: `goal_status=paused`;

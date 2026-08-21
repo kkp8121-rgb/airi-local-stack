@@ -2501,6 +2501,33 @@
   stream과 같은 terminal 증적을 추가했다. 최종 `test-current-checkpoint.ps1` PASS,
   B3-d 16/16·B4c rehearsal 83/83 PASS다.
 
+## 2026-08-21 클로드 PC 평가 배치 (코덱스 배치 검수·수리 6커밋)
+
+- 전날 코덱스 배치를 R1(프록시·보안)/R2(하네스·게이트)/R3(학습 governance) 3분할로
+  검수했다(opus/opus/sonnet). capability 보안은 성립(위조·재사용·비루프백 차단)하고
+  어제 확정 계약 4종·런처 하네스 기능 4종은 무손상, 트레이너·머지·GGUF 핀 체계도 견고함을
+  재확인했다.
+- **즉시 수리 6커밋**: `32947e9`(training EOL 핀) `5f021b5`(런처 `$Pid` 셰도잉 + CI 6파일
+  배선) `4a4847d`(SHA 어테스테이션 CRLF 바이트 박제 재핀 — 비트 단위 확증) `b8981f1`
+  (재사용 trace_id fail-soft + 시스템 프롬프트 방송 게이트화, OFF 949자 복원) `d65134a`
+  (레포 전체 CRLF 908파일 정규화 + dry-run terminal 버그) `889d4c2`(input_safety 정책
+  어테스테이션 3중 체인 재정렬). 최종 스윕: eval 563·training 201·proxy 488·계약 13 =
+  **1,265 passed, 0 failed**.
+- **핵심 governance 발견(R3)**: continuity v2/v3/v4(1,840행)가 `training_eligible: True`를
+  합성 스크립트 내 자기선언(`user_aggregate_feedback_2026-08-21`, 검증 가능 결속 없음)으로
+  부여받았고 E1 학습이 이미 투입돼 인간 검수 위반으로 판정했다. `adoption_authorized=false`/
+  `t3_status=pending` 게이트는 전 구간 생존해 운영 채택은 아직 막혀 있다. v2 자체 감사
+  테스트가 작성 시점부터 red로 커밋돼 한 번도 통과한 적 없었다는 추가 증거도 확인(테스트
+  버그로 수리했으나 "감사 미통과 상태 자기선언" 사실은 별개로 성립).
+- **코덱스 선결 목록**(재개 전 필수)을 R2 F5~F10(시드 하한 부재, 교락 필드 미비교, T3
+  미통과→캠페인 차단 코드 0건 등 — F5/F6/F7은 T3 신뢰의 필수 조건), R1 F3~F7(발화계약
+  탈동조, receipt 정규화 3갈래, confirm_injected 후 300초 wedge 등), R3 3건(eligibility
+  검증 가능 게이트 전환, v4 review 투명성, 독스트링 보증 약화 문서화)으로 정리했다.
+- **사용자 확인 1건 대기**: continuity governance 자기선언 승인 표식의 실재 여부 —
+  실재하면 근거 문서화, 부재하면 E1을 미승인 실험으로 재분류.
+- 상세: `진행중/AIRI-CODEX-BATCH-EVAL-2026-08-21.md`(자기완결형 평가 보고서).
+  `진행중/AIRI-CODEX-HANDOFF-2026-08-21.md`에 재개 시 선결 목록 소화 배너 추가.
+
 ## 2026-08-21 코덱스 PC 배치 (broadcast continuity v4 확정 + E1 QLoRA)
 
 - runtime prompt seam으로 실제 proxy가 모델에 보내는 순서를 재현하는 v4 corpus
