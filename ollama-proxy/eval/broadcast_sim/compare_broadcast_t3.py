@@ -160,6 +160,8 @@ def validate_report(report: dict[str, Any], allowed: set[str]) -> tuple[str, int
 def compare(base_dir: Path, candidate_dir: Path, manifest_path: Path,
             output: Path, phase: str | None = None, fixture: str | None = None) -> dict[str, Any]:
     reasons: list[str] = []
+    fixtures_compared: list[str] = []
+    seeds_by_fixture: dict[str, list[int]] = {}
     try:
         fixtures = load_manifest(manifest_path)
         reasons.extend(verify_fixture_files(manifest_path, fixtures))
@@ -169,7 +171,9 @@ def compare(base_dir: Path, candidate_dir: Path, manifest_path: Path,
             fixtures = [x for x in fixtures if x['filename'] == fixture or x['canonical_sha256'] == fixture]
         if not fixtures:
             raise ValueError('selection contains no manifest fixtures')
+        fixtures_compared = sorted(x['filename'] for x in fixtures)
         allowed = {x['canonical_sha256'] for x in fixtures}
+        sha_to_filename = {x['canonical_sha256']: x['filename'] for x in fixtures}
         maps: list[dict[tuple[str, int], dict[str, Any]]] = []
         for directory in (base_dir, candidate_dir):
             grouped = {}
@@ -193,6 +197,8 @@ def compare(base_dir: Path, candidate_dir: Path, manifest_path: Path,
         final_fact_deltas = []
         for key in sorted(base):
             left, right = base[key], candidate[key]
+            sha, seed = key
+            seeds_by_fixture.setdefault(sha_to_filename.get(sha, sha), []).append(seed)
             if any(left[name] != right[name] for name in SETTINGS):
                 raise ValueError('settings mismatch')
             if len(left['rows']) != len(right['rows']):
@@ -243,7 +249,9 @@ def compare(base_dir: Path, candidate_dir: Path, manifest_path: Path,
     result = {'schema_version': 'airi.broadcast-sim-t3-comparison.v1',
               'status': 'pass' if not reasons else 'fail', 'adoption_authorized': False,
               'paired_reports': 0 if reasons and not aggregate else len(locals().get('base', {})),
-              'aggregate_numerators': aggregate, 'reasons': sorted(set(reasons))}
+              'aggregate_numerators': aggregate, 'reasons': sorted(set(reasons)),
+              'phase': phase or 'all', 'fixtures_compared': fixtures_compared,
+              'seeds_by_fixture': {name: sorted(seeds) for name, seeds in seeds_by_fixture.items()}}
     output.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix='.t3-', suffix='.json', dir=output.parent)
     try:

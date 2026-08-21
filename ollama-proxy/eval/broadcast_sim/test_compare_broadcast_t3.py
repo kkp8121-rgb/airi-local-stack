@@ -152,13 +152,30 @@ class ComparatorTests(unittest.TestCase):
                 self.put(self.candidate, f'x-{SEEDS[0]}.json', bad)
                 self.assert_fails_with(field)
 
-    @unittest.skipUnless(list(Path.cwd().rglob('*r4*.json')), 'no local r4 report')
+    @unittest.skipUnless(list(MODULE.parent.rglob('*r4*.json')), 'no local r4 report')
     def test_current_r4_fails_if_present(self):
         # Kept deliberately independent of report location/contents: a lone r4 report
         # cannot satisfy the paired, complete fixture set required by this comparator.
-        r4 = next(Path.cwd().rglob('*r4*.json'))
+        r4 = next(MODULE.parent.rglob('*r4*.json'))
         self.put(self.base, 'r4.json', json.loads(r4.read_text(encoding='utf-8')))
         self.assertEqual(self.compare_reports()['status'], 'fail')
+
+    def test_pass_result_records_provenance_for_full_run(self):
+        self.passing_pair()
+        result = self.compare_reports()
+        self.assertEqual(result['status'], 'pass')
+        self.assertEqual(result['phase'], 'all')
+        self.assertEqual(result['fixtures_compared'], ['fixture.json'])
+        self.assertEqual(result['seeds_by_fixture'], {'fixture.json': [7]})
+
+    def test_phase_filter_is_recorded_instead_of_all(self):
+        self.passing_pair()
+        result = comparator.compare(self.base, self.candidate, self.manifest,
+                                     self.root / 'out-phase.json', phase='final_blind')
+        self.assertEqual(result['status'], 'pass')
+        self.assertEqual(result['phase'], 'final_blind')
+        self.assertEqual(result['fixtures_compared'], ['fixture.json'])
+        self.assertEqual(result['seeds_by_fixture'], {'fixture.json': [7]})
 
 
 if __name__ == '__main__':

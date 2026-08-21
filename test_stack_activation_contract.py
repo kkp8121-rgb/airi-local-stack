@@ -3,7 +3,11 @@
 These tests intentionally inspect launcher text: starting or stopping a local
 Ollama process is not a deterministic CI operation.
 """
+import json
 import pathlib
+import shutil
+import subprocess
+import tempfile
 import unittest
 
 
@@ -101,6 +105,39 @@ class StackActivationContractTests(unittest.TestCase):
         self.assertIn('Remove-MemoryExtractorOwnerRecord', STACK_START)
         self.assertIn("memory-extractor-owner.json", STACK_START)
         self.assertIn('Move-Item -LiteralPath $temporary -Destination $extractorOwnerPath -Force', STACK_START)
+        self.assertIn('Write-MemoryExtractorOwnerRecord -Port $MemoryExtractionPort -OwnerPid', STACK_START)
+
+    def test_write_memory_extractor_owner_record_actually_executes(self) -> None:
+        # Regression guard for F1: `param([int]$Port, [int]$Pid)` crashed at call
+        # time with "Cannot overwrite variable Pid" because $Pid is PowerShell's
+        # read-only automatic current-process-id variable. A string-presence
+        # check alone let that regression through, so actually invoke the
+        # extracted function body via pwsh/powershell here.
+        pwsh = shutil.which('pwsh') or shutil.which('powershell')
+        if not pwsh:
+            self.skipTest('pwsh/powershell is not available on this runner')
+        start = STACK_START.index('function Write-MemoryExtractorOwnerRecord {')
+        end = STACK_START.index('function Remove-MemoryExtractorOwnerRecord {')
+        function_source = STACK_START[start:end]
+        with tempfile.TemporaryDirectory() as runtime_dir:
+            runtime_path = pathlib.Path(runtime_dir)
+            owner_path = runtime_path / 'memory-extractor-owner.json'
+            script = (
+                f"$extractorRuntimeDir = '{runtime_path}'\n"
+                f"$extractorOwnerPath = '{owner_path}'\n"
+                + function_source
+                + "\nWrite-MemoryExtractorOwnerRecord -Port 4321 -OwnerPid 9876\n"
+            )
+            script_path = runtime_path / 'invoke-write-owner-record.ps1'
+            script_path.write_text(script, encoding='utf-8')
+            completed = subprocess.run(
+                [pwsh, '-NoProfile', '-NonInteractive', '-File', str(script_path)],
+                capture_output=True, text=True, timeout=30,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertNotIn('Cannot overwrite variable', completed.stderr)
+            record = json.loads(owner_path.read_text(encoding='utf-8'))
+            self.assertEqual(record, {'port': 4321, 'pid': 9876})
 
     def test_stop_uses_owner_pid_only_and_retains_stale_record(self) -> None:
         self.assertIn('-ExpectedPid $ownerPid', STACK_STOP)

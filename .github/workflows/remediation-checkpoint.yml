@@ -215,6 +215,9 @@ jobs:
               ollama-proxy/training/tests/test_export_extraction_sft_dataset.py
               ollama-proxy/training/tests/test_validate_airi_style_pending.py
               ollama-proxy/training/tests/test_verify_airi_style_dataset.py
+          - shard: ollama-proxy-live-campaign
+            tests: >-
+              ollama-proxy/eval/live_broadcast_campaign/test_live_campaign.py
           - shard: latency-trace
             tests: test_latency_trace.py
           - shard: startup
@@ -223,6 +226,9 @@ jobs:
             tests: test_broadcast_t3_matrix_launcher_contract.py
           - shard: model-configuration
             tests: test_midm_model_configuration.py
+          - shard: launcher-contracts
+            tests: >-
+              test_stack_activation_contract.py test_live_campaign_launcher_contract.py
           - shard: latency-monitor
             tests: latency-monitor
           - shard: stt

@@ -244,12 +244,12 @@ if (-not $extractorOwnerPath.StartsWith($extractorRuntimeDir + [IO.Path]::Direct
     throw 'Memory extractor owner record path must stay under the repository runtime directory.'
 }
 function Write-MemoryExtractorOwnerRecord {
-    param([int]$Port, [int]$Pid)
-    if ($Pid -le 0) { throw 'Memory extractor owner PID must be positive.' }
+    param([int]$Port, [int]$OwnerPid)
+    if ($OwnerPid -le 0) { throw 'Memory extractor owner PID must be positive.' }
     New-Item -ItemType Directory -Path $extractorRuntimeDir -Force | Out-Null
     $temporary = Join-Path $extractorRuntimeDir ('.memory-extractor-owner-' + [guid]::NewGuid().ToString('N') + '.tmp')
     try {
-        @{ port = $Port; pid = $Pid } | ConvertTo-Json -Compress | Set-Content -LiteralPath $temporary -Encoding utf8 -NoNewline
+        @{ port = $Port; pid = $OwnerPid } | ConvertTo-Json -Compress | Set-Content -LiteralPath $temporary -Encoding utf8 -NoNewline
         Move-Item -LiteralPath $temporary -Destination $extractorOwnerPath -Force
     }
     finally {
@@ -478,7 +478,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
             throw 'Memory extractor ownership verification failed.'
         }
         if ($extractorResult.StartedByCaller -eq $true) {
-            Write-MemoryExtractorOwnerRecord -Port $MemoryExtractionPort -Pid ([int]$extractorResult.Pid)
+            Write-MemoryExtractorOwnerRecord -Port $MemoryExtractionPort -OwnerPid ([int]$extractorResult.Pid)
         }
         $null = Wait-LocalHealth -Uri "http://127.0.0.1:$MemoryExtractionPort/api/tags" -TimeoutSeconds 30
         & (Join-Path $PSScriptRoot 'ollama-proxy\start-local-ollama-proxy.ps1') `
