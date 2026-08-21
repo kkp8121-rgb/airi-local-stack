@@ -116,6 +116,11 @@ class BroadcastBehaviorV2Test(unittest.TestCase):
                     row = json.loads(line)
                 except json.JSONDecodeError:
                     continue
+                # continuity_v3 re-exports this very corpus verbatim by design
+                # (synthesize_broadcast_continuity_v3._v2_records, split preserved),
+                # so its v2-sourced rows are downstream copies, not prior targets.
+                if row.get("source") == "airi_broadcast_behavior_v2":
+                    continue
                 if isinstance(row.get("target"), str):
                     old_targets.add(row["target"])
                 if isinstance(row.get("answer"), str):

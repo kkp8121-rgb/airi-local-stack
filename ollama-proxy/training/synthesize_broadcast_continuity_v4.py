@@ -77,7 +77,9 @@ PARTITION_CONTRACTS = {
 DEFAULT_SOURCE = SEED / 'airi_broadcast_continuity_v4.jsonl'
 DEFAULT_CHAT = SEED / 'airi_broadcast_continuity_v4_chat.jsonl'
 MANIFEST = HERE.parent / 'eval' / 'broadcast_sim' / 't3_fixture_manifest_v2.json'
-MANIFEST_SHA256 = 'd150bf0d928da565ab1d29885b2eb494e52f806b04d384ed9bbf124609953bd8'
+# Attestation re-pinned to LF-normalized bytes: the original manifest pinned the two
+# calibration fixtures from CRLF-smudged working-copy bytes, never from the LF repo blobs.
+MANIFEST_SHA256 = '5defeb5029a9dd7aee8b4010fa212d562cec6848cd83c43f95949c1ad15d2ac7'
 FAMILIES = {'memory_known': (64, 4, (52, 6, 6)), 'memory_unknown': (16, 4, (12, 2, 2)),
             'donation_isolation': (30, 6, (24, 3, 3)), 'briefing_topic': (50, 5, (40, 5, 5)),
             'grounding': (26, 5, (20, 3, 3)), 'natural_broadcast': (24, 5, (20, 2, 2))}

@@ -29,6 +29,7 @@ REPORT_SCHEMA = "airi.native-transformers-baseline.v1"
 # Pinned to the committed fixture blob (a7412af, unchanged since).  The
 # previous value never matched any committed revision of the file, so the
 # "immutable" gate had been failing closed since 565cc65 (2026-08-14).
+# The pin is taken from LF-normalized bytes, not from a CRLF-smudged working copy.
 CASES_SHA256 = "95309e101e30009ec12a9edb4d047e69a46aec42c2f46df0a8b70962225dc3be"
 DEFAULT_CASES = Path(__file__).with_name("airi_baseline_cases.json")
 

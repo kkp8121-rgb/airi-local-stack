@@ -11,7 +11,7 @@ ollama-proxy/eval/chat_replay/fixtures/*.jsonl text eol=lf
 # The blind T3 fixture and its manifest carry raw SHA-256 attestations.
 ollama-proxy/eval/broadcast_sim/t3_fixture_manifest_v2.json text eol=lf
 ollama-proxy/eval/broadcast_sim/third_long_broadcast_heldout_v1.json text eol=lf
-# The other two manifest-listed fixtures are raw-SHA-256 checked by the same _contamination() path (synthesize_broadcast_continuity_v4.py) — closing the same gap for consistency, even though their current raw pin mismatch is a pre-existing content drift, not a CRLF artifact (see task-15-report.md).
+# The other two manifest-listed fixtures are raw-SHA-256 checked by the same _contamination() path (synthesize_broadcast_continuity_v4.py). Their raw pins were NOT content drift (task-15-report.md said otherwise — corrected in task-18): both pinned values reproduce exactly from the CRLF-smudged working copy, so the manifest was attested off unnormalized bytes and has been re-pinned to the LF blobs.
 ollama-proxy/eval/broadcast_sim/first_broadcast_v1.json text eol=lf
 ollama-proxy/eval/broadcast_sim/second_broadcast_v1.json text eol=lf
 # Deterministic SFT exports are pinned by raw SHA-256 and must survive Windows checkout.
@@ -20,3 +20,6 @@ ollama-proxy/training/seed/airi_broadcast_continuity_v4_chat.jsonl text eol=lf
 # Whole training corpus tree is read raw-byte for SHA-256 determinism gates (behavior_v2/continuity_v3/v4 seeds, cards, schemas) — closes the gap the two entries above only partially covered; any CRLF smudge under Windows autocrlf breaks the hash pins.
 ollama-proxy/training/**/*.jsonl text eol=lf
 ollama-proxy/training/**/*.json text eol=lf
+# run_airi_native_{context_gate,baseline}.py hash these with raw read_bytes(); both pins were taken from CRLF-smudged bytes and are re-pinned to the LF blobs (task-18).
+ollama-proxy/eval/airi_context_cases.json text eol=lf
+ollama-proxy/eval/airi_baseline_cases.json text eol=lf

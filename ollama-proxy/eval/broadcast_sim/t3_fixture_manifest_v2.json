@@ -6,14 +6,14 @@
       "filename": "first_broadcast_v1.json",
       "creation_order": 1,
       "role": "calibration_regression",
-      "raw_sha256": "d6cdd694e76ac4017ca1cdebb60ba09c337efa6a1813ce9c00c91b03d4ffcc9c",
+      "raw_sha256": "e4dc404bd4e36746c8189b9e00419d2122935514989ba3d5bfdc10c6f15f875d",
       "canonical_sha256": "0d558c0ce3e019569673ed96f4f171e3464e1e044028e7de6b7ede9d5b8085d6"
     },
     {
       "filename": "second_broadcast_v1.json",
       "creation_order": 2,
       "role": "calibration_regression",
-      "raw_sha256": "22692a9d24f25cbb6877c297ffc23c93e7d0a74028ddff5072b899e648583760",
+      "raw_sha256": "dad3eec7b6e1c7ebcb1a2a6150c84c5d46253614a13eafa2468535b0cb9c0d20",
       "canonical_sha256": "c2ae8a2db00f8f0ed8bd4ee4d909bde965bcbf18dd359b8dbaf340f4c65a57b1"
     },
     {

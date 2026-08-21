@@ -23,7 +23,8 @@ from run_airi_native_fit_probe import (
 
 
 REPORT_SCHEMA = "airi.native-transformers-context-gate.v1"
-CONTEXT_CASES_SHA256 = "ba1735b13c3828a75f41a2f214365f8b73ea71bee2d88bca3048e5af16d2e6ba"
+# Attestation re-pinned to LF-normalized bytes (was attested off a CRLF-smudged working copy).
+CONTEXT_CASES_SHA256 = "a606c88ec99a7f2c074922e2567c74b794d692cdb361d92ce761d7fe0861ddbb"
 DEFAULT_CASES = Path(__file__).with_name("airi_context_cases.json")
 PRESSURES = (0, 8, 20, 48)
 
