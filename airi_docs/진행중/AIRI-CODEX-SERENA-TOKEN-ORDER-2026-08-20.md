@@ -4,6 +4,7 @@
 > github.com/oraios/serena, 28.3k★)를 붙여 **파일 통짜 read·grep 반복
 > 체인을 심볼 단위 조회로 대체**해 토큰 소비를 줄인다. 본 문서는
 > 자기완결형이며, 절차 §1~§5를 순서대로 실행하고 §7에 결과를 추기한다.
+> Phase 1(serena) 적용 후에는 §8 Phase 2(caveman 프록시)를 진행한다.
 > 이 작업은 **코덱스 PC의 에이전트 환경 변경**이다 — AIRI 레포 코드·운영
 > 설정은 건드리지 않는다 (§6 경계).
 
@@ -113,3 +114,37 @@ Codex 세션에서 `/mcp` 실행 → serena 연결 확인. `--project-from-cwd`�
 | §4 AGENTS.md 배선 | | |
 | §5 A/B 토큰 실측 (arm별 수치) | | |
 | 채택/롤백 판정 | | |
+| §8 caveman trial 실측 (세션 유형별) | | |
+| §8 caveman 채택/부분 채택/기각 판정 | | |
+
+## 8. Phase 2 — Caveman 프록시 (serena 적용 확인 2026-08-21, 클로드 검토 완료분)
+
+Serena가 "적게 읽기"라면 caveman 프록시(github.com/JuliusBrussee/caveman,
+99.7k★, 2026-08-21 검토)는 "그래도 흐르는 것 압축"이다 — 로컬 프록시가
+provider 호출 직전 tool 출력을 유형별 압축(테스트 출력 27.8%·로그
+50.2%·JSON 리포트 26.4% — 공식 벤치 실측)하고 원본은 디스크에 byte-exact
+보존한다. **주의: 공식 33.2%(CI 14.6~48.5%)는 Claude Code 측정이고 Codex
+벤치는 없다.** 클로드 추정 = 코덱스 워크로드(테스트·시뮬·학습 로그 위주)
+기준 입력 15~30%, 코드 편집 세션은 0~순손실 위험(`code` 압축기가 함수
+본문을 생략 → patch 컨텍스트 불일치 재시도 가능). serena와 절감 축이
+겹치므로 합산 기대 금지 — 그래서 trial 실측이 의무다.
+
+1. **설치** (프록시만 — **스킬(`npx skills add`)은 설치 금지**, 출력 축소는
+   보고 품질 훼손 + 순손실 가능이라 기각됨):
+   ```powershell
+   npm install -g @caveman-ai/cli
+   caveman setup --install
+   caveman telemetry off     # 필수 — 익명 텔레메트리 기본 ON
+   ```
+2. **실측**: 내장 A/B 하네스 사용 — `caveman trial -- codex`로 실세션
+   기록 후 `caveman trial report`. **세션 유형 2종을 반드시 분리 측정**:
+   ①실행형(pytest·시뮬·벤치 돌리고 결과 읽기 — 추정 상한 지형)
+   ②코드 편집형(patch 실패율·재시도 횟수를 함께 기록).
+3. **판정**: ①에서 유의 절감 + ②에서 patch 실패율 무악화 → 전면 채택
+   (`caveman codex`로 상시 wrap). ②만 악화 → **부분 채택**(실행형
+   세션에만 wrap). 전 유형 무이득 → 제거(`npm uninstall -g` — 가역).
+4. **경계**: 엔진은 BSL-1.1(자가 사용 무료 — 우리 용도 허용), ChatGPT
+   구독 로그인은 ephemeral CODEX_HOME 방식으로 자격증명이 로컬 프록시를
+   경유함을 인지할 것. 레포 무접촉 원칙은 §6과 동일. loopback upstream은
+   차단돼 있어(이슈 #841) 로컬 릴레이엔 못 물린다 — AIRI의 127.0.0.1
+   프록시와는 무관(그건 Codex provider 트래픽이 아님).
