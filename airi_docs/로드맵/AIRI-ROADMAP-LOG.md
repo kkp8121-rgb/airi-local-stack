@@ -19,13 +19,18 @@
   800 microsteps/50 optimizer updates, train first3 3.3845→last3 2.9151, dev 2.8938,
   peak PyTorch CUDA 6,134,145,536 bytes다. adapter SHA `379b2a5aba1e`, report SHA
   `0f71b042a743`; dataset/base pin exact, base copy 없음, T3 pending·채택 금지다.
-- E2 2-epoch 실험은 사용량 한계가 가까워졌다는 사용자 요청으로 약 14분 시점에
-  안전 중단했다. GPU는 해제됐고 E2 adapter/report/partial output은 없다. 다음 세션은
-  인계문의 exact 명령으로 처음부터 재실행한다.
+- E2 2-epoch 실험은 사용량 한계가 가까워졌다는 사용자 요청으로 첫 실행 약 14분,
+  인계 재검증 중 두 번째 실행 약 3분 시점에 안전 중단했다. 둘 다 checkpoint 전이며
+  GPU는 해제됐고 E2 adapter/report/partial output은 없다. 다음 세션은 인계문의 exact
+  명령으로 처음부터 재실행한다.
 - 다음 게이트를 baseline/E1/E2 × first/second calibration 4-seed × final-blind
   180분 4-seed의 36 reports로 고정했다. T3 전용 isolated launcher 보강 후 우승 후보만
   trace-bound RAG/journal/TTS/latency/closure를 증명하는 3×500 live campaign으로 간다.
   서비스 모델·운영 태그·greybox·extraction은 변경하지 않았다.
+- T3 isolated launcher 첫 초안은 독립 감사에서 PowerShell 배열 비교, health schema,
+  모델/memory-arm confound, 반복 보고서 디렉터리 생성 P0를 확인해 반려하고 삭제했다.
+  미검증 초안은 push하지 않았으며, 다음 구현의 추가 필수 계약은 현행 GPU 인계문에
+  기록했다.
 
 ## 2026-08-21 코덱스 PC 배치 (broadcast continuity v3 학습 + 실제 스택 게이트 정렬)
 

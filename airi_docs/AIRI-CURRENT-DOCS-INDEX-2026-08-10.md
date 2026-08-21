@@ -27,9 +27,10 @@ E1 QLoRA 완료, E2 재개 명령, T3/campaign 게이트 인계 등록).
 
 - `AIRI-CODEX-HANDOFF-2026-08-21.md` — **현행 코덱스(GPU) 인계 단일 SSoT.**
   runtime-shaped broadcast continuity v4 1,000행의 source/chat SHA, seq2048
-  token 실측, E1 adapter/report/hash, 중단된 E2의 처음부터 재실행 명령,
+  token 실측, E1 adapter/report/hash, checkpoint 없이 중단된 E2의 처음부터 재실행 명령,
   safe-merge/GGUF 도구 핀, baseline/E1/E2 × calibration/heldout/blind 36-report
-  T3와 승자 3×500 live campaign 순서를 고정한다. E1은 T3 pending·채택 금지이며
+  T3와 승자 3×500 live campaign 순서를 고정한다. 반려된 T3 launcher 초안의 P0와
+  후속 fail-closed 구현 계약도 포함한다. E1은 T3 pending·채택 금지이며
   서비스 모델은 변경하지 않았다.
 - `AIRI-CODEX-HANDOFF-2026-08-20.md` — 이전 greybox·추출·사용자 총평 인계.
   방송 GPU 진행 상태는 08-21판이 대체한다.

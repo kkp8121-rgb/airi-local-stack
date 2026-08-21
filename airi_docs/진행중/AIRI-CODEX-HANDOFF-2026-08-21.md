@@ -102,8 +102,9 @@ batch=1, gradient_accumulation=16, seed=42
 
 ### 3.3 E2 — 중단, 재실행 필요
 
-사용량 한계가 가까워졌다는 사용자 요청에 따라 약 14분 시점에 Ctrl+C로
-안전 중단했다. GPU는 520MiB 수준으로 해제됐고 다음 두 경로는 **둘 다
+사용량 한계가 가까워졌다는 사용자 요청에 따라 첫 실행은 약 14분, 인계 재검증 중
+시작한 두 번째 실행은 약 3분 시점에 각각 Ctrl+C로 안전 중단했다. 두 실행 모두
+checkpoint 저장 전이며 GPU는 520MiB 수준으로 해제됐다. 다음 두 경로는 **둘 다
 존재하지 않는다**. 재개가 아니라 처음부터 동일 seed로 재실행한다.
 
 ```text
@@ -190,6 +191,16 @@ ephemeral master/observer token을 제공하는 T3 wrapper를 먼저 만들거�
 명시적으로 재현해야 한다. 현 comparator가 model/digest, memory arm, max tokens,
 timeout을 자체 비교하지 않으므로 외부 manifest에서 반드시 고정한다.
 
+인계 직전 T3 wrapper 초안을 별도 작성해 감사했으나 다음 P0 때문에 **반려하고
+파일도 보존하지 않았다**: PowerShell 배열 비교 오류로 정상 manifest도 거부,
+`/health.chat_model` 스키마 오독, baseline/E1/E2에 서로 다른 memory arm을 배정한
+모델-기억 confound, 반복 run마다 동일 보고서 디렉터리를 다시 만들며 중단되는 경로.
+후속 구현은 세 모델 모두 `seeded`를 쓰고, `model`·digest
+`status=pinned`·`verified=true`·`num_ctx`·timeout·live receipt를 실제 health/report로
+증명해야 한다. 보고서는 모델별 디렉터리로 분리하고 baseline↔E1 및 baseline↔E2
+comparator를 각각 실행한다. T3에는 RAG corpus가 필요 없으므로 fresh knowledge DB는
+빈 상태를 attest하며, populated campaign fixture를 섞지 않는다.
+
 통과 기준은 기존 calibration 계약과 새 blind fixture를 모두 만족해야 하며,
 특히 v3의 memory 12/24→8/24, donation callout 40/40→38/40 회귀를 되돌려야 한다.
 blind fixture는 폐쇄된 후 처음 사용하므로 결과를 보고 target을 고치면 오염이다.
@@ -218,7 +229,8 @@ T3 우승 후보만 `run-airi-live-broadcast-campaign.ps1`로 3 seed × 500 turn
   merge/package, stack/campaign launcher): **131 passed**
 - `git diff --check -- . ':(exclude)airi_docs/patches/*.patch'`: whitespace error 0
 - E1 artifact 독립 provenance audit: blocker 0
-- E2: 사용자 요청으로 중단, 불완전 산출물 0
+- E2: 두 번 모두 사용자 인계 요청에 따라 checkpoint 전 중단, 불완전 산출물 0
+- T3 launcher 초안: 독립 감사 P0 4건으로 반려·삭제, 원격 반영 0
 
 다음 세션 첫 순서: **E2 재실행 → E1/E2 merge/package → isolated 36-report
 T3 → 승자만 3×500 live campaign → 사용자에게 실제 응답 묶음 제출**.

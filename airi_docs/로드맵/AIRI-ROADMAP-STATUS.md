@@ -242,7 +242,14 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   3-seed×500-turn 장시간 캠페인이 별도로 소유한다. **v4 게이트는** baseline/E1/E2
   각각 first+second 4-seed와 final-blind 180분 4-seed, 총 36 reports로 수행한다.
   전용 isolated T3 launcher가 아직 없으므로 fresh memory/knowledge DB와 model digest,
-  ephemeral live capability를 외부 manifest로 고정한 뒤에만 실측한다.
+  ephemeral live capability를 외부 manifest로 고정한 뒤에만 실측한다. 인계 직전
+  작성한 첫 wrapper 초안은 정상 manifest까지 거부하는 배열 비교, health 스키마 오독,
+  모델별 서로 다른 memory arm, 반복 run의 보고서 디렉터리 재생성이라는 P0 4건으로
+  반려·삭제했다. 다음 구현은 세 모델 모두 `seeded`, digest `pinned+verified`, exact
+  `num_ctx`/timeout, 모든 row의 durable
+  live receipt, 모델별 보고서 분리와 baseline↔E1/E2 두 comparator를 fail-closed로
+  증명해야 한다. T3 knowledge DB는 fresh empty 상태를 attest하고 campaign RAG fixture를
+  섞지 않는다.
 - [ ] **P3-T4 하드코딩 축소** — T3 통과 행동부터 결정론 계층 걷어냄
   (집계 오프너·폴백 후보). **thank 렌더러는 유지** — 후원 호명 오류
   비용이 커서 고정이 정석
