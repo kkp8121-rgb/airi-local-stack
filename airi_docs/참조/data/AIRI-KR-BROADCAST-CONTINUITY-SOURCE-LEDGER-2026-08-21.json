@@ -1,0 +1,17 @@
+{
+  "schema_version": "airi.broadcast-continuity-source-ledger.v1",
+  "observation_date": "2026-08-21",
+  "research_only": true,
+  "training_permitted": false,
+  "contains_transcript": false,
+  "contains_viewer_pii": false,
+  "sources": [
+    {"source_case_id":"ARC-J01","creator":"주르르","official_url":"https://www.youtube.com/watch?v=lnhHD--ViEw&t=1604s","video_id":"lnhHD--ViEw","seed_start_seconds":1604,"seed_end_seconds":1683,"callback_start_seconds":5849,"callback_end_seconds":5942,"evidence_tier":"official_primary_contiguous","limitation":"제품명 자동자막 오류 가능; 원문과 개인 식별자는 보존하지 않음"},
+    {"source_case_id":"ARC-J02","creator":"주르르","official_url":"https://www.youtube.com/watch?v=lnhHD--ViEw&t=2630s","video_id":"lnhHD--ViEw","seed_start_seconds":2630,"seed_end_seconds":2657,"callback_start_seconds":4998,"callback_end_seconds":5021,"evidence_tier":"official_primary_contiguous","limitation":"도구 화면 상태는 독립 검증하지 않고 회수 기능만 기록함"},
+    {"source_case_id":"ARC-J03","creator":"주르르","official_url":"https://www.youtube.com/watch?v=lnhHD--ViEw&t=2665s","video_id":"lnhHD--ViEw","seed_start_seconds":2665,"seed_end_seconds":2703,"callback_start_seconds":4519,"callback_end_seconds":4600,"evidence_tier":"official_primary_contiguous","limitation":"다자 대화의 자동자막 화자 분리는 부분적임"},
+    {"source_case_id":"ARC-J04","creator":"주르르","official_url":"https://www.youtube.com/watch?v=lnhHD--ViEw&t=2035s","video_id":"lnhHD--ViEw","seed_start_seconds":2035,"seed_end_seconds":2115,"callback_start_seconds":13543,"callback_end_seconds":13575,"evidence_tier":"official_primary_system_assisted","limitation":"무작위 시스템 재등장이 회상을 촉발함"},
+    {"source_case_id":"ARC-J05","creator":"주르르","official_url":"https://www.youtube.com/watch?v=lnhHD--ViEw&t=3197s","video_id":"lnhHD--ViEw","seed_start_seconds":3197,"seed_end_seconds":3245,"callback_start_seconds":10390,"callback_end_seconds":10430,"evidence_tier":"official_primary_system_assisted","limitation":"중간 선호 재확인과 무작위 시스템 선택이 최종 회수를 보조함"},
+    {"source_case_id":"ARC-J06","creator":"주르르","official_url":"https://www.youtube.com/watch?v=lnhHD--ViEw&t=9230s","video_id":"lnhHD--ViEw","seed_start_seconds":9230,"seed_end_seconds":9375,"callback_start_seconds":19567,"callback_end_seconds":19607,"evidence_tier":"official_primary_contiguous","limitation":"자동자막 단어 오류 가능; 경험 일반화 기능만 보존함"},
+    {"source_case_id":"ARC-J07","creator":"주르르","official_url":"https://www.youtube.com/watch?v=lnhHD--ViEw&t=594s","video_id":"lnhHD--ViEw","seed_start_seconds":594,"seed_end_seconds":638,"callback_start_seconds":16970,"callback_end_seconds":17379,"evidence_tier":"official_primary_system_assisted","limitation":"화면과 무작위 시스템 상태가 장기 농담 회수를 강하게 보조함"}
+  ]
+}

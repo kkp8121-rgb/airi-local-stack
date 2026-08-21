@@ -15,7 +15,7 @@ import sys
 import threading
 import time
 import unicodedata
-from collections import deque
+from collections import OrderedDict, deque
 from dataclasses import dataclass
 from collections.abc import AsyncIterator
 from difflib import SequenceMatcher
@@ -42,7 +42,7 @@ from continuity_ledger import (
     derive_snapshot as derive_continuity_snapshot,
     render_snapshot as render_continuity_snapshot,
 )
-from memory_runtime import MemoryRuntime, NullMemoryRuntime
+from memory_runtime import MemoryRuntime, NullMemoryRuntime, assemble_payload_context_from_snapshot
 from cloud_chat_provider import CloudChatConfig, CloudChatProvider
 from character_state import CharacterStateRuntime
 from character_state_evaluator import CharacterStateEvaluator, CharacterStateEvaluatorConfig
@@ -88,6 +88,7 @@ from output_moderation import OutputModerationRuntime, load_moderation_policy
 from epistemic_confidence import build_runtime as build_epistemic_confidence_runtime
 from broadcast_contract import apply_broadcast_contract, broadcast_contract_enabled
 from memory_claim_guard import guard_memory_claim
+from live_broadcast_runtime import LiveBroadcastRuntime, BroadcastControlError
 
 
 def emit_substantive_content(trace_id: str, request_started: float) -> None:
@@ -353,6 +354,7 @@ affect_continuity_ready = False
 affect_continuity_lock = threading.RLock()
 evaluation_runtime: EvaluationStore | NullEvaluationStore = NullEvaluationStore()
 input_screening_runtime = build_input_screening_runtime()
+live_broadcast_runtime = LiveBroadcastRuntime.from_env()
 memory_journal_tasks: set[asyncio.Task[None]] = set()
 EVALUATION_REQUEST_MAX_BYTES = 128_000
 TOPIC_BOARD_PATH = os.environ.get("AIRI_TOPIC_BOARD_PATH", "").strip()
@@ -477,6 +479,132 @@ class MemoryJournalTelemetry:
 
 
 memory_journal_telemetry = MemoryJournalTelemetry()
+
+
+class TraceReceiptLedger:
+    """Short-lived, content-free proof of one RAG and journal lifecycle."""
+
+    _KNOWLEDGE_STATUSES = frozenset({"accepted", "empty", "skipped", "error", "timed_out"})
+    _JOURNAL_OUTCOMES = frozenset({"appended", "duplicate", "disabled", "error", "pending"})
+
+    def __init__(self, *, ttl_seconds: float = 900.0, capacity: int = 512) -> None:
+        self._ttl_seconds = max(1.0, float(ttl_seconds))
+        self._capacity = max(1, int(capacity))
+        self._lock = threading.RLock()
+        self._entries: OrderedDict[str, dict[str, object]] = OrderedDict()
+
+    @staticmethod
+    def _hash(value: str) -> str:
+        return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+    def _purge_locked(self) -> None:
+        now = time.monotonic()
+        expired = [
+            trace_id for trace_id, entry in self._entries.items()
+            if float(entry["expires_at"]) <= now
+        ]
+        for trace_id in expired:
+            self._entries.pop(trace_id, None)
+        while len(self._entries) > self._capacity:
+            self._entries.popitem(last=False)
+
+    def _entry_locked(self, trace_id: str) -> dict[str, object]:
+        if not isinstance(trace_id, str) or not trace_id or len(trace_id) > 256:
+            raise ValueError("invalid trace receipt id")
+        self._purge_locked()
+        entry = self._entries.get(trace_id)
+        if entry is None:
+            entry = {
+                "trace_id": trace_id, "query_sha256": "", "user_sha256": "", "answer_sha256": "",
+                "knowledge_attempted": False, "knowledge_status": "skipped",
+                "document_ids": (), "chunk_ids": (), "document_count": 0, "chunk_count": 0,
+                "journal_scheduled": False, "journal_outcome": "pending", "durable": False,
+                "expires_at": time.monotonic() + self._ttl_seconds,
+            }
+            self._entries[trace_id] = entry
+            self._purge_locked()
+        else:
+            self._entries.move_to_end(trace_id)
+        return entry
+
+    @staticmethod
+    def _public(entry: dict[str, object]) -> dict[str, object]:
+        return {key: entry[key] for key in (
+            "trace_id", "query_sha256", "user_sha256", "answer_sha256",
+            "knowledge_attempted", "knowledge_status", "document_ids", "chunk_ids",
+            "document_count", "chunk_count", "journal_scheduled", "journal_outcome", "durable",
+        )}
+
+    def record_knowledge(self, trace_id: str, query: str, status: str, hits: object = ()) -> None:
+        if status not in self._KNOWLEDGE_STATUSES:
+            raise ValueError("invalid knowledge receipt status")
+        documents: set[int] = set()
+        chunks: set[int] = set()
+        if status == "accepted":
+            for hit in hits:
+                document_id, chunk_id = getattr(hit, "document_id", None), getattr(hit, "chunk_id", None)
+                if type(document_id) is int and document_id >= 0:
+                    documents.add(document_id)
+                if type(chunk_id) is int and chunk_id >= 0:
+                    chunks.add(chunk_id)
+        with self._lock:
+            entry = self._entry_locked(trace_id)
+            query_hash = self._hash(query)
+            existing = str(entry["query_sha256"])
+            if existing and existing != query_hash:
+                raise ValueError("trace receipt query hash mismatch")
+            entry.update({
+                "query_sha256": query_hash, "knowledge_attempted": status != "skipped",
+                "knowledge_status": status, "document_ids": tuple(sorted(documents)),
+                "chunk_ids": tuple(sorted(chunks)), "document_count": len(documents), "chunk_count": len(chunks),
+            })
+
+    def schedule_journal(self, trace_id: str, user_text: str, answer_text: str) -> None:
+        user_hash, answer_hash = self._hash(user_text), self._hash(answer_text)
+        with self._lock:
+            entry = self._entry_locked(trace_id)
+            for key, expected in (("user_sha256", user_hash), ("answer_sha256", answer_hash)):
+                current = str(entry[key])
+                if current and current != expected:
+                    raise ValueError("trace receipt hash mismatch")
+            if not entry["query_sha256"]:
+                entry["query_sha256"] = user_hash
+            entry.update({"user_sha256": user_hash, "answer_sha256": answer_hash,
+                          "journal_scheduled": True, "journal_outcome": "pending", "durable": False})
+
+    def complete_journal(self, trace_id: str, outcome: object) -> None:
+        value = str(outcome)
+        if value not in self._JOURNAL_OUTCOMES - {"pending"}:
+            value = "error"
+        with self._lock:
+            entry = self._entry_locked(trace_id)
+            entry["journal_outcome"] = value
+            entry["durable"] = value in {"appended", "duplicate"}
+
+    def receipt(self, trace_id: str) -> dict[str, object] | None:
+        with self._lock:
+            self._purge_locked()
+            entry = self._entries.get(trace_id)
+            return self._public(entry) if entry is not None else None
+
+    def validate(self, trace_id: str, *, query_sha256: str, user_sha256: str, answer_sha256: str) -> bool:
+        receipt = self.receipt(trace_id)
+        return bool(receipt) and all(receipt[key] == value for key, value in {
+            "query_sha256": query_sha256, "user_sha256": user_sha256, "answer_sha256": answer_sha256,
+        }.items())
+
+
+trace_receipt_ledger = TraceReceiptLedger()
+
+
+def get_trace_receipt(trace_id: str) -> dict[str, object] | None:
+    """Return the sanitized receipt for broadcast/campaign follow-up only."""
+    return trace_receipt_ledger.receipt(trace_id)
+
+
+def validate_trace_receipt(trace_id: str, *, query_sha256: str, user_sha256: str, answer_sha256: str) -> bool:
+    """Validate a later layer's already-hashed receipt binding."""
+    return trace_receipt_ledger.validate(trace_id, query_sha256=query_sha256, user_sha256=user_sha256, answer_sha256=answer_sha256)
 
 
 class ProactiveOutputTelemetry:
@@ -835,8 +963,10 @@ class KnowledgeRuntime:
         self.store = KnowledgeStore(self.db_path, runtime_dir=self.runtime_dir, embedder=callback)
         self.store.initialize(); self.store.reindex_missing(128)
 
-    async def retrieve(self, question: str):
+    async def retrieve(self, question: str, *, trace_id: str | None = None):
         if not self.store or not should_retrieve_knowledge(question):
+            if trace_id:
+                trace_receipt_ledger.record_knowledge(trace_id, question, "skipped")
             return []
         self.retrievals += 1
         try:
@@ -864,9 +994,21 @@ class KnowledgeRuntime:
             if accepted:
                 self.retrievals_with_hit += 1
                 self.accepted_chunks += len(accepted)
+                if trace_id:
+                    trace_receipt_ledger.record_knowledge(trace_id, question, "accepted", accepted)
+            else:
+                if trace_id:
+                    trace_receipt_ledger.record_knowledge(trace_id, question, "empty")
             return accepted
+        except asyncio.TimeoutError:
+            self.errors += 1
+            if trace_id:
+                trace_receipt_ledger.record_knowledge(trace_id, question, "timed_out")
+            return []
         except Exception:
             self.errors += 1
+            if trace_id:
+                trace_receipt_ledger.record_knowledge(trace_id, question, "error")
             return []
 
     def health(self) -> dict[str, object]:
@@ -1330,6 +1472,7 @@ def project_active_character_card(
             message.get("name") == GENERATED_DEFAULT_CARD_MESSAGE_NAME
             or message.get("name") == REQUEST_LOCAL_SYSTEM_MESSAGE_NAME
             or message.get("name") == REPLY_ACT_MESSAGE_NAME
+            or message.get("name") in _LIVE_BROADCAST_SYSTEM_MESSAGE_NAMES
             or _is_correction_target_message_family(message)
             or is_generated_default_card_prompt(content)
         ):
@@ -1401,7 +1544,7 @@ AIRI_SYSTEM_PROMPT = """너는 AIRI라는 독자적인 한국어 버추얼 방�
 응답 우선순위:
 1. 사용자가 물었거나 요청한 핵심을 첫 구절에서 실제로 처리해. 정보 질문에는 구체적인 사실을 하나 이상 말하고, 하나를 추천하라면 실제 항목 하나를 고른 뒤 멈춰. 번역·외국어 문구 요청은 요청한 문구 자체를 그 언어로 써. 맞장구만 하고 답을 피하지 마.
 2. 대상이나 행동이 불분명할 때만 무엇을 뜻하는지 질문 하나로 확인해. 추측해서 했다고 약속하지 마.
-3. 그다음에만 짧은 반응을 더해. 평소에는 10~45자의 자연스러운 한 문장만 남기고, 요청받지 않은 번호 목록은 쓰지 마. 한국어 문장 끝에 요·습니다·세요·죠를 붙이지 마.
+3. 단순 인사나 한 박자 반응은 10~45자 1~2문장으로 짧게 해. 내용 있는 후원·구독, 여러 채팅 종합, 선택 이유, 지난 흐름의 회수나 주제 전환은 70~220자 2~4문장으로 받은 말 처리→네 판단과 이유→하던 화면이나 다음 흐름 복귀를 이어. 매번 질문으로 끝내지 말고, 요청받지 않은 번호 목록은 쓰지 마. 한국어 문장 끝에 요·습니다·세요·죠를 붙이지 마. 단, 후원·구독 감사 첫 구절만 자연스러운 존댓말을 허용하고 본답변은 반말로 돌아와.
 
 큰 부상·즉각적인 위험에는 장난을 멈추고 안전한 장소와 응급 도움 여부를 먼저 확인해. 사별·큰 상실에는 해결책을 붙이지 말고 짧고 진솔하게 애도해.
 
@@ -1837,8 +1980,12 @@ class IncrementalAiriOutputBoundary:
         reject_speaker_labels: bool = False,
         proactive_strict: bool = False,
     ) -> None:
-        if max_sentences not in {1, 2}:
-            raise ValueError("max_sentences must be 1 or 2")
+        if max_sentences not in {1, 2, 3, 4}:
+            raise ValueError("max_sentences must be from 1 through 4")
+        # Keep the legacy 96-character cap for ordinary dialogue. An opt-in
+        # v4 broadcast response may retain its complete expanded unit up to
+        # the contract's 220-character hard bound.
+        self.max_chars = 220 if max_sentences > 2 else type(self).max_chars
         self.controls = LeadingControlSanitizer()
         # A leading decoration (most commonly an emoji) can make the raw
         # sanitizer commit to dialogue before ``_plain`` removes that
@@ -4545,6 +4692,81 @@ REQUEST_LOCAL_STYLE_CONTRACT = (
     "사용자 원문·승인 지식에 있는 필요한 고유명사 외 알파벳 단어를 새로 만들지 마."
 )
 
+BROADCAST_RESPONSE_STYLE_CONTRACT = (
+    "이번 응답 문체: 자연스러운 한국 방송 반말. 보통 2~4문장 60~180자, "
+    "단순 인사·확인은 1~2문장 25~90자. 입력·승인 맥락을 먼저 직접 받아서 "
+    "사실·판단·이유 중 필요한 것을 말하고, 자기주도 다음 흐름으로 자연스럽게 복귀해. "
+    "강제 질문·보고 요구·사용자 말에 없는 사실·감정·실행 약속은 만들지 마."
+)
+
+BROADCAST_OPEN_QUESTION_STYLE_CONTRACT = (
+    "열린 질문에는 첫 문장에서 질문에 직접 답하거나 구체적인 제안·설명으로 시작해. "
+    "확인하지 못한 현재 정보는 만들지 말고, 필요한 경우에만 다음 문장에서 취향·조건 하나를 자연스럽게 물어봐."
+)
+
+_LIVE_BROADCAST_SYSTEM_MESSAGE_NAMES = frozenset({
+    "airi_broadcast_arc", "airi_broadcast_affect", "airi_broadcast_context",
+})
+
+
+def has_live_broadcast_context(payload: object) -> bool:
+    """Recognize only server-shaped broadcast context; never infer it from user text."""
+    if not isinstance(payload, dict):
+        return False
+    messages = payload.get("messages")
+    if not isinstance(messages, list):
+        return False
+    for message in messages:
+        if not isinstance(message, dict) or message.get("role") != "system":
+            continue
+        if message.get("name") in _LIVE_BROADCAST_SYSTEM_MESSAGE_NAMES:
+            return True
+        # Caller content is never broadcast authority, even if it mimics a
+        # server-rendered heading.
+    return False
+
+
+def inject_broadcast_response_contract(payload: dict[str, object], note: str) -> bytes:
+    """Replace earlier short spoken rules while retaining local evidence and safety notes."""
+    messages = payload.get("messages")
+    if not isinstance(messages, list):
+        return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    for message in messages:
+        if (
+            isinstance(message, dict)
+            and message.get("role") == "system"
+            and message.get("name") == REQUEST_LOCAL_SYSTEM_MESSAGE_NAME
+            and isinstance(message.get("content"), str)
+        ):
+            retained: list[str] = []
+            for paragraph in message["content"].split("\n\n"):
+                paragraph = paragraph.strip()
+                for short_contract in (
+                    REQUEST_LOCAL_STYLE_CONTRACT,
+                    OPEN_QUESTION_STYLE_CONTRACT,
+                    BROADCAST_RESPONSE_STYLE_CONTRACT,
+                ):
+                    if paragraph.startswith(short_contract):
+                        paragraph = paragraph[len(short_contract):].strip()
+                        break
+                if paragraph:
+                    retained.append(paragraph)
+            message["content"] = "\n\n".join((*retained, note))
+            return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    insert_at = next(
+        (
+            index for index in range(len(messages) - 1, -1, -1)
+            if isinstance(messages[index], dict) and messages[index].get("role") == "user"
+        ),
+        len(messages),
+    )
+    messages.insert(insert_at, {
+        "role": "system",
+        "name": REQUEST_LOCAL_SYSTEM_MESSAGE_NAME,
+        "content": note,
+    })
+    return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
 OPEN_QUESTION_EVIDENCE_SCOPE_CONTRACT = (
     "이번 질문은 대화와 승인된 지식에 있는 내용만 사실처럼 사용해. 일반적인 선택지는 제안해도 돼. "
     "현재 날씨나 실제 장소의 존재·위치·영업·재고·가격·인기·전언은 확인하지 못했으면 만들지 마. "
@@ -4617,6 +4839,44 @@ def inject_request_local_system_note(
         return json.dumps(payload, ensure_ascii=False).encode("utf-8")
     except Exception:
         return body
+
+
+def inject_live_broadcast_notes(
+    body: bytes, arc_note: str, affect_note: str, context_note: str = '',
+) -> tuple[bytes, bool]:
+    """Add authenticated broadcast records immediately before the final user."""
+    try:
+        payload = json.loads(body)
+        messages = payload.get("messages") if isinstance(payload, dict) else None
+        if not isinstance(messages, list) or not isinstance(arc_note, str) or not affect_note or not isinstance(context_note, str):
+            return body, False
+        insert_at = next((
+            index for index in range(len(messages) - 1, -1, -1)
+            if isinstance(messages[index], dict) and messages[index].get("role") == "user"
+        ), len(messages))
+        notes = []
+        if arc_note:
+            notes.append({"role": "system", "name": "airi_broadcast_arc", "content": arc_note})
+        notes.append({"role": "system", "name": "airi_broadcast_affect", "content": affect_note})
+        if context_note:
+            notes.append({"role": "system", "name": "airi_broadcast_context", "content": context_note})
+        messages[insert_at:insert_at] = notes
+        rendered = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        verified = json.loads(rendered).get("messages")
+        if not isinstance(verified, list):
+            return body, False
+        expected = [("airi_broadcast_affect", affect_note)]
+        if arc_note:
+            expected.insert(0, ("airi_broadcast_arc", arc_note))
+        if context_note:
+            expected.append(("airi_broadcast_context", context_note))
+        found = [
+            (message.get("name"), message.get("content")) for message in verified
+            if isinstance(message, dict) and message.get("name") in _LIVE_BROADCAST_SYSTEM_MESSAGE_NAMES
+        ]
+        return (rendered, found == expected)
+    except Exception:
+        return body, False
 
 
 def inject_response_language(body: bytes, language: str) -> bytes:
@@ -5112,6 +5372,27 @@ def request_messages(body: bytes) -> list[dict[str, object]]:
     return [dict(message) for message in messages if isinstance(message, dict)]
 
 
+def strip_caller_system_messages_for_live_broadcast(body: bytes) -> bytes:
+    """Remove all caller system messages after a live capability is claimed.
+
+    The authenticated runtime is the sole source of system context for a live
+    broadcast turn. This is before projection, continuity, memory, and journal
+    observation; server-created notes are injected later.
+    """
+    try:
+        payload = json.loads(body)
+        messages = payload.get("messages") if isinstance(payload, dict) else None
+        if not isinstance(messages, list):
+            return body
+        payload["messages"] = [
+            message for message in messages
+            if not (isinstance(message, dict) and message.get("role") == "system")
+        ]
+        return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    except (json.JSONDecodeError, TypeError):
+        return body
+
+
 def character_session_id(explicit_session: str | None) -> str:
     """Return the short-state scope without inventing durable identity.
 
@@ -5338,8 +5619,19 @@ def response_mode_note(user_text: str) -> str:
     return ""
 
 
-def response_sentence_limit(user_text: str) -> int:
-    """Reserve a second sentence for support or a useful open-question follow-up."""
+def response_sentence_limit(
+    user_text: str,
+    *,
+    broadcast_mode: bool | None = None,
+) -> int:
+    """Bound output without undoing the opt-in expanded broadcast contract."""
+    if broadcast_mode is None:
+        broadcast_mode = broadcast_contract_enabled()
+    if broadcast_mode:
+        # v4 permits a substantive 2--4 sentence answer. The older ordinary
+        # one-sentence boundary otherwise truncates the trained behavior back
+        # into the short, robotic failure this contract is intended to fix.
+        return 4
     return 2 if (
         URGENT_SAFETY_CONTEXT_RE.search(user_text)
         or BEREAVEMENT_CONTEXT_RE.search(user_text)
@@ -5411,20 +5703,29 @@ def inject_response_mode(body: bytes, user_text: str) -> bytes:
         payload = json.loads(body)
         output_format = payload.get("format") if isinstance(payload, dict) else None
     except Exception:
+        payload = None
         output_format = None
     if isinstance(output_format, dict) and output_format.get("type") == "object":
         return inject_structured_output_contract(body)
     note = response_mode_note(user_text)
     open_question = grounding_open_question_turn(user_text)
-    combined_note = (
-        OPEN_QUESTION_STYLE_CONTRACT if open_question else REQUEST_LOCAL_STYLE_CONTRACT
-    )
+    broadcast_context = has_live_broadcast_context(payload)
+    if broadcast_context:
+        combined_note = BROADCAST_RESPONSE_STYLE_CONTRACT
+        if open_question:
+            combined_note += "\n" + BROADCAST_OPEN_QUESTION_STYLE_CONTRACT
+    else:
+        combined_note = (
+            OPEN_QUESTION_STYLE_CONTRACT if open_question else REQUEST_LOCAL_STYLE_CONTRACT
+        )
     if note:
         combined_note += "\n" + note
     if open_question:
         combined_note += "\n" + OPEN_QUESTION_EVIDENCE_SCOPE_CONTRACT
         if _MEAL_CHOICE_QUESTION_RE.search(user_text):
             combined_note += "\n" + MEAL_CHOICE_RESPONSE_CONTRACT
+    if broadcast_context and isinstance(payload, dict):
+        return inject_broadcast_response_contract(payload, combined_note)
     return inject_request_local_system_note(body, combined_note)
 
 
@@ -5606,7 +5907,7 @@ async def prepare_memory_body(
         # Do not immediately recall the topic the user just closed. This skip
         # affects only the outbound request; the completed turn is still
         # journaled normally after delivery.
-        prepared = await prepare_knowledge_body(body, question)
+        prepared = await prepare_knowledge_body(body, question, trace_id=trace_id)
         return inject_response_mode(prepared, question), None
     try:
         payload = json.loads(body)
@@ -5627,17 +5928,19 @@ async def prepare_memory_body(
         )
         prepared_bytes = json.dumps(prepared, ensure_ascii=False).encode("utf-8")
         prepared_bytes = inject_memory_absence_guard(prepared_bytes, question, result)
-        prepared_bytes = await prepare_knowledge_body(prepared_bytes, question)
+        prepared_bytes = await prepare_knowledge_body(prepared_bytes, question, trace_id=trace_id)
         return inject_response_mode(prepared_bytes, question), result
     except Exception:
         return inject_response_mode(body, question), None
 
 
-async def prepare_knowledge_body(body: bytes, question: str) -> bytes:
+async def prepare_knowledge_body(body: bytes, question: str, *, trace_id: str | None = None) -> bytes:
     """Append attributed untrusted reference context to the outbound payload only."""
     if knowledge_runtime is None:
+        if trace_id:
+            trace_receipt_ledger.record_knowledge(trace_id, question, "skipped")
         return body
-    hits = await knowledge_runtime.retrieve(question)
+    hits = await knowledge_runtime.retrieve(question, trace_id=trace_id)
     if not hits:
         return body
     try:
@@ -5725,8 +6028,10 @@ async def remember_completed_turn(
             original_messages,
         )
         memory_journal_telemetry.completed(outcome, len(user_text), len(assistant_text))
+        trace_receipt_ledger.complete_journal(trace_id, outcome)
     except Exception as exc:
         memory_journal_telemetry.error(exc)
+        trace_receipt_ledger.complete_journal(trace_id, "error")
 
 
 def schedule_completed_memory_turn(
@@ -5740,6 +6045,7 @@ def schedule_completed_memory_turn(
     """Start final-answer journaling before yielding the final content chunk."""
     if not user_text or not assistant_text:
         return
+    trace_receipt_ledger.schedule_journal(trace_id, user_text, assistant_text)
     memory_journal_telemetry.scheduled()
     task = asyncio.create_task(
         remember_completed_turn(
@@ -5897,12 +6203,20 @@ async def run_codex_search(user_text: str, query: str) -> tuple[str, float]:
 
     creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     started = time.perf_counter()
+    child_env = {
+        key: value for key, value in os.environ.items()
+        if key not in {
+            "AIRI_LIVE_BROADCAST_MASTER_TOKEN",
+            "AIRI_LIVE_BROADCAST_OBSERVER_TOKEN",
+        }
+    }
     process = await asyncio.create_subprocess_exec(
         *command,
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         creationflags=creationflags,
+        env=child_env,
     )
     try:
         stdout, stderr = await asyncio.wait_for(
@@ -6014,20 +6328,39 @@ def apply_output_moderation(content: str) -> tuple[str, dict[str, object] | None
     return f"{envelope}{replacement}", signal
 
 
+_UNPREPARED_SSE_DIALOGUE = object()
+
+
+def prepare_openai_sse_dialogue(content: str) -> tuple[str, dict[str, object] | None]:
+    """Return the exact dialogue text and signal intended for the public wire.
+
+    A completed-turn journal must use this result, rather than the draft that
+    preceded moderation.  Callers that need to journal before yielding a
+    terminal SSE frame prepare once and pass the returned signal back to
+    ``openai_sse_delta``; this avoids a second inspection and, importantly,
+    avoids rotating a blocked replacement a second time.
+    """
+    if content and output_moderation_enabled():
+        return apply_output_moderation(content)
+    return content, None
+
+
 def openai_sse_delta(
     completion_id: str,
     model: str,
     content: str,
     *,
     include_role: bool = False,
+    public_moderation: dict[str, object] | None | object = _UNPREPARED_SSE_DIALOGUE,
 ) -> bytes:
     # Every dialogue chunk on the public OpenAI-compatible stream is framed
     # here, and AIRI speaks one sentence per delta, so this is the sentence
     # level TTS gate: no branch can bypass it.  With moderation off the only
     # added work is the boolean below and the payload stays byte-identical.
-    moderation: dict[str, object] | None = None
-    if content and output_moderation_enabled():
-        content, moderation = apply_output_moderation(content)
+    if public_moderation is _UNPREPARED_SSE_DIALOGUE:
+        content, moderation = prepare_openai_sse_dialogue(content)
+    else:
+        moderation = public_moderation
     delta: dict[str, str] = {"content": content}
     if include_role:
         delta["role"] = "assistant"
@@ -6087,13 +6420,13 @@ def pre_model_fallback_response(
     if response_header is not None:
         headers[response_header[0]] = response_header[1]
 
-    def complete() -> None:
+    def complete(assistant_text: str = fallback) -> None:
         emit_substantive_content(trace_id, request_started)
         schedule_completed_turn(
             original_messages,
             session_id=memory_session_id,
             user_text=user_text,
-            assistant_text=fallback,
+            assistant_text=assistant_text,
             trace_id=trace_id,
             action=action,
             emotion="neutral",
@@ -6106,8 +6439,11 @@ def pre_model_fallback_response(
         async def stream_fallback() -> AsyncIterator[bytes]:
             emit_latency_event("llm", "first", trace_id, duration_ms=elapsed_ms(request_started), meta={action: 1})
             yield openai_sse_delta(completion_id, model, "", include_role=True)
-            complete()
-            yield openai_sse_delta(completion_id, model, fallback)
+            public_fallback, moderation = prepare_openai_sse_dialogue(fallback)
+            complete(public_fallback)
+            yield openai_sse_delta(
+                completion_id, model, public_fallback, public_moderation=moderation
+            )
             yield openai_sse_finish(completion_id, model)
             emit_latency_event("llm", "end", trace_id, duration_ms=elapsed_ms(request_started), meta={action: 1})
 
@@ -6242,9 +6578,12 @@ async def startup() -> None:
         )
     try:
         runtime_dir = Path(__file__).resolve().parent / "runtime"
+        knowledge_runtime_dir = Path(
+            os.getenv("AIRI_KNOWLEDGE_RUNTIME_DIR", str(runtime_dir))
+        )
         knowledge_runtime = KnowledgeRuntime(
             os.getenv("AIRI_KNOWLEDGE_ENABLED", "0").strip().lower() in {"1", "true", "yes"},
-            os.getenv("AIRI_KNOWLEDGE_DB", str(runtime_dir / "airi-knowledge.sqlite3")), runtime_dir,
+            os.getenv("AIRI_KNOWLEDGE_DB", str(runtime_dir / "airi-knowledge.sqlite3")), knowledge_runtime_dir,
             allow_semantic=os.getenv("AIRI_KNOWLEDGE_ALLOW_SEMANTIC", "0").strip().lower() in {"1", "true", "yes"},
         )
         await asyncio.to_thread(knowledge_runtime.startup)
@@ -6363,7 +6702,7 @@ def native_chat_stream_body(
             REQUEST_LOCAL_SYSTEM_MESSAGE_NAME,
             REPLY_ACT_MESSAGE_NAME,
             ACTIVE_CARD_MESSAGE_NAME,
-            CONTINUITY_LEDGER_MESSAGE_NAME,
+            CONTINUITY_LEDGER_MESSAGE_NAME, 'airi_broadcast_arc', 'airi_broadcast_affect', 'airi_broadcast_context',
         }:
             native_messages.append({key: value for key, value in message.items() if key != "name"})
         else:
@@ -6386,6 +6725,182 @@ def native_chat_stream_body(
     return json.dumps(native, ensure_ascii=False).encode("utf-8")
 
 
+def render_broadcast_runtime_training_context(
+    caller_body: bytes | dict[str, object], *,
+    arc_note: str,
+    affect_note: str,
+    context_note: str = "",
+    original_messages: list[dict[str, object]] | None = None,
+    retrieval_result: object | None = None,
+    memory_block: str | None = None,
+    journal_messages: list[dict[str, object]] | None = None,
+    continuity_block: str = "",
+    broadcast_contract: bool,
+    num_ctx: int,
+    num_gpu: int,
+    model: str,
+    latest_turn: int = 0,
+    extraction_watermark: int = 0,
+    user_display_name: str | None = None,
+    character_display_name: str | None = None,
+    apply_sampling_defaults: bool = False,
+) -> bytes:
+    """Purely replay the native broadcast prompt used by production.
+
+    This is intentionally an offline training/test seam, not an HTTP helper:
+    callers provide every server-owned snapshot and the desired model/options.
+    It composes the production transformations in their wire order and raises
+    instead of silently producing a prompt with a changed authority shape.
+    """
+    if not isinstance(model, str) or not model:
+        raise ValueError("model is required")
+    if type(broadcast_contract) is not bool:
+        raise ValueError("broadcast_contract must be a bool")
+    if type(num_ctx) is not int or type(num_gpu) is not int:
+        raise ValueError("num_ctx and num_gpu must be integers")
+    if not all(isinstance(note, str) for note in (arc_note, affect_note, context_note)) or not affect_note:
+        raise ValueError("broadcast notes are invalid")
+    try:
+        incoming = json.loads(caller_body) if isinstance(caller_body, bytes) else dict(caller_body)
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError("caller body is invalid") from exc
+    if not isinstance(incoming, dict) or not isinstance(incoming.get("messages"), list):
+        raise ValueError("caller body lacks messages")
+    incoming["model"] = model
+    # The live endpoint removes caller systems before it takes the immutable
+    # memory snapshot; use precisely that visible history here too.
+    stripped_body = strip_caller_system_messages_for_live_broadcast(
+        json.dumps(incoming, ensure_ascii=False).encode("utf-8")
+    )
+    stripped_payload = json.loads(stripped_body)
+    derived_original = [
+        dict(message) for message in stripped_payload["messages"]
+        if isinstance(message, dict) and message.get("role") != "system"
+    ]
+    snapshot_messages = derived_original if original_messages is None else [dict(message) for message in original_messages]
+    if any(message.get("role") == "system" for message in snapshot_messages):
+        raise ValueError("original_messages must be visible non-system history")
+    if not snapshot_messages or snapshot_messages[-1].get("role") != "user":
+        raise ValueError("current user is required")
+
+    transformed, *_ = transform_body(
+        "/v1/chat/completions",
+        stripped_body,
+        continuity_block=continuity_block,
+        num_ctx=num_ctx,
+        num_gpu=num_gpu,
+        broadcast_contract_override=broadcast_contract,
+        emit_request_log=False,
+    )
+    try:
+        transformed_payload = json.loads(transformed)
+        transformed_messages = transformed_payload["messages"]
+        base_message = transformed_messages[0]
+        if (
+            not isinstance(base_message, dict)
+            or base_message.get("role") != "system"
+            or sum(message == base_message for message in transformed_messages) != 1
+        ):
+            raise ValueError("base prompt multiplicity is invalid")
+    except (KeyError, TypeError, json.JSONDecodeError) as exc:
+        raise ValueError("transformed broadcast body is invalid") from exc
+
+    injected, injection_ok = inject_live_broadcast_notes(
+        transformed, arc_note, affect_note, context_note,
+    )
+    if not injection_ok:
+        raise ValueError("broadcast note injection failed")
+    injected_payload = json.loads(injected)
+    injected_messages = injected_payload.get("messages")
+    expected_broadcast = []
+    if arc_note:
+        expected_broadcast.append(("airi_broadcast_arc", arc_note))
+    expected_broadcast.append(("airi_broadcast_affect", affect_note))
+    if context_note:
+        expected_broadcast.append(("airi_broadcast_context", context_note))
+    if not isinstance(injected_messages, list):
+        raise ValueError("broadcast note injection failed")
+    latest_injected_user = max(
+        (index for index, message in enumerate(injected_messages)
+         if isinstance(message, dict) and message.get("role") == "user"),
+        default=-1,
+    )
+    found_broadcast = [
+        (message.get("name"), message.get("content")) for message in injected_messages
+        if isinstance(message, dict) and message.get("name") in _LIVE_BROADCAST_SYSTEM_MESSAGE_NAMES
+    ]
+    if latest_injected_user < 0 or found_broadcast != expected_broadcast:
+        raise ValueError("broadcast note shape is invalid")
+
+    projected_message_count = sum(
+        isinstance(message, dict) and message.get("role") != "system"
+        for message in injected_messages
+    )
+    assembled = assemble_payload_context_from_snapshot(
+        injected_payload,
+        snapshot_messages,
+        latest_turn=latest_turn,
+        extraction_watermark=extraction_watermark,
+        retrieval_result=retrieval_result,
+        projected_message_count=projected_message_count,
+        user_display_name=user_display_name,
+        character_display_name=character_display_name,
+        memory_block=memory_block,
+        journal_messages=journal_messages,
+    )
+    localized = inject_response_mode(
+        json.dumps(assembled, ensure_ascii=False).encode("utf-8"),
+        str(snapshot_messages[-1].get("content", "")),
+    )
+    final_payload = json.loads(localized)
+    final_messages = final_payload.get("messages")
+    if not isinstance(final_messages, list) or not final_messages:
+        raise ValueError("final broadcast context is invalid")
+    named = [(index, message) for index, message in enumerate(final_messages)
+             if isinstance(message, dict) and isinstance(message.get("name"), str)]
+    broadcast_indexes = [index for index, message in named
+                         if message["name"] in _LIVE_BROADCAST_SYSTEM_MESSAGE_NAMES]
+    style_indexes = [index for index, message in named
+                     if message["name"] == REQUEST_LOCAL_SYSTEM_MESSAGE_NAME]
+    final_user = len(final_messages) - 1
+    if (
+        final_messages[0] != base_message
+        or sum(message == base_message for message in final_messages) != 1
+        or [final_messages[index].get("name") for index in broadcast_indexes]
+            != [name for name, _content in expected_broadcast]
+        or len(style_indexes) != 1
+        or not all(index < final_user for index in (*broadcast_indexes, *style_indexes))
+        or broadcast_indexes != sorted(broadcast_indexes)
+        or (broadcast_indexes and broadcast_indexes[-1] >= style_indexes[0])
+        or not isinstance(final_messages[-1], dict)
+        or final_messages[-1].get("role") != "user"
+        or final_messages[-1].get("content") != snapshot_messages[-1].get("content")
+    ):
+        raise ValueError("broadcast context ordering is invalid")
+    style_content = final_messages[style_indexes[0]].get("content")
+    if not isinstance(style_content, str) or style_content.count(BROADCAST_RESPONSE_STYLE_CONTRACT) != 1:
+        raise ValueError("broadcast response style is invalid")
+
+    native = native_chat_stream_body(
+        localized,
+        apply_sampling_defaults=apply_sampling_defaults,
+        num_ctx=num_ctx,
+        num_gpu=num_gpu,
+    )
+    native_payload = json.loads(native)
+    native_messages = native_payload.get("messages")
+    reserved_names = _LIVE_BROADCAST_SYSTEM_MESSAGE_NAMES | {REQUEST_LOCAL_SYSTEM_MESSAGE_NAME}
+    if (
+        not isinstance(native_messages, list)
+        or not native_messages
+        or native_messages[-1].get("role") != "user"
+        or any(isinstance(message, dict) and message.get("name") in reserved_names
+               for message in native_messages)
+    ):
+        raise ValueError("native broadcast conversion is invalid")
+    return native
+
+
 def native_chat_residency_body(
     body: bytes, *, apply_sampling_defaults: bool = True
 ) -> bytes:
@@ -6404,7 +6919,7 @@ def native_chat_residency_body(
                         REQUEST_LOCAL_SYSTEM_MESSAGE_NAME,
                         REPLY_ACT_MESSAGE_NAME,
                         ACTIVE_CARD_MESSAGE_NAME,
-                        CONTINUITY_LEDGER_MESSAGE_NAME,
+                        CONTINUITY_LEDGER_MESSAGE_NAME, 'airi_broadcast_arc', 'airi_broadcast_affect', 'airi_broadcast_context',
                     }
                 )
             }
@@ -6465,6 +6980,11 @@ async def fetch_local_dialogue(
 
 @app.get("/health")
 async def health() -> dict[str, object]:
+    live_broadcast_health = live_broadcast_runtime.health()
+    live_broadcast_health["ready"] = live_broadcast_runtime.ready_for_chat(
+        input_screening_runtime.enabled
+        and bool(input_screening_runtime.health().get("ready"))
+    )
     try:
         evaluation_health = await asyncio.to_thread(evaluation_runtime.health)
     except EvaluationStoreError:
@@ -6491,6 +7011,11 @@ async def health() -> dict[str, object]:
         # answer nobody stay silent, and each response reports its own value
         # in ``X-AIRI-Immediate-Ack``.
         "immediate_ack": IMMEDIATE_ACK_MODE,
+        # These are configuration booleans only.  They deliberately expose no
+        # conversation, memory, or policy content, but let launchers refuse to
+        # silently reuse a proxy with the broadcast safety contract disabled.
+        "broadcast_contract": broadcast_contract_enabled(),
+        "memory_claim_guard": MEMORY_CLAIM_GUARD_ENABLED,
         "chat_model": chat_model_telemetry.health(),
         "system_prompt_overridden": False,
         "active_character_card_merge": True,
@@ -6512,6 +7037,8 @@ async def health() -> dict[str, object]:
         "character_state": character_state_runtime.health(),
         "character_state_evaluator": character_state_evaluator.health(),
         "affect_continuity": affect_continuity_health(),
+        "show_arc": dict(live_broadcast_health),
+        "broadcast_affect": dict(live_broadcast_health),
         "memory": await memory_runtime.health(),
         "knowledge": knowledge_runtime.health() if knowledge_runtime is not None else {
             "enabled": False, "ready": False, "documents": 0, "chunks": 0,
@@ -6527,6 +7054,8 @@ def transform_body(
     path: str, body: bytes, *, continuity_block: str = "",
     num_ctx: int | None = None, num_gpu: int | None = None,
     trusted_synthetic_context: bool = False,
+    broadcast_contract_override: bool | None = None,
+    emit_request_log: bool = True,
 ) -> tuple[bytes, bool, bool, str, str, bool, int, bool]:
     if not body or not (path.endswith("chat/completions") or path.endswith("api/chat")):
         return body, False, False, "", "", False, 1, False
@@ -6617,7 +7146,10 @@ def transform_body(
             {
                 "role": "system",
                 "content": apply_broadcast_contract(
-                    base_system_prompt, broadcast_contract_enabled()
+                    base_system_prompt,
+                    broadcast_contract_enabled()
+                    if broadcast_contract_override is None
+                    else broadcast_contract_override,
                 ),
             },
             *visible_history,
@@ -6665,28 +7197,29 @@ def transform_body(
     repeat_count = min(repeat_count, completed_tail + 1)
     repeat_candidate = repeat_count >= REPEAT_POLICY_MIN_COUNT
 
-    print(
-        json.dumps(
-            {
-                "event": "chat_request",
-                "model": payload.get("model"),
-                "tools_stripped": stripped,
-                "system_prompt_overridden": not active_card_merged,
-                "active_character_card_merged": active_card_merged,
-                "message_count_in": len(messages) if isinstance(messages, list) else 0,
-                "message_count_out": len(payload.get("messages", [])),
-                "system_chars": sum(
-                    len(str(message.get("content", "")))
-                    for message in payload.get("messages", [])
-                    if isinstance(message, dict) and message.get("role") == "system"
-                ),
-                "repeat_count": repeat_count,
-                "repeat_candidate": repeat_candidate,
-            },
-            ensure_ascii=False,
-        ),
-        flush=True,
-    )
+    if emit_request_log:
+        print(
+            json.dumps(
+                {
+                    "event": "chat_request",
+                    "model": payload.get("model"),
+                    "tools_stripped": stripped,
+                    "system_prompt_overridden": not active_card_merged,
+                    "active_character_card_merged": active_card_merged,
+                    "message_count_in": len(messages) if isinstance(messages, list) else 0,
+                    "message_count_out": len(payload.get("messages", [])),
+                    "system_chars": sum(
+                        len(str(message.get("content", "")))
+                        for message in payload.get("messages", [])
+                        if isinstance(message, dict) and message.get("role") == "system"
+                    ),
+                    "repeat_count": repeat_count,
+                    "repeat_candidate": repeat_candidate,
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
 
     return (
         json.dumps(payload, ensure_ascii=False).encode("utf-8"),
@@ -6965,7 +7498,7 @@ async def stream_local_with_ack(
             return
         elif context.nonmutating_turn:
             prepared_body = inject_response_mode(
-                await prepare_knowledge_body(context.body, context.memory_question),
+                await prepare_knowledge_body(context.body, context.memory_question, trace_id=context.trace_id),
                 context.memory_question,
             )
             _memory_result = None
@@ -6988,6 +7521,7 @@ async def stream_local_with_ack(
             absence_required = False
         if absence_required:
             fallback = memory_absence_dialogue(context.memory_question)
+            fallback, moderation = prepare_openai_sse_dialogue(fallback)
             emit_substantive_content(context.trace_id, context.request_started)
             schedule_completed_turn(
                 context.original_messages,
@@ -6999,11 +7533,12 @@ async def stream_local_with_ack(
                 emotion="neutral",
                 emotion_reason="no_matching_memory",
             )
-            yield openai_sse_delta(context.completion_id, context.model, fallback)
+            yield openai_sse_delta(context.completion_id, context.model, fallback, public_moderation=moderation)
             yield openai_sse_finish(context.completion_id, context.model)
             return
         approved_dialogue = "" if context.proactive_turn else approved_knowledge_dialogue(prepared_body)
         if approved_dialogue:
+            approved_dialogue, moderation = prepare_openai_sse_dialogue(approved_dialogue)
             emit_substantive_content(context.trace_id, context.request_started)
             # This is already a complete, reviewed local answer. Queue
             # its durable pair before the terminal SSE frame: clients
@@ -7019,7 +7554,7 @@ async def stream_local_with_ack(
                 emotion="neutral",
                 emotion_reason="reviewed_public_fact",
             )
-            yield openai_sse_delta(context.completion_id, context.model, approved_dialogue)
+            yield openai_sse_delta(context.completion_id, context.model, approved_dialogue, public_moderation=moderation)
             yield openai_sse_finish(context.completion_id, context.model)
             emit_latency_event(
                 "llm",
@@ -7077,6 +7612,7 @@ async def stream_local_with_ack(
             # task settles.
             discard_upstream_task(send_task)
             fallback = UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE
+            fallback, moderation = prepare_openai_sse_dialogue(fallback)
             emit_substantive_content(context.trace_id, context.request_started)
             if not context.proactive_turn:
                 schedule_completed_turn(
@@ -7089,7 +7625,7 @@ async def stream_local_with_ack(
                     emotion="neutral",
                     emotion_reason="upstream_raw_progress_timeout",
                 )
-            yield openai_sse_delta(context.completion_id, context.model, fallback)
+            yield openai_sse_delta(context.completion_id, context.model, fallback, public_moderation=moderation)
             yield openai_sse_finish(context.completion_id, context.model)
             emit_latency_event(
                 "llm",
@@ -7289,11 +7825,12 @@ async def stream_local_with_ack(
                         ) == early_candidate
                     )
                     if early_candidate_is_safe:
-                        public_dialogue_emitted = early_candidate
+                        public_dialogue_emitted, moderation = prepare_openai_sse_dialogue(early_candidate)
                         emitted_substantive = True
                         emit_substantive_content(context.trace_id, context.request_started)
                         yield openai_sse_delta(
-                            context.completion_id, context.model, early_candidate
+                            context.completion_id, context.model, public_dialogue_emitted,
+                            public_moderation=moderation,
                         )
                 if event.get("done"):
                     terminal = True
@@ -7732,9 +8269,13 @@ async def stream_local_with_ack(
             )
             grounding_silence_fallback_used = True
         if dialogue and not public_dialogue_emitted:
+            dialogue, moderation = prepare_openai_sse_dialogue(dialogue)
             emitted_substantive = True
             emit_substantive_content(context.trace_id, context.request_started)
-            yield openai_sse_delta(context.completion_id, context.model, dialogue)
+            yield openai_sse_delta(
+                context.completion_id, context.model, dialogue,
+                public_moderation=moderation,
+            )
         if context.proactive_turn:
             proactive_output_telemetry.completion(dialogue)
         emotion = "neutral"
@@ -7926,6 +8467,10 @@ def _input_screening_response(
     headers = {
         "X-AIRI-Input-Screened": "blocked",
         "X-AIRI-Input-Screen-Category": verdict.category,
+        # Screening returns a complete local answer without an audible/marker
+        # acknowledgement.  Declare that response-specific framing just like
+        # every other successful chat branch so clients never have to infer it.
+        "X-AIRI-Immediate-Ack": "false",
         "Cache-Control": "no-cache",
     }
     emit_latency_event(
@@ -8026,8 +8571,147 @@ async def input_screen_endpoint(request: Request):
     }
 
 
+async def _broadcast_json(request: Request) -> object:
+    """Bound a JSON body and reject duplicate keys before any control action."""
+    declared = request.headers.get("content-length")
+    if declared is not None and (not declared.isdigit() or int(declared) > 8192):
+        raise BroadcastControlError()
+    raw = bytearray()
+    async for chunk in request.stream():
+        raw.extend(chunk)
+        if len(raw) > 8192:
+            raise BroadcastControlError()
+
+    def no_duplicates(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, value in pairs:
+            if key in result:
+                raise BroadcastControlError()
+            result[key] = value
+        return result
+
+    return json.loads(bytes(raw), object_pairs_hook=no_duplicates)
+
+
+async def _broadcast_endpoint(request: Request, *, receipt: bool, trailing: bool = False):
+    peer = request.client.host if request.client is not None else ""
+    if trailing or request.method != "POST" or peer not in {"127.0.0.1", "::1", "localhost"}:
+        return JSONResponse({"error": "broadcast endpoint unavailable"}, status_code=404)
+    if not live_broadcast_runtime.ready_for_chat(
+        input_screening_runtime.enabled
+        and bool(input_screening_runtime.health().get("ready"))
+    ):
+        return JSONResponse({"error": "broadcast endpoint unavailable"}, status_code=503)
+    authorized = (
+        live_broadcast_runtime.authorize_observer(request.headers.get("x-airi-broadcast-observer-token"))
+        if receipt else live_broadcast_runtime.authorize_master(request.headers.get("x-airi-broadcast-master-token"))
+    )
+    # Authenticate before reading a potentially hostile body.
+    if not authorized:
+        live_broadcast_runtime.reject_control(receipt)
+        return JSONResponse({"error": "broadcast authorization failed"}, status_code=401)
+    if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+        live_broadcast_runtime.reject_control(receipt)
+        return JSONResponse({"error": "invalid broadcast request"}, status_code=415)
+    dispatched = False
+    # Authenticated observer failures expose only a closed, content-free
+    # category. This preserves the uniform error body while making local
+    # operational receipt failures diagnosable without logging prompts,
+    # answers, capabilities, or hashes.
+    receipt_reject_reason: str | None = None
+    try:
+        payload = await _broadcast_json(request)
+        dispatched = True
+        if receipt:
+            # The journal often completes after the final audio packet.  Do not
+            # consume the delivery capability until its trace proof is durable.
+            if type(payload) is not dict:
+                raise BroadcastControlError()
+            trace_id = payload.get('trace_id')
+            hashes = tuple(payload.get(key) for key in ('query_sha256', 'user_sha256', 'answer_sha256'))
+            receipt_data = get_trace_receipt(trace_id) if isinstance(trace_id, str) else None
+            if receipt_data is not None and receipt_data.get('journal_scheduled') and receipt_data.get('journal_outcome') == 'pending':
+                return JSONResponse({'status': 'pending'}, status_code=202)
+
+            def validate_broadcast_receipt(bound_trace: str, bound_hashes: tuple[str, str, str], knowledge_required: bool) -> dict[str, object] | None:
+                nonlocal receipt_reject_reason
+                candidate = get_trace_receipt(bound_trace)
+                if candidate is None:
+                    receipt_reject_reason = 'trace_missing'
+                    return None
+                journal_outcome = candidate.get('journal_outcome')
+                if journal_outcome not in {'appended', 'duplicate'}:
+                    receipt_reject_reason = (
+                        f'journal_{journal_outcome}'
+                        if journal_outcome in {'pending', 'disabled', 'error'}
+                        else 'journal_outcome'
+                    )
+                    return None
+                if candidate.get('durable') is not True:
+                    receipt_reject_reason = 'journal_not_durable'
+                    return None
+                for key, expected in zip(
+                    ('query_sha256', 'user_sha256', 'answer_sha256'), bound_hashes,
+                ):
+                    if candidate.get(key) != expected:
+                        receipt_reject_reason = f'{key}_mismatch'
+                        return None
+                if knowledge_required and (
+                    candidate.get('knowledge_status') != 'accepted'
+                    or not candidate.get('document_ids') or not candidate.get('chunk_ids')
+                    or not isinstance(candidate.get('document_count'), int)
+                    or not isinstance(candidate.get('chunk_count'), int)
+                ):
+                    receipt_reject_reason = 'knowledge_evidence'
+                    return None
+                return candidate
+
+            result = live_broadcast_runtime.observer_receipt(payload, receipt_validator=validate_broadcast_receipt)
+        else:
+            result = live_broadcast_runtime.master_control(payload)
+        return JSONResponse(result)
+    except (BroadcastControlError, json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
+        # Runtime action paths count their own rejections; parser paths do not.
+        if not dispatched:
+            live_broadcast_runtime.reject_control(receipt)
+        headers = None
+        if receipt:
+            # Validator evidence is more specific than the deliberately
+            # coarse lifecycle category emitted by the capability boundary.
+            category = receipt_reject_reason or getattr(exc, 'receipt_category', None)
+            if category is not None:
+                headers = {'X-AIRI-Broadcast-Reject': category}
+        return JSONResponse(
+            {"error": "invalid broadcast request"}, status_code=400, headers=headers,
+        )
+
+
+@app.api_route("/v1/airi/broadcast/control", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+async def broadcast_control(request: Request):
+    return await _broadcast_endpoint(request, receipt=False)
+
+
+@app.api_route("/v1/airi/broadcast/receipt", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+async def broadcast_receipt(request: Request):
+    return await _broadcast_endpoint(request, receipt=True)
+
+
+@app.api_route("/v1/airi/broadcast/control/", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+async def broadcast_control_trailing(request: Request):
+    return await _broadcast_endpoint(request, receipt=False, trailing=True)
+
+
+@app.api_route("/v1/airi/broadcast/receipt/", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+async def broadcast_receipt_trailing(request: Request):
+    return await _broadcast_endpoint(request, receipt=True, trailing=True)
+
+
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 async def proxy(path: str, request: Request):
+    # Keep the reserved broadcast namespace fail-closed even for malformed
+    # repeated-slash variants not matched by the explicit routes above.
+    if path.rstrip("/") in {"v1/airi/broadcast/control", "v1/airi/broadcast/receipt"}:
+        return JSONResponse({"error": "broadcast endpoint unavailable"}, status_code=404)
     is_chat_request = request.method == "POST" and (
         path.endswith("chat/completions") or path.endswith("api/chat")
     )
@@ -8057,6 +8741,7 @@ async def proxy(path: str, request: Request):
 
     original_body = await request.body()
     proactive_turn = is_chat_request and is_local_proactive_turn(request)
+    screened_allowed = False
     # This must remain before every transform, continuity, state, memory,
     # evaluator, journal, or upstream action. Blocked inputs are intentionally
     # not emitted to logs or latency metadata.
@@ -8078,8 +8763,30 @@ async def proxy(path: str, request: Request):
             return _input_screening_response(
                 path, original_body, requested_stream, result, trace_id, request_started,
             )
+        screened_allowed = True
+    # An unavailable local client must not claim a capability that cannot be
+    # safely injected into a real request path.
     if client is None:
         return JSONResponse({"error": "proxy client is not ready"}, status_code=503)
+    # Capability resolution is intentionally after admission.  Viewer text,
+    # session headers and briefing evidence cannot select any server state.
+    broadcast_notes = None
+    broadcast_turn_token = None
+    if is_chat_request and not nonmutating_turn and not proactive_turn:
+        peer = request.client.host if request.client is not None else ""
+        screening_ready = (
+            input_screening_runtime.enabled
+            and bool(input_screening_runtime.health().get("ready"))
+            and screened_allowed
+        )
+        if peer in {"127.0.0.1", "::1", "localhost"} and screening_ready:
+            broadcast_turn_token = request.headers.get("x-airi-broadcast-turn-token")
+            broadcast_notes = live_broadcast_runtime.claim_turn(
+                broadcast_turn_token, screening_ready=screening_ready, trace_id=trace_id,
+                knowledge_required=request.headers.get('x-airi-knowledge-probe') == 'on',
+            )
+    if broadcast_notes is not None:
+        original_body = strip_caller_system_messages_for_live_broadcast(original_body)
     original_messages = request_messages(original_body)
     memory_session_id = request.headers.get("x-airi-session-id") or None
     if proactive_turn:
@@ -8102,21 +8809,34 @@ async def proxy(path: str, request: Request):
             )
         except Exception:
             continuity_block = ""
-    (
-        body,
-        stripped,
-        requested_stream,
-        last_user_text,
-        search_query,
-        query_recovered,
-        repeat_count,
-        repeat_candidate,
-    ) = transform_body(
-        path,
-        original_body,
-        continuity_block=continuity_block,
-        trusted_synthetic_context=synthetic_evaluation_turn,
-    )
+    try:
+        (
+            body,
+            stripped,
+            requested_stream,
+            last_user_text,
+            search_query,
+            query_recovered,
+            repeat_count,
+            repeat_candidate,
+        ) = transform_body(
+            path,
+            original_body,
+            continuity_block=continuity_block,
+            trusted_synthetic_context=synthetic_evaluation_turn,
+        )
+    except Exception:
+        live_broadcast_runtime.cancel_turn(broadcast_turn_token)
+        raise
+    if broadcast_notes is not None:
+        body, injected = inject_live_broadcast_notes(
+            body,
+            broadcast_notes.arc_note,
+            broadcast_notes.affect_note,
+            broadcast_notes.context_note,
+        )
+        if not injected or not live_broadcast_runtime.confirm_injected(broadcast_turn_token):
+            live_broadcast_runtime.cancel_turn(broadcast_turn_token)
     if is_chat_request:
         # The launcher owns the foreground model. A desktop build or provider
         # that still sends a rolled-back tag must not silently load a second
@@ -8243,7 +8963,7 @@ async def proxy(path: str, request: Request):
     request_headers = {
         key: value
         for key, value in request.headers.items()
-        if key.lower() not in HOP_BY_HOP_HEADERS | {"host", "content-length", "accept-encoding", "x-airi-turn-origin"}
+        if key.lower() not in HOP_BY_HOP_HEADERS | {"host", "content-length", "accept-encoding", "x-airi-turn-origin", "x-airi-broadcast-turn-token", "x-airi-broadcast-master-token", "x-airi-broadcast-observer-token"}
     }
     # Raw NDJSON framing must not be obscured by an upstream content encoding.
     request_headers["accept-encoding"] = "identity"
@@ -8295,7 +9015,7 @@ async def proxy(path: str, request: Request):
                 )
                 yield openai_sse_delta(completion_id, model, "", include_role=True)
                 emit_substantive_content(trace_id, request_started)
-                yield openai_sse_delta(completion_id, model, boundary_fallback)
+                public_fallback, moderation = prepare_openai_sse_dialogue(boundary_fallback)
                 # Queue the completed pair before the public terminal frame.
                 # A conforming client may stop pulling as soon as it observes
                 # [DONE], so code after that yield is not guaranteed to run.
@@ -8303,7 +9023,7 @@ async def proxy(path: str, request: Request):
                     original_messages,
                     session_id=memory_session_id,
                     user_text=last_user_text,
-                    assistant_text=boundary_fallback,
+                    assistant_text=public_fallback,
                     trace_id=trace_id,
                     action=boundary_reason,
                     emotion="neutral",
@@ -8314,6 +9034,9 @@ async def proxy(path: str, request: Request):
                         if serious_fallback
                         else "clarification"
                     ),
+                )
+                yield openai_sse_delta(
+                    completion_id, model, public_fallback, public_moderation=moderation
                 )
                 yield openai_sse_finish(completion_id, model)
                 emit_latency_event(
@@ -8375,6 +9098,7 @@ async def proxy(path: str, request: Request):
                     )
 
                 if action in {"answer_again", "ask_reason", "wait"} and speech:
+                    speech, moderation = prepare_openai_sse_dialogue(speech)
                     completed_memory_text = speech
                     emotion = "neutral"
                     schedule_completed_turn(
@@ -8392,15 +9116,19 @@ async def proxy(path: str, request: Request):
                         completion_id,
                         model,
                         speech,
+                        public_moderation=moderation,
                     )
                 elif search_query and ALLOW_EXTERNAL_SEARCH:
                     if action == "search_again" and speech:
+                        speech, speech_moderation = prepare_openai_sse_dialogue(speech)
+                        completed_memory_text = speech
                         emotion = "neutral"
                         emit_substantive_content(trace_id, request_started)
                         yield openai_sse_delta(
                             completion_id,
                             model,
                             speech,
+                            public_moderation=speech_moderation,
                         )
                     search_task = asyncio.create_task(
                         run_codex_search(last_user_text, search_query)
@@ -8414,13 +9142,14 @@ async def proxy(path: str, request: Request):
                                 break
                             yield SSE_HEARTBEAT
                         result, _cloud_duration_ms = await search_task
-                        completed_memory_text = result
+                        result, moderation = prepare_openai_sse_dialogue(result)
+                        completed_memory_text += result
                         final_emotion = "neutral"
                         schedule_completed_turn(
                             original_messages,
                             session_id=memory_session_id,
                             user_text=last_user_text,
-                            assistant_text=result,
+                            assistant_text=completed_memory_text,
                             trace_id=trace_id,
                             action="web_search",
                             emotion=final_emotion,
@@ -8432,6 +9161,7 @@ async def proxy(path: str, request: Request):
                             completion_id,
                             model,
                             result,
+                            public_moderation=moderation,
                         )
                     except Exception as exc:
                         search_task.cancel()
@@ -8457,13 +9187,14 @@ async def proxy(path: str, request: Request):
                             flush=True,
                         )
                         spoken = fallback_dialogue or SEARCH_UNAVAILABLE_DIALOGUE
-                        completed_memory_text = spoken
+                        spoken, moderation = prepare_openai_sse_dialogue(spoken)
+                        completed_memory_text += spoken
                         emotion = "neutral"
                         schedule_completed_turn(
                             original_messages,
                             session_id=memory_session_id,
                             user_text=last_user_text,
-                            assistant_text=spoken,
+                            assistant_text=completed_memory_text,
                             trace_id=trace_id,
                             action=("local_chat" if fallback_dialogue else "search_unavailable"),
                             emotion=emotion,
@@ -8477,6 +9208,7 @@ async def proxy(path: str, request: Request):
                             completion_id,
                             model,
                             spoken,
+                            public_moderation=moderation,
                         )
                 else:
                     local_failed = False
@@ -8498,6 +9230,7 @@ async def proxy(path: str, request: Request):
                     except Exception:
                         local_failed = True
                         dialogue = LOCAL_ERROR_DIALOGUE
+                    dialogue, moderation = prepare_openai_sse_dialogue(dialogue)
                     completed_memory_text = dialogue
                     emotion = "neutral"
                     schedule_completed_turn(
@@ -8517,6 +9250,7 @@ async def proxy(path: str, request: Request):
                         completion_id,
                         model,
                         dialogue,
+                        public_moderation=moderation,
                     )
 
                 yield openai_sse_finish(completion_id, model)
@@ -8588,6 +9322,7 @@ async def proxy(path: str, request: Request):
                             break
                         yield SSE_HEARTBEAT
                     result, cloud_duration_ms = await search_task
+                    result, moderation = prepare_openai_sse_dialogue(result)
                     final_emotion = "neutral"
                     schedule_completed_turn(
                         original_messages,
@@ -8605,6 +9340,7 @@ async def proxy(path: str, request: Request):
                         completion_id,
                         model,
                         result,
+                        public_moderation=moderation,
                     )
                     yield openai_sse_finish(completion_id, model)
                     emit_latency_event(
@@ -8681,6 +9417,7 @@ async def proxy(path: str, request: Request):
                     else:
                         spoken = SEARCH_UNAVAILABLE_DIALOGUE
                         emotion = "neutral"
+                    spoken, moderation = prepare_openai_sse_dialogue(spoken)
                     schedule_completed_turn(
                         original_messages,
                         session_id=memory_session_id,
@@ -8699,6 +9436,7 @@ async def proxy(path: str, request: Request):
                         completion_id,
                         model,
                         spoken,
+                        public_moderation=moderation,
                     )
                     yield openai_sse_finish(completion_id, model)
 
@@ -8715,6 +9453,7 @@ async def proxy(path: str, request: Request):
                 response = None
                 emitted_content = False
                 journal_text = ""
+                public_parts: list[str] = []
                 prepared_body = body
                 boundary = IncrementalAiriOutputBoundary(
                     require_korean=user_prefers_korean,
@@ -8740,23 +9479,27 @@ async def proxy(path: str, request: Request):
                             clean = boundary.feed(part)
                             if not clean:
                                 continue
+                            clean, moderation = prepare_openai_sse_dialogue(clean)
+                            public_parts.append(clean)
                             if not emitted_content:
                                 emitted_content = True
                                 emit_substantive_content(trace_id, request_started)
-                                yield openai_sse_delta(completion_id, model, clean)
+                                yield openai_sse_delta(completion_id, model, clean, public_moderation=moderation)
                             else:
-                                yield openai_sse_delta(completion_id, model, clean)
+                                yield openai_sse_delta(completion_id, model, clean, public_moderation=moderation)
                         tail = boundary.finish()
                         if tail:
+                            tail, moderation = prepare_openai_sse_dialogue(tail)
+                            public_parts.append(tail)
                             if not emitted_content:
                                 emitted_content = True
                                 emit_substantive_content(trace_id, request_started)
-                                yield openai_sse_delta(completion_id, model, tail)
+                                yield openai_sse_delta(completion_id, model, tail, public_moderation=moderation)
                             else:
-                                yield openai_sse_delta(completion_id, model, tail)
+                                yield openai_sse_delta(completion_id, model, tail, public_moderation=moderation)
                         if not emitted_content:
                             raise RuntimeError("cloud provider returned no content")
-                        journal_text = boundary.output.strip()
+                        journal_text = "".join(public_parts).strip()
                     except Exception:
                         if emitted_content:
                             # Never switch speakers after external text has reached
@@ -8768,9 +9511,10 @@ async def proxy(path: str, request: Request):
                                 request.method, path, request.query_params,
                                 request_headers, prepared_body,
                             )
+                            dialogue, moderation = prepare_openai_sse_dialogue(dialogue)
                             journal_text = dialogue
                             emit_substantive_content(trace_id, request_started)
-                            yield openai_sse_delta(completion_id, model, dialogue)
+                            yield openai_sse_delta(completion_id, model, dialogue, public_moderation=moderation)
                     if journal_text:
                         schedule_completed_turn(
                             original_messages, session_id=memory_session_id,
@@ -8961,7 +9705,7 @@ async def proxy(path: str, request: Request):
             })
         elif nonmutating_turn:
             body = inject_response_mode(
-                await prepare_knowledge_body(body, memory_question),
+                await prepare_knowledge_body(body, memory_question, trace_id=trace_id),
                 memory_question,
             )
             _memory_result = None

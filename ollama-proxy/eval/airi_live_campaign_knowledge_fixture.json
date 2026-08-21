@@ -1,0 +1,17 @@
+[
+  {
+    "approved": true,
+    "source": "airi-local-synthetic-campaign-fixture",
+    "title": "별모래 정원 월광석 규칙",
+    "aliases": [
+      "별모래 정원",
+      "월광석",
+      "서쪽 유리문"
+    ],
+    "answer_summary": "별모래 정원의 월광석은 서쪽 유리문을 여는 재료다.",
+    "version": "2026-08-21-v1",
+    "reviewed_at": "2026-08-21T00:00:00+09:00",
+    "provenance": "user-authorized-local-synthetic-evaluation-fixture",
+    "content": "별모래 정원이라는 가상 게임에서 월광석은 서쪽 유리문을 여는 데 쓰는 재료다. 동쪽 나무문이나 북쪽 철문에는 사용하지 않는다. 이 사실은 AIRI 로컬 지식 검색 경로를 검증하기 위해 만든 합성 평가 정보이며 실제 게임, 인물, 방송 또는 개인정보를 가리키지 않는다."
+  }
+]

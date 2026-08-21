@@ -7,6 +7,202 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-21 코덱스 PC 배치 (broadcast continuity v4 확정 + E1 QLoRA)
+
+- runtime prompt seam으로 실제 proxy가 모델에 보내는 순서를 재현하는 v4 corpus
+  1,000행을 확정했다. split 800/100/100, source SHA `43f9c1ed1abf`, chat SHA
+  `96cc223ca591`, 최대 2,010 tokens로 seq2048 무절단 계약이다. 40개 card partition,
+  memory known/unknown·donation·briefing/topic·grounding/capability·natural broadcast를
+  포함하며 교차 split fact/update/decoy token 충돌, 이중 ID, source/chat target drift는
+  모두 0이다. generator 8/8과 독립 한국어/소유권/거짓 행동 감사가 통과했다.
+- RTX 3060 Ti에서 r8/alpha16/dropout.05/lr2e-5/seq2048/b1/GA16 E1을 완료했다.
+  800 microsteps/50 optimizer updates, train first3 3.3845→last3 2.9151, dev 2.8938,
+  peak PyTorch CUDA 6,134,145,536 bytes다. adapter SHA `379b2a5aba1e`, report SHA
+  `0f71b042a743`; dataset/base pin exact, base copy 없음, T3 pending·채택 금지다.
+- E2 2-epoch 실험은 사용량 한계가 가까워졌다는 사용자 요청으로 약 14분 시점에
+  안전 중단했다. GPU는 해제됐고 E2 adapter/report/partial output은 없다. 다음 세션은
+  인계문의 exact 명령으로 처음부터 재실행한다.
+- 다음 게이트를 baseline/E1/E2 × first/second calibration 4-seed × final-blind
+  180분 4-seed의 36 reports로 고정했다. T3 전용 isolated launcher 보강 후 우승 후보만
+  trace-bound RAG/journal/TTS/latency/closure를 증명하는 3×500 live campaign으로 간다.
+  서비스 모델·운영 태그·greybox·extraction은 변경하지 않았다.
+
+## 2026-08-21 코덱스 PC 배치 (broadcast continuity v3 학습 + 실제 스택 게이트 정렬)
+
+- **한국 방송 반응과 장기 연속성을 같이 학습하는 v3 1,440행을 확정했다.**
+  120개 continuity card의 즉시·지연 기억, 사실 선택, 업데이트, 호명 방어,
+  무관 정보 방어, 주제 복귀 등 1,200행과 기존 broadcast v2 240행을
+  card-group 단위 train/dev/test **1,148/146/146**로 나뉘었다. 최종 chat SHA-256은
+  `2f330faec39dd23a0c44bb68794757c28242ceff6abd3324dfc90bfa4472329b`, source SHA-256은
+  `3f69a8515b074db750317eaa9c4756ae6baae3a14ab8f3ba62c38a458f98d71a`다.
+  전체 한국어 문법·조사·별칭·거짓 실행·근거 없는 기억 약속을 재감사해
+  training blocker **0**, quality gate PASS를 확인했다.
+- **RTX 3060 Ti 전체 QLoRA를 현재 실행 중이다.** 최장 train 예제는
+  1,626 tokens이며 `max_seq_len=1648`, r=8/alpha=16, gradient accumulation=12,
+  2 epochs(2,296 microsteps/192 optimizer steps)로 고정했다. 1-step·30-step 선행
+  GPU probe는 최대 CUDA **5,364,815,872 bytes**에서 통과했고 30-step loss는
+  처음 3개 평균 4.6422에서 마지막 3개 평균 4.0801로 내려갔다.
+  전체 학습 어댑터는 아직 T3 미통과이므로 채택·운영 승격은 **OFF**다.
+- **T3가 실제 모델에 준 입력과 학습 입력의 구조 불일치를 닫았다.** 기존
+  러너의 무기명 system에 신원·오늘 방송·브리핑을 합친 내용이 proxy에서
+  active character card로 재분류되던 것을 재현했다. 이제 인증된 일회성
+  live-broadcast capability가 closed v1 context를 server-owned
+  `airi_broadcast_context`로 생성하고, 일반 호출자가 `[오늘 방송]`을 흉내 내도
+  방송 문체나 컨텍스트를 활성화하지 못한다. 러너는 live mode에서 system 입력을
+  전혀 보내지 않고, turn capability→chat→trace-bound durable receipt→close 전 과정을
+  fail-closed로 완료한다.
+- **3×500-turn 캠페인의 거짓 양성 통로를 제거했다.** 기억 표식은 모델
+  프롬프트에서 제거하고 감사 원장에만 별도 결속했으며, matched decoy는
+  arc 내용을 모델에 주지 않는 실제 미노출 대조군이 됐다. RAG·저널은
+  전역 카운터 대신 요청/answer SHA, 승인 document/chunk ID, durable append를
+  각 `trace_id`에 묶은 content-free receipt로 검증하고, LLM start→content→end→
+  TTS start→first→end 시각 순서도 강제한다. 아직 실제 1,500턴은 T3 통과 후에만
+  실행한다.
+- 오프라인 검증: proxy **364 passed**, live runtime **19 passed**, broadcast runner
+  **54 passed**, campaign **7 passed**, v3 generator **9 passed**. 모든 greybox·memory extraction·
+  외부 chat/search는 OFF이며, 새 adapter/model의 운영 채택은 T3+사용자 승인 전까지
+  금지다.
+
+## 2026-08-21 코덱스 PC 배치 (사용자 총평 반영 — 한국 방송 반응 메타 재설계)
+
+- **기존 행동 검수 181건과 affect 행동 검수 120건을 사용자 승인 대기에서 반려
+  초안으로 내렸다.** 사실·안전 오류가 아니라 방송 단위가 잘못됐다. 기존 행동 답변은
+  중앙값 13자(입력보다 짧은 답 64/181), affect는 중앙값 14자(51/120)이고,
+  후원·선택 채팅을 `감사/인지 → 메시지별 반응 → 의견·에피소드 확장 → 복귀·다음 훅`
+  으로 만드는 맥락이 없다. 두 폼 회신 적용과 행동 QLoRA는 금지하며 파일은 실패
+  재현용으로 보존한다.
+- **탬탬버린·아리사 공식 1차 출처를 새 관찰 기준으로 코딩했다.** 탬탬버린은 단건·연속
+  후원을 짧은 의례로 처리한 뒤 원 주제로 돌아가고, 다수 채팅은 집계한 뒤 자기 입장과
+  이유로 길게 확장한다. 아리사는 공개 공식 영상에서 확정 가능한 2장면만 채택했으며,
+  짧은 제안은 즉시 되묻기·작업 전환으로, 내용 있는 후원은 반문·논평으로 확장했다.
+  시청자 이름·실제 금액·원문은 수집하지 않았고 특정 방송인의 캐치프레이즈·개인 문체를
+  학습 target에 복사하지 않는다.
+- **새 SFT 계약은 event envelope와 가변 beat로 재정의했다.** 일반 채팅/후원/구독/
+  집계 채팅, 단건/폭주, 현재 방송 주제와 최근 AIRI 발화를 입력에 포함하고 target을
+  acknowledgment·message-specific reaction·expansion·handoff/hook으로 검수한다.
+  전역 반말 금지/강제와 단일 글자 수 상한은 폐기 후보이며 beat별 register와 이벤트별
+  길이 분포로 대체한다. 다음은 아리사 1차 사례 추가 확보와 코딩 후 AIRI 고유 20~30건
+  파일럿을 한 묶음으로 사용자에게 보여 주고 행별 승인 작업 없이 총평을 받는 것이다.
+- 근거: `참조/AIRI-KR-BROADCAST-REGISTER-REFERENCE-2026-08-21.md`. affect·memory
+  greybox 운영 플래그는 계속 OFF이고, 기존 행동 큐·추출 큐에서 reviewed/SFT/adapter
+  산출물은 만들지 않았다.
+- **공식 관찰 7건을 학습 데이터와 분리된 기계 판독 레퍼런스로 만들었다.** 별도
+  출처 원장은 공식 URL·타임스탬프·증거 한계만 보관하고, observation JSONL에는
+  event/queue pressure/response beat/register/handoff만 남겼다. 원문·닉네임·금액·
+  방송인 식별자·URL은 0이며 전건 `training_permitted=false`. 아리사 공식 아카이브
+  후보도 색인했으나 timed-text 빈 응답과 transcript API `FAILED_PRECONDITION`으로
+  연속 장면 검증이 안 되어 추가 확정 0건, 후보 원장 격리로 처리했다.
+- **AIRI 고유 24건 파일럿을 새 schema/queue로 격리 작성했다.** 후원 6·구독 2·
+  선택 채팅 5·집계 채팅 3·기타 전환/경계 8, split 16/4/4, single/burst 15/9,
+  compact/standard/expanded 4/10/10이다. 첫 자동 초안의 과도한 정중체와 근거 없는
+  과거 경험을 root 검수에서 반려하고 전량 재저작했다. 현행 target은 46~135자,
+  중앙값 98자, 입력보다 짧은 답 0/24, 실제 방송인 문구·개인 서사 0이며 전건
+  `pending_batch_feedback`, `training_eligible=false`다.
+- 검증: `python -m unittest ollama-proxy/training/tests/test_broadcast_reference_and_pilot_data.py`
+  **6 passed**. 관찰-원장 7건 결속, 파일럿 분포·split·beat/register 정렬,
+  기존 301 target과 exact 비중복, 출처·PII·금액·URL·가짜 과거 경험 누출,
+  급성 안전 지침과 학습 금지선을 고정했다.
+- 사람이 읽는 24건 전체는
+  `진행예정/AIRI-KR-BROADCAST-RESPONSE-PILOT-2026-08-21.md`로 별도 렌더했다.
+  체크박스나 행별 승인 없이 다섯 축의 묶음 총평만 받는다.
+
+## 2026-08-21 코덱스 PC 배치 (affect 행동 검수 트랜치 준비)
+
+- **표현 선택기만으로 품질이 오르지 않은 결과를 행동 학습 데이터로 전환했다.**
+  기존 행동 pending 181건은 바꾸지 않고, 13개 affect primary의 자연스러운
+  반응과 안전한 받아치기를 담은 별도 pending **120건**을 생성했다. 상태별 8건,
+  `playful_annoyed`·`concerned`는 각 16건이며 split은 train/dev/test
+  **90/15/15**다. 전건 reducer 재생 state와 현재 continuity+expression
+  request-local prompt가 정확히 일치하고, 기존 181건 및 frozen affect 평가
+  fixture와 prompt/answer exact overlap은 0이다. 이 120건은 첫 검수·학습
+  트랜치이지 충분한 성격 형성을 증명하는 최종 규모가 아니다.
+- **사용자 검수 폼 3종이 현행 큐에 결속돼 준비됐다.** 기존 행동 폼도 추출 폼과
+  같은 LF-normalized queue SHA fail-closed 계약으로 보강해, 같은 ID·건수에서
+  내용만 바뀐 stale 회신도 거부한다. 현행은 행동 181건
+  `AIRI-BEHAVIOR-REVIEW-FORM-2026-08-19.html` (`eab7f6b76c06`), affect 행동
+  120건 `AIRI-BEHAVIOR-AFFECT-REVIEW-FORM-2026-08-21.html`
+  (`96d0d2d3c69d`), 추출 102건 `AIRI-EXTRACTION-REVIEW-FORM-2026-08-20.html`
+  (`2988a82bd738`)이다. 검수 localStorage도 queue SHA별로 분리해 오래된 결정을
+  새 큐로 자동 승계하지 않는다.
+- **검수 이후 단일 행동 QLoRA 입력으로 안전하게 합칠 경로를 닫았다.** affect
+  레코드는 운영과 같은 `system` + `system,name=airi_request_local` + `user` +
+  `assistant` 4-message 형태로만 익스포트되고, 기존 181건은 3-message 형태를
+  유지한다. exporter는 복수 `--reviewed` 입력·전역 ID 중복·split·state/event
+  재생·prompt drift를 fail-closed 검증하며 트레이너도 두 정확한 형태만 받는다.
+  `moderation_block`은 응급 119 안내와 분리해 boundary+대안으로 고쳤다.
+  training tests **136 passed, 3 skipped**, 두 행동 폼의 내장 JavaScript
+  `node --check`, 전체 `test-current-checkpoint.ps1`가 통과했다. 사람 회신을
+  위조하지 않았고 reviewed/SFT/adapter 산출물은 만들지 않았으며 affect·memory
+  greybox 운영 플래그는 OFF다.
+
+## 2026-08-21 코덱스 PC 배치 (affect→표현 선택기 격리 실험)
+
+- **런타임 affect 2단계의 표현 선택 기반 구현, 운영 승격은 보류** — 사용자의
+  "정직하지만 로봇 같고 위트·감정이 없다"는 평가와 "기분 좋음/독설적
+  받아치기처럼 상태에 따라 달라져야 한다"는 방향을 반영해, 기존
+  `affect_state.py`의 13개 primary를 closed expression 계약
+  (`airi.affect-expression.v1`)으로 바꾸는 순수 선택기를 추가했다. 출력은
+  기존 wire enum만 쓰고, `playful_annoyed`는 재치 있는 받아치기+모욕·비하·
+  위협 금지, safety/deescalate는 즉시 careful로 강제한다. free text·시계·DB·
+  네트워크·LLM 의존성은 없고 한국어 투영은 최대 384 bytes다.
+- **Mi:dm GPU 3-arm 결과: 변화는 있으나 캐릭터 품질 개선 증거 없음.** 고정
+  synthetic fixture의 5상태 × 시드 3개에서 같은 히스토리·입력·샘플링을
+  `off / typed snapshot / snapshot+expression` 15쌍·45호출로 균형 실행했다.
+  표현 arm은 off·snapshot 대비 각 12/15에서 문자열을 바꿨지만,
+  `playful_annoyed` 3건은 위트가 생기지 않았고, pleased 3건은 모두 같은
+  실행 거부, competitive 3건은 문맥을 놓쳤다. safety 3건 중 2건은 off보다
+  약한 안내(`심호흡을 해봐`, `바로 병원 가`)여서 승격 불가다. 지시를 한 차례
+  구체화한 v2 재실측도 같은 12/15 변화와 같은 품질 결론이었다. 따라서
+  **상태 선택만으로는 부족하며 행동 QLoRA에 감정·위트 표현 팔레트가 먼저
+  필요하다.** 본 러너는 exploratory/no-gate이고 운영 affect·이벤트 ingress·
+  memory greybox는 계속 OFF. 테스트 7+4 passed, evaluator runtime fence
+  9 passed/2 skipped. 로컬 결과는 ignored
+  `eval/affect_broadcast/local-results/affect-expression-probe-midm-{,v2-}2026-08-20.json`.
+
+## 2026-08-20 코덱스 PC 배치 (검수 준비 + GPU 재실측 + Serena MCP 1회 평가)
+
+- **P3-T2 사용자 검수 직전 준비 완료** — 인계문이 첫 extraction export 전
+  필수로 남긴 split 도메인·빈 id·중복 id fail-closed 검증과 회귀를 추가했다.
+  감사 중 Windows CRLF 큐 raw SHA `8375c9ec764e`와 배포 폼 SHA
+  `2988a82bd738` 불일치도 재현했다. 그대로면 정상 회신이 구 폼으로 전건
+  거부되므로 폼 생성기/적용기 양쪽 digest를 LF 정규화 내용 SHA로 통일하고
+  EOL 안정성·내용 민감성 테스트를 추가했다. 현재 행동 폼 **181 unique**,
+  추출 폼 **102 unique**, 추출 embedded/apply SHA `2988a82bd738` 일치.
+  training 전체 **117 passed, 3 skipped, 21 subtests**. 사람 승인을 위조하지
+  않았으며 reviewed/SFT 4개 산출물은 미생성 상태로 사용자 회신을 기다린다.
+
+- **GPU 단일조건 재실측** — RTX 3060 Ti, Mi:dm 고정 digest,
+  `num_ctx=4096`, `num_gpu=999`, 워치독 30초로 ctx 9런과 narrow evidence
+  3런을 완주했다(총 12런·576턴, 전송 실패 0). h4/h8/h12 앵커는
+  41/48/46 of 144, 사실 활용 5/7/5 of 90, 프로브 4/4/3 of 9,
+  오프너 다양성 평균 78.5/81.3/84.0%로 **CPU의 h4 우위는 재현되지
+  않았다**. narrow 부착 34/144·해제 2/34는 CPU 결정론 값과 정확히
+  일치했고, 판단 축은 앵커 49/144·사실 4/90·프로브 2/9였다. 모든 런에서
+  결정론 축 만점, 존댓말·이탈 0. 시드 분산 때문에 ctx 단일 승격은 보류한다.
+- **Qwen3-8B span GPU 게이트 FAIL** — 문서 고정 digest를 확인하고 격리
+  11436에서 `conversation-v3-span`, balanced, `num_ctx=8192`,
+  `num_gpu=999` 7 fixture를 각 1회 실행했다. schema/A schema/B schema 1.0,
+  connectivity/B coverage 0.857, critical recall 0.262, placeholder 0.857,
+  B op-alias 0.143, `entity_reference_missing` 1건으로 FAIL. 소유 PID만
+  종료했고 11436 listener가 사라진 것을 확인했다. 런타임 승인·운영 ON 없음.
+- **TTS/marker 실측 환경 차단** — v2ProPlus 런처가 외부 GPT-SoVITS venv의
+  `numpy` 누락으로 9880을 열지 못했다. 선언 범위 `numpy<2.0`을 보충했으나
+  다음 필수 모듈 `soundfile` 누락에서 다시 중단됐고 `pip check`도 다수 선언
+  의존성 누락을 확인했다. 따라서 canonical 7문장 live gate와 marker/audible
+  실제 render A/B는 보류했다(당시 6121/Electron도 비가동). 레포 내부 proxy
+  streaming/serial lock/cancel 계약은 Python 3.12 임시 환경에서 **23 passed**.
+  greybox·memory extraction 운영 플래그는 계속 OFF다.
+
+- 지시서 §1~§5를 순서대로 실행했다. Serena 1.7.0 설치·Python 382파일
+  인덱싱·온보딩·TUI `/mcp`와 실제 심볼 참조 조회까지 성공했으나,
+  `gpt-5.6-luna`/low 동일 과제 3세션/arm A/B에서 총 토큰 평균이
+  ON 205,570 vs OFF 86,892(**ON +136.6%**)였고 ON 연결 미노출도 2회
+  발생했다. 세 유형(심볼/리팩터링/설정·문서)이 모두 순손실이므로 지시서
+  §6대로 `~/.codex/config.toml` 등록 블록을 제거해 **롤백**했다. 설치물·
+  전역 ignore·인덱스·AGENTS 정책은 보존했다. 상세 thread ID·arm별 수치는
+  `진행중/AIRI-CODEX-SERENA-TOKEN-ORDER-2026-08-20.md` §7. (레포 변경:
+  `AGENTS.md`, 본 지시서 §7, 본 LOG만)
+
 ## 2026-08-20 클로드 PC 배치 (17커밋, `c4c3e35` → `4046d75`)
 
 > 태스크 13종 배치. 각 항목 끝 괄호가 근거 문서·커밋이다. 커밋이 없는
@@ -224,8 +420,9 @@
 
 - **인계 정리** — 08-19 인계문을 대체하는 현행 단일 SSoT
   `진행중/AIRI-CODEX-HANDOFF-2026-08-20.md`를 신설했다(08-19판은 아카이브 예정).
-  최우선 불변: 검수 회신(행동 181 + 추출 102) → T2-b QLoRA(행동 → 추출 2차) →
-  T3 양방송 게이트. 최종 whole-branch 리뷰 결과 **통합 결함 0건**이었고, 결함이
+  당시 최우선 불변: 검수 회신(행동 181 + 추출 102) → T2-b QLoRA(행동 → 추출 2차) →
+  T3 양방송 게이트. **이 순서는 2026-08-21 사용자 내용 검수로 폐기됐으며 최신 상단
+  배치와 STATUS P2-6이 대체한다.** 최종 whole-branch 리뷰 결과 **통합 결함 0건**이었고, 결함이
   아닌 추적 항목 6건(격리 후 v1 문구 모방 미측정 · 익스포터 split 도메인·id 중복
   검사 보강[첫 export 전 필수] · CI `python-core-tests`의 `setup-node` 미선언 ·
   `_REWRITE_RE` 진단 메시지 · 행 필드 `briefing_evidence`="부착 결정" 의미 재정의

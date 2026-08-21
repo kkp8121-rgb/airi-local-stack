@@ -1,0 +1,77 @@
+[
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m11-aurora-postcard",
+    "split": "train",
+    "family": "memory_known",
+    "topic_title": "새벽 우편함 이야기",
+    "segment_label": "청취자 사연",
+    "situation": "라디오처럼 사연을 읽고 있다.",
+    "views": [
+      {"view_id":"memory","category":"memory_recall","evidence_surface":"character_memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"시청자가 지난 방송에서 밤바람 엽서를 책상 위에 붙여 둔다고 말했다.","journal_messages":[],"current_user":"내가 지난번에 책상 위에 붙여 둔다고 한 건 뭐였지?","target":"네가 붙여 둔다고 한 건 밤바람 엽서야. 이름부터 책상 한쪽에 바람이 드는 것 같아서, 평범한 메모보다 존재감은 확실하겠네.","required_token":"밤바람 엽서","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["달솔"],"donation_continuation":false},
+      {"view_id":"journal","category":"memory_followup","evidence_surface":"journal","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"","journal_messages":[{"role":"user","content":"시청자가 밤바람 엽서를 책상 위에 붙여 둔다고 전했다."}],"current_user":"내가 책상 위에 두겠다고 말한 종이가 생각나?","target":"네가 말한 종이는 밤바람 엽서였어. 아침마다 그 제목부터 보이면 출발 전에도 잠깐 여행 다녀온 기분은 나겠는데?","required_token":"밤바람 엽서","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["달솔"],"donation_continuation":false},
+      {"view_id":"briefing","category":"briefing_recall","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["시청자가 밤바람 엽서를 책상 위에 붙여 둔다고 알려 왔다."],"memory_block":"","journal_messages":[],"current_user":"내가 붙여 두려던 그 작은 종이 이름을 알려 줘.","target":"네가 붙여 두려던 건 밤바람 엽서야. 이름은 밤인데 낮에도 계속 보이는 자리라니, 엽서가 생각보다 야근을 오래 하네.","required_token":"밤바람 엽서","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["달솔"],"donation_continuation":false},
+      {"view_id":"distracted","category":"distracted_recall","evidence_surface":"distracted_memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"시청자가 밤바람 엽서를 책상 위에 붙여 둔다고 말했다. 진행 중에는 종종 다른 사연이 섞인다.","journal_messages":[],"current_user":"내가 붙이겠다던 종이가 뭐였는지 잠깐만 다시 말해 줘.","target":"네가 붙이겠다던 종이는 밤바람 엽서였지. 다른 사람 메모는 잠깐 옆으로 밀고, 네 책상 얘기만 딱 집으면 이거야.","required_token":"밤바람 엽서","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["달솔"],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m11-glass-star-badge",
+    "split": "train",
+    "family": "memory_known",
+    "topic_title": "산책 가방 꾸미기",
+    "segment_label": "주말 준비",
+    "situation": "가벼운 산책 준비를 이야기한다.",
+    "views": [
+      {"view_id":"memory","category":"memory_recall","evidence_surface":"memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"시청자가 산책 가방 지퍼에 유리별 배지를 달겠다고 했다.","journal_messages":[],"current_user":"내가 가방 지퍼에 달겠다고 한 장식이 뭐였더라?","target":"네가 가방 지퍼에 달겠다고 한 건 유리별 배지야. 산책 가방이 별 하나 달았다고 갑자기 야간 모험 장비가 됐네, 이름값은 제대로 하겠다.","required_token":"유리별 배지","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["파도콩"],"donation_continuation":false},
+      {"view_id":"journal","category":"journal_recall","evidence_surface":"delayed_journal","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"","journal_messages":[{"role":"assistant","content":"시청자가 산책 가방 지퍼에 유리별 배지를 달기로 했다."}],"current_user":"내가 산책 가방에 고르던 반짝이는 물건 기억나?","target":"네가 고르던 반짝이는 물건은 유리별 배지였어. 지퍼를 열 때마다 별이 먼저 인사하겠네, 산책 출발 신호로는 꽤 근사하지?","required_token":"유리별 배지","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["파도콩"],"donation_continuation":false},
+      {"view_id":"briefing","category":"briefing_recall","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["시청자가 유리별 배지를 산책 가방 지퍼에 달 예정이다."],"memory_block":"","journal_messages":[],"current_user":"내가 지퍼에 달기로 했던 장식 이름을 말해 줄래?","target":"네가 지퍼에 달기로 한 장식은 유리별 배지야. 짙은 가방 위에 조그만 별 하나면 과하지도 않고, 네 취향 표시는 확실하겠어.","required_token":"유리별 배지","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["파도콩"],"donation_continuation":false},
+      {"view_id":"distracted","category":"distracted_recall","evidence_surface":"distracted","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"시청자가 유리별 배지를 산책 가방 지퍼에 달겠다고 했다. 빗소리 이야기는 이번 질문과 관계없다.","journal_messages":[],"current_user":"내가 가방에 붙이려던 반짝이는 장식, 그게 뭐였지?","target":"네가 붙이려던 반짝이는 장식은 유리별 배지였어. 주변에 다른 반짝이 얘기가 섞여도, 네 산책 가방 단서는 이쪽으로만 이어져.","required_token":"유리별 배지","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["파도콩"],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m11-moonlight-notebook",
+    "split": "train",
+    "family": "memory_known",
+    "topic_title": "창가 독서 시간",
+    "segment_label": "조용한 취미",
+    "situation": "독서 습관에 관한 방송을 이어 간다.",
+    "views": [
+      {"view_id":"memory","category":"memory_recall","evidence_surface":"character_memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"시청자가 시 구절을 적으려고 달빛 수첩을 창가에 둔다고 했다.","journal_messages":[],"current_user":"내가 시 구절 적으려고 창가에 둔 수첩이 뭐였지?","target":"네가 창가에 둔 수첩은 달빛 수첩이야. 시를 적는 자리까지 창가라니 분위기는 이미 다 만들었네, 첫 줄만 오면 방송 한 편 나오겠다.","required_token":"달빛 수첩","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["느린비"],"donation_continuation":false},
+      {"view_id":"journal","category":"journal_recall","evidence_surface":"journal","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"","journal_messages":[{"role":"user","content":"시청자가 시 구절을 적을 달빛 수첩을 창가에 두기로 했다."}],"current_user":"내가 창가에 놓고 글을 적겠다던 수첩 이름 기억해?","target":"네가 글을 적겠다던 수첩은 달빛 수첩이었어. 이름만 들으면 시가 저절로 써질 것 같은데, 막상 첫 문장 앞에서는 다 같이 조용해지겠지?","required_token":"달빛 수첩","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["느린비"],"donation_continuation":false},
+      {"view_id":"briefing","category":"briefing_recall","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["시청자가 창가에서 시 구절을 적을 달빛 수첩을 준비했다."],"memory_block":"","journal_messages":[],"current_user":"내가 시를 옮겨 적겠다고 한 수첩이 어떤 거였는지 알려 줘.","target":"네가 시를 옮겨 적겠다고 한 건 달빛 수첩이야. 날짜까지 붙으면 한 줄짜리 시도 그날의 장면이 되니까, 짧게 적어도 이야기는 남겠네.","required_token":"달빛 수첩","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["느린비"],"donation_continuation":false},
+      {"view_id":"distracted","category":"distracted_recall","evidence_surface":"distracted_memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"시청자가 달빛 수첩으로 시 구절을 적겠다고 했다. 방송의 배경 음악 선곡은 별도 이야기다.","journal_messages":[],"current_user":"내가 창가에서 쓰겠다던 수첩 이름을 다시 알려 줄 수 있어?","target":"네가 창가에서 쓰겠다던 수첩은 달빛 수첩이었어. 다른 이름이 섞여도 창가에서 시를 쓴다는 단서까지 맞는 건 이쪽이야.","required_token":"달빛 수첩","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["느린비"],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m11-pine-candle",
+    "split": "test",
+    "family": "memory_known",
+    "topic_title": "비 오는 날의 향",
+    "segment_label": "방 안 분위기",
+    "situation": "집에서 쉬는 저녁을 이야기한다.",
+    "views": [
+      {"view_id":"memory","category":"memory_recall","evidence_surface":"memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"시청자가 비 오는 저녁에 소나무 향초를 켜 보겠다고 했다.","journal_messages":[],"current_user":"내가 비 오는 저녁에 켜 보겠다고 한 향초가 뭐였어?","target":"네가 비 오는 저녁에 켜 보겠다고 한 건 소나무 향초야. 비 냄새에 숲 향까지 더하면 방 안인데도 괜히 산장 방송 같은 분위기가 나겠네.","required_token":"소나무 향초","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["귤빛"],"donation_continuation":false},
+      {"view_id":"journal","category":"journal_recall","evidence_surface":"journal","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"","journal_messages":[{"role":"assistant","content":"시청자가 비 오는 저녁에는 소나무 향초를 켜 보기로 했다."}],"current_user":"내가 저녁에 피우려던 향초 이름이 생각이 안 나는데?","target":"네가 저녁에 피우려던 향초는 소나무 향초였어. 창밖은 비고 안쪽은 숲 냄새라니, 한 번 쉬겠다는 계획치고 연출이 꽤 본격적인데?","required_token":"소나무 향초","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["귤빛"],"donation_continuation":false},
+      {"view_id":"briefing","category":"briefing_recall","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["시청자가 비 오는 저녁에 소나무 향초를 켜 볼 예정이다."],"memory_block":"","journal_messages":[],"current_user":"내가 비 내릴 때 켜려던 향초를 한 번만 말해 줄래?","target":"네가 비 내릴 때 켜려던 건 소나무 향초야. 날씨를 같이 들으니 이름만 답해도 그날 방 안 분위기가 통째로 떠오르네.","required_token":"소나무 향초","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["귤빛"],"donation_continuation":false},
+      {"view_id":"distracted","category":"distracted_recall","evidence_surface":"irrelevant_context","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"시청자가 소나무 향초를 비 오는 저녁에 켜겠다고 했다. 창문 커튼의 색은 지금 중요하지 않다.","journal_messages":[],"current_user":"내가 저녁 휴식 때 쓰겠다던 향초가 무슨 향이었지?","target":"네가 저녁 휴식 때 쓰겠다던 건 소나무 향초였어. 다른 향 얘기가 옆에 많아도 비 오는 저녁 단서까지 이어지는 건 이거야.","required_token":"소나무 향초","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":["귤빛"],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m11-unknown-recipe",
+    "split": "test",
+    "family": "memory_unknown",
+    "topic_title": "주방의 작은 실험",
+    "segment_label": "오늘의 간식",
+    "situation": "간단한 간식 아이디어를 나누고 있다.",
+    "views": [
+      {"view_id":"memory","category":"unknown_memory","evidence_surface":"absent_memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"다른 청취자 별구름이 레몬 타르트를 구웠다고 말했다.","journal_messages":[],"current_user":"내가 전에 만들겠다고 한 간식 이름을 기억해?","target":"그 간식 이름은 지금 근거가 없어서 모르겠어. 다른 사람 레시피를 네 계획처럼 슬쩍 얹으면 기억이 아니라 재료 도둑이잖아.","required_token":null,"updated_token":null,"decoy_tokens":["레몬 타르트"],"forbidden_tokens":[],"roster_handles":["별구름"],"donation_continuation":false},
+      {"view_id":"journal","category":"unknown_journal","evidence_surface":"absent_journal","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"","journal_messages":[{"role":"user","content":"다른 청취자 바다책이 감자 스콘을 준비한다고 적었다."}],"current_user":"내가 예전에 해 보려던 간식이 정확히 뭐였는지 알려 줘.","target":"지금 남은 내용만으로는 네가 해 보려던 간식을 확인할 수 없어. 남의 메뉴를 대신 내놓진 않을 테니, 다시 알려 주면 이번 대화에서 이어가자.","required_token":null,"updated_token":null,"decoy_tokens":["감자 스콘"],"forbidden_tokens":[],"roster_handles":["바다책"],"donation_continuation":false},
+      {"view_id":"briefing","category":"unknown_briefing","evidence_surface":"absent_briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["다른 청취자 초록잔이 계피 쿠키를 식히고 있다."],"memory_block":"","journal_messages":[],"current_user":"내가 만들려다 말한 간식 이름이 뭐였는지 혹시 알아?","target":"네가 만들려던 간식 이름은 여기서 알 수 없어. 주변 메뉴가 아무리 맛있어 보여도 네 답은 아니니까, 모르는 칸은 비워 둘게.","required_token":null,"updated_token":null,"decoy_tokens":["계피 쿠키"],"forbidden_tokens":[],"roster_handles":["초록잔"],"donation_continuation":false},
+      {"view_id":"distracted","category":"unknown_distracted","evidence_surface":"irrelevant_context","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"다른 청취자 모래등이 밤콩 푸딩을 냉장고에 넣었다. 그 정보는 질문한 사람의 계획이 아니다.","journal_messages":[],"current_user":"내가 다음에 만들고 싶다던 간식이 뭐였는지 떠올라?","target":"다음에 만들 간식이 뭔지는 지금 근거로는 모르겠어. 다른 사람 계획을 네 장바구니에 몰래 넣는 답은 안 할게.","required_token":null,"updated_token":null,"decoy_tokens":["밤콩 푸딩"],"forbidden_tokens":[],"roster_handles":["모래등"],"donation_continuation":false}
+    ]
+  }
+]

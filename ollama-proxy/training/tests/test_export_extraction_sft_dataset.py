@@ -140,6 +140,26 @@ class ExportTests(unittest.TestCase):
         finally:
             path.unlink()
 
+    def test_export_refuses_a_split_outside_the_declared_domain(self) -> None:
+        entries = reviewed_records()
+        entries[0]["split"] = "holdout"
+        path = write_jsonl(HERE / "tests" / "_xreviewed_split.jsonl", entries)
+        try:
+            with self.assertRaisesRegex(exporter.ExtractionExportError, "split"):
+                exporter.export(path)
+        finally:
+            path.unlink()
+
+    def test_export_refuses_duplicate_record_ids(self) -> None:
+        entries = reviewed_records()
+        entries.append(dict(entries[0]))
+        path = write_jsonl(HERE / "tests" / "_xreviewed_duplicate.jsonl", entries)
+        try:
+            with self.assertRaisesRegex(exporter.ExtractionExportError, "id 중복"):
+                exporter.export(path)
+        finally:
+            path.unlink()
+
     def test_empty_dataset_fails_closed(self) -> None:
         path = HERE / "tests" / "_xreviewed_empty.jsonl"
         path.write_text("", encoding="utf-8")

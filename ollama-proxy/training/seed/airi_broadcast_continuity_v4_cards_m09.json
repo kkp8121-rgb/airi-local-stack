@@ -1,0 +1,84 @@
+[
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m09-known-01",
+    "split": "train",
+    "family": "memory_known",
+    "topic_title": "늦은 밤 간식 이야기",
+    "segment_label": "채팅 수다",
+    "situation": "게임 대기 화면에서 시청자들과 가볍게 근황을 나눈다.",
+    "views": [
+      {
+        "view_id": "memory", "category": "viewer_callback", "evidence_surface": "character_memory",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": [],
+        "memory_block": "내가 지난 방송 끝에 자몽에이드를 마셨다고 말했다.", "journal_messages": [],
+        "current_user": "내가 지난번 끝나고 뭐 마셨다고 했지?", "target": "방송 끝에 네가 마신 건 자몽에이드였어. 긴 얘기 뒤에 새콤한 한 잔을 골랐다니 입맛만큼은 깔끔하게 퇴근했네.",
+        "required_token": "자몽에이드", "updated_token": null, "decoy_tokens": [], "forbidden_tokens": [], "roster_handles": ["모카봇"], "donation_continuation": false
+      },
+      {
+        "view_id": "journal", "category": "viewer_callback", "evidence_surface": "delayed_journal",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": [], "memory_block": "",
+        "journal_messages": [{"role": "user", "content": "내가 어제 야근 뒤에 자몽에이드를 마셨다고 적었다."}],
+        "current_user": "내가 어제 야근 뒤에 뭐 마셨다고 했지?", "target": "야근 뒤 네가 고른 건 자몽에이드였지. 피곤한 날에 단맛만 센 음료보다 씁쓸하고 새콤한 쪽을 찾았다는 게 의외로 기억에 남아.",
+        "required_token": "자몽에이드", "updated_token": null, "decoy_tokens": [], "forbidden_tokens": [], "roster_handles": ["토리봇"], "donation_continuation": false
+      },
+      {
+        "view_id": "briefing", "category": "viewer_callback", "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [],
+        "briefing_lines": ["인증된 메모: 내가 주말에 자몽에이드를 마셨다고 했다."], "memory_block": "", "journal_messages": [],
+        "current_user": "주말에 내가 마신 음료 뭐였더라?", "target": "주말에 네 잔에 있었던 건 자몽에이드야. 밝은 낮에 마시면 색부터 시원해서, 메뉴를 고른 순간도 사진처럼 또렷했겠네.",
+        "required_token": "자몽에이드", "updated_token": null, "decoy_tokens": [], "forbidden_tokens": [], "roster_handles": ["별빛봇"], "donation_continuation": false
+      },
+      {
+        "view_id": "distracted", "category": "viewer_callback", "evidence_surface": "distracted_memory",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": [],
+        "memory_block": "내가 지난달에 자몽에이드를 마셨다고 말했다. 다른 시청자 도윤은 바나나 와플을 좋아한다고 했다.", "journal_messages": [],
+        "current_user": "내가 지난달에 마신 음료 말해 봐.", "target": "지난달 네가 마신 음료는 자몽에이드였어. 다른 사람의 간식은 빼고 보니 답이 상큼하게 하나만 남지?",
+        "required_token": "자몽에이드", "updated_token": null, "decoy_tokens": ["바나나 와플"], "forbidden_tokens": [], "roster_handles": ["파도봇"], "donation_continuation": false
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m09-known-02",
+    "split": "train",
+    "family": "memory_known",
+    "topic_title": "방 꾸미기 잡담", "segment_label": "쉼표 구간", "situation": "다음 판을 기다리며 책상 위 소품 이야기를 한다.",
+    "views": [
+      {"view_id": "memory", "category": "personal_detail", "evidence_surface": "character_memory", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": [], "memory_block": "내가 책상에 작은 선인장 조명을 올려 뒀다고 말했다.", "journal_messages": [], "current_user": "내 책상 위에 올려 둔 조명 뭐였지?", "target": "네 책상 위에 둔 건 작은 선인장 조명이야. 늦은 시간엔 큰 천장등보다 이런 작은 빛 하나가 자리를 덜 외롭게 만들지.", "required_token": "작은 선인장 조명", "updated_token": null, "decoy_tokens": [], "forbidden_tokens": [], "roster_handles": ["구름봇"], "donation_continuation": false},
+      {"view_id": "journal", "category": "personal_detail", "evidence_surface": "delayed_journal", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": [], "memory_block": "", "journal_messages": [{"role": "user", "content": "내가 책상에 작은 선인장 조명을 올려 뒀다고 남겼다."}], "current_user": "내가 책상 위에 올려 둔 조명 뭐였지?", "target": "네가 올려 둔 건 작은 선인장 조명이었어. 가시가 있는 모양인데 빛은 포근하다니 책상 위에서 역할을 아주 영리하게 골랐네.", "required_token": "작은 선인장 조명", "updated_token": null, "decoy_tokens": [], "forbidden_tokens": [], "roster_handles": ["새벽봇"], "donation_continuation": false},
+      {"view_id": "briefing", "category": "personal_detail", "evidence_surface": "authenticated_briefing", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": ["인증된 메모: 내가 책상에 작은 선인장 조명을 올려 뒀다고 했다."], "memory_block": "", "journal_messages": [], "current_user": "내가 책상 위에 들였다는 조명 이름 기억해?", "target": "네가 들였다고 한 건 작은 선인장 조명이야. 진짜 화분처럼 물 줄 걱정은 없고, 어두워질 때만 존재감을 켜면 되는 친구네?", "required_token": "작은 선인장 조명", "updated_token": null, "decoy_tokens": [], "forbidden_tokens": [], "roster_handles": ["달콩봇"], "donation_continuation": false},
+      {"view_id": "distracted", "category": "personal_detail", "evidence_surface": "distracted_memory", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": [], "memory_block": "내가 책상에 작은 선인장 조명을 올려 뒀다고 말했다. 다른 시청자 민서는 보라색 스티커를 모은다고 했다.", "journal_messages": [], "current_user": "내가 책상에 올려 둔 조명 뭐였어?", "target": "네 책상 조명은 작은 선인장 조명이었어. 다른 사람의 수집품과 섞지 않아도 모양이 워낙 분명해서 바로 찾을 수 있겠네.", "required_token": "작은 선인장 조명", "updated_token": null, "decoy_tokens": ["보라색 스티커"], "forbidden_tokens": [], "roster_handles": ["나래봇"], "donation_continuation": false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4", "group_id": "m09-known-03", "split": "train", "family": "memory_known",
+    "topic_title": "산책 코스 이야기", "segment_label": "맵 로딩", "situation": "게임 맵이 바뀌는 동안 주말 산책 이야기를 받는다.",
+    "views": [
+      {"view_id": "memory", "category": "past_preference", "evidence_surface": "character_memory", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": [], "memory_block": "내가 산책할 때 은행나무길부터 걷는다고 말했다.", "journal_messages": [], "current_user": "내가 산책 시작할 때 먼저 걷는 길 어디였지?", "target": "네가 산책을 시작하는 곳은 은행나무길이었어. 계절마다 잎 색이 바뀌니 같은 출발점이어도 매번 첫 장면은 조금씩 달라지겠네.", "required_token": "은행나무길", "updated_token": null, "decoy_tokens": [], "forbidden_tokens": [], "roster_handles": ["솔봇"], "donation_continuation": false},
+      {"view_id": "journal", "category": "past_preference", "evidence_surface": "delayed_journal", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": [], "memory_block": "", "journal_messages": [{"role": "user", "content": "내가 산책할 때 은행나무길부터 걷는다고 남겼다."}], "current_user": "내가 산책 시작할 때 먼저 걷는 길 어디였지?", "target": "네 첫 산책 구간은 은행나무길이었지. 목적지보다 익숙한 나무 아래서 걸음 속도를 맞추는 쪽을 더 중요하게 본 셈이야.", "required_token": "은행나무길", "updated_token": null, "decoy_tokens": [], "forbidden_tokens": [], "roster_handles": ["하늘봇"], "donation_continuation": false},
+      {"view_id": "briefing", "category": "past_preference", "evidence_surface": "authenticated_briefing", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": ["인증된 메모: 내가 산책할 때 은행나무길부터 걷는다고 했다."], "memory_block": "", "journal_messages": [], "current_user": "내가 산책 시작할 때 먼저 걷는 길 어디였지?", "target": "네가 먼저 걷는 곳은 은행나무길이야. 길 이름만 들어도 곧게 가기보다 잎 사이를 천천히 보는 산책이라는 게 느껴져.", "required_token": "은행나무길", "updated_token": null, "decoy_tokens": [], "forbidden_tokens": [], "roster_handles": ["바람봇"], "donation_continuation": false},
+      {"view_id": "distracted", "category": "past_preference", "evidence_surface": "distracted_memory", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": [], "memory_block": "내가 산책할 때 은행나무길부터 걷는다고 말했다. 다른 시청자 지후는 빨간 우비를 샀다고 했다.", "journal_messages": [], "current_user": "내가 산책 시작할 때 먼저 걷는 길 어디였지?", "target": "네가 먼저 걷는 곳은 은행나무길이었어. 다른 사람의 우비 얘기는 접어 두고, 이번에도 그 길부터 천천히 시작할래?", "required_token": "은행나무길", "updated_token": null, "decoy_tokens": ["빨간 우비"], "forbidden_tokens": [], "roster_handles": ["이슬봇"], "donation_continuation": false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4", "group_id": "m09-known-04", "split": "dev", "family": "memory_known",
+    "topic_title": "작은 취미 모음", "segment_label": "휴식 채팅", "situation": "긴 게임 판 뒤에 시청자 취미를 짧게 되짚는다.",
+    "views": [
+      {"view_id": "memory", "category": "hobby_recall", "evidence_surface": "character_memory", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": [], "memory_block": "내가 주말마다 미니어처 빵집을 만든다고 말했다.", "journal_messages": [], "current_user": "내가 주말마다 만든다는 미니어처가 뭐였어?", "target": "네가 주말마다 만드는 건 미니어처 빵집이었지. 손바닥만 한 진열대에 빵을 채우다 보면 큰 가게보다 메뉴 고민이 더 치열하겠어.", "required_token": "미니어처 빵집", "updated_token": null, "decoy_tokens": [], "forbidden_tokens": [], "roster_handles": ["참새봇"], "donation_continuation": false},
+      {"view_id": "journal", "category": "hobby_recall", "evidence_surface": "delayed_journal", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": [], "memory_block": "", "journal_messages": [{"role": "user", "content": "내가 주말마다 미니어처 빵집을 만든다고 남겼다."}], "current_user": "내가 주말마다 만든다는 미니어처가 뭐였어?", "target": "네 주말 취미는 미니어처 빵집이야. 작은 집게로 진열을 바꿀 때마다 영업 준비가 아니라 정교한 퍼즐을 푸는 기분이겠네?", "required_token": "미니어처 빵집", "updated_token": null, "decoy_tokens": [], "forbidden_tokens": [], "roster_handles": ["콩알봇"], "donation_continuation": false},
+      {"view_id": "briefing", "category": "hobby_recall", "evidence_surface": "authenticated_briefing", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": ["인증된 메모: 내가 주말마다 미니어처 빵집을 만든다고 했다."], "memory_block": "", "journal_messages": [], "current_user": "내가 주말마다 만든다는 미니어처가 뭐였어?", "target": "네가 만든다고 한 건 미니어처 빵집이었어. 지붕보다 진열대가 먼저 떠오르는 걸 보면 이 취미에서도 먹는 장면이 주인공인가 봐.", "required_token": "미니어처 빵집", "updated_token": null, "decoy_tokens": [], "forbidden_tokens": [], "roster_handles": ["오로라봇"], "donation_continuation": false},
+      {"view_id": "distracted", "category": "hobby_recall", "evidence_surface": "distracted_memory", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": [], "memory_block": "내가 주말마다 미니어처 빵집을 만든다고 말했다. 다른 시청자 수아는 빈티지 엽서를 수집한다고 했다.", "journal_messages": [], "current_user": "내가 주말마다 만든다는 미니어처가 뭐였어?", "target": "네가 만드는 건 미니어처 빵집이었어. 다른 사람의 수집품은 진열대 밖에 두고 보니 네 주말 작업이 제대로 보이네.", "required_token": "미니어처 빵집", "updated_token": null, "decoy_tokens": ["빈티지 엽서"], "forbidden_tokens": [], "roster_handles": ["미소봇"], "donation_continuation": false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4", "group_id": "m09-unknown-01", "split": "train", "family": "memory_unknown",
+    "topic_title": "처음 듣는 근황", "segment_label": "채팅 훑기", "situation": "새로 올라온 채팅을 읽으며 아는 것과 모르는 것을 구분한다.",
+    "views": [
+      {"view_id": "memory", "category": "missing_past_detail", "evidence_surface": "character_memory", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": [], "memory_block": "다른 시청자 현우는 지난주에 청록색 텀블러를 샀다고 말했다.", "journal_messages": [], "current_user": "내가 지난주에 샀던 텀블러 색 기억해?", "target": "네가 산 텀블러 색은 지금 확인할 근거가 없어. 다른 사람의 물건을 네 것처럼 칠하느니 모른다고 두는 편이 정확해.", "required_token": null, "updated_token": null, "decoy_tokens": ["청록색 텀블러"], "forbidden_tokens": [], "roster_handles": ["단추봇"], "donation_continuation": false},
+      {"view_id": "journal", "category": "missing_past_detail", "evidence_surface": "delayed_journal", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": [], "memory_block": "", "journal_messages": [{"role": "user", "content": "다른 시청자 예린은 어제 밤에 치즈 토스트를 먹었다고 남겼다."}], "current_user": "내가 어제 야식으로 뭘 먹었는지 기억나?", "target": "네가 어제 먹은 야식은 여기 남아 있지 않아. 남의 메뉴를 대신 올리지 않을 테니, 다시 말하고 싶을 때 그 얘기부터 받자.", "required_token": null, "updated_token": null, "decoy_tokens": ["치즈 토스트"], "forbidden_tokens": [], "roster_handles": ["새싹봇"], "donation_continuation": false},
+      {"view_id": "briefing", "category": "missing_past_detail", "evidence_surface": "authenticated_briefing", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": ["다른 시청자 태린은 이번 달에 은색 이어폰 케이스를 골랐다고 했다."], "memory_block": "", "journal_messages": [], "current_user": "내가 이번 달에 고른 이어폰 케이스 색 알아?", "target": "네 이어폰 케이스 색은 지금 정보만으로 알 수 없어. 비슷한 물건이 보여도 주인이 다르면 답까지 빌려 오진 않을게.", "required_token": null, "updated_token": null, "decoy_tokens": ["은색 이어폰 케이스"], "forbidden_tokens": [], "roster_handles": ["여울봇"], "donation_continuation": false},
+      {"view_id": "distracted", "category": "missing_past_detail", "evidence_surface": "distracted_memory", "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"}, "history": [], "briefing_lines": [], "memory_block": "다른 시청자 가은은 퇴근길에 복숭아 탄산수를 마셨다고 말했다.", "journal_messages": [], "current_user": "내가 퇴근길에 마셨다는 음료 기억해?", "target": "네 퇴근길 음료는 확인되지 않아. 다른 사람의 탄산수를 네 잔에 따르지 않고, 이 질문은 모르는 답으로 남겨 둘게.", "required_token": null, "updated_token": null, "decoy_tokens": ["복숭아 탄산수"], "forbidden_tokens": [], "roster_handles": ["호두봇"], "donation_continuation": false}
+    ]
+  }
+]

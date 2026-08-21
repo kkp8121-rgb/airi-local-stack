@@ -1,6 +1,8 @@
 # AIRI Documentation Index
 
-최종 현행화 2026-08-20 (클로드 PC — 17커밋 배치 산출 문서 6종 등록:
+최종 현행화 2026-08-21 (Codex GPU — broadcast continuity v4 1,000행,
+E1 QLoRA 완료, E2 재개 명령, T3/campaign 게이트 인계 등록).
+직전 현행화 2026-08-20 (클로드 PC — 17커밋 배치 산출 문서 6종 등록:
 인계문 신설·근거 계약 2종·토큰 예산·GLiNER 실측·추출 검수 폼).
 직전 현행화 2026-08-19 (로드맵 v3 개편 + 레거시 정리: 이동 22건 전부
 `git mv`, 삭제 0건. 이동 사유는 각 항목 끝에 병기).
@@ -23,11 +25,21 @@
 
 ## 진행중 — 현행 계약
 
-- `AIRI-CODEX-HANDOFF-2026-08-20.md` — **현행 코덱스(GPU) 인계 단일 SSoT.**
-  2026-08-20 배치(17커밋) 소화본. 오늘의 구조 변화(브리핑 근거 신호 계약·
+- `AIRI-CODEX-HANDOFF-2026-08-21.md` — **현행 코덱스(GPU) 인계 단일 SSoT.**
+  runtime-shaped broadcast continuity v4 1,000행의 source/chat SHA, seq2048
+  token 실측, E1 adapter/report/hash, 중단된 E2의 처음부터 재실행 명령,
+  safe-merge/GGUF 도구 핀, baseline/E1/E2 × calibration/heldout/blind 36-report
+  T3와 승자 3×500 live campaign 순서를 고정한다. E1은 T3 pending·채택 금지이며
+  서비스 모델은 변경하지 않았다.
+- `AIRI-CODEX-HANDOFF-2026-08-20.md` — 이전 greybox·추출·사용자 총평 인계.
+  방송 GPU 진행 상태는 08-21판이 대체한다.
+  2026-08-21 사용자 총평 반영본. 기존 행동 181·affect 행동 120은 짧고 기계적인
+  챗봇형 Q→A로 반려돼 회신 적용·QLoRA가 금지됐고, 공식 방송 반응 7건의 비식별
+  event/beat 데이터와 AIRI 고유 파일럿 24건이 준비됐다. 현행 다음은 행별 승인 없는
+  사용자 총평 반영이다. 앞선 구조 변화(브리핑 근거 신호 계약·
   좁힌 정의·검수 폼 v2 큐 결속·v3-span greybox·alias/택소노미 greybox·
-  결정론 발화 격리·사전 결함 3건 수리), 최우선 순서(검수 회신 → T2-b QLoRA →
-  T3 양방송 게이트), GPU 재실측 큐 7건, **활성화 선행 조건 8건**(span 4·
+  결정론 발화 격리·사전 결함 3건 수리), GPU 재실측 큐 7건,
+  **활성화 선행 조건 8건**(span 4·
   taxonomy 2·동시 ON 1·런처 노출 1), 실측 함정(워치독 클램프·백그라운드
   stall·루프백 전용 계약), 최종 리뷰 추적 항목 6건.
   08-19판(`AIRI-CODEX-HANDOFF-2026-08-19.md`)을 **대체**한다 — 08-19판은
@@ -487,6 +499,14 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
   **item 0%(취약점)**, 잡담 과추출 0/6. **판정: 조건부 채택** — person/org
   한정 프리필터로 유효, item 제외, `{{user}}`는 규칙 기반 별도 처리, 조사 잔차
   흡수 후처리 필수, CC-BY-NC-4.0은 상용 배포 시 재검토.
+- `AIRI-KR-BROADCAST-REGISTER-REFERENCE-2026-08-21.md` — **현행 행동 재설계
+  SSoT.** 사용자 총평을 반영해 탬탬버린·아리사 공식 1차 출처의 후원/선택 채팅
+  반응을 비식별 event/beat로 코딩했다. 실제 방송인 문체 모방 없이 AIRI 고유
+  파일럿을 저작하는 계약과 기존 181+120 학습 금지선을 기록한다. 부속
+  `참조/data/`에는 출처 원장·학습 금지 추상 관찰 7건·JSON Schema가 있고,
+  `ollama-proxy/training/seed/airi_broadcast_response_pilot_pending.jsonl`에는
+  batch 총평용 AIRI 원본 24건이 있다(전건 training-ineligible). 사람이 읽는 전체
+  묶음은 `진행예정/AIRI-KR-BROADCAST-RESPONSE-PILOT-2026-08-21.md`다.
 - `AIRI-BROADCAST-OBSERVATION-STUDY-2026-08-14.md` — 저스트챗 방송 방식
   관찰 연구 (사용자 지정 4인 트랜스크립트 1차 실측). 공통 패턴 10종·차이
   스펙트럼·기존 설계 수정 지점 7건·B4c 파라미터 후보. 2차 자료 기반이던

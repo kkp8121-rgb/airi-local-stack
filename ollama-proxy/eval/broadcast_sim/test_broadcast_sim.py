@@ -3,9 +3,11 @@ from __future__ import annotations
 import ast
 import copy
 import importlib.util
+import os
 import sys
 import types
 import unittest
+from unittest import mock
 from pathlib import Path
 from typing import Any
 
@@ -418,6 +420,293 @@ class _FakeTransport:
         return "응, 그렇구나!", 5.0, 10.0, {"status_code": 200}
 
 
+class _LiveResponse:
+    def __init__(self, status_code: int, payload: dict[str, Any]) -> None:
+        self.status_code = status_code
+        self._payload = payload
+
+    def json(self) -> dict[str, Any]:
+        return self._payload
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise RuntimeError("HTTP error")
+
+
+class _LiveClient:
+    def __init__(self, events: list[tuple[str, object]], health: dict[str, Any] | None = None) -> None:
+        self.headers: dict[str, str] = {}
+        self.events = events
+        self.receipt_calls = 0
+        self.health = {
+            "broadcast_contract": True, "immediate_ack": "marker",
+        } if health is None else health
+
+    def get(self, url: str, *, timeout: float):
+        self.events.append(("health", {"url": url}))
+        return _LiveResponse(200, self.health)
+
+    def post(self, url: str, *, json: dict[str, object], headers: dict[str, str]):
+        action = str(json.get("action", "receipt"))
+        self.events.append((action, {"url": url, "payload": json, "headers": headers}))
+        if action == "issue_turn":
+            return _LiveResponse(200, {"turn_token": "t" * 32, "delivery_token": "d" * 32})
+        if action == "receipt":
+            self.receipt_calls += 1
+            return _LiveResponse(202 if self.receipt_calls == 1 else 200, {"status": "pending"})
+        return _LiveResponse(200, {})
+
+
+class _LiveTransport:
+    def __init__(self, health: dict[str, Any] | None = None) -> None:
+        self.events: list[tuple[str, object]] = []
+        self.client = _LiveClient(self.events, health)
+        self.messages: list[list[dict[str, str]]] = []
+
+    def stream_chat(self, *, model, messages, max_tokens, timeout):
+        self.messages.append(messages)
+        self.events.append(("chat", dict(self.client.headers)))
+        return '<|ACT {"emotion":"think"}|>live answer', 5.0, 10.0, {
+            "status_code": 200, "streaming": True, "terminal": True,
+            "immediate_ack": "marker",
+        }
+
+    def close(self) -> None:
+        self.events.append(("transport_close", {}))
+
+
+class LiveBroadcastContextRunnerTests(unittest.TestCase):
+    def test_main_binds_live_turn_then_retries_durable_receipt_without_system_prompt(self) -> None:
+        transport = _LiveTransport()
+        environment = {
+            runner.LIVE_CONTEXT_ENV_MASTER: "m" * 32,
+            runner.LIVE_CONTEXT_ENV_OBSERVER: "o" * 32,
+        }
+        with mock.patch.object(
+                runner.ab, "HttpTransport", return_value=transport,
+        ) as transport_constructor, \
+             mock.patch.dict(os.environ, environment, clear=False), \
+             mock.patch.object(runner.time, "sleep", return_value=None):
+            self.assertEqual(runner.main(["--max-turns", "1", "--live-broadcast-context", "on"]), 0)
+
+        transport_constructor.assert_called_once_with(
+            "http://127.0.0.1:11435/v1", None, stream_mode="on",
+        )
+        self.assertEqual([name for name, _data in transport.events[:6]],
+                         ["health", "start", "issue_turn", "chat", "receipt", "receipt"])
+        issue = transport.events[2][1]["payload"]
+        context = issue["broadcast_context"]
+        self.assertEqual(context["schema_version"], 1)
+        self.assertEqual(context["topic_title"], sim.load_fixture()["topic"]["title"])
+        self.assertFalse(context["donation_continuation"])
+        self.assertTrue(all(message["role"] != "system" for message in transport.messages[0]))
+        chat_headers = transport.events[3][1]
+        receipt = transport.events[5][1]["payload"]
+        user_content = transport.messages[0][-1]["content"]
+        self.assertEqual(receipt["trace_id"], chat_headers["x-airi-request-id"])
+        self.assertEqual(receipt["query_sha256"], runner.sha256_text(user_content))
+        self.assertEqual(receipt["user_sha256"], runner.sha256_text(user_content))
+        self.assertEqual(receipt["answer_sha256"], runner.sha256_text("live answer"))
+        self.assertEqual(transport.events[6][0], "close")
+
+    def test_live_contract_must_match_on_off_and_be_present(self) -> None:
+        for contract, health in (("on", {"broadcast_contract": False, "immediate_ack": "marker"}),
+                                 ("off", {"broadcast_contract": True, "immediate_ack": "marker"}),
+                                 ("on", {})):
+            transport = _LiveTransport(health)
+            environment = {
+                runner.LIVE_CONTEXT_ENV_MASTER: "m" * 32,
+                runner.LIVE_CONTEXT_ENV_OBSERVER: "o" * 32,
+            }
+            with mock.patch.object(runner.ab, "HttpTransport", return_value=transport), \
+                 mock.patch.dict(os.environ, environment, clear=False):
+                with self.assertRaisesRegex(RuntimeError, "contract"):
+                    runner.main(["--max-turns", "1", "--contract", contract,
+                                 "--live-broadcast-context", "on"])
+            self.assertEqual([event[0] for event in transport.events], ["health", "transport_close"])
+
+    def test_live_preseeds_are_receipted_before_the_first_scored_capability(self) -> None:
+        transport = _LiveTransport()
+        environment = {
+            runner.LIVE_CONTEXT_ENV_MASTER: "m" * 32,
+            runner.LIVE_CONTEXT_ENV_OBSERVER: "o" * 32,
+        }
+        with mock.patch.object(runner.ab, "HttpTransport", return_value=transport), \
+             mock.patch.dict(os.environ, environment, clear=False), \
+             mock.patch.object(runner.time, "sleep", return_value=None):
+            self.assertEqual(runner.main(["--memory-arm", "seeded", "--max-turns", "1",
+                                          "--live-broadcast-context", "on"]), 0)
+        events = [event[0] for event in transport.events]
+        controls = [event for event in transport.events if event[0] in {"start", "close"}]
+        self.assertEqual([event[0] for event in controls], ["start", "close", "start", "close"])
+        preseed_show_id = controls[0][1]["payload"]["show_id"]
+        scored_show_id = controls[2][1]["payload"]["show_id"]
+        self.assertNotEqual(preseed_show_id, scored_show_id)
+        self.assertEqual(controls[1][1]["payload"]["show_id"], preseed_show_id)
+        self.assertEqual(controls[3][1]["payload"]["show_id"], scored_show_id)
+        first_scored_issue = next(
+            index for index, event in enumerate(transport.events)
+            if event[0] == "issue_turn" and event[1]["payload"]["action_id"].startswith("turn-")
+        )
+        first_preseed_close = events.index("close")
+        scored_start = events.index("start", events.index("start") + 1)
+        self.assertIn("receipt", events[:first_preseed_close])
+        self.assertLess(first_preseed_close, scored_start)
+        self.assertLess(scored_start, first_scored_issue)
+        self.assertTrue(all(message[0]["role"] == "user" for message in transport.messages))
+        chat_headers = [event[1] for event in transport.events if event[0] == "chat"]
+        self.assertEqual({headers[runner.SESSION_HEADER] for headers in chat_headers},
+                         {"broadcast-sim-seeded-20260818"})
+
+    def test_preseed_close_error_fails_the_run_before_scored_show_starts(self) -> None:
+        transport = _LiveTransport()
+        original_post = transport.client.post
+
+        def reject_close(url, *, json, headers):
+            if json.get("action") == "close":
+                return _LiveResponse(500, {"error": "close failed"})
+            return original_post(url, json=json, headers=headers)
+
+        transport.client.post = reject_close
+        environment = {
+            runner.LIVE_CONTEXT_ENV_MASTER: "m" * 32,
+            runner.LIVE_CONTEXT_ENV_OBSERVER: "o" * 32,
+        }
+        with mock.patch.object(runner.ab, "HttpTransport", return_value=transport), \
+             mock.patch.dict(os.environ, environment, clear=False), \
+             mock.patch.object(runner.time, "sleep", return_value=None):
+            with self.assertRaisesRegex(RuntimeError, "capability unavailable"):
+                runner.main(["--memory-arm", "seeded", "--max-turns", "1",
+                             "--live-broadcast-context", "on"])
+        self.assertEqual([event[0] for event in transport.events].count("start"), 1)
+
+    def test_live_receipt_rejection_of_raw_hash_fails_closed(self) -> None:
+        transport = _LiveTransport()
+        original_post = transport.client.post
+
+        def reject_raw_hash(url, *, json, headers):
+            if "delivery_token" in json:
+                return _LiveResponse(400, {"error": "answer hash mismatch"})
+            return original_post(url, json=json, headers=headers)
+
+        transport.client.post = reject_raw_hash
+        live = {"base_url": "http://example/v1", "master_token": "m" * 32,
+                "observer_token": "o" * 32, "show_id": "show"}
+        with self.assertRaisesRegex(RuntimeError, "capability unavailable"):
+            runner.run_live_capability_turn(
+                transport, live, model="test", messages=[{"role": "user", "content": "u"}],
+                user_content="u", max_tokens=1, timeout=1.0, action_id="a", trace_id="t",
+                turn_type="chat_question",
+            )
+
+    def test_live_input_screening_block_fails_before_receipt(self) -> None:
+        transport = _LiveTransport()
+        transport.stream_chat = mock.Mock(return_value=(
+            "blocked answer", 5.0, 10.0,
+            {
+                "status_code": 200, "streaming": True, "terminal": True,
+                "immediate_ack": "false", "input_screened": "blocked",
+                "input_screen_category": "privacy",
+            },
+        ))
+        live = {"base_url": "http://example/v1", "master_token": "m" * 32,
+                "observer_token": "o" * 32, "show_id": "show"}
+        with self.assertRaisesRegex(RuntimeError, "category=privacy"):
+            runner.run_live_capability_turn(
+                transport, live, model="test", messages=[{"role": "user", "content": "u"}],
+                user_content="u", max_tokens=1, timeout=1.0, action_id="a", trace_id="t",
+                turn_type="chat_question",
+            )
+        self.assertEqual(transport.client.receipt_calls, 0)
+
+    def test_live_receipt_binds_substantive_body_after_marker_ack(self) -> None:
+        transport = _LiveTransport()
+        transport.stream_chat = mock.Mock(return_value=(
+            '<|ACT {"emotion":"think"}|>live answer', 5.0, 10.0,
+            {"status_code": 200, "streaming": True, "terminal": True,
+             "immediate_ack": "marker"},
+        ))
+        live = {"base_url": "http://example/v1", "master_token": "m" * 32,
+                "observer_token": "o" * 32, "show_id": "show"}
+        with mock.patch.object(runner.time, "sleep", return_value=None):
+            record, ok = runner.run_live_capability_turn(
+                transport, live, model="test", messages=[{"role": "user", "content": "u"}],
+                user_content="u", max_tokens=1, timeout=1.0, action_id="a", trace_id="t",
+                turn_type="chat_question",
+            )
+        self.assertTrue(ok)
+        receipt = next(
+            event[1]["payload"] for event in transport.events
+            if event[0] == "receipt"
+        )
+        self.assertEqual(receipt["answer_sha256"], runner.sha256_text("live answer"))
+        self.assertEqual(record["receipt_binding"], {
+            "schema": "airi.attested-stream-answer.v1",
+            "leading_marker_stripped": True,
+        })
+
+    def test_live_receipt_binds_terminal_dialogue_when_response_has_no_ack(self) -> None:
+        transport = _LiveTransport()
+        transport.stream_chat = mock.Mock(return_value=(
+            "  answer without marker  ", 5.0, 10.0,
+            {"status_code": 200, "streaming": True, "terminal": True,
+             "immediate_ack": "false"},
+        ))
+        live = {"base_url": "http://example/v1", "master_token": "m" * 32,
+                "observer_token": "o" * 32, "show_id": "show"}
+        with mock.patch.object(runner.time, "sleep", return_value=None):
+            record, ok = runner.run_live_capability_turn(
+                transport, live, model="test", messages=[{"role": "user", "content": "u"}],
+                user_content="u", max_tokens=1, timeout=1.0, action_id="a", trace_id="t",
+                turn_type="chat_question",
+            )
+        self.assertTrue(ok)
+        receipt = next(event[1]["payload"] for event in transport.events
+                       if event[0] == "receipt")
+        self.assertEqual(receipt["answer_sha256"], runner.sha256_text("answer without marker"))
+        self.assertEqual(record["receipt_binding"], {
+            "schema": "airi.attested-stream-answer.v1",
+            "leading_marker_stripped": False,
+        })
+
+    def test_live_receipt_keeps_nonprefix_act_like_text_byte_exact(self) -> None:
+        transport = _LiveTransport()
+        public = 'live answer <|ACT {"emotion":"curious"}|> literal'
+        transport.stream_chat = mock.Mock(return_value=(
+            '<|ACT {"emotion":"think"}|>' + public, 5.0, 10.0,
+            {"status_code": 200, "streaming": True, "terminal": True,
+             "immediate_ack": "marker"},
+        ))
+        live = {"base_url": "http://example/v1", "master_token": "m" * 32,
+                "observer_token": "o" * 32, "show_id": "show"}
+        with mock.patch.object(runner.time, "sleep", return_value=None):
+            runner.run_live_capability_turn(
+                transport, live, model="test", messages=[{"role": "user", "content": "u"}],
+                user_content="u", max_tokens=1, timeout=1.0, action_id="a", trace_id="t",
+                turn_type="chat_question",
+            )
+        receipt = next(event[1]["payload"] for event in transport.events
+                       if event[0] == "receipt")
+        self.assertEqual(receipt["answer_sha256"], runner.sha256_text(public))
+
+    def test_live_turn_rejects_nonterminal_stream_before_receipt(self) -> None:
+        transport = _LiveTransport()
+        transport.stream_chat = mock.Mock(return_value=(
+            "partial answer", 5.0, 10.0,
+            {"status_code": 200, "streaming": True, "terminal": False,
+             "immediate_ack": "marker"},
+        ))
+        live = {"base_url": "http://example/v1", "master_token": "m" * 32,
+                "observer_token": "o" * 32, "show_id": "show"}
+        with self.assertRaisesRegex(RuntimeError, "terminal answer"):
+            runner.run_live_capability_turn(
+                transport, live, model="test", messages=[{"role": "user", "content": "u"}],
+                user_content="u", max_tokens=1, timeout=1.0, action_id="a", trace_id="t",
+                turn_type="chat_question",
+            )
+        self.assertFalse(any(event[0] == "receipt" for event in transport.events))
+
+
 class BriefingEvidenceSignalTests(unittest.TestCase):
     """디렉터→프록시 근거 신호: 브리핑이 회상 재료를 실은 턴에만 붙는다."""
 
@@ -637,8 +926,11 @@ class DeterministicActHistoryIsolationTests(unittest.TestCase):
 
     def test_renderer_callout_name_does_not_leak_into_the_next_model_call(self) -> None:
         transport, _result = self._run()
-        # 후원 턴은 acts=on 이라 렌더러가 말한다 — 그 턴만 모델 호출이 없다.
-        self.assertEqual(len(transport.calls), len(self.picks) - 1)
+        # 후원 턴도 모델이 본답변을 잇는다. 렌더러는 호명·감사 opener만 소유한다.
+        self.assertEqual(len(transport.calls), len(self.picks))
+        donation_call_messages = transport.calls[8]
+        self.assertIn(runner.DONATION_CONTINUATION_CONTRACT,
+                      donation_call_messages[0]["content"])
         next_call_messages = transport.calls[-1]
 
         # 채널 1 — 히스토리: 렌더러 문구가 assistant 턴으로 되먹이면 안 된다.
@@ -666,6 +958,7 @@ class DeterministicActHistoryIsolationTests(unittest.TestCase):
         donation_entry = next(entry for entry in result["transcript"]
                               if entry.get("stage") == "turn" and entry["kind"] == "donation")
         self.assertIn(self.donor, donation_entry["airi"])
+        self.assertGreater(len(donation_entry["airi"]), len(self.donor) + 5)
 
 
 class RescoreReportTests(unittest.TestCase):
@@ -860,6 +1153,20 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(summary["memory_probe"], {"hits": 0, "of": 1, "rate": 0.0})
         self.assertEqual(summary["addressee"]["of"], 1)
         self.assertIsNone(summary["opinion_topic_answered"]["rate"])
+
+    def test_briefed_fact_that_matches_a_roster_handle_is_not_name_invention(self) -> None:
+        probe = message(kind="memory_probe", author="밤산책", text="아까 말한 별명이 뭐였지?")
+        row = sim.score_turn(
+            self.pick(probe),
+            "별명은 달빛우체국이라고 했지.",
+            beat=self.beat,
+            fallback_pool=("음, 잠깐만.",),
+            roster_handles=("밤산책", "달빛우체국"),
+            drift_terms=(),
+            briefing_fact_tokens=("달빛우체국",),
+        )
+        self.assertTrue(any(token.startswith("달빛우체국") for token in row["fact_tokens_used"]))
+        self.assertEqual(row["invented_handles"], [])
 
 
 if __name__ == "__main__":

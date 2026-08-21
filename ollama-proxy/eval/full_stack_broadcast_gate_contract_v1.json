@@ -1,0 +1,12 @@
+{
+  "schema_version": "full-stack-broadcast-gate-contract-v1",
+  "required_categories": ["runtime_activation", "long_broadcast", "model_training", "tts_latency", "safety_activation"],
+  "artifact_binding": {"sha256": "64 lowercase hexadecimal characters", "unique_run_ids": true, "distinct_artifacts_per_category": true, "paths": "relative regular non-symlink files beneath the resolved manifest directory", "captured_at": "strict UTC RFC3339 YYYY-MM-DDTHH:MM:SSZ", "model_digest": "64 lowercase hexadecimal characters"},
+  "thresholds": {
+    "long_broadcast": {"minimum_minutes": 180, "minimum_seeds": 3, "minimum_turns_per_seed": 500, "minimum_arcs_per_seed": 12, "minimum_callback_gaps": 6, "minimum_callback_gap_minutes": 90, "minimum_complete_arc_recall": 0.9, "maximum_wrong_or_forbidden_callbacks": 0, "maximum_cross_show_leakage": 0, "minimum_self_led_initiative": 0.3, "maximum_cta_rate": 0.45, "maximum_meta_leaks": 0},
+    "runtime_activation": {"before_after_health": "distinct SHA-256 telemetry digests", "input_safety_state": "enabled_ready", "output_safety_state": "enabled_ready"},
+    "model_training": {"minimum_train_rows": 200, "cuda_required": true, "official_transcript_training_allowed": false, "qlora_metrics_must_be_finite": true, "group_leakage": 0, "duplicate_targets": 0, "heldout_reference_overlap": 0},
+    "tts_latency": {"engine": "GPT-SoVITS v2ProPlus", "first_4096_byte_samples": 7, "maximum_first_4096_byte_ms": 800},
+    "safety_activation": {"greybox_span": false, "greybox_taxonomy": false, "greybox_alias": false, "greybox_briefing_evidence": false, "external_services": false, "training_artifact_promotion": false, "user_approval": false}
+  }
+}

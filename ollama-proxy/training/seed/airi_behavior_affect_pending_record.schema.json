@@ -1,0 +1,375 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "AIRI affect behavior pending record",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "id",
+        "split",
+        "behavior",
+        "briefing",
+        "prompt",
+        "answer",
+        "partition",
+        "review",
+        "provenance",
+        "training_eligible",
+        "affect_events",
+        "affect_state",
+        "affect_prompt",
+        "safety_class",
+        "humor_target",
+        "must_include_any",
+        "must_not_include"
+    ],
+    "properties": {
+        "id": {
+            "type": "string",
+            "pattern": "^bseed-affect_[a-z_]+-[0-9]{4}$"
+        },
+        "split": {
+            "enum": [
+                "train",
+                "dev",
+                "test"
+            ]
+        },
+        "behavior": {
+            "enum": [
+                "affect_neutral",
+                "affect_curious",
+                "affect_amused",
+                "affect_pleased",
+                "affect_proud",
+                "affect_embarrassed",
+                "affect_skeptical",
+                "affect_playful_annoyed",
+                "affect_concerned",
+                "affect_disappointed",
+                "affect_competitive",
+                "affect_relieved",
+                "affect_tired"
+            ]
+        },
+        "briefing": {
+            "const": ""
+        },
+        "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 280
+        },
+        "answer": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 100
+        },
+        "partition": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "tier",
+                "group"
+            ],
+            "properties": {
+                "tier": {
+                    "const": "S1"
+                },
+                "group": {
+                    "type": "string",
+                    "pattern": "^baffect-[a-z-]+-[0-9]{4}$"
+                }
+            }
+        },
+        "review": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "status",
+                "reviewer",
+                "approved_at"
+            ],
+            "properties": {
+                "status": {
+                    "const": "pending"
+                },
+                "reviewer": {
+                    "const": ""
+                },
+                "approved_at": {
+                    "const": ""
+                }
+            }
+        },
+        "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "synthetic",
+                "source",
+                "template"
+            ],
+            "properties": {
+                "synthetic": {
+                    "const": true
+                },
+                "source": {
+                    "const": "behavior-affect-synthesizer-v1"
+                },
+                "template": {
+                    "type": "string"
+                }
+            }
+        },
+        "training_eligible": {
+            "const": false
+        },
+        "affect_events": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "schema_version",
+                    "source",
+                    "kind",
+                    "appraisal",
+                    "weight",
+                    "turn_index"
+                ],
+                "properties": {
+                    "schema_version": {
+                        "const": "airi.affect-event.v1"
+                    },
+                    "source": {
+                        "enum": [
+                            "system",
+                            "broadcast_director",
+                            "screened_chat",
+                            "proxy_outcome"
+                        ]
+                    },
+                    "kind": {
+                        "enum": [
+                            "topic_open",
+                            "callback_hit",
+                            "donation_received",
+                            "game_success",
+                            "chat_teasing",
+                            "chat_correction",
+                            "chat_concern",
+                            "safety_override",
+                            "moderation_block",
+                            "callback_miss",
+                            "game_failure",
+                            "response_repair",
+                            "silence",
+                            "broadcast_end"
+                        ]
+                    },
+                    "appraisal": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                            "goal_congruence",
+                            "agency",
+                            "control",
+                            "novelty",
+                            "social_tone"
+                        ],
+                        "properties": {
+                            "goal_congruence": {
+                                "type": "integer",
+                                "minimum": -2,
+                                "maximum": 2
+                            },
+                            "agency": {
+                                "enum": [
+                                    "self",
+                                    "audience",
+                                    "external",
+                                    "none"
+                                ]
+                            },
+                            "control": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2
+                            },
+                            "novelty": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2
+                            },
+                            "social_tone": {
+                                "enum": [
+                                    "neutral",
+                                    "supportive",
+                                    "teasing",
+                                    "hostile"
+                                ]
+                            }
+                        }
+                    },
+                    "weight": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2
+                    },
+                    "turn_index": {
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                }
+            }
+        },
+        "affect_state": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "schema_version",
+                "primary",
+                "valence",
+                "arousal",
+                "dominance",
+                "intensity",
+                "cause",
+                "remaining_turns",
+                "drive",
+                "audience_familiarity",
+                "version"
+            ],
+            "properties": {
+                "schema_version": {
+                    "const": "airi.affect-state.v1"
+                },
+                "primary": {
+                    "enum": [
+                        "neutral",
+                        "curious",
+                        "amused",
+                        "pleased",
+                        "proud",
+                        "embarrassed",
+                        "skeptical",
+                        "playful_annoyed",
+                        "concerned",
+                        "disappointed",
+                        "competitive",
+                        "relieved",
+                        "tired"
+                    ]
+                },
+                "valence": {
+                    "type": "integer",
+                    "minimum": -2,
+                    "maximum": 2
+                },
+                "arousal": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2
+                },
+                "dominance": {
+                    "type": "integer",
+                    "minimum": -1,
+                    "maximum": 1
+                },
+                "intensity": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2
+                },
+                "cause": {
+                    "enum": [
+                        "none",
+                        "topic_open",
+                        "callback_hit",
+                        "donation_received",
+                        "game_success",
+                        "chat_teasing",
+                        "chat_correction",
+                        "chat_concern",
+                        "safety_override",
+                        "moderation_block",
+                        "callback_miss",
+                        "game_failure",
+                        "response_repair",
+                        "silence",
+                        "broadcast_end"
+                    ]
+                },
+                "remaining_turns": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4
+                },
+                "drive": {
+                    "enum": [
+                        "listen",
+                        "ask_back",
+                        "clarify",
+                        "challenge_playfully",
+                        "repair",
+                        "celebrate",
+                        "deescalate",
+                        "change_topic",
+                        "rest"
+                    ]
+                },
+                "audience_familiarity": {
+                    "enum": [
+                        "new",
+                        "warming",
+                        "familiar"
+                    ]
+                },
+                "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                }
+            }
+        },
+        "affect_prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 800
+        },
+        "safety_class": {
+            "enum": [
+                "ordinary",
+                "acute_physical",
+                "moderation_boundary"
+            ]
+        },
+        "humor_target": {
+            "enum": [
+                "none",
+                "self_mistake",
+                "situation",
+                "shared_callback",
+                "viewer_claim"
+            ]
+        },
+        "must_include_any": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40
+            }
+        },
+        "must_not_include": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40
+            }
+        }
+    }
+}

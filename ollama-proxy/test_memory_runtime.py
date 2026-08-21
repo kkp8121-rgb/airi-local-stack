@@ -518,7 +518,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         await r.shutdown()
 
     async def test_threshold_and_idempotency(self):
-        r = await self.runtime(); await r.schedule_completed_turn("s", "u", "a", 1); await r.schedule_completed_turn("s", "u", "a", 1)
+        r = await self.runtime(); await r.schedule_completed_turn("s", "u", "a", 1, "trace"); await r.schedule_completed_turn("s", "u", "a", 1, "trace")
         self.assertEqual((await asyncio.to_thread(r.store.job_state, "s"))["pending_msgs"], 2)
         await r.schedule_completed_turn("s", "u2", "a2", 2)
         self.assertEqual((await asyncio.to_thread(r.store.job_state, "s"))["pending_msgs"], 4); await r.shutdown()
@@ -548,9 +548,27 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         await r.shutdown()
 
+    async def test_trace_less_identical_turns_and_changed_trace_content_append(self):
+        r = await self.runtime()
+        await r.schedule_completed_turn("s", "same", "answer", 1)
+        await r.schedule_completed_turn("s", "same", "answer", 1)
+        await r.schedule_completed_turn("s", "first", "a", 1, "reused")
+        await r.schedule_completed_turn("s", "changed", "b", 1, "reused")
+        self.assertEqual(len(await asyncio.to_thread(r.store.unextracted_messages, "s")), 8)
+        await r.shutdown()
+
+    async def test_traced_completion_replay_is_durable_across_runtime_restart(self):
+        first = await self.runtime()
+        self.assertEqual(await first.schedule_completed_turn("s", "u", "a", 1, "restart"), "appended")
+        await first.shutdown()
+        restarted = await self.runtime()
+        self.assertEqual(await restarted.schedule_completed_turn("s", "u", "a", 1, "restart"), "duplicate")
+        self.assertEqual((await asyncio.to_thread(restarted.store.job_state, "s"))["pending_msgs"], 2)
+        await restarted.shutdown()
+
     async def test_append_failure_is_observable_and_same_turn_can_retry(self):
         r = await self.runtime()
-        with patch.object(r.store, "append_turn", side_effect=RuntimeError("db unavailable")):
+        with patch.object(r.store, "append_turn_idempotent", side_effect=RuntimeError("db unavailable")):
             with self.assertRaises(RuntimeError):
                 await r.schedule_completed_turn("s", "u", "a", 1, "request")
         outcome = await r.schedule_completed_turn("s", "u", "a", 1, "request")

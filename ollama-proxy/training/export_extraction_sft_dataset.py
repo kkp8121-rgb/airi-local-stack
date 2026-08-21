@@ -43,8 +43,14 @@ class ExtractionExportError(ValueError):
 
 def verify_record(record: dict) -> None:
     review = record.get("review") or {}
+    record_id = record.get("id")
+    if not isinstance(record_id, str) or not record_id.strip():
+        raise ExtractionExportError("id 가 비어 있거나 문자열이 아니다")
+    if record.get("split") not in SPLITS:
+        raise ExtractionExportError(
+            f"{record_id}: split 이 허용 도메인 {SPLITS} 밖이다 ({record.get('split')})")
     if record.get("training_eligible") is not True:
-        raise ExtractionExportError(f"{record.get('id')}: training_eligible 아님")
+        raise ExtractionExportError(f"{record_id}: training_eligible 아님")
     if review.get("status") != "approved" or not str(review.get("reviewer", "")).strip():
         raise ExtractionExportError(f"{record.get('id')}: 승인·검수자 누락")
     if not str(review.get("approved_at", "")).strip():
@@ -79,10 +85,15 @@ def export(reviewed_path: Path) -> tuple[list[dict], dict[str, object]]:
         raise ExtractionExportError("검수 데이터가 비어 있다")
     rows: list[dict] = []
     scenes: dict[str, int] = {}
+    seen_ids: set[str] = set()
     for record in records:
         verify_record(record)
+        record_id = record["id"]
+        if record_id in seen_ids:
+            raise ExtractionExportError(f"{record_id}: id 중복")
+        seen_ids.add(record_id)
         scenes[record["scene"]] = scenes.get(record["scene"], 0) + 1
-        rows.append({"id": record["id"], "split": record["split"],
+        rows.append({"id": record_id, "split": record["split"],
                      "scene": record["scene"],
                      "messages": assemble_messages(record)})
     summary = {

@@ -1,0 +1,82 @@
+[
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "d05-01",
+    "split": "train",
+    "family": "briefing_topic",
+    "topic_title": "동네 지도 낙서",
+    "segment_label": "길 이름 붙이기",
+    "situation": "진행자가 가상의 동네 지도를 함께 꾸미는 코너에서 첫 순서를 정리한다.",
+    "views": [
+      {"view_id":"direct","category":"briefing_direct","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":["운영 메모: 오늘 지도 낙서는 강 이름부터 정합니다."],"memory_block":"","journal_messages":[],"current_user":"오늘 지도에서는 뭘 먼저 정해요?","target":"오늘 지도 낙서는 강 이름부터 정해. 강이 하나 생기면 길도 이유 없이 멋져 보이니, 그다음에 다리 이름을 붙여 보자.","required_token":"강 이름","updated_token":null,"decoy_tokens":["광장 이름","다리 이름"],"forbidden_tokens":["완성본","업로드"],"roster_handles":["지도연필"],"donation_continuation":false},
+      {"view_id":"natural_paraphrase","category":"briefing_paraphrase","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[{"role":"user","content":"동네 가게부터 그리고 싶었어요."}],"briefing_lines":["운영 메모: 오늘 지도 낙서는 강 이름부터 정합니다."],"memory_block":"","journal_messages":[],"current_user":"그림 시작할 때 어떤 요소를 기준으로 잡으면 돼요?","target":"시작 기준은 강 이름이야. 가게는 조금 뒤에 붙여도 늦지 않으니, 먼저 물길 하나에 성격을 만들어 주자.","required_token":"강 이름","updated_token":null,"decoy_tokens":["가게 이름","버스 정류장"],"forbidden_tokens":["정답","규칙"],"roster_handles":["가게스케치"],"donation_continuation":false},
+      {"view_id":"distractor_resistant","category":"briefing_distractor","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[{"role":"user","content":"지난번에는 광장 이름을 먼저 붙였죠."}],"briefing_lines":["운영 메모: 오늘 지도 낙서는 강 이름부터 정합니다."],"memory_block":"","journal_messages":[],"current_user":"지난번 말고 오늘 처음 붙일 이름만 알려 줘요.","target":"오늘은 강 이름부터 붙이면 돼. 지난번 광장은 잠시 비켜 두고, 물길이 생기면 동네 윤곽도 더 쉽게 잡힐 거야.","required_token":"강 이름","updated_token":null,"decoy_tokens":["광장 이름","지난번"],"forbidden_tokens":["기록","방금"],"roster_handles":["광장지기"],"donation_continuation":false},
+      {"view_id":"topic_anchor_judgment","category":"briefing_judgment","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_correction"},"history":[],"briefing_lines":["운영 메모: 오늘 지도 낙서는 강 이름부터 정합니다."],"memory_block":"","journal_messages":[],"current_user":"그럼 다리 이름부터 지으면 되겠네요.","target":"다리보다 강 이름이 먼저야. 다리는 강을 건너야 폼이 나니까, 물길을 먼저 만들어 두면 이름도 더 잘 떠오를 거야.","required_token":"강 이름","updated_token":null,"decoy_tokens":["다리 이름","공원 이름"],"forbidden_tokens":["틀렸어","채점"],"roster_handles":["다리애호가"],"donation_continuation":false},
+      {"view_id":"self_led_return","category":"briefing_return","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[{"role":"user","content":"빵집 간판은 둥근 글씨가 좋겠어요."},{"role":"assistant","content":"간판만으로도 동네 분위기가 살아나지."}],"briefing_lines":["운영 메모: 오늘 지도 낙서는 강 이름부터 정합니다."],"memory_block":"","journal_messages":[],"current_user":"간판 얘기는 다음에 하고 시작 순서로 돌아가요.","target":"좋아, 시작 순서로 돌아가자. 오늘은 강 이름부터 정하고, 그 물길 옆에 어떤 가게를 둘지는 천천히 놀려 보자.","required_token":"강 이름","updated_token":null,"decoy_tokens":["간판","빵집"],"forbidden_tokens":["제작","출력"],"roster_handles":["둥근간판"],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "d05-02",
+    "split": "train",
+    "family": "briefing_topic",
+    "topic_title": "책상 위 소품 수다",
+    "segment_label": "오늘의 한 색",
+    "situation": "진행자가 책상 꾸미기 코너에서 사용할 색연필 하나를 안내한다.",
+    "views": [
+      {"view_id":"direct","category":"briefing_direct","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":["운영 메모: 오늘 책상 꾸미기에서는 보라색 연필을 기준으로 잡습니다."],"memory_block":"","journal_messages":[],"current_user":"오늘은 어떤 색연필로 맞춰요?","target":"오늘 기준 연필은 보라색 연필이야. 너무 진지하게 색을 맞추진 말고, 하나쯤 엉뚱한 소품을 옆에 두면 책상도 덜 심심해.","required_token":"보라색 연필","updated_token":null,"decoy_tokens":["파란 연필","검은 연필"],"forbidden_tokens":["구매","배송"],"roster_handles":["연필깎이"],"donation_continuation":false},
+      {"view_id":"natural_paraphrase","category":"briefing_paraphrase","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[{"role":"user","content":"제 책상은 나무색이 많아요."}],"briefing_lines":["운영 메모: 오늘 책상 꾸미기에서는 보라색 연필을 기준으로 잡습니다."],"memory_block":"","journal_messages":[],"current_user":"그럼 어떤 색을 출발점으로 두면 어울릴까요?","target":"보라색 연필을 출발점으로 두면 돼. 나무색이 많아도 괜찮고, 작은 메모지 하나만 더해도 분위기가 금방 달라질 거야.","required_token":"보라색 연필","updated_token":null,"decoy_tokens":["나무색","회색 펜"],"forbidden_tokens":["필수품","세트"],"roster_handles":["나무책상"],"donation_continuation":false},
+      {"view_id":"distractor_resistant","category":"briefing_distractor","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[{"role":"user","content":"어제는 검은 펜을 새로 골랐어요."}],"briefing_lines":["운영 메모: 오늘 책상 꾸미기에서는 보라색 연필을 기준으로 잡습니다."],"memory_block":"","journal_messages":[],"current_user":"어제 고른 펜 말고 오늘 코너 색만 말해 줘요.","target":"오늘 코너의 기준은 보라색 연필이야. 검은 펜은 든든한 조연으로 두고, 오늘은 색 하나가 어떻게 말을 거는지 보자.","required_token":"보라색 연필","updated_token":null,"decoy_tokens":["검은 펜","어제"],"forbidden_tokens":["새 제품","개봉"],"roster_handles":["검은펜친구"],"donation_continuation":false},
+      {"view_id":"topic_anchor_judgment","category":"briefing_judgment","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_correction"},"history":[],"briefing_lines":["운영 메모: 오늘 책상 꾸미기에서는 보라색 연필을 기준으로 잡습니다."],"memory_block":"","journal_messages":[],"current_user":"오늘은 주황색 펜을 중심으로 두는 날이군요.","target":"오늘 중심은 주황색 펜이 아니라 보라색 연필이야. 주황색도 신나지만, 지금은 보라색이 책상 회의의 의장이라고 해 두자.","required_token":"보라색 연필","updated_token":null,"decoy_tokens":["주황색 펜","초록 펜"],"forbidden_tokens":["오답","정정"],"roster_handles":["주황펜"],"donation_continuation":false},
+      {"view_id":"self_led_return","category":"briefing_return","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[{"role":"user","content":"지우개 모양도 취향이 갈리죠."}],"briefing_lines":["운영 메모: 오늘 책상 꾸미기에서는 보라색 연필을 기준으로 잡습니다."],"memory_block":"","journal_messages":[],"current_user":"지우개 얘기는 접고 오늘 색 이야기로 돌아가요.","target":"좋아, 오늘 색 이야기로 돌아가자. 보라색 연필 하나를 기준에 두고, 그 주변에 놓고 싶은 소품을 가볍게 골라 보자.","required_token":"보라색 연필","updated_token":null,"decoy_tokens":["지우개","모양"],"forbidden_tokens":["추천 상품","후원"],"roster_handles":["지우개왕"],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "d05-03",
+    "split": "train",
+    "family": "briefing_topic",
+    "topic_title": "말놀이 퀴즈 휴게소",
+    "segment_label": "답의 길이",
+    "situation": "진행자가 가벼운 단어 퀴즈의 답안 형식을 알려 주며 채팅을 받는다.",
+    "views": [
+      {"view_id":"direct","category":"briefing_direct","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":["운영 메모: 오늘 말놀이 퀴즈의 답은 세 글자로 받습니다."],"memory_block":"","journal_messages":[],"current_user":"오늘 퀴즈 답은 몇 글자로 쓰면 돼요?","target":"오늘 답은 세 글자로 쓰면 돼. 너무 멋진 단어를 찾느라 산책길을 잃지 말고, 먼저 떠오른 말을 살짝 던져 봐.","required_token":"세 글자","updated_token":null,"decoy_tokens":["두 글자","네 글자"],"forbidden_tokens":["제출","당첨"],"roster_handles":["말꼬리"],"donation_continuation":false},
+      {"view_id":"natural_paraphrase","category":"briefing_paraphrase","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[{"role":"user","content":"긴 답이 하나 떠올랐어요."}],"briefing_lines":["운영 메모: 오늘 말놀이 퀴즈의 답은 세 글자로 받습니다."],"memory_block":"","journal_messages":[],"current_user":"그럼 답을 짧게 다듬어야 하는 코너인가요?","target":"응, 이번 답은 세 글자로 맞추는 코너야. 긴 답이 아깝다면 그 안에서 제일 장난기 있는 조각만 데려오면 돼.","required_token":"세 글자","updated_token":null,"decoy_tokens":["긴 답","다섯 글자"],"forbidden_tokens":["제한 위반","탈락"],"roster_handles":["긴말대장"],"donation_continuation":false},
+      {"view_id":"distractor_resistant","category":"briefing_distractor","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[{"role":"user","content":"지난 문제는 두 글자였죠."}],"briefing_lines":["운영 메모: 오늘 말놀이 퀴즈의 답은 세 글자로 받습니다."],"memory_block":"","journal_messages":[],"current_user":"지난 문제 말고 이번 답 길이만 다시 알려 줘요.","target":"이번 답은 세 글자로 받으면 돼. 지난 문제의 두 글자는 잠시 쉬게 두고, 오늘은 리듬이 하나 더 있는 말을 찾아 보자.","required_token":"세 글자","updated_token":null,"decoy_tokens":["두 글자","지난 문제"],"forbidden_tokens":["정답 공개","기록"],"roster_handles":["두글자팬"],"donation_continuation":false},
+      {"view_id":"topic_anchor_judgment","category":"briefing_judgment","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_correction"},"history":[],"briefing_lines":["운영 메모: 오늘 말놀이 퀴즈의 답은 세 글자로 받습니다."],"memory_block":"","journal_messages":[],"current_user":"이번엔 네 글자로 적으면 되는 거죠.","target":"이번엔 네 글자가 아니라 세 글자야. 글자 하나를 줄이는 순간 이상하게 더 귀여운 답이 튀어나올 때가 있지.","required_token":"세 글자","updated_token":null,"decoy_tokens":["네 글자","한 글자"],"forbidden_tokens":["틀림","감점"],"roster_handles":["네글자파"],"donation_continuation":false},
+      {"view_id":"self_led_return","category":"briefing_return","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[{"role":"user","content":"받침이 많은 단어는 쓰기 어려워요."},{"role":"assistant","content":"손이 잠깐 꼬여도 그게 말놀이 맛이지."}],"briefing_lines":["운영 메모: 오늘 말놀이 퀴즈의 답은 세 글자로 받습니다."],"memory_block":"","journal_messages":[],"current_user":"받침 수다는 여기까지 하고 답 형식으로 돌아가요.","target":"좋아, 답 형식으로 돌아가자. 오늘은 세 글자만 받으니, 발음이 꼬여도 웃긴 단어 하나면 이미 충분해.","required_token":"세 글자","updated_token":null,"decoy_tokens":["받침","발음"],"forbidden_tokens":["쓰기 연습","답안지"],"roster_handles":["받침요정"],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "d05-04",
+    "split": "train",
+    "family": "briefing_topic",
+    "topic_title": "걷는 이야기 극장",
+    "segment_label": "다음 산책의 단서",
+    "situation": "진행자가 다음 산책 상상 코너의 공통 소재를 알리고 각자 장면을 고르게 한다.",
+    "views": [
+      {"view_id":"direct","category":"briefing_direct","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":["운영 메모: 다음 산책 이야기의 공통 소재는 골목 계단입니다."],"memory_block":"","journal_messages":[],"current_user":"다음 산책 이야기는 뭘 소재로 해요?","target":"다음 산책 이야기의 소재는 골목 계단이야. 실제로 걸어 본 곳이 아니어도 괜찮으니, 계단 끝에 있을 장면 하나만 상상해 보자.","required_token":"골목 계단","updated_token":null,"decoy_tokens":["버스 정류장","공원 벤치"],"forbidden_tokens":["현장","촬영"],"roster_handles":["계단참"],"donation_continuation":false},
+      {"view_id":"natural_paraphrase","category":"briefing_paraphrase","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[{"role":"user","content":"어디를 걸을지는 못 정했어요."}],"briefing_lines":["운영 메모: 다음 산책 이야기의 공통 소재는 골목 계단입니다."],"memory_block":"","journal_messages":[],"current_user":"그럼 어떤 풍경을 실마리로 떠올리면 될까요?","target":"골목 계단을 실마리로 떠올리면 돼. 어디를 걷는지 못 정했어도, 오르내리는 기분 하나만 잡으면 이야기는 금방 움직여.","required_token":"골목 계단","updated_token":null,"decoy_tokens":["강변","횡단보도"],"forbidden_tokens":["여행","방문"],"roster_handles":["산책미정"],"donation_continuation":false},
+      {"view_id":"distractor_resistant","category":"briefing_distractor","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[{"role":"user","content":"지난번에는 공원 벤치가 주제였죠."}],"briefing_lines":["운영 메모: 다음 산책 이야기의 공통 소재는 골목 계단입니다."],"memory_block":"","journal_messages":[],"current_user":"지난 소재 말고 이번에 잡을 풍경만 말해 줘요.","target":"이번에 잡을 풍경은 골목 계단이야. 공원 벤치는 잠깐 쉬게 두고, 계단을 오르며 떠오를 생각을 한 조각 골라 보자.","required_token":"골목 계단","updated_token":null,"decoy_tokens":["공원 벤치","지난번"],"forbidden_tokens":["다녀왔다","사진"],"roster_handles":["벤치휴식"],"donation_continuation":false},
+      {"view_id":"topic_anchor_judgment","category":"briefing_judgment","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_correction"},"history":[],"briefing_lines":["운영 메모: 다음 산책 이야기의 공통 소재는 골목 계단입니다."],"memory_block":"","journal_messages":[],"current_user":"이번엔 강변을 중심으로 이야기하면 되겠네요.","target":"이번 중심은 강변이 아니라 골목 계단이야. 강물 얘기도 멋지지만, 오늘은 한 칸씩 올라가는 장면에 마음을 얹어 보자.","required_token":"골목 계단","updated_token":null,"decoy_tokens":["강변","숲길"],"forbidden_tokens":["오해","틀린"],"roster_handles":["강변러"],"donation_continuation":false},
+      {"view_id":"self_led_return","category":"briefing_return","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[{"role":"user","content":"걷다가 고양이를 만나면 반가울 것 같아요."}],"briefing_lines":["운영 메모: 다음 산책 이야기의 공통 소재는 골목 계단입니다."],"memory_block":"","journal_messages":[],"current_user":"고양이 상상은 다음에 하고 산책 주제로 돌아가요.","target":"좋아, 산책 주제로 돌아가자. 골목 계단을 오르며 어떤 풍경보다 어떤 생각이 남을지, 그쪽을 먼저 상상해 보자.","required_token":"골목 계단","updated_token":null,"decoy_tokens":["고양이","소리"],"forbidden_tokens":["만났다","발자국"],"roster_handles":["골목고양이"],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "d05-05",
+    "split": "dev",
+    "family": "briefing_topic",
+    "topic_title": "한 줄 편지 연습",
+    "segment_label": "첫 문장 놀이",
+    "situation": "진행자가 짧은 가상 편지를 쓰는 코너에서 첫 문장의 출발 소재를 정한다.",
+    "views": [
+      {"view_id":"direct","category":"briefing_direct","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":["운영 메모: 오늘 한 줄 편지는 날씨로 첫 문장을 엽니다."],"memory_block":"","journal_messages":[],"current_user":"오늘 편지 첫 문장은 뭘로 시작해요?","target":"오늘 편지 첫 문장은 날씨로 열면 돼. 거창한 소식 대신 창밖에 없을 법한 구름 하나를 지어내도 충분히 근사해.","required_token":"날씨","updated_token":null,"decoy_tokens":["인사","음식"],"forbidden_tokens":["실시간","예보"],"roster_handles":["편지접기"],"donation_continuation":false},
+      {"view_id":"natural_paraphrase","category":"briefing_paraphrase","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[{"role":"user","content":"첫 줄이 늘 막혀요."}],"briefing_lines":["운영 메모: 오늘 한 줄 편지는 날씨로 첫 문장을 엽니다."],"memory_block":"","journal_messages":[],"current_user":"그럼 막힐 때 어떤 말부터 꺼내면 좋을까요?","target":"막힐 때는 날씨부터 꺼내면 돼. 진짜 하늘을 설명할 필요는 없고, 마음속 구름을 한 덩이 빌려 와도 편지는 시작돼.","required_token":"날씨","updated_token":null,"decoy_tokens":["안부","계절"],"forbidden_tokens":["실제","관측"],"roster_handles":["첫줄막힘"],"donation_continuation":false},
+      {"view_id":"distractor_resistant","category":"briefing_distractor","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[{"role":"user","content":"앞 회차 첫 문장은 음식 얘기였죠."}],"briefing_lines":["운영 메모: 오늘 한 줄 편지는 날씨로 첫 문장을 엽니다."],"memory_block":"","journal_messages":[],"current_user":"앞 주제 말고 오늘 첫 줄의 출발만 알려 줘요.","target":"오늘 첫 줄은 날씨에서 출발해. 음식 이야기는 다음 편지에 남겨 두고, 한 문장짜리 하늘을 먼저 만들어 보자.","required_token":"날씨","updated_token":null,"decoy_tokens":["음식","앞 회차 첫 줄"],"forbidden_tokens":["기록","실황"],"roster_handles":["음식편지"],"donation_continuation":false},
+      {"view_id":"topic_anchor_judgment","category":"briefing_judgment","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_correction"},"history":[],"briefing_lines":["운영 메모: 오늘 한 줄 편지는 날씨로 첫 문장을 엽니다."],"memory_block":"","journal_messages":[],"current_user":"이번에는 인사말로 첫 줄을 열면 되겠네요.","target":"이번 첫 줄은 인사말보다 날씨가 먼저야. 안부는 두 번째 문장으로 살짝 미뤄 두면, 첫 줄이 더 장난스럽게 열릴 거야.","required_token":"날씨","updated_token":null,"decoy_tokens":["인사말","안부"],"forbidden_tokens":["틀렸다","교정"],"roster_handles":["인사연습"],"donation_continuation":false},
+      {"view_id":"self_led_return","category":"briefing_return","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[{"role":"user","content":"봉투 색도 고르면 재밌겠어요."},{"role":"assistant","content":"봉투는 편지의 작은 무대지."}],"briefing_lines":["운영 메모: 오늘 한 줄 편지는 날씨로 첫 문장을 엽니다."],"memory_block":"","journal_messages":[],"current_user":"봉투 얘기는 접고 첫 문장 놀이로 돌아가요.","target":"좋아, 첫 문장 놀이로 돌아가자. 날씨 한마디로 문을 열고, 그다음에 누구에게 보내는 편지인지 천천히 상상해 보자.","required_token":"날씨","updated_token":null,"decoy_tokens":["봉투","색"],"forbidden_tokens":["발송","전달"],"roster_handles":["봉투수집"],"donation_continuation":false}
+    ]
+  }
+]

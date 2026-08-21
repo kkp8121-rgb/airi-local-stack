@@ -1,9 +1,12 @@
 param(
-  [switch]$SkipWarmup
+  [switch]$SkipWarmup,
+  [ValidateSet('on', 'off')]
+  [string]$ReferenceEmbeddingCache = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_GPT_SOVITS_SV_CACHE)) { 'off' } else { $env:AIRI_GPT_SOVITS_SV_CACHE })
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
+$ReferenceEmbeddingCache = $ReferenceEmbeddingCache.ToLowerInvariant()
 
 # GPT-SoVITS is a separate clone that this repository does not vendor, so accept
 # an explicit GPT_SOVITS_ROOT first and fall back to the known checkout layouts.
@@ -114,12 +117,25 @@ if (-not (Test-Port 11434)) {
 }
 
 $startedBackend = $false
+if ((Test-Port 9880) -and $ReferenceEmbeddingCache -eq 'on') {
+  throw 'ReferenceEmbeddingCache on requires a fresh 9880 backend; an existing backend cannot attest the overlay.'
+}
 if (-not (Test-Port 9880)) {
   $env:PYTHONPATH = "$gptRoot;$gptRoot\GPT_SoVITS"
   $env:PYTHONIOENCODING = 'utf-8'
   $out = Join-Path $PSScriptRoot 'api-v2proplus.out.log'
   $err = Join-Path $PSScriptRoot 'api-v2proplus.err.log'
-  Start-Process -FilePath $python -ArgumentList '-u','api_v2.py','-a','127.0.0.1','-p','9880','-c',(Join-Path $PSScriptRoot 'tts-infer-v2proplus.yaml') -WorkingDirectory $gptRoot -RedirectStandardOutput $out -RedirectStandardError $err -WindowStyle Hidden
+  $backendArguments = if ($ReferenceEmbeddingCache -eq 'on') {
+    @(
+      '-u', (Join-Path $PSScriptRoot 'run_v2proplus_with_sv_cache.py'),
+      '--external-root', $gptRoot, '--', '-a', '127.0.0.1', '-p', '9880',
+      '-c', (Join-Path $PSScriptRoot 'tts-infer-v2proplus.yaml')
+    )
+  }
+  else {
+    @('-u', 'api_v2.py', '-a', '127.0.0.1', '-p', '9880', '-c', (Join-Path $PSScriptRoot 'tts-infer-v2proplus.yaml'))
+  }
+  Start-Process -FilePath $python -ArgumentList $backendArguments -WorkingDirectory $gptRoot -RedirectStandardOutput $out -RedirectStandardError $err -WindowStyle Hidden
   $startedBackend = $true
 }
 

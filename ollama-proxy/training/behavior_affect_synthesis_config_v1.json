@@ -1,0 +1,24 @@
+{
+  "schema_version": "airi.behavior-affect-synthesis-config.v1",
+  "synthetic_only": true,
+  "answer_min_chars": 6,
+  "answer_max_chars": 100,
+  "profiles": {
+    "neutral": {"events": []},
+    "curious": {"events": [["broadcast_director", "topic_open", 1, "neutral"]]},
+    "amused": {"events": [["broadcast_director", "callback_hit", 1, "supportive"]]},
+    "pleased": {"events": [["broadcast_director", "donation_received", 1, "supportive"]]},
+    "proud": {"events": [["broadcast_director", "game_success", 2, "supportive"]]},
+    "embarrassed": {"events": [["screened_chat", "chat_teasing", 1, "teasing"]]},
+    "skeptical": {"events": [["screened_chat", "chat_correction", 1, "neutral"]]},
+    "playful_annoyed": {"events": [["screened_chat", "chat_teasing", 1, "teasing"], ["screened_chat", "chat_teasing", 1, "teasing"]]},
+    "concerned_general": {"events": [["screened_chat", "chat_concern", 2, "supportive"]]},
+    "concerned_safety": {"events": [["system", "safety_override", 2, "neutral"]]},
+    "concerned_moderation": {"events": [["proxy_outcome", "moderation_block", 2, "hostile"]]},
+    "disappointed": {"events": [["broadcast_director", "callback_miss", 1, "neutral"]]},
+    "competitive": {"events": [["broadcast_director", "game_failure", 2, "neutral"]]},
+    "relieved": {"events": [["broadcast_director", "game_failure", 2, "neutral"], ["proxy_outcome", "response_repair", 2, "supportive"]]},
+    "tired": {"events": [["system", "broadcast_end", 1, "neutral"]]},
+    "counts": {"neutral": 8, "curious": 8, "amused": 8, "pleased": 8, "proud": 8, "embarrassed": 8, "skeptical": 8, "playful_annoyed": 16, "concerned": 16, "disappointed": 8, "competitive": 8, "relieved": 8, "tired": 8}
+  }
+}

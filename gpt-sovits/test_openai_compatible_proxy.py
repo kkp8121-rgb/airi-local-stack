@@ -1,5 +1,6 @@
 import ast
 import asyncio
+import hashlib
 import json
 import re
 import threading
@@ -107,6 +108,8 @@ class ImmediateResponseCacheTests(unittest.TestCase):
         self.assertEqual(payload["text_lang"], "ko")
         self.assertEqual(payload["speed_factor"], 1.25)
         self.assertFalse(payload["parallel_infer"])
+        self.assertEqual(payload["streaming_mode"], 2)
+        self.assertEqual(payload["min_chunk_length"], 16)
 
 
 class ProxyEndpointTestCase(unittest.TestCase):
@@ -304,6 +307,17 @@ class StreamCancellationTests(unittest.TestCase):
 
 
 class RequestContractTests(ProxyEndpointTestCase):
+    def test_response_binds_trace_and_normalized_input_hash(self):
+        backend = FakeBackendResponse(chunks=[b"RIFF" + b"\x00" * 40, b"\x01\x02" * 4096])
+        with mock.patch.object(proxy.HTTP, "post", return_value=backend):
+            response = self.post_speech(input="  실제 방송 답변  ")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers["x-airi-tts-input-sha256"],
+            hashlib.sha256("실제 방송 답변".encode("utf-8")).hexdigest(),
+        )
+        self.assertTrue(response.headers["x-airi-request-id"])
+
     def test_pcm_is_rejected_instead_of_receiving_wav_bytes(self):
         response = self.post_speech(response_format="pcm")
         self.assertEqual(response.status_code, 400)
@@ -344,6 +358,12 @@ class HealthTests(unittest.TestCase):
         body = self.health(Path(__file__))
         self.assertTrue(body["reference_audio_found"])
         self.assertEqual(body["status"], "ok")
+        self.assertEqual(body["streaming_contract"], {
+            "mode": 2,
+            "min_chunk_length": 16,
+            "media_type": "wav",
+            "parallel_infer": False,
+        })
 
     def test_default_reference_audio_lives_inside_the_repository(self):
         self.assertEqual(

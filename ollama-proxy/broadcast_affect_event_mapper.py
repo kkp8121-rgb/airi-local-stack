@@ -17,6 +17,14 @@ MAX_SAFE_INTEGER = 9007199254740991
 
 _OUTCOME_KEYS = frozenset(("schema_version", "evidence", "outcome", "delivery_status", "turn_index"))
 _MAPPINGS = {
+    ("director_delivery", "broadcast_start"): (
+        "broadcast_director", "broadcast_start",
+        {"goal_congruence": 0, "agency": "none", "control": 1, "novelty": 1, "social_tone": "neutral"}, 1,
+    ),
+    ("director_delivery", "topic_open"): (
+        "broadcast_director", "topic_open",
+        {"goal_congruence": 0, "agency": "none", "control": 1, "novelty": 1, "social_tone": "neutral"}, 1,
+    ),
     ("director_delivery", "donation_acknowledged"): (
         "broadcast_director", "donation_received",
         {"goal_congruence": 1, "agency": "none", "control": 1, "novelty": 1, "social_tone": "neutral"}, 1,
@@ -44,6 +52,34 @@ _MAPPINGS = {
     ("proxy_terminal_output", "response_repair"): (
         "proxy_outcome", "response_repair",
         {"goal_congruence": 1, "agency": "none", "control": 1, "novelty": 1, "social_tone": "neutral"}, 2,
+    ),
+    ("screened_chat", "chat_question"): (
+        "screened_chat", "chat_question",
+        {"goal_congruence": 0, "agency": "audience", "control": 1, "novelty": 1, "social_tone": "neutral"}, 1,
+    ),
+    ("screened_chat", "chat_teasing"): (
+        "screened_chat", "chat_teasing",
+        {"goal_congruence": -1, "agency": "audience", "control": 1, "novelty": 1, "social_tone": "teasing"}, 1,
+    ),
+    ("screened_chat", "chat_correction"): (
+        "screened_chat", "chat_correction",
+        {"goal_congruence": -1, "agency": "audience", "control": 1, "novelty": 1, "social_tone": "neutral"}, 1,
+    ),
+    ("screened_chat", "chat_concern"): (
+        "screened_chat", "chat_concern",
+        {"goal_congruence": -1, "agency": "audience", "control": 1, "novelty": 1, "social_tone": "supportive"}, 1,
+    ),
+    ("proxy_terminal_output", "moderation_block"): (
+        "proxy_outcome", "moderation_block",
+        {"goal_congruence": -1, "agency": "none", "control": 1, "novelty": 1, "social_tone": "neutral"}, 2,
+    ),
+    ("proxy_terminal_output", "safety_override"): (
+        "proxy_outcome", "safety_override",
+        {"goal_congruence": -1, "agency": "none", "control": 1, "novelty": 1, "social_tone": "neutral"}, 2,
+    ),
+    ("director_delivery", "broadcast_end"): (
+        "broadcast_director", "broadcast_end",
+        {"goal_congruence": -1, "agency": "none", "control": 1, "novelty": 1, "social_tone": "neutral"}, 1,
     ),
 }
 

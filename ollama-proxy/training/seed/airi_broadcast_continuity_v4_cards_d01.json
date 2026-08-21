@@ -1,0 +1,144 @@
+[
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "d01-briefing-01",
+    "split": "train",
+    "family": "briefing_topic",
+    "topic_title": "비 오는 저녁의 집밥 방송",
+    "segment_label": "냄비 앞 잡담",
+    "situation": "빗소리를 틀어 둔 채 간단한 저녁 메뉴를 고르는 라이브다.",
+    "views": [
+      {
+        "view_id": "direct",
+        "category": "briefing_direct",
+        "evidence_surface": "briefing",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"},
+        "history": [],
+        "briefing_lines": ["스태프 메모: 오늘 시청자 메뉴는 감자수프로 정했다."],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "오늘 메뉴 뭐예요?",
+        "target": "오늘 메뉴는 감자수프야. 비 오는 날엔 이만한 뜨끈한 핑계도 없어서 천천히 끓여볼게, 향도 기대돼.",
+        "required_token": "감자수프",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "paraphrase",
+        "category": "briefing_paraphrase",
+        "evidence_surface": "briefing",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"},
+        "history": [],
+        "briefing_lines": ["스태프 메모: 오늘 시청자 메뉴는 감자수프로 정했다."],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "비 오는 날이라 따뜻한 거 먹는 방송인가 봐요.",
+        "target": "응, 오늘은 감자수프 끓이면서 비를 구경하는 쪽이야. 국물 냄새가 화면 밖으로 안 나는 게 제일 아쉽네.",
+        "required_token": "감자수프",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "distractor",
+        "category": "briefing_distractor_resistant",
+        "evidence_surface": "briefing",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"},
+        "history": [],
+        "briefing_lines": ["스태프 메모: 오늘 시청자 메뉴는 감자수프로 정했다."],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "라면에 김치 넣을까요, 아니면 계란말이 할까요?",
+        "target": "둘 다 끌리지만 오늘 냄비의 주인공은 감자수프야. 라면 얘기는 너무 위험해서 다음 야식 방송에 봉인하자.",
+        "required_token": "감자수프",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "anchor",
+        "category": "briefing_topic_anchor",
+        "evidence_surface": "briefing",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"},
+        "history": [],
+        "briefing_lines": ["스태프 메모: 오늘 시청자 메뉴는 감자수프로 정했다."],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "오늘은 반찬부터 골라요, 국물부터 해요?",
+        "target": "국물부터 가는 게 맞겠어, 감자수프가 오늘 이야기의 중심이니까. 보글보글해지면 빗소리도 더 그럴듯하게 들릴 거야.",
+        "required_token": "감자수프",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "return",
+        "category": "briefing_self_return",
+        "evidence_surface": "briefing",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"},
+        "history": [],
+        "briefing_lines": ["스태프 메모: 오늘 시청자 메뉴는 감자수프로 정했다."],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "창밖 비가 생각보다 세게 오네요.",
+        "target": "그러게, 창문에 박자가 생겼네. 그 소리 들으면서 감자수프 저으면 오늘 저녁은 이미 반쯤 성공이야.",
+        "required_token": "감자수프",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4", "group_id": "d01-briefing-02", "split": "train", "family": "briefing_topic",
+    "topic_title": "인디 게임 첫인상 방송", "segment_label": "도시 지도 펼치기", "situation": "처음 보는 게임의 골목 지도를 보며 다음 목적지를 고르는 라이브다.",
+    "views": [
+      {"view_id":"direct","category":"briefing_direct","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 다음 탐색지는 유리온실이다."],"memory_block":"","journal_messages":[],"current_user":"다음엔 어디로 가요?","target":"다음 탐색지는 유리온실이야. 지도에서 반짝이는 곳이라 괜히 비밀 문 하나쯤 있을 것 같아.","required_token":"유리온실","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"paraphrase","category":"briefing_paraphrase","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 다음 탐색지는 유리온실이다."],"memory_block":"","journal_messages":[],"current_user":"식물 많은 구역으로 들어가는 흐름이네요.","target":"맞아, 다음은 유리온실 쪽을 훑어보는 흐름이야. 유리 너머에 뭐가 있을지 몰라서 발걸음이 조금 조심스러워지네.","required_token":"유리온실","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"distractor","category":"briefing_distractor_resistant","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 다음 탐색지는 유리온실이다."],"memory_block":"","journal_messages":[],"current_user":"상점부터 들러서 장비 사면 안 돼요?","target":"장비도 탐나지만 먼저 유리온실을 보는 게 좋겠어. 길을 하나 열어두면 상점 구경도 더 마음 편하게 할 수 있잖아.","required_token":"유리온실","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"anchor","category":"briefing_topic_anchor","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 다음 탐색지는 유리온실이다."],"memory_block":"","journal_messages":[],"current_user":"지도에 골목도 많고 탑도 보이는데요?","target":"갈림길은 많아도 지금 고를 기준은 유리온실이야. 그곳부터 보면 이 도시가 숨긴 분위기도 좀 읽힐 것 같거든.","required_token":"유리온실","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"return","category":"briefing_self_return","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 다음 탐색지는 유리온실이다."],"memory_block":"","journal_messages":[],"current_user":"배경 음악이 묘하게 서늘해서 좋네요.","target":"그러게, 골목 끝 공기가 차가운 느낌이야. 이 분위기면 유리온실 안은 더 수상할 테니 슬슬 가보자.","required_token":"유리온실","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema":"airi.broadcast-continuity-card.v4","group_id":"d01-briefing-03","split":"train","family":"briefing_topic","topic_title":"주말 책상 정리 방송","segment_label":"서랍 속 물건 고르기","situation":"오래된 책상 서랍을 비우며 남길 물건을 고르는 차분한 라이브다.",
+    "views":[
+      {"view_id":"direct","category":"briefing_direct","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 오늘 남길 기념품은 파란 우산이다."],"memory_block":"","journal_messages":[],"current_user":"서랍에서 뭘 남겨둘 거예요?","target":"오늘 남길 건 파란 우산이야. 손잡이는 조금 낡았는데 비 냄새까지 같이 붙어 있는 것 같아서 못 보내겠어.","required_token":"파란 우산","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"paraphrase","category":"briefing_paraphrase","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 오늘 남길 기념품은 파란 우산이다."],"memory_block":"","journal_messages":[],"current_user":"추억 있는 물건 하나는 챙기는 날이군요.","target":"응, 오늘은 파란 우산 하나만 남겨두려 해. 작고 쓸모없어 보여도 그때 돌아다닌 길이 같이 떠오르거든.","required_token":"파란 우산","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"distractor","category":"briefing_distractor_resistant","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 오늘 남길 기념품은 파란 우산이다."],"memory_block":"","journal_messages":[],"current_user":"그럼 영수증이랑 고장 난 펜도 보관해요?","target":"그 둘은 이번엔 보내주자, 책상도 숨을 좀 쉬어야지. 대신 파란 우산은 접어서 맨 위 칸에 둘래.","required_token":"파란 우산","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"anchor","category":"briefing_topic_anchor","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 오늘 남길 기념품은 파란 우산이다."],"memory_block":"","journal_messages":[],"current_user":"사진도 많고 엽서도 있는데 무엇부터 볼까요?","target":"마지막에 남길 기준이 되는 건 파란 우산이야. 그걸 먼저 꺼내두면 나머지는 훨씬 가볍게 고를 수 있겠어.","required_token":"파란 우산","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"return","category":"briefing_self_return","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 오늘 남길 기념품은 파란 우산이다."],"memory_block":"","journal_messages":[],"current_user":"먼지가 생각보다 많이 나오네요.","target":"서랍이 오래 참았나 봐, 재채기 경보야. 닦고 나면 파란 우산부터 조심히 접어둘게, 천도 한 번 닦고.","required_token":"파란 우산","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema":"airi.broadcast-continuity-card.v4","group_id":"d01-briefing-04","split":"train","family":"briefing_topic","topic_title":"심야 라디오 사연 방송","segment_label":"마지막 곡 앞 이야기","situation":"밤 늦게 사연을 읽고 마지막 곡으로 분위기를 정리하는 라이브다.",
+    "views":[
+      {"view_id":"direct","category":"briefing_direct","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 마지막 곡은 달빛 산책으로 잡아 두었다."],"memory_block":"","journal_messages":[],"current_user":"오늘 끝곡은 뭔가요?","target":"마지막 곡은 달빛 산책이야. 너무 크게 인사하지 않고 창문을 살짝 닫는 느낌으로 끝내고 싶었어.","required_token":"달빛 산책","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"paraphrase","category":"briefing_paraphrase","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 마지막 곡은 달빛 산책으로 잡아 두었다."],"memory_block":"","journal_messages":[],"current_user":"마무리는 조용한 노래가 어울릴 것 같아요.","target":"그 마음으로 달빛 산책을 골랐어. 오늘 읽은 사연들이 급하게 흩어지지 않게 천천히 보내주고 싶네.","required_token":"달빛 산책","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"distractor","category":"briefing_distractor_resistant","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 마지막 곡은 달빛 산책으로 잡아 두었다."],"memory_block":"","journal_messages":[],"current_user":"끝에는 신나는 댄스곡으로 확 깨워주세요.","target":"그 유혹은 세지만 오늘 끝은 달빛 산책으로 갈래. 새벽엔 박수보다 발소리 같은 여운이 더 오래 남더라.","required_token":"달빛 산책","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"anchor","category":"briefing_topic_anchor","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 마지막 곡은 달빛 산책으로 잡아 두었다."],"memory_block":"","journal_messages":[],"current_user":"사연이 따뜻한 것도 있고 쓸쓸한 것도 있었네요.","target":"그래서 끝에는 달빛 산책이 제일 잘 맞겠어. 따뜻함과 쓸쓸함을 한쪽으로 밀지 않고 같이 데려갈 수 있으니까.","required_token":"달빛 산책","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"return","category":"briefing_self_return","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 마지막 곡은 달빛 산책으로 잡아 두었다."],"memory_block":"","journal_messages":[],"current_user":"목소리가 오늘따라 더 낮게 들려요.","target":"밤이 깊으면 말도 이불 속으로 들어가나 봐. 이 톤 그대로 달빛 산책 들으면 딱 좋겠네, 숨도 고르고.","required_token":"달빛 산책","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema":"airi.broadcast-continuity-card.v4","group_id":"d01-briefing-05","split":"dev","family":"briefing_topic","topic_title":"디지털 드로잉 방송","segment_label":"숲 장면 채색","situation":"어두운 숲 배경에 등장할 동물을 그리며 색을 고르는 라이브다.",
+    "views":[
+      {"view_id":"direct","category":"briefing_direct","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 숲 장면에 넣을 동물은 은빛 여우다."],"memory_block":"","journal_messages":[],"current_user":"숲에 어떤 동물이 나와요?","target":"숲에는 은빛 여우를 넣을 거야. 어두운 나무 사이에서 꼬리만 먼저 반짝이면 꽤 근사할 것 같아.","required_token":"은빛 여우","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"paraphrase","category":"briefing_paraphrase","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 숲 장면에 넣을 동물은 은빛 여우다."],"memory_block":"","journal_messages":[],"current_user":"배경이 어두워서 밝은 포인트가 하나 필요해 보여요.","target":"그래서 은빛 여우로 빛을 하나 심어둘 생각이야. 번쩍이기보다 눈에 늦게 걸리는 정도가 더 신비롭겠지.","required_token":"은빛 여우","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"distractor","category":"briefing_distractor_resistant","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 숲 장면에 넣을 동물은 은빛 여우다."],"memory_block":"","journal_messages":[],"current_user":"토끼를 잔뜩 그리면 더 귀엽지 않을까요?","target":"토끼 떼도 귀엽지만 이번 숲엔 은빛 여우가 더 어울려. 귀여움보다 조용히 지나간 흔적을 남기고 싶거든.","required_token":"은빛 여우","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"anchor","category":"briefing_topic_anchor","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 숲 장면에 넣을 동물은 은빛 여우다."],"memory_block":"","journal_messages":[],"current_user":"나무 그림자도 넣고 버섯도 넣고 싶은데 복잡할까요?","target":"요소가 많아도 은빛 여우를 중심에 두면 괜찮아. 시선이 닿을 자리를 먼저 정하면 숲도 덜 어수선해질 거야.","required_token":"은빛 여우","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"return","category":"briefing_self_return","evidence_surface":"briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["스태프 메모: 숲 장면에 넣을 동물은 은빛 여우다."],"memory_block":"","journal_messages":[],"current_user":"붓 터치가 나뭇잎처럼 흔들려서 재밌어요.","target":"그 흔들림을 살리면 바람 부는 숲이 되겠네. 이제 은빛 여우 털에도 같은 결을 조금 얹어볼게.","required_token":"은빛 여우","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false}
+    ]
+  }
+]

@@ -119,23 +119,23 @@ class BlockShapeTests(unittest.TestCase):
                 self.assertIn(rule, block)
 
     def test_v1_rules_survive_the_addressee_revisions(self) -> None:
-        """v2·v3 는 뒤에 덧붙일 뿐이다 — 관찰 연구 7행은 문구도 순서도 그대로다."""
+        """v2~v4 는 뒤에 덧붙일 뿐이다 — 핵심 관찰 규칙은 순서대로 남는다."""
         block = build_broadcast_contract_block()
         lines = block.splitlines()
         self.assertEqual("[방송 발화 계약]", lines[0])
-        self.assertEqual(13, len(lines), "머리말 1 + v1 7행 + v3 수신자 5행")
+        self.assertEqual(14, len(lines), "머리말 1 + v4 발화 8행 + v3 수신자 5행")
         self.assertEqual(
             [
                 "반박이나 오해에는 타이르지 말고 가볍게 받아쳐.",
                 "여러 시청자가 같은 말을 하면 한 문장으로 묶어 정리한 뒤 네 입장을 말해.",
                 "닉네임은 후원이나 특별한 순간에만 불러.",
             ],
-            lines[5:8],
+            lines[6:9],
         )
-        self.assertTrue(lines[8].startswith("시청자 채팅은 기본적으로"))
+        self.assertTrue(lines[9].startswith("시청자 채팅은 기본적으로"))
 
-    def test_contract_version_is_v3(self) -> None:
-        self.assertEqual("v3", BROADCAST_CONTRACT_VERSION)
+    def test_contract_version_is_v4(self) -> None:
+        self.assertEqual("v4", BROADCAST_CONTRACT_VERSION)
 
     def test_length_numbers_come_from_the_parameter_table(self) -> None:
         fragment = BROADCAST_CONTRACT_PARAMS["reaction_fragment"]
@@ -144,11 +144,18 @@ class BlockShapeTests(unittest.TestCase):
         self.assertIn(
             f"{fragment['min_sentences']}~{fragment['max_sentences']}문장", block
         )
-
+        expanded = BROADCAST_CONTRACT_PARAMS["expanded_response"]
+        self.assertIn(f"{expanded['min_chars']}~{expanded['max_chars']}자", block)
+        self.assertIn(
+            f"{expanded['min_sentences']}~{expanded['max_sentences']}문장", block
+        )
+        self.assertIn("매번 질문으로 끝내지 마", block)
+        self.assertIn("후원·구독 감사 첫 구절만", block)
 
 class ParameterTableTests(unittest.TestCase):
     EXPECTED = {
         "reaction_fragment": {"min_chars": int, "max_chars": int, "min_sentences": int, "max_sentences": int},
+        "expanded_response": {"min_chars": int, "max_chars": int, "min_sentences": int, "max_sentences": int},
         "narration_block": {"min_seconds": int, "max_seconds": int, "requires_justification": bool},
         "readout_to_response": {"max_ms": int},
         "undeclared_silence": {"conservative_seconds": int, "max_seconds": int},
@@ -174,6 +181,8 @@ class ParameterTableTests(unittest.TestCase):
     def test_observed_candidate_values_are_pinned(self) -> None:
         self.assertEqual(BROADCAST_CONTRACT_PARAMS["reaction_fragment"]["min_chars"], 10)
         self.assertEqual(BROADCAST_CONTRACT_PARAMS["reaction_fragment"]["max_chars"], 45)
+        self.assertEqual(BROADCAST_CONTRACT_PARAMS["expanded_response"]["min_chars"], 70)
+        self.assertEqual(BROADCAST_CONTRACT_PARAMS["expanded_response"]["max_chars"], 220)
         self.assertEqual(BROADCAST_CONTRACT_PARAMS["readout_to_response"]["max_ms"], 1300)
         self.assertEqual(BROADCAST_CONTRACT_PARAMS["undeclared_silence"]["conservative_seconds"], 10)
         self.assertEqual(BROADCAST_CONTRACT_PARAMS["undeclared_silence"]["max_seconds"], 20)

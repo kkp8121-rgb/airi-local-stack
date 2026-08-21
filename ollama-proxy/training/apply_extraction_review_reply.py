@@ -46,13 +46,16 @@ class ReviewReplyError(ValueError):
 
 
 def queue_digest(pending_path: Path) -> str:
-    """Pending 큐 파일 내용의 sha256 단축(12자).
+    """Pending 큐의 LF 정규화 내용 sha256 단축(12자).
 
     회신이 어느 큐 스냅샷을 검수했는지 결속하는 값이다 — 큐가 재생성되면
     (레코드 수·id 가 우연히 같더라도) 이 값이 달라져 구 회신이 새 큐에
     적용되는 사고를 apply_reply 가 잡아낼 수 있다 (Task 2 리뷰 Minor 9).
+    체크아웃의 CRLF/LF 차이는 큐 내용 변경이 아니므로 digest 에서 제외한다.
     """
-    return hashlib.sha256(pending_path.read_bytes()).hexdigest()[:12]
+    text = pending_path.read_text(encoding="utf-8")
+    canonical = text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()[:12]
 
 
 def parse_reply(reply: str) -> dict[str, object]:

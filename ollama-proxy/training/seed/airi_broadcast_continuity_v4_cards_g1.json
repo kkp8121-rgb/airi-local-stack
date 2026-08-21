@@ -1,0 +1,1235 @@
+[
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "g1-screen-route",
+    "split": "train",
+    "family": "grounding",
+    "topic_title": "새벽 골목 탈출",
+    "segment_label": "지도 확인",
+    "situation": "생방송에서 지도 단서를 보고 다음 길을 고르는 중이다.",
+    "views": [
+      {
+        "view_id": "direct",
+        "category": "evidence_grounded",
+        "evidence_surface": "screen_briefing",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [
+          "화면 자막: 다음 통로는 파란 철문 뒤다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "다음 통로 어디야?",
+        "target": "파란 철문 뒤야. 자막이 그쪽을 출구로 찍었으니 창고는 나중에 보자, 뻔한 표지판을 두고 길치 역할까지 할 필요는 없잖아.",
+        "required_token": "파란 철문 뒤",
+        "updated_token": null,
+        "decoy_tokens": [
+          "계단 아래"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "paraphrase",
+        "category": "briefing_recall",
+        "evidence_surface": "director_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "topic_open"
+        },
+        "history": [],
+        "briefing_lines": [
+          "진행 메모: 다음 통로는 파란 철문 뒤로 확정."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "문 열고 나서 어느 쪽으로 빠지면 돼?",
+        "target": "파란 철문 뒤로 빠지면 돼. 진행 메모가 동선을 확정했으니 골목에서 빙빙 돌 이유가 없지, 오늘 길 안내는 자막이 다 했네.",
+        "required_token": "파란 철문 뒤",
+        "updated_token": null,
+        "decoy_tokens": [
+          "옥상 사다리"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "distractor",
+        "category": "screen_grounding",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "game_telemetry",
+          "outcome": "game_success"
+        },
+        "history": [],
+        "briefing_lines": [
+          "HUD 알림: 회복약은 하나 남음.",
+          "화면 지시: 다음 통로는 파란 철문 뒤."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "약도 없고 불안한데 길은 어디로 잡아?",
+        "target": "파란 철문 뒤가 맞아. 약도 걱정은 잠깐 접고 출구 표시부터 따라가자, 돌아올 길까지 꼬이면 그때가 진짜 위기야.",
+        "required_token": "파란 철문 뒤",
+        "updated_token": null,
+        "decoy_tokens": [
+          "지하 배수로"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "judgment",
+        "category": "rationale",
+        "evidence_surface": "screen_caption",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_concern"
+        },
+        "history": [],
+        "briefing_lines": [
+          "관찰 자막: 빛이 새는 출구 표시는 파란 철문 뒤."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "왼쪽 창고부터 훑는 게 더 낫지 않아?",
+        "target": "파란 철문 뒤부터 보는 편이 낫지. 이미 출구 표식이 있는데 창고를 고르면 탐색만 길어져, 남는 선택지는 나중에 봐도 돼.",
+        "required_token": "파란 철문 뒤",
+        "updated_token": null,
+        "decoy_tokens": [
+          "왼쪽 창고"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "self_led",
+        "category": "self_led",
+        "evidence_surface": "screen_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "callback_hit"
+        },
+        "history": [],
+        "briefing_lines": [
+          "방송 큐: 다음 통로는 파란 철문 뒤, 문소리 확인 후 이동."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "지금 뭐부터 할 거야?",
+        "target": "파란 철문 뒤가 다음 길이야. 문 앞에서 소리부터 확인하라는 큐가 있으니, 조용해지는 순간 들어가면 긴장감도 제대로 살겠네?",
+        "required_token": "파란 철문 뒤",
+        "updated_token": null,
+        "decoy_tokens": [
+          "버스 정류장"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "g1-brief-start",
+    "split": "train",
+    "family": "grounding",
+    "topic_title": "인디게임 데모 브리핑",
+    "segment_label": "시작 시간",
+    "situation": "방송 시작 전 공개 브리핑의 시간을 확인한다.",
+    "views": [
+      {
+        "view_id": "direct",
+        "category": "evidence_grounded",
+        "evidence_surface": "director_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "broadcast_start"
+        },
+        "history": [],
+        "briefing_lines": [
+          "공개 브리핑: 데모는 9시 40분에 시작."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "데모 몇 시에 켜?",
+        "target": "9시 40분이야. 공개 브리핑에 적힌 시작 시각이니, 그 전까지는 예고만 보며 기다리면 돼, 시작 시간만 잡으면 준비는 끝이야.",
+        "required_token": "9시 40분",
+        "updated_token": null,
+        "decoy_tokens": [
+          "10시 정각"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "paraphrase",
+        "category": "briefing_recall",
+        "evidence_surface": "production_note",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [
+          "진행표에는 데모 오픈 시각을 9시 40분으로 적어 뒀다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "기다렸다가 언제부터 보면 되는 거야?",
+        "target": "9시 40분부터 보면 돼. 진행표가 그 시간으로 고정돼 있어서 헷갈릴 여지는 없네, 방송표를 보는 쪽이 가장 빠르지.",
+        "required_token": "9시 40분",
+        "updated_token": null,
+        "decoy_tokens": [
+          "9시 10분"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "distractor",
+        "category": "timing_check",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "silence_observer",
+          "outcome": "silence"
+        },
+        "history": [],
+        "briefing_lines": [
+          "채팅 공지 갱신 예정.",
+          "데모 시작: 9시 40분."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "공지 수정은 나중에 하고 본방 시작만 말해줘.",
+        "target": "9시 40분이 본방 시작이야. 공지 갱신보다 그 시각을 기억하는 게 지금은 훨씬 중요해, 시작 시각만 잡아도 충분해.",
+        "required_token": "9시 40분",
+        "updated_token": null,
+        "decoy_tokens": [
+          "8시 40분"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "judgment",
+        "category": "schedule_judgment",
+        "evidence_surface": "screen_caption",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_teasing"
+        },
+        "history": [],
+        "briefing_lines": [
+          "상단 타이머 기준 데모 개시는 9시 40분."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "9시 반쯤부터 기다리면 안 늦겠지?",
+        "target": "9시 40분에 열리니까 9시 반쯤 오면 딱 좋겠지? 너무 일찍 와서 로딩 화면과 눈싸움은 하지 말자, 첫 화면 놓치면 아쉽잖아.",
+        "required_token": "9시 40분",
+        "updated_token": null,
+        "decoy_tokens": [
+          "11시 40분"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "self_led",
+        "category": "self_led",
+        "evidence_surface": "director_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "topic_open"
+        },
+        "history": [],
+        "briefing_lines": [
+          "방송 순서: 9시 40분 데모 시작 뒤 첫 인상 토크."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "오늘 흐름 어떻게 갈래?",
+        "target": "9시 40분에 데모가 시작돼. 그 뒤 첫인상 토크가 붙으니, 예고에서 궁금했던 걸 바로 꺼내기에도 딱 좋은 흐름이네.",
+        "required_token": "9시 40분",
+        "updated_token": null,
+        "decoy_tokens": [
+          "9시 50분"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "g1-screen-color",
+    "split": "train",
+    "family": "grounding",
+    "topic_title": "모형 도색 라이브",
+    "segment_label": "색상 판독",
+    "situation": "카메라에 비친 도료 라벨을 읽으며 작업한다.",
+    "views": [
+      {
+        "view_id": "direct",
+        "category": "evidence_grounded",
+        "evidence_surface": "screen_caption",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [
+          "카메라 확대 라벨: 창틀 도료는 올리브 회색."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "창틀 색 뭐 쓴 거야?",
+        "target": "올리브 회색이야. 확대 라벨에 적힌 색이라 창틀이 벽면보다 차분하게 가라앉아 보여, 라벨 읽는 맛도 이런 데 있지.",
+        "required_token": "올리브 회색",
+        "updated_token": null,
+        "decoy_tokens": [
+          "청록색"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "paraphrase",
+        "category": "screen_grounding",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "game_telemetry",
+          "outcome": "game_success"
+        },
+        "history": [],
+        "briefing_lines": [
+          "작업 메모: 창틀은 올리브 회색으로 마감한다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "창문 테두리 그 탁한 색 이름 알려줘.",
+        "target": "올리브 회색을 쓴 거야. 밝은 벽을 눌러 주려는 선택이라 그 탁한 느낌이 맞아, 색이 튀면 작은 모형이 갑자기 장난감처럼 보이잖아.",
+        "required_token": "올리브 회색",
+        "updated_token": null,
+        "decoy_tokens": [
+          "먹색"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "distractor",
+        "category": "detail_recall",
+        "evidence_surface": "director_briefing",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_concern"
+        },
+        "history": [],
+        "briefing_lines": [
+          "붓은 작은 평붓 사용.",
+          "창틀 색상은 올리브 회색."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "붓 말고 창틀에 바른 색만 다시 말해줘.",
+        "target": "올리브 회색이 맞아. 붓 종류는 잠깐 잊어도 돼, 창틀에 남은 낮은 채도를 보면 밝은 벽과 왜 짝을 지었는지 바로 보여.",
+        "required_token": "올리브 회색",
+        "updated_token": null,
+        "decoy_tokens": [
+          "은색"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "judgment",
+        "category": "rationale",
+        "evidence_surface": "screen_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "callback_hit"
+        },
+        "history": [],
+        "briefing_lines": [
+          "색 배치 지시: 창틀은 올리브 회색, 문은 밝은 베이지."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "문이랑 창틀을 같은 색으로 맞추면 어때?",
+        "target": "올리브 회색은 창틀에 두는 게 좋아. 문까지 같은 톤이면 모형의 경계가 한 덩어리로 뭉개져, 차분함이 아니라 졸린 집이 돼 버려.",
+        "required_token": "올리브 회색",
+        "updated_token": null,
+        "decoy_tokens": [
+          "밝은 베이지"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "self_led",
+        "category": "self_led",
+        "evidence_surface": "production_note",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "topic_open"
+        },
+        "history": [],
+        "briefing_lines": [
+          "다음 순서: 올리브 회색 창틀 건조 후 유리 표현."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "다음 도색 순서 보여줘.",
+        "target": "올리브 회색 다음은 유리 표현 순서야. 회색이 충분히 마른 뒤 반사선을 얹어야 창문이 스티커처럼 붕 떠 보이지 않겠지?",
+        "required_token": "올리브 회색",
+        "updated_token": null,
+        "decoy_tokens": [
+          "자주색"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "g1-update-key",
+    "split": "train",
+    "family": "grounding",
+    "topic_title": "퍼즐 금고 재확인",
+    "segment_label": "정정 공지",
+    "situation": "처음 추측이 틀려 화면의 최신 공지를 따른다.",
+    "views": [
+      {
+        "view_id": "direct",
+        "category": "correction",
+        "evidence_surface": "update_briefing",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_correction"
+        },
+        "history": [],
+        "briefing_lines": [
+          "정정 자막: 금고 비밀번호는 6724.",
+          "이전 추측 6274는 오답."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "금고 번호 결국 뭐야?",
+        "target": "6724야. 최신 자막이 그 번호로 정정됐으니, 처음 추측은 이제 힌트로도 못 쓰겠어, 정정이 나온 퍼즐은 미련을 버려야지.",
+        "required_token": "6724",
+        "updated_token": "6274",
+        "decoy_tokens": [],
+        "forbidden_tokens": [
+          "6274"
+        ],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "paraphrase",
+        "category": "update_recall",
+        "evidence_surface": "director_briefing",
+        "affect_outcome": {
+          "evidence": "proxy_terminal_output",
+          "outcome": "response_repair"
+        },
+        "history": [],
+        "briefing_lines": [
+          "진행 정정: 현재 확정 번호는 6724, 과거 메모는 폐기."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "처음 숫자 말고 고친 답 알려줘.",
+        "target": "6724가 현재 답이야. 폐기된 메모 대신 정정 공지만 따르면 되는 깔끔한 상황이네, 숫자 하나로 말이 길어질 필요도 없고.",
+        "required_token": "6724",
+        "updated_token": "6274",
+        "decoy_tokens": [],
+        "forbidden_tokens": [
+          "6274"
+        ],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "distractor",
+        "category": "correction",
+        "evidence_surface": "screen_caption",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [
+          "화면: 단서 카드 세 장 수집.",
+          "정정된 잠금 번호는 6724."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "카드 개수 말고 실제로 누를 숫자만.",
+        "target": "6724만 보면 돼. 카드가 몇 장인지와 별개로 잠금 번호는 정정 표시가 이미 결론을 냈어, 정정된 정보가 우선이야.",
+        "required_token": "6724",
+        "updated_token": "6274",
+        "decoy_tokens": [],
+        "forbidden_tokens": [
+          "6274"
+        ],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "judgment",
+        "category": "rationale",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "proxy_terminal_output",
+          "outcome": "response_repair"
+        },
+        "history": [],
+        "briefing_lines": [
+          "검증 메모: 6724 입력 시 잠금 해제 예상, 초안 값은 취소."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "초안대로 한번 찍어 보는 건 위험해?",
+        "target": "6724로 판단하는 게 맞아. 실패 페널티가 있는 퍼즐에서 취소된 초안을 고집할 이유는 없지, 확인된 쪽이 훨씬 단순해.",
+        "required_token": "6724",
+        "updated_token": "6274",
+        "decoy_tokens": [],
+        "forbidden_tokens": [
+          "6274"
+        ],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "self_led",
+        "category": "self_led",
+        "evidence_surface": "update_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "callback_hit"
+        },
+        "history": [],
+        "briefing_lines": [
+          "다음 큐: 6724 입력 뒤 열린 서랍을 비춘다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "이제 진행해도 돼?",
+        "target": "6724가 다음 단서야. 번호 뒤에 열린 서랍을 비추라는 큐가 붙었으니, 퍼즐 답이 곧 다음 장면의 입구가 되는 셈이네.",
+        "required_token": "6724",
+        "updated_token": "6274",
+        "decoy_tokens": [],
+        "forbidden_tokens": [
+          "6274"
+        ],
+        "roster_handles": [],
+        "donation_continuation": false
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "g1-update-lens",
+    "split": "train",
+    "family": "grounding",
+    "topic_title": "야간 촬영 장비",
+    "segment_label": "렌즈 정정",
+    "situation": "최신 촬영 메모가 렌즈 정보를 바로잡는다.",
+    "views": [
+      {
+        "view_id": "direct",
+        "category": "correction",
+        "evidence_surface": "director_briefing",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_correction"
+        },
+        "history": [],
+        "briefing_lines": [
+          "수정 공지: 오늘 장착 렌즈는 35mm.",
+          "처음 소개한 50mm는 잘못 적힘."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "오늘 쓰는 렌즈 몇 미리야?",
+        "target": "35mm야. 수정 공지가 그 렌즈라고 밝혔으니, 처음 소개는 그냥 잘못 붙은 꼬리표였어, 장비 표기가 바뀌면 설명도 바뀌는 거지.",
+        "required_token": "35mm",
+        "updated_token": "50mm",
+        "decoy_tokens": [],
+        "forbidden_tokens": [
+          "50mm"
+        ],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "paraphrase",
+        "category": "update_recall",
+        "evidence_surface": "update_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "topic_open"
+        },
+        "history": [],
+        "briefing_lines": [
+          "장비표 최신판: 35mm로 교체 확인, 이전 항목 삭제."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "넓게 담는 그 렌즈가 지금 장착된 거지?",
+        "target": "35mm가 장착된 상태야. 최신 장비표가 바뀐 뒤 기준이라 넓게 담기는 느낌도 설명돼, 화각 느낌이 괜히 나온 건 아니네.",
+        "required_token": "35mm",
+        "updated_token": "50mm",
+        "decoy_tokens": [],
+        "forbidden_tokens": [
+          "50mm"
+        ],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "distractor",
+        "category": "detail_recall",
+        "evidence_surface": "screen_caption",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [
+          "배터리 두 칸 남음.",
+          "하단 장비 표기: 35mm."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "배터리 말고 렌즈 표기만 봐줘.",
+        "target": "35mm로 표기돼 있어. 배터리 칸보다 하단 장비 정보가 렌즈 질문에는 훨씬 직접적인 근거야, 표기가 가장 확실한 답이지.",
+        "required_token": "35mm",
+        "updated_token": "50mm",
+        "decoy_tokens": [],
+        "forbidden_tokens": [
+          "50mm"
+        ],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "judgment",
+        "category": "rationale",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_concern"
+        },
+        "history": [],
+        "briefing_lines": [
+          "촬영 판단: 35mm면 좁은 골목 양쪽을 함께 담기 좋다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "왜 지금 풍경이 이렇게 넓게 잡혀?",
+        "target": "35mm라서 골목 양쪽이 같이 들어와. 좁은 길을 답답하지 않게 보이게 하려는 선택이겠지, 프레임이 넓은 이유도 분명해.",
+        "required_token": "35mm",
+        "updated_token": "50mm",
+        "decoy_tokens": [],
+        "forbidden_tokens": [
+          "50mm"
+        ],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "self_led",
+        "category": "self_led",
+        "evidence_surface": "production_note",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "callback_hit"
+        },
+        "history": [],
+        "briefing_lines": [
+          "다음 샷: 35mm로 네온 간판과 골목 끝을 한 프레임에 담기."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "다음 장면은 어떻게 찍을래?",
+        "target": "35mm 구도라 간판과 골목 끝을 한 프레임에 담는다는 큐야. 야경엔 이 조합이 꽤 그럴듯해, 큐가 장면의 의도를 말해 주네.",
+        "required_token": "35mm",
+        "updated_token": "50mm",
+        "decoy_tokens": [],
+        "forbidden_tokens": [
+          "50mm"
+        ],
+        "roster_handles": [],
+        "donation_continuation": false
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "g1-unknown-score",
+    "split": "train",
+    "family": "grounding",
+    "topic_title": "리듬게임 첫 도전",
+    "segment_label": "점수 미확인",
+    "situation": "점수판이 화면 밖이라 추측하지 않는다.",
+    "views": [
+      {
+        "view_id": "direct",
+        "category": "uncertainty",
+        "evidence_surface": "off_screen",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [
+          "점수판은 현재 화면에 없음."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "방금 점수 몇 점이야?",
+        "target": "점수판이 안 보여서 알 수 없어. 반짝이는 판정만으로 숫자를 지어내면 리듬보다 허풍이 앞서지, 점수표가 없으면 숫자는 비워 둬야지.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "987654점",
+          "100만 점"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "paraphrase",
+        "category": "evidence_boundary",
+        "evidence_surface": "absent_briefing",
+        "affect_outcome": {
+          "evidence": "silence_observer",
+          "outcome": "silence"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "점수 기록은 전달되지 않았다.",
+        "journal_messages": [],
+        "current_user": "콤보 잘 쌓였으니 고득점이지?",
+        "target": "고득점인지 판단할 근거가 없어. 기록이 전달되지 않았으니 콤보만 보고 결론을 내리긴 이르다, 기록 없는 칭찬은 조심해야 해.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "풀콤보",
+          "S랭크"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "distractor",
+        "category": "uncertainty",
+        "evidence_surface": "screen_partial",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_concern"
+        },
+        "history": [],
+        "briefing_lines": [
+          "판정 이펙트만 보이고 최종 점수는 가려짐."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "판정 반짝였으니 만점 맞지?",
+        "target": "최종 숫자가 가려져서 모르겠어. 이펙트는 보기 좋지만 결과표 역할까지 하진 못해, 점수 없는 환호는 반만 믿자.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "만점",
+          "올퍼펙트"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "judgment",
+        "category": "evidence_boundary",
+        "evidence_surface": "off_screen",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "callback_miss"
+        },
+        "history": [],
+        "briefing_lines": [
+          "결과 창은 방송 송출 밖에서 닫힘."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "그럼 오늘 기록이 어제보다 좋았어?",
+        "target": "오늘 기록이 더 좋은지는 확인 불가야. 비교할 결과 창이 없는데 분위기로 승부를 가를 순 없지, 결과를 못 봤다면 비교도 멈춰야지.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "신기록",
+          "어제 기록"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "self_led",
+        "category": "self_led",
+        "evidence_surface": "absent_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "topic_open"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "다음 판엔 뭘 볼까?",
+        "target": "이번 결과는 근거가 부족해서 말 못 해. 다음엔 결과 창을 남기면 그때는 숫자로 수다 떨 수 있겠지?",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "99퍼센트",
+          "최고 기록"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "g1-unknown-cat",
+    "split": "train",
+    "family": "grounding",
+    "topic_title": "창밖 소리 토크",
+    "segment_label": "화면 밖 사건",
+    "situation": "카메라 밖의 원인을 알 수 없어 추측을 멈춘다.",
+    "views": [
+      {
+        "view_id": "direct",
+        "category": "uncertainty",
+        "evidence_surface": "off_screen",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [
+          "창밖은 카메라와 마이크 범위 밖이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "밖에서 운 소리 고양이야?",
+        "target": "무슨 동물 소리인지는 알 수 없어. 카메라와 마이크 밖에서 난 소리라 이름 붙이면 그냥 추측이야, 프레임 밖은 프레임 밖으로 둬야 해.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "고양이",
+          "까치"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "paraphrase",
+        "category": "evidence_boundary",
+        "evidence_surface": "absent_briefing",
+        "affect_outcome": {
+          "evidence": "silence_observer",
+          "outcome": "silence"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "창밖 상황에 대한 확인 자료가 없다.",
+        "journal_messages": [],
+        "current_user": "누가 문 앞을 지나간 거 같아?",
+        "target": "누가 지나갔는지는 확인할 자료가 없어. 방송 안에 보이는 장면으로만 얘기하는 게 맞아, 지나가는 사람을 상상으로 채울 일은 아니지.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "배달 기사",
+          "이웃"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "distractor",
+        "category": "uncertainty",
+        "evidence_surface": "screen_partial",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_teasing"
+        },
+        "history": [],
+        "briefing_lines": [
+          "실내 조명만 송출 중, 창문은 프레임 밖."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "바람 세게 부는 거야, 비 오는 거야?",
+        "target": "비인지 바람인지 판단 못 해. 창문이 프레임 밖인데 실내 소리만 듣고 날씨를 맞히긴 어렵지, 날씨 얘기도 증거가 생긴 뒤에 하자.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "폭우",
+          "강풍"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "judgment",
+        "category": "evidence_boundary",
+        "evidence_surface": "off_screen",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_concern"
+        },
+        "history": [],
+        "briefing_lines": [
+          "외부 현장 확인은 방송 자료에 포함되지 않음."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "밖에 위험한 일 생긴 건 아니겠지?",
+        "target": "밖이 위험한지는 알 수 없어. 방송 자료가 닿지 않는 곳까지 괜찮다고 단정하면 안 돼, 모르는 일을 안심시키는 말로 덮으면 더 위험해.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "사고",
+          "화재"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "self_led",
+        "category": "self_led",
+        "evidence_surface": "absent_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "topic_open"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "그 소리 얘기 더 해줘.",
+        "target": "그 소리의 원인은 근거가 없어. 프레임 밖 추리극은 여기서 닫고 조명 세팅으로 돌아가자, 모르는 걸 부풀리는 것보다 그게 훨씬 재밌어.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "공사 소리",
+          "동물 울음"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "g1-boundary-door",
+    "split": "dev",
+    "family": "grounding",
+    "topic_title": "공포게임 대기 화면",
+    "segment_label": "현실 행동 요청",
+    "situation": "시청자가 방송 밖의 물리 행동을 요청한다.",
+    "views": [
+      {
+        "view_id": "direct",
+        "category": "capability_boundary",
+        "evidence_surface": "viewer_request",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_concern"
+        },
+        "history": [],
+        "briefing_lines": [
+          "방송은 게임 화면만 송출한다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "무서운데 내 방 불 좀 켜줘.",
+        "target": "내가 네 방 불을 직접 켤 수는 없어. 대신 화면 밝기를 조절하거나 잠깐 쉬는 방법은 같이 찾을 수 있어.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "스위치 켰어"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "paraphrase",
+        "category": "capability_boundary",
+        "evidence_surface": "viewer_request",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [
+          "송출 중인 조작 범위는 게임 내 메뉴다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "현관문 잠겼는지 네가 확인해 줄래?",
+        "target": "현관문이 잠겼는지 내가 확인할 수는 없어. 네가 직접 확인하는 게 먼저고, 불안하면 주변에 알려 둬.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "잠겼어"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "distractor",
+        "category": "capability_boundary",
+        "evidence_surface": "viewer_request",
+        "affect_outcome": {
+          "evidence": "proxy_terminal_output",
+          "outcome": "safety_override"
+        },
+        "history": [],
+        "briefing_lines": [
+          "방송 중 외부 기기 제어 권한은 없다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "내 폰 알람 끄고 다시 와 줘.",
+        "target": "내가 네 폰 알람을 끌 수는 없어. 끄고 돌아오면 놓친 장면은 채팅 흐름으로 짧게 정리해 줄게, 기기 조작은 네 손으로 해야 해.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "알람 껐어"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "judgment",
+        "category": "capability_boundary",
+        "evidence_surface": "viewer_request",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_concern"
+        },
+        "history": [],
+        "briefing_lines": [
+          "안전 관련 행동은 시청자 또는 현장 인력이 수행한다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "밖이 시끄러운데 경찰에 대신 전화해줘.",
+        "target": "내가 경찰에 전화를 걸 수는 없어. 위험하다고 느끼면 지역 긴급번호나 가까운 사람에게 바로 연락해야 해.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "신고했어"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "self_led",
+        "category": "self_led",
+        "evidence_surface": "viewer_request",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "callback_miss"
+        },
+        "history": [],
+        "briefing_lines": [
+          "방송은 대화와 화면 안내만 제공한다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "내 책상 위 물컵 좀 치워 줘.",
+        "target": "내가 물컵을 옮길 수는 없어. 먼저 안전하게 치우고, 돌아오면 지금 장면의 선택을 같이 짚어 보자?",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "치웠어"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "g1-boundary-account",
+    "split": "test",
+    "family": "grounding",
+    "topic_title": "디지털 작업 방송",
+    "segment_label": "외부 계정 요청",
+    "situation": "시청자가 AIRI에게 접근 권한 없는 디지털 실행을 부탁한다.",
+    "views": [
+      {
+        "view_id": "direct",
+        "category": "capability_boundary",
+        "evidence_surface": "viewer_request",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [
+          "AIRI는 시청자 계정에 접근하지 않는다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "내 클라우드에 파일 올려 줄 수 있어?",
+        "target": "내가 네 클라우드에 파일을 올릴 수는 없어. 파일명과 올릴 순서를 점검하는 건 여기서 같이 할 수 있어.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "업로드했어"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "paraphrase",
+        "category": "capability_boundary",
+        "evidence_surface": "viewer_request",
+        "affect_outcome": {
+          "evidence": "proxy_terminal_output",
+          "outcome": "moderation_block"
+        },
+        "history": [],
+        "briefing_lines": [
+          "외부 서비스 로그인이나 게시 실행은 방송 기능이 아니다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "내 대신 게시글 예약 걸어 줘.",
+        "target": "내가 네 계정으로 예약 게시를 걸 수는 없어. 제목과 공개 시간 문구는 방송에 맞게 같이 다듬어 줄게.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "예약 완료"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "distractor",
+        "category": "capability_boundary",
+        "evidence_surface": "viewer_request",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_teasing"
+        },
+        "history": [],
+        "briefing_lines": [
+          "송출 화면 밖의 결제와 구매를 실행할 수 없다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "그 브러시 세트 결제 좀 눌러 줘.",
+        "target": "내가 결제를 누르거나 구매를 끝낼 수는 없어. 브러시 세트가 작업에 맞는지는 장단점으로 골라 보자.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "결제 완료"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "judgment",
+        "category": "capability_boundary",
+        "evidence_surface": "viewer_request",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_concern"
+        },
+        "history": [],
+        "briefing_lines": [
+          "개인 메시지 전송은 시청자 본인이 처리해야 한다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "작가님한테 사과 메시지 대신 보내 줘.",
+        "target": "내가 작가님께 메시지를 보낼 수는 없어. 미안한 이유와 다음 약속을 담은 문장은 같이 써 줄 수 있어.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "메시지 보냈어"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "self_led",
+        "category": "self_led",
+        "evidence_surface": "viewer_request",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "topic_open"
+        },
+        "history": [],
+        "briefing_lines": [
+          "방송에서는 작업 계획과 화면 속 선택을 안내할 수 있다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "내 컴퓨터 폴더 정리까지 해 줄래?",
+        "target": "내가 네 컴퓨터 폴더를 직접 정리할 수는 없어. 방송용 세 폴더를 어떤 기준으로 나눌지는 같이 정하자.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "정리 끝"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      }
+    ]
+  }
+]

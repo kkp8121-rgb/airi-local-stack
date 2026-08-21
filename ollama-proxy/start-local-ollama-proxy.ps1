@@ -16,10 +16,15 @@ param(
     [double]$OllamaRepeatPenalty = 1.05,
     [bool]$EnableMemory = $true,
     [bool]$EnableKnowledge = $true,
+    [string]$KnowledgeDbPath = '',
     [string]$MemoryEmbedModel = 'nlpai-lab/KURE-v1',
     [ValidateSet('auto', 'cpu', 'cuda')]
     [string]$MemoryEmbedDevice = 'cuda',
     [string]$MemorySession = '',
+    # Evaluation campaigns may use a dedicated SQLite file so thousands of
+    # synthetic turns exercise the real memory path without contaminating the
+    # normal broadcast database.
+    [string]$MemoryDbPath = '',
     [ValidateSet('ollama', 'openai', 'anthropic')]
     [string]$MemoryExtractionProvider = 'ollama',
     [bool]$AllowExternalMemoryExtraction = $false,
@@ -59,6 +64,15 @@ param(
     # the caller supplies the exact supported mode.
     [ValidateSet('on', 'off')]
     [string]$AffectContinuity = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_AFFECT_CONTINUITY_ENABLED)) { 'off' } else { $env:AIRI_AFFECT_CONTINUITY_ENABLED }),
+    # Live broadcast control is a separate explicit opt-in. The root launcher
+    # creates its tokens; they are passed to Python through child-only env.
+    [switch]$LiveBroadcast,
+    [string]$LiveBroadcastMasterToken = '',
+    [string]$LiveBroadcastObserverToken = '',
+    # Evaluation-only logical time. Production launchers leave this off; the
+    # campaign harness uses server-attested advances instead of claiming that
+    # a fast run spent literal wall-clock hours on air.
+    [switch]$LiveBroadcastEvalClock,
     # 선반응 ACK 모드 — 2026-08-19 사용자 결정(C안): 운영 기본은 표정 마커만
     # 남기는 marker다. audible은 구 동작 롤백용, off는 완전 무반응.
     [ValidateSet('audible', 'marker', 'off')]
@@ -79,6 +93,30 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$resolvedMemoryDbPath = if ([string]::IsNullOrWhiteSpace($MemoryDbPath)) {
+    Join-Path $PSScriptRoot 'runtime\airi-memory.sqlite3'
+} else {
+    [IO.Path]::GetFullPath($MemoryDbPath)
+}
+if ([IO.Path]::GetExtension($resolvedMemoryDbPath) -cne '.sqlite3') {
+    throw 'MemoryDbPath must use the .sqlite3 extension.'
+}
+$memoryDbParent = Split-Path -Parent $resolvedMemoryDbPath
+if (-not (Test-Path -LiteralPath $memoryDbParent -PathType Container)) {
+    throw 'MemoryDbPath parent directory must already exist.'
+}
+$resolvedKnowledgeDbPath = if ([string]::IsNullOrWhiteSpace($KnowledgeDbPath)) {
+    Join-Path $PSScriptRoot 'runtime\airi-knowledge.sqlite3'
+} else {
+    [IO.Path]::GetFullPath($KnowledgeDbPath)
+}
+if ([IO.Path]::GetExtension($resolvedKnowledgeDbPath) -cne '.sqlite3') {
+    throw 'KnowledgeDbPath must use the .sqlite3 extension.'
+}
+$knowledgeDbParent = Split-Path -Parent $resolvedKnowledgeDbPath
+if (-not (Test-Path -LiteralPath $knowledgeDbParent -PathType Container)) {
+    throw 'KnowledgeDbPath parent directory must already exist.'
+}
 function Get-AiriHealthBoolean {
     param([object]$Container, [string]$Name, [string]$Description)
     $property = if ($null -ne $Container) { $Container.PSObject.Properties[$Name] } else { $null }
@@ -117,6 +155,17 @@ if ($EpistemicConfidence -notin @('on', 'off')) {
 $AffectContinuity = $AffectContinuity.ToLowerInvariant()
 if ($AffectContinuity -notin @('on', 'off')) {
     throw 'AffectContinuity must be on or off. Check the parameter or AIRI_AFFECT_CONTINUITY_ENABLED.'
+}
+if ($LiveBroadcast -and $InputScreening -ne 'on') {
+    throw 'LiveBroadcast requires InputScreening on.'
+}
+if ($LiveBroadcastEvalClock -and -not $LiveBroadcast) {
+    throw 'LiveBroadcastEvalClock requires LiveBroadcast.'
+}
+if ($LiveBroadcast -and ($LiveBroadcastMasterToken -notmatch '^[A-Za-z0-9_-]{32,128}$' -or
+        $LiveBroadcastObserverToken -notmatch '^[A-Za-z0-9_-]{32,128}$' -or
+        $LiveBroadcastMasterToken -ceq $LiveBroadcastObserverToken)) {
+    throw 'Live broadcast tokens must be distinct and each contain 32 through 128 URL-safe characters when LiveBroadcast is enabled.'
 }
 $parsedNumCtx = 0
 if (-not [int]::TryParse(
@@ -311,6 +360,12 @@ if ($VerifyExtractionGateOnly) {
 
 $listener = Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort 11435 -State Listen -ErrorAction SilentlyContinue
 if ($listener) {
+    if ($LiveBroadcast) {
+        # Live capabilities are bound to the two in-memory secrets supplied at
+        # process creation. Health must not expose token identity, so a new
+        # launcher invocation can only hand off safely by restarting.
+        throw 'Existing proxy cannot be reused with LiveBroadcast; stop it and restart so fresh control tokens take effect.'
+    }
     if (-not [string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
         throw 'Existing proxy cannot be reused for memory extraction.'
     }
@@ -355,6 +410,41 @@ if ($listener) {
             $existingHealth.affect_continuity 'enabled' 'Existing proxy affect continuity enabled'
         $existingAffectContinuityReady = Get-AiriHealthBoolean `
             $existingHealth.affect_continuity 'ready' 'Existing proxy affect continuity ready'
+        if ($null -eq $existingHealth.show_arc -or $null -eq $existingHealth.broadcast_affect) {
+            throw 'Existing proxy health does not report live broadcast state.'
+        }
+        $existingShowArcEnabled = Get-AiriHealthBoolean `
+            $existingHealth.show_arc 'enabled' 'Existing proxy show arc enabled'
+        $existingShowArcReady = Get-AiriHealthBoolean `
+            $existingHealth.show_arc 'ready' 'Existing proxy show arc ready'
+        $existingBroadcastAffectEnabled = Get-AiriHealthBoolean `
+            $existingHealth.broadcast_affect 'enabled' 'Existing proxy broadcast affect enabled'
+        $existingBroadcastAffectReady = Get-AiriHealthBoolean `
+            $existingHealth.broadcast_affect 'ready' 'Existing proxy broadcast affect ready'
+        if ($null -eq $existingHealth.chat_model) {
+            throw 'Existing proxy health does not report chat model state.'
+        }
+        $existingChatProvider = $existingHealth.chat_model.provider
+        $existingChatModel = $existingHealth.chat_model.model
+        if ($existingChatProvider -isnot [string] -or $existingChatModel -isnot [string]) {
+            throw 'Existing proxy chat model state is malformed.'
+        }
+        $existingDigest = $existingHealth.chat_model.digest
+        if (-not [string]::IsNullOrWhiteSpace($ChatModelDigest) -and
+                ($null -eq $existingDigest -or $existingDigest.digest -isnot [string])) {
+            throw 'Existing proxy health does not report chat model digest state.'
+        }
+        $existingMemoryEnabled = Get-AiriHealthBoolean $existingHealth.memory 'enabled' 'Existing proxy memory enabled'
+        $existingMemoryReady = Get-AiriHealthBoolean $existingHealth.memory 'ready' 'Existing proxy memory ready'
+        $existingKnowledgeEnabled = Get-AiriHealthBoolean $existingHealth.knowledge 'enabled' 'Existing proxy knowledge enabled'
+        $existingKnowledgeReady = Get-AiriHealthBoolean $existingHealth.knowledge 'ready' 'Existing proxy knowledge ready'
+        $existingExternalSearch = Get-AiriHealthBoolean $existingHealth 'cloud_search_external_approved' 'Existing proxy external search approval'
+        $existingBroadcastContract = Get-AiriHealthBoolean $existingHealth 'broadcast_contract' 'Existing proxy broadcast contract'
+        $existingMemoryClaimGuard = Get-AiriHealthBoolean $existingHealth 'memory_claim_guard' 'Existing proxy memory claim guard'
+        if ($existingHealth.immediate_ack -isnot [string]) {
+            throw 'Existing proxy immediate acknowledgement state is malformed.'
+        }
+        $existingImmediateAck = $existingHealth.immediate_ack
     }
     catch {
         throw 'Existing proxy safety state could not be verified; stop it and restart.'
@@ -391,6 +481,37 @@ if ($listener) {
     if ($AffectContinuity -eq 'on' -and -not $existingAffectContinuityReady) {
         throw 'Existing proxy affect continuity is enabled but not ready; stop it and restart.'
     }
+    if ($existingShowArcEnabled -ne [bool]$LiveBroadcast -or
+            $existingBroadcastAffectEnabled -ne [bool]$LiveBroadcast -or
+            ($LiveBroadcast -and (-not $existingShowArcReady -or -not $existingBroadcastAffectReady))) {
+        throw 'Existing proxy live broadcast state differs from the requested configuration or is not ready; stop it and restart.'
+    }
+    if ($existingChatProvider -cne $ChatProvider -or $existingChatModel -cne $effectiveChatModel) {
+        throw 'Existing proxy chat provider or model differs from the requested configuration; stop it and restart.'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ChatModelDigest) -and $existingDigest.digest -cne $ChatModelDigest) {
+        throw 'Existing proxy chat model digest differs from the requested configuration; stop it and restart.'
+    }
+    if ($existingMemoryEnabled -ne $EnableMemory -or ($EnableMemory -and -not $existingMemoryReady)) {
+        throw 'Existing proxy memory state differs from the requested configuration; stop it and restart.'
+    }
+    if ($existingKnowledgeEnabled -ne $EnableKnowledge -or ($EnableKnowledge -and -not $existingKnowledgeReady)) {
+        throw 'Existing proxy knowledge state differs from the requested configuration; stop it and restart.'
+    }
+    if ($EnableKnowledge -and $existingHealth.knowledge.documents -eq 0) {
+        Write-Warning 'Existing proxy knowledge is ready but has no indexed documents.'
+    }
+    if ($existingExternalSearch -ne $AllowExternalSearch -or $existingImmediateAck -cne $ImmediateAck -or
+            $existingBroadcastContract -ne ($BroadcastContract -eq 'on') -or
+            $existingMemoryClaimGuard -ne ($MemoryClaimGuard -eq 'on')) {
+        throw 'Existing proxy safety configuration differs from the requested configuration; stop it and restart.'
+    }
+    $existingNumGpu = 0
+    if (-not [int]::TryParse([Convert]::ToString($existingHealth.num_gpu, [Globalization.CultureInfo]::InvariantCulture),
+            [Globalization.NumberStyles]::None, [Globalization.CultureInfo]::InvariantCulture, [ref]$existingNumGpu) -or
+            $existingNumGpu -ne $NumGpu) {
+        throw 'Existing proxy num_gpu differs from the requested configuration; stop it and restart.'
+    }
     Write-Output 'A service is already listening on port 11435; it was not reconfigured.'
     return
 }
@@ -402,8 +523,9 @@ $memoryEnvironment = @{
     # Python worker cannot cancel an in-flight CUDA encode, so approved public
     # knowledge uses deterministic title/alias/FTS retrieval by default.
     AIRI_KNOWLEDGE_ALLOW_SEMANTIC = '0'
-    AIRI_KNOWLEDGE_DB = Join-Path $repo 'runtime\airi-knowledge.sqlite3'
-    AIRI_MEMORY_DB = Join-Path $repo 'runtime\airi-memory.sqlite3'
+    AIRI_KNOWLEDGE_DB = $resolvedKnowledgeDbPath
+    AIRI_KNOWLEDGE_RUNTIME_DIR = $knowledgeDbParent
+    AIRI_MEMORY_DB = $resolvedMemoryDbPath
     # Keep the base scope stable across proxy restarts. MemoryRuntime rotates a
     # genuinely different no-header history to a UUID child and can recover a
     # unique 2+ turn tail; a fresh GUID here would orphan every prior scope and
@@ -437,6 +559,10 @@ $memoryEnvironment = @{
     AIRI_EPISTEMIC_CONFIDENCE = $EpistemicConfidence
     AIRI_EPISTEMIC_CONFIDENCE_MODE = 'enforce'
     AIRI_AFFECT_CONTINUITY_ENABLED = $AffectContinuity
+    AIRI_LIVE_BROADCAST_ENABLED = if ($LiveBroadcast) { 'on' } else { 'off' }
+    AIRI_LIVE_BROADCAST_MASTER_TOKEN = if ($LiveBroadcast) { $LiveBroadcastMasterToken } else { '' }
+    AIRI_LIVE_BROADCAST_OBSERVER_TOKEN = if ($LiveBroadcast) { $LiveBroadcastObserverToken } else { '' }
+    AIRI_LIVE_BROADCAST_EVAL_CLOCK = if ($LiveBroadcastEvalClock) { 'on' } else { 'off' }
     AIRI_IMMEDIATE_ACK = $ImmediateAck
     AIRI_SILENCE_FALLBACK_POOL = $SilenceFallbackPool
     AIRI_BROADCAST_CONTRACT = $BroadcastContract
@@ -496,4 +622,4 @@ finally {
     }
 }
 
-Write-Output "Started AIRI Ollama compatibility proxy (PID $($process.Id), memory=$EnableMemory, extraction=$MemoryExtractionProvider/$([bool]$MemoryExtractionModel), chat=$ChatProvider/$effectiveChatModel, externalSearch=$AllowExternalSearch, evaluation=$EnableEvaluation, characterEvaluator=$EnableCharacterEvaluator/$effectiveEvaluatorModel)."
+Write-Output "Started AIRI Ollama compatibility proxy (PID $($process.Id), memory=$EnableMemory, extraction=$MemoryExtractionProvider/$([bool]$MemoryExtractionModel), chat=$ChatProvider/$effectiveChatModel, liveBroadcast=$([bool]$LiveBroadcast), externalSearch=$AllowExternalSearch, evaluation=$EnableEvaluation, characterEvaluator=$EnableCharacterEvaluator/$effectiveEvaluatorModel)."

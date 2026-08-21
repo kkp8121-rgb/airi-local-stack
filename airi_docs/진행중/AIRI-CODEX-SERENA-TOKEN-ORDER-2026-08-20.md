@@ -123,11 +123,11 @@ Codex 세션에서 `/mcp` 실행 → serena 연결 확인. `--project-from-cwd`�
 
 | 항목 | 결과 | 증거 |
 |---|---|---|
-| §1~2 설치·연결 | | |
-| §3 인덱싱·온보딩 | | |
-| §4 AGENTS.md 배선 | | |
-| §5 A/B 토큰 실측 (arm별 수치) | | |
-| 채택/롤백 판정 | | |
+| §1~2 설치·연결 | 2026-08-20 설치·실연결 성공 후 판정에 따라 등록 롤백 | `Serena 1.7.0`; TUI `/mcp`에서 Serena 도구 24종 표시; 실제 `initial_instructions` → `find_symbol` → `find_referencing_symbols` 성공(thread `01a01f61-dbef-7b30-806b-d6d5a47d7f83`) |
+| §3 인덱싱·온보딩 | Python 382파일 인덱싱, 온보딩 메모리 11개 인식, 전역 ignore 적용 | `.serena/project.yml`; `.serena/memories/`(전역 ignore); `serena memories check` → `✓ No referential integrity issues found.` |
+| §4 AGENTS.md 배선 | 지시 블록 원문 그대로 추가 | 루트 `AGENTS.md`의 `Serena 사용 정책 (2026-08-20)` |
+| §5 A/B 토큰 실측 (arm별 수치) | `gpt-5.6-luna`/low, 완료 3세션/arm. 총 토큰 ON=`130,673 / 233,882 / 252,156`(심볼/리팩터링/설정문서; 합 616,711, 평균 205,570), OFF=`86,433 / 78,094 / 96,148`(합 260,675, 평균 86,892). ON 평균 **+136.6% 순손실** | ON threads `01a01f61-dbef-7b30-806b-d6d5a47d7f83`, `01a01f64-5221-7031-86fe-f36bcb93e0fb`, `01a01f65-d107-7c30-b797-6eac1dd4732d`; OFF threads `01a01f62-f7fe-79e2-a107-a5c116b89e55`, `01a01f65-0c6a-70f0-b925-c9c51e205052`, `01a01f66-bd5a-74c0-ae30-682c858c63db`. ON 연결 미노출 실패 2회(각 57,657·56,079토큰)는 완료 표본에서 제외했으나 안정성 판정에 반영 |
+| 채택/롤백 판정 | **롤백** — 세 유형 전부 순손실(ON 대비 OFF: +51.2% / +199.5% / +162.3%)이고 간헐적 MCP 미노출 2회. `~/.codex/config.toml` Serena 블록 제거 완료 | 롤백 후 `codex mcp list`에 Serena 없음; 설치물·인덱스·전역 ignore·정책 기록은 보존 |
 | §8 caveman trial 실측 (세션 유형별) | | |
 | §8 caveman 채택/부분 채택/기각 판정 | | |
 

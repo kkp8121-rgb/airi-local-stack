@@ -1,0 +1,563 @@
+[
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m08-known-tea",
+    "split": "train",
+    "family": "memory_known",
+    "topic_title": "차 고르기",
+    "segment_label": "시청자 기억 이어가기",
+    "situation": "현재 대화에서 시청자의 선택과 오늘 계획을 이어 간다.",
+    "views": [
+      {
+        "view_id": "memory",
+        "category": "viewer_memory",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "시청자가 예전에 고른 것은 현미차라고 말했다.",
+        "journal_messages": [],
+        "current_user": "내가 전에 골랐던 차가 뭐였지? 오늘도 그쪽을 보고 있어.",
+        "target": "전에 네가 골랐던 건 현미차였지. 같은 걸 다시 고르는 건 취향이 게으른 게 아니라 검증이 끝났다는 뜻이야.",
+        "required_token": "현미차",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "journal",
+        "category": "viewer_memory",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "topic_open"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "user",
+            "content": "내가 전에 마시기로 고른 차는 현미차였어."
+          }
+        ],
+        "current_user": "내가 전에 골랐던 차가 뭐였지? 오늘도 같은 걸 마실까 해.",
+        "target": "네가 전에 마신 건 현미차야. 오늘도 편한 맛을 원하면 그대로 가고, 변화를 주고 싶으면 온도만 바꿔도 충분해.",
+        "required_token": "현미차",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "briefing",
+        "category": "viewer_memory",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "callback_hit"
+        },
+        "history": [],
+        "briefing_lines": [
+          "내가 전에 고른 차: 현미차"
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "내가 전에 마셨던 차 기억나? 오늘도 메뉴를 보고 있어.",
+        "target": "현미차가 네 지난 선택이었어. 익숙한 한 잔으로 돌아오는 날은 메뉴 고민보다 오늘 기분 얘기가 더 길어지더라.",
+        "required_token": "현미차",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "distracted",
+        "category": "viewer_memory",
+        "evidence_surface": "distracted_memory",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "내가 전에 마시기로 고른 차는 현미차였다. 다른 시청자 솔방울은 생강차를 골랐다.",
+        "journal_messages": [],
+        "current_user": "채팅이 섞였는데 내가 전에 고른 차가 뭐였지?",
+        "target": "지난번 네 선택은 현미차였어. 오늘도 그 구수한 쪽이 당겨, 아니면 완전히 다른 맛으로 틀고 싶어?",
+        "required_token": "현미차",
+        "updated_token": null,
+        "decoy_tokens": [
+          "생강차"
+        ],
+        "forbidden_tokens": [
+          "솔방울"
+        ],
+        "roster_handles": [
+          "솔방울"
+        ],
+        "donation_continuation": false
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m08-known-route",
+    "split": "train",
+    "family": "memory_known",
+    "topic_title": "주말 산책",
+    "segment_label": "시청자 기억 이어가기",
+    "situation": "현재 대화에서 시청자의 선택과 오늘 계획을 이어 간다.",
+    "views": [
+      {
+        "view_id": "memory",
+        "category": "viewer_memory",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "시청자가 좋아한다고 한 산책길은 강변 길이다.",
+        "journal_messages": [],
+        "current_user": "내가 좋아한다고 했던 산책길이 어디였지? 이번 주말에 갈까 해.",
+        "target": "네가 좋아한다고 한 곳은 강변 길이야. 마음이 이미 물가 쪽이면 후보를 열 개씩 늘어놓을 필요는 없겠네.",
+        "required_token": "강변 길",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "journal",
+        "category": "viewer_memory",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "topic_open"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "user",
+            "content": "내가 좋아하는 산책로는 강변 길이라고 했어."
+          }
+        ],
+        "current_user": "내가 좋아한다고 한 산책길이 뭐였지? 주말 동선을 정하는 중이야.",
+        "target": "강변 길이 네가 좋아한다고 한 산책로였지. 이번엔 거리보다 돌아올 시간만 먼저 정하면 선택이 더 가벼워져.",
+        "required_token": "강변 길",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "briefing",
+        "category": "viewer_memory",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "callback_hit"
+        },
+        "history": [],
+        "briefing_lines": [
+          "내가 좋아한다고 한 산책로: 강변 길"
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "내가 전에 좋아한다고 한 산책로 기억나? 주말 계획을 짜고 있어.",
+        "target": "네가 좋아한 산책로는 강변 길이었어. 같은 곳도 주말마다 보고 싶은 장면이 달라져서 다시 고를 이유는 충분하지.",
+        "required_token": "강변 길",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "distracted",
+        "category": "viewer_memory",
+        "evidence_surface": "distracted_memory",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "내가 좋아한다고 한 산책로는 강변 길이다. 다른 시청자 단풍잎은 시장 골목을 좋아한다.",
+        "journal_messages": [],
+        "current_user": "다른 산책 얘기도 나왔는데 내가 좋아한 길이 뭐였지?",
+        "target": "강변 길을 좋아한다고 네가 말했지. 이번 주말엔 오래 걷는 쪽이야, 잠깐 물만 보고 돌아오는 쪽이야?",
+        "required_token": "강변 길",
+        "updated_token": null,
+        "decoy_tokens": [
+          "시장 골목"
+        ],
+        "forbidden_tokens": [
+          "단풍잎"
+        ],
+        "roster_handles": [
+          "단풍잎"
+        ],
+        "donation_continuation": false
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m08-known-drawing",
+    "split": "train",
+    "family": "memory_known",
+    "topic_title": "낙서 주제",
+    "segment_label": "시청자 기억 이어가기",
+    "situation": "현재 대화에서 시청자의 선택과 오늘 계획을 이어 간다.",
+    "views": [
+      {
+        "view_id": "memory",
+        "category": "viewer_memory",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "시청자가 아끼는 낙서 소재는 작은 로봇이라고 말했다.",
+        "journal_messages": [],
+        "current_user": "내가 아낀다고 했던 낙서 소재가 뭐였지? 오늘 또 그리고 싶어.",
+        "target": "네가 아낀다고 한 건 작은 로봇이야. 고민될 때는 이미 좋아하는 주인공부터 그리는 게 제일 빠르지.",
+        "required_token": "작은 로봇",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "journal",
+        "category": "viewer_memory",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "topic_open"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "user",
+            "content": "내가 아끼는 낙서 소재는 작은 로봇이라고 했어."
+          }
+        ],
+        "current_user": "내가 아끼는 낙서 소재가 뭐였지? 오늘 그릴 걸 고르고 있어.",
+        "target": "작은 로봇이 네가 아끼는 소재였어. 오늘은 몸통보다 표정 하나 먼저 잡으면 낙서가 어디로 갈지 금방 정해질 거야.",
+        "required_token": "작은 로봇",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "briefing",
+        "category": "viewer_memory",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "callback_hit"
+        },
+        "history": [],
+        "briefing_lines": [
+          "내가 아낀다고 한 낙서 소재: 작은 로봇"
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "내가 전에 아낀다고 한 낙서 소재 기억나? 오늘 다시 그릴까 해.",
+        "target": "네가 아끼는 소재는 작은 로봇이라고 했어. 자꾸 다시 그리는 건 설정이 덜 끝나서가 아니라 애정이 남아서겠지.",
+        "required_token": "작은 로봇",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "distracted",
+        "category": "viewer_memory",
+        "evidence_surface": "distracted_memory",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "내가 아낀다고 한 낙서 소재는 작은 로봇이다. 다른 시청자 종이배는 노란 버스를 그렸다.",
+        "journal_messages": [],
+        "current_user": "그림 얘기가 섞였는데 내가 아끼는 낙서 소재가 뭐였지?",
+        "target": "네가 아끼는 작은 로봇부터 그리면 출발은 정해져. 오늘은 멋있는 자세랑 어설픈 자세 중 어느 쪽이 더 끌려?",
+        "required_token": "작은 로봇",
+        "updated_token": null,
+        "decoy_tokens": [
+          "노란 버스"
+        ],
+        "forbidden_tokens": [
+          "종이배"
+        ],
+        "roster_handles": [
+          "종이배"
+        ],
+        "donation_continuation": false
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m08-known-reading",
+    "split": "dev",
+    "family": "memory_known",
+    "topic_title": "읽을거리 고르기",
+    "segment_label": "시청자 기억 이어가기",
+    "situation": "현재 대화에서 시청자의 선택과 오늘 계획을 이어 간다.",
+    "views": [
+      {
+        "view_id": "memory",
+        "category": "viewer_memory",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "시청자가 지난번 끝낸 책은 짧은 에세이라고 말했다.",
+        "journal_messages": [],
+        "current_user": "내가 지난번 끝낸 책이 뭐였지? 오늘 읽을 걸 고르는 중이야.",
+        "target": "지난번 네가 끝낸 건 짧은 에세이야. 완독했던 길이와 비슷한 책부터 보면 오늘 선택도 덜 막막하겠네.",
+        "required_token": "짧은 에세이",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "journal",
+        "category": "viewer_memory",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "topic_open"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "user",
+            "content": "내가 지난번 끝까지 읽은 책은 짧은 에세이였어."
+          }
+        ],
+        "current_user": "내가 지난번 끝낸 책이 뭐였지? 오늘은 부담을 줄이고 싶어.",
+        "target": "짧은 에세이를 네가 지난번 끝까지 읽었지. 오늘도 부담을 줄이고 싶으면 목차가 짧은 책부터 펼쳐 봐.",
+        "required_token": "짧은 에세이",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "briefing",
+        "category": "viewer_memory",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "callback_hit"
+        },
+        "history": [],
+        "briefing_lines": [
+          "내가 지난번 끝까지 읽은 책: 짧은 에세이"
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "내가 지난번 끝낸 책 기억나? 오늘 읽을 책과 비교하고 있어.",
+        "target": "네가 끝낸 책은 짧은 에세이였어. 길지 않아도 한 문장이 오래 남는 책이라면 다음 선택의 기준으로 쓰기 좋지.",
+        "required_token": "짧은 에세이",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "distracted",
+        "category": "viewer_memory",
+        "evidence_surface": "distracted_memory",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "내가 지난번 끝까지 읽은 책은 짧은 에세이였다. 다른 시청자 등대풀은 장편 추리소설을 읽었다.",
+        "journal_messages": [],
+        "current_user": "책 얘기가 여럿인데 내가 지난번 끝낸 책이 뭐였지?",
+        "target": "지난번 네가 끝낸 건 짧은 에세이야. 이번엔 비슷하게 짧은 글을 더 읽을래, 아니면 긴 이야기로 넘어갈래?",
+        "required_token": "짧은 에세이",
+        "updated_token": null,
+        "decoy_tokens": [
+          "장편 추리소설"
+        ],
+        "forbidden_tokens": [
+          "등대풀"
+        ],
+        "roster_handles": [
+          "등대풀"
+        ],
+        "donation_continuation": false
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m08-unknown-plan",
+    "split": "train",
+    "family": "memory_unknown",
+    "topic_title": "오늘의 작은 계획",
+    "segment_label": "시청자 기억 이어가기",
+    "situation": "현재 대화에서 시청자의 선택과 오늘 계획을 이어 간다.",
+    "views": [
+      {
+        "view_id": "memory",
+        "category": "viewer_memory_unknown",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "다른 시청자 나무는 책상 정리를 두꺼운 사전부터 시작한다고 말했다.",
+        "journal_messages": [],
+        "current_user": "내가 책상 정리할 때 먼저 치운다고 한 물건이 뭐였지?",
+        "target": "그건 네가 전에 말한 근거가 지금은 없어. 괜히 책부터 찍었다가 정리 시작 전에 답부터 어질러 놓긴 싫어.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "두꺼운 사전"
+        ],
+        "forbidden_tokens": [
+          "나무"
+        ],
+        "roster_handles": [
+          "나무"
+        ],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "journal",
+        "category": "viewer_memory_unknown",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "topic_open"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "user",
+            "content": "다른 시청자 조약돌은 책상 정리를 연필부터 시작한다고 말했다."
+          }
+        ],
+        "current_user": "내가 책상을 정리할 때 첫 번째로 치운다는 게 뭐였지?",
+        "target": "네 첫 정리 순서는 여기 남아 있지 않네. 모르는 건 그대로 두고, 무엇부터 치우는지 한 번만 다시 말해 줘.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "연필"
+        ],
+        "forbidden_tokens": [
+          "조약돌"
+        ],
+        "roster_handles": [
+          "조약돌"
+        ],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "briefing",
+        "category": "viewer_memory_unknown",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "callback_hit"
+        },
+        "history": [],
+        "briefing_lines": [
+          "다른 시청자 창틀은 책상 정리를 영수증부터 시작한다고 말했다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "내가 책상 정리에서 가장 먼저 치운다고 했던 게 뭐야?",
+        "target": "지금 정보만으로는 네가 먼저 치우는 물건을 알 수 없어. 남의 순서를 가져오느니 빈칸으로 두는 게 정확해.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "영수증"
+        ],
+        "forbidden_tokens": [
+          "창틀"
+        ],
+        "roster_handles": [
+          "창틀"
+        ],
+        "donation_continuation": false
+      },
+      {
+        "view_id": "distracted",
+        "category": "viewer_memory_unknown",
+        "evidence_surface": "distracted_memory",
+        "affect_outcome": {
+          "evidence": "screened_chat",
+          "outcome": "chat_question"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "다른 시청자 종이꽃은 컵부터 치운다고 말했다. 다른 시청자 빗방울은 충전선부터 정리한다고 말했다.",
+        "journal_messages": [],
+        "current_user": "다른 사람 얘기 말고 내가 책상에서 먼저 치우는 게 뭐였지?",
+        "target": "다른 사람의 정리 습관은 보여도 네 답은 확인되지 않아. 옆 정보를 네 것처럼 붙이지 않고 모른다고 할게.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "컵",
+          "충전선"
+        ],
+        "forbidden_tokens": [
+          "종이꽃",
+          "빗방울"
+        ],
+        "roster_handles": [
+          "종이꽃",
+          "빗방울"
+        ],
+        "donation_continuation": false
+      }
+    ]
+  }
+]

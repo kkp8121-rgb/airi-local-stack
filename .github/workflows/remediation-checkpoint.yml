@@ -88,7 +88,8 @@ jobs:
             tests: >-
               ollama-proxy/test_airi_session_header_patch.py
               ollama-proxy/test_character_state.py ollama-proxy/test_character_state_evaluator.py
-              ollama-proxy/test_affect_state.py ollama-proxy/test_broadcast_affect_event_mapper.py
+              ollama-proxy/test_affect_state.py ollama-proxy/test_affect_expression.py
+              ollama-proxy/test_broadcast_affect_event_mapper.py
               ollama-proxy/test_continuity_ledger.py
               ollama-proxy/test_benchmark_cloud_chat_latency.py
               ollama-proxy/test_cloud_chat_provider.py
@@ -128,6 +129,7 @@ jobs:
               ollama-proxy/eval/test_airi_native_fit_probe.py
               ollama-proxy/eval/test_airi_native_persona_gate.py
               ollama-proxy/eval/test_airi_native_broadcast_rehearsal.py
+              ollama-proxy/eval/affect_broadcast/test_affect_expression_probe.py
               ollama-proxy/eval/test_airi_motif_native.py
               ollama-proxy/eval/test_airi_motif_local_backend.py
               ollama-proxy/eval/test_build_airi_ab_summary.py
@@ -165,8 +167,11 @@ jobs:
               ollama-proxy/training/tests/test_compile_airi_style_reviewed.py
               ollama-proxy/training/tests/test_review_airi_style_pending.py
               ollama-proxy/training/tests/test_synthesize_behavior_pending.py
+              ollama-proxy/training/tests/test_synthesize_behavior_affect_pending.py
+              ollama-proxy/training/tests/test_broadcast_reference_and_pilot_data.py
               ollama-proxy/training/tests/test_build_behavior_review_form.py
               ollama-proxy/training/tests/test_behavior_review_pipeline.py
+              ollama-proxy/training/tests/test_export_behavior_affect_dataset.py
               ollama-proxy/training/tests/test_train_airi_behavior_lora.py
               ollama-proxy/training/tests/test_synthesize_extraction_sft.py
               ollama-proxy/training/tests/test_build_extraction_review_form.py

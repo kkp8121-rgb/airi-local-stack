@@ -311,12 +311,15 @@ SCENE_LABELS = {
 
 
 def queue_digest(pending_path: Path) -> str:
-    """Pending 큐 파일 내용의 sha256 단축(12자).
+    """Pending 큐의 LF 정규화 내용 sha256 단축(12자).
 
     apply_extraction_review_reply.py 의 동명 함수와 정의가 같아야 한다 — 폼이
     임베드한 값과 적용기가 재계산한 값이 같은 큐 스냅샷일 때만 일치한다(Minor 9).
+    체크아웃의 CRLF/LF 차이는 큐 내용 변경이 아니므로 digest 에서 제외한다.
     """
-    return hashlib.sha256(pending_path.read_bytes()).hexdigest()[:12]
+    text = pending_path.read_text(encoding="utf-8")
+    canonical = text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()[:12]
 
 
 def build_form(pending_path: Path, date_label: str) -> str:

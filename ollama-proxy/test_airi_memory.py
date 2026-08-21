@@ -658,6 +658,33 @@ class MemoryTests(unittest.TestCase):
         self.assertEqual(self.s.job_state('s')['pending_msgs'],4)
         with self.assertRaises(ValueError): self.s.append_turn('s','u3','',1)
         self.assertEqual(self.s.latest_turn('s'),2)
+    def test_completion_receipt_is_atomic_monotonic_and_restart_safe(self):
+        for turn in range(1, 9):
+            self.s.append_turn('s', f'u{turn}', f'a{turn}', turn)
+        appended, first = self.s.append_turn_idempotent('s', 'u9', 'a9', 1, 'trace\\0digest')
+        duplicate, replay = self.s.append_turn_idempotent('s', 'u9', 'a9', 1, 'trace\\0digest')
+        self.assertTrue(appended)
+        self.assertFalse(duplicate)
+        self.assertEqual(first[0], 9)
+        self.assertEqual(replay, first)
+        self.assertEqual(self.s.job_state('s')['pending_msgs'], 18)
+        reopened = MemoryStore(self.db, self.e)
+        duplicate, replayed = reopened.append_turn_idempotent('s', 'u9', 'a9', 1, 'trace\\0digest')
+        self.assertFalse(duplicate)
+        self.assertEqual(replayed, first)
+        self.assertEqual(reopened.job_state('s')['pending_msgs'], 18)
+    def test_completion_receipts_serialize_distinct_keys(self):
+        def write(index):
+            return self.s.append_turn_idempotent('s', f'u{index}', f'a{index}', 1, f'trace-{index}')[1][0]
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            turns = list(pool.map(write, range(20)))
+        self.assertEqual(sorted(turns), list(range(1, 21)))
+    def test_retention_removes_completion_receipts_with_journal_turns(self):
+        self.s.append_turn_idempotent('s', 'u', 'a', 1, 'trace-key')
+        with self.s._session(immediate=True) as connection:
+            self.s._retention_prune_session(connection, 's', keep_messages=0)
+            receipts = connection.execute("SELECT COUNT(*) FROM completion_receipt WHERE session_id='s'").fetchone()[0]
+        self.assertEqual(receipts, 0)
     def test_explicit_tail_adopts_bounded_history_and_is_idempotent(self):
         turns=[(n,f'u{n}',f'a{n}') for n in range(1,1001)]
         self.assertEqual(self.s.adopt_explicit_turn_tail('header',turns),60)

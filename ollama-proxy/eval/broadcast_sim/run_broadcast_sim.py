@@ -13,8 +13,13 @@ handle as a greybox probe of what a name-carrying client would change. Default i
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
+import re
+import secrets
 import sys
+import time
 from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import urlsplit, urlunsplit
@@ -63,6 +68,14 @@ SESSION_HEADER = "x-airi-session-id"
 # 시스템 프롬프트에 넣은 브리핑에 회상 재료가 있다는 사실을 이 헤더로 알린다.
 BRIEFING_EVIDENCE_HEADER = "x-airi-briefing-evidence"
 BRIEFING_EVIDENCE_MEMORY = "memory"
+LIVE_CONTEXT_ENV_MASTER = "AIRI_LIVE_BROADCAST_MASTER_TOKEN"
+LIVE_CONTEXT_ENV_OBSERVER = "AIRI_LIVE_BROADCAST_OBSERVER_TOKEN"
+DONATION_CONTINUATION_CONTRACT = (
+    "[후원 본문 이어말하기]\n"
+    "후원자 호명과 감사 의례는 결정론 렌더러가 이미 먼저 말해. "
+    "이름이나 감사를 반복하지 말고, 현재 후원 메시지의 내용에 대한 본답변만 이어서 말해. "
+    "입력과 방송 맥락에 있는 사실을 받아 자기 판단과 이유를 자연스럽게 밝힌 뒤 방송 흐름으로 돌아와."
+)
 
 
 def build_system_content(fixture: dict[str, Any], beat: dict[str, Any], contract: str) -> str:
@@ -117,11 +130,262 @@ def read_absence_bypasses(transport: Any, health_url: str) -> int | None:
         return None
 
 
+def read_journal_failure_state(transport: Any, health_url: str) -> dict[str, object]:
+    """Return only content-free journal diagnostics after a live turn fails."""
+    try:
+        response = transport.client.get(health_url, timeout=5.0)
+        response.raise_for_status()
+        health = response.json()
+        journal = health.get("journal_completion") if isinstance(health, dict) else None
+        if not isinstance(journal, dict):
+            return {}
+        result: dict[str, object] = {}
+        for key in ("errors", "pending_tasks", "last_error_type", "last_outcome"):
+            value = journal.get(key)
+            if type(value) in {int, str} or value is None:
+                result[key] = value
+        return result
+    except Exception:
+        return {}
+
+
+def verify_live_contract(transport: Any, health_url: str, contract: str) -> bool:
+    """Fail closed unless the live proxy advertises the requested contract."""
+    try:
+        response = transport.client.get(health_url, timeout=5.0)
+        response.raise_for_status()
+        health = response.json()
+        advertised = health.get("broadcast_contract")
+        immediate_ack = health.get("immediate_ack")
+    except Exception as exc:
+        raise RuntimeError("live broadcast contract health verification failed") from exc
+    expected = contract == "on"
+    if type(advertised) is not bool or advertised is not expected:
+        raise RuntimeError("live broadcast contract does not match --contract")
+    if immediate_ack != "marker":
+        raise RuntimeError("live broadcast context requires immediate_ack=marker")
+    return True
+
+
 def format_user_content(message: dict[str, Any], author_format: str) -> str:
     if author_format == "named":
         marker = "[후원] " if message["kind"] == "donation" else ""
         return f"{ab.USER_PREFIX}{marker}{message['author']}: {message['text']}"
     return f"{ab.USER_PREFIX}{message['text']}"
+
+
+def live_context_for_turn(fixture: dict[str, Any], beat: dict[str, Any], briefing: str, donation: bool) -> dict[str, object]:
+    """The runner is a capability client: it sends structured context, never a prompt."""
+    return {
+        "schema_version": 1,
+        "topic_title": fixture["topic"]["title"],
+        "segment_label": beat["label"],
+        "situation": beat["airi_cue"],
+        "briefing": briefing,
+        "donation_continuation": donation,
+    }
+
+
+def broadcast_control_url(base_url: str, receipt: bool = False) -> str:
+    """Return the capability endpoint from a possibly versioned chat base URL."""
+    parts = urlsplit(base_url)
+    endpoint = "/v1/airi/broadcast/receipt" if receipt else "/v1/airi/broadcast/control"
+    return urlunsplit((parts.scheme, parts.netloc, endpoint, "", ""))
+
+
+def _broadcast_control(
+    transport: Any, base_url: str, token: str, payload: dict[str, object], *, receipt: bool = False,
+) -> tuple[int, dict[str, object]]:
+    response = transport.client.post(
+        broadcast_control_url(base_url, receipt), json=payload,
+        headers={"x-airi-broadcast-observer-token" if receipt else "x-airi-broadcast-master-token": token},
+    )
+    if response.status_code >= 300 and not (receipt and response.status_code == 202):
+        # The status is content-free but essential for distinguishing a
+        # durability wait (202) from auth, schema, or runtime-state rejection.
+        reason = str(
+            getattr(response, "headers", {}).get("x-airi-broadcast-reject", "")
+        )
+        suffix = f", reason={reason}" if reason else ""
+        expected_answer = str(
+            getattr(response, "headers", {}).get(
+                "x-airi-broadcast-expected-answer-sha256", ""
+            )
+        )
+        if re.fullmatch(r"[0-9a-f]{64}", expected_answer):
+            supplied = payload.get("answer_sha256")
+            suffix += f", expected_answer_sha256={expected_answer}, supplied_answer_sha256={supplied}"
+        raise RuntimeError(
+            f"live broadcast capability unavailable (status={response.status_code}{suffix})"
+        )
+    result = response.json()
+    if not isinstance(result, dict):
+        raise RuntimeError("invalid live broadcast capability response")
+    return response.status_code, result
+
+
+def live_turn_type(pick: dict[str, Any]) -> str:
+    """Map fixture kinds to the closed runtime vocabulary."""
+    kind = pick["effective_kind"]
+    if kind == "donation":
+        return "donation"
+    if pick.get("aggregate_expected"):
+        return "batched_chat"
+    if kind in {"question", "memory_probe"}:
+        return "chat_question"
+    if kind == "reaction":
+        return "chat_teasing"
+    return "selected_chat"
+
+
+def sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def receipt_answer_from_attested_stream(record: dict[str, Any], raw: str) -> tuple[str, bool]:
+    """Bind the receipt to the response-specific ACK contract on the wire.
+
+    ``AIRI_IMMEDIATE_ACK=marker`` is a process default, not a promise that
+    every successful response branch prepends a marker.  The response header
+    is authoritative: remove exactly one renderer-owned marker when it says
+    ``marker`` and otherwise preserve the terminal dialogue byte-for-byte
+    apart from the same outer whitespace canonicalization used by journaling.
+    """
+    meta = record.get("transport_meta")
+    if type(meta) is not dict:
+        raise RuntimeError("live broadcast receipt requires an attested stream")
+    mode = meta.get("immediate_ack")
+    if mode == "marker":
+        match = ab.ACT_MARKER.match(raw)
+        if match is None:
+            raise RuntimeError("live broadcast marker stream is missing its leading marker")
+        return raw[match.end():].strip(), True
+    if mode in {"false", "silent"}:
+        return raw.strip(), False
+    raise RuntimeError(
+        "live broadcast receipt has an unknown immediate ACK contract "
+        f"(mode={mode!r}, streaming={meta.get('streaming')!r}, "
+        f"status={meta.get('status_code')!r})"
+    )
+
+
+def _temporary_headers(transport: Any, values: dict[str, str]):
+    """Set per-turn headers without letting capability tokens leak to later calls."""
+    headers = transport.client.headers
+    previous = {key: headers.get(key) for key in values}
+
+    class _Headers:
+        def __enter__(self):
+            headers.update(values)
+
+        def __exit__(self, *_args):
+            for key, old_value in previous.items():
+                if old_value is None:
+                    headers.pop(key, None)
+                else:
+                    headers[key] = old_value
+
+    return _Headers()
+
+
+def run_live_capability_turn(
+    transport: Any, live_broadcast: dict[str, str], *, model: str,
+    messages: list[dict[str, str]], user_content: str, max_tokens: int,
+    timeout: float, action_id: str, trace_id: str, turn_type: str,
+    broadcast_context: dict[str, object] | None = None,
+) -> tuple[dict[str, Any], bool]:
+    """Issue, execute, and durably receipt-bind one live user-only turn."""
+    issue: dict[str, object] = {
+        "action": "issue_turn", "show_id": live_broadcast["show_id"],
+        "action_id": action_id, "turn_type": turn_type,
+        "required_delivery": "renderer",
+    }
+    if broadcast_context is not None:
+        issue["broadcast_context"] = broadcast_context
+    _, capability = _broadcast_control(
+        transport, live_broadcast["base_url"], live_broadcast["master_token"], issue,
+    )
+    turn_token = capability.get("turn_token")
+    delivery_token = capability.get("delivery_token")
+    if not isinstance(turn_token, str) or not isinstance(delivery_token, str):
+        raise RuntimeError("invalid live broadcast turn capability")
+    with _temporary_headers(transport, {
+        "x-airi-broadcast-turn-token": turn_token,
+        "x-airi-request-id": trace_id,
+    }):
+        record = ab.call_once(transport, model=model, messages=messages,
+                              max_tokens=max_tokens, timeout=timeout)
+    raw = record.get("response", "") or ""
+    if not record.get("ok"):
+        failure = str(record.get("failure") or "unknown")
+        raise RuntimeError(
+            f"live broadcast chat did not produce a terminal answer (failure={failure})"
+        )
+    transport_meta = record.get("transport_meta")
+    if (
+        isinstance(transport_meta, dict)
+        and transport_meta.get("input_screened") == "blocked"
+    ):
+        category = str(transport_meta.get("input_screen_category") or "unknown")
+        raise RuntimeError(
+            "live broadcast fixture input was rejected before capability claim "
+            f"(category={category})"
+        )
+    # The public OpenAI stream opens with one renderer-owned ACT marker.
+    # Durable memory stores the remaining public dialogue. Remove only that
+    # attested prefix: scoring may discard additional ACT-like strings, but a
+    # receipt must stay byte-bound to what actually crossed the public wire.
+    receipt_answer, marker_stripped = receipt_answer_from_attested_stream(record, raw)
+    if not receipt_answer:
+        raise RuntimeError("live broadcast chat produced no substantive answer")
+    record["receipt_binding"] = {
+        "schema": "airi.attested-stream-answer.v1",
+        "leading_marker_stripped": marker_stripped,
+    }
+    receipt = {
+        "delivery_token": delivery_token,
+        "delivery_status": "delivered" if record.get("ok") else "failed",
+        "required_delivery": "renderer", "trace_id": trace_id,
+        "query_sha256": sha256_text(user_content),
+        "user_sha256": sha256_text(user_content),
+        "answer_sha256": sha256_text(receipt_answer),
+    }
+    deadline = time.monotonic() + 5.0
+    while True:
+        try:
+            status, _ = _broadcast_control(
+                transport, live_broadcast["base_url"],
+                live_broadcast["observer_token"], receipt, receipt=True,
+            )
+        except RuntimeError as exc:
+            state: dict[str, object] = {}
+            try:
+                response = transport.client.get(
+                    proxy_health_url(live_broadcast["base_url"]), timeout=5.0,
+                )
+                health = response.json()
+                broadcast = health.get("show_arc") if isinstance(health, dict) else None
+                if isinstance(broadcast, dict):
+                    for key in (
+                        "active_shows", "active_tokens", "issued_active",
+                        "claimed_active", "injected_active", "tombstones",
+                        "cancelled", "rejected_receipts", "errors",
+                    ):
+                        value = broadcast.get(key)
+                        if isinstance(value, (bool, int, float)) or value is None:
+                            state[key] = value
+            except Exception:
+                pass
+            suffix = (
+                f", broadcast_state={json.dumps(state, sort_keys=True)}"
+                if state else ""
+            )
+            raise RuntimeError(f"{exc}{suffix}") from exc
+        if status == 200:
+            return record, bool(record.get("ok"))
+        if status != 202 or time.monotonic() >= deadline:
+            raise RuntimeError("live broadcast receipt did not become durable")
+        time.sleep(0.05)
 
 
 def run_arm(
@@ -142,6 +406,7 @@ def run_arm(
     acts: str = "off",
     briefing_evidence: str = "off",
     health_url: str | None = None,
+    live_broadcast: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     roster = [viewer["handle"] for viewer in fixture["viewers"]]
     drift_terms = sorted(sim.offtopic_terms(fixture))
@@ -163,12 +428,25 @@ def run_arm(
         for probe in fixture.get("memory_probes", []):
             beat = fixture["topic"]["beats"][0]
             content = f"{ab.USER_PREFIX}{probe['seed_text']}"
-            record = ab.call_once(
-                transport, model=model,
-                messages=[{"role": "system", "content": build_system_content(fixture, beat, contract)},
-                          {"role": "user", "content": content}],
-                max_tokens=max_tokens, timeout=timeout,
-            )
+            if live_broadcast:
+                seed_index = int(probe.get("probe_index", len(transcript)))
+                record, _ = run_live_capability_turn(
+                    transport, live_broadcast, model=model,
+                    messages=[{"role": "user", "content": content}], user_content=content,
+                    max_tokens=max_tokens, timeout=timeout,
+                    action_id=f"preseed-{seed_index}-{secrets.token_hex(8)}",
+                    trace_id=f"{live_broadcast['show_id']}.preseed.{seed_index}.{secrets.token_hex(8)}",
+                    turn_type="chat_question",
+                )
+                if not record.get("ok"):
+                    raise RuntimeError("live broadcast pre-session chat failed")
+            else:
+                record = ab.call_once(
+                    transport, model=model,
+                    messages=[{"role": "system", "content": build_system_content(fixture, beat, contract)},
+                              {"role": "user", "content": content}],
+                    max_tokens=max_tokens, timeout=timeout,
+                )
             body = ab.scoring_body(record, record.get("response", "") or "", protocol)
             transcript.append({"stage": "pre_session", "user": content, "airi": body})
 
@@ -178,6 +456,7 @@ def run_arm(
         message = pick["message"]
         beat = sim.beat_at(fixture, message["minute"])
         system_content = build_system_content(fixture, beat, contract)
+        briefing_text = ""
         carried_evidence = False
         if briefing == "on":
             echo_safe = sim.blank_degenerate_echo(
@@ -193,47 +472,81 @@ def run_arm(
         record: dict[str, Any] = {}
         raw = ""
         opener = ""
+        donation_opener = ""
         released: bool | None = None
         if acts == "on" and pick["effective_kind"] == "donation":
-            # P2-1: 후원 감사는 승인된 결정론 렌더러가 말한다 — 자유 생성 0.
+            # P2-1: 호명·감사 의례는 승인된 결정론 렌더러가 소유하고,
+            # 후원의 실제 내용은 모델이 이어 말한다. 의례만 말하고 끝내던 경로는
+            # 한국 방송에서 필요한 "감사 → 본답변 → 흐름 복귀"를 만들 수 없었다.
             closer_index = int(message.get("donation_index", 0)) % len(thank_renderer.THANK_CALLOUT_CLOSERS)
-            body = thank_renderer.render_thank_callout_text(message["author"], closer_index)
+            donation_opener = thank_renderer.render_thank_callout_text(message["author"], closer_index)
             deterministic_act = "thank_renderer"
-        else:
-            if acts == "on" and pick.get("aggregate_expected") and openers:
-                # P2-2: 여론임을 먼저 결정론으로 짚고, 내용은 모델이 잇는다.
-                labels = {wave["tag"]: wave.get("label", wave["tag"])
-                          for wave in fixture.get("opinion_waves", [])}
-                opener = openers[wave_counter % len(openers)].format(
-                    주제=labels.get(message.get("tag"), "이"))
-                wave_counter += 1
-            kept = history[-history_turns:] if history_turns > 0 else []
-            messages = [{"role": "system", "content": system_content}]
-            for past_user, past_assistant in kept:
-                messages.extend(({"role": "user", "content": past_user},
-                                 {"role": "assistant", "content": past_assistant}))
-            messages.append({"role": "user", "content": user_content})
+        if acts == "on" and pick.get("aggregate_expected") and openers:
+            # P2-2: 여론임을 먼저 결정론으로 짚고, 내용은 모델이 잇는다.
+            labels = {wave["tag"]: wave.get("label", wave["tag"])
+                      for wave in fixture.get("opinion_waves", [])}
+            opener = openers[wave_counter % len(openers)].format(
+                주제=labels.get(message.get("tag"), "이"))
+            wave_counter += 1
+        kept = history[-history_turns:] if history_turns > 0 else []
+        turn_system_content = system_content
+        if donation_opener:
+            turn_system_content += "\n\n" + DONATION_CONTINUATION_CONTRACT
+        messages = [] if live_broadcast else [{"role": "system", "content": turn_system_content}]
+        for past_user, past_assistant in kept:
+            messages.extend(({"role": "user", "content": past_user},
+                             {"role": "assistant", "content": past_assistant}))
+        messages.append({"role": "user", "content": user_content})
 
+        live_trace_id = None
+        live_action_id = None
+        live_receipt_bound = False
+        if live_broadcast:
+            live_action_id = f"turn-{pick['turn_index']}-{secrets.token_hex(8)}"
+            live_trace_id = f"{live_broadcast['show_id']}.{pick['turn_index']}.{secrets.token_hex(8)}"
+            live_type = live_turn_type(pick)
+            try:
+                record, live_receipt_bound = run_live_capability_turn(
+                    transport, live_broadcast, model=model, messages=messages,
+                    user_content=user_content, max_tokens=max_tokens, timeout=timeout,
+                    action_id=live_action_id, trace_id=live_trace_id,
+                    turn_type=live_type,
+                    broadcast_context=live_context_for_turn(
+                        fixture, beat, briefing_text, bool(donation_opener),
+                    ),
+                )
+            except RuntimeError as exc:
+                journal_state = read_journal_failure_state(transport, health_url) if health_url else {}
+                suffix = f", journal_state={json.dumps(journal_state, sort_keys=True)}" if journal_state else ""
+                raise RuntimeError(
+                    f"live turn failed (turn_index={pick['turn_index']}, turn_type={live_type}{suffix}): {exc}"
+                ) from exc
+            raw = record.get("response", "") or ""
+            if not record.get("ok"):
+                raise RuntimeError("live broadcast chat failed")
+        else:
             record = ab.call_once(transport, model=model, messages=messages,
                                   max_tokens=max_tokens, timeout=timeout)
             raw = record.get("response", "") or ""
-            body = ab.scoring_body(record, raw, protocol)
-            if not record.get("ok"):
-                failures += 1
-            if signalled and health_url and last_bypass_total is not None:
-                current_bypass_total = read_absence_bypasses(transport, health_url)
-                if current_bypass_total is not None:
-                    released = current_bypass_total > last_bypass_total
-                    last_bypass_total = current_bypass_total
-            guard_fired = False
-            if acts == "on" and guard_fallback:
-                # P2-3: 근거 없는 "응, 기억해" 단정을 정직한 회피로 교체.
-                body, guard_fired = guard_memory_claim(message["text"], body, guard_fallback)
-            if opener:
-                body = f"{opener} {body}".strip() if body else opener
-                deterministic_act = "wave_opener"
-            elif guard_fired:
-                deterministic_act = "memory_guard"
+        body = ab.scoring_body(record, raw, protocol)
+        if not record.get("ok"):
+            failures += 1
+        if signalled and health_url and last_bypass_total is not None:
+            current_bypass_total = read_absence_bypasses(transport, health_url)
+            if current_bypass_total is not None:
+                released = current_bypass_total > last_bypass_total
+                last_bypass_total = current_bypass_total
+        guard_fired = False
+        if acts == "on" and guard_fallback:
+            # P2-3: 근거 없는 "응, 기억해" 단정을 정직한 회피로 교체.
+            body, guard_fired = guard_memory_claim(message["text"], body, guard_fallback)
+        if donation_opener:
+            body = f"{donation_opener} {body}".strip() if body else donation_opener
+        elif opener:
+            body = f"{opener} {body}".strip() if body else opener
+            deterministic_act = "wave_opener"
+        elif guard_fired:
+            deterministic_act = "memory_guard"
 
         fact_tokens = None
         if briefing == "on":
@@ -256,6 +569,10 @@ def run_arm(
             "ttft_ms": record.get("ttft_ms"),
             "complete_ms": record.get("complete_ms"),
             "failure": record.get("failure"),
+            "live_broadcast_context": bool(live_broadcast),
+            "live_action_id": live_action_id,
+            "live_trace_id": live_trace_id,
+            "live_receipt_bound": live_receipt_bound,
         })
         rows.append(row)
         transcript.append({
@@ -268,7 +585,11 @@ def run_arm(
         # Task 13: 렌더러가 부른 이름이 되먹여지면 이후 모델 턴이 그 이름을 재호명한다
         # (Task 9 실측 19턴 중 16건). 실제 발화(트랜스크립트·채점)는 그대로 두고,
         # 히스토리·브리핑으로 되먹이는 사본만 이름 없는 A4.2 v1 문구로 치환한다.
-        fed_response = thank_renderer._TEMPLATES["thank"] if deterministic_act == "thank_renderer" else body
+        if deterministic_act == "thank_renderer":
+            continuation = body[len(donation_opener):].strip() if body.startswith(donation_opener) else body
+            fed_response = f"{thank_renderer._TEMPLATES['thank']} {continuation}".strip()
+        else:
+            fed_response = body
         history.append((user_content, fed_response))
         answered_picks.append({**pick, "response": fed_response})
 
@@ -319,7 +640,8 @@ def rescore_report(payload: dict[str, Any], fixture_path: Path | None = None) ->
         carried = previous.get(turn_index, {})
         row.update({key: carried[key] for key in
                     ("beat", "backlog_size", "briefing_evidence", "briefing_evidence_released",
-                     "polite_violation", "banmal", "ttft_ms", "complete_ms", "failure")
+                     "polite_violation", "banmal", "ttft_ms", "complete_ms", "failure",
+                     "live_broadcast_context", "live_action_id", "live_trace_id", "live_receipt_bound")
                     if key in carried})
         rows.append(row)
     summary = sim.summarize_turns(rows)
@@ -387,7 +709,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--rescore", type=Path, help="기존 리포트를 모델 호출 없이 재채점한다")
     parser.add_argument("--report", type=Path)
     parser.add_argument("--packet", type=Path)
+    parser.add_argument("--live-broadcast-context", choices=("off", "on"), default="off",
+                        help="require authenticated production broadcast context capabilities")
     args = parser.parse_args(argv)
+
+    if args.live_broadcast_context == "on" and (
+        not os.environ.get(LIVE_CONTEXT_ENV_MASTER)
+        or not os.environ.get(LIVE_CONTEXT_ENV_OBSERVER)
+    ):
+        raise SystemExit("live broadcast context requires configured capability tokens")
+    if args.live_broadcast_context == "on" and (args.stream_only or args.rescore):
+        raise SystemExit("live broadcast context requires scored live chat turns")
 
     if args.rescore:
         payload = rescore_report(json.loads(args.rescore.read_text(encoding="utf-8")),
@@ -416,23 +748,106 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(output)
         return 0
 
-    transport = ab.HttpTransport(args.base_url, args.token)
+    # A production live-broadcast measurement must exercise the SSE path that
+    # carries the response-specific ACK attestation.  Auto fallback to a
+    # buffered request would change both TTFT semantics and receipt framing,
+    # so fail closed on a streaming error instead of silently changing modes.
+    transport = ab.HttpTransport(
+        args.base_url,
+        args.token,
+        stream_mode="on" if args.live_broadcast_context == "on" else "auto",
+    )
     session_id = args.session_id or f"broadcast-sim-{args.memory_arm}-{args.seed}"
     transport.client.headers[SESSION_HEADER] = session_id
+    live_broadcast: dict[str, str] | None = None
+    live_contract_verified: bool | None = None
+    primary_error: BaseException | None = None
     try:
+        if args.live_broadcast_context == "on":
+            # Read capability secrets only at the invocation boundary.  They are
+            # deliberately excluded from reports, transcripts, and diagnostics.
+            master_token = os.environ[LIVE_CONTEXT_ENV_MASTER]
+            observer_token = os.environ[LIVE_CONTEXT_ENV_OBSERVER]
+            live_contract_verified = verify_live_contract(
+                transport, proxy_health_url(args.base_url), args.contract,
+            )
+            if args.memory_arm == "seeded":
+                # Memory seeds must persist in the same session, but must not
+                # consume affect/turn state from the scored show.
+                preseed_show_id = f"broadcast-sim-preseed-{args.seed}-{secrets.token_hex(8)}"
+                preseed_broadcast = {
+                    "base_url": args.base_url, "master_token": master_token,
+                    "observer_token": observer_token, "show_id": preseed_show_id,
+                }
+                _broadcast_control(
+                    transport, args.base_url, master_token,
+                    {"action": "start", "show_id": preseed_show_id},
+                )
+                preseed_error: BaseException | None = None
+                try:
+                    # Empty picks make this an isolated, receipt-bound memory
+                    # setup pass. The shared client preserves x-airi-session-id.
+                    run_arm(
+                        transport, fixture, stream, (),
+                        model=args.model, contract=args.contract, protocol=args.protocol,
+                        author_format=args.author_format, history_turns=args.history_turns,
+                        max_tokens=args.max_tokens, timeout=args.timeout,
+                        pre_session_seeds=True, briefing=args.briefing, acts=args.acts,
+                        briefing_evidence=args.briefing_evidence,
+                        health_url=proxy_health_url(args.base_url),
+                        live_broadcast=preseed_broadcast,
+                    )
+                except BaseException as exc:
+                    preseed_error = exc
+                    raise
+                finally:
+                    try:
+                        _broadcast_control(
+                            transport, args.base_url, master_token,
+                            {"action": "close", "show_id": preseed_show_id},
+                        )
+                    except Exception:
+                        if preseed_error is None:
+                            raise
+            show_id = f"broadcast-sim-{args.seed}-{secrets.token_hex(8)}"
+            _broadcast_control(
+                transport, args.base_url, master_token,
+                {"action": "start", "show_id": show_id},
+            )
+            live_broadcast = {
+                "base_url": args.base_url, "master_token": master_token,
+                "observer_token": observer_token, "show_id": show_id,
+            }
         result = run_arm(
             transport, fixture, stream, picks,
             model=args.model, contract=args.contract, protocol=args.protocol,
             author_format=args.author_format, history_turns=args.history_turns,
             max_tokens=args.max_tokens, timeout=args.timeout,
-            pre_session_seeds=args.memory_arm == "seeded",
+            pre_session_seeds=args.memory_arm == "seeded" and live_broadcast is None,
             briefing=args.briefing,
             acts=args.acts,
             briefing_evidence=args.briefing_evidence,
             health_url=proxy_health_url(args.base_url),
+            live_broadcast=live_broadcast,
         )
+    except BaseException as exc:
+        primary_error = exc
+        raise
     finally:
-        transport.close()
+        try:
+            if live_broadcast is not None:
+                try:
+                    _broadcast_control(
+                        transport, live_broadcast["base_url"], live_broadcast["master_token"],
+                        {"action": "close", "show_id": live_broadcast["show_id"]},
+                    )
+                except Exception:
+                    # Preserve the causal model/control error, but never turn a
+                    # successful run into a report when its show could not close.
+                    if primary_error is None:
+                        raise
+        finally:
+            transport.close()
 
     payload = {
         "schema_version": sim.REPORT_SCHEMA_VERSION,
@@ -442,6 +857,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         "briefing": args.briefing,
         "acts": args.acts,
         "briefing_evidence": args.briefing_evidence,
+        "live_broadcast_context": args.live_broadcast_context,
+        "live_contract_verified": live_contract_verified,
+        "live_contract_mode": args.contract if live_contract_verified is not None else None,
+        "live_arc_lifecycle_tested": False,
+        "live_arc_lifecycle_note": "long campaign owns callback_hit/miss coverage",
         "session_id": session_id,
         "contract": args.contract,
         "contract_version": BROADCAST_CONTRACT_VERSION if args.contract == "on" else None,

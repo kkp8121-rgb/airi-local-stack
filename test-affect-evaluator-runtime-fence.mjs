@@ -20,7 +20,8 @@ export const FORBIDDEN_TOKENS = Object.freeze([
   'correction_target',
   'correction_target_v1.json',
   'run_correction_target_ab_eval',
-  'run_affect_broadcast_eval'
+  'run_affect_broadcast_eval',
+  'run_affect_expression_probe'
 ])
 
 const SOURCE_EXTENSIONS = new Set([

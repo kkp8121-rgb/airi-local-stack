@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://airi.local/schemas/airi.broadcast-reference-event.v1.json",
+  "title": "AIRI Korean broadcast mechanics observation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "dataset_role",
+    "source_case_id",
+    "evidence_tier",
+    "event_type",
+    "event_content",
+    "show_segment",
+    "queue_pressure",
+    "input_visibility",
+    "response_latency_band",
+    "response_beats",
+    "expansion_scope",
+    "handoff",
+    "register_by_beat",
+    "audience_address",
+    "nickname_use",
+    "topic_state",
+    "evidence_gaps",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {"const": "airi.broadcast-reference-event.v1"},
+    "record_id": {"type": "string", "pattern": "^refevt-[0-9]{4}$"},
+    "dataset_role": {"const": "observation_only"},
+    "source_case_id": {"type": "string", "pattern": "^OBS-[A-Z][0-9]{2}$"},
+    "evidence_tier": {
+      "enum": ["official_primary_contiguous", "official_primary_partial"]
+    },
+    "event_type": {
+      "enum": ["donation", "subscription", "selected_chat", "batched_chat", "screen_event", "greeting", "moderation", "safety"]
+    },
+    "event_content": {
+      "enum": ["content_unknown", "ritual_only", "content_bearing", "aggregate_opinion", "safety_or_policy"]
+    },
+    "show_segment": {
+      "enum": ["just_chatting", "game", "watchalong", "transition", "unknown"]
+    },
+    "queue_pressure": {"enum": ["single", "burst"]},
+    "input_visibility": {
+      "enum": ["event_only", "host_read_or_screen_confirmed", "aggregate_only"]
+    },
+    "response_latency_band": {"enum": ["immediate", "short_delay", "unknown"]},
+    "response_beats": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "acknowledgment",
+          "callout",
+          "content_callback",
+          "clarifying_question",
+          "self_position",
+          "rationale_or_episode",
+          "aggregate_summary",
+          "safety_boundary",
+          "expansion",
+          "return_to_topic",
+          "invite_participation",
+          "close"
+        ]
+      }
+    },
+    "expansion_scope": {"enum": ["none", "brief", "sustained"]},
+    "handoff": {
+      "enum": ["return_prior_topic", "next_chat_hook", "screen_or_task_action", "no_handoff_observed", "safety_stop"]
+    },
+    "register_by_beat": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"enum": ["ritual_formal", "host_casual", "neutral", "unknown"]}
+    },
+    "audience_address": {"enum": ["individual", "room_wide", "mixed", "unknown"]},
+    "nickname_use": {"enum": ["none_observed", "observed_but_not_retained", "unknown"]},
+    "topic_state": {"enum": ["known", "unknown"]},
+    "evidence_gaps": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "exact_input_unavailable",
+          "exact_response_unavailable",
+          "speaker_or_event_actor_uncertain",
+          "exact_duration_unavailable",
+          "amount_unavailable_or_removed",
+          "input_response_link_partial",
+          "screen_action_not_captured"
+        ]
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_class", "observation_date", "review_status", "contains_transcript", "contains_pii", "training_permitted"],
+      "properties": {
+        "source_class": {"const": "official_public_primary"},
+        "observation_date": {"type": "string", "format": "date"},
+        "review_status": {"const": "coded"},
+        "contains_transcript": {"const": false},
+        "contains_pii": {"const": false},
+        "training_permitted": {"const": false}
+      }
+    }
+  }
+}

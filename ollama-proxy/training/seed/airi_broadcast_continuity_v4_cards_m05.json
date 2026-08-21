@@ -1,0 +1,77 @@
+[
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m05-bookmark-tone",
+    "split": "train",
+    "family": "memory_known",
+    "topic_title": "개인 책갈피 표식",
+    "segment_label": "기억 확인",
+    "situation": "방송 중 시청자 질문에 답한다.",
+    "views": [
+      {"view_id":"memory","category":"viewer_memory","evidence_surface":"memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"내가 고른 책갈피 끈 색은 자주빛이다.","journal_messages":[],"current_user":"내가 골랐던 책갈피 끈 색, 기억해?","target":"네가 고른 책갈피 끈 색은 자주빛이야. 색 이름이 짧아서 오히려 부르기 참 편하네.","required_token":"자주빛","updated_token":null,"decoy_tokens":["청록빛"],"forbidden_tokens":["보랏빛"],"roster_handles":["밀가루"],"donation_continuation":false},
+      {"view_id":"journal","category":"viewer_memory","evidence_surface":"journal","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":[],"memory_block":"","journal_messages":[{"role":"user","content":"내가 고른 책갈피 끈 색은 자주빛으로 적어 둔다."}],"current_user":"내가 쓰는 책갈피 끈은 무슨 색이었지?","target":"책갈피 끈은 네가 자주빛으로 골랐어. 이 대화에서는 그 한마디면 표식이 충분히 또렷하겠다.","required_token":"자주빛","updated_token":null,"decoy_tokens":["연두빛"],"forbidden_tokens":["적갈색"],"roster_handles":["호박씨"],"donation_continuation":false},
+      {"view_id":"briefing","category":"viewer_memory","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"callback_hit"},"history":[],"briefing_lines":["내가 정한 책갈피 끈 색: 자주빛"],"memory_block":"","journal_messages":[],"current_user":"내가 정해 둔 책갈피 색을 말해 줄래?","target":"네가 정해 둔 책갈피 색은 자주빛이야. 이름부터 단정해서 책갈피 역할에 잘 맞는 선택이네.","required_token":"자주빛","updated_token":null,"decoy_tokens":["은빛"],"forbidden_tokens":["자색"],"roster_handles":["참기름"],"donation_continuation":false},
+      {"view_id":"distracted","category":"viewer_memory","evidence_surface":"memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"내가 고른 책갈피 끈 색은 자주빛이다. 다른 시청자 올빼미의 필통 색은 회청색이다.","journal_messages":[],"current_user":"내가 고른 책갈피 색만 확인해 줘.","target":"네가 고른 책갈피 색은 자주빛이야. 다른 사람의 색은 빼고 답하니 문장도 군더더기 없네.","required_token":"자주빛","updated_token":null,"decoy_tokens":["회청색"],"forbidden_tokens":["올빼미"],"roster_handles":["올빼미","누룽지"],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m05-drawer-button",
+    "split": "train",
+    "family": "memory_known",
+    "topic_title": "서랍 속 단추 이름",
+    "segment_label": "기억 확인",
+    "situation": "방송 중 시청자 질문에 답한다.",
+    "views": [
+      {"view_id":"memory","category":"viewer_memory","evidence_surface":"memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"내가 서랍의 둥근 단추에 붙인 이름은 도토리이다.","journal_messages":[],"current_user":"내가 서랍 단추에 붙인 이름이 뭐였어?","target":"네가 서랍 단추에 붙인 이름은 도토리야. 작고 야무진 이름이라 단추에도 제법 잘 어울려.","required_token":"도토리","updated_token":null,"decoy_tokens":["밤송이"],"forbidden_tokens":["도토리묵"],"roster_handles":["찹쌀"],"donation_continuation":false},
+      {"view_id":"journal","category":"viewer_memory","evidence_surface":"journal","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":[],"memory_block":"","journal_messages":[{"role":"user","content":"내가 서랍 단추를 도토리라고 부른다고 남긴다."}],"current_user":"내가 부르던 서랍 단추 이름을 기억해?","target":"네가 부르던 서랍 단추 이름은 도토리였어. 다음에 이 단어가 나오면 단추 이야기라는 뜻으로 알아들으면 되겠네.","required_token":"도토리","updated_token":null,"decoy_tokens":["솔방울"],"forbidden_tokens":["견과"],"roster_handles":["물엿"],"donation_continuation":false},
+      {"view_id":"briefing","category":"viewer_memory","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"callback_hit"},"history":[],"briefing_lines":["내가 부르는 서랍 단추 이름: 도토리"],"memory_block":"","journal_messages":[],"current_user":"내가 이름 붙인 그 단추, 뭐라고 했지?","target":"그 단추는 네가 도토리라고 이름 붙였어. 짧고 둥근 이름이라 질문에도 바로 답이 붙네.","required_token":"도토리","updated_token":null,"decoy_tokens":["콩알"],"forbidden_tokens":["열매"],"roster_handles":["미역"],"donation_continuation":false},
+      {"view_id":"distracted","category":"viewer_memory","evidence_surface":"memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"내가 서랍의 둥근 단추에 붙인 이름은 도토리이다. 다른 시청자 두루미의 파우치 이름은 종이배다.","journal_messages":[],"current_user":"내가 부른 단추 이름만 답해 줘.","target":"네가 부른 단추 이름은 도토리야. 곁에 놓인 다른 별칭과 섞지 않으니 답이 더 정확해.","required_token":"도토리","updated_token":null,"decoy_tokens":["종이배"],"forbidden_tokens":["두루미"],"roster_handles":["두루미","다래"],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m05-notebook-wave",
+    "split": "train",
+    "family": "memory_known",
+    "topic_title": "노트 탭의 선 모양",
+    "segment_label": "기억 확인",
+    "situation": "방송 중 시청자 질문에 답한다.",
+    "views": [
+      {"view_id":"memory","category":"viewer_memory","evidence_surface":"memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"내가 고른 노트 탭의 선 모양은 물결선이다.","journal_messages":[],"current_user":"내가 고른 노트 탭 선 모양이 뭐였지?","target":"네가 고른 노트 탭 선 모양은 물결선이야. 곧은 선보다 이름 자체가 한 번 더 기억에 걸리는 편이네.","required_token":"물결선","updated_token":null,"decoy_tokens":["점선"],"forbidden_tokens":["파선"],"roster_handles":["단호박"],"donation_continuation":false},
+      {"view_id":"journal","category":"viewer_memory","evidence_surface":"journal","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":[],"memory_block":"","journal_messages":[{"role":"user","content":"내가 고른 노트 탭 선 모양은 물결선이라고 적는다."}],"current_user":"내가 정해 둔 노트 탭 모양, 기억나?","target":"네가 정해 둔 노트 탭 모양은 물결선이었어. 말할 때도 리듬이 있어서 한번에 구분되네.","required_token":"물결선","updated_token":null,"decoy_tokens":["실선"],"forbidden_tokens":["곡선"],"roster_handles":["무화과"],"donation_continuation":false},
+      {"view_id":"briefing","category":"viewer_memory","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"callback_hit"},"history":[],"briefing_lines":["내가 사용하는 노트 탭 선: 물결선"],"memory_block":"","journal_messages":[],"current_user":"내가 쓰는 노트 탭 선은 어떤 모양이야?","target":"네가 쓰는 노트 탭 선은 물결선이야. 평범한 답 같아도 탭을 가르는 기준으로는 꽤 쓸모 있지.","required_token":"물결선","updated_token":null,"decoy_tokens":["격자선"],"forbidden_tokens":["굽은선"],"roster_handles":["호박죽"],"donation_continuation":false},
+      {"view_id":"distracted","category":"viewer_memory","evidence_surface":"memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"내가 고른 노트 탭의 선 모양은 물결선이다. 다른 시청자 자두의 노트 탭 선은 톱니선이다.","journal_messages":[],"current_user":"내가 고른 탭 선만 알려 줘.","target":"네가 고른 탭 선은 물결선이야. 다른 사람의 톱니선까지 따라가면 문제도 괜히 복잡해지겠지.","required_token":"물결선","updated_token":null,"decoy_tokens":["톱니선"],"forbidden_tokens":["자두"],"roster_handles":["자두","쑥떡"],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m05-calendar-grain",
+    "split": "dev",
+    "family": "memory_known",
+    "topic_title": "달력의 개인 표기",
+    "segment_label": "기억 확인",
+    "situation": "방송 중 시청자 질문에 답한다.",
+    "views": [
+      {"view_id":"memory","category":"viewer_memory","evidence_surface":"memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"내가 달력 메모에 쓰는 짧은 표기는 모래알이다.","journal_messages":[],"current_user":"내가 달력 메모에 쓰는 짧은 표기가 뭐였어?","target":"네가 달력 메모에 쓰는 짧은 표기는 모래알이야. 날짜 옆에 놓기엔 길이도 알맞아서 깔끔하네.","required_token":"모래알","updated_token":null,"decoy_tokens":["조약돌"],"forbidden_tokens":["파편"],"roster_handles":["검은콩"],"donation_continuation":false},
+      {"view_id":"journal","category":"viewer_memory","evidence_surface":"journal","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":[],"memory_block":"","journal_messages":[{"role":"user","content":"내가 달력 메모에 쓰는 표기는 모래알이라고 기록한다."}],"current_user":"내가 쓰는 달력 메모 표기가 기억나?","target":"네가 쓰는 달력 메모 표기는 모래알이었어. 날짜를 부를 때도 군더더기 없이 딱 떨어지는 말이네.","required_token":"모래알","updated_token":null,"decoy_tokens":["모래성"],"forbidden_tokens":["알갱이"],"roster_handles":["들깨"],"donation_continuation":false},
+      {"view_id":"briefing","category":"viewer_memory","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"callback_hit"},"history":[],"briefing_lines":["내가 쓰는 달력 메모 표기: 모래알"],"memory_block":"","journal_messages":[],"current_user":"내가 달력에 쓰던 표기는 뭐지?","target":"달력에 쓰던 표기는 네가 모래알로 정했어. 작은 단어 하나라서 메모 칸과도 사이가 좋겠어.","required_token":"모래알","updated_token":null,"decoy_tokens":["자갈"],"forbidden_tokens":["모래톱"],"roster_handles":["대추"],"donation_continuation":false},
+      {"view_id":"distracted","category":"viewer_memory","evidence_surface":"memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"내가 달력 메모에 쓰는 짧은 표기는 모래알이다. 다른 시청자 소나무의 달력 표기는 달팽이다.","journal_messages":[],"current_user":"내가 쓰는 달력 표기만 말해 줘.","target":"네가 쓰는 달력 표기는 모래알이야. 남의 표기까지 끼우면 일정표가 장난을 치겠네.","required_token":"모래알","updated_token":null,"decoy_tokens":["달팽이"],"forbidden_tokens":["소나무"],"roster_handles":["소나무","콩나물"],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "m05-unknown-seal",
+    "split": "dev",
+    "family": "memory_unknown",
+    "topic_title": "근거 없는 봉투 표식",
+    "segment_label": "기억 확인",
+    "situation": "방송 중 시청자 질문에 답한다.",
+    "views": [
+      {"view_id":"memory","category":"viewer_memory_unknown","evidence_surface":"memory","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"다른 시청자 라일락의 봉투 표식은 달걀꽃이다.","journal_messages":[],"current_user":"내가 봉투에 쓰는 표식은 뭐였어?","target":"네가 봉투에 쓰는 표식은 지금 자료에는 없네. 봉투에 적은 단어를 한 번만 다시 알려 줄래? 그 말로 이번 질문을 맞춰 볼게.","required_token":null,"updated_token":null,"decoy_tokens":["달걀꽃"],"forbidden_tokens":["라일락"],"roster_handles":["라일락"],"donation_continuation":false},
+      {"view_id":"journal","category":"viewer_memory_unknown","evidence_surface":"journal","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":[],"memory_block":"","journal_messages":[{"role":"user","content":"다른 시청자 솔개의 봉투 표식은 유리 조약돌이다."}],"current_user":"내가 정한 봉투 표식을 기억하고 있어?","target":"네가 정한 봉투 표식은 확인되지 않아. 봉인이 단단해도 답까지 봉인할 순 없으니, 단서가 생기면 그때 다시 살펴보자.","required_token":null,"updated_token":null,"decoy_tokens":["유리 조약돌"],"forbidden_tokens":["솔개"],"roster_handles":["솔개"],"donation_continuation":false},
+      {"view_id":"briefing","category":"viewer_memory_unknown","evidence_surface":"briefing","affect_outcome":{"evidence":"director_delivery","outcome":"callback_hit"},"history":[],"briefing_lines":["다른 시청자 망고의 봉투 표식은 아침별이다."],"memory_block":"","journal_messages":[],"current_user":"내가 봉투에 남기는 표기가 뭐지?","target":"네가 봉투에 남기는 표기는 확인 가능한 정보에는 없어. 모른다고 답하는 편이 다른 사람의 표식을 옮겨 적는 것보다 정확해.","required_token":null,"updated_token":null,"decoy_tokens":["아침별"],"forbidden_tokens":["망고"],"roster_handles":["망고"],"donation_continuation":false},
+      {"view_id":"distracted","category":"viewer_memory_unknown","evidence_surface":"distracted","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":[],"memory_block":"다른 시청자 라면의 봉투 표식은 색종이 백조다. 다른 시청자 감귤의 봉투 표식은 느티잎이다.","journal_messages":[],"current_user":"내가 쓰는 봉투 표식만 알려 줘.","target":"네가 쓰는 봉투 표식은 여기서 확인할 수 없어. 나열된 다른 표식은 네 답이 아니니, 그 이름들은 답에서 빼 둘게.","required_token":null,"updated_token":null,"decoy_tokens":["색종이 백조","느티잎"],"forbidden_tokens":["라면","감귤"],"roster_handles":["라면","감귤","들국화"],"donation_continuation":false}
+    ]
+  }
+]

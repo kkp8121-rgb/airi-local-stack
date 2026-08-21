@@ -15,7 +15,10 @@ param(
     [object]$NumCtx = $null,
     # Keep the foreground Ollama runner loaded across normal chat gaps.
     [string]$OllamaKeepAlive = '30m',
+    [bool]$EnableMemory = $true,
     [bool]$EnableKnowledge = $true,
+    [string]$MemoryDbPath = '',
+    [string]$KnowledgeDbPath = '',
     [ValidateSet('ollama', 'openai', 'anthropic')]
     [string]$MemoryExtractionProvider = 'ollama',
     [bool]$AllowExternalMemoryExtraction = $false,
@@ -55,6 +58,17 @@ param(
     # Affect continuity stays opt-in; no launcher path may promote it.
     [ValidateSet('on', 'off')]
     [string]$AffectContinuity = $(if ([string]::IsNullOrWhiteSpace($env:AIRI_AFFECT_CONTINUITY_ENABLED)) { 'off' } else { $env:AIRI_AFFECT_CONTINUITY_ENABLED }),
+    # This enables the separately authenticated live broadcast control plane.
+    # The launcher creates a fresh in-memory master token for the proxy child.
+    [switch]$LiveBroadcast,
+    # Test-only logical time is a second explicit opt-in. Production launches
+    # must never gain the ability to manufacture long continuity gaps.
+    [switch]$LiveBroadcastEvalClock,
+    # A same-process evaluation wrapper may supply fresh capabilities so it
+    # can start the proxy and immediately run the campaign without printing
+    # or persisting either secret. Supplying only one always fails closed.
+    [string]$LiveBroadcastMasterTokenOverride = '',
+    [string]$LiveBroadcastObserverTokenOverride = '',
     [bool]$AllowExternalSearch = $false,
     [string]$TopicBoardPath = '',
     [bool]$EnableEvaluation = $false,
@@ -93,6 +107,17 @@ function Resolve-AiriNumCtx {
     }
     return $parsed
 }
+function New-AiriLiveBroadcastMasterToken {
+    $bytes = New-Object byte[] 48
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $rng.GetBytes($bytes)
+    }
+    finally {
+        $rng.Dispose()
+    }
+    return [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+}
 $NumCtx = Resolve-AiriNumCtx $(if ($null -ne $NumCtx) { $NumCtx } elseif (-not [string]::IsNullOrWhiteSpace($env:AIRI_NUM_CTX)) { $env:AIRI_NUM_CTX } else { 2048 })
 $OutputModeration = $OutputModeration.ToLowerInvariant()
 if ($OutputModeration -notin @('on', 'off')) {
@@ -101,6 +126,16 @@ if ($OutputModeration -notin @('on', 'off')) {
 $InputScreening = $InputScreening.ToLowerInvariant()
 if ($InputScreening -notin @('on', 'off')) {
     throw 'InputScreening must be on or off. Check the parameter or AIRI_INPUT_SCREENING.'
+}
+if ($LiveBroadcast -and $InputScreening -ne 'on') {
+    throw 'LiveBroadcast requires InputScreening on.'
+}
+if ($LiveBroadcastEvalClock -and -not $LiveBroadcast) {
+    throw 'LiveBroadcastEvalClock requires LiveBroadcast.'
+}
+if (-not $LiveBroadcast -and (-not [string]::IsNullOrWhiteSpace($LiveBroadcastMasterTokenOverride) -or
+        -not [string]::IsNullOrWhiteSpace($LiveBroadcastObserverTokenOverride))) {
+    throw 'Live broadcast token overrides require LiveBroadcast.'
 }
 $EpistemicConfidence = $EpistemicConfidence.ToLowerInvariant()
 if ($EpistemicConfidence -notin @('on', 'off')) {
@@ -158,6 +193,26 @@ $effectiveEvaluatorModel = if ($ChatProvider -eq 'local') {
 } else {
     'midm-airi:2.0-mini'
 }
+$hasMasterTokenOverride = -not [string]::IsNullOrWhiteSpace($LiveBroadcastMasterTokenOverride)
+$hasObserverTokenOverride = -not [string]::IsNullOrWhiteSpace($LiveBroadcastObserverTokenOverride)
+if ($LiveBroadcast -and $hasMasterTokenOverride -ne $hasObserverTokenOverride) {
+    throw 'Live broadcast token overrides must be supplied together.'
+}
+$liveBroadcastMasterToken = if ($hasMasterTokenOverride) {
+    $LiveBroadcastMasterTokenOverride
+} elseif ($LiveBroadcast) {
+    New-AiriLiveBroadcastMasterToken
+} else { '' }
+$liveBroadcastObserverToken = if ($hasObserverTokenOverride) {
+    $LiveBroadcastObserverTokenOverride
+} elseif ($LiveBroadcast) {
+    New-AiriLiveBroadcastMasterToken
+} else { '' }
+if ($LiveBroadcast -and ($liveBroadcastMasterToken -notmatch '^[A-Za-z0-9_-]{32,128}$' -or
+        $liveBroadcastObserverToken -notmatch '^[A-Za-z0-9_-]{32,128}$' -or
+        $liveBroadcastMasterToken -ceq $liveBroadcastObserverToken)) {
+    throw 'Live broadcast token generation failed or produced duplicate tokens.'
+}
 
 function Wait-LocalHealth {
     param(
@@ -177,6 +232,34 @@ function Wait-LocalHealth {
     } while ((Get-Date) -lt $deadline)
 
     throw "Local service did not become ready within $TimeoutSeconds seconds: $Uri"
+}
+
+# Only an extractor process this launcher actually created may be stopped by
+# the companion stop script.  Keep the record under the repository runtime
+# directory and write it via a same-directory rename so an interrupted launch
+# never leaves a partially written ownership claim.
+$extractorRuntimeDir = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'ollama-proxy\runtime'))
+$extractorOwnerPath = [IO.Path]::GetFullPath((Join-Path $extractorRuntimeDir 'memory-extractor-owner.json'))
+if (-not $extractorOwnerPath.StartsWith($extractorRuntimeDir + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Memory extractor owner record path must stay under the repository runtime directory.'
+}
+function Write-MemoryExtractorOwnerRecord {
+    param([int]$Port, [int]$Pid)
+    if ($Pid -le 0) { throw 'Memory extractor owner PID must be positive.' }
+    New-Item -ItemType Directory -Path $extractorRuntimeDir -Force | Out-Null
+    $temporary = Join-Path $extractorRuntimeDir ('.memory-extractor-owner-' + [guid]::NewGuid().ToString('N') + '.tmp')
+    try {
+        @{ port = $Port; pid = $Pid } | ConvertTo-Json -Compress | Set-Content -LiteralPath $temporary -Encoding utf8 -NoNewline
+        Move-Item -LiteralPath $temporary -Destination $extractorOwnerPath -Force
+    }
+    finally {
+        if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue }
+    }
+}
+function Remove-MemoryExtractorOwnerRecord {
+    if (Test-Path -LiteralPath $extractorOwnerPath -PathType Leaf) {
+        Remove-Item -LiteralPath $extractorOwnerPath -Force -ErrorAction Stop
+    }
 }
 
 if ($Stt -eq 'off') {
@@ -323,7 +406,10 @@ if ([string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
         -NumCtx $NumCtx `
         -NumGpu $OllamaNumGpu `
         -OllamaKeepAlive $OllamaKeepAlive `
+        -EnableMemory $EnableMemory `
         -EnableKnowledge $EnableKnowledge `
+        -MemoryDbPath $MemoryDbPath `
+        -KnowledgeDbPath $KnowledgeDbPath `
         -MemoryExtractionProvider $MemoryExtractionProvider `
         -AllowExternalMemoryExtraction $AllowExternalMemoryExtraction `
         -MemoryExtractionModel $MemoryExtractionModel `
@@ -340,6 +426,10 @@ if ([string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
         -InputScreeningPolicy $resolvedInputScreeningPolicy `
         -EpistemicConfidence $EpistemicConfidence `
         -AffectContinuity $AffectContinuity `
+        -LiveBroadcast:$LiveBroadcast `
+        -LiveBroadcastEvalClock:$LiveBroadcastEvalClock `
+        -LiveBroadcastMasterToken $liveBroadcastMasterToken `
+        -LiveBroadcastObserverToken $liveBroadcastObserverToken `
         -ChatModelPreflighted `
         -AllowExternalSearch $AllowExternalSearch `
         -TopicBoardPath $TopicBoardPath `
@@ -354,6 +444,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
         -NumCtx $NumCtx `
         -NumGpu $OllamaNumGpu -MemoryExtractionProvider $MemoryExtractionProvider `
         -OllamaKeepAlive $OllamaKeepAlive `
+        -EnableMemory $EnableMemory `
         -EnableKnowledge $EnableKnowledge `
         -AllowExternalMemoryExtraction $AllowExternalMemoryExtraction -MemoryExtractionModel $MemoryExtractionModel `
         -MemoryExtractionGateReport $MemoryExtractionGateReport -MemoryExtractionUpstream "http://127.0.0.1:$MemoryExtractionPort" `
@@ -386,12 +477,18 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
                 -or [int]$extractorResult.Pid -le 0) {
             throw 'Memory extractor ownership verification failed.'
         }
+        if ($extractorResult.StartedByCaller -eq $true) {
+            Write-MemoryExtractorOwnerRecord -Port $MemoryExtractionPort -Pid ([int]$extractorResult.Pid)
+        }
         $null = Wait-LocalHealth -Uri "http://127.0.0.1:$MemoryExtractionPort/api/tags" -TimeoutSeconds 30
         & (Join-Path $PSScriptRoot 'ollama-proxy\start-local-ollama-proxy.ps1') `
             -NumCtx $NumCtx `
             -NumGpu $OllamaNumGpu -MemoryExtractionProvider $MemoryExtractionProvider `
             -OllamaKeepAlive $OllamaKeepAlive `
+            -EnableMemory $EnableMemory `
             -EnableKnowledge $EnableKnowledge `
+            -MemoryDbPath $MemoryDbPath `
+            -KnowledgeDbPath $KnowledgeDbPath `
             -AllowExternalMemoryExtraction $AllowExternalMemoryExtraction -MemoryExtractionModel $MemoryExtractionModel `
             -MemoryExtractionGateReport $MemoryExtractionGateReport -MemoryExtractionUpstream "http://127.0.0.1:$MemoryExtractionPort" `
             -MemoryExtractionGateProfile $MemoryExtractionGateProfile `
@@ -401,6 +498,10 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
             -InputScreening $InputScreening -InputScreeningPolicy $resolvedInputScreeningPolicy `
             -EpistemicConfidence $EpistemicConfidence `
             -AffectContinuity $AffectContinuity `
+            -LiveBroadcast:$LiveBroadcast `
+            -LiveBroadcastEvalClock:$LiveBroadcastEvalClock `
+            -LiveBroadcastMasterToken $liveBroadcastMasterToken `
+            -LiveBroadcastObserverToken $liveBroadcastObserverToken `
             -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `
             -EnableCharacterEvaluator $EnableCharacterEvaluator -EvaluationMaxRecords $EvaluationMaxRecords
         $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
@@ -418,6 +519,9 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
                 # Preserve the proxy-start failure; the stop script refuses
                 # PID replacement rather than affecting another process.
             }
+            # This launch failed; never leave an ownership claim behind even
+            # when the extractor has already exited or been replaced.
+            Remove-MemoryExtractorOwnerRecord
         }
         throw
     }
@@ -426,6 +530,19 @@ else {
     throw 'Memory extraction gate requires the local ollama provider.'
 }
 $proxy = Wait-LocalHealth -Uri 'http://127.0.0.1:11435/health'
+$liveMemoryEnabled = Get-AiriHealthBoolean $proxy.memory 'enabled' 'Live proxy memory enabled'
+$liveMemoryReady = Get-AiriHealthBoolean $proxy.memory 'ready' 'Live proxy memory ready'
+$liveKnowledgeEnabled = Get-AiriHealthBoolean $proxy.knowledge 'enabled' 'Live proxy knowledge enabled'
+$liveKnowledgeReady = Get-AiriHealthBoolean $proxy.knowledge 'ready' 'Live proxy knowledge ready'
+if ($liveMemoryEnabled -ne $EnableMemory -or ($EnableMemory -and -not $liveMemoryReady)) {
+    throw 'Live proxy memory state is missing, unready, or differs from the requested configuration.'
+}
+if ($liveKnowledgeEnabled -ne $EnableKnowledge -or ($EnableKnowledge -and -not $liveKnowledgeReady)) {
+    throw 'Live proxy knowledge state is missing, unready, or differs from the requested configuration.'
+}
+if ($EnableKnowledge -and $proxy.knowledge.documents -eq 0) {
+    Write-Warning 'Live proxy knowledge is ready but has no indexed documents.'
+}
 $requestedInputScreening = $InputScreening -eq 'on'
 $requestedEpistemicConfidence = $EpistemicConfidence -eq 'on'
 $requestedAffectContinuity = $AffectContinuity -eq 'on'
@@ -447,9 +564,7 @@ if ($requestedInputScreening -and ($null -eq $livePolicyProperty -or
         $livePolicyProperty.Value -cne $expectedInputScreeningPolicySha256)) {
     throw 'Live proxy input screening policy digest differs from the requested policy.'
 }
-if ($null -eq $proxy.epistemic_confidence) {
-    throw 'Live proxy epistemic confidence state is missing or differs from the requested configuration.'
-}
+
 $liveEpistemicConfidenceEnabled = Get-AiriHealthBoolean `
     $proxy.epistemic_confidence 'enabled' 'Live proxy epistemic confidence enabled'
 if ($liveEpistemicConfidenceEnabled -ne $requestedEpistemicConfidence) {
@@ -466,6 +581,20 @@ $liveAffectContinuityReady = Get-AiriHealthBoolean `
 if ($liveAffectContinuityEnabled -ne $requestedAffectContinuity -or
         ($requestedAffectContinuity -and -not $liveAffectContinuityReady)) {
     throw 'Live proxy affect continuity state is missing or differs from the requested configuration.'
+}
+if ($null -eq $proxy.show_arc -or $null -eq $proxy.broadcast_affect) {
+    throw 'Live proxy broadcast state is missing or differs from the requested configuration.'
+}
+$liveShowArcEnabled = Get-AiriHealthBoolean $proxy.show_arc 'enabled' 'Live proxy show arc enabled'
+$liveShowArcReady = Get-AiriHealthBoolean $proxy.show_arc 'ready' 'Live proxy show arc ready'
+$liveBroadcastAffectEnabled = Get-AiriHealthBoolean $proxy.broadcast_affect 'enabled' 'Live proxy broadcast affect enabled'
+$liveBroadcastAffectReady = Get-AiriHealthBoolean $proxy.broadcast_affect 'ready' 'Live proxy broadcast affect ready'
+$liveBroadcastEvalClock = Get-AiriHealthBoolean $proxy.show_arc 'evaluation_clock' 'Live proxy broadcast evaluation clock'
+if ($liveShowArcEnabled -ne [bool]$LiveBroadcast -or
+        $liveBroadcastAffectEnabled -ne [bool]$LiveBroadcast -or
+        $liveBroadcastEvalClock -ne [bool]$LiveBroadcastEvalClock -or
+        ($LiveBroadcast -and (-not $liveShowArcReady -or -not $liveBroadcastAffectReady))) {
+    throw 'Live proxy broadcast state is missing, unready, or differs from the requested configuration.'
 }
 $liveNumCtx = 0
 $liveNumCtxText = [Convert]::ToString(
@@ -549,6 +678,9 @@ if ($ChatProvider -eq 'local') {
     EpistemicConfidenceEnabled = $proxy.epistemic_confidence.enabled
     AffectContinuityEnabled = $proxy.affect_continuity.enabled
     AffectContinuityReady = $proxy.affect_continuity.ready
+    LiveBroadcastEnabled = $proxy.show_arc.enabled
+    LiveBroadcastReady = $proxy.show_arc.ready
+    LiveBroadcastEvaluationClock = $proxy.show_arc.evaluation_clock
     LLMWarmup = if ($warmup) { $warmup.StatusCode } else { $null }
     ChatProvider = $ChatProvider
     ChatModel = $effectiveChatModel

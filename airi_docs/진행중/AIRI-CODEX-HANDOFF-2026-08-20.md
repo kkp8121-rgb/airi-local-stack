@@ -72,7 +72,8 @@
 
 ```
 검수 회신 (사용자)          → T2-b QLoRA (코덱스)        → T3 양방송 게이트
- · 행동 181건                 · 1차 = 행동                 · 1차 + 2차(held-out)
+ · 기존 행동 181건            · 1차 = 행동 181+affect 120  · 1차 + 2차(held-out)
+ · affect 행동 120건           · 표현 팔레트 함께 학습      · affect probe+인간 선호
  · 추출 102건                 · 2차 = 추출                 · 미통과 어댑터 폐기
 ```
 
@@ -82,33 +83,58 @@
 ### 1-1. 준비된 파이프라인 (클로드 PC 완결분)
 
 ```
-[✅] 합성 181건   training/seed/airi_behavior_seed_pending.jsonl
-[⏳ 사용자] 행동 검수 폼 회신  airi_docs/진행예정/AIRI-BEHAVIOR-REVIEW-FORM-2026-08-19.html
+[⛔ 반려·보존] 합성 181건   training/seed/airi_behavior_seed_pending.jsonl
+     ★ 2026-08-21 사용자 총평: 너무 짧고 후원/선택 채팅을 방송 주제로 확장하지 못한다.
+       큐와 폼은 실패 재현용이며 회신 적용·학습 금지.
+[⛔ 반려·보존] affect 행동 합성 120건
+     training/seed/airi_behavior_affect_seed_pending.jsonl
+     ★ 상태 표현만 늘었고 동일한 챗봇형 단답 구조다. 검수 회신·학습 금지.
+[✅] 한국 방송 반응 event/beat 재설계
+     airi_docs/참조/AIRI-KR-BROADCAST-REGISTER-REFERENCE-2026-08-21.md
+     ★ 공식 관찰 7건(탬 5·아리사 2) 비식별 JSONL + 별도 출처 원장
+[✅] AIRI 원본 방송 반응 파일럿 24건
+     ollama-proxy/training/seed/airi_broadcast_response_pilot_pending.jsonl
+     ★ 16/4/4, single/burst 15/9, 중앙값 98자, 입력보다 짧은 답 0, 전건 학습 금지
+[⏳ 사용자] 24건 묶음 총평 — 행별 approve/rewrite/reject 작업 없음
+     airi_docs/진행예정/AIRI-KR-BROADCAST-RESPONSE-PILOT-2026-08-21.md
 [✅] 적용기   apply_behavior_review_reply.py  (미결정 있으면 fail-closed,
-     수정 답변 반말 게이트, eligibility 유일 전환점 — 검수자 id 필수)
+     큐 SHA·수정 답변 반말/affect 안전 게이트, eligibility 유일 전환점 — 검수자 id 필수)
 [✅] 익스포터 export_behavior_chat_dataset.py (운영 시스템 프롬프트+브리핑+
-     [YouTube] 프리픽스 그대로 chat messages 조립, sha256 출력)
+     [YouTube] 프리픽스 그대로 조립; affect는 request-local 상태/표현 prompt 포함,
+     검수된 두 행동 큐를 복수 --reviewed로 결합, sha256 출력)
 [✅] 트레이너 train_airi_behavior_lora.py     (CPU 스모크로 루프 전체 검증 완료)
-[⏳ 코덱스] CUDA 실행 ← ★여기
+[⛔] CUDA 행동 실행 — 24건 총평 반영·별도 전량 검수 계약 전 금지
 
 [✅] 추출 학습쌍 102건  training/seed/airi_extraction_seed_pending.jsonl
-[⏳ 사용자] 추출 검수 폼 회신  airi_docs/진행예정/AIRI-EXTRACTION-REVIEW-FORM-2026-08-20.html
+[⏸ 보류] 추출 검수 폼 회신  airi_docs/진행예정/AIRI-EXTRACTION-REVIEW-FORM-2026-08-20.html
      ★ 2026-08-20 v2 — 큐 sha 결속. 구 폼 회신은 거부된다.
 [✅] 적용기   apply_extraction_review_reply.py (스팬 스키마 게이트 — 손으로 고친
      target은 parse_stage_a_span 재통과 필수[evidence가 turns 원문에 실재 +
      모든 이름이 그 인용 안 + drop 0], 한 건이라도 실패 시 회신 전체 거부)
 [✅] 익스포터 export_extraction_sft_dataset.py (벤치마크 Stage A 조립을 import해
      재사용 — 학습 프롬프트 복붙 금지가 테스트로 강제됨, sha256 출력)
-[⏳ 코덱스] 2차 학습 (행동 SFT 이후)
+[⏸ 코덱스] 2차 학습 (새 행동 SFT 승인·통과 이후)
 ```
 
 ### 1-2. 실행 절차 (검수 회신이 레포에 반영된 후)
+
+> **2026-08-21 중지선:** 아래 명령은 재현을 위해 보존하지만 현행 181/120 행동
+> 큐에는 실행하지 않는다. `AIRI-KR-BROADCAST-REGISTER-REFERENCE-2026-08-21.md`의
+> 24건 event/beat 파일럿에 사용자 총평을 반영하고 별도 전량 검수 계약을 닫은 뒤 새
+> 큐·새 SHA로 절차를 다시 열어야 한다. 사용자에게 행별 승인 작업을 요구하지 않는다.
 
 ```powershell
 cd ollama-proxy/training
 # 1) 검수 반영·익스포트가 아직 안 돼 있으면 (클로드가 이미 했으면 스킵):
 python apply_behavior_review_reply.py --reply <회신.txt> --reviewer <사용자id> --approved-at 2026-08-XX
-python export_behavior_chat_dataset.py     # 출력의 sha256을 다음 단계에 사용
+python apply_behavior_review_reply.py `
+  --pending seed/airi_behavior_affect_seed_pending.jsonl `
+  --reply <affect-회신.txt> --reviewer <사용자id> --approved-at 2026-08-XX `
+  --output seed/airi_behavior_affect_reviewed.jsonl
+python export_behavior_chat_dataset.py `
+  --reviewed seed/airi_behavior_reviewed.jsonl `
+  --reviewed seed/airi_behavior_affect_reviewed.jsonl
+# 출력의 sha256을 다음 단계에 사용
 
 # 2) Mi:dm HF 스냅샷을 로컬 디렉터리로 (허브 이름 직접 지정은 거부됨):
 #    K-intelligence/Midm-2.0-Mini-Instruct → 예: D:\models\midm-2.0-mini
@@ -195,6 +221,72 @@ python run_broadcast_sim.py --fixture second_broadcast_v1.json  (동일 옵션)
    `select_viewer_lines_tagged`만의 함수라 **결정론적**이므로 GPU에서도
    같아야 정상 — 다르면 배선 사고를 의심할 것.
    (`완료/AIRI-BRIEFING-EVIDENCE-NARROW-2026-08-20.md`)
+
+### 2026-08-20 코덱스 GPU 실행 결과
+
+- **ctx 예산 단일조건 9런 완료** — RTX 3060 Ti, Mi:dm 고정 digest,
+  `num_ctx=4096`, `num_gpu=999`, 워치독 30초, 시드 11/22/33에서 전 런
+  전송 실패 0. h4/h8/h12의 앵커는 41/48/46 of 144, 사실 활용은
+  5/7/5 of 90, 기억 프로브는 4/4/3 of 9, 오프너 다양성 평균은
+  78.5/81.3/84.0%였다. 결정론 축은 전 런 만점·존댓말/이탈 0. 따라서
+  CPU의 "h4 최고" 판정은 재현되지 않았고, h8은 사실·프로브 균형,
+  h12는 다양성·단답 억제가 좋았으나 시드 분산이 커 단일 승격은 하지 않는다.
+- **narrow evidence GPU 3런 완료** — 부착 **34/144**, 해제 **2/34**로
+  CPU 결정론 배선과 정확히 일치했다. 앵커 49/144, 사실 활용 4/90,
+  프로브 2/9로 판단 축은 CPU(49/144·8/90·3/9)보다 낮아 품질 개선
+  주장은 하지 않는다. 전송 실패·존댓말·이탈·이름 발명은 0.
+- **Qwen3-8B + v3-span 1회 완료·FAIL** — 고정 digest
+  `500a1f...b8b41`, 격리 11436, `num_ctx=8192`, `num_gpu=999`.
+  schema/A schema/B schema는 1.0이나 connectivity/B coverage 0.857,
+  critical recall 0.262, placeholder 0.857, B op-alias 0.143,
+  `entity_reference_missing` 1건으로 balanced gate FAIL. 이 v3-span
+  리포트는 런타임 승인에 사용할 수 없고 §3 선행조건도 그대로 열린다.
+- **marker 체감 A/B·TTS live gate 보류(환경 차단)** — TTS 런처가 외부
+  GPT-SoVITS venv의 선언 의존성 누락으로 9880을 열지 못했다. 누락된
+  `numpy<2.0`을 venv에 보충한 뒤에도 다음 필수 모듈 `soundfile`에서
+  중단됐고 `pip check`가 다수 누락을 확인했다. 전체 외부 venv 재구축 없이
+  canonical 7문장 gate나 실제 render A/B를 주장하지 않는다. AIRI source와
+  server-channel config는 있으나 측정 시 6121/Electron도 비가동이었다.
+  레포 내부 proxy streaming/lock/cancel 계약은 Python 3.12 임시 환경에서
+  **23 passed**. 모든 greybox/extraction 운영 플래그는 OFF를 유지했다.
+
+### 2026-08-21 사용자 피드백 후 affect 표현 실험
+
+- 사용자 평가는 현행 행동 데이터가 "거짓말은 없지만 정직한 로봇처럼 들리고
+  인간의 위트·감정이 없다"는 것이며, 목표 예시는 상태에 따라 기분 좋음과
+  장난스런 독설이 오가는 반응이다. 이에 ①학습된 표현 팔레트와 ②런타임
+  상태 선택을 분리했고, 사용자 지시에 따라 **②를 먼저 격리 실행**했다.
+- 기존 `affect_state.py`와 proxy opt-in 주입은 이미 있었지만 production event
+  producer와 state→expression selector가 없었다. 새 `affect_expression.py`는
+  validated state만 받아 13개 primary를 closed mood/expression/response/safety
+  계약으로 바꾸며, safety/deescalate는 careful로 강제한다. evaluator-only
+  `run_affect_expression_probe.py`는 frozen fixture를 수정하지 않고 동일 요청에
+  `off / typed snapshot / snapshot+expression`만 중첩 추가함을 canonical bytes로
+  검증한다. 운영 runtime에는 evaluator import가 들어가지 않도록 fence를 확장했다.
+- RTX 3060 Ti·고정 Mi:dm digest·`num_ctx=2048`·temperature 0.6·시드
+  42/43/44에서 5상태 15 triplet, **45호출**을 위치 균형 실행했다. 지시를 더
+  구체화한 v2도 별도 45호출 재실행했다. 두 런 모두 문자열 변화는
+  snapshot/off 12/15, expression/off 12/15, expression/snapshot 12/15였으나
+  이는 품질 지표가 아니다. v2 수동 판독에서 `playful_annoyed` 3건은 위트가
+  없고, pleased 3건은 전 arm 동일 거부, competitive 3건은 방송 시작/종료 등
+  문맥 오류, safety 3건 중 2건은 off보다 약한 안내였다. **운영 승격·게이트
+  통과 주장은 0이며 결론은 "런타임 선택만으로 부족"이다.**
+- 다음 순서는 사용자 검수/행동 QLoRA 데이터에 감정·위트 표현 팔레트를
+  보강한 뒤 동일 probe와 블라인드 선호 평가를 재실행하는 것이다. 이를 위해
+  별도 affect 행동 pending 120건과 검수 폼을 준비했다(13상태 각 8,
+  playful_annoyed/concerned 각 16, split 90/15/15). 기존 181건은 무수정 보존하고
+  두 reviewed 큐만 exporter에서 합친다. affect 폼 queue SHA는 `96d0d2d3c69d`,
+  기존 행동 폼은 새 SHA 결속판 `eab7f6b76c06`이다. 120건은 첫 트랜치이며
+  성격 품질 충분성은 학습 후에만 판정한다. production event ingress, affect
+  운영 ON, wire 표정 방출은 재평가 통과+사용자 승인 전까지 금지. memory
+  greybox도 OFF 유지.
+
+> **후속 사용자 총평으로 위 “120건 검수→QLoRA” 순서는 폐기됐다.** 두 행동 큐는
+> 답변 길이 중앙값이 13자/14자이고, 후원 의례·메시지별 반응·주제 확장·복귀 beat가
+> 없는 챗봇형 단답이라는 판정을 받았다. 현행 진입점은
+> `참조/AIRI-KR-BROADCAST-REGISTER-REFERENCE-2026-08-21.md`의 공식 방송 관찰과
+> AIRI 고유 24건 파일럿 총평 반영이다. 실제 방송인의 고유 문체·캐치프레이즈·시청자
+> 식별정보는 학습 데이터로 복사하지 않는다.
 
 ## 3. 활성화 선행 조건 — 켜기 전에 반드시 닫을 것
 
@@ -350,11 +442,21 @@ python run_broadcast_sim.py --fixture second_broadcast_v1.json  (동일 옵션)
    **모델이 이번엔 그 v1 문구 자체를 모방하기 시작하는지**는 아직 측정하지
    않았다(seed 11 1런 대조만 수행). 다음 풀 시뮬 배치에서 응답 다양성과 함께
    관찰할 것.
-2. **[첫 실제 export 실행 전 필수 — 코덱스] 익스포터 보강 2건.**
-   `ollama-proxy/training/export_extraction_sft_dataset.py:91` 부근에서
-   ① split 값의 **도메인 미검증**(`SPLITS` 밖 값이 조용히 통과) ② 레코드
-   **id 중복 미검사**. 지금은 검수 회신이 없어 실행 경로가 열리지 않아
-   무해하지만, **검수 회신을 수령해 처음 export를 돌리기 전에 반드시 보강**할 것.
+2. **[완료 2026-08-20 — 코덱스] 첫 실제 export 전 익스포터 보강.**
+   `export_extraction_sft_dataset.py`가 ① `SPLITS` 밖 split 값 ② 빈/비문자열
+   id ③ 레코드 id 중복을 전부 fail-closed로 거부한다. 회귀 테스트 2건을
+   추가했다. 준비 감사 중 Windows CRLF 체크아웃 큐의 raw digest
+   (`8375c9ec764e`)와 배포 폼의 LF digest(`2988a82bd738`)가 달라 실제 회신이
+   전건 구 폼으로 거부될 결함도 발견했다. 폼 생성기와 적용기의 `queue_digest`를
+   **LF 정규화 내용 SHA**로 통일하고 EOL 동일/내용 변경 상이 회귀를 추가했다.
+   현재 기존 행동 폼 181 unique(`eab7f6b76c06`)·affect 행동 폼 120 unique
+   (`96d0d2d3c69d`)·추출 폼 102 unique(`2988a82bd738`)가 각 큐와 일치한다.
+   행동 폼/적용기도 동일 SHA 결속과 중복·거부/수정 overlap 차단을 갖췄다.
+   training 전체 검증은 **136 passed, 3 skipped**(skip: symlink 1, 임시 환경의
+   torch/peft/transformers 부재 CUDA 스모크 2), 두 행동 폼 JavaScript syntax와
+   전체 offline checkpoint도 통과했다. 이 준비 상태는 재현용으로 보존하지만,
+   **2026-08-21 사용자 총평 이후 행동 2종은 반려됐고 추출은 보류**다. 따라서
+   reviewed/SFT 산출물은 계속 미생성이 정상이며 새 event/beat 파일럿 전에는 만들지 않는다.
 3. **[워크플로 다음 수정 때] CI `python-core-tests` 잡에 `setup-node` 미선언.**
    폼 JS 검증 테스트는 Node로 실제 `<script>` 원문을 실행한다. 현재는 Windows
    러너 이미지에 Node가 내장돼 통과하지만, 이미지에서 Node가 빠지면 검증이
@@ -387,7 +489,7 @@ python run_broadcast_sim.py --fixture second_broadcast_v1.json  (동일 옵션)
 - 어댑터 운영 채택은 T3 통과 + 사용자 승인 후에만
 - **검수 회신 산출물(`seed/airi_*_reviewed.jsonl`·`*_sft.jsonl`)을 가짜
   reviewer로 채우지 말 것** — 사람 승인을 위조하게 된다. 실제 회신이 있어야
-  나오는 산출물이며, 현재 양쪽 다 미생성이 정상 상태다.
+  나오는 산출물이며, 현재 3개 검수 경로 모두 미생성이 정상 상태다.
 
 ## 6. 참고 문서
 
@@ -400,6 +502,12 @@ python run_broadcast_sim.py --fixture second_broadcast_v1.json  (동일 옵션)
 - `참조/AIRI-GLINER-KO-EVAL-2026-08-20.md` — LLM 0회 엔티티 프리필터 실측
   (person/org 조건부 채택, item 0%, GLiNER2≠GLiNER 용어 정정)
 - `진행예정/AIRI-EXTRACTION-REVIEW-FORM-2026-08-20.html` — **현행 추출 검수 폼**
+- `진행예정/AIRI-BEHAVIOR-REVIEW-FORM-2026-08-19.html` — **반려 큐 재현용, 회신 금지**
+- `진행예정/AIRI-BEHAVIOR-AFFECT-REVIEW-FORM-2026-08-21.html` — **반려 큐 재현용, 회신 금지**
+- `참조/AIRI-KR-BROADCAST-REGISTER-REFERENCE-2026-08-21.md` — **현행 행동 재설계 SSoT**
+- `참조/data/airi_kr_broadcast_reference_events_2026-08-21.jsonl` — **학습 금지 추상 관찰 7건**
+- `training/seed/airi_broadcast_response_pilot_pending.jsonl` — **AIRI 원본 batch 총평용 24건**
+- `진행예정/AIRI-KR-BROADCAST-RESPONSE-PILOT-2026-08-21.md` — **사람이 읽는 24건 전체 총평본**
 - `진행중/AIRI-CODEX-SERENA-TOKEN-ORDER-2026-08-20.md` — 병행 지시서
 
 **2026-08-18~19 (승계)**

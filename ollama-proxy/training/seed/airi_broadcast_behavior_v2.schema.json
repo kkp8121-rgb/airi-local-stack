@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AIRI original Korean broadcast behavior v2 record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "id", "source_local_id", "split", "category",
+    "scenario_group", "template_group", "briefing", "prompt", "answer",
+    "target", "event", "required_beats", "register_by_beat", "affect",
+    "arc", "provenance", "review", "training_eligible",
+    "response_length_class"
+  ],
+  "properties": {
+    "schema_version": {"const": "airi.broadcast-behavior.v2"},
+    "id": {"type": "string", "pattern": "^bbv2-[0-9]{4}$"},
+    "source_local_id": {"type": "string", "pattern": "^[abc][0-9]{3}$"},
+    "split": {"enum": ["train", "dev", "test"]},
+    "category": {"enum": [
+      "donation_content", "donation_ritual", "donation_burst", "subscription",
+      "selected_proposal", "selected_correction", "selected_tease", "batched_opinion",
+      "screen_game", "greeting_transition", "continuity_callback", "safety_boundary"
+    ]},
+    "scenario_group": {"type": "string", "minLength": 1},
+    "template_group": {"type": "string", "minLength": 1},
+    "briefing": {"type": "string", "minLength": 1},
+    "prompt": {"type": "string", "minLength": 1},
+    "answer": {"type": "string", "minLength": 70, "maxLength": 220},
+    "target": {"type": "string", "minLength": 70, "maxLength": 220},
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_type", "selected_message", "synthetic_alias", "safety_class"],
+      "properties": {
+        "event_type": {"type": "string", "minLength": 1},
+        "selected_message": {"type": "string", "minLength": 1},
+        "synthetic_alias": {"type": "string"},
+        "safety_class": {"enum": ["none", "acute_physical", "imminent_self_harm", "hostile_abuse", "privacy"]}
+      }
+    },
+    "required_beats": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 1}},
+    "register_by_beat": {"type": "array", "minItems": 2, "items": {"enum": ["host_casual", "ritual_formal_allowed", "safety_direct"]}},
+    "affect": {"type": "string", "minLength": 1},
+    "arc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["has_prior_turn", "open_arc", "gap_minutes"],
+      "properties": {
+        "has_prior_turn": {"type": "boolean"},
+        "open_arc": {"type": "string"},
+        "gap_minutes": {"type": ["integer", "null"], "minimum": 10, "maximum": 360}
+      }
+    },
+    "provenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["synthetic", "source", "official_transcript_used", "reference_mechanics_only"],
+      "properties": {
+        "synthetic": {"const": true},
+        "source": {"const": "airi-original-korean-broadcast-behavior-v2"},
+        "official_transcript_used": {"const": false},
+        "reference_mechanics_only": {"const": true}
+      }
+    },
+    "review": {
+      "type": "object", "additionalProperties": false,
+      "required": ["basis", "human_review_per_row", "user_aggregate_authorized", "root_quality_audit"],
+      "properties": {
+        "basis": {"type": "string", "minLength": 1},
+        "human_review_per_row": {"const": false},
+        "user_aggregate_authorized": {"const": true},
+        "root_quality_audit": {"const": true}
+      }
+    },
+    "training_eligible": {"const": true},
+    "response_length_class": {"const": "expanded"}
+  }
+}

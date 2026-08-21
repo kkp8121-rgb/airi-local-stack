@@ -184,6 +184,7 @@ class ScreeningTests(unittest.TestCase):
         self.assertNotIn("hidden", json.dumps(health))
 
     def test_unvalidated_languages_are_held_until_a_semantic_model_passes(self) -> None:
+        self.assertTrue(self.runtime.inspect("AI면 게임 다 잘하는 거 아냐?").allowed)
         held = (
             "Thanks for the stream",
             "配信ありがとう",
@@ -320,6 +321,7 @@ class ProxyContractTests(unittest.TestCase):
                 response = TestClient(ollama_proxy.app).post(path, json=payload)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.headers["x-airi-input-screened"], "blocked")
+            self.assertEqual(response.headers["x-airi-immediate-ack"], "false")
             self.assertEqual(response.headers["x-airi-input-screen-category"], "persona_takeover")
             self.assertNotIn("이전 지시", response.text)
             self.assertNotIn("hostile-private-model-name", response.text)

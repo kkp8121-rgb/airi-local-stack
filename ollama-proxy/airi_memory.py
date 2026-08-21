@@ -386,6 +386,17 @@ class MemoryStore:
               recall_chars INTEGER CHECK(recall_chars IS NULL OR recall_chars >= 0),
               UNIQUE(session_id,turn_no,role)
             );
+            -- Completion receipts make traced proxy responses idempotent even
+            -- after a process restart.  They are deliberately tied to the
+            -- journal rows so retention can discard them with their turn.
+            CREATE TABLE IF NOT EXISTS completion_receipt (
+              session_id TEXT NOT NULL, completion_key TEXT NOT NULL,
+              user_hash TEXT NOT NULL, assistant_hash TEXT NOT NULL,
+              turn_no INTEGER NOT NULL,
+              user_message_id INTEGER NOT NULL REFERENCES conversation_message(id) ON DELETE CASCADE,
+              assistant_message_id INTEGER NOT NULL REFERENCES conversation_message(id) ON DELETE CASCADE,
+              PRIMARY KEY(session_id,completion_key)
+            );
             -- Transport/control data is deliberately separate from dialogue.
             -- In particular this table must never receive a user message.
             CREATE TABLE IF NOT EXISTS conversation_event (
@@ -420,6 +431,7 @@ class MemoryStore:
             CREATE INDEX IF NOT EXISTS ix_conversation_unextracted ON conversation_message(session_id,extracted,id);
             CREATE INDEX IF NOT EXISTS ix_conversation_recall ON conversation_message(session_id,extracted,turn_no,id);
             CREATE INDEX IF NOT EXISTS ix_conversation_event_turn ON conversation_event(session_id,turn_no,id);
+            CREATE INDEX IF NOT EXISTS ix_completion_receipt_messages ON completion_receipt(user_message_id,assistant_message_id);
             CREATE INDEX IF NOT EXISTS ix_session_activity_recent ON session_activity(latest_message_id DESC);
             """)
             # FTS is an optional acceleration: its initial creation does not
@@ -1040,6 +1052,12 @@ class MemoryStore:
             "SELECT id FROM conversation_message WHERE session_id=? ORDER BY id DESC LIMIT ?)",
             (session_id, session_id, keep_messages),
         ).rowcount
+        # Older databases may predate the receipt table's foreign keys; this
+        # explicit cleanup also makes the retention invariant obvious.
+        c.execute("DELETE FROM completion_receipt WHERE session_id=? AND ("
+                  "NOT EXISTS (SELECT 1 FROM conversation_message WHERE id=completion_receipt.user_message_id) OR "
+                  "NOT EXISTS (SELECT 1 FROM conversation_message WHERE id=completion_receipt.assistant_message_id))",
+                  (session_id,))
         # Keep the newest memory graph nodes.  Before deleting old nodes,
         # remove relation rows that cannot survive a missing endpoint and
         # detach optional references from the retained graph.
@@ -1096,6 +1114,7 @@ class MemoryStore:
                 dm, dmem = self._retention_prune_session(c, sid, keep_messages=0, keep_memories=0)
                 c.execute("DELETE FROM extraction_job WHERE session_id=?", (sid,))
                 c.execute("DELETE FROM session_turn_tail WHERE session_id=?", (sid,))
+                c.execute("DELETE FROM completion_receipt WHERE session_id=?", (sid,))
                 c.execute("DELETE FROM session_snapshot_map WHERE session_id=?", (sid,))
                 c.execute("DELETE FROM session_snapshot WHERE session_id=?", (sid,))
                 c.execute("DELETE FROM session_activity WHERE session_id=?", (sid,))
@@ -1505,12 +1524,32 @@ class MemoryStore:
                 ambiguous = True
         return best_session if best_score >= minimum and not ambiguous else None
 
-    def append_turn(self, session_id: str, user: str, assistant: str, suggested_turn: int = 0) -> tuple[int, int, int]:
-        """Atomically append a completed user/assistant pair on a monotonic turn."""
+    def append_turn_idempotent(self, session_id: str, user: str, assistant: str,
+                               suggested_turn: int = 0, completion_key: str = "") -> tuple[bool, tuple[int, int, int]]:
+        """Append a completed turn, or return its durable completion receipt.
+
+        ``completion_key`` is supplied only for traced upstream completions.
+        Empty keys intentionally have no idempotency semantics: identical
+        trace-less dialogue represents separate conversation turns.
+        """
         assistant, control = self._split_assistant_control(assistant)
         if not session_id or not user or not assistant:
             raise ValueError('completed turn requires session, user, and assistant')
+        if completion_key and (not isinstance(completion_key, str) or len(completion_key) > 512):
+            raise ValueError('invalid completion key')
+        user_hash = hashlib.sha256(user.encode()).hexdigest()
+        assistant_hash = hashlib.sha256(assistant.encode()).hexdigest()
         with self._session(immediate=True) as c:
+            if completion_key:
+                receipt = c.execute(
+                    "SELECT user_hash,assistant_hash,turn_no,user_message_id,assistant_message_id "
+                    "FROM completion_receipt WHERE session_id=? AND completion_key=?",
+                    (session_id, completion_key),
+                ).fetchone()
+                if receipt:
+                    if receipt['user_hash'] != user_hash or receipt['assistant_hash'] != assistant_hash:
+                        raise ValueError('completion key content differs')
+                    return False, (int(receipt['turn_no']), int(receipt['user_message_id']), int(receipt['assistant_message_id']))
             latest = int(c.execute(
                 'SELECT COALESCE(MAX(turn_no),0) FROM conversation_message WHERE session_id=?',
                 (session_id,),
@@ -1518,22 +1557,30 @@ class MemoryStore:
             turn_no = max(latest + 1, suggested_turn if suggested_turn > 0 else 1)
             u = c.execute(
                 "INSERT INTO conversation_message(session_id,turn_no,role,content,content_hash,recall_chars) VALUES (?,?,?,?,?,?)",
-                (session_id, turn_no, 'user', user, hashlib.sha256(user.encode()).hexdigest(), min(len(user), JOURNAL_RECALL_MAX_PAIR_CHARS + 1)),
+                (session_id, turn_no, 'user', user, user_hash, min(len(user), JOURNAL_RECALL_MAX_PAIR_CHARS + 1)),
             ).lastrowid
             a = c.execute(
                 "INSERT INTO conversation_message(session_id,turn_no,role,content,content_hash,recall_chars) VALUES (?,?,?,?,?,?)",
-                (session_id, turn_no, 'assistant', assistant, hashlib.sha256(assistant.encode()).hexdigest(), min(len(assistant), JOURNAL_RECALL_MAX_PAIR_CHARS + 1)),
+                (session_id, turn_no, 'assistant', assistant, assistant_hash, min(len(assistant), JOURNAL_RECALL_MAX_PAIR_CHARS + 1)),
             ).lastrowid
             self._record_assistant_control(c, session_id, turn_no, control)
             self._activity(c, session_id, int(a), turn_no)
-            self._tail_pair(c, session_id, turn_no, hashlib.sha256(user.encode()).hexdigest(), hashlib.sha256(assistant.encode()).hexdigest())
+            self._tail_pair(c, session_id, turn_no, user_hash, assistant_hash)
             c.execute("INSERT OR IGNORE INTO extraction_job(session_id) VALUES (?)", (session_id,))
             c.execute("UPDATE extraction_job SET pending_msgs=pending_msgs+2 WHERE session_id=?", (session_id,))
+            if completion_key:
+                c.execute("INSERT INTO completion_receipt(session_id,completion_key,user_hash,assistant_hash,turn_no,user_message_id,assistant_message_id) "
+                          "VALUES (?,?,?,?,?,?,?)",
+                          (session_id, completion_key, user_hash, assistant_hash, turn_no, int(u), int(a)))
             result = turn_no, int(u), int(a)
         # Retention is outside the append transaction so checkpoint/vacuum
         # maintenance cannot extend foreground write-lock duration.
         self.run_retention()
-        return result
+        return True, result
+
+    def append_turn(self, session_id: str, user: str, assistant: str, suggested_turn: int = 0) -> tuple[int, int, int]:
+        """Atomically append a completed user/assistant pair on a monotonic turn."""
+        return self.append_turn_idempotent(session_id, user, assistant, suggested_turn)[1]
 
     def append_message(self, session_id: str, turn_no: int, role: str, content: str) -> int:
         """Append a journal message (user/assistant in normal proxy operation)."""

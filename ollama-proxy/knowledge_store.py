@@ -199,6 +199,10 @@ class KnowledgeHit:
     semantic_score: float | None = None
     answer_summary: str | None = None
     reviewed_at: str | None = None
+    # Stable local row ids let the proxy issue a content-free retrieval
+    # receipt.  They intentionally carry no source, title, or chunk text.
+    document_id: int | None = None
+    chunk_id: int | None = None
 
 
 class KnowledgeStore:
@@ -419,7 +423,7 @@ class KnowledgeStore:
             if remaining < 32:
                 break
             content = row["content"][:remaining].rstrip()
-            selected.append(KnowledgeHit(row["source"], row["title"], row["version"], row["published_at"], row["provenance"], content, round(score, 6), reviewed_at=row["reviewed_at"]))
+            selected.append(KnowledgeHit(row["source"], row["title"], row["version"], row["published_at"], row["provenance"], content, round(score, 6), reviewed_at=row["reviewed_at"], document_id=int(row["document_id"]), chunk_id=int(row["id"])))
             used += len(content)
             if len(selected) >= top_k:
                 break
@@ -514,7 +518,7 @@ class KnowledgeStore:
             if remaining < 32:
                 break
             content = row["content"][:remaining].rstrip()
-            selected.append(KnowledgeHit(row["source"], row["title"], row["version"], row["published_at"], row["provenance"], content, round(score, 6), method, matched, lexical_score, semantic_score, row["answer_summary"], row["reviewed_at"]))
+            selected.append(KnowledgeHit(row["source"], row["title"], row["version"], row["published_at"], row["provenance"], content, round(score, 6), method, matched, lexical_score, semantic_score, row["answer_summary"], row["reviewed_at"], int(row["document_id"]), int(row["id"])))
             used += len(content)
             if len(selected) >= top_k:
                 break

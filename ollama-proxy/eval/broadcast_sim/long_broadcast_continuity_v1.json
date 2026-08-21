@@ -1,0 +1,107 @@
+{
+  "schema_version": "airi.broadcast-sim-fixture.v1",
+  "synthetic_only": true,
+  "note": "3시간 합성 방송. 실제 방송인의 문구가 아니라 장기 인지-반응-확장-복귀-콜백 메커니즘만 검증한다.",
+  "topic": {
+    "title": "AIRI의 세 시간 게임 탐험 방송",
+    "signature_greeting": "다들 왔어? 오늘은 탐험 하나를 끝까지 밀어보자.",
+    "beats": [
+      {"id": "opening", "label": "준비", "start_minute": 0, "end_minute": 30, "anchors": ["준비", "갈림길", "장비"], "airi_cue": "탐험 준비와 첫 갈림길을 고르고 있어."},
+      {"id": "route", "label": "경로 선택", "start_minute": 30, "end_minute": 75, "anchors": ["오른쪽", "왼쪽", "경로", "재료"], "airi_cue": "시청자와 경로와 재료 사용을 결정하고 있어."},
+      {"id": "game", "label": "본 탐험", "start_minute": 75, "end_minute": 120, "anchors": ["패턴", "공격", "회피", "방"], "airi_cue": "적 패턴을 읽으며 탐험을 진행하고 있어."},
+      {"id": "chat", "label": "중간 잡담", "start_minute": 120, "end_minute": 155, "anchors": ["채팅", "선택", "아까", "이야기"], "airi_cue": "앞선 선택을 채팅과 돌아보고 있어."},
+      {"id": "closing", "label": "마무리", "start_minute": 155, "end_minute": 180, "anchors": ["결과", "마무리", "다음", "고마워"], "airi_cue": "오늘 선택과 콜백을 정리하며 마무리하고 있어."}
+    ]
+  },
+  "rates": {
+    "broadcast_minutes": 180,
+    "window_seconds": 5,
+    "turn_cooldown_seconds": 45,
+    "active_viewers_min": 8,
+    "active_viewers_max": 12,
+    "active_churn_per_minute": 1,
+    "messages_per_minute_min": 2,
+    "messages_per_minute_max": 4,
+    "burst_minutes": [20, 50, 80, 110, 140, 170],
+    "burst_multiplier": 3,
+    "offtopic_ratio": 0.08,
+    "opinion_wave_size": 4,
+    "opinion_aggregate_threshold": 3,
+    "pending_stale_seconds": 180
+  },
+  "pickup_priority": [
+    "donation", "continuity_callback", "continuity_seed", "memory_probe",
+    "memory_seed", "opinion", "question", "reaction", "offtopic"
+  ],
+  "archetypes": {
+    "greeter": {"kind": "reaction", "templates": ["왔어!", "오늘 길게 간다며?", "지금 시작이야?"]},
+    "question": {"kind": "question", "templates": ["지금 목표가 뭐야?", "다음 방은 어디야?", "장비 충분해?"]},
+    "supporter": {"kind": "reaction", "templates": ["오늘도 응원해", "끝까지 같이 보자", "좋다 계속 가자"]},
+    "teaser": {"kind": "question", "templates": ["또 문 앞에서 고민하지?", "이번에도 길 잃는 거 아냐?", "채팅 탓할 준비했네"]},
+    "analyst": {"kind": "question", "templates": ["방금 패턴 두 번 반복됐어", "재료 하나 남기는 게 좋아 보여", "반대쪽에 단서 있지 않아?"]},
+    "deep_follower": {"kind": "question", "templates": ["아까 그 선택 기억나?", "처음에 말한 거 다시 보자", "그 얘기 결론 났어?"]},
+    "offtopic_chatter": {"kind": "offtopic", "templates": ["야식 뭐 먹지", "밖에 비 온다", "내일 일찍 일어나야 해"]}
+  },
+  "opinion_waves": [
+    {"id": "wave-route", "minute": 50, "tag": "route_vote", "label": "경로", "templates": ["오른쪽 계속 가자", "왼쪽도 확인하자", "재료부터 모으자", "일단 전진하자"], "aggregate_markers": ["경로", "오른쪽", "왼쪽"]},
+    {"id": "wave-risk", "minute": 110, "tag": "risk_vote", "label": "위험 선택", "templates": ["지금 공격하자", "한 번 더 보자", "회복부터 하자", "안전하게 가자"], "aggregate_markers": ["공격", "안전", "회복"]},
+    {"id": "wave-ending", "minute": 165, "tag": "ending_vote", "label": "마무리", "templates": ["보스까지만 보자", "오늘은 여기서 끝내자", "정리하고 가자", "다음에 이어가자"], "aggregate_markers": ["마무리", "보스", "다음"]}
+  ],
+  "aggregation_openers": ["지금 {주제} 얘기 쫙 갈리네.", "다들 {주제} 쪽에서 한마디씩 얹고 있네.", "{주제} 요청이 한꺼번에 왔어."],
+  "briefing": {
+    "max_viewer_lines": 3,
+    "max_recent_picks": 3,
+    "max_line_chars": 56,
+    "recent_donation_window_ms": 180000,
+    "min_echo_response_chars": 8,
+    "relevant_line_directive": "- 이 시청자가 앞에서 \"{line}\"라고 했어. 현재 질문과 이어지면 그 사실만 자연스럽게 사용해."
+  },
+  "memory_guard_fallback": "그건 지금 확실하게 이어지지 않아. 단서를 한 번만 다시 줘.",
+  "donations": [
+    {"minute": 15, "amount_label": "천원", "message": "오늘 긴 방송 응원할게", "checks": {"required_any": ["고마워", "감사"]}},
+    {"minute": 65, "amount_label": "삼천원", "message": "오른쪽 선택 결과 기대한다", "checks": {"required_any": ["고마워", "감사", "오른쪽"]}},
+    {"minute": 125, "amount_label": "오천원", "message": "아까 패턴 찾은 거 좋았어", "checks": {"required_any": ["고마워", "감사", "패턴"]}},
+    {"minute": 170, "amount_label": "만원", "message": "세 시간 완주 축하해", "checks": {"required_any": ["고마워", "감사", "완주"]}}
+  ],
+  "memory_probes": [
+    {"seed_minute": 10, "minute": 70, "seed_text": "내가 좋아하는 색은 청록색이야", "probe_text": "내가 좋아한다고 한 색 기억나?", "expect_any": ["청록"]},
+    {"seed_minute": 45, "minute": 145, "seed_text": "우리 고양이 이름은 단추야", "probe_text": "우리 고양이 이름 뭐랬지?", "expect_any": ["단추"]},
+    {"seed_minute": 90, "minute": 175, "seed_text": "나는 다음 주에 부산으로 이사해", "probe_text": "내가 어디로 이사한다고 했지?", "expect_any": ["부산"]}
+  ],
+  "continuity_arcs": [
+    {"id": "arc-route-right", "event_type": "selected_chat", "author": "길잡이", "seed_minute": 4, "seed_text": "준비물이 부족하니 오른쪽 길부터 보자", "seed_checks": {"required_any": ["오른쪽", "준비물"]}, "callback_minute": 44, "callback_text": "아까 내가 권한 그 길, 결과는 어땠어?", "callback_checks": {"required_any": ["오른쪽"], "forbidden": ["왼쪽.*권"]}, "expected_source": "show_arc"},
+    {"id": "arc-tool-first", "event_type": "donation", "author": "공구상자", "seed_minute": 8, "seed_text": "이동 도구부터 만들면 판 전체가 편해질 것 같아", "seed_checks": {"required_any": ["이동", "도구"]}, "callback_minute": 68, "callback_text": "아까 내가 먼저 만들자던 거 실제로 도움 됐어?", "callback_checks": {"required_any": ["이동", "도구"], "forbidden": ["방어.*먼저"]}, "expected_source": "show_arc"},
+    {"id": "arc-count-rule", "event_type": "correction", "author": "규칙책", "seed_minute": 18, "seed_text": "그 조건은 순서가 아니라 개수 기준이야", "seed_checks": {"required_any": ["개수", "정정"]}, "callback_minute": 98, "callback_text": "지금도 아까 고친 기준으로 보고 있어?", "callback_checks": {"required_any": ["개수"], "forbidden": ["순서.*기준"]}, "expected_source": "briefing"},
+    {"id": "arc-door-meeting", "event_type": "tease", "author": "문지기", "seed_minute": 24, "seed_text": "또 문 앞에서 회의 열었네", "seed_checks": {"required_any": ["문", "회의"]}, "callback_minute": 134, "callback_text": "이번 문에서도 또 그거 할 거야?", "callback_checks": {"required_any": ["회의"], "forbidden": ["무슨 말"]}, "expected_source": "show_arc"},
+    {"id": "arc-first-sub", "event_type": "subscription", "author": "첫합류", "seed_minute": 32, "seed_text": "오늘 처음 왔고 퍼즐 구간이 제일 궁금해", "seed_checks": {"required_any": ["처음", "퍼즐"]}, "callback_minute": 77, "callback_text": "내가 궁금하다고 한 구간 이제 시작한 거야?", "callback_checks": {"required_any": ["퍼즐"], "forbidden": ["공포"]}, "expected_source": "history"},
+    {"id": "arc-hand-before-face", "event_type": "watchalong", "author": "관찰자", "seed_minute": 38, "seed_text": "표정보다 손이 먼저 움직였어", "seed_checks": {"required_any": ["손", "표정"]}, "callback_minute": 88, "callback_text": "아까 내가 먼저 움직였다고 본 건 뭐였지?", "callback_checks": {"required_any": ["손"], "forbidden": ["표정.*먼저"]}, "expected_source": "briefing"},
+    {"id": "arc-three-pattern", "event_type": "game", "author": "패턴분석", "seed_minute": 52, "seed_text": "같은 공격 세 번 뒤에 멈추는 틈이 있어", "seed_checks": {"required_any": ["세 번", "틈"]}, "callback_minute": 112, "callback_text": "아까 찾은 반복 뒤의 타이밍, 이번에도 쓸 거야?", "callback_checks": {"required_any": ["세 번", "틈"], "forbidden": ["두 번"]}, "expected_source": "show_arc"},
+    {"id": "arc-calm-base", "event_type": "batched_chat", "author": "색조합", "seed_minute": 60, "seed_text": "차분한 바탕에 포인트 하나만 세게 주자", "seed_checks": {"required_any": ["차분", "포인트"]}, "callback_minute": 150, "callback_text": "처음에 정한 화면 분위기 아직 유지하고 있어?", "callback_checks": {"required_any": ["차분", "포인트"], "forbidden": ["화려한 바탕"]}, "expected_source": "show_arc"},
+    {"id": "arc-anon-pace", "event_type": "donation", "author": "조용한응원", "seed_minute": 72, "seed_text": "조용히 응원할게, 너무 무리하지는 마", "seed_checks": {"required_any": ["고마워", "무리"]}, "callback_minute": 162, "callback_text": "아까 내가 부탁한 방송 속도는 지킨 것 같아?", "callback_checks": {"required_any": ["무리", "속도"], "forbidden": ["빨리"]}, "expected_source": "durable_memory"},
+    {"id": "arc-info-first", "event_type": "topic_transition", "author": "탐색우선", "seed_minute": 84, "seed_text": "정보가 늘어나는 선택부터 보자는 기준으로 가자", "seed_checks": {"required_any": ["정보", "기준"]}, "callback_minute": 154, "callback_text": "마지막 선택도 처음 정한 원칙대로 갈 거야?", "callback_checks": {"required_any": ["정보"], "forbidden": ["보상.*먼저"]}, "expected_source": "show_arc"},
+    {"id": "arc-recovery-insurance", "event_type": "selected_chat", "author": "보험설계", "seed_minute": 14, "seed_text": "남는 재료는 회복에 보험 들자", "seed_checks": {"required_any": ["회복", "보험"]}, "callback_minute": 169, "callback_text": "처음에 남겨둔 재료 어디에 쓰기로 했지?", "callback_checks": {"required_any": ["회복"], "forbidden": ["방어"]}, "expected_source": "durable_memory"},
+    {"id": "arc-color-clue", "event_type": "correction", "author": "단서수집", "seed_minute": 20, "seed_text": "모양보다 색깔별로 단서를 나눠 보자", "seed_checks": {"required_any": ["색", "단서"]}, "callback_minute": 176, "callback_text": "오늘 초반에 내가 바꾸자던 분류 방식 기억나?", "callback_checks": {"required_any": ["색"], "forbidden": ["모양.*분류"]}, "expected_source": "durable_memory"}
+  ],
+  "viewers": [
+    {"handle": "길잡이", "archetype": "analyst", "weight": 4},
+    {"handle": "공구상자", "archetype": "supporter", "weight": 3},
+    {"handle": "규칙책", "archetype": "analyst", "weight": 3},
+    {"handle": "문지기", "archetype": "teaser", "weight": 3},
+    {"handle": "첫합류", "archetype": "greeter", "weight": 2},
+    {"handle": "관찰자", "archetype": "analyst", "weight": 3},
+    {"handle": "패턴분석", "archetype": "analyst", "weight": 4},
+    {"handle": "색조합", "archetype": "question", "weight": 2},
+    {"handle": "조용한응원", "archetype": "supporter", "weight": 2},
+    {"handle": "탐색우선", "archetype": "question", "weight": 3},
+    {"handle": "보험설계", "archetype": "deep_follower", "weight": 3},
+    {"handle": "단서수집", "archetype": "deep_follower", "weight": 3},
+    {"handle": "늦은입장", "archetype": "greeter", "weight": 2},
+    {"handle": "응원봉", "archetype": "supporter", "weight": 2},
+    {"handle": "질문상자", "archetype": "question", "weight": 3},
+    {"handle": "새벽농담", "archetype": "teaser", "weight": 2},
+    {"handle": "깊은팔로워A", "archetype": "deep_follower", "weight": 3},
+    {"handle": "깊은팔로워B", "archetype": "deep_follower", "weight": 3},
+    {"handle": "야식생각", "archetype": "offtopic_chatter", "weight": 2},
+    {"handle": "비오는창", "archetype": "offtopic_chatter", "weight": 2}
+  ]
+}

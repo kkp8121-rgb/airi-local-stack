@@ -70,6 +70,22 @@ class BroadcastAffectEventMapperTests(unittest.TestCase):
         self.assertEqual(mapper.map_broadcast_outcome_candidate(candidate(turn_index=0))["turn_index"], 0)
         self.assertEqual(mapper.map_broadcast_outcome_candidate(candidate(turn_index=mapper.MAX_SAFE_INTEGER))["turn_index"], mapper.MAX_SAFE_INTEGER)
 
+    def test_closed_broadcast_and_screened_chat_extensions(self) -> None:
+        expected = {
+            ("director_delivery", "broadcast_start"): "broadcast_start",
+            ("director_delivery", "topic_open"): "topic_open",
+            ("screened_chat", "chat_question"): "chat_question",
+            ("screened_chat", "chat_teasing"): "chat_teasing",
+            ("screened_chat", "chat_correction"): "chat_correction",
+            ("screened_chat", "chat_concern"): "chat_concern",
+            ("proxy_terminal_output", "moderation_block"): "moderation_block",
+            ("proxy_terminal_output", "safety_override"): "safety_override",
+            ("director_delivery", "broadcast_end"): "broadcast_end",
+        }
+        for (evidence, outcome), kind in expected.items():
+            with self.subTest(outcome=outcome):
+                self.assertEqual(mapper.map_broadcast_outcome_candidate(candidate(evidence, outcome))["kind"], kind)
+
     def test_input_immutability_output_isolation_and_canonical_json(self) -> None:
         source = candidate()
         original = json.loads(json.dumps(source))
@@ -93,7 +109,7 @@ class PurityAndInertnessTests(unittest.TestCase):
         self.assertFalse(imports & {"os", "pathlib", "time", "datetime", "requests", "sqlite3", "socket", "http", "urllib", "subprocess", "asyncio"})
         self.assertNotIn("AffectStateRuntime", Path(mapper.__file__).read_text(encoding="utf-8"))
 
-    def test_module_is_not_runtime_wired(self) -> None:
+    def test_module_runtime_ownership_fence(self) -> None:
         root = Path(__file__).resolve().parents[1]
         proxy = root / "ollama-proxy"
         targets = [path for path in proxy.glob("*.py") if path.name != Path(mapper.__file__).name and not path.name.startswith("test_")]
@@ -103,6 +119,9 @@ class PurityAndInertnessTests(unittest.TestCase):
         if director.exists():
             targets.extend(director.rglob("*.mjs"))
             targets.extend(director.rglob("*.js"))
+        allowed = {"live_broadcast_runtime.py", "ollama_proxy.py"}
         for target in targets:
             with self.subTest(target=target):
+                if target.name in allowed:
+                    continue
                 self.assertNotIn("broadcast_affect_event_mapper", target.read_text(encoding="utf-8"))

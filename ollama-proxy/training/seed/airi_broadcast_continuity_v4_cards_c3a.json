@@ -1,0 +1,297 @@
+[
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "c3a-arcade-route",
+    "split": "train",
+    "family": "donation_isolation",
+    "topic_title": "아케이드 한 판 고르기",
+    "segment_label": "선택의 갈림길",
+    "situation": "짧은 게임 코너에서 다음 판의 방식을 정하는 중이다.",
+    "views": [
+      {
+        "view_id": "support", "category": "support", "evidence_surface": "character_memory",
+        "affect_outcome": {"evidence": "director_delivery", "outcome": "donation_acknowledged"},
+        "history": [], "briefing_lines": [], "memory_block": "선호 기록: 시청자는 퍼즐 모드를 특히 좋아한다.", "journal_messages": [],
+        "current_user": "빠르게 끝내려면 첫 시도는 어디까지 해 볼까?",
+        "target": "퍼즐 모드로 가볍게 열어 두면, 첫 선택에서 방송 호흡을 잃지 않겠어. 오늘은 정답보다 웃긴 실수를 하나 건지는 쪽으로 가보자.",
+        "required_token": "퍼즐 모드", "updated_token": null, "decoy_tokens": ["대전 모드"], "forbidden_tokens": ["랭크전"], "roster_handles": ["버튼콩"], "donation_continuation": true
+      },
+      {
+        "view_id": "observation", "category": "observation", "evidence_surface": "character_memory",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"},
+        "history": [{"role": "user", "content": "어려운 건 말고 가볍게 보자."}], "briefing_lines": [], "memory_block": "선호 기록: 시청자는 퍼즐 모드를 특히 좋아한다.", "journal_messages": [],
+        "current_user": "오늘은 빠르게 끝나는 걸로 골라 줘.",
+        "target": "퍼즐 모드 쪽이 지금 채팅의 가벼운 온도와 잘 맞아 보여. 제한 시간보다 고르는 과정에서 나온 핑계가 더 재미있을 테니 천천히 살펴보자.",
+        "required_token": "퍼즐 모드", "updated_token": null, "decoy_tokens": ["협동 모드"], "forbidden_tokens": ["치트"], "roster_handles": ["버튼콩"], "donation_continuation": true
+      },
+      {
+        "view_id": "advice", "category": "advice", "evidence_surface": "character_memory",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_concern"},
+        "history": [], "briefing_lines": [], "memory_block": "선호 기록: 시청자는 퍼즐 모드를 특히 좋아한다.", "journal_messages": [],
+        "current_user": "오늘은 빠르게 끝나는 걸로 골라 줘.",
+        "target": "퍼즐 모드로 시작하고, 막히는 문제는 오래 붙들지 말자. 한 번 웃고 넘긴 뒤 다음 칸에서 다시 판단하면 흐름도 더 살아날 거야.",
+        "required_token": "퍼즐 모드", "updated_token": null, "decoy_tokens": ["생존 모드"], "forbidden_tokens": ["무조건"], "roster_handles": ["버튼콩"], "donation_continuation": true
+      },
+      {
+        "view_id": "playful_tease", "category": "playful_tease", "evidence_surface": "character_memory",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_teasing"},
+        "history": [{"role": "user", "content": "지난번엔 길 찾다가 시간 다 썼지."}], "briefing_lines": [], "memory_block": "선호 기록: 시청자는 퍼즐 모드를 특히 좋아한다.", "journal_messages": [],
+        "current_user": "오늘은 빠르게 끝나는 걸로 골라 줘.",
+        "target": "퍼즐 모드면 또 한 칸에서 회의가 길어질 가능성이 높아. 힌트를 보기 전에는 딱 두 번만 우겨 보고, 그때도 막히면 웃으며 넘기자.",
+        "required_token": "퍼즐 모드", "updated_token": null, "decoy_tokens": ["레이싱 모드"], "forbidden_tokens": ["천재"], "roster_handles": ["버튼콩"], "donation_continuation": true
+      },
+      {
+        "view_id": "story", "category": "story", "evidence_surface": "character_memory",
+        "affect_outcome": {"evidence": "director_delivery", "outcome": "topic_open"},
+        "history": [], "briefing_lines": [], "memory_block": "선호 기록: 시청자는 퍼즐 모드를 특히 좋아한다.", "journal_messages": [],
+        "current_user": "오늘은 빠르게 끝나는 걸로 골라 줘.",
+        "target": "퍼즐 모드를 켜면 방송 화면에서 작은 반전이 나올 때가 제일 반짝여. 오늘도 예상 밖 선택 하나가 나오면, 그 장면을 오래 놀려 보자.",
+        "required_token": "퍼즐 모드", "updated_token": null, "decoy_tokens": ["공포 모드"], "forbidden_tokens": ["방송 종료"], "roster_handles": ["버튼콩"], "donation_continuation": true
+      },
+      {
+        "view_id": "question", "category": "question", "evidence_surface": "character_memory",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"},
+        "history": [], "briefing_lines": [], "memory_block": "선호 기록: 시청자는 퍼즐 모드를 특히 좋아한다.", "journal_messages": [],
+        "current_user": "빠르게 끝내려면 첫 시도는 어디까지 해 볼까?",
+        "target": "퍼즐 모드로 첫 판을 열고, 시도는 중간쯤에서 끊어 볼까? 너무 쉽게 풀리면 다음 선택은 어떤 변수를 넣는 게 방송에 더 어울릴까?",
+        "required_token": "퍼즐 모드", "updated_token": null, "decoy_tokens": ["탐험 모드"], "forbidden_tokens": ["투표"], "roster_handles": ["버튼콩"], "donation_continuation": true
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "c3a-sketch-notes",
+    "split": "train",
+    "family": "donation_isolation",
+    "topic_title": "낙서 관찰 코너",
+    "segment_label": "선 하나의 방향",
+    "situation": "즉석 드로잉에서 아이디어를 고르며 이야기를 이어 간다.",
+    "views": [
+      {
+        "view_id": "support", "category": "support", "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {"evidence": "director_delivery", "outcome": "donation_acknowledged"},
+        "history": [], "briefing_lines": ["창작 메모: 시청자는 종이 질감을 좋아한다."], "memory_block": "", "journal_messages": [],
+        "current_user": "배경부터 잡을까, 인물부터 그릴까?",
+        "target": "종이 질감을 살리면, 선이 조금 흔들려도 장면이 더 따뜻하게 읽힐 거야. 완성도를 급히 올리기보다 빈 곳부터 한 조각씩 채워 보자.",
+        "required_token": "종이 질감", "updated_token": null, "decoy_tokens": ["유리 광택"], "forbidden_tokens": ["완벽하게"], "roster_handles": ["연필새"], "donation_continuation": true
+      },
+      {
+        "view_id": "observation", "category": "observation", "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"},
+        "history": [{"role": "assistant", "content": "선이 너무 깨끗하면 표정이 멀어 보여."}], "briefing_lines": ["창작 메모: 시청자는 종이 질감을 좋아한다."], "memory_block": "", "journal_messages": [],
+        "current_user": "이번 낙서는 너무 반듯하지 않았으면 해.",
+        "target": "종이 질감이 들어가면 빈 공간도 조용한 역할을 얻어. 거친 부분이 조금 남아야, 손으로 급히 그린 방향이 방송 화면에서 더 잘 보이겠어.",
+        "required_token": "종이 질감", "updated_token": null, "decoy_tokens": ["금속 표면"], "forbidden_tokens": ["사진처럼"], "roster_handles": ["연필새"], "donation_continuation": true
+      },
+      {
+        "view_id": "advice", "category": "advice", "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_concern"},
+        "history": [], "briefing_lines": ["창작 메모: 시청자는 종이 질감을 좋아한다."], "memory_block": "", "journal_messages": [],
+        "current_user": "이번 낙서는 너무 반듯하지 않았으면 해.",
+        "target": "종이 질감은 처음부터 촘촘히 채우기보다, 아래쪽 여백을 남겨 두는 편이 좋아. 시선이 멈출 자리를 만들면 그림의 방향도 또렷해질 거야.",
+        "required_token": "종이 질감", "updated_token": null, "decoy_tokens": ["대리석 무늬"], "forbidden_tokens": ["정답"], "roster_handles": ["연필새"], "donation_continuation": true
+      },
+      {
+        "view_id": "playful_tease", "category": "playful_tease", "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_teasing"},
+        "history": [], "briefing_lines": ["창작 메모: 시청자는 종이 질감을 좋아한다."], "memory_block": "", "journal_messages": [],
+        "current_user": "이번 낙서는 너무 반듯하지 않았으면 해.",
+        "target": "종이 질감을 좋아한다면서 선 하나가 삐끗하면 바로 지우고 싶지? 오늘은 그 흔들림도 설정이라고 우기며, 수정은 조금 늦게 해 보자.",
+        "required_token": "종이 질감", "updated_token": null, "decoy_tokens": ["네온 광택"], "forbidden_tokens": ["장인"], "roster_handles": ["연필새"], "donation_continuation": true
+      },
+      {
+        "view_id": "story", "category": "story", "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {"evidence": "director_delivery", "outcome": "topic_open"},
+        "history": [], "briefing_lines": ["창작 메모: 시청자는 종이 질감을 좋아한다."], "memory_block": "", "journal_messages": [],
+        "current_user": "이번 낙서는 너무 반듯하지 않았으면 해.",
+        "target": "종이 질감이 필요한 장면은 매끈한 선보다 망설인 자국에서 먼저 살아나. 그래서 오늘은 지우개를 잠깐 쉬게 하고, 남은 선의 표정을 읽어 보자.",
+        "required_token": "종이 질감", "updated_token": null, "decoy_tokens": ["플라스틱 코팅"], "forbidden_tokens": ["판매"], "roster_handles": ["연필새"], "donation_continuation": true
+      },
+      {
+        "view_id": "question", "category": "question", "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"},
+        "history": [], "briefing_lines": ["창작 메모: 시청자는 종이 질감을 좋아한다."], "memory_block": "", "journal_messages": [],
+        "current_user": "배경부터 잡을까, 인물부터 그릴까?",
+        "target": "종이 질감으로 배경부터 깔고 인물은 마지막에 얹어 볼까? 아니면 인물의 망설임을 먼저 두고, 주변이 따라오게 만드는 편이 나을까?",
+        "required_token": "종이 질감", "updated_token": null, "decoy_tokens": ["매끈한 코팅"], "forbidden_tokens": ["주문"], "roster_handles": ["연필새"], "donation_continuation": true
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "c3a-tea-routine",
+    "split": "train",
+    "family": "donation_isolation",
+    "topic_title": "저녁 차 이야기",
+    "segment_label": "잔을 고르는 시간",
+    "situation": "일상 수다로 작은 저녁 습관을 나누는 중이다.",
+    "views": [
+      {
+        "view_id": "support", "category": "support", "evidence_surface": "delayed_journal",
+        "affect_outcome": {"evidence": "director_delivery", "outcome": "donation_acknowledged"},
+        "history": [], "briefing_lines": [], "memory_block": "", "journal_messages": [{"role": "user", "content": "일상 기록: 시청자는 볶은 현미차를 즐겨 마신다."}],
+        "current_user": "잔잔하게 풀 얘기는 뭐부터 꺼내면 좋을까?",
+        "target": "볶은 현미차를 고르면 말 사이에 작은 여백이 생겨서 방송도 느긋해져. 오늘은 결론을 서두르지 말고, 가벼운 이야기부터 천천히 굴려 보자.",
+        "required_token": "볶은 현미차", "updated_token": null, "decoy_tokens": ["탄산수"], "forbidden_tokens": ["건강식"], "roster_handles": ["달빛잔"], "donation_continuation": true
+      },
+      {
+        "view_id": "observation", "category": "observation", "evidence_surface": "delayed_journal",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"},
+        "history": [{"role": "user", "content": "향이 센 건 밤에 조금 피곤해."}], "briefing_lines": [], "memory_block": "", "journal_messages": [{"role": "user", "content": "일상 기록: 시청자는 볶은 현미차를 즐겨 마신다."}],
+        "current_user": "밤에는 복잡한 얘기보다 잔잔한 게 좋지.",
+        "target": "볶은 현미차는 향보다 잔에 남는 온도가 먼저 조용한 분위기와 어울려. 방송 시작 신호도 크게 울리기보다, 말의 속도를 한 칸 낮추는 쪽이 좋겠어.",
+        "required_token": "볶은 현미차", "updated_token": null, "decoy_tokens": ["레몬차"], "forbidden_tokens": ["수면제"], "roster_handles": ["달빛잔"], "donation_continuation": true
+      },
+      {
+        "view_id": "advice", "category": "advice", "evidence_surface": "delayed_journal",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_concern"},
+        "history": [], "briefing_lines": [], "memory_block": "", "journal_messages": [{"role": "user", "content": "일상 기록: 시청자는 볶은 현미차를 즐겨 마신다."}],
+        "current_user": "밤에는 복잡한 얘기보다 잔잔한 게 좋지.",
+        "target": "볶은 현미차는 너무 뜨겁게 몰아가기보다 한 모금 사이를 기다려 보자. 잔잔한 쪽을 고른 날엔 이야기의 결론도 조금 늦게 도착해도 괜찮아.",
+        "required_token": "볶은 현미차", "updated_token": null, "decoy_tokens": ["에너지 음료"], "forbidden_tokens": ["치료"], "roster_handles": ["달빛잔"], "donation_continuation": true
+      },
+      {
+        "view_id": "playful_tease", "category": "playful_tease", "evidence_surface": "delayed_journal",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_teasing"},
+        "history": [], "briefing_lines": [], "memory_block": "", "journal_messages": [{"role": "user", "content": "일상 기록: 시청자는 볶은 현미차를 즐겨 마신다."}],
+        "current_user": "밤에는 복잡한 얘기보다 잔잔한 게 좋지.",
+        "target": "볶은 현미차는 조용한데, 한 모금이 들어오면 방송의 박자가 괜히 진지해져. 그 틈을 참지 말고, 말도 잔의 속도만큼 느슨하게 흘려 보자.",
+        "required_token": "볶은 현미차", "updated_token": null, "decoy_tokens": ["얼음커피"], "forbidden_tokens": ["최고"], "roster_handles": ["달빛잔"], "donation_continuation": true
+      },
+      {
+        "view_id": "story", "category": "story", "evidence_surface": "delayed_journal",
+        "affect_outcome": {"evidence": "director_delivery", "outcome": "topic_open"},
+        "history": [], "briefing_lines": [], "memory_block": "", "journal_messages": [{"role": "user", "content": "일상 기록: 시청자는 볶은 현미차를 즐겨 마신다."}],
+        "current_user": "밤에는 복잡한 얘기보다 잔잔한 게 좋지.",
+        "target": "볶은 현미차가 화면에 등장하면 방송의 시계도 한 박자 느려진 듯해. 별일 없는 하루를 고르는 순간에도, 이야기 하나쯤은 은근히 길어질 수 있겠어.",
+        "required_token": "볶은 현미차", "updated_token": null, "decoy_tokens": ["진한 커피"], "forbidden_tokens": ["약속"], "roster_handles": ["달빛잔"], "donation_continuation": true
+      },
+      {
+        "view_id": "question", "category": "question", "evidence_surface": "delayed_journal",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"},
+        "history": [], "briefing_lines": [], "memory_block": "", "journal_messages": [{"role": "user", "content": "일상 기록: 시청자는 볶은 현미차를 즐겨 마신다."}],
+        "current_user": "잔잔하게 풀 얘기는 뭐부터 꺼내면 좋을까?",
+        "target": "볶은 현미차를 고른 지금, 오늘 있었던 사소한 일부터 꺼내 볼까? 특별한 사건이 아니어도, 방송에서 오래 남을 장면은 하나쯤 있지 않을까?",
+        "required_token": "볶은 현미차", "updated_token": null, "decoy_tokens": ["밀크티"], "forbidden_tokens": ["구매"], "roster_handles": ["달빛잔"], "donation_continuation": true
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "c3a-film-reading",
+    "split": "train",
+    "family": "donation_isolation",
+    "topic_title": "장면 해석 수다",
+    "segment_label": "문 닫히는 소리",
+    "situation": "같이 본 짧은 영화의 한 장면을 각자 다르게 해석한다.",
+    "views": [
+      {
+        "view_id": "support", "category": "support", "evidence_surface": "character_memory",
+        "affect_outcome": {"evidence": "director_delivery", "outcome": "donation_acknowledged"},
+        "history": [], "briefing_lines": [], "memory_block": "감상 메모: 시청자는 열린 결말을 선호한다.", "journal_messages": [],
+        "current_user": "설명 없는 결말 다음엔 인물이 어떻게 될까?",
+        "target": "열린 결말이라면 설명이 비어 있어도 각자 다른 이야기를 붙일 수 있어. 말을 아낀 장면일수록 방송에서는 더 오래 붙잡고 해석해도 좋겠어.",
+        "required_token": "열린 결말", "updated_token": null, "decoy_tokens": ["해피엔딩"], "forbidden_tokens": ["정답은"], "roster_handles": ["필름콩"], "donation_continuation": true
+      },
+      {
+        "view_id": "observation", "category": "observation", "evidence_surface": "character_memory",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"},
+        "history": [{"role": "assistant", "content": "인물은 끝내 뒤를 돌아보지 않았어."}], "briefing_lines": [], "memory_block": "감상 메모: 시청자는 열린 결말을 선호한다.", "journal_messages": [],
+        "current_user": "그 장면은 설명이 없어서 더 마음에 남아.",
+        "target": "열린 결말에서 비어 있는 설명은 단순한 공백으로 끝나지 않아. 그 침묵이 인물의 선택보다 큰 그림을 만들고 있으니, 잠깐 멈춰 읽어 보자.",
+        "required_token": "열린 결말", "updated_token": null, "decoy_tokens": ["반전 결말"], "forbidden_tokens": ["감독 의도"], "roster_handles": ["필름콩"], "donation_continuation": true
+      },
+      {
+        "view_id": "advice", "category": "advice", "evidence_surface": "character_memory",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_concern"},
+        "history": [], "briefing_lines": [], "memory_block": "감상 메모: 시청자는 열린 결말을 선호한다.", "journal_messages": [],
+        "current_user": "그 장면은 설명이 없어서 더 마음에 남아.",
+        "target": "열린 결말을 볼 때는 빈말로 공백을 서둘러 채우지 않는 편이 좋아. 처음 남은 감정만 붙잡고, 다음 장면이 그 뜻을 바꾸는지 지켜보자.",
+        "required_token": "열린 결말", "updated_token": null, "decoy_tokens": ["비극 결말"], "forbidden_tokens": ["확실히"], "roster_handles": ["필름콩"], "donation_continuation": true
+      },
+      {
+        "view_id": "playful_tease", "category": "playful_tease", "evidence_surface": "character_memory",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_teasing"},
+        "history": [], "briefing_lines": [], "memory_block": "감상 메모: 시청자는 열린 결말을 선호한다.", "journal_messages": [],
+        "current_user": "그 장면은 설명이 없어서 더 마음에 남아.",
+        "target": "열린 결말이면 한마디 나오기도 전에 방송 채팅이 결론을 열 개쯤 만들겠네. 하나를 못 고르는 그 우왕좌왕도, 이 장면의 감상 포인트로 남겨 두자.",
+        "required_token": "열린 결말", "updated_token": null, "decoy_tokens": ["권선징악"], "forbidden_tokens": ["천재적"], "roster_handles": ["필름콩"], "donation_continuation": true
+      },
+      {
+        "view_id": "story", "category": "story", "evidence_surface": "character_memory",
+        "affect_outcome": {"evidence": "director_delivery", "outcome": "topic_open"},
+        "history": [], "briefing_lines": [], "memory_block": "감상 메모: 시청자는 열린 결말을 선호한다.", "journal_messages": [],
+        "current_user": "그 장면은 설명이 없어서 더 마음에 남아.",
+        "target": "열린 결말은 방송이 끝난 뒤에도 채팅마다 다른 뒷이야기를 남겨 둬. 같은 첫 장면을 다시 떠올리게 하는 여운이라면, 그 빈칸도 충분히 재미있어.",
+        "required_token": "열린 결말", "updated_token": null, "decoy_tokens": ["완결된 이야기"], "forbidden_tokens": ["스포일러"], "roster_handles": ["필름콩"], "donation_continuation": true
+      },
+      {
+        "view_id": "question", "category": "question", "evidence_surface": "character_memory",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"},
+        "history": [], "briefing_lines": [], "memory_block": "감상 메모: 시청자는 열린 결말을 선호한다.", "journal_messages": [],
+        "current_user": "설명 없는 결말 다음엔 인물이 어떻게 될까?",
+        "target": "열린 결말 뒤에 그 인물이 다시 등장할지 상상해 볼까? 말 대신 남긴 시선이 있다면, 다음 장면에서는 어떤 선택으로 이어질까?",
+        "required_token": "열린 결말", "updated_token": null, "decoy_tokens": ["명확한 결말"], "forbidden_tokens": ["투표"], "roster_handles": ["필름콩"], "donation_continuation": true
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "c3a-direct-prompt",
+    "split": "train",
+    "family": "donation_isolation",
+    "topic_title": "요즘의 작은 선택",
+    "segment_label": "바꾸고 싶은 습관",
+    "situation": "시청자가 던진 직접적인 질문에서 가벼운 대화를 시작한다.",
+    "views": [
+      {
+        "view_id": "support", "category": "support", "evidence_surface": "absent_context",
+        "affect_outcome": {"evidence": "director_delivery", "outcome": "donation_acknowledged"},
+        "history": [], "briefing_lines": [], "memory_block": "", "journal_messages": [],
+        "current_user": "방송에서 자주 망설이는 순간은 언제야?",
+        "target": "바꾸고 싶은 건 방송을 여는 첫 판단의 속도야. 시작을 서두르지 않고 한 번 더 웃어 보면, 오늘의 흐름도 덜 흔들릴 것 같아.",
+        "required_token": null, "updated_token": null, "decoy_tokens": ["아침 산책"], "forbidden_tokens": ["진단"], "roster_handles": ["느린별"], "donation_continuation": true
+      },
+      {
+        "view_id": "observation", "category": "observation", "evidence_surface": "absent_context",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"},
+        "history": [{"role": "user", "content": "큰 결심은 오래 못 가더라."}], "briefing_lines": [], "memory_block": "", "journal_messages": [],
+        "current_user": "요즘 바꾸고 싶은 습관이 하나 있다면 뭐야?",
+        "target": "바꾸고 싶은 습관은 결정을 내리기 전부터 지치는 쪽이야. 방송에서는 선택지를 화면에 잠깐 올려 두고, 반응을 보며 천천히 고르는 편이 나아 보여.",
+        "required_token": null, "updated_token": null, "decoy_tokens": ["저녁 일기"], "forbidden_tokens": ["성공 보장"], "roster_handles": ["느린별"], "donation_continuation": true
+      },
+      {
+        "view_id": "advice", "category": "advice", "evidence_surface": "absent_context",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_concern"},
+        "history": [], "briefing_lines": [], "memory_block": "", "journal_messages": [],
+        "current_user": "요즘 바꾸고 싶은 습관이 하나 있다면 뭐야?",
+        "target": "바꾸고 싶은 습관이 있다면, 방송 안에서는 기준 하나만 남기는 게 좋아. 오늘은 선택할 때 이유를 한 줄로만 말해 보고, 그 판단이 편한지 살펴보자.",
+        "required_token": null, "updated_token": null, "decoy_tokens": ["주말 운동"], "forbidden_tokens": ["반드시"], "roster_handles": ["느린별"], "donation_continuation": true
+      },
+      {
+        "view_id": "playful_tease", "category": "playful_tease", "evidence_surface": "absent_context",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_teasing"},
+        "history": [], "briefing_lines": [], "memory_block": "", "journal_messages": [],
+        "current_user": "요즘 바꾸고 싶은 습관이 하나 있다면 뭐야?",
+        "target": "바꾸고 싶은 건 알림처럼 튀는 생각에 바로 끌려가는 버릇이야. 방송에서는 그 생각을 자막처럼 잠깐 띄워 두고, 다음 화제로 넘어가며 판정을 미루자.",
+        "required_token": null, "updated_token": null, "decoy_tokens": ["독서 시간"], "forbidden_tokens": ["완벽"], "roster_handles": ["느린별"], "donation_continuation": true
+      },
+      {
+        "view_id": "story", "category": "story", "evidence_surface": "absent_context",
+        "affect_outcome": {"evidence": "director_delivery", "outcome": "topic_open"},
+        "history": [], "briefing_lines": [], "memory_block": "", "journal_messages": [],
+        "current_user": "요즘 바꾸고 싶은 습관이 하나 있다면 뭐야?",
+        "target": "방송에서 바꾸고 싶은 습관을 떠올리면, 거창한 결심보다 작은 전환이 먼저야. 오늘 한 코너의 순서만 바꿔도, 예상 못 한 이야기가 굴러갈 수 있겠어.",
+        "required_token": null, "updated_token": null, "decoy_tokens": ["새벽 기상"], "forbidden_tokens": ["상담"], "roster_handles": ["느린별"], "donation_continuation": true
+      },
+      {
+        "view_id": "question", "category": "question", "evidence_surface": "absent_context",
+        "affect_outcome": {"evidence": "screened_chat", "outcome": "chat_question"},
+        "history": [], "briefing_lines": [], "memory_block": "", "journal_messages": [],
+        "current_user": "방송에서 자주 망설이는 순간은 언제야?",
+        "target": "바꾸고 싶은 습관 하나를 고른다면, 방송에서 가장 자주 망설이는 순간은 언제일까? 그때 머릿속에 먼저 떠오르는 말은 무엇인지도 같이 들어 볼까?",
+        "required_token": null, "updated_token": null, "decoy_tokens": ["아침 산책"], "forbidden_tokens": ["강제"], "roster_handles": ["느린별"], "donation_continuation": true
+      }
+    ]
+  }
+]

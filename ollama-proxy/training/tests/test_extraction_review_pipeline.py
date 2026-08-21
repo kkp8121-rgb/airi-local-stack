@@ -201,6 +201,23 @@ class QueueBindingTests(unittest.TestCase):
     def test_queue_digest_is_12_lowercase_hex_chars(self) -> None:
         self.assertRegex(QUEUE_SHA, r"^[0-9a-f]{12}$")
 
+    def test_queue_digest_is_eol_stable_and_content_sensitive(self) -> None:
+        lf_path = HERE / "tests" / "_extraction_queue_lf.jsonl"
+        crlf_path = HERE / "tests" / "_extraction_queue_crlf.jsonl"
+        changed_path = HERE / "tests" / "_extraction_queue_changed.jsonl"
+        lf_path.write_bytes(b'{"id":"one"}\n{"id":"two"}\n')
+        crlf_path.write_bytes(b'{"id":"one"}\r\n{"id":"two"}\r\n')
+        changed_path.write_bytes(b'{"id":"one"}\n{"id":"changed"}\n')
+        try:
+            lf_digest = applier.queue_digest(lf_path)
+            self.assertEqual(lf_digest, applier.queue_digest(crlf_path))
+            self.assertEqual(lf_digest, builder.queue_digest(crlf_path))
+            self.assertNotEqual(lf_digest, applier.queue_digest(changed_path))
+        finally:
+            lf_path.unlink()
+            crlf_path.unlink()
+            changed_path.unlink()
+
     def test_reply_without_queue_segment_is_refused_fail_closed(self) -> None:
         # 큐 결속은 선택이 아니라 강제다 — queue= 세그먼트가 없는 구 형식 회신을
         # 조용히 통과시키는 우회 경로를 두지 않는다. 오류에는 검수자가 원인을 알 수

@@ -31,7 +31,7 @@ PROXY_URL = "http://127.0.0.1:8880/v1/audio/speech"
 DIRECT_URL = "http://127.0.0.1:9880/tts"
 
 
-def build_payload(text: str, direct: bool, mode: int, minimum: int) -> dict:
+def build_payload(text: str, direct: bool, mode: int, minimum: int, seed: int = -1) -> dict:
     if not direct:
         return {
             "model": "tts-1-ko",
@@ -43,6 +43,7 @@ def build_payload(text: str, direct: bool, mode: int, minimum: int) -> dict:
     payload = proxy.build_backend_payload(text)
     payload["streaming_mode"] = mode
     payload["min_chunk_length"] = minimum
+    payload["seed"] = seed
     return payload
 
 
@@ -54,6 +55,7 @@ def run(
     gate_first_ms: float,
     gate_min_bytes: int,
     timeout: float,
+    seed: int = -1,
 ) -> int:
     first_ms: list[float] = []
     total_ms: list[float] = []
@@ -63,7 +65,7 @@ def run(
         started = time.perf_counter()
         try:
             response = requests.post(
-                url, json=build_payload(text, direct, mode, minimum), stream=True, timeout=timeout
+                url, json=build_payload(text, direct, mode, minimum, seed), stream=True, timeout=timeout
             )
         except requests.RequestException as exc:
             failures.append(f"{label}: request failed: {exc}")
@@ -125,6 +127,10 @@ def main() -> int:
     parser.add_argument("--gate-first-ms", type=float, default=800.0)
     parser.add_argument("--gate-min-bytes", type=int, default=4096)
     parser.add_argument("--timeout", type=float, default=60.0)
+    parser.add_argument(
+        "--seed", type=int, default=-1,
+        help="direct-backend diagnostic seed; -1 preserves production randomness",
+    )
     args = parser.parse_args()
     url = args.url or (DIRECT_URL if args.direct else PROXY_URL)
     return run(
@@ -135,6 +141,7 @@ def main() -> int:
         args.gate_first_ms,
         args.gate_min_bytes,
         args.timeout,
+        args.seed,
     )
 
 

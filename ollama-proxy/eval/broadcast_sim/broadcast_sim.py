@@ -25,7 +25,10 @@ FIXTURE_SCHEMA_VERSION = "airi.broadcast-sim-fixture.v1"
 STREAM_SCHEMA_VERSION = "airi.broadcast-sim-stream.v1"
 REPORT_SCHEMA_VERSION = "airi.broadcast-sim-report.v1"
 MEMORY_ARMS = ("off", "on", "seeded")
-KINDS = ("donation", "memory_seed", "memory_probe", "opinion", "question", "reaction", "offtopic")
+KINDS = (
+    "donation", "continuity_callback", "continuity_seed", "memory_seed",
+    "memory_probe", "opinion", "question", "reaction", "offtopic",
+)
 
 
 class BroadcastSimError(ValueError):
@@ -80,6 +83,49 @@ def validate_fixture(value: Any) -> dict[str, Any]:
         raise BroadcastSimError("message rate bounds are inverted")
     if list(value.get("pickup_priority") or []) and not set(value["pickup_priority"]) <= set(KINDS):
         raise BroadcastSimError("pickup_priority names an unknown kind")
+    arcs = value.get("continuity_arcs") or []
+    if not isinstance(arcs, list):
+        raise BroadcastSimError("continuity_arcs must be a list")
+    arc_ids: set[str] = set()
+    handle_set = set(handles)
+    for arc in arcs:
+        if not isinstance(arc, dict):
+            raise BroadcastSimError("continuity arc must be an object")
+        arc_id = arc.get("id")
+        if not isinstance(arc_id, str) or not re.fullmatch(r"arc-[a-z0-9-]+", arc_id):
+            raise BroadcastSimError("continuity arc id is malformed")
+        if arc_id in arc_ids:
+            raise BroadcastSimError(f"duplicate continuity arc id: {arc_id}")
+        arc_ids.add(arc_id)
+        if arc.get("author") not in handle_set:
+            raise BroadcastSimError(f"continuity arc {arc_id} references an unknown author")
+        seed_minute = arc.get("seed_minute")
+        callback_minute = arc.get("callback_minute")
+        if not isinstance(seed_minute, int) or not isinstance(callback_minute, int):
+            raise BroadcastSimError(f"continuity arc {arc_id} minutes must be integers")
+        if not 0 <= seed_minute < callback_minute < int(rates["broadcast_minutes"]):
+            raise BroadcastSimError(f"continuity arc {arc_id} minute order is invalid")
+        if not str(arc.get("seed_text", "")).strip() or not str(arc.get("callback_text", "")).strip():
+            raise BroadcastSimError(f"continuity arc {arc_id} needs seed and callback text")
+        expected_source = arc.get("expected_source")
+        if expected_source not in {"history", "briefing", "durable_memory", "show_arc"}:
+            raise BroadcastSimError(f"continuity arc {arc_id} expected_source is invalid")
+        if arc.get("event_type") not in {
+            "donation", "subscription", "selected_chat", "batched_chat",
+            "game", "watchalong", "correction", "tease", "topic_transition",
+        }:
+            raise BroadcastSimError(f"continuity arc {arc_id} event_type is invalid")
+        for phase in ("seed_checks", "callback_checks"):
+            checks = arc.get(phase)
+            if not isinstance(checks, dict) or not checks.get("required_any"):
+                raise BroadcastSimError(f"continuity arc {arc_id} {phase} needs required_any")
+            if not all(isinstance(pattern, str) and pattern for pattern in checks["required_any"]):
+                raise BroadcastSimError(f"continuity arc {arc_id} {phase} patterns are malformed")
+            forbidden = checks.get("forbidden", [])
+            if not isinstance(forbidden, list) or not all(
+                isinstance(pattern, str) and pattern for pattern in forbidden
+            ):
+                raise BroadcastSimError(f"continuity arc {arc_id} {phase} forbidden is malformed")
     return value
 
 
@@ -127,6 +173,23 @@ def generate_stream(fixture: dict[str, Any], seed: int = 20260818) -> dict[str, 
         author = probe_authors[index % len(probe_authors)]["handle"]
         seeds_by_minute.setdefault(int(probe["seed_minute"]), []).append({**probe, "author": author, "index": index})
         probes_by_minute.setdefault(int(probe["minute"]), []).append({**probe, "author": author, "index": index})
+    arc_seeds_by_minute: dict[int, list[dict[str, Any]]] = {}
+    arc_callbacks_by_minute: dict[int, list[dict[str, Any]]] = {}
+    for arc in fixture.get("continuity_arcs", []):
+        gap_minutes = int(arc["callback_minute"]) - int(arc["seed_minute"])
+        shared = {
+            "author": arc["author"],
+            "arc_id": arc["id"],
+            "arc_event_type": arc["event_type"],
+            "arc_gap_minutes": gap_minutes,
+            "arc_expected_source": arc["expected_source"],
+        }
+        arc_seeds_by_minute.setdefault(int(arc["seed_minute"]), []).append({
+            **shared, "text": arc["seed_text"], "checks": arc["seed_checks"],
+        })
+        arc_callbacks_by_minute.setdefault(int(arc["callback_minute"]), []).append({
+            **shared, "text": arc["callback_text"], "checks": arc["callback_checks"],
+        })
 
     active = _weighted_sample(rng, viewers, rng.randint(int(rates["active_viewers_min"]), int(rates["active_viewers_max"])))
     messages: list[dict[str, Any]] = []
@@ -158,6 +221,12 @@ def generate_stream(fixture: dict[str, Any], seed: int = 20260818) -> dict[str, 
             planned.append({"author": entry["author"], "archetype": "deep_follower", "kind": "memory_probe",
                             "text": entry["probe_text"], "expect_any": list(entry["expect_any"]),
                             "probe_index": entry["index"]})
+        for entry in arc_seeds_by_minute.get(minute, []):
+            planned.append({**entry, "archetype": "continuity", "kind": "continuity_seed",
+                            "arc_phase": "seed"})
+        for entry in arc_callbacks_by_minute.get(minute, []):
+            planned.append({**entry, "archetype": "continuity", "kind": "continuity_callback",
+                            "arc_phase": "callback"})
         if minute in waves_by_minute:
             wave = waves_by_minute[minute]
             size = min(int(rates.get("opinion_wave_size", 3)), len(active))
@@ -181,7 +250,9 @@ def generate_stream(fixture: dict[str, Any], seed: int = 20260818) -> dict[str, 
 
         rng.shuffle(planned)
         # 후원·기억 프로브는 분 안에서 앞쪽에 두어 픽업 창을 확보한다.
-        planned.sort(key=lambda item: 0 if item["kind"] in ("donation", "memory_probe") else 1)
+        planned.sort(key=lambda item: 0 if item["kind"] in (
+            "donation", "memory_probe", "continuity_seed", "continuity_callback",
+        ) else 1)
         span = 60_000 // max(1, len(planned))
         for position, item in enumerate(planned):
             offset = position * span + rng.randrange(0, max(1, span // 2))
@@ -543,8 +614,17 @@ def score_turn(
     called = [handle for handle in roster_handles if handle and handle in text]
     row["called_handles"] = called
     row["callout_count"] = sum(text.count(handle) for handle in called)
-    # 입력에 없던 시청자 이름을 부르면 그건 호명이 아니라 발명이다.
-    row["invented_handles"] = [handle for handle in called if handle not in message["text"] and handle != message["author"]]
+    # 입력에도 브리핑 근거에도 없던 시청자 이름을 부르면 발명이다. 별명이나
+    # 고유명사가 우연히 roster handle과 같은 경우, 브리핑에서 실제로 회수한
+    # 토큰까지 발명으로 세면 fact_usage와 invented_handle이 동시에 참이 되는
+    # 모순된 게이트가 된다.
+    grounded_callouts = set(row.get("fact_tokens_used", ()))
+    row["invented_handles"] = [
+        handle for handle in called
+        if handle not in message["text"]
+        and handle != message["author"]
+        and not _matching_tokens({handle}, grounded_callouts)
+    ]
     row["callout_correct"] = called == [message["author"]] and row["callout_count"] == 1
 
     checks = message.get("checks") or {}
@@ -558,6 +638,21 @@ def score_turn(
         expect = message.get("expect_any", [])
         row["probe_expect"] = list(expect)
         row["probe_hit"] = any(token in text for token in expect)
+    if message["kind"] in {"continuity_seed", "continuity_callback"}:
+        checks = message.get("checks") or {}
+        required = list(checks.get("required_any") or [])
+        forbidden = list(checks.get("forbidden") or [])
+        phase = message["arc_phase"]
+        row.update({
+            "arc_id": message["arc_id"],
+            "arc_phase": phase,
+            "arc_event_type": message["arc_event_type"],
+            "arc_gap_minutes": message["arc_gap_minutes"],
+            "arc_expected_source": message["arc_expected_source"],
+            "arc_required_met": any(re.search(pattern, text) for pattern in required),
+            "arc_forbidden_hits": [pattern for pattern in forbidden if re.search(pattern, text)],
+        })
+        row[f"arc_{phase}_hit"] = row["arc_required_met"] and not row["arc_forbidden_hits"]
     if pick.get("aggregate_expected"):
         markers = message.get("aggregate_markers", [])
         row["wave_size"] = pick.get("wave_size")
@@ -578,7 +673,7 @@ def summarize_turns(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     probes = [row for row in rows if "probe_hit" in row]
     waves = [row for row in rows if "wave_topic_answered" in row]
     chars = sorted(row["chars"] for row in rows)
-    return {
+    summary = {
         "turns": len(rows),
         "empty": sum(1 for row in rows if row["empty"]),
         "fallback": rate(rows, "is_fallback"),
@@ -596,6 +691,49 @@ def summarize_turns(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
         "kind_counts": {kind: sum(1 for row in rows if row["kind"] == kind) for kind in KINDS
                         if any(row["kind"] == kind for row in rows)},
     }
+    arc_rows = [row for row in rows if row.get("arc_id")]
+    seeds = [row for row in arc_rows if row.get("arc_phase") == "seed"]
+    callbacks = [row for row in arc_rows if row.get("arc_phase") == "callback"]
+    by_arc: dict[str, dict[str, dict[str, Any]]] = {}
+    for row in arc_rows:
+        by_arc.setdefault(row["arc_id"], {})[row["arc_phase"]] = row
+    complete = [
+        phases for phases in by_arc.values()
+        if "seed" in phases and "callback" in phases
+    ]
+    long_callbacks = [row for row in callbacks if int(row["arc_gap_minutes"]) >= 30]
+    ultra_callbacks = [row for row in callbacks if int(row["arc_gap_minutes"]) >= 90]
+    summary["continuity"] = {
+        "seed_response": rate(seeds, "arc_seed_hit"),
+        "callback": rate(callbacks, "arc_callback_hit"),
+        "long_callback_30m": rate(long_callbacks, "arc_callback_hit"),
+        "ultra_callback_90m": rate(ultra_callbacks, "arc_callback_hit"),
+        "complete_arc": {
+            "hits": sum(
+                bool(phases["seed"].get("arc_seed_hit"))
+                and bool(phases["callback"].get("arc_callback_hit"))
+                for phases in complete
+            ),
+            "of": len(complete),
+            "rate": round(sum(
+                bool(phases["seed"].get("arc_seed_hit"))
+                and bool(phases["callback"].get("arc_callback_hit"))
+                for phases in complete
+            ) / len(complete), 4) if complete else None,
+        },
+        "forbidden_hit_turns": sum(bool(row.get("arc_forbidden_hits")) for row in arc_rows),
+        "expected_source_counts": {
+            source: sum(row.get("arc_expected_source") == source for row in callbacks)
+            for source in ("history", "briefing", "durable_memory", "show_arc")
+            if any(row.get("arc_expected_source") == source for row in callbacks)
+        },
+        "event_type_counts": {
+            event_type: sum(row.get("arc_event_type") == event_type for row in callbacks)
+            for event_type in sorted({row.get("arc_event_type") for row in callbacks})
+            if event_type
+        },
+    }
+    return summary
 
 
 def priority_violations(picks: Sequence[dict[str, Any]], priority: Sequence[str], threshold: int) -> list[dict[str, Any]]:

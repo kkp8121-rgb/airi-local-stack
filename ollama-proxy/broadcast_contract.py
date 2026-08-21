@@ -17,8 +17,9 @@ from collections.abc import Mapping
 BROADCAST_CONTRACT_ENV = "AIRI_BROADCAST_CONTRACT"
 
 # 계약 블록 개정 번호. v2 = v1(관찰 연구 규범) + 수신자 인지 규칙,
-# v3 = 그 규칙을 추상 지시에서 예시·해석 규칙형으로 교체(로컬 Mi:dm 재발 실측).
-BROADCAST_CONTRACT_VERSION = "v3"
+# v3 = 그 규칙을 추상 지시에서 예시·해석 규칙형으로 교체(로컬 Mi:dm 재발 실측),
+# v4 = 짧은 한 박자 반응과 내용 있는 방송 턴을 분리하고 후원·구독 의례를 명시.
+BROADCAST_CONTRACT_VERSION = "v4"
 
 # 켜짐으로 읽을 값만 열거한다(default-deny). 미설정·0·false·off·그 외 = 꺼짐.
 BROADCAST_CONTRACT_ON_VALUES = frozenset({"1", "true", "on", "yes"})
@@ -36,6 +37,16 @@ BROADCAST_CONTRACT_PARAMS: dict[str, dict[str, object]] = {
         "min_sentences": 1,
         "max_sentences": 2,
         "source": "관찰 연구 §6 — 리액션 조각 길이 1~3초(10~45자 현행 유지), 4인 공통 지배 구간",
+    },
+    # 내용 있는 후원·구독, 여러 채팅의 종합, 판단 근거, 장기 콜백과 주제 전환은
+    # 짧은 리액션 조각으로 잘라서는 방송 흐름이 생기지 않는다. 2026-08-21 사용자
+    # 총평과 공식 공개 방송 기계론 30건에서 공통으로 확인한 발화 단위다.
+    "expanded_response": {
+        "min_chars": 70,
+        "max_chars": 220,
+        "min_sentences": 2,
+        "max_sentences": 4,
+        "source": "2026-08-21 사용자 총평 + 공식 공개 한국 방송 30건 기계론 관찰 — 의례·내용 처리·판단·복귀의 결합",
     },
     # 긴 블록은 명분이 있을 때만 나온다. 한국 3인 최장 33~59초,
     # 359초 1건은 감상이라는 명분이 붙은 우이 사례.
@@ -103,9 +114,9 @@ BROADCAST_CONTRACT_PARAMS: dict[str, dict[str, object]] = {
     },
     # 계약 블록이 컨텍스트를 잠식하면 안 된다. 운영 proxy 는 num_ctx 2048 로 돈다.
     "contract_block": {
-        "target_max_chars": 600,
+        "target_max_chars": 780,
         "hard_max_chars": 800,
-        "source": "운영 제약 — proxy num_ctx 2048 (ollama_proxy.NUM_CTX)",
+        "source": "운영 제약 — proxy num_ctx 2048 (ollama_proxy.NUM_CTX), v4 확장 발화 규칙 포함",
     },
 }
 
@@ -119,9 +130,11 @@ def _build_block() -> str:
     v2 는 마지막에 수신자 인지 규칙을 더했고, v3 는 그 단락을 추상 지시에서
     예시·해석 규칙형으로 바꿨다. 로컬 Mi:dm 실측에서 v2 문구로는 축하 반사
     (dn04)·경어 지시 주체 반전(gr01)·의혹 자백(tk04)이 그대로 재발했기 때문이다
-    (`addressee` 파라미터의 source). 앞 7행(v1 관찰 연구 규범)은 건드리지 않는다.
+    (`addressee` 파라미터의 source). v4 는 사용자 검토에서 드러난 단답 문제를
+    해결하되 단순 리액션의 짧은 호흡은 보존한다.
     """
     fragment = BROADCAST_CONTRACT_PARAMS["reaction_fragment"]
+    expanded = BROADCAST_CONTRACT_PARAMS["expanded_response"]
     return "\n".join(
         [
             "[방송 발화 계약]",
@@ -130,8 +143,13 @@ def _build_block() -> str:
             f"기본은 {fragment['min_chars']}~{fragment['max_chars']}자"
             f" {fragment['min_sentences']}~{fragment['max_sentences']}문장짜리 짧은 반응이다."
             " 사연·감상·상황 중계처럼 길게 말할 명분이 있을 때만 늘려.",
+            f"내용 있는 후원·구독, 여러 채팅 종합, 선택 이유, 지난 흐름의 회수·전환은 "
+            f"{expanded['min_chars']}~{expanded['max_chars']}자 "
+            f"{expanded['min_sentences']}~{expanded['max_sentences']}문장으로 말해. "
+            "받은 말 처리→네 판단과 이유→하던 화면이나 다음 흐름 복귀를 잇고, 매번 질문으로 끝내지 마.",
             "인용하거나 설명할 때는 잠깐 서술체로 바꿔도 되지만 네 말은 반말 구어체로 돌아와."
-            " 시청자가 존댓말을 써도 따라 하지 마.",
+            " 시청자가 존댓말을 써도 따라 하지 마. 단, 후원·구독 감사 첫 구절만 자연스러운 존댓말을 허용하고"
+            " 본답변은 반말로 돌아와.",
             "가끔 ~잖아·~지?·~거든? 처럼 동의를 구하는 말끝이나 되묻기로 말을 시청자에게 돌려."
             " 매번 하지 말고 어울릴 때만 써.",
             "반박이나 오해에는 타이르지 말고 가볍게 받아쳐.",

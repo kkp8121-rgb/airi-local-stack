@@ -64,7 +64,7 @@ AIRI_SYSTEM_PROMPT = """너는 AIRI라는 독자적인 한국어 버추얼 방�
 응답 우선순위:
 1. 사용자가 물었거나 요청한 핵심을 첫 구절에서 실제로 처리해. 정보 질문에는 구체적인 사실을 하나 이상 말하고, 하나를 추천하라면 실제 항목 하나를 고른 뒤 멈춰. 번역·외국어 문구 요청은 요청한 문구 자체를 그 언어로 써. 맞장구만 하고 답을 피하지 마.
 2. 대상이나 행동이 불분명할 때만 무엇을 뜻하는지 질문 하나로 확인해. 추측해서 했다고 약속하지 마.
-3. 그다음에만 짧은 반응을 더해. 평소에는 10~45자의 자연스러운 한 문장만 남기고, 요청받지 않은 번호 목록은 쓰지 마. 한국어 문장 끝에 요·습니다·세요·죠를 붙이지 마.
+3. 단순 인사나 한 박자 반응은 10~45자 1~2문장으로 짧게 해. 내용 있는 후원·구독, 여러 채팅 종합, 선택 이유, 지난 흐름의 회수나 주제 전환은 70~220자 2~4문장으로 받은 말 처리→네 판단과 이유→하던 화면이나 다음 흐름 복귀를 이어. 매번 질문으로 끝내지 말고, 요청받지 않은 번호 목록은 쓰지 마. 한국어 문장 끝에 요·습니다·세요·죠를 붙이지 마. 단, 후원·구독 감사 첫 구절만 자연스러운 존댓말을 허용하고 본답변은 반말로 돌아와.
 
 큰 부상·즉각적인 위험에는 장난을 멈추고 안전한 장소와 응급 도움 여부를 먼저 확인해. 사별·큰 상실에는 해결책을 붙이지 말고 짧고 진솔하게 애도해.
 
@@ -652,8 +652,15 @@ class HttpTransport:
         first_at: float | None = None
         chunks: list[str] = []
         meta: dict[str, Any] = {"transport": "http", "streaming": True}
+        terminal = False
         with self.client.stream("POST", self.url, json=payload, timeout=timeout) as response:
             meta["status_code"] = response.status_code
+            meta["immediate_ack"] = response.headers.get("x-airi-immediate-ack")
+            meta["num_ctx"] = response.headers.get("x-airi-num-ctx")
+            meta["input_screened"] = response.headers.get("x-airi-input-screened")
+            meta["input_screen_category"] = response.headers.get(
+                "x-airi-input-screen-category"
+            )
             if response.status_code != 200:
                 meta["error_body"] = response.read().decode("utf-8", errors="replace")[:2000]
                 return "", None, (time.perf_counter() - started) * 1000.0, meta
@@ -662,6 +669,7 @@ class HttpTransport:
                     continue
                 data = line[5:].strip()
                 if data == "[DONE]":
+                    terminal = True
                     break
                 try:
                     event = json.loads(data)
@@ -675,6 +683,9 @@ class HttpTransport:
                     if first_at is None:
                         first_at = (time.perf_counter() - started) * 1000.0
                     chunks.append(piece)
+        meta["terminal"] = terminal
+        if not terminal:
+            meta["truncated"] = True
         return "".join(chunks), first_at, (time.perf_counter() - started) * 1000.0, meta
 
     def _plain_call(
@@ -724,9 +735,10 @@ def call_once(
         text, ttft, elapsed, meta = transport.stream_chat(
             model=model, messages=messages, max_tokens=max_tokens, timeout=timeout
         )
+        stream_complete = meta.get("streaming") is not True or meta.get("terminal") is True
         record.update(
             {
-                "ok": bool(text.strip()) and meta.get("status_code", 200) == 200,
+                "ok": bool(text.strip()) and meta.get("status_code", 200) == 200 and stream_complete,
                 "response": text,
                 "ttft_ms": None if ttft is None else round(ttft, 1),
                 "complete_ms": round(elapsed, 1),
@@ -735,6 +747,8 @@ def call_once(
         )
         if meta.get("status_code", 200) != 200:
             record["failure"] = f"http_{meta['status_code']}"
+        elif not stream_complete:
+            record["failure"] = "missing_stream_terminal"
         elif not text.strip():
             record["failure"] = "empty_response"
     except Exception as exc:  # 실패는 그대로 기록하고 계속한다

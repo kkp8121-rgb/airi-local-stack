@@ -139,6 +139,39 @@ I2a 기존 기반) · 방송 구간/경과 · 최근 화제 · 여론 현황 · 
 - [ ] P2-4b (신설·저순위) cheer/sincere 수신 오프너 — 디렉터 분류는 이미
   존재(`priority-policy.mjs` CHEER_CUES/SINCERE_CUES)하나 근거 표본이
   sp01 1건(단발 한정)이고 다양성 지표를 누를 위험 → 착수 가치 낮음
+- [~] P2-5 affect→표현 선택(평가 전용, 2026-08-21) — 기존 13상태를
+  closed expression 계약으로 바꾸는 순수 선택기와 frozen fixture 3-arm
+  GPU probe를 추가했다. 5상태×3시드 15쌍에서 표현 arm은 문자열을 12/15
+  바꿨지만, 위트 0/3·pleased 반응 불변 3/3·competitive 문맥 이탈 3/3,
+  safety 안내 약화 2/3이어서 **품질 승격 실패**. 이는 런타임 선택 구조보다
+  모델의 표현 팔레트가 선행 병목임을 보여준다. 별도 affect 행동 pending 120건과
+  queue-SHA 결속 검수 폼까지 준비했으나, **2026-08-21 사용자 내용 검수에서 반려**됐다.
+  기존 행동 181건 중앙값 13자·affect 120건 중앙값 14자로 짧고, 후원/선택 채팅의
+  이벤트 맥락·감사 의례·메시지별 반응·주제 확장·복귀 beat가 없는 챗봇형 Q→A다.
+  두 큐와 폼은 실패 재현용으로만 보존하며 검수 회신·QLoRA에 쓰지 않는다. 이벤트
+  ingress 배선·운영 ON은 별도 사용자 승인 전 금지하며 현재 기본/실행 모두 OFF
+- [~] **P2-6 한국 인터넷 방송 반응 메타 재관찰·행동 데이터 재설계
+  (2026-08-21)** — 탬탬버린 공식 다시보기/클립과 아리사 공식 영상의 확인 가능한
+  입력→반응 장면을 비식별 코딩했다. 공통 단위는 `인지/감사 → 메시지별 반응 →
+  의견·에피소드 확장 → 복귀·다음 훅`이며, 길이와 존댓말/반말은 전역 규칙이 아니라
+  이벤트·beat별 계약이어야 한다. 실제 방송인의 고유 문체를 복제하지 않고 AIRI
+  고유 합성 target을 새 큐로 저작한다. **2026-08-21 데이터화 완료:** 탬탬버린
+  5건+아리사 2건을 원문·PII 없는 observation-only event/beat JSONL과 별도 출처
+  원장으로 분리했다. AIRI 원본 파일럿 24건도 train/dev/test 16/4/4,
+  single/burst 15/9, compact/standard/expanded 4/10/10으로 작성했으며 target
+  길이 중앙값 98자·입력보다 짧은 답 0건·전건 training-ineligible이다.
+  **잔여:** 24건 묶음에 대한 사용자 총평 반영(행별 approve/rewrite/reject 없음),
+  아리사 추가 공식 사례는 자막 접근이 복구될 때만 확정 표본으로 승격.
+  근거: `참조/AIRI-KR-BROADCAST-REGISTER-REFERENCE-2026-08-21.md`,
+  `진행예정/AIRI-KR-BROADCAST-RESPONSE-PILOT-2026-08-21.md`
+
+  **2026-08-21 총평 반영 후 학습 트랙 진입:** 사용자가 파일럿의 길이·후원
+  의례·한국 방송식 주제 확장·RAG 연속성 방향을 묶음 단위로 승인했다.
+  이 총평을 반영한 broadcast v2 240행 선행 학습은 T3에서 두 방송 사실 활용
+  기준을 소폭 밑돌아 채택하지 않았다. 현행 v3는 120 card×10 연속성 변형+
+  v2 240으로 **1,440행**이며, group split 1,148/146/146, 한국어 전수 감사
+  blocker 0건·quality gate PASS다. RTX 3060 Ti 전체 QLoRA가 진행 중이며
+  T3+사용자 승인 전에는 어댑터·양자화 모델을 운영 채택하지 않는다.
 
 ### P3. 생성 상한 재검토 — **게이트 열림 (2026-08-19 실측 판정)**
 
@@ -171,14 +204,45 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   이어 **추출 검수 폼 v2**(`eb9f46a`): rewrite 브라우저 사전 검증
   (evidence ⊂ turns·이름 ⊂ evidence) + target 파싱 실패 배지 분리 +
   **회신-큐 sha256 결속 필수화** — 큐가 바뀌면 **구 폼 회신은 거부되고
-  최신 폼을 안내**한다. training 스위트 114 passed.
-  잔여: 검수 회신 2종(행동 181·추출 102, 사용자)·CUDA 실행(코덱스)
+  최신 폼을 안내**한다. **검수 직전 보강 완료(2026-08-20 코덱스)**:
+  추출 익스포터가 split 도메인·빈 id·중복 id를 fail-closed로 거부하고,
+  queue SHA를 LF 정규화해 Windows CRLF 체크아웃에서도 폼/적용기 결속이
+  `2988a82bd738`으로 일치한다. **2026-08-21 보강**: 행동 폼도 LF-normalized
+  queue SHA 결속과 duplicate/overlap fail-closed를 갖췄고, affect 행동 120건을
+  별도 큐·폼으로 추가했다. 현행 SHA는 기존 행동 181건 `eab7f6b76c06`, affect
+  행동 120건 `96d0d2d3c69d`, 추출 102건 `2988a82bd738`. 행동 exporter는 검수된
+  두 행동 큐를 한 번에 합치되 affect만 운영 request-local 4-message 형태로 조립하고,
+  trainer는 기존 3-message/affect 4-message 두 정확한 계약만 허용한다. training
+  스위트 **136 passed, 3 skipped**. **2026-08-21 순서 변경:** 기존 행동 181·affect
+  행동 120은 사용자 총평으로 반려되어 회신 적용·CUDA 행동 1차를 금지한다. P2-6의
+  새 AIRI 고유 방송 반응 24건 파일럿 총평 반영과 별도 전량 검수 계약 뒤에만 행동 학습
+  큐를 다시 연다. 추출 102건은
+  기술적으로 별도이나 현 배치에서는 행동 재설계와 혼동하지 않도록 검수·2차 학습 보류
+  **2026-08-21 현행 대체 트랙:** 반려된 181/120 큐를 재사용하지 않고,
+  사용자 묶음 총평을 반영한 broadcast v2 240행→T3 실패 분석→continuity v3
+  1,440행→**runtime-shaped continuity v4 1,000행**으로 재설계했다. v4는
+  train/dev/test 800/100/100, chat SHA `96cc223ca591`, source SHA
+  `43f9c1ed1abf`로 고정됐다. seq2048 E1 QLoRA(800 microsteps/50 optimizer
+  updates)는 train first3 3.3845→last3 2.9151, dev loss 2.8938로 완료했지만
+  `adoption_authorized=false`, `t3_status=pending`이다. E2는 사용량 한계에 따른
+  사용자 요청으로 중단해 산출물 없이 다음 세션 재실행으로 넘겼다. 정확한 명령과
+  해시는 `진행중/AIRI-CODEX-HANDOFF-2026-08-21.md`에 고정했다.
 - [ ] **P3-T3 전/후 게이트** — 시뮬 하네스 그대로. **캘리브레이션 완료
   (2026-08-19 4-시드)**: 사실 활용은 12% 노이즈 천장 상회 필수, 결정론
   축 만점·존댓말 0 유지, 앵커·다양성은 3시드 평균 비교
   (`완료/AIRI-SPAN-CONTRACT-AND-VARIANCE-2026-08-19.md`). **held-out 2차
   방송 기준선 확보(2026-08-19)** — 과적합 검출용, 1차+2차 양쪽 측정 의무
   (`완료/AIRI-HELDOUT-AND-EXTRACTION-SFT-2026-08-19.md`). 미통과 어댑터 폐기
+  **2026-08-21 실측 계약 보강:** baseline/candidate 모두 인증된
+  `--live-broadcast-context on`으로만 새로 측정한다. proxy가 신원/규칙을 한 번만
+  만들고 server-owned `[오늘 방송]`·브리핑·affect·request-local 문체 순으로
+  모델에 전달한다. 호출자 system은 capability claim 후 전량 제거하고,
+  사전 기억 seed도 trace-bound durable journal receipt 완료 후 본 방송을 시작한다.
+  show-arc callback_hit/miss와 TTS·RAG·저널·지연 전 체인은 T3 통과 후
+  3-seed×500-turn 장시간 캠페인이 별도로 소유한다. **v4 게이트는** baseline/E1/E2
+  각각 first+second 4-seed와 final-blind 180분 4-seed, 총 36 reports로 수행한다.
+  전용 isolated T3 launcher가 아직 없으므로 fresh memory/knowledge DB와 model digest,
+  ephemeral live capability를 외부 manifest로 고정한 뒤에만 실측한다.
 - [ ] **P3-T4 하드코딩 축소** — T3 통과 행동부터 결정론 계층 걷어냄
   (집계 오프너·폴백 후보). **thank 렌더러는 유지** — 후원 호명 오류
   비용이 커서 고정이 정석
@@ -215,22 +279,32 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
 
 ## 5. 코덱스(GPU) 대기열
 
-- [ ] GPU 재실측 — TTFT 포함(**C안 ACK 제거의 체감 지연 근거**),
-  게이트 경로 폴백률 reps 확대, 치환표 중기 조치 ①② 판단
-- [ ] **ctx 예산 GPU 단일조건 재실측 (2026-08-20 신설)** —
+- [~] GPU 재실측 — ctx/narrow/Qwen3-8B span은 2026-08-20 실행 완료.
+  marker 실제 render TTFT A/B는 외부 GPT-SoVITS venv 불완전으로 보류,
+  게이트 경로 폴백률 reps 확대·치환표 중기 조치 ①② 판단은 잔여
+- [x] **ctx 예산 GPU 단일조건 재실측 (2026-08-20 완료)** —
   `--history-turns {4,8,12}` 효과가 CPU 스로틀 epoch와 완전히 교락돼
   앵커·다양성·fact_usage·프로브의 우열을 확정하지 못했다. 스로틀·워치독
   변경 없이 **단일 조건**으로 9런을 재실측해 history_turns 효과를 epoch
   효과와 분리할 것. 확정된 것은 결정론 축 무영향·`num_ctx 4096`이
   history_turns=12까지 수용한다는 두 가지뿐이다
-  (`완료/AIRI-CTX-BUDGET-TRADEOFF-2026-08-20.md`).
+  (`완료/AIRI-CTX-BUDGET-TRADEOFF-2026-08-20.md`). GPU 고정조건 9런은
+  전송 실패 0, h4/h8/h12 앵커 41/48/46 of 144, 사실 5/7/5 of 90,
+  프로브 4/4/3 of 9, 오프너 다양성 평균 78.5/81.3/84.0%였다.
+  CPU의 h4 우위는 재현되지 않았고 시드 분산 때문에 단일 설정을 승격하지 않는다.
   주의: `AIRI_UPSTREAM_FIRST_RAW_TIMEOUT_SECONDS`의 유효 범위는 **1~30초**이며
   벗어나면 경고 없이 8초로 클램프된다
-- [ ] **narrow evidence GPU 확인 (2026-08-20 신설)** — 좁힌 근거 정의
+- [x] **narrow evidence GPU 확인 (2026-08-20 완료)** — 좁힌 근거 정의
   (부착 23.6%·해제 2건)와 행 단위 해제 관측성이 GPU에서도 같은 값인지
   확인하고, 프로브·사실활용·앵커가 CPU 노이즈에 묻혀 판정 불가였던 축을
-  다중 시드로 다시 잰다 (`완료/AIRI-BRIEFING-EVIDENCE-NARROW-2026-08-20.md`)
-- [ ] TTS 재검증 (v2ProPlus 스트리밍 계약)
+  다중 시드로 다시 쟀다. 부착 34/144·해제 2/34는 CPU와 정확히 같고,
+  프로브 2/9·사실 4/90·앵커 49/144였다
+  (`완료/AIRI-BRIEFING-EVIDENCE-NARROW-2026-08-20.md`)
+- [x] **Qwen3-8B + `conversation-v3-span` GPU 1회** — 구조 schema 3종은
+  1.0이나 connectivity/B coverage 0.857, recall 0.262, op-alias 0.143,
+  failure code 1건으로 balanced gate FAIL. 운영 승인·span 활성화 근거 아님
+- [~] TTS 재검증 (v2ProPlus 스트리밍 계약) — proxy 계약 23 passed.
+  live 7문장 gate는 외부 GPT-SoVITS venv의 다수 선언 의존성 누락으로 보류
 - [ ] B1b 라이브 어댑터 (외부 자격증명과 함께)
 - [ ] 인간 검수 100건 수집
 - [ ] 실제 마이크 음성 체인 P50/P95 (보류: 사용자 요청 시)

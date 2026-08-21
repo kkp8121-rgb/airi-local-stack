@@ -322,8 +322,6 @@ class MemoryRuntime:
         # has no cooperative cancellation.  Track those workers until their
         # threads return, so shutdown can drain the handles they still own.
         self._store_workers: set[asyncio.Task[Any]] = set()
-        self._scheduled: set[str] = set()
-        self._scheduled_order: list[str] = []
         self._sessions: set[str] = set()
         self._snapshotted: set[str] = set()
         self._implicit_session = self.config.session_id
@@ -661,27 +659,26 @@ class MemoryRuntime:
         if not sid:
             sid = await self._resolve_session(None, history or (), trace_id)
         await self._ensure_session(sid)
-        content_digest = hashlib.sha256(f"{user}\0{assistant}".encode()).hexdigest()
-        # Correlation IDs are expected to be unique, but a renderer restart or
-        # integration bug must not let one reused ID discard a different
-        # completed turn. The content digest preserves exact replay
-        # idempotency while keeping distinct dialogue appendable.
-        stable_part = f"{trace_id}\0{content_digest}" if trace_id else content_digest
-        key = f"{sid}\0{stable_part}"
-        if key in self._scheduled:
-            return "duplicate"
-        self._scheduled.add(key)
-        self._scheduled_order.append(key)
-        if len(self._scheduled_order) > 2048:
-            self._scheduled.discard(self._scheduled_order.pop(0))
         try:
-            await self._store_call(self.store.append_turn, sid, user, assistant, turn_no)
+            # A trace identifies an upstream completion, not a user turn. Bind
+            # it to exact content so reused traces with changed dialogue still
+            # append, while the same completion survives a runtime restart.
+            if trace_id:
+                digest = hashlib.sha256(f"{user}\0{assistant}".encode()).hexdigest()
+                appended, _turn = await self._store_call(
+                    self.store.append_turn_idempotent, sid, user, assistant,
+                    turn_no, f"{trace_id}\0{digest}",
+                )
+            else:
+                await self._store_call(self.store.append_turn, sid, user, assistant, turn_no)
+                appended = True
+            if not appended:
+                return "duplicate"
             state = await self._store_call(self.store.job_state, sid)
             if self.extraction_provider.can_extract and state["pending_msgs"] >= self.config.extraction_threshold and state["fail_count"] < 5:
                 self._schedule_extraction(sid, trace_id)
             return "appended"
         except Exception:
-            self._scheduled.discard(key)
             raise
 
     def _track(self, task: asyncio.Task[Any]) -> None:

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://airi.local/schemas/airi.broadcast-continuity-observation.v1.json",
+  "title": "AIRI Korean long-broadcast continuity observation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "dataset_role",
+    "source_case_id",
+    "evidence_tier",
+    "arc_type",
+    "trigger_origin",
+    "callback_function",
+    "gap_minutes_lower",
+    "gap_minutes_upper",
+    "expected_runtime_source",
+    "evidence_gaps",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {"const": "airi.broadcast-continuity-observation.v1"},
+    "record_id": {"type": "string", "pattern": "^refarc-[0-9]{4}$"},
+    "dataset_role": {"const": "observation_only"},
+    "source_case_id": {"type": "string", "pattern": "^ARC-[A-Z][0-9]{2}$"},
+    "evidence_tier": {
+      "enum": ["official_primary_contiguous", "official_primary_system_assisted"]
+    },
+    "arc_type": {
+      "enum": [
+        "plan_fulfillment",
+        "object_location_recall",
+        "shared_rule_reapplication",
+        "repeated_activity_recognition",
+        "preference_return",
+        "experience_generalization",
+        "running_joke_payoff"
+      ]
+    },
+    "trigger_origin": {"enum": ["spontaneous_contextual", "system_reappearance"]},
+    "callback_function": {
+      "enum": ["fulfill", "retrieve", "apply_rule", "recognize_repeat", "reassert_preference", "generalize", "payoff"]
+    },
+    "gap_minutes_lower": {"type": "integer", "minimum": 10, "maximum": 360},
+    "gap_minutes_upper": {"type": "integer", "minimum": 10, "maximum": 360},
+    "expected_runtime_source": {"const": "show_arc"},
+    "evidence_gaps": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "automatic_caption_word_error_possible",
+          "speaker_separation_partial",
+          "screen_state_not_independently_verified",
+          "system_reappearance_assisted",
+          "midstream_reconfirmation_present"
+        ]
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_class", "observation_date", "review_status", "contains_transcript", "contains_pii", "training_permitted"],
+      "properties": {
+        "source_class": {"const": "official_public_primary"},
+        "observation_date": {"type": "string", "format": "date"},
+        "review_status": {"const": "coded"},
+        "contains_transcript": {"const": false},
+        "contains_pii": {"const": false},
+        "training_permitted": {"const": false}
+      }
+    }
+  }
+}

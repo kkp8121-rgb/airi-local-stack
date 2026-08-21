@@ -1,0 +1,1504 @@
+[
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "c2-donation-walk",
+    "split": "train",
+    "family": "donation_isolation",
+    "topic_title": "저녁 산책 수다",
+    "segment_label": "후원 뒤 이어가기",
+    "situation": "짧은 후원 메시지 뒤 산책 화제로 돌아간다.",
+    "views": [
+      {
+        "view_id": "support",
+        "category": "support",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "현재 산책 화제의 표식은 도토리빵이다.",
+        "journal_messages": [],
+        "current_user": "오늘 산책 얘기 좋아.",
+        "target": "도토리빵 얘기까지 곁들이면 산책 수다가 더 든든해지겠다. 천천히 걷는 날엔 이런 느슨한 화제가 잘 맞아.",
+        "required_token": "도토리빵",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "observation",
+        "category": "observation",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "현재 산책 화제의 표식은 도토리빵이다.",
+        "journal_messages": [],
+        "current_user": "걷는 얘기 계속해 줘.",
+        "target": "도토리빵처럼 소소한 단어가 나오면 산책 이야기도 금세 구체적이 된다. 발걸음 속도부터 떠올려 보자.",
+        "required_token": "도토리빵",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "advice",
+        "category": "advice",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "현재 산책 화제의 표식은 도토리빵이다.",
+        "journal_messages": [],
+        "current_user": "산책 코스 고민 중이야.",
+        "target": "도토리빵을 목표로 하나 정해 두면 코스 고르기가 조금 쉬워진다. 너무 멀리 잡기보다 돌아오기 편한 길이 좋겠어.",
+        "required_token": "도토리빵",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "playful_tease",
+        "category": "playful_tease",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "현재 산책 화제의 표식은 도토리빵이다.",
+        "journal_messages": [],
+        "current_user": "산책은 늘 미뤄져.",
+        "target": "도토리빵 한 조각을 핑계로 삼으면 미루기 챔피언도 밖에 나갈 수 있겠다. 오늘은 신발부터 이겨 보자.",
+        "required_token": "도토리빵",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "story",
+        "category": "story",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "현재 산책 화제의 표식은 도토리빵이다.",
+        "journal_messages": [],
+        "current_user": "산책길은 조용한 편이 좋아.",
+        "target": "도토리빵을 챙긴 짧은 산책이라면 조용한 골목도 충분히 목적지가 된다. 서두르지 않는 쪽이 오늘 화제와 잘 어울려.",
+        "required_token": "도토리빵",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "question",
+        "category": "question",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "현재 산책 화제의 표식은 도토리빵이다.",
+        "journal_messages": [],
+        "current_user": "저녁 얘기 더 하자.",
+        "target": "도토리빵을 떠올리며 걷는다면 어느 동네부터 가 보고 싶어? 일단 저녁 산책의 첫 모퉁이부터 정해 보자.",
+        "required_token": "도토리빵",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "c2-donation-desk",
+    "split": "train",
+    "family": "donation_isolation",
+    "topic_title": "책상 정리 수다",
+    "segment_label": "후원 뒤 이어가기",
+    "situation": "짧은 후원 메시지 뒤 책상 화제로 돌아간다.",
+    "views": [
+      {
+        "view_id": "support",
+        "category": "support",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "현재 책상 화제의 표식은 초승나침반이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "정리 얘기 재밌네.",
+        "target": "초승나침반 하나쯤 올려둔 책상이라면 정리도 너무 각 잡지 않아도 되겠다. 손이 자주 가는 것부터 남기면 충분해.",
+        "required_token": "초승나침반",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "observation",
+        "category": "observation",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "현재 책상 화제의 표식은 초승나침반이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "내 책상은 늘 어질러져.",
+        "target": "초승나침반 같은 작은 물건은 남아 있으면 책상 성격이 생긴다. 완벽한 빈자리보다 쓸모 있는 자리가 더 오래가.",
+        "required_token": "초승나침반",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "advice",
+        "category": "advice",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "현재 책상 화제의 표식은 초승나침반이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "정리부터 해야 할까?",
+        "target": "초승나침반을 둘 자리만 먼저 비워 보면 시작이 덜 부담스럽다. 나머지는 세 가지로만 나누면 금방 갈피가 잡혀.",
+        "required_token": "초승나침반",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "playful_tease",
+        "category": "playful_tease",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "현재 책상 화제의 표식은 초승나침반이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "물건이 너무 많아.",
+        "target": "초승나침반까지 잃어버릴 정도면 책상이 보물찾기 코스겠는데. 오늘은 하나만 구조해도 정리 점수는 인정이야.",
+        "required_token": "초승나침반",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "story",
+        "category": "story",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "현재 책상 화제의 표식은 초승나침반이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "작은 물건은 못 버리겠어.",
+        "target": "초승나침반 같은 물건은 서랍보다 눈에 보이는 자리에 둘 때 이야기가 이어진다. 그래서 책상 정리는 취향을 남기는 일이기도 해.",
+        "required_token": "초승나침반",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "question",
+        "category": "question",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "현재 책상 화제의 표식은 초승나침반이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "책상 얘기 더 해 줘.",
+        "target": "초승나침반처럼 꼭 남겨 두고 싶은 물건은 무엇이야? 그 한 가지부터 기준으로 잡고 책상 수다를 이어 가자.",
+        "required_token": "초승나침반",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "c2-donation-letter",
+    "split": "train",
+    "family": "donation_isolation",
+    "topic_title": "편지 쓰기 수다",
+    "segment_label": "후원 뒤 이어가기",
+    "situation": "짧은 후원 메시지 뒤 편지 화제로 돌아간다.",
+    "views": [
+      {
+        "view_id": "support",
+        "category": "support",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "user",
+            "content": "현재 편지 화제의 표식은 잿빛우편함이다."
+          }
+        ],
+        "current_user": "편지 주제 좋다.",
+        "target": "잿빛우편함을 떠올리면 편지도 너무 꾸미지 않아도 멋있어 보인다. 한 문장만 솔직하면 이미 시작은 충분해.",
+        "required_token": "잿빛우편함",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "observation",
+        "category": "observation",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "user",
+            "content": "현재 편지 화제의 표식은 잿빛우편함이다."
+          }
+        ],
+        "current_user": "요즘도 편지 쓰는 사람 있겠지.",
+        "target": "잿빛우편함 같은 단어가 나오면 손글씨 이야기는 아직도 살아 있다는 생각이 든다. 짧아도 남는 말이 있잖아.",
+        "required_token": "잿빛우편함",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "advice",
+        "category": "advice",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "user",
+            "content": "현재 편지 화제의 표식은 잿빛우편함이다."
+          }
+        ],
+        "current_user": "편지 첫줄이 어려워.",
+        "target": "잿빛우편함 앞에 섰다고 생각하고 첫줄은 안부 한마디로 두면 된다. 멋진 문장보다 전달할 마음을 먼저 고르자.",
+        "required_token": "잿빛우편함",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "playful_tease",
+        "category": "playful_tease",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "user",
+            "content": "현재 편지 화제의 표식은 잿빛우편함이다."
+          }
+        ],
+        "current_user": "편지는 너무 진지해져.",
+        "target": "잿빛우편함 앞에서 갑자기 문학상이 열리는 건 아니니까 너무 긴장하지 마. 한 줄 쓰고 쉬어 가도 편지는 편지야.",
+        "required_token": "잿빛우편함",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "story",
+        "category": "story",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "user",
+            "content": "현재 편지 화제의 표식은 잿빛우편함이다."
+          }
+        ],
+        "current_user": "편지엔 어떤 말이 좋을까.",
+        "target": "잿빛우편함으로 가는 길을 생각하면 편지는 작은 약속처럼 느껴진다. 그래서 마지막 인사는 짧아도 오래 남아.",
+        "required_token": "잿빛우편함",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "question",
+        "category": "question",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "user",
+            "content": "현재 편지 화제의 표식은 잿빛우편함이다."
+          }
+        ],
+        "current_user": "편지 얘기 이어 가자.",
+        "target": "잿빛우편함에 넣을 편지라면 첫 문장을 누구에게 쓰고 싶어? 그 답에서 다음 편지 주제를 골라 보자.",
+        "required_token": "잿빛우편함",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "c2-donation-cooking",
+    "split": "train",
+    "family": "donation_isolation",
+    "topic_title": "저녁 요리",
+    "segment_label": "후원 뒤 주제 이어가기",
+    "situation": "직전 후원 메시지 뒤 현재 주제로 자연스럽게 돌아간다.",
+    "views": [
+      {
+        "view_id": "support",
+        "category": "support",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "오늘 저녁 요리의 핵심 소재는 달빛 토마토이다.",
+        "journal_messages": [],
+        "current_user": "토마토가 남아서 저녁에 써 보고 싶어.",
+        "target": "달빛 토마토를 남겨 둔 건 좋은 선택이야. 저녁에 자르면 하루 끝에 작은 색 하나가 더해져서 식탁이 덜 심심해져.",
+        "required_token": "달빛 토마토",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "observation",
+        "category": "observation",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "오늘 저녁 요리의 핵심 소재는 달빛 토마토이다.",
+        "journal_messages": [],
+        "current_user": "생토마토 향이 좋더라.",
+        "target": "달빛 토마토는 불을 만나기 전에도 향으로 존재감이 크지. 잘 익은 조각 몇 개만 있어도 접시가 먼저 말을 거는 느낌이야.",
+        "required_token": "달빛 토마토",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "advice",
+        "category": "advice",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "오늘 저녁 요리의 핵심 소재는 달빛 토마토이다.",
+        "journal_messages": [],
+        "current_user": "볶을지 그냥 먹을지 고민 중이야.",
+        "target": "달빛 토마토를 반은 그대로 두고 반은 살짝 볶아 봐. 같은 재료인데 온도가 달라지면 저녁 메뉴도 두 가지 표정을 얻어.",
+        "required_token": "달빛 토마토",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "playful_tease",
+        "category": "playful_tease",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "오늘 저녁 요리의 핵심 소재는 달빛 토마토이다.",
+        "journal_messages": [],
+        "current_user": "요리하면 꼭 설거지가 산더미야.",
+        "target": "달빛 토마토 하나 쓰는데 냄비 셋을 꺼내면 설거지가 요리의 본편이 되지. 오늘은 도마와 팬 하나만 출전시키는 쪽으로 가자.",
+        "required_token": "달빛 토마토",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "story",
+        "category": "story",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "오늘 저녁 요리의 핵심 소재는 달빛 토마토이다.",
+        "journal_messages": [],
+        "current_user": "한 접시만 예쁘게 먹고 싶어.",
+        "target": "달빛 토마토를 하얀 접시에 놓고 소금만 살짝 더해 봐. 단순한 한 접시가 오히려 저녁을 오래 기억하게 만들 때가 있어.",
+        "required_token": "달빛 토마토",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "question",
+        "category": "question",
+        "evidence_surface": "character_memory",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "오늘 저녁 요리의 핵심 소재는 달빛 토마토이다.",
+        "journal_messages": [],
+        "current_user": "오늘 저녁 맛을 정해 보자.",
+        "target": "달빛 토마토는 차갑게 먹어도 따뜻하게 먹어도 저녁의 색과 기분을 살려 줘. 지금은 어느 온도가 더 끌려?",
+        "required_token": "달빛 토마토",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "c2-donation-music",
+    "split": "train",
+    "family": "donation_isolation",
+    "topic_title": "플레이리스트",
+    "segment_label": "후원 뒤 주제 이어가기",
+    "situation": "직전 후원 메시지 뒤 현재 주제로 자연스럽게 돌아간다.",
+    "views": [
+      {
+        "view_id": "support",
+        "category": "support",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "오늘 플레이리스트의 핵심 소재는 파란 이어폰이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "이어폰 끼고 산책할 노래가 필요해.",
+        "target": "파란 이어폰을 끼고 걷는다면 발걸음과 맞는 곡부터 찾으면 돼. 멜로디가 앞서가도 길은 자기 속도로 따라오니까 부담이 없어.",
+        "required_token": "파란 이어폰",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "observation",
+        "category": "observation",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "오늘 플레이리스트의 핵심 소재는 파란 이어폰이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "낮은 볼륨의 곡이 편해.",
+        "target": "파란 이어폰은 낮은 소리를 가까이 붙잡아 주는 느낌이 있어. 조용한 곡을 들을 땐 빈 박자까지 쉬는 시간처럼 들리겠지.",
+        "required_token": "파란 이어폰",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "advice",
+        "category": "advice",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "오늘 플레이리스트의 핵심 소재는 파란 이어폰이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "재생목록이 너무 길어서 못 고르겠어.",
+        "target": "파란 이어폰으로 들을 세 곡만 따로 빼 봐. 시작, 중간, 마무리로 나누면 긴 목록도 지금 기분에 맞는 작은 흐름이 돼.",
+        "required_token": "파란 이어폰",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "playful_tease",
+        "category": "playful_tease",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "오늘 플레이리스트의 핵심 소재는 파란 이어폰이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "셔플은 늘 엉뚱한 곡을 틀어.",
+        "target": "파란 이어폰을 꼈는데 셔플이 갑자기 전투 음악을 틀면 산책도 퀘스트가 되지. 오늘은 알고리즘보다 손가락을 믿어 보자.",
+        "required_token": "파란 이어폰",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "story",
+        "category": "story",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "오늘 플레이리스트의 핵심 소재는 파란 이어폰이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "노래 한 곡이 기분을 바꾸기도 해.",
+        "target": "파란 이어폰에서 익숙한 첫 소절이 나오면 마음이 먼저 고개를 끄덕일 때가 있어. 그 한 곡이 오늘의 분위기를 조용히 정리해 줘.",
+        "required_token": "파란 이어폰",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "question",
+        "category": "question",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "오늘 플레이리스트의 핵심 소재는 파란 이어폰이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "지금 들을 분위기를 골라 보자.",
+        "target": "파란 이어폰으로 들을 곡은 잔잔한 기타와 느린 피아노가 서로 다른 밤을 만든다. 지금은 어느 쪽이 더 끌려?",
+        "required_token": "파란 이어폰",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "c2-donation-garden",
+    "split": "train",
+    "family": "donation_isolation",
+    "topic_title": "창가 화분",
+    "segment_label": "후원 뒤 주제 이어가기",
+    "situation": "직전 후원 메시지 뒤 현재 주제로 자연스럽게 돌아간다.",
+    "views": [
+      {
+        "view_id": "support",
+        "category": "support",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "assistant",
+            "content": "오늘 창가 화분의 핵심 소재는 은빛 물뿌리개이다."
+          }
+        ],
+        "current_user": "창가 화분에 새잎이 하나 났어.",
+        "target": "은빛 물뿌리개를 옆에 두면 새잎을 더 자주 살피게 될 거야. 작은 변화가 보이는 날은 돌봄이 이미 절반은 잘된 느낌이 들지.",
+        "required_token": "은빛 물뿌리개",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "observation",
+        "category": "observation",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "assistant",
+            "content": "오늘 창가 화분의 핵심 소재는 은빛 물뿌리개이다."
+          }
+        ],
+        "current_user": "잎을 보면 물이 필요한지 헷갈려.",
+        "target": "은빛 물뿌리개가 있어도 잎보다 흙을 먼저 보는 게 좋아. 표면이 마른 날을 기억해 두면 물 주는 감도 조금씩 생겨.",
+        "required_token": "은빛 물뿌리개",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "advice",
+        "category": "advice",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "assistant",
+            "content": "오늘 창가 화분의 핵심 소재는 은빛 물뿌리개이다."
+          }
+        ],
+        "current_user": "화분 자리를 바꿔도 될까?",
+        "target": "은빛 물뿌리개는 잠시 내려두고 화분이 받는 빛을 며칠 관찰해 봐. 잎이 한쪽으로 기울면 자리를 바꾸기 전에 방향부터 확인하면 돼.",
+        "required_token": "은빛 물뿌리개",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "playful_tease",
+        "category": "playful_tease",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "assistant",
+            "content": "오늘 창가 화분의 핵심 소재는 은빛 물뿌리개이다."
+          }
+        ],
+        "current_user": "식물은 말이 없어서 더 어렵다.",
+        "target": "은빛 물뿌리개가 말을 대신해 주진 않아서 초보 정원사는 늘 추리 중이야. 그래도 잎의 색을 매일 보는 사람은 이미 꽤 훌륭해.",
+        "required_token": "은빛 물뿌리개",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "story",
+        "category": "story",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "assistant",
+            "content": "오늘 창가 화분의 핵심 소재는 은빛 물뿌리개이다."
+          }
+        ],
+        "current_user": "아침 햇빛에 화분 보는 게 좋아.",
+        "target": "은빛 물뿌리개에 비친 아침빛을 보면 창가도 작은 무대처럼 느껴진다. 화분은 조용하지만 하루의 시작을 가장 먼저 받아 주는 친구야.",
+        "required_token": "은빛 물뿌리개",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "question",
+        "category": "question",
+        "evidence_surface": "delayed_journal",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [
+          {
+            "role": "assistant",
+            "content": "오늘 창가 화분의 핵심 소재는 은빛 물뿌리개이다."
+          }
+        ],
+        "current_user": "오늘 화분 얘기 마무리하자.",
+        "target": "은빛 물뿌리개를 든 날에는 새잎과 흙을 차례로 천천히 살피면 정말 좋아. 오늘은 무엇부터 보고 싶어?",
+        "required_token": "은빛 물뿌리개",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "c2-donation-rain",
+    "split": "dev",
+    "family": "donation_isolation",
+    "topic_title": "빗소리",
+    "segment_label": "후원 뒤 주제 이어가기",
+    "situation": "직전 후원 메시지 뒤 현재 주제로 자연스럽게 돌아간다.",
+    "views": [
+      {
+        "view_id": "support",
+        "category": "support",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "오늘 빗소리의 핵심 소재는 노란 창문이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "빗소리 들으면서 그냥 앉아 있고 싶어.",
+        "target": "노란 창문을 떠올리면 빗소리도 너무 차갑게만 들리진 않아. 비가 오는 동안은 아무것도 하지 않고 앉아 있어도 그 자체로 괜찮아.",
+        "required_token": "노란 창문",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "observation",
+        "category": "observation",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "오늘 빗소리의 핵심 소재는 노란 창문이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "창문에 빗방울이 흐르는 게 좋아.",
+        "target": "노란 창문에 비친 빗방울은 천천히 움직여서 자꾸 보게 된다. 흐르는 선을 따라가다 보면 생각도 잠깐 속도를 낮추는 것 같아.",
+        "required_token": "노란 창문",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "advice",
+        "category": "advice",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "오늘 빗소리의 핵심 소재는 노란 창문이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "비 오는 날엔 마음이 처져.",
+        "target": "노란 창문을 한 번 바라보고 숨을 길게 쉬어 봐. 마음이 처진 날엔 이유를 해결하려 하기보다 소리 하나에 집중하는 편이 먼저야.",
+        "required_token": "노란 창문",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "playful_tease",
+        "category": "playful_tease",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "오늘 빗소리의 핵심 소재는 노란 창문이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "우산 쓰면 꼭 바지가 젖어.",
+        "target": "노란 창문이 보이는 날에도 우산과 바지는 늘 서로 양보를 안 하지. 오늘의 승부는 멋보다 덜 젖는 쪽이 이기는 걸로 하자.",
+        "required_token": "노란 창문",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "story",
+        "category": "story",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "오늘 빗소리의 핵심 소재는 노란 창문이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "비가 그친 뒤 공기가 좋더라.",
+        "target": "노란 창문 주변의 빗소리가 잦아들면 공기도 새로 씻긴 듯 느껴진다. 그때 창문을 열지 않아도 비 뒤의 가벼움은 전해져.",
+        "required_token": "노란 창문",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "question",
+        "category": "question",
+        "evidence_surface": "authenticated_briefing",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [
+          "오늘 빗소리의 핵심 소재는 노란 창문이다."
+        ],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "비 오는 장면 하나만 골라 줘.",
+        "target": "노란 창문 아래의 빗소리는 가늘 때와 굵을 때 장면의 결이 달라진다. 지금은 어느 소리가 더 듣고 싶어?",
+        "required_token": "노란 창문",
+        "updated_token": null,
+        "decoy_tokens": [],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "c2-donation-cafe",
+    "split": "train",
+    "family": "donation_isolation",
+    "topic_title": "카페 창가",
+    "segment_label": "후원 뒤 주제 이어가기",
+    "situation": "직전 후원 메시지 뒤 현재 주제로 자연스럽게 돌아간다.",
+    "views": [
+      {
+        "view_id": "support",
+        "category": "support",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "창가 자리에서 혼자 커피 마시는 중이야.",
+        "target": "혼자 창가에 앉아 커피를 마시는 시간은 굳이 채울 필요가 없어. 잔에서 올라오는 김을 보고 밖을 한 번 보면 그걸로도 충분히 쉬는 거야.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "보랏빛 영수증"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "observation",
+        "category": "observation",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "밖에 사람들 지나가는 걸 보고 있어.",
+        "target": "지나가는 사람을 보고 있으면 각자 다른 속도로 하루를 건너는 게 보여. 잠깐 마주친 풍경인데도 내 자리의 시간이 더 또렷해지지.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "보랏빛 영수증"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "advice",
+        "category": "advice",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "카페에서 할 일을 시작 못 하겠어.",
+        "target": "할 일은 첫 줄만 열어 두고 다섯 분만 앉아 있어 봐. 시작이 늦어도 커피가 식기 전 한 문장만 쓰면 오늘 몫은 생겨.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "보랏빛 영수증"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "playful_tease",
+        "category": "playful_tease",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "커피가 식을 때까지 멍하게 있었어.",
+        "target": "커피가 식는 동안 멍한 건 카페의 정식 기능을 아주 충실히 쓴 거야. 다음 모금이 차가워도 휴식 점수는 따뜻하게 남아.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "보랏빛 영수증"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "story",
+        "category": "story",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "오늘은 조용한 곳을 찾았어.",
+        "target": "조용한 카페에서는 작은 소리도 배경 음악처럼 들린다. 아무 말 없이 앉아 있던 시간이 나중에는 제일 선명하게 기억될 수도 있어.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "보랏빛 영수증"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "question",
+        "category": "question",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "창가에서 할 일 하나를 정해 줘.",
+        "target": "창가에서는 사람 구경과 짧은 메모가 서로 다른 휴식이 된다. 오늘은 마음이 가는 쪽 하나만 조용히 골라 두자.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "보랏빛 영수증"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "c2-donation-night",
+    "split": "train",
+    "family": "donation_isolation",
+    "topic_title": "밤 산책",
+    "segment_label": "후원 뒤 주제 이어가기",
+    "situation": "직전 후원 메시지 뒤 현재 주제로 자연스럽게 돌아간다.",
+    "views": [
+      {
+        "view_id": "support",
+        "category": "support",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "집 앞을 열 분만 걷고 왔어.",
+        "target": "열 분 걷고 온 것만으로도 몸이 하루의 끝을 알아차렸을 거야. 멀리 가지 않아도 집 앞 공기를 바꾸면 마음이 조금 가벼워지지.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "검은 엽서"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "observation",
+        "category": "observation",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "밤 공기가 생각보다 선선해.",
+        "target": "선선한 밤 공기는 낮에 남은 열기를 천천히 밀어낸다. 숨을 들이쉴 때마다 오늘의 속도도 한 칸 낮아지는 느낌이야.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "검은 엽서"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "advice",
+        "category": "advice",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "걷다 보면 생각이 많아져.",
+        "target": "걷다가 생각이 많아지면 발걸음 수만 조용히 세어 봐. 머릿속 이야기를 다 해결하지 않아도 몸이 먼저 돌아오는 길을 기억해 줘.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "검은 엽서"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "playful_tease",
+        "category": "playful_tease",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "편의점 불빛이 유난히 밝아 보여.",
+        "target": "편의점 불빛이 밤에는 작은 등대처럼 밝아 보일 때가 있지. 필요한 게 없어도 그 앞을 지나면 왠지 길을 잘 찾은 기분이 들어.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "검은 엽서"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "story",
+        "category": "story",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "집에 돌아가는 길이 편안해.",
+        "target": "집으로 향하는 길이 편안했다면 오늘 산책은 이미 제 역할을 한 거야. 문을 열기 전 잠깐 멈춰서 밤 공기를 한 번 더 챙겨 가자.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "검은 엽서"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "question",
+        "category": "question",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "밤 산책 얘기는 여기까지 하자.",
+        "target": "밤 산책 이야기는 여기서 접고, 남은 시간은 편하게 쉬는 쪽으로 넘겨 두자. 걸었던 열 분이 오늘의 마침표면 충분해.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "검은 엽서"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      }
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "c2-donation-book",
+    "split": "test",
+    "family": "donation_isolation",
+    "topic_title": "책 한 장",
+    "segment_label": "후원 뒤 주제 이어가기",
+    "situation": "직전 후원 메시지 뒤 현재 주제로 자연스럽게 돌아간다.",
+    "views": [
+      {
+        "view_id": "support",
+        "category": "support",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "책 한 쪽을 읽다가 좋은 문장을 만났어.",
+        "target": "좋은 문장을 만난 날은 책을 많이 못 읽어도 괜찮아. 한 줄이 오래 남으면 그 페이지가 오늘의 가장 큰 수확이 되지.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "흰 나침반"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "observation",
+        "category": "observation",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "줄거리보다 문장 분위기가 좋아.",
+        "target": "줄거리보다 문장 분위기가 좋을 때는 속도를 더 늦춰도 돼. 뜻을 다 붙잡지 못해도 문장이 만든 공기만으로 충분히 따라갈 수 있어.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "흰 나침반"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "advice",
+        "category": "advice",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "읽던 곳을 자꾸 놓쳐.",
+        "target": "읽던 곳을 놓치면 마지막으로 기억나는 단어에 표시해 봐. 다시 펼쳤을 때 그 단어가 길목이 되어 자연스럽게 다음 줄로 데려가 줄 거야.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "흰 나침반"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "playful_tease",
+        "category": "playful_tease",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "책을 펴면 졸음이 먼저 와.",
+        "target": "책을 펴자마자 졸리면 몸이 문장을 베개로 착각한 모양이야. 두 쪽만 읽고 덮어도 오늘 독서는 출석 처리가 가능해.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "흰 나침반"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "story",
+        "category": "story",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "천천히 읽는 시간이 필요했어.",
+        "target": "천천히 읽는 시간은 페이지 수보다 마음의 여백을 남겨 준다. 급하게 넘기지 않은 문장은 나중에 다시 생각날 자리를 갖게 돼.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "흰 나침반"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      },
+      {
+        "view_id": "question",
+        "category": "question",
+        "evidence_surface": "direct_chat",
+        "affect_outcome": {
+          "evidence": "director_delivery",
+          "outcome": "donation_acknowledged"
+        },
+        "history": [],
+        "briefing_lines": [],
+        "memory_block": "",
+        "journal_messages": [],
+        "current_user": "다음에 읽을 책을 정하고 싶어.",
+        "target": "다음에 읽을 책은 짧은 에세이와 긴 소설이 서로 다른 속도를 건넨다. 지금 마음에는 가벼운 첫 장이 더 잘 맞아 보여.",
+        "required_token": null,
+        "updated_token": null,
+        "decoy_tokens": [
+          "흰 나침반"
+        ],
+        "forbidden_tokens": [],
+        "roster_handles": [],
+        "donation_continuation": true
+      }
+    ]
+  }
+]

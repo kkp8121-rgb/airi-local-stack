@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "airi.broadcast-response-pilot.v1",
+  "title": "AIRI Broadcast Response Pilot Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "split", "scenario_family", "lexical_family", "event", "required_beats", "register_by_beat", "response_length_class", "target", "review", "training_eligible", "provenance"],
+  "properties": {
+    "schema_version": { "const": "airi.broadcast-response-pilot.v1" },
+    "id": { "type": "string", "pattern": "^brpilot-[a-z0-9-]+$" },
+    "split": { "enum": ["train", "dev", "test"] },
+    "scenario_family": { "type": "string", "minLength": 1 },
+    "lexical_family": { "type": "string", "minLength": 1 },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_type", "event_content", "show_segment", "queue_pressure", "current_topic", "selected_message", "synthetic_alias", "recent_airi_turns"],
+      "properties": {
+        "event_type": { "enum": ["donation", "subscription", "selected_chat", "batched_chat", "greeting", "topic_transition", "game_chat", "watchalong", "privacy", "moderation", "acute_health", "imitation_copyright"] },
+        "event_content": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "show_segment": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "queue_pressure": { "enum": ["single", "burst"] },
+        "current_topic": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "selected_message": { "oneOf": [{ "type": "string", "minLength": 1, "maxLength": 300 }, { "type": "array", "minItems": 2, "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 300 } }] },
+        "synthetic_alias": { "type": "string", "maxLength": 40 },
+        "recent_airi_turns": { "type": "array", "maxItems": 2, "items": { "type": "string", "minLength": 1, "maxLength": 240 } }
+      }
+    },
+    "required_beats": { "type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": { "enum": ["acknowledgment", "callout", "content_callback", "clarifying_question", "self_position", "rationale_or_episode", "aggregate_summary", "safety_boundary", "expansion", "return_to_topic", "invite_participation", "close"] } },
+    "register_by_beat": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "enum": ["ritual_formal", "host_casual", "neutral"] } },
+    "response_length_class": { "enum": ["compact", "standard", "expanded"] },
+    "target": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "review": { "type": "object", "additionalProperties": false, "required": ["status", "aggregate_feedback", "reviewer"], "properties": { "status": { "const": "pending_batch_feedback" }, "aggregate_feedback": { "const": "" }, "reviewer": { "const": "" } } },
+    "training_eligible": { "const": false },
+    "provenance": { "type": "object", "additionalProperties": false, "required": ["synthetic", "source", "reference_mechanics_only"], "properties": { "synthetic": { "const": true }, "source": { "const": "airi-original-korean-broadcast-pilot-v1" }, "reference_mechanics_only": { "const": true } } }
+  }
+}

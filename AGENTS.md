@@ -29,3 +29,11 @@ Recent history follows Conventional Commit-style subjects: `fix: ...`, `test: ..
 ## Security & Configuration Tips
 
 Never commit `.env` files, credentials, model weights, personal audio, logs, SQLite runtime data, or generated outputs; these are ignored intentionally. External chat, search, and memory providers must remain explicit opt-ins. Avoid weakening localhost bindings or pinned CI dependencies without documenting the security impact.
+
+## Serena 사용 정책 (2026-08-20)
+
+- Serena로 할 것: 심볼 검색·참조 조회·타입 계층·cross-file rename/move·
+  메서드 본문 단위 read/edit. 파일 전체 read 전에 반드시 심볼 조회 먼저.
+- built-in으로 할 것: 1~2줄 수정, 자유 텍스트/문자열 검색, 설정·JSON·
+  픽스처·ps1·md 파일, 쉘·git·테스트 실행.
+- 판단 기준 한 줄: "IDE라면 go-to-definition을 쓸 작업인가?" — 그렇다면 Serena.

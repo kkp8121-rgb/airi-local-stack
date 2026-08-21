@@ -1,0 +1,27 @@
+{
+  "schema_version": "airi.broadcast-sim-t3-fixture-manifest.v2",
+  "canonicalization": "utf-8 JSON: sort_keys=true, separators=(',', ':'), ensure_ascii=false",
+  "fixtures": [
+    {
+      "filename": "first_broadcast_v1.json",
+      "creation_order": 1,
+      "role": "calibration_regression",
+      "raw_sha256": "d6cdd694e76ac4017ca1cdebb60ba09c337efa6a1813ce9c00c91b03d4ffcc9c",
+      "canonical_sha256": "0d558c0ce3e019569673ed96f4f171e3464e1e044028e7de6b7ede9d5b8085d6"
+    },
+    {
+      "filename": "second_broadcast_v1.json",
+      "creation_order": 2,
+      "role": "calibration_regression",
+      "raw_sha256": "22692a9d24f25cbb6877c297ffc23c93e7d0a74028ddff5072b899e648583760",
+      "canonical_sha256": "c2ae8a2db00f8f0ed8bd4ee4d909bde965bcbf18dd359b8dbaf340f4c65a57b1"
+    },
+    {
+      "filename": "third_long_broadcast_heldout_v1.json",
+      "creation_order": 3,
+      "role": "final_blind",
+      "raw_sha256": "4e0f018729857b8f4648496298abf2f358a1ad19098f2927d6ec1356809a9897",
+      "canonical_sha256": "ddb43f03f88dacff70ebd8a6221274e51348e01e9fe542153139c0330bd52b61"
+    }
+  ]
+}

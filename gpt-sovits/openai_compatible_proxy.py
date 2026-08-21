@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import logging
 import os
 import sys
@@ -101,6 +102,12 @@ def health():
         "backend_url": GPT_TTS_URL,
         "reference_audio": REFERENCE_AUDIO,
         "reference_audio_found": reference_found,
+        "streaming_contract": {
+            "mode": STREAMING_MODE,
+            "min_chunk_length": MIN_CHUNK_LENGTH,
+            "media_type": "wav",
+            "parallel_infer": False,
+        },
         "immediate_response_cache": cache_health(),
     }
 
@@ -356,6 +363,11 @@ def speech(request: SpeechRequest, http_request: Request):
             ),
         )
     trace_id = request_id(http_request.headers, uuid4().hex)
+    input_sha256 = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    evidence_headers = {
+        "X-AIRI-Request-ID": trace_id,
+        "X-AIRI-TTS-Input-SHA256": input_sha256,
+    }
     request_started = time.perf_counter()
     emit_latency_event(
         "tts",
@@ -380,7 +392,7 @@ def speech(request: SpeechRequest, http_request: Request):
         return Response(
             content=cached_audio,
             media_type="audio/wav",
-            headers={"X-AIRI-Request-ID": trace_id, "X-AIRI-TTS-Cache": "hit"},
+            headers={**evidence_headers, "X-AIRI-TTS-Cache": "hit"},
         )
     # Contact the backend before the streaming response starts. Returning a
     # StreamingResponse first would turn every backend failure into "HTTP 200
@@ -414,7 +426,7 @@ def speech(request: SpeechRequest, http_request: Request):
         stream,
         _stream_backend(stream, trace_id, request_started),
         media_type="audio/wav",
-        headers={"X-AIRI-Request-ID": trace_id},
+        headers=evidence_headers,
     )
 
 

@@ -1,0 +1,82 @@
+[
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "d09-library-marker",
+    "split": "train",
+    "family": "briefing_topic",
+    "topic_title": "야간 도서관 책갈피 정리",
+    "segment_label": "오늘 방송 정보 회수",
+    "situation": "진행 메모에 적힌 오늘의 핵심 소품을 바탕으로 책 이야기를 이어 간다.",
+    "views": [
+      {"view_id":"direct","category":"direct_answer","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["오늘 정리할 핵심 소품: 자작나무 책갈피"],"memory_block":"","journal_messages":[],"current_user":"오늘 책 사이에서 먼저 찾을 물건이 뭐야?","target":"먼저 찾을 건 자작나무 책갈피야. 얇은 물건 하나가 어느 페이지에서 이야기를 멈췄는지 가장 정확히 알려 주잖아.","required_token":"자작나무 책갈피","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"paraphrase","category":"observation","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":["오늘 정리할 핵심 소품: 자작나무 책갈피"],"memory_block":"","journal_messages":[],"current_user":"책을 다시 펼칠 때 제일 먼저 눈에 들어오는 건 보통 뭐야?","target":"오늘은 자작나무 책갈피가 먼저 보여. 읽던 자리를 조용히 붙들고 있던 물건이라 책보다 앞서 지난 장면을 꺼내 주네.","required_token":"자작나무 책갈피","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"distractor","category":"correction","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["오늘 정리할 핵심 소품: 자작나무 책갈피"],"memory_block":"","journal_messages":[],"current_user":"먼저 볼 건 대출 영수증이지? 날짜부터 확인하면 되잖아.","target":"날짜보다 먼저 볼 건 자작나무 책갈피야. 영수증은 빌린 날을 말하지만, 이건 실제로 읽다가 멈춘 자리를 바로 가리켜.","required_token":"자작나무 책갈피","updated_token":null,"decoy_tokens":["대출 영수증"],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"topic_anchor","category":"topic_judgment","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":["오늘 정리할 핵심 소품: 자작나무 책갈피"],"memory_block":"","journal_messages":[],"current_user":"책을 제목순이랑 읽던 순서 중 어느 쪽으로 놓는 게 좋을까?","target":"자작나무 책갈피가 남은 책부터 읽던 순서로 두는 게 좋아. 오늘은 예쁜 진열보다 중단된 이야기를 다시 잇는 쪽이 핵심이니까.","required_token":"자작나무 책갈피","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"self_led","category":"self_led_return","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"director_delivery","outcome":"callback_hit"},"history":[],"briefing_lines":["오늘 정리할 핵심 소품: 자작나무 책갈피"],"memory_block":"","journal_messages":[],"current_user":"도서관 조명이 생각보다 따뜻해서 화면이 편안해 보여.","target":"조명 얘기하니 종이결도 더 잘 보이네. 자작나무 책갈피가 꽂힌 책부터 펼치면 이 차분한 분위기와도 잘 맞을까?","required_token":"자작나무 책갈피","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "d09-aquarium-shrimp",
+    "split": "train",
+    "family": "briefing_topic",
+    "topic_title": "작은 수족관 생물 관찰",
+    "segment_label": "오늘 방송 정보 회수",
+    "situation": "관찰 대상으로 정한 생물을 놓치지 않고 화면의 움직임을 설명한다.",
+    "views": [
+      {"view_id":"direct","category":"direct_answer","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["오늘 자세히 볼 생물: 유리새우"],"memory_block":"","journal_messages":[],"current_user":"오늘 수조에서 자세히 보기로 한 생물이 뭐였어?","target":"오늘 자세히 볼 건 유리새우야. 몸이 비쳐서 가만히 있으면 사라진 것 같다가 다리만 먼저 움직이는 게 재밌어.","required_token":"유리새우","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"paraphrase","category":"observation","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":["오늘 자세히 볼 생물: 유리새우"],"memory_block":"","journal_messages":[],"current_user":"돌 뒤에서 투명한 게 움직였는데 화면에 제대로 잡힌 거 맞아?","target":"방금 움직인 건 유리새우로 보여. 몸통보다 수염과 다리의 미세한 흔들림을 보면 돌 그림자와 구분하기 쉬워.","required_token":"유리새우","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"distractor","category":"correction","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["오늘 자세히 볼 생물: 유리새우"],"memory_block":"","journal_messages":[],"current_user":"오늘은 소라게가 먹이 먹는 장면을 기다리는 거 아니었어?","target":"기다리는 대상은 소라게가 아니라 유리새우야. 먹이보다 투명한 몸 안쪽이 움직일 때 화면을 가까이 보는 편이 오늘 관찰과 맞아.","required_token":"유리새우","updated_token":null,"decoy_tokens":["소라게"],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"topic_anchor","category":"topic_judgment","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":["오늘 자세히 볼 생물: 유리새우"],"memory_block":"","journal_messages":[],"current_user":"카메라는 수조 전체를 볼까, 돌 주변을 가까이 잡을까?","target":"유리새우를 놓치지 않으려면 돌 주변을 가까이 잡는 편이 낫겠어. 넓게 보면 수조는 예쁘지만 작은 움직임은 금방 배경에 섞이거든.","required_token":"유리새우","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"self_led","category":"self_led_return","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"director_delivery","outcome":"callback_hit"},"history":[],"briefing_lines":["오늘 자세히 볼 생물: 유리새우"],"memory_block":"","journal_messages":[],"current_user":"물 흐르는 소리가 은근히 졸리게 만든다.","target":"소리는 느긋한데 수조 안은 계속 바쁘네. 유리새우가 돌 틈에서 나오는 순간만 잡아도 오늘 관찰은 꽤 선명하게 남지 않을까?","required_token":"유리새우","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "d09-lunch-side",
+    "split": "train",
+    "family": "briefing_topic",
+    "topic_title": "도시락 반찬 조합 수다",
+    "segment_label": "오늘 방송 정보 회수",
+    "situation": "미리 정한 중심 반찬을 기준으로 도시락 구성을 판단한다.",
+    "views": [
+      {"view_id":"direct","category":"direct_answer","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["오늘 도시락의 중심 반찬: 연근조림"],"memory_block":"","journal_messages":[],"current_user":"오늘 도시락에서 중심으로 보기로 한 반찬이 뭐야?","target":"오늘 중심 반찬은 연근조림이야. 아삭한 식감과 짭짤한 맛이 둘 다 있어서 주변 반찬을 정할 기준으로 쓰기 좋아.","required_token":"연근조림","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"paraphrase","category":"observation","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":["오늘 도시락의 중심 반찬: 연근조림"],"memory_block":"","journal_messages":[],"current_user":"간이 센 반찬 하나를 가운데 두면 나머지는 어떻게 맞추는 게 좋아?","target":"연근조림이 중심이면 나머지는 담백한 쪽이 편해. 맛을 전부 세게 밀기보다 밥과 달걀이 한 번씩 쉬어 갈 자리를 주면 돼.","required_token":"연근조림","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"distractor","category":"correction","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["오늘 도시락의 중심 반찬: 연근조림"],"memory_block":"","journal_messages":[],"current_user":"매운 어묵을 기준으로 색이랑 간을 맞추면 되겠네.","target":"오늘 기준은 매운 어묵이 아니라 연근조림이야. 갈색 반찬이 중심이라 초록 채소를 곁들이면 맛뿐 아니라 칸도 덜 답답해 보여.","required_token":"연근조림","updated_token":null,"decoy_tokens":["매운 어묵"],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"topic_anchor","category":"topic_judgment","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":["오늘 도시락의 중심 반찬: 연근조림"],"memory_block":"","journal_messages":[],"current_user":"달걀말이랑 데친 브로콜리 중 하나만 넣으면 어느 쪽이 나아?","target":"연근조림 옆에는 데친 브로콜리가 더 나아 보여. 단맛과 간이 이미 있으니 부드러운 달걀보다 산뜻한 식감이 균형을 잡아 줘.","required_token":"연근조림","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"self_led","category":"self_led_return","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"director_delivery","outcome":"callback_hit"},"history":[],"briefing_lines":["오늘 도시락의 중심 반찬: 연근조림"],"memory_block":"","journal_messages":[],"current_user":"도시락 통 칸이 생각보다 작아서 다 넣기는 어렵겠다.","target":"그러면 욕심내서 칸마다 채우기보다 기준부터 남기자. 연근조림 한 칸을 확보하고 밥 옆의 빈자리만 가볍게 채우는 게 깔끔해.","required_token":"연근조림","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "d09-alley-sign",
+    "split": "train",
+    "family": "briefing_topic",
+    "topic_title": "오래된 골목 표지 읽기",
+    "segment_label": "오늘 방송 정보 회수",
+    "situation": "골목에서 찾기로 한 표지를 기준으로 이동 방향과 화면 단서를 해석한다.",
+    "views": [
+      {"view_id":"direct","category":"direct_answer","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["오늘 골목에서 찾을 단서: 세모난 번지판"],"memory_block":"","journal_messages":[],"current_user":"오늘 골목에서 찾기로 한 표지가 뭐였지?","target":"찾기로 한 건 세모난 번지판이야. 모양이 흔하지 않아서 간판이 많은 길에서도 방향을 다시 잡기 좋은 단서지.","required_token":"세모난 번지판","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"paraphrase","category":"observation","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":["오늘 골목에서 찾을 단서: 세모난 번지판"],"memory_block":"","journal_messages":[],"current_user":"낡은 벽에 모서리만 튀어나온 표지가 보이는데 저게 단서일까?","target":"모서리 셋이 보인다면 세모난 번지판일 가능성이 커. 글자가 흐려도 윤곽이 남아 있어서 오늘은 번호보다 형태부터 보면 돼.","required_token":"세모난 번지판","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"distractor","category":"correction","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["오늘 골목에서 찾을 단서: 세모난 번지판"],"memory_block":"","journal_messages":[],"current_user":"빨간 가게 간판을 따라가면 약속한 골목이 나오겠지?","target":"가게 간판보다 세모난 번지판을 따라야 해. 빨간색은 바뀔 수 있지만 벽에 붙은 독특한 모양은 골목의 오래된 흔적이니까.","required_token":"세모난 번지판","updated_token":null,"decoy_tokens":["빨간 가게 간판"],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"topic_anchor","category":"topic_judgment","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":["오늘 골목에서 찾을 단서: 세모난 번지판"],"memory_block":"","journal_messages":[],"current_user":"갈림길에서 벽 글씨와 표지 모양 중 어느 쪽을 먼저 볼까?","target":"세모난 번지판을 찾는 중이니 표지 모양부터 보자. 벽 글씨는 이야깃거리가 많아도 지금 필요한 방향을 바로 가리키진 않아.","required_token":"세모난 번지판","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"self_led","category":"self_led_return","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"director_delivery","outcome":"callback_hit"},"history":[],"briefing_lines":["오늘 골목에서 찾을 단서: 세모난 번지판"],"memory_block":"","journal_messages":[],"current_user":"벽돌 색이 구간마다 달라서 걷는 맛이 있네.","target":"벽돌도 재밌지만 길을 잃으면 감상 시간이 갑자기 늘어나지. 세모난 번지판부터 찾아 두고 마음 편하게 벽을 구경할까?","required_token":"세모난 번지판","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false}
+    ]
+  },
+  {
+    "schema": "airi.broadcast-continuity-card.v4",
+    "group_id": "d09-knitting-yarn",
+    "split": "test",
+    "family": "briefing_topic",
+    "topic_title": "손뜨개 색 조합 고르기",
+    "segment_label": "오늘 방송 정보 회수",
+    "situation": "오늘 정한 실을 중심으로 뜨개 배색과 작업 순서를 판단한다.",
+    "views": [
+      {"view_id":"direct","category":"direct_answer","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["오늘 배색의 중심 재료: 겨자색 실타래"],"memory_block":"","journal_messages":[],"current_user":"오늘 배색에서 중심으로 쓰기로 한 실이 뭐야?","target":"오늘 중심은 겨자색 실타래야. 노랑보다 차분하고 갈색보다 밝아서 작은 면적만 써도 배색의 방향이 또렷해져.","required_token":"겨자색 실타래","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"paraphrase","category":"observation","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":["오늘 배색의 중심 재료: 겨자색 실타래"],"memory_block":"","journal_messages":[],"current_user":"따뜻한 색인데 너무 밝지는 않은 실부터 잡으면 되지?","target":"그 설명이면 겨자색 실타래가 딱 맞아. 화면에서는 묵직해 보여도 밝은 실 옆에 두면 색이 의외로 가볍게 살아나.","required_token":"겨자색 실타래","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"distractor","category":"correction","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"screened_chat","outcome":"chat_question"},"history":[],"briefing_lines":["오늘 배색의 중심 재료: 겨자색 실타래"],"memory_block":"","journal_messages":[],"current_user":"하늘색 실을 중심으로 두고 흰색을 섞는 계획이었지?","target":"오늘 중심은 하늘색이 아니라 겨자색 실타래야. 흰색을 곁들이는 건 괜찮지만 주인공을 바꾸면 전체 인상이 너무 차가워져.","required_token":"겨자색 실타래","updated_token":null,"decoy_tokens":["하늘색 실"],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"topic_anchor","category":"topic_judgment","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"director_delivery","outcome":"topic_open"},"history":[],"briefing_lines":["오늘 배색의 중심 재료: 겨자색 실타래"],"memory_block":"","journal_messages":[],"current_user":"테두리와 가운데 무늬 중 어디에 중심색을 넣는 게 좋을까?","target":"겨자색 실타래는 가운데 무늬에 쓰는 편이 좋아 보여. 테두리에 둘러버리면 색이 무거워지고, 한가운데 한 번 들어가야 시선이 모여.","required_token":"겨자색 실타래","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false},
+      {"view_id":"self_led","category":"self_led_return","evidence_surface":"authenticated_briefing","affect_outcome":{"evidence":"director_delivery","outcome":"callback_hit"},"history":[],"briefing_lines":["오늘 배색의 중심 재료: 겨자색 실타래"],"memory_block":"","journal_messages":[],"current_user":"바늘 부딪히는 소리가 생각보다 리듬감 있다.","target":"그 소리에 맞춰 뜨면 손이 덜 급해지겠다. 겨자색 실타래가 들어갈 무늬 구간까지만 천천히 가면 배색도 흐트러지지 않겠지?","required_token":"겨자색 실타래","updated_token":null,"decoy_tokens":[],"forbidden_tokens":[],"roster_handles":[],"donation_continuation":false}
+    ]
+  }
+]
