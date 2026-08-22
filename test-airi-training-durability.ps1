@@ -837,12 +837,29 @@ def artifact_receipt(path):
             for item in sorted(path.rglob("*")) if item.is_file()]
     return {"path": str(path.resolve()), "kind": "directory", "files": rows,
             "manifest_sha256": hashlib.sha256(canonical(rows)).hexdigest()}
+def publish_adapter_artifact():
+    args.output.mkdir(parents=True, exist_ok=True)
+    adapter_path = args.output / "adapter.bin"
+    adapter_path.write_bytes(b"adapter")
+    adapter_raw = adapter_path.read_bytes()
+    pins = {"dataset_sha256": args.dataset_sha256,
+            "model_weight_sha256": args.model_sha256,
+            "trainer_source_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}
+    manifest = {
+        "schema_version": "airi.behavior-adapter-artifact.v1",
+        "run_id": args.run_id,
+        "pins": pins,
+        "files": [{"path": "adapter.bin", "bytes": len(adapter_raw),
+                   "sha256": hashlib.sha256(adapter_raw).hexdigest()}],
+    }
+    manifest_path = args.output / "artifact-manifest.json"
+    manifest_path.write_bytes(canonical(manifest))
+    return hashlib.sha256(manifest_path.read_bytes()).hexdigest()
 if args.inject_terminal:
     # Create the synthetic terminal artifacts before the long fault window.
     # Windows venv launch shims can outlive or underlive their child; the
     # runner must never mistake shim timing for missing final test artifacts.
-    args.output.mkdir(parents=True, exist_ok=True)
-    (args.output / "adapter.bin").write_bytes(b"adapter")
+    publish_adapter_artifact()
     args.report.write_text("{}\n", encoding="utf-8")
     injection_deadline = time.monotonic() + 8.0
     state_path = args.run_dir / "run-state.json"
@@ -939,8 +956,7 @@ else:
     # Keep the synthetic trainer live across several 500 ms launcher polls so
     # exact runner/trainer provenance is observed before terminal publication.
     time.sleep(2.0)
-args.output.mkdir(parents=True, exist_ok=True)
-(args.output / "adapter.bin").write_bytes(b"adapter")
+adapter_artifact_manifest_sha256 = publish_adapter_artifact()
 args.report.write_text("{}\n", encoding="utf-8")
 generation = "checkpoint-00000001"
 checkpoint_dir = args.run_dir / "checkpoints" / generation
@@ -993,7 +1009,7 @@ progress_bytes = canonical(progress)
 producer = {"schema_version": "airi.behavior-producer-evidence-root.v1", "run_id": args.run_id,
             "checkpoint_index_sha256": hashlib.sha256(index_bytes).hexdigest(),
             "latest_checkpoint": reference,
-            "adapter_artifact_manifest_sha256": artifact_receipt(args.output)["manifest_sha256"],
+            "adapter_artifact_manifest_sha256": adapter_artifact_manifest_sha256,
             "report_sha256": artifact_receipt(args.report)["sha256"],
             "progress": {"microsteps_completed": 2, "optimizer_steps": 1,
                          "pending_microbatches": 0, "training_elapsed_ns": 1}}

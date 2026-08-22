@@ -7,17 +7,17 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
-> **2026-08-23 P0 local batch receipt:** 최신 사용자 `/goal`로 Goal 도구 status는
-> `active`다. local HEAD/local origin/main/remote main은 `32830a4`, worktree는
-> modified 16+untracked 1+staged 0, 관련 trainer/runner/test PID와 식별 가능한 AIRI
-> GPU workload는 0이다. 동결 P0 후속 배치는 최종 Python `145 passed, 5 skipped`,
-> actual-process PowerShell durability literal PASS, 전체 offline checkpoint PASS,
-> repo diff-check와 17-path security hit 0을 통과해 잔여 로컬 P0/P1이 0이다.
-> commit `911d082dcf1768a5145bd34d56a19f82deb9d248`과 actual push receipt docs
-> `a898ff82939ab59dc3fd84d2fb6214ecf381113e`은 origin/main push됐다. final live
-> receipt commit/push와 HEAD/local·remote origin/main·clean worktree 재확인 뒤 controlled
-> GPU로 이동한다. `goal_status=active`; E2 microstep 0,
-> 운영 채택과 기본 모델 변경 금지는 유지한다.
+> **2026-08-23 first controlled GPU/P0 correction receipt:** Goal status는 `active`,
+> HEAD/local·remote origin/main은 `5f2f50e`다. 첫 K=5 baseline은 480/480·30/30 계산 뒤
+> actual checkpoint interval max `705.902827`초와 `supervisor-durablerunnererror`로 FAIL,
+> related PID 0/final evidence root absent이며 root는 보존한다. 원인은 producer internal
+> artifact-manifest file SHA를 runner와 pause가 adapter directory inventory SHA와 비교한
+> 두 P0 의미 혼동이었다. exact internal manifest receipt row 결속으로 최소 수정했고
+> pinned Python `146 passed, 5 skipped`, actual-process PowerShell durability literal PASS,
+> final offline checkpoint PASS, exact diff/security hit 0이다. 현재 verified local 배치의
+> milestone docs·commit/push가 남았으며, HEAD=origin/main·clean 뒤 K=3 fresh controlled
+> GPU로 재실증한다. `goal_status=active`; E2 microstep 0, 운영 채택과 기본 모델 변경 금지는
+> 유지한다.
 >
 > **이전 권한 이력 — 2026-08-22 goal resume:** 사용자 `/goal` 명령으로 당시 AIRI 본 goal은 `active`였다.
 > 저장소 구현·GPU 학습·모델 병합/패키징·로컬 서비스·T3·장시간 캠페인과
@@ -352,10 +352,12 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   trainer-bound launcher와 anchor-bound pause를 구현했다. 한 차례 감사 P0=0/P1=4의
   네 원래 P1만 최소 수정하고 targeted+최종 Python `145 passed, 5 skipped`+actual-process
   PowerShell+전체 offline+diff/security gate로 잔여 로컬 P0/P1 0을 확인했다. 새 감사
-  라운드는 추가하지 않는다. 검증 완료 commit `911d082`은 origin/main push됐으며 actual
-  push receipt docs `a898ff8`도 origin/main에 durable하다. final live receipt와 clean
-  경계 뒤에만 controlled GPU로 이동한다. 이미 완료된 P0-A를
-  다시 넓게 감사하며 공회전하지 않는다.
+  라운드는 추가하지 않는다. 검증 완료 commit `911d082`과 receipt docs `a898ff8`은
+  origin/main에 durable하다. 첫 K=5 controlled baseline은 480/30 계산 뒤 interval max
+  705.902827초와 final-root adapter SHA 의미 혼동으로 FAIL했다. runner/pause 두 P0를 exact
+  internal manifest receipt row에 결속해 pinned Python 146/5, actual PowerShell, final offline,
+  diff/security PASS로 수리했으며 local commit/push 대기다. push/clean 뒤 K=3 fresh baseline+
+  safe arm으로 재실증한다. 이미 완료된 P0-A를 다시 넓게 감사하며 공회전하지 않는다.
 - [ ] preflight: live-state 단독 diff를 제외한 입력 code/data clean, trainer 0,
   corpus/base/E1 SHA exact, E2 산출물 부재 재확인
 - [ ] **E2-LAUNCH:** P0 receipt의 authoritative durable runner로만 seed 42·1,600

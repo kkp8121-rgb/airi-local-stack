@@ -1139,6 +1139,9 @@ function Assert-VerifiedFinalEvidenceRoot {
     Assert-ExactJsonProperties -Value $producer.progress -Names @(
         'microsteps_completed', 'optimizer_steps', 'pending_microbatches', 'training_elapsed_ns') `
         -Label 'producer evidence progress'
+    $adapterArtifactManifests = @($State.outputs.adapter.files | Where-Object {
+            [string]$_.path -eq 'artifact-manifest.json'
+        })
     if ([string]$progress.schema_version -ne 'airi.behavior-training-progress.v2' -or
         [string]$progress.run_id -ne [string]$State.run_id -or [string]$progress.status -ne 'completed' -or
         [int64]$progress.pending_microbatches -ne 0 -or
@@ -1150,7 +1153,9 @@ function Assert-VerifiedFinalEvidenceRoot {
                     pending_microbatches = $progress.pending_microbatches
                     training_elapsed_ns = $progress.training_elapsed_ns
                 })) -or
-        [string]$producer.adapter_artifact_manifest_sha256 -ne [string]$State.outputs.adapter.manifest_sha256 -or
+        $adapterArtifactManifests.Count -ne 1 -or
+        [string]$producer.adapter_artifact_manifest_sha256 -ne
+            [string]$adapterArtifactManifests[0].sha256 -or
         [string]$producer.report_sha256 -ne [string]$State.outputs.report.sha256) {
         throw 'completion progress/artifact receipts do not match the final evidence root'
     }

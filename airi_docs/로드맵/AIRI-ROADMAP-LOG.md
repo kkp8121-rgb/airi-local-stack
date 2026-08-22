@@ -9,6 +9,102 @@
 
 ## 2026-08-23 goal resume·P0 final validation
 
+- 05:03 KST final pre-stage continuity/diff/security는 exact 9 paths, boundary 0, 모든 hit 0,
+  manifest `2a7fd217...14a2f`로 PASS했다. exact stage 뒤 staged 9/unstaged·untracked 0,
+  cached boundary/diff/security PASS, staged blob 908,149 bytes, index manifest
+  `2c2fe7b7...9c13f`다. 이 receipt 두 문서를 restage·재검증한 뒤
+  `fix: bind final adapter evidence` commit을 실행하며 실패 시 push/fresh K=3 GPU/E2는 금지다.
+- 05:02 KST milestone docs 포함 focused continuity exit 0/PASS, repo diff-check exit 0이며
+  expected line-ending warning만 있다. exact 9 paths/boundary 0/staged·untracked 0,
+  forbidden artifact/oversize/binary/sensitive literal/personal path hit 0, 총 908,726 bytes,
+  manifest `caa8b23e...e1d79`, 관련 PID 0이다. 첫 wrapper의 native stderr 승격은 비종료
+  캡처로 고쳐 폐기했다. receipt 기록 뒤 final focused/diff/security와 exact 9-path stage/
+  cached 검증을 수행하며 실패 시 commit/push/fresh K=3 GPU/E2는 금지다.
+- 05:00 KST compact 뒤 지정 SSoT 5종을 순서대로 전체 재독하고 Goal/Git/PID/artifact를
+  read-only 대조했다. Goal active, HEAD/local·remote origin/main `5f2f50e`, exact 9 modified,
+  staged/untracked 0, 관련 AIRI runner/trainer/GPU workload 0이다. failed K=5 root는 terminal
+  failed revision 392·480/30·checkpoint 7과 state/anchor/index/event/progress/producer SHA가
+  기존 receipt와 exact하고 final root absent다. source/chat/base/E1도 exact, E2 adapter/report
+  absent·로그 각 0 bytes, D: free `62,937,473,024` bytes다. 첫 inventory wrapper의 ordered
+  dictionary `Measure-Object size` 실패는 명시 누산기로 고쳐 폐기했다. 다음은 exact 9-path
+  focused continuity/diff/security이며 PASS 전 stage/commit/push/fresh K=3 GPU/E2는 금지다.
+- 04:55 KST final repo diff/security는 exact 6 paths/boundary 0/staged·untracked 0,
+  whitespace error 0, forbidden artifact/binary/oversize/sensitive literal/personal path hit 0,
+  총 831,582 bytes manifest `ec2391c2...7caa5`다. 첫 두 receipt wrapper는 미지원
+  `SHA256.HashData`와 ordered dictionary `Measure-Object size` 때문에 값 조립 뒤 실패했고
+  호환 hasher+accumulator의 위 결과만 권위다. WORKING/handoff/STATUS/LOG/NEXT를 actual
+  K=5 FAIL·P0 closure·K=3 recovery에 맞춰 정리하고 focused/diff/security 뒤 exact stage/
+  commit/push한다. 문서 인덱스는 unchanged다.
+- 04:53 KST final `test-current-checkpoint.ps1` exit 0; 내부 continuity/durability와 최종
+  offline checkpoint PASS, post-run 관련 PID 0이다. 최신 P0 receipt는 pinned Python
+  `146 passed, 5 skipped`, actual PowerShell PASS, final offline PASS다. exact 6-path
+  diff/security 전에는 docs 정리·stage/commit/push/fresh GPU/E2를 금지한다.
+- 04:51 KST 수정 후 exact fresh actual-process PowerShell durability exit 0/literal PASS,
+  post-run 관련 PID 0이다. runner final root, internal manifest fixture, pause complete/
+  deadline/SAFE가 한 contract에서 통합 PASS했다. 다음은 final offline checkpoint 1회이며
+  PASS 전 diff/security/commit/push/fresh GPU/E2는 금지다.
+- 04:49 KST pause verifier를 exact internal manifest receipt row SHA에 결속했다. AST error 0,
+  preserved complete root의 delayed gate는 exit 1/deadline true/marker false, normal gate는
+  exit 0/exact SAFE marker true, scoped diff/PID 0이다. 첫 targeted wrapper의 expected stderr
+  승격은 캡처 방식으로 고쳐 폐기했다. exact fresh full PowerShell gate 한 번을 실행하며
+  PASS 전 offline/fresh GPU/E2는 금지다.
+- 04:48 KST preserved complete root의 isolated pause는 exact
+  `completion progress/artifact receipts do not match the final evidence root`로 거부됐다.
+  pause source도 producer internal manifest file SHA를 state adapter directory inventory SHA와
+  비교하는 같은 의미 혼동을 확인했다. 정상 complete를 SAFE/deadline 전에 거짓 거부하는
+  재현 가능한 P0다. pause 비교식 한 곳만 exact `artifact-manifest.json` receipt row SHA로
+  고치고 preserved deadline/no-delay targeted 회귀 뒤 fresh full gate를 한 번 실행한다.
+- 04:47 KST fixture migration 뒤 fresh full gate는 initial launcher를 complete revision 3/
+  exit 0/final evidence root/adapter internal manifest까지 통과했다. 후속 기존 completed-run
+  deadline fault가 exit nonzero/no marker이나 expected deadline text도 없이 line 1220에서
+  실패했다. preserved root `78ce56...`, PID 0, logs 각 0 bytes다. 같은 full gate를 반복하지
+  않고 보존 complete RunDir의 exact 1초 deadline/1.5초 delay 호출만 격리 진단해 output
+  class를 확정하며 offline/fresh GPU/E2는 금지다.
+- 04:46 KST fixture 수정 뒤 PowerShell AST, embedded source compile+non-inject actual
+  execution `TARGETED_EMBEDDED_FAKE_PASS`, required static 3/3, scoped diff-check, PID 0이다.
+  첫 targeted wrapper의 quote-transport SyntaxError는 stdin transport로 원인을 고쳐 폐기했다.
+  실제 manifest file SHA와 producer가 exact이고 directory inventory SHA와 다름을 동적
+  확인했다. exact fresh full PowerShell durability 한 번을 재실행하며 PASS 전 offline/
+  fresh GPU/E2는 금지다.
+- 04:44 KST preserved producer는 adapter directory inventory SHA를
+  `adapter_artifact_manifest_sha256`으로 기록했고 synthetic output에는 내부 manifest가 없었다.
+  test source도 old-bug 의미를 그대로 사용해 새 exact product contract에 미이관된 fixture로
+  원인을 확정했다. runner를 약화하지 않고 embedded fake만 실제 schema의 canonical
+  `artifact-manifest.json`을 게시하고 그 file SHA를 producer에 기록한다. AST/embedded
+  pycompile/targeted probe/diff PASS 뒤에만 fresh full PowerShell gate 한 번을 승인한다.
+- 04:42 KST exact actual-process PowerShell durability 1회는 exit 1/final PASS 없음,
+  line 1174 launcher status failed다. preserved synthetic root `a4f971...`, related PID 0;
+  launcher state는 trainer exit 0 뒤 `supervisor-durablerunnererror`, adapter에는
+  `adapter.bin`만 있고 report 존재, logs 두 개 각 0 bytes다. 같은 full gate를 반복하지 않고
+  producer root와 fake trainer final adapter publication을 대조해 product 대 fixture 원인을
+  확정하며 offline/fresh GPU/E2는 금지다.
+- 04:41 KST pinned five-module pycompile+네 Python suite 전체 exit 0,
+  `146 passed, 5 skipped in 43.29s`, post-run 관련 PID 0이다. exact fresh actual-process
+  PowerShell durability `-KeepFailedArtifacts` 한 번을 영향/integration gate로 실행하며
+  exit 0/literal PASS/PID 0 전 offline/fresh GPU/E2는 금지다.
+- 04:40 KST final adapter evidence를 exact `artifact-manifest.json` directory-receipt row SHA에
+  결속하도록 runner와 targeted 회귀만 최소 수정했다. pinned pycompile, 새 회귀
+  `1 passed, 50 deselected`, scoped diff-check, 관련 PID 0이다. old-bug directory inventory
+  SHA는 거부되고 실제 file SHA는 final root를 게시한다. 다음은 pinned 5-module pycompile+
+  네 Python suite 전체 1회이며, PASS 전 PowerShell/offline/fresh GPU/E2는 금지다.
+- 04:38 KST failed GPU root의 final evidence 조건을 pinned Python으로 동일 순서 비교해
+  index/latest event/progress/report는 모두 exact PASS, 첫 실패를 adapter 결속으로 확정했다.
+  producer는 adapter 내부 `artifact-manifest.json` SHA `f796cc38...714cd`를 약속하지만
+  runner는 전체 directory receipt inventory SHA `2bae66ea...75ad`와 비교한다. 서로 다른
+  의미의 SHA를 비교해 정상 산출물을 terminal failure로 만드는 재현 가능한 P0다. runner와
+  해당 targeted regression만 최소 수정하고 pinned Python/actual-process PowerShell/final
+  offline/diff-security gate 및 commit/push 전에는 fresh GPU root/safe arm/E2를 금지한다.
+- 04:36 KST compact 뒤 지정 SSoT 5종을 순서대로 전체 재독하고 actual terminal을
+  대조했다. Goal active, HEAD/local·remote origin/main `5f2f50e`, 기존 worktree는
+  WORKING-STATE 단독 diff/staged·untracked 0, 관련 runner/trainer/verifier/test PID와
+  식별 가능한 AIRI GPU workload 0, E2 microstep 0이다. failed baseline state는
+  `failed` revision 392, exit 0/`supervisor-durablerunnererror`, 480/480 microsteps·30/30
+  optimizer steps·pending 0, latest checkpoint 7 SHA `c65f7bac...d04f1`이다. adapter/report
+  receipt는 exact하지만 final evidence root는 absent하고, 앞선 event authority의 max
+  training interval `705.902827`초로 K=5 timing gate도 FAIL이다. source/chat/base/E1 SHA는
+  exact, E2 adapter/report absent, E2 logs 각 0 bytes다. 계산 완료를 PASS로 승격하지 않고
+  root를 보존한다. producer root/current index/latest event/progress/output의 첫 결속 실패를
+  read-only로 확정하기 전에는 fresh root/safe arm/E2를 시작하지 않는다.
 - 03:17 KST compact 뒤 지정 SSoT 5종을 순서대로 전체 재독하고 actual 상태를
   재대조했다. Goal active, HEAD/local·remote origin/main
   `68343a43651ebc678a46e25f1c3b6cbcf1a961fc`, worktree clean, 관련 PID와 AIRI GPU

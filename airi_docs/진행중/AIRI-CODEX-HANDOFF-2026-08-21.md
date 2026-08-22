@@ -1,10 +1,11 @@
 # AIRI Codex GPU 인수인계 — broadcast continuity v4
 
-갱신: 2026-08-23 03:04 KST (파일명은 현행 GPU SSoT 식별자로 유지)
+갱신: 2026-08-23 04:55 KST (파일명은 현행 GPU SSoT 식별자로 유지)
 
-상태: **ACTIVE — P0 BATCH AND RECEIPT DOCS PUSHED; CONTROLLED GPU NEXT AFTER CLEAN CONFIRMATION. E1 완료·미채택,
-E2 저장 산출물 0, merge/package 0, v4 T3 0, live campaign 0. 동결된 P0 후속
-코드·검증 commit `911d082`과 receipt docs `a898ff8`은 origin/main에 durable하다.**
+상태: **ACTIVE — FIRST CONTROLLED GPU BASELINE FAILED; FINAL-EVIDENCE P0 FIX VERIFIED,
+COMMIT/PUSH PENDING. E1 완료·미채택, E2 microstep/저장 산출물 0, merge/package 0,
+v4 T3 0, live campaign 0. K=5 root는 timing max 705.902827초와 final-root 결속 실패
+증거로 보존하며, 검증 배치 push 뒤 K=3 fresh controlled GPU를 실행한다.**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
@@ -18,6 +19,22 @@ E2 저장 산출물 0, merge/package 0, v4 T3 0, live campaign 0. 동결된 P0 �
 
 ## 0. 2026-08-23 P0 로컬 배치 최종 검증 receipt
 
+- 04:30 KST 첫 controlled GPU K=5 baseline은 480/480 microsteps·30/30 optimizer
+  steps까지 계산했으나 PASS가 아니다. authority state는 `failed` revision 392, exit 0/
+  `supervisor-durablerunnererror`, latest checkpoint 7 SHA `c65f7bac...d04f1`, 관련 PID 0,
+  final evidence root absent다. checkpoint event의 normal training interval은
+  569.416106/548.424438/502.980348/705.902827초로 실제 600초 상한을 넘었다. root
+  `airi-controlled-gpu-20260823-031152`는 실패 증거로 보존하며 같은 K=5를 반복하지 않는다.
+- final-root 첫 실패는 producer internal `artifact-manifest.json` SHA를 runner와 pause가
+  adapter directory inventory SHA와 비교한 의미 혼동이었다. runner/pause를 exact internal
+  manifest receipt row SHA에 결속하고 PowerShell fake fixture를 actual artifact schema로
+  이관했다. targeted runner 1 PASS, pinned 5-module+네 Python suite
+  `146 passed, 5 skipped`, actual-process PowerShell durability literal PASS, final offline
+  checkpoint PASS, 관련 PID 0이다. repo diff/security도 exact 6-path/hit 0이다.
+- 이 검증 배치는 아직 local commit/push 전이다. WORKING/handoff/roadmap status/log/NEXT를
+  actual receipt로 정리해 focused/cached 검증과 Conventional Commit/push를 완료하고
+  HEAD=origin/main·clean을 확인해야만 K=3 fresh controlled GPU로 이동한다. E2는 계속
+  microstep 0이며 운영 채택·기본 모델 변경 금지는 유지한다.
 - 03:04 KST Goal 도구 status=`active`; exact implementation commit
   `911d082dcf1768a5145bd34d56a19f82deb9d248`을 origin/main에 push했다
   (`32830a4..911d082 main -> main`). HEAD/local origin/main/remote main은 모두
@@ -458,8 +475,11 @@ identity spoof, corrupt-current/valid-previous 회귀와 전체 offline checkpoi
    checkpoint PASS, diff/security PASS로 잔여 로컬 P0/P1 0을 확인했다. commit
    `911d082`과 receipt docs `a898ff8`은 origin/main push됐다. final live receipt와
    HEAD=origin/main·clean 뒤
-   controlled GPU 동등성과 실제 E2 속도
-   checkpoint 간격을 전원 종료 손실 상한 10분 이하로 실측·고정하는 단계가 남았다.
+   첫 K=5 controlled baseline은 480/30 계산 뒤 actual interval max 705.902827초와
+   final-root SHA 의미 혼동으로 FAIL했다. 두 final-evidence P0는 pinned Python
+   `146 passed, 5 skipped`, actual-process PowerShell와 final offline PASS로 최소 수리·
+   검증됐고 local commit/push 대기다. push/clean 뒤 K=3 fresh baseline과 safe-pause arm으로
+   controlled GPU 동등성과 checkpoint 간격을 전원 종료 손실 상한 10분 이하로 다시 실측한다.
 4. [ ] preflight에서 입력 코드·데이터가 clean인지 확인한다. live heartbeat로 생긴
    `AIRI-WORKING-STATE.md` 단독 diff만 별도 검토 후 제외할 수 있고 다른 tracked/untracked
    변경은 금지한다. trainer 0, corpus source/chat SHA, base model SHA, E1 SHA,

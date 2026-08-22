@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 03:19:26 +09:00"
-checkpoint_id: "20260823-031926-reconcile-docs-commit-push-intent"
+updated_at_kst: "2026-08-23 05:03:43 +09:00"
+checkpoint_id: "20260823-050343-final-evidence-p0-staged-commit-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "controlled-gpu-preflight-reconciliation"
-git_head: "68343a43651ebc678a46e25f1c3b6cbcf1a961fc"
-worktree_state: "2-reconciliation-docs-modified-staged-0-untracked-0"
+active_phase: "final-evidence-p0-verified-milestone-docs-commit-preflight"
+git_head: "5f2f50ec387a23d36d4ef3dee44963bc0f988e1e"
+worktree_state: "verified-p0-code-tests-and-milestone-docs-dirty; staged-untracked-zero"
 active_trainer_count: 0
 ---
 
@@ -42,17 +42,318 @@ active_trainer_count: 0
 
 | 항목 | 값 |
 |---|---|
-| 의도 | clean origin/main 경계에서 fresh 외부 root의 무중단 대 safe-pause/checkpoint/resume controlled GPU 동등성을 실증한다. |
-| 허용 범위 | seed 42, batch 1, gradient accumulation 16, 480 microsteps/30 optimizer steps, checkpoint 5 optimizer steps 간격의 두 authoritative durable-runner arm과 verifier receipt. 운영 채택은 금지 |
-| 시작 전 증거 | Goal active, HEAD/local·remote origin/main `68343a4`, clean, AIRI trainer/runner 0, 선택한 root와 E2 adapter/report absent. source/chat/base/E1 크기·SHA exact, E2 logs 각 0 bytes. |
-| exact 변경 | 외부 root에 canonical v2 input manifest를 non-replacing 생성하고 baseline을 완주한다. safe arm은 첫 optimizer 경계 prearm, 실제 `SAFE_TO_POWER_OFF`, 동일 run explicit resume를 거쳐 complete한 뒤 exact GPU equivalence verifier를 수행한다. 저장소 구현은 변경하지 않는다. |
-| 출력 경로 | `D:\AIRI-Models\airi-controlled-gpu-20260823-031152` 아래 input/receipts, 두 run, adapter/report. Git에는 모델·adapter·GGUF·로그·생성 산출물을 넣지 않는다. |
-| 완료 조건 | 두 arm 480/30 complete, 실제 interval 최소 4개·최대 600초 이하, safe pause 정확히 1회, adapter·optimizer/scheduler·RNG·cursor·loss·event/report exact, verifier `pass=true` receipt |
-| 중단·복구 | baseline 또는 safe pre-SAFE가 중단되면 해당 root를 보존하고 재사용/중복 시작하지 않는다. `SAFE_TO_POWER_OFF` 후에는 exact same run/manifest/config만 resume한다. 실패 receipt를 기록하고 E2를 열지 않는다. |
-| 현재 행동 | final live receipt commit `68343a43651ebc678a46e25f1c3b6cbcf1a961fc`까지 origin/main에 push됐고 HEAD/local·remote origin/main exact, clean, PID/GPU workload 0, E2 microstep 0을 재확인했다. 선택한 fresh root `D:\AIRI-Models\airi-controlled-gpu-20260823-031152`는 absent다. 이 reconciliation receipt를 먼저 기록한 뒤 root/manifest 생성 intent를 별도로 쓴다. |
+| 의도 | 첫 controlled GPU 실패가 드러낸 두 final-evidence SHA 의미 혼동 P0를 최소 수정한 검증 배치를 milestone docs와 함께 commit/push해 clean GPU 경계를 복구한다. |
+| 허용 범위 | runner final root의 internal artifact-manifest file receipt 결속, pause complete verifier의 동일 결속, 정확한 targeted/영향/final integration 회귀와 receipt 문서. 새 schema/기능/architecture와 운영 채택은 금지 |
+| 시작 전 증거 | Goal active, HEAD/local·remote origin/main `5f2f50e`, failed K=5 root 보존/PID 0, timing max `705.902827`초 FAIL, final root absent, source/chat/base/E1 exact, E2 microstep 0. |
+| exact 변경 | runner와 pause가 producer의 `adapter_artifact_manifest_sha256`을 closed adapter receipt의 exact `artifact-manifest.json` row SHA와 비교한다. synthetic PowerShell fixture도 실제 내부 manifest를 게시한다. |
+| 출력 경로 | 저장소 코드·회귀·SSoT 문서만 변경한다. failed GPU/synthetic roots는 Git 밖에 보존하고 모델·adapter·GGUF·로그·생성 산출물을 Git에 넣지 않는다. |
+| 완료 조건 | pinned Python 146/5, actual-process PowerShell PASS, final offline PASS, diff/security hit 0, exact docs validation, Conventional Commit/push, HEAD=origin/main·clean·PID 0 |
+| 중단·복구 | gate 실패 root는 보존하고 원인 없이 반복하지 않는다. commit/push 실패 시 local 상태를 보존하며 fresh GPU/E2를 시작하지 않는다. |
+| 현재 행동 | P0 수정과 지정 integration/diff/security가 모두 PASS했다. WORKING·handoff·roadmap status/log·NEXT를 실제 receipt로 정리하고 focused continuity/diff/security 뒤 exact stage/commit/push한다. 다음 controlled GPU는 같은 K=5가 아니라 K=3을 결속한 fresh timestamped root다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260823-050343-final-evidence-p0-staged-commit-intent`: final pre-stage focused
+  continuity/diff/security는 exact 9 paths, boundary/staged/untracked 0, 모든 security hit 0,
+  총 910,318 bytes, manifest `2a7fd217...14a2f`로 PASS했다. exact 9-path `git add --`
+  exit 0 뒤 staged 9, unstaged/untracked 0, cached diff-check/boundary와 forbidden artifact/
+  oversize/binary/sensitive literal/personal path hit 모두 0이다. staged blob 총 908,149 bytes,
+  index path+size+blob manifest는
+  `2c2fe7b7b8362d6a3825c29cd10244f964fa6211777f70e49dc8fd2309c9c13f`다. 이 receipt로
+  바뀐 WORKING-STATE와 roadmap log 두 파일만 재stage해 동일 9/0/0과 cached diff/security를
+  재확인한 뒤 exact `git commit -m "fix: bind final adapter evidence"`를 실행한다. 실패하면
+  push/fresh K=3 GPU/E2로 이동하지 않고 staged 배치를 보존한다.
+- `20260823-050233-final-evidence-p0-prestage-validation-pass-stage-intent`: milestone docs를
+  포함한 focused continuity는 exit 0/literal PASS, repo 기본 diff-check exit 0이며 출력은
+  expected LF→CRLF warning 9줄뿐이다. actual 변경은 exact 9 paths, boundary diff 0,
+  staged/untracked 0이고 forbidden artifact path/5 MiB 초과/binary/sensitive added literal/
+  개인 경로 hit 모두 0, 총 908,726 bytes, path+size+SHA manifest
+  `caa8b23ee82fdc4b22946e8d1a881b00e34288c987722828e9fad375de9e1d79`, 관련 PID 0이다.
+  첫 validation wrapper는 Git의 expected line-ending stderr를 terminating native error로
+  승격해 receipt 조립 전에 중단했으며, native stderr를 비종료 캡처한 위 결과만 권위로
+  쓴다. 이 receipt 기록 뒤 focused continuity/diff/security를 final 확인하고 exact 9경로만
+  stage한다. staged 9/unstaged 0/untracked 0과 cached boundary/diff/security가 모두 PASS하지
+  않으면 commit/push/fresh K=3 GPU/E2로 이동하지 않는다.
+- `20260823-050053-post-compact-final-evidence-p0-commit-preflight-reconcile`: compact 직후
+  지정 SSoT 5종을 순서대로 전체 재독하고 Goal/Git/PID/run-state/artifact를 read-only로
+  대조했다. Goal status=`active`; HEAD/local origin/main/remote main은 모두
+  `5f2f50ec387a23d36d4ef3dee44963bc0f988e1e`, actual worktree는 예상한 exact 9 modified,
+  staged/untracked 0이다. 관련 runner/trainer/verifier/PowerShell contract PID와 식별 가능한
+  AIRI GPU workload는 0이다. failed K=5 root는 `failed` revision 392, exit 0/
+  `supervisor-durablerunnererror`, 480/480 microsteps·30/30 optimizer steps·pending 0,
+  latest checkpoint 7 SHA `c65f7bac...d04f1`; state/anchor/current index/latest event/
+  progress/producer SHA가 기존 receipt와 exact이고 final evidence root는 absent다. 로그는
+  1,783/500 bytes이며 본문은 읽지 않았다. source/chat/base/E1 크기·SHA는 고정값과 exact,
+  E2 adapter/config/report absent, E2 로그 각 0 bytes/SHA empty, D: free
+  `62,937,473,024` bytes다. 첫 failed-root inventory wrapper는 ordered dictionary에 대한
+  `Measure-Object size` 오류로 read-only 조립 중단했고 명시 누산기로 고친 inventory만
+  권위로 쓴다. 관측 불일치는 없다. 다음은 milestone docs가 포함된 exact 9-path focused
+  continuity/repo diff/security 재검증이며, PASS 뒤 exact stage/cached 검증 전에는 commit/
+  push/fresh K=3 GPU/E2를 실행하지 않는다.
+- `20260823-045511-final-evidence-p0-diff-security-pass-milestone-docs-intent`: repo 기본
+  exact diff-check exit 0/whitespace error 0이다. 당시 exact 6-path boundary diff 0,
+  staged/untracked 0, forbidden artifact path/binary/5 MiB 초과/sensitive added literal/개인
+  경로 hit 모두 0, 총 831,582 bytes, path+size+SHA manifest
+  `ec2391c271300fd42891af5ab72bf89a831f543ba0886611944129e24897caa5`다. 첫 receipt
+  assembly 두 번은 Windows PowerShell의 미지원 `SHA256.HashData`, ordered dictionary에 대한
+  `Measure-Object size` 사용으로 각각 검증값 조립 뒤 실패했고, 동일 read-only 계산을
+  `SHA256.Create().ComputeHash`와 명시 total accumulator로 고친 위 결과만 권위로 쓴다.
+  WORKING-STATE, 현행 handoff, roadmap status/log, NEXT를 actual failed GPU/P0 closure/
+  K=3 fresh recovery 경계에 맞춰 갱신한다. 문서 인덱스는 현행 handoff를 정확히 가리켜
+  변경하지 않는다. focused continuity와 repo diff/security 뒤 exact 변경 경로만 stage,
+  cached diff/security를 확인해 Conventional Commit/push한다. 실패하면 fresh GPU/E2를
+  시작하지 않는다.
+- `20260823-045320-final-evidence-p0-offline-pass-diff-security-intent`: exact
+  `test-current-checkpoint.ps1`은 exit 0이다. 내부 work-continuity와 actual-process
+  durability literal PASS, 최종 `Current checkpoint contract: PASS (offline synthetic
+  ASAR only; no installed archive/service/model access)`를 확인했고 post-run 관련 PID 0이다.
+  최신 권위 P0 receipt는 pinned Python `146 passed, 5 skipped`, actual PowerShell PASS,
+  final offline PASS다. 현재 변경은 WORKING-STATE, roadmap log, runner+test, pause,
+  PowerShell test exact 6개/staged·untracked 0이다. 다음은 repo 기본 exact
+  `git diff --check -- . ':(exclude)airi_docs/patches/*.patch'`, 6-path boundary와 금지
+  artifact/binary/over-size/credential·민감 literal·개인 경로 added-content scan이다. 모두
+  exit 0/hit 0 전에는 장기 milestone docs 정리, stage/commit/push/fresh GPU/E2로 이동하지
+  않는다.
+- `20260823-045126-final-evidence-p0-powershell-pass-offline-intent`: exact fresh
+  `test-airi-training-durability.ps1 -KeepFailedArtifacts`는 exit 0, literal
+  `AIRI training durability contract: PASS`; post-run 관련 PID 0이다. 새 runner final-root,
+  actual internal manifest fixture, pause complete/deadline/SAFE 경로가 한 actual-process
+  contract에서 통합 PASS했다. 변경 경계는 exact 6개/staged·untracked 0이며 GPU/E2 실행은
+  0이다. 다음 한 gate는 exact `powershell -NoProfile -ExecutionPolicy Bypass -File
+  .\test-current-checkpoint.ps1` 1회다. exit 0/final offline checkpoint PASS/PID 0 실패 시
+  diff/security/commit/push/fresh GPU/E2로 이동하지 않고 보존 진단한다.
+- `20260823-044948-pause-final-evidence-targeted-pass-full-powershell-intent`: pause verifier는
+  closed adapter receipt의 exact `artifact-manifest.json` row count 1과 row SHA를 producer에
+  결속하도록 최소 수정했다. PowerShell AST error 0, preserved complete root에서 1초
+  timeout+1.5초 final delay는 exit 1/exact deadline text true/exact SAFE marker false,
+  delay 없는 호출은 exit 0/exact SAFE marker true, scoped diff-check exit 0, 관련 PID 0이다.
+  targeted 첫 wrapper는 기대 child stderr가 outer `ErrorActionPreference=Stop`에 승격돼 receipt
+  조립 전에 끝났고, child stderr를 캡처하도록 고친 위 결과만 권위로 쓴다. pause는 68,027
+  bytes SHA `f484c6ea...93650`; test는 99,964 bytes SHA `e639c144...2c3cc`다. 변경 경계는
+  WORKING-STATE, roadmap log, runner+test, pause, PowerShell test exact 6개/staged·untracked 0이다.
+  관련 PID 0에서 exact fresh `test-airi-training-durability.ps1 -KeepFailedArtifacts` 한 번을
+  영향/최종 PowerShell gate로 실행한다. exit 0/literal final PASS/PID 0 실패 시 새 root를
+  보존·원인 진단하고 반복하지 않으며 offline/fresh GPU/E2는 금지다.
+- `20260823-044833-pause-final-evidence-adapter-binding-p0-fix-intent`: preserved complete
+  RunDir의 exact test-hook pause 호출은 exit 1/no marker이며 exact error
+  `completion progress/artifact receipts do not match the final evidence root`다. source line
+  1153에서 pause verifier도 producer의 internal artifact-manifest file SHA를
+  `State.outputs.adapter.manifest_sha256` directory inventory SHA와 직접 비교하는 같은 의미
+  혼동을 확인했다. 이 때문에 정상 complete final evidence를 deadline check와 SAFE gate 전에
+  거짓 거부하는 재현 가능한 P0 제품 결함이다. `pause-airi-safely.ps1` 한 곳만 closed adapter
+  receipt에서 exact `artifact-manifest.json` row가 하나인지 요구하고 그 row SHA와 producer를
+  비교하도록 최소 수정한다. 다른 deadline/process/anchor/artifact 검증은 변경하지 않는다.
+  PowerShell AST/static 뒤 preserved complete root에서 1초 deadline+1.5초 delay가 exact deadline
+  error/no marker인지, delay 없는 호출이 exit 0/exact `SAFE_TO_POWER_OFF`인지 targeted 검증한다.
+  PASS 뒤 fresh full PowerShell gate를 별도 intent로 한 번 실행한다. 실패 시 반복하지 않고
+  offline/fresh GPU/E2는 금지다.
+- `20260823-044708-powershell-final-deadline-fixture-failure-diagnostic-intent`: fixture
+  migration 뒤 exact fresh PowerShell gate는 초기 launcher/final-root 경로를 통과해
+  launcher state `complete` revision 3, exit 0/`trainer-complete`, exact final evidence root,
+  adapter `adapter.bin`+`artifact-manifest.json` receipt와 report를 게시했다. 이후 line 1220
+  final-completion deadline fault가 `exit_success=False; exact_marker=False;
+  deadline_text=False`로 exit 1했고 final PASS는 없다. preserved root는 system temp의
+  `airi-durability-contract-78ce56881b4b4d12b5ad2922fa4ad405`, post-run 관련 PID 0,
+  launcher logs 두 개 각 0 bytes다. 직전 P0 제품/fixture 수정은 actual launcher path에서
+  해소됐지만 후속 기존 deadline fixture의 child output class가 기대와 다르다. 같은 full
+  gate를 반복하지 않고 preserved complete RunDir에 test hook의 1초 deadline/1.5초 final
+  delay 호출만 격리 재현해 exact child exit/output을 회수한다. 제품 deadline과 manifest
+  validator 중 어느 fail-closed 조건인지 확정 전에는 수정·offline/fresh GPU/E2를 금지한다.
+- `20260823-044602-final-evidence-fixture-targeted-pass-powershell-retry-intent`:
+  PowerShell AST error 0, embedded fake source compile과 non-inject actual execution은
+  `TARGETED_EMBEDDED_FAKE_PASS`, required schema/file/producer token 3/3, scoped diff-check
+  exit 0, 관련 PID 0이다. targeted 첫 wrapper는 Windows PowerShell→`python -c` quote가
+  소실돼 실행 전 SyntaxError였고, 파일을 만들지 않는 stdin transport로 원인을 고친 위
+  receipt만 권위로 쓴다. fake는 actual schema manifest를 게시하고 producer file SHA와
+  exact 일치하며 directory inventory SHA와는 다름을 동적 확인했다. test는 99,964 bytes
+  SHA `e639c144...2c3cc`다. 제품/Python bytes는 fixture 수정 뒤 unchanged이므로 직전
+  `146 passed, 5 skipped`를 유지한다. 관련 PID 0에서 exact fresh
+  `test-airi-training-durability.ps1 -KeepFailedArtifacts` 한 번을 다시 실행한다. exit 0/
+  literal final PASS/PID 0 실패 시 새 root를 보존·진단하고 반복하지 않으며 offline/GPU/E2는
+  금지다.
+- `20260823-044402-final-evidence-powershell-fixture-migration-intent`: preserved launcher
+  producer root는 `adapter_artifact_manifest_sha256`에 adapter directory inventory SHA
+  `9f161130...1344`를 넣었고 output에는 `adapter.bin`만 있어 exact
+  `artifact-manifest.json` row가 없다. PowerShell embedded fake source line 996도
+  `artifact_receipt(args.output)["manifest_sha256"]`를 producer 의미로 쓰는 old-bug fixture임을
+  확인했다. 실제 trainer는 `airi.behavior-adapter-artifact.v1` manifest file을 adapter 안에
+  게시하고 그 file SHA를 producer/report에 기록하므로 제품 결함이 아니라 강화된 exact 계약에
+  미이관된 synthetic fixture다. 제품 runner를 약화하거나 되돌리지 않고 embedded fake만
+  actual schema/run/pins/adapter.bin file inventory의 canonical `artifact-manifest.json`을 만들고
+  producer가 그 file SHA를 기록하도록 최소 수정한다. PowerShell AST, embedded fake pinned
+  pycompile, targeted static/actual launcher probe와 scoped diff-check를 먼저 수행한다. PASS 뒤
+  별도 intent에서 exact fresh full PowerShell gate를 한 번만 재실행하며, 그 전에는 offline/
+  fresh GPU/E2를 금지한다.
+- `20260823-044253-final-evidence-p0-powershell-fixture-failure`: authorized exact
+  `test-airi-training-durability.ps1 -KeepFailedArtifacts` 1회는 exit 1/final PASS 없음,
+  line 1174 `Durable launcher integration ended as failed`로 종료했다. preserved root는
+  system temp의 `airi-durability-contract-a4f9716957c1491a8009b15703cd1fe7`; post-run 관련
+  PID 0이다. launcher fixture state는 `failed` revision 4, trainer exit 0/reason
+  `supervisor-durablerunnererror`, progress 2 microsteps/1 optimizer step/pending 0이고,
+  adapter receipt에는 `adapter.bin` 한 파일만 있다. report도 존재하며 trainer logs 두 개는
+  각 0 bytes/SHA empty다. 별도 synthetic paused/spoof state는 기존 fault fixture다. 이는
+  actual GPU failed root 재실행이나 repository/model 손상 증거가 아니며 PASS/진척으로
+  승격하지 않는다. 같은 full gate를 반복하지 않고 preserved launcher run의 producer root와
+  PowerShell fake trainer의 final adapter publication을 read-only로 대조해 제품 결함인지
+  새 exact artifact-manifest 계약에 미이관된 fixture인지 확정한다. 원인 확정 전에는 test/
+  product를 수정하거나 offline/fresh GPU/E2로 이동하지 않는다.
+- `20260823-044134-final-evidence-p0-python-pass-powershell-intent`: pinned five-module
+  pycompile과 checkpoint/trainer/runner/verifier 네 Python suite 전체는 exit 0,
+  `146 passed, 5 skipped in 43.29s`; post-run 관련 PID 0이다. 변경 경계는 WORKING-STATE,
+  roadmap log, runner, runner test exact 4개/staged·untracked 0이다. 다음 exact 영향/
+  integration gate는 `powershell -NoProfile -ExecutionPolicy Bypass -File
+  .\test-airi-training-durability.ps1 -KeepFailedArtifacts` 한 번이다. 완료 조건은 exit 0,
+  literal final PASS, post-run 관련 PID 0이다. 실패하면 보존 root를 진단하고 같은 명령을
+  원인 없이 반복하지 않으며 offline/fresh GPU/E2는 금지다.
+- `20260823-044007-final-evidence-p0-targeted-pass-python-integration-intent`: runner는
+  closed adapter directory receipt에서 path가 exact `artifact-manifest.json`인 row가 정확히
+  하나인지 확인하고 그 row SHA를 producer commitment와 비교하도록 최소 수정했다. 새 targeted
+  회귀는 old-bug 값인 directory inventory manifest SHA가 실제 artifact-manifest file SHA와
+  다름을 고정하고, old-bug 값은 `adapter mismatch`로 거부하며 file SHA는 final evidence root를
+  정상 게시함을 검증한다. pinned runner py_compile exit 0, targeted pytest exit 0,
+  `1 passed, 50 deselected in 0.26s`, scoped diff-check exit 0, 관련 PID 0이다. runner는
+  108,490 bytes SHA `181ead6b...3387`, test는 82,682 bytes SHA `c3adbe2d...5e86`다.
+  다음 한 gate는 핀된 Python 3.12로 checkpoint/trainer/runner/verifier/input-manifest builder
+  py_compile 후 관련 네 Python suite 전체를 한 번 실행하는 것이다. 기대 count는 새 회귀를
+  포함한 146 passed/5 skipped이며 exit 0/PID 0 실패 시 PowerShell/offline/GPU/E2로 이동하지
+  않고 같은 원인을 반복하지 않는다.
+- `20260823-043802-final-evidence-adapter-binding-p0-fix-intent`: pinned Python으로 failed
+  root의 `_bind_final_evidence_root` 조건을 동일 순서로 byte/canonical/SHA 비교했다.
+  producer canonical, current index SHA, latest object, event SHA, completed progress canonical/
+  projection, report SHA는 모두 true이고 첫 실패는 `adapter_match=false`다. producer의
+  `adapter_artifact_manifest_sha256`은 adapter 안 `artifact-manifest.json` 자체 SHA
+  `f796cc38...714cd`이고, runner가 비교한 `outputs.adapter.manifest_sha256`은 전체 adapter
+  directory receipt inventory SHA `2bae66ea...75ad`다. 이름과 의미가 다른 두 SHA를 직접
+  비교해 정상 GPU 산출물을 terminal failure로 만드는 재현 가능한 P0 제품 결함이다. timing
+  K=5 FAIL과 분리해 `durable_training_runner.py`에서 exact `artifact-manifest.json` receipt
+  row를 closed adapter directory receipt에서 찾아 producer SHA와 비교하고, 같은 의미 혼동을
+  재현하는 `test_durable_training_runner.py` targeted 회귀만 추가한다. 다른 schema/기능/
+  architecture는 변경하지 않는다. targeted PASS 뒤 핀된 네 Python suite, actual-process
+  PowerShell durability, final offline checkpoint와 diff/security를 영향·최종 gate로 실행한다.
+  모두 PASS/PID 0이고 docs receipt commit/push와 HEAD=origin/main clean 전에는 fresh GPU
+  root/safe arm/E2를 시작하지 않는다.
+- `20260823-043622-controlled-gpu-baseline-terminal-failure-reconcile`: compact 직후 지정
+  SSoT 5종을 순서대로 전체 재독하고 Goal/Git/PID/artifact를 read-only로 대조했다. Goal은
+  `active`; HEAD/local origin/main/remote main은 모두
+  `5f2f50ec387a23d36d4ef3dee44963bc0f988e1e`, worktree는 기존 WORKING-STATE 단독 diff,
+  staged/untracked 0이다. 관련 durable runner/trainer/verifier/test PID 0이고 식별 가능한
+  AIRI GPU workload는 없다. failed baseline authority state는 `failed` revision 392,
+  terminal exit 0/reason `supervisor-durablerunnererror`, progress 480/480 microsteps·30/30
+  optimizer steps·pending 0, latest `checkpoint-00000007` manifest SHA
+  `c65f7baca2d89b934808d9d43f681769627b456dfb7b2d3f532c5a5383cd04f1`다. state/previous/
+  anchor/progress SHA는 `9a1198c6...b37`/`7e1d5b95...f293`/`cb3498e6...76dc`/
+  `fdfcf7b5...10f5`; current index SHA `f867358a...01ba`, producer root SHA
+  `d8d5ea4a...1511`, final evidence root absent다. adapter/report receipts는 존재·state와
+  exact하고 logs는 1,783/500 bytes이며 본문은 읽지 않았다. source/chat/base/E1는 고정
+  크기·SHA exact, E2 adapter/report absent, E2 logs 각 0 bytes, E2 microstep 0이다. 앞서
+  event receipt의 max training interval `705.902827`초로 K=5 timing gate도 확정 FAIL이다.
+  따라서 계산 완료를 PASS로 승격하지 않고 failed root를 보존한다. 다음은 producer root와
+  current index/latest event/progress/report/adapter를 compact 비교해 `_bind_final_evidence_root`
+  첫 실패 조건과 실제 code defect 여부를 확정하는 read-only 진단이다. fresh root/safe arm/
+  E2는 계속 금지다.
+- `20260823-042726-controlled-gpu-baseline-final-checkpoint-heartbeat`: failed K=5 baseline은
+  480/480 microsteps, 30/30 optimizer steps, pending 0에 도달하고 final
+  `checkpoint-00000006`, manifest SHA
+  `b650b911d1d02138e81be79e4ba7657e9d549d0046486cb457ebe46de6997b39`를 게시했다.
+  run-state는 아직 `running` revision 380이며 adapter/report·dev/final evidence publication을
+  수행 중이다. timing gate FAIL은 앞선 exact event receipt로 확정됐으므로 완료 계산을 PASS로
+  승격하지 않는다. terminal state와 runner/trainer PID 0을 확인한 뒤에만 fresh recovery
+  root/config intent를 기록한다. safe arm/E2는 계속 금지다.
+- `20260823-041330-controlled-gpu-baseline-timing-failure-receipt`: current event v2 다섯
+  개를 byte hash와 schema로 읽어 normal interval 네 개를 계산했다. training elapsed는
+  `569.416106`, `548.424438`, `502.980348`, `705.902827`초이고 durable wall은
+  `573.440362`, `552.082063`, `506.005931`, `710.085404`초다. event SHA와 predecessor
+  chain은 존재하지만 max가 600초를 명백히 초과해 checkpoint-every-5 config의 baseline은
+  controlled GPU timing gate FAIL이다. 이는 계산 시간이나 관찰 오차가 아니라 권위 event
+  receipt다. current run은 400/480·25/30, pending 0으로 live이므로 중복/강제 종료 없이
+  terminal receipt까지 회수한다. 이 failed root는 보존하고 safe arm/E2는 시작하지 않는다.
+  terminal/PID 0 뒤 checkpoint interval을 줄인 fresh root/config의 최소 재실행 intent를
+  별도로 기록하며, 동일 K=5 명령은 반복하지 않는다.
+- `20260823-041136-controlled-gpu-baseline-checkpoint-5-heartbeat`: baseline state는
+  `running` revision 287, 400/480 microsteps, 25/30 optimizer steps, pending 0이다. 다섯 번째
+  interval checkpoint `checkpoint-00000005`, manifest SHA
+  `9fb4551d07b0e6ae8835e197cc25df0aeac3de8e51c9c60c32ea2f7c61a41550`가 게시됐다.
+  네 번째 checkpoint publication 이후 wall 관측은 약 11분 55초로 600초를 넘었다.
+  cumulative monotonic training interval과 actual durable publication interval을 최종 verifier가
+  판정하기 전에는 PASS로 승격하지 않는다. baseline은 5/6 진행됐고 pause evidence 0이다.
+  current run을 임의 중단하거나 중복 시작하지 않고 480/30 terminal receipt를 회수한다.
+- `20260823-040011-controlled-gpu-baseline-checkpoint-4-heartbeat`: baseline state는
+  `running` revision 221, 320/480 microsteps, 20/30 optimizer steps, pending 0이다. 네 번째
+  interval checkpoint `checkpoint-00000004`, manifest SHA
+  `6e917c2fbc41bb9a8df0ae51a82a51afc2b6f38ce3578cfd90b6bc34ed7a8c61`가 게시됐다.
+  세 번째 checkpoint 이후 wall 관측은 약 8분 32초다. baseline은 2/3 진행됐고 pause
+  evidence 0이다. 최소 interval 수와 최대 600초 판정은 최종 verifier까지 보류하며,
+  현재 exact run을 terminal까지 계속 monitor한다.
+- `20260823-035129-controlled-gpu-baseline-checkpoint-3-heartbeat`: baseline state는
+  `running` revision 170, 240/480 microsteps, 15/30 optimizer steps, pending 0이다. 세 번째
+  interval checkpoint `checkpoint-00000003`, manifest SHA
+  `847dd50e1f02c775d68e8d08d2a98cc7d3c5fe1e233c643b0468ea61705733c1`가 게시됐다.
+  두 번째 checkpoint 이후 wall 관측은 약 9분 7초이며 baseline은 정확히 50%다. pause
+  evidence는 계속 0이다. 최종 verifier 전에는 interval PASS로 승격하지 않고 동일 run을
+  480/30 terminal까지 monitor한다.
+- `20260823-034202-controlled-gpu-baseline-checkpoint-2-heartbeat`: baseline state는
+  `running` revision 115, 160/480 microsteps, 10/30 optimizer steps, pending 0이다. 두 번째
+  interval checkpoint `checkpoint-00000002`, manifest SHA
+  `4fd994ea37ed2a0d7b47d1acd43d82f5448eb5034033bcc5065c5e9beee5aed6`가 게시됐다.
+  첫 checkpoint 이후 wall 관측은 약 9분 35초로 600초 아래이며, 최종 authority interval은
+  verifier의 monotonic event receipt가 판정한다. baseline pause evidence는 계속 0이다.
+  현재 run을 중복 시작하지 않고 480/30 terminal까지 monitor한다.
+- `20260823-033247-controlled-gpu-baseline-checkpoint-1-heartbeat`: baseline state는
+  `running` revision 61, 80/480 microsteps, 5/30 optimizer steps, pending 0이다. 첫 실제
+  interval checkpoint `checkpoint-00000001`, manifest SHA
+  `2d825d608175eb53972396d9367eb45b831ebb76196a52c8be93b2f79df3880a`가 게시됐다.
+  baseline control에는 pause request/ack/history가 없고 terminal도 아니다. 시작 뒤 wall
+  관측은 약 10분 경계지만 최종 ≤600초 판정은 event의 cumulative monotonic timing을
+  verifier가 수행한다. runner/trainer를 중복 시작하거나 safe arm/E2로 이동하지 않고
+  현재 exact process tree와 authority state를 계속 monitor한다.
+- `20260823-032301-controlled-gpu-baseline-live-receipt`: launcher 호출은 baseline run을
+  실제 생성·시작했으나 caller wrapper가 PowerShell script 뒤 빈 `$LASTEXITCODE`를 0이 아닌
+  것으로 비교해 자체 exit 1을 냈다. 중복 실행 없이 read-only 대조한 권위 증거는
+  `run-state.json`/anchor 존재, schema v1, run id `controlled-baseline-480`, status `running`,
+  revision 3, progress 0/480 microsteps·0/30 optimizer steps다. state가 결속한 runner PID
+  29388/creation `2026-08-22T18:22:28.7741730Z`, trainer PID 19484/creation
+  `2026-08-22T18:22:41.7129860Z`는 exact command/source snapshot/input manifest/config와
+  live 일치한다. Windows venv redirector를 포함한 해당 process tree 네 PID가 존재하고 GPU는
+  3,321 MiB used/4,704 MiB free였다. 이는 launcher 본체 실패가 아니므로 같은 launch를
+  재실행하지 않는다. authority state complete/PID 0까지 monitor하며 15분 이내 heartbeat를
+  갱신한다. E2 microstep은 계속 0이다.
+- `20260823-032135-controlled-gpu-baseline-launch-intent`: manifest receipt exact를 입력으로
+  `baseline-run`, `baseline-adapter`, `baseline-report.json`이 모두 absent인 fresh arm을
+  run id `controlled-baseline-480`으로 authoritative
+  `run-airi-behavior-training-durable.ps1`에서 정확히 한 번 시작한다. 핀은 manifest SHA
+  `6f6b4b43ad1c7092d0b35a190bccbaa4d4b19c98f734862d0ee92c454939d933`, config SHA
+  `fb21fb2e1eee8e749c270a94abc074d910ac2c1ae473c554b2803ef29b1a2ca8`, seed 42,
+  batch 1, accumulation 16, max 480 microsteps/30 optimizer steps, checkpoint every 5 optimizer
+  steps, deterministic validation이다. launcher 완료 조건은 verified live runner+trainer
+  identity receipt이며, 이후 `run-state.json`만 권위로 monitor한다. complete 480/30,
+  adapter/report/checkpoint events와 related PID 0이 baseline 완료 조건이다. 실패/중단 시
+  root를 보존하고 같은 run을 중복 시작하거나 safe arm/E2로 이동하지 않는다. GPU 학습 중
+  WORKING-STATE heartbeat 상한은 15분이다.
+- `20260823-032135-controlled-gpu-root-manifest-receipt`: fresh root/input/receipts 생성과
+  pinned builder 1회는 exit 0이다. 생성된 v2 manifest는 1,637 bytes, SHA
+  `6f6b4b43ad1c7092d0b35a190bccbaa4d4b19c98f734862d0ee92c454939d933`; build receipt와
+  byte hash가 exact다. schema, dataset SHA `96cc223c...6eb44`, base SHA
+  `394b6624...8f506`, expected config SHA `fb21fb2e...1a2ca8`가 모두 exact고 root inventory는
+  `input`/`receipts`뿐이며 관련 PID 0이다. builder 단계 GPU process 생성 0, E2 microstep 0이다.
+- `20260823-032017-controlled-gpu-root-manifest-intent`: selected root
+  `D:\AIRI-Models\airi-controlled-gpu-20260823-031152`가 absent이고 parent D:가 존재하며
+  관련 PID/AIRI GPU workload 0인 clean preflight에서 root와 `input`, `receipts`를 새로
+  만든다. 핀된 Python 3.12의 `build_airi_behavior_input_manifest.py`를 정확히 1회 호출해
+  chat dataset SHA `96cc223c...6eb44`, base weight SHA `394b6624...8f506`, current trainer,
+  mode `cuda-qlora`, seed 42, LoRA 8/16/0.05, lr 2e-5, max 480 microsteps, batch 1,
+  accumulation 16, seq 2048, checkpoint every 5 optimizer steps, deterministic validation을
+  canonical v2 manifest에 결속한다. 기대 config SHA는
+  `fb21fb2e1eee8e749c270a94abc074d910ac2c1ae473c554b2803ef29b1a2ca8`다. 완료 조건은
+  builder exit 0, manifest/receipt schema PASS, actual manifest SHA와 expected config SHA
+  exact이며 이 단계의 GPU process 생성 0이다. 실패하면 root와 receipt를 보존하고 builder를
+  원인 없이 반복하거나 baseline/E2를 시작하지 않는다.
+- `20260823-032017-reconcile-docs-push-receipt`: exact 2-doc stage는 staged 2/unstaged 0/
+  untracked 0, cached diff/security PASS였다. `git commit -m "docs: record controlled GPU
+  preflight"` exit 0, commit `5f2f50ec387a23d36d4ef3dee44963bc0f988e1e`, 2 files,
+  50 insertions/21 deletions; push exit 0, `68343a4..5f2f50e main -> main`이다. 이후
+  HEAD/local origin/main/remote main exact, worktree clean, 관련 PID 0, selected root absent다.
+  따라서 WORKING-STATE 단독 intent diff를 제외한 input code/data clean 경계를 유지하며
+  root/manifest 단계로 이동한다.
 - `20260823-031926-reconcile-docs-commit-push-intent`: post-compact actual-state 정정 뒤
   focused `test-airi-work-continuity.ps1` exit 0/PASS, repo exact diff-check exit 0/
   whitespace error 0이다. changed는 WORKING-STATE와 roadmap log exact 2, staged/untracked 0,
@@ -2347,15 +2648,15 @@ active_trainer_count: 0
 
 ## 4. 다음 허용 행동
 
-1. 이 reconciliation 문서 diff만 별도 검토한 뒤 fresh timestamped 외부 root와 input/
-   receipts 디렉터리 생성, input-manifest builder 1회 실행 intent를 기록한다.
-2. manifest receipt의 actual SHA와 expected config SHA
-   `fb21fb2e1eee8e749c270a94abc074d910ac2c1ae473c554b2803ef29b1a2ca8` exact를 확인한다.
-3. baseline 480 microsteps/30 optimizer steps GPU intent를 쓰고 authoritative durable runner로
-   무중단 arm을 시작한다. 실행 중 WORKING-STATE heartbeat 상한은 15분이다.
-4. baseline complete/PID 0 뒤 safe-pause arm을 prearm하고 실제
-   `SAFE_TO_POWER_OFF` receipt 후 resume·complete·GPU equivalence verifier를 수행한다.
-5. controlled GPU receipt 전에는 authoritative E2를 시작하지 않는다.
+1. WORKING-STATE, 현행 handoff, roadmap status/log, NEXT를 actual receipt에 맞춰 정리하고
+   focused continuity, repo diff/security를 재검증한다. 문서 인덱스는 변경하지 않는다.
+2. exact 변경 경로만 stage하고 cached boundary/diff/security 뒤 Conventional Commit/push,
+   actual HEAD=origin/main·clean·PID 0을 확인한다.
+3. clean 경계 뒤에만 checkpoint interval K=3을 결속한 fresh timestamped 외부 root/manifest
+   intent를 기록한다. 같은 K=5 명령은 반복하지 않는다.
+4. 새 baseline complete/PID 0 뒤 safe-pause arm을 prearm하고 실제 `SAFE_TO_POWER_OFF`
+   receipt 후 resume·complete·GPU equivalence verifier를 수행한다.
+5. controlled GPU PASS receipt 전에는 authoritative E2를 시작하지 않는다.
 
 ## 5. 갱신 트리거
 

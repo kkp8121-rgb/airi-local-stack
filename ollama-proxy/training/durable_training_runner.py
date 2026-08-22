@@ -1189,7 +1189,14 @@ def _bind_final_evidence_root(run_dir: Path, run_id: str, state: Mapping[str, An
     report = outputs.get("report")
     if report is not None and producer.get("report_sha256") != report.get("sha256"):
         raise DurableRunnerError("producer evidence root report mismatch")
-    if producer.get("adapter_artifact_manifest_sha256") != outputs["adapter"].get("manifest_sha256"):
+    adapter_files = outputs["adapter"].get("files")
+    artifact_manifests = ([row for row in adapter_files
+                           if isinstance(row, dict)
+                           and row.get("path") == "artifact-manifest.json"]
+                          if isinstance(adapter_files, list) else [])
+    if (len(artifact_manifests) != 1
+            or producer.get("adapter_artifact_manifest_sha256")
+            != artifact_manifests[0].get("sha256")):
         raise DurableRunnerError("producer evidence root adapter mismatch")
     projection = {"run_id": run_id, "revision": state["revision"], "status": "complete",
                   "inputs": dict(inputs), "outputs": outputs,

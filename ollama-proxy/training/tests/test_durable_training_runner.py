@@ -886,6 +886,87 @@ def test_final_input_mutation_fails_terminal_without_verified_output_promotion()
         assert not (root / "run" / "final-evidence-root.json").exists()
 
 
+def test_final_evidence_binds_adapter_artifact_manifest_file_receipt() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        run_dir = root / "run"
+        checkpoints = run_dir / "checkpoints"
+        events = run_dir / "checkpoint-events"
+        checkpoints.mkdir(parents=True)
+        events.mkdir()
+        adapter = root / "adapter"
+        adapter.mkdir()
+        (adapter / "adapter_model.safetensors").write_bytes(b"adapter")
+        artifact_manifest = adapter / "artifact-manifest.json"
+        artifact_manifest.write_bytes(runner.canonical_bytes({"artifact": "adapter"}))
+        report_path = root / "report.json"
+        report_path.write_bytes(runner.canonical_bytes({"status": "complete"}))
+        adapter_receipt = runner._artifact_receipt(str(adapter))
+        report_receipt = runner._artifact_receipt(str(report_path))
+        assert adapter_receipt is not None
+        assert report_receipt is not None
+        artifact_manifest_sha256 = runner.sha256_file(artifact_manifest)
+        assert artifact_manifest_sha256 != adapter_receipt["manifest_sha256"]
+
+        event_path = events / "checkpoint-00000001.json"
+        event_path.write_bytes(runner.canonical_bytes({"generation": "checkpoint-00000001"}))
+        latest = {
+            "relative_path": "checkpoint-00000001",
+            "manifest_sha256": "a" * 64,
+            "event_relative_path": "checkpoint-events/checkpoint-00000001.json",
+            "event_sha256": runner.sha256_file(event_path),
+        }
+        index_path = checkpoints / "checkpoint-index.json"
+        index_path.write_bytes(runner.canonical_bytes({
+            "schema_version": "airi.behavior-checkpoint-index.v2",
+            "run_id": "final-evidence-run", "latest": latest,
+            "previous": None, "previous_index_sha256": None,
+        }))
+        progress = {
+            "schema_version": runner.PROGRESS_SCHEMA, "run_id": "final-evidence-run",
+            "status": "completed", "epoch": 1, "next_batch_index": 0,
+            "microsteps_completed": 16, "optimizer_steps": 1,
+            "pending_microbatches": 0, "training_elapsed_ns": 123,
+            "checkpoint": {
+                "relative_path": latest["relative_path"],
+                "manifest_sha256": latest["manifest_sha256"],
+            },
+            "updated_at_utc": "2026-08-23T00:00:00Z",
+        }
+        (run_dir / "progress.json").write_bytes(runner.canonical_bytes(progress))
+        state = {
+            "revision": 7,
+            "outputs": {"adapter": adapter_receipt, "report": report_receipt},
+        }
+        producer = {
+            "schema_version": "airi.behavior-producer-evidence-root.v1",
+            "run_id": "final-evidence-run",
+            "checkpoint_index_sha256": runner.sha256_file(index_path),
+            "latest_checkpoint": latest,
+            "progress": {
+                key: progress[key] for key in (
+                    "microsteps_completed", "optimizer_steps",
+                    "pending_microbatches", "training_elapsed_ns")
+            },
+            "report_sha256": report_receipt["sha256"],
+            "adapter_artifact_manifest_sha256": adapter_receipt["manifest_sha256"],
+        }
+        producer_path = run_dir / "producer-evidence-root.json"
+        producer_path.write_bytes(runner.canonical_bytes(producer))
+        with pytest.raises(runner.DurableRunnerError, match="adapter mismatch"):
+            runner._bind_final_evidence_root(
+                run_dir, "final-evidence-run", state, progress, {"input": "pinned"})
+        assert not (run_dir / "final-evidence-root.json").exists()
+
+        producer["adapter_artifact_manifest_sha256"] = artifact_manifest_sha256
+        producer_path.write_bytes(runner.canonical_bytes(producer))
+        receipt = runner._bind_final_evidence_root(
+            run_dir, "final-evidence-run", state, progress, {"input": "pinned"})
+        assert receipt["relative_path"] == "final-evidence-root.json"
+        assert receipt["sha256"] == runner.sha256_file(
+            run_dir / "final-evidence-root.json")
+
+
 def test_corrupt_current_run_state_never_authorizes_stale_paused_resume() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
