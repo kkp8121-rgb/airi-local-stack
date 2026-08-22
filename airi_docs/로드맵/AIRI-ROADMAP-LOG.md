@@ -9,6 +9,17 @@
 
 ## 2026-08-23 goal resume·P0 final validation
 
+- 05:10 KST two-doc continuity/diff/security PASS 뒤 `git push origin main` exit 0,
+  `18d0bc6..57cd999 main -> main`. HEAD/local·remote origin/main은 모두
+  `57cd9994e11d87bb2fb2801661d5e32da7de2195`, 관련 PID 0이며 actual push receipt용
+  WORKING/LOG만 dirty다. implementation과 five-doc receipt는 origin/main에 durable하다.
+  두 문서를 `docs: close final evidence P0 milestone`로 final commit/push하고 read-only clean
+  확인 뒤 K=3 fresh controlled GPU preflight로 이동한다.
+- 05:09 KST receipt docs restage 뒤 staged 5/unstaged·untracked 0, cached boundary/diff PASS.
+  `git commit -m "docs: record final adapter evidence push"` exit 0, commit
+  `57cd9994e11d87bb2fb2801661d5e32da7de2195`, parent `18d0bc6`, 5 files,
+  91 insertions/30 deletions이다. local ahead 1이며 두 receipt docs diff/security 확인 뒤
+  exact push하고, 실패 시 fresh K=3 GPU/E2는 금지다.
 - 05:09 KST final five-doc continuity/diff/security PASS 뒤 exact stage exit 0,
   staged 5/unstaged·untracked 0, cached boundary/diff/security hit 0, staged 554,483 bytes,
   index manifest `fe18f981...6db3f8`다. receipt 두 문서만 restage·revalidate한 뒤
