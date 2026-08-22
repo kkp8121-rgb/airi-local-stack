@@ -9,6 +9,17 @@
 
 ## 2026-08-22 P0-B 독립 감사·compact 복구 정정
 
+- actual docs push receipt 2개는 boundary/continuity/diff-check PASS, exact stage 뒤
+  staged 2·unstaged 0·untracked 0, cached diff-check PASS다. stage receipt를
+  재stage·재검증하고 final receipt commit/push하며 실패 시 GPU/E2를 실행하지 않는다.
+- docs receipt push 성공: `8cd69b5..248e548 main -> main`, HEAD=origin/main
+  `248e548`, AIRI trainer/runner와 Ollama 0이다. expected-run gate와 6개 장기 SSoT
+  receipt는 origin/main에 durable하다. 이 actual push receipt 두 문서를 final
+  focused 검증·commit/push한 뒤에만 fresh controlled GPU intent로 이동한다.
+- docs receipt commit 성공: `248e5481b50658ecd6da6d4bc9675f7ff3971d77`
+  (`docs: record expected GPU gate receipt`), 6 files, 102 insertions/30 deletions.
+  직후 worktree clean, local main은 origin/main보다 1 ahead, AIRI trainer/runner 0이다.
+  exact push 성공 전에는 controlled GPU/E2를 시작하지 않는다.
 - exact 6-doc stage exit 0, staged 6·unstaged 0·untracked 0, cached diff-check PASS다.
   이 stage receipt 두 문서를 재stage·재검증한 뒤 docs receipt commit을 수행하며
   실패 시 push/GPU/E2로 이동하지 않는다.
