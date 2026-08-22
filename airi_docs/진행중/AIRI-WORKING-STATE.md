@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 03:01:50 +09:00"
-checkpoint_id: "20260823-030150-p0-staged-batch-commit-intent"
+updated_at_kst: "2026-08-23 03:06:05 +09:00"
+checkpoint_id: "20260823-030605-p0-push-receipt-docs-stage-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "p0-batch-final-validation"
-git_head: "32830a43556ba7704a39bd9094f128a5a98dd7d7"
-worktree_state: "17-staged-2-receipt-docs-unstaged-0-untracked-p0-batch"
+active_phase: "p0-batch-receipt-docs"
+git_head: "911d082dcf1768a5145bd34d56a19f82deb9d248"
+worktree_state: "5-receipt-docs-prestage-pass-head-origin-main-equal"
 active_trainer_count: 0
 ---
 
@@ -49,10 +49,39 @@ active_trainer_count: 0
 | 출력 경로 | 저장소 owned code/test와 SSoT 문서만 변경. 모델·adapter·GGUF·runtime DB·로그 본문·D: P0-B root 출력 0 |
 | 완료 조건 | manifest mismatch/path fault, prearm fresh-only/first-boundary, exact runner-exit/timeout 회귀와 focused/full offline PASS, 독립 최신 P0/P1 0, diff/security PASS, milestone commit/push |
 | 중단·복구 | 회귀 실패·새 P0/P1·프로세스 누수 시 GPU/E2 금지를 유지하고 receipt를 기록한다. 기존 실행/산출물을 삭제하거나 재사용하지 않는다. |
-| 현재 행동 | exact 17-path stage와 cached diff/security가 PASS했다. 이 receipt로 바뀐 WORKING-STATE와 roadmap log 두 파일만 재stage하고 staged 17/unstaged 0/untracked 0과 cached diff-check/security를 재확인한 뒤 `git commit -m "fix: harden durable training evidence"`를 실행한다. |
+| 현재 행동 | actual implementation push receipt 5-doc의 exact boundary/focused continuity/diff/security가 PASS했다. 이 5경로만 stage해 staged 5/unstaged 0/untracked 0과 cached diff/security를 확인하고 `git commit -m "docs: record durable training push"` 뒤 push한다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260823-030605-p0-push-receipt-docs-stage-intent`: implementation push receipt를
+  반영한 WORKING-STATE, 현행 handoff, roadmap status/log, NEXT exact 5경로만 dirty이며
+  boundary diff 0, staged/untracked 0이다. focused continuity exit 0/PASS, repo diff-check
+  exit 0/whitespace error 0, security hit 0이다. 5-doc 총 506,017 bytes path+size+SHA
+  manifest는 `66f49a42b3f4291e6599df6b4d125702f09f31bb623a347a0dffa79e3915305b`다.
+  이 receipt 문서 반영 뒤 exact 5경로를 stage해 staged 5/unstaged 0/untracked 0과
+  cached diff/security를 확인하고 `git commit -m "docs: record durable training push"`,
+  `git push origin main` 순서로 실행한다. 실패하면 controlled GPU/E2로 이동하지 않는다.
+- `20260823-030416-p0-implementation-push-receipt-docs-intent`: commit receipt 두 문서는
+  exact boundary 2, staged/untracked 0, focused continuity와 repo diff-check PASS였다.
+  exact `git push origin main`은 exit 0,
+  `32830a4..911d082 main -> main`. 이후 HEAD/local origin/main/remote main은 모두
+  `911d082dcf1768a5145bd34d56a19f82deb9d248`, 관련 PID와 AIRI GPU workload 0,
+  E2 adapter/report absent다. P0 로컬 배치 구현·검증 commit은 origin/main에 durable하지만
+  actual push receipt용 문서는 아직 로컬이다. WORKING-STATE, 현행 handoff, roadmap
+  status/log, NEXT 5종에 이 receipt와 controlled-GPU-next 경계를 반영한다. focused
+  continuity/diff/security 뒤 exact 5-doc commit/push를 완료하기 전에는 controlled GPU/E2를
+  시작하지 않는다.
+- `20260823-030311-p0-implementation-commit-push-intent`: receipt 문서 재stage 뒤 final
+  index는 staged 17+unstaged/untracked 0, boundary diff 0, cached diff/security PASS,
+  총 blob 1,170,009 bytes, manifest
+  `69cbf2c653d896d1863aa28b69544c63deca3cba83d58427e6ba658302c9b23d`였다.
+  exact `git commit -m "fix: harden durable training evidence"`는 exit 0, commit
+  `911d082dcf1768a5145bd34d56a19f82deb9d248`, 17 files, 8,275 insertions/
+  544 deletions, input-manifest builder 신규다. parent는 `32830a4`; commit 직후
+  worktree clean, local main은 local/remote origin/main `32830a4`보다 1 ahead, 관련 PID
+  0이다. 이 receipt용 WORKING-STATE와 roadmap log 두 파일만 dirty로 만들고 boundary/
+  diff-check 뒤 exact `git push origin main`을 실행한다. 실패하면 local commit과 receipt
+  문서를 보존하고 GPU/E2로 이동하지 않는다.
 - `20260823-030150-p0-staged-batch-commit-intent`: exact 17-path `git add --` exit 0.
   cached diff-check는 exit 0/출력 0이고 staged 17, boundary diff 0, unstaged 0,
   untracked 0이다. staged blob 총 1,168,787 bytes, index path/mode/blob/size manifest SHA는
@@ -2276,14 +2305,14 @@ active_trainer_count: 0
 
 ## 4. 다음 허용 행동
 
-1. exact `powershell -NoProfile -ExecutionPolicy Bypass -File
-   .\test-current-checkpoint.ps1`을 한 번 실행하고 exit 0/final PASS/PID 0 receipt를 남긴다.
-2. PASS 뒤 repo 기본 `git diff --check`와 금지 산출물·비밀정보 검사를 수행한다.
-3. WORKING-STATE, 현행 handoff, roadmap status/log, NEXT를 실제 receipt에 맞게 갱신하고
-   exact 배치만 Conventional Commit으로 commit/push한다. 문서 인덱스는 현행 handoff를
-   이미 정확히 가리키므로 변경하지 않는다.
-4. HEAD=origin/main과 clean worktree를 확인한 뒤에만 controlled GPU 동등성·실제
-   E2 속도 ≤600초 checkpoint 실측으로 이동한다. 이 receipt 전에는 E2를 시작하지 않는다.
+1. implementation push receipt를 WORKING-STATE, 현행 handoff, roadmap status/log,
+   NEXT에 반영하고 focused continuity/diff/security를 검증한다. 문서 인덱스는 현행
+   handoff를 이미 정확히 가리키므로 변경하지 않는다.
+2. exact 5-doc receipt batch를 Conventional Commit으로 commit/push하고 actual push
+   receipt를 최종 live 문서에 durable하게 남긴다.
+3. HEAD=origin/main과 clean worktree를 확인한 뒤 fresh timestamped 외부 root의 controlled
+   GPU 동등성·실제 checkpoint ≤600초/최소 4구간 실측 intent를 별도로 기록한다.
+4. controlled GPU receipt 전에는 authoritative E2를 시작하지 않는다.
 
 ## 5. 갱신 트리거
 

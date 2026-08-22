@@ -9,6 +9,22 @@
 
 ## 2026-08-23 goal resume·P0 final validation
 
+- 03:06 KST actual implementation push receipt 5-doc은 exact boundary/focused continuity/
+  diff/security PASS, staged/untracked 0, 총 506,017 bytes manifest
+  `66f49a42...15305b`다. exact 5-doc stage/cached 검증 뒤
+  `docs: record durable training push` commit/push를 수행하고 실패 시 GPU/E2는 금지다.
+- 03:04 KST exact `git push origin main` exit 0,
+  `32830a4..911d082 main -> main`. HEAD/local·remote origin/main은 모두
+  `911d082dcf1768a5145bd34d56a19f82deb9d248`, 관련 PID/AIRI GPU workload 0,
+  E2 adapter/report absent다. P0 배치 구현·검증은 origin/main에 durable하다. 실제 push
+  receipt를 WORKING·현행 handoff·STATUS·LOG·NEXT 5종에 반영해 focused/diff/security와
+  docs commit/push를 완료하기 전에는 controlled GPU/E2를 시작하지 않는다.
+- 03:03 KST final stage manifest `69cbf2c6...c9b23d`/17 paths/cached diff-security PASS
+  뒤 `git commit -m "fix: harden durable training evidence"` exit 0. commit
+  `911d082dcf1768a5145bd34d56a19f82deb9d248`, 17 files, 8,275 insertions/
+  544 deletions, builder 신규다. commit 직후 worktree clean, local main은 origin/main
+  `32830a4`보다 1 ahead, 관련 PID 0이다. 이 receipt 두 문서의 boundary/diff 뒤 exact
+  push를 실행하며 실패 시 GPU/E2는 금지다.
 - 03:01 KST exact 17-path stage exit 0. staged 17/boundary diff 0/unstaged 0/untracked 0,
   cached diff-check PASS, index blob 총 1,168,787 bytes와 manifest
   `19a63ba8...8182b8`, cached security hit 0, 관련 PID 0이다. 문서 인덱스는 stage하지

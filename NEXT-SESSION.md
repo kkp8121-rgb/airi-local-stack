@@ -3,15 +3,17 @@
 > **2026-08-23 P0 local batch receipt:** 최신 사용자 `/goal`로 Goal 도구 status는
 > `active`, `goal_status=active`다. local HEAD/local origin/main/remote main은
 > `32830a43556ba7704a39bd9094f128a5a98dd7d7`, 관련 AIRI Python/PowerShell PID와
-> durable GPU trainer는 0이다. 동결 P0 배치는 modified 16+untracked 1+staged 0의
-> 로컬 검증 완료·commit/push 대기 상태다. 운영 채택과 기본 모델 변경 금지는 유지한다.
+> durable GPU trainer는 0이다. 동결 P0 code/validation commit
+> `911d082dcf1768a5145bd34d56a19f82deb9d248`은 origin/main에 push됐고
+> HEAD/local·remote origin/main이 exact다. actual push receipt 5-doc commit/push만
+> 남아 있다. 운영 채택과 기본 모델 변경 금지는 유지한다.
 >
 > 최신 권위 receipt는 핀된 Python `145 passed, 5 skipped`, actual-process PowerShell
 > durability literal PASS, 전체 offline checkpoint PASS, repo diff-check와 17-path
 > security hit 0, post-run PID 0이다. 한 차례 독립 감사의 P0=0/P1=4 중 고정된 네
 > 원래 P1만 최소 수정했고 targeted/integration gate로 모두 닫았다. 새 감사 라운드는
-> 추가하지 않는다. 현재 다음 상태 변경은 WORKING·현행 handoff·STATUS·LOG·NEXT의
-> focused 검증 뒤 exact 17-path stage/Conventional Commit/origin/main push다. 문서
+> 추가하지 않는다. 현재 다음 상태 변경은 actual implementation push receipt가 반영된
+> WORKING·현행 handoff·STATUS·LOG·NEXT exact 5-doc focused 검증/commit/push다. 문서
 > 인덱스는 현행 handoff를 정확히 가리켜 변경하지 않는다. HEAD=origin/main과 clean
 > worktree 전에는 controlled GPU/E2를 시작하지 않는다.
 >
