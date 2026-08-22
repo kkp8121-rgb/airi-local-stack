@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import tempfile
+from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import patch
 
@@ -28,7 +29,10 @@ class ArtifactVerifier:
 def _event(run_id: str, generation: str, reason: str = "interval"):
     return {"run_id": run_id, "generation": generation, "reason": reason,
             "checkpoint_manifest_sha256": "b" * 64,
-            "checkpoint_payload_sha256": "c" * 64}
+            "checkpoint_payload_sha256": "c" * 64,
+            "microsteps_completed": 16 if reason == "safe-pause" else 320,
+            "optimizer_steps": 1 if reason == "safe-pause" else 20,
+            "pending_microbatches": 0}
 
 
 def _pins():
@@ -36,7 +40,8 @@ def _pins():
         "dataset_sha256": "1" * 64,
         "model_weight_sha256": "2" * 64,
         "trainer_source_sha256": "3" * 64,
-        "config": {"mode": "cuda-qlora", "max_steps": 320,
+        "config": {"mode": "cuda-qlora", "seed": 42, "max_steps": 320,
+                   "batch_size": 1, "gradient_accumulation": 16,
                    "checkpoint_every_optimizer_steps": 5,
                    "deterministic_validation": True},
         "determinism": {"validation_enabled": True, "algorithms_enabled": True,
@@ -62,10 +67,25 @@ def _state(run_id: str):
             "status": "complete"}
 
 
+def _expected_bindings(**overrides):
+    bindings = {
+        "expected_input_manifest_sha256": "4" * 64,
+        "expected_training_config_sha256": verifier._sha256_bytes(
+            verifier._canonical(_pins()["config"])),
+        "expected_seed": 42,
+        "expected_batch_size": 1,
+        "expected_gradient_accumulation": 16,
+        "expected_safe_pause_microsteps": 16,
+        "expected_safe_pause_optimizer_step": 1,
+    }
+    bindings.update(overrides)
+    return bindings
+
+
 def _write_pause_history(run: Path, run_id: str = "resume",
                          request_id: str = "pause-001") -> None:
     history = run / "control" / "history"
-    history.mkdir(parents=True)
+    history.mkdir(parents=True, exist_ok=True)
     request = {"schema_version": "airi.behavior-pause-request.v1",
                "run_id": run_id, "request_id": request_id}
     ack = {"schema_version": "airi.behavior-pause-ack.v1",
@@ -93,6 +113,7 @@ def test_pass_receipt_is_canonical_atomic_and_never_authorizes_adoption() -> Non
             (directory / "run-state.json").write_bytes(b"{}\n")
             adapter = directory / "adapter"; adapter.mkdir()
             (adapter / "adapter_model.safetensors").write_bytes(b"not-model-bytes-in-receipt")
+        (baseline / "control").mkdir()
         receipt = root / "out" / "receipt.json"
         latest = {"manifest": {"pins": _pins(), "generation": "checkpoint-00000001",
                                "payload": {"sha256": "c" * 64}},
@@ -109,6 +130,7 @@ def test_pass_receipt_is_canonical_atomic_and_never_authorizes_adoption() -> Non
                 baseline_adapter_dir=baseline / "adapter", resumed_adapter_dir=resumed / "adapter",
                 expected_microsteps=320, expected_optimizer_steps=20,
                 expected_checkpoint_every_optimizer_steps=5,
+                **_expected_bindings(),
                 tensor_loader=lambda _path: {}, state_loader=lambda _dir, _events: {"run_id": "different", "checkpoint_generation": "different", "same": [1]})
         assert result["pass"] is True
         assert result["adoption_authorized"] is False
@@ -119,6 +141,11 @@ def test_pass_receipt_is_canonical_atomic_and_never_authorizes_adoption() -> Non
         assert result["safe_pause_resume"]["latest_checkpoint_payload_sha256"] == "c" * 64
         assert result["comparator"]["schema_version"] == verifier.COMPARATOR_SCHEMA
         assert result["comparator"]["exact"] is True
+        assert result["expected_bindings"] == {
+            key.removeprefix("expected_"): value
+            for key, value in _expected_bindings().items()
+        }
+        assert result["safe_pause_resume"]["safe_pause_event"]["generation"] == "checkpoint-00000001"
 
 
 def test_failure_never_publishes_a_pass_receipt() -> None:
@@ -138,7 +165,8 @@ def test_failure_never_publishes_a_pass_receipt() -> None:
                 verifier.verify_equivalence(
                     baseline, resumed, receipt,
                     expected_microsteps=320, expected_optimizer_steps=20,
-                    expected_checkpoint_every_optimizer_steps=5)
+                    expected_checkpoint_every_optimizer_steps=5,
+                    **_expected_bindings())
             except verifier.EquivalenceError as error:
                 assert "interval" in str(error)
             else:
@@ -151,7 +179,7 @@ def test_normalization_only_ignores_identity_fields() -> None:
 
 
 def test_nested_checkpoint_tensor_comparison_is_exact() -> None:
-    import torch
+    torch = pytest.importorskip("torch")
     left = {"run_id": "a", "checkpoint_generation": 4,
             "optimizer": {"state": [torch.tensor([1.0, 2.0])]}, "losses": [1.0]}
     right = {"run_id": "b", "checkpoint_generation": 5,
@@ -278,7 +306,8 @@ def test_latest_checkpoint_without_matching_event_is_refused() -> None:
                 verifier.verify_equivalence(
                     baseline, resumed, receipt,
                     expected_microsteps=320, expected_optimizer_steps=20,
-                    expected_checkpoint_every_optimizer_steps=5)
+                    expected_checkpoint_every_optimizer_steps=5,
+                    **_expected_bindings())
         assert not receipt.exists()
 
 
@@ -291,6 +320,14 @@ def test_cli_has_no_tolerance_or_interval_gate_override() -> None:
             "--expected-microsteps", "320",
             "--expected-optimizer-steps", "20",
             "--expected-checkpoint-every-optimizer-steps", "5",
+            "--expected-input-manifest-sha256", "4" * 64,
+            "--expected-training-config-sha256", verifier._sha256_bytes(
+                verifier._canonical(_pins()["config"])),
+            "--expected-seed", "42",
+            "--expected-batch-size", "1",
+            "--expected-gradient-accumulation", "16",
+            "--expected-safe-pause-microsteps", "16",
+            "--expected-safe-pause-optimizer-step", "1",
             "--atol", "inf",
         ])
     assert refusal.value.code == 2
@@ -331,3 +368,102 @@ def test_atomic_new_receipt_never_overwrites_or_deletes_concurrent_file() -> Non
         with pytest.raises(verifier.EquivalenceError):
             verifier._atomic_new_receipt(receipt, {"pass": True})
         assert receipt.read_bytes() == b"concurrent-owner\n"
+
+
+def test_expected_manifest_config_and_training_shape_mismatches_refuse() -> None:
+    cases = [
+        ("manifest", _expected_bindings(expected_input_manifest_sha256="0" * 64), _pins()),
+        ("config", _expected_bindings(expected_training_config_sha256="0" * 64), _pins()),
+        ("seed", _expected_bindings(), {**_pins(), "config": {**_pins()["config"], "seed": 43}}),
+        ("batch", _expected_bindings(), {**_pins(), "config": {**_pins()["config"], "batch_size": 2}}),
+        ("grad", _expected_bindings(), {**_pins(), "config": {**_pins()["config"], "gradient_accumulation": 8}}),
+    ]
+    for label, bindings, pins in cases:
+        if label in {"seed", "batch", "grad"}:
+            bindings = _expected_bindings(
+                expected_training_config_sha256=verifier._sha256_bytes(
+                    verifier._canonical(pins["config"])))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline, resumed = root / "baseline", root / "resumed"
+            baseline.mkdir(); resumed.mkdir()
+            latest = {"manifest": {"pins": pins, "generation": "checkpoint-00000001",
+                                   "payload": {"sha256": "c" * 64}},
+                      "manifest_sha256": "b" * 64}
+            with ExitStack() as stack:
+                stack.enter_context(patch.object(verifier, "_completed_run",
+                                                 side_effect=[_state("base"), _state("resume")]))
+                stack.enter_context(patch.object(verifier, "_latest_verified_generation",
+                                                 side_effect=[latest, latest]))
+                with pytest.raises(verifier.EquivalenceError):
+                    verifier.verify_equivalence(
+                        baseline, resumed, root / "receipt.json",
+                        expected_microsteps=320, expected_optimizer_steps=20,
+                        expected_checkpoint_every_optimizer_steps=5, **bindings)
+
+
+@pytest.mark.parametrize(
+    "events,bindings",
+    [
+        ((([_event("base", "checkpoint-00000001")], [1, 2, 3, 4]),
+          ([_event("resume", "checkpoint-00000001", "safe-pause")], [])),
+         _expected_bindings(expected_safe_pause_microsteps=32,
+                            expected_safe_pause_optimizer_step=2)),
+        ((([_event("base", "checkpoint-00000001")], [1, 2, 3, 4]),
+          ([_event("resume", "checkpoint-00000001", "safe-pause"),
+            _event("resume", "checkpoint-00000002", "safe-pause")], [])),
+         _expected_bindings()),
+    ],
+)
+def test_safe_pause_location_and_extra_event_refuse(events, bindings) -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        baseline, resumed = root / "baseline", root / "resumed"
+        baseline.mkdir(); resumed.mkdir()
+        latest = {"manifest": {"pins": _pins(), "generation": "checkpoint-00000001",
+                               "payload": {"sha256": "c" * 64}},
+                  "manifest_sha256": "b" * 64}
+        with patch.object(verifier, "_completed_run", side_effect=[_state("base"), _state("resume")]), \
+                patch.object(verifier, "_latest_verified_generation", side_effect=[latest, latest]), \
+                patch.object(verifier, "_events", side_effect=events), \
+                patch.object(verifier, "_safe_pause_history", return_value=[]):
+            with pytest.raises(verifier.EquivalenceError):
+                verifier.verify_equivalence(
+                    baseline, resumed, root / "receipt.json",
+                    expected_microsteps=320, expected_optimizer_steps=20,
+                    expected_checkpoint_every_optimizer_steps=5, **bindings)
+
+
+def test_safe_pause_history_rejects_extra_complete_triple() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        run = Path(temporary)
+        _write_pause_history(run, request_id="pause-001")
+        _write_pause_history(run, request_id="pause-002")
+        with pytest.raises(verifier.EquivalenceError, match="exactly one"):
+            verifier._safe_pause_history(
+                run, "resume", [_event("resume", "checkpoint-00000001", "safe-pause")])
+
+
+def test_baseline_control_must_be_absent_or_an_empty_regular_directory() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        run = Path(temporary)
+        control = run / "control"
+        control.mkdir()
+        verifier._require_no_safe_pause_evidence(run, [])
+        (control / ".orphan").write_bytes(b"evidence\n")
+        with pytest.raises(verifier.EquivalenceError, match="control evidence"):
+            verifier._require_no_safe_pause_evidence(run, [])
+
+
+def test_baseline_control_rejects_a_link_when_supported() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        run = Path(temporary)
+        target = run / "target"
+        target.mkdir()
+        control = run / "control"
+        try:
+            control.symlink_to(target, target_is_directory=True)
+        except OSError:
+            pytest.skip("filesystem does not permit test symlinks")
+        with pytest.raises(verifier.EquivalenceError, match="control evidence"):
+            verifier._require_no_safe_pause_evidence(run, [])

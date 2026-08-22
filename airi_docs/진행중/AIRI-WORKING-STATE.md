@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-22 18:45:52 +09:00"
-checkpoint_id: "20260822-184552-p0b-final-receipt-staged"
+updated_at_kst: "2026-08-22 19:10:20 +09:00"
+checkpoint_id: "20260822-191020-p0b-expected-gate-commit-intent"
 goal_status: "active"
 authorization: "repo-gpu-package-test-commit-push; operational-adoption-forbidden"
 active_phase: "p0-controlled-gpu-validation"
-git_head: "74d8999bdfba7cc1bf45749b9e110379853b8bac"
-worktree_state: "staged-two-doc-final-receipt-before-working-restage"
+git_head: "f2c9a46dfb0b15b1e1a6340c84167b0a5f009119"
+worktree_state: "staged-four-file-full-offline-receipt-before-final-restage"
 active_trainer_count: 0
 ---
 
@@ -30,28 +30,171 @@ active_trainer_count: 0
   trainer/runner workload는 0이다.
 - v4 파인튜닝은 E1 adapter/report까지만 완료·검증됐고 아직 미채택이다.
 - E2 adapter/report, merge/package, v4 T3, live campaign 산출물은 0이다.
-- HEAD와 origin/main은 P0-B evidence gate implementation
-  `e970cf7e4c3a4685fd8bce23c659a1c9aa93c21e`로 일치한다. source/chat/base와
+- HEAD와 origin/main은 P0-B gate receipt
+  `f2c9a46dfb0b15b1e1a6340c84167b0a5f009119`로 일치한다. source/chat/base와
   E1 adapter/config/report의 크기·SHA는 고정값과 exact 일치한다. E2 adapter/report/
   durable run, T3와 campaign은 없고 기존 E2 stdout/stderr는 각 0 bytes다. compact
-  복구 전 receipt용 WORKING-STATE와 roadmap log 두 파일만 dirty이며 AIRI
+  복구 뒤 expected gate 네 파일만 staged, unstaged/untracked 0이며 AIRI
   trainer/runner는 0이다.
 
 ## 2. 현재 작업 트랜잭션
 
 | 항목 | 값 |
 |---|---|
-| 의도 | P0-B gate SSoT receipt commit `74d8999`의 actual push 성공을 durable하게 기록하고 clean GPU preflight 경계를 만든다. |
-| 허용 범위 | WORKING-STATE와 roadmap log의 push receipt 갱신·offline 문서 검증만 허용; GPU·서비스·E2 실행 금지 |
-| 시작 전 증거 | `git push origin main` exit 0, `e970cf7..74d8999 main -> main`; HEAD=origin/main `74d8999`; AIRI trainer/runner 0; post-push receipt 문서 2개만 dirty |
-| exact 명령 | 두 문서 갱신 뒤 focused continuity와 repo 기본 diff-check, exact 2-doc boundary 확인; PASS 시 exact stage/cached diff-check, `git commit -m "docs: record P0-B gate push"`, `git push origin main` |
-| 출력 경로 | Git tracked WORKING-STATE와 roadmap log만. GPU runtime 산출물·로그 본문은 생성하지 않는다. |
-| 완료 조건 | actual `74d8999` push receipt가 두 SSoT에 보존되고 final receipt commit이 origin/main에 push되어 worktree clean, AIRI trainer/runner 0 |
-| 중단·복구 | quota/PC 중단은 origin/main `74d8999`과 두 문서 diff에서 재개한다. final receipt push 전에는 controlled GPU/E2를 시작하지 않는다. |
-| 현재 행동 | exact 2-doc stage와 cached diff-check가 PASS했다. WORKING-STATE의 stage receipt를 재stage한 뒤 동일 2/0/0 경계를 확인하고 final receipt commit을 실행한다. |
+| 의도 | controlled GPU 전에 verifier가 계획된 input/config SHA·seed·batch·accumulation·단일 첫 optimizer 경계 pause를 외부 기대값으로 fail-closed 고정하도록 보강한다. |
+| 허용 범위 | verifier와 owned test, WORKING-STATE의 offline 구현·회귀만 허용; GPU·서비스·E2 실행 금지 |
+| 시작 전 증거 | HEAD=origin/main `f2c9a46`; AIRI trainer/runner/Ollama 0; worktree는 live WORKING-STATE와 worker 소유 verifier/test 2개만 modified. verifier `9d723c99...4bc4` 41,278 B, test `61288966...8d23` 22,698 B |
+| exact 명령 | 핀된 Python 3.12로 verifier py_compile과 checkpoint/trainer/runner/verifier 4-suite pytest, actual-process `test-airi-training-durability.ps1`; PASS 뒤 최신 bytes 독립 P0/P1 감사, exact stage 상태의 `test-current-checkpoint.ps1`, diff/security |
+| 출력 경로 | Git tracked verifier/test와 WORKING-STATE/roadmap receipt 문서만. GPU runtime·모델 산출물 0 |
+| 완료 조건 | explicit expected input/config/shape/pause mismatch fault가 PASS하고 전체 P0 회귀·PowerShell·full offline PASS, 독립 P0/P1 0, 구현·receipt commit이 origin/main push됨 |
+| 중단·복구 | quota/PC 중단 시 origin/main `f2c9a46`과 exact 3-file diff에서 재개한다. 구현 push 전에는 fresh GPU target이나 E2를 만들지 않는다. |
+| 현재 행동 | exact 4-file staged 상태의 full offline checkpoint가 exit 0/PASS했다. receipt 두 문서를 재stage하고 4/0/0·cached diff-check를 재검증한 뒤 implementation commit/push를 수행한다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260822-191020-p0b-expected-gate-commit-intent`: full-offline receipt 두 문서의
+  exact `git add` exit 0. staged 4, unstaged 0, untracked 0, cached diff-check exit 0이다.
+  이 stage receipt를 담은 두 문서만 다시 stage하고 동일 4/0/0과 cached diff-check를
+  확인한 뒤 exact `git commit -m "fix: bind GPU equivalence to expected run"`을
+  실행한다. commit 실패 시 push/GPU/E2를 실행하지 않고 staged 배치를 보존한다.
+- `20260822-190933-p0b-expected-gate-full-offline-pass`: compact 뒤 지정 SSoT 5종을
+  순서대로 전체 재독하고 goal `active`를 확인했다. 실제 HEAD=origin/main `f2c9a46`,
+  expected gate 네 파일만 staged, unstaged/untracked 0, source/chat/base와 E1 3종의
+  크기·SHA exact, E2/T3/campaign 부재, E2 로그 각 0 bytes, AIRI trainer/runner 0을
+  대조했다. 중복 실행하지 않고 기존 exec session `45999`를 회수한 결과
+  `test-current-checkpoint.ps1` exit 0, 최종 `Current checkpoint contract: PASS
+  (offline synthetic ASAR only; no installed archive/service/model access)`, 종료 뒤 관련
+  PID 0이다. 이 receipt를 담은 WORKING-STATE/roadmap log를 재stage해 동일 4/0/0과
+  cached diff-check를 확인한 뒤 `fix: bind GPU equivalence to expected run`으로
+  commit/push한다. 실패하면 controlled GPU/E2를 실행하지 않는다.
+- `20260822-190548-p0b-expected-gate-staged-full-offline-intent`: exact 4-file
+  `git add` exit 0. staged 4, unstaged 0, untracked 0, cached diff-check exit 0이고
+  최초 staged 통계는 368 insertions/24 deletions다. 이 receipt를 담은 WORKING-STATE와
+  roadmap log만 재stage하고 동일 4/0/0과 cached diff-check를 확인한 뒤 exact
+  `.\test-current-checkpoint.ps1`을 실행한다. 완료 조건은 exit 0과 최종 offline
+  checkpoint PASS, 관련 PID 0이다. 실패하면 commit/push/GPU/E2를 실행하지 않는다.
+- `20260822-190523-p0b-expected-gate-prestage-pass`: fresh pre-stage 감사는 exact
+  4 changed, boundary diff 0, untracked 0, repo 기본 diff-check exit 0/whitespace error 0,
+  금지 산출물 filename 0, 비밀 값 형태 content hit 0이다. verifier/test SHA는
+  `6c64cd0c...7439` 41,449 B / `da797b70...ee0e` 23,774 B다. 다음 상태 변경은
+  WORKING-STATE/roadmap log/verifier/test 네 경로만 exact `git add`하고 staged 4·
+  unstaged 0·untracked 0 및 cached diff-check를 확인하는 것이다. 실패하면 full offline/
+  commit/push/GPU/E2를 실행하지 않는다.
+- `20260822-190443-p0b-expected-gate-ready-prestage`: 최신 bytes 독립 read-only
+  재감사는 repaired baseline control, expected manifest/config/seed/batch/accumulation,
+  단일 safe event/history, latest 결속, 고정 최소 4구간/≤600초, exact state/tensor와
+  fresh non-replacing receipt를 확인해 P0 0/P1 0, `READY`다. static 감사로 테스트/GPU는
+  실행하지 않았고 root fresh Python `73 passed, 2 skipped`, PowerShell PASS,
+  diff-check PASS, 관련 PID 0이 실행 근거다. 다음은 WORKING-STATE/roadmap log/verifier/
+  test exact 4개 배치의 boundary·security·SHA preflight, exact stage/cached diff-check,
+  `test-current-checkpoint.ps1`이다. 실패하면 commit/push/GPU/E2를 실행하지 않는다.
+- `20260822-190232-p0b-expected-gate-ready-reaudit`: exact identity가 유지된 Ollama
+  app PID 26872를 먼저 종료하고 남은 serve PID 24004를 종료했다. 종료 대기 뒤
+  `ollama.exe`/`ollama app.exe` process 0이다. AIRI trainer/runner PID도 0이며 GPU/E2
+  실행은 0이다. 최신 verifier는 actual baseline의 empty regular control을 허용하되
+  entry/link/Windows reparse를 거부하고, root 통합 `73 passed, 2 skipped`, actual-process
+  PowerShell PASS다. 이전 독립 감사 P0 1의 exact 수정 bytes를 재감사해 P0/P1 0
+  `READY` 전에는 full offline·stage/commit/GPU/E2로 이동하지 않는다.
+- `20260822-190158-p0b-ollama-app-restart-correction`: baseline control 수정 뒤
+  actual-process PowerShell durability exit 0/PASS, AIRI trainer/runner/planned-root/fake
+  관련 PID 0이다. 그러나 `ollama.exe` PID 24004가 creation 18:52:58 KST로 존재했고,
+  parent는 `ollama app.exe` PID 26872, creation 18:50:22 KST, hidden fast-startup이다.
+  둘 다 첫 `ollama ps` 부작용 시각에 생성됐으며 앞서 child serve PID 16312만 종료한 뒤
+  app이 새 child를 재생성한 것이다. localhost `/api/ps`는 `models: []`로 GPU 모델 적재
+  0을 확인했다. 따라서 `185302`의 순간 Ollama process 0은 맞지만 이후 자동 재기동을
+  놓쳤고 `185826`의 서비스 0 표현은 부정확했다. 관측 사실로 정정한다. exact parent/app
+  PID 26872와 child/serve PID 24004 identity를 재검증해 parent부터 종료한 뒤 child를
+  종료하고 Ollama process 0을 확인한다. GPU trainer/E2는 계속 0이다.
+- `20260822-190053-p0b-baseline-control-fix-python-pass`: baseline control은 부재 또는
+  fixed-local/non-reparse empty regular directory만 허용하고 어떤 entry도 거부하도록
+  수정했다. pass fixture가 실제 empty control을 만들고 orphan entry/link fault를 추가했다.
+  existing `_require_local_fixed_path`가 Windows junction/reparse attributes도 차단한다.
+  핀된 Python pycompile exit 0, 4-suite exit 0,
+  `73 passed, 2 skipped in 17.08s`. 기존 CUDA-box gpu-less skip과 Windows test symlink
+  권한 조건 skip이며 제품 reparse 검사는 직접 결속됐다. 다음 exact 검증은 actual-process
+  PowerShell durability이며 PASS/PID 0 뒤 최신 bytes 독립 재감사를 다시 요청한다.
+- `20260822-185917-p0b-baseline-control-false-reject`: root가 trainer
+  `run_dir.mkdir` 직후 `(run_dir / "control").mkdir(exist_ok=True)`를 모든 run에
+  수행하는 실제 계약을 대조했다. 새 `_require_no_safe_pause_evidence`는
+  `os.path.lexists(control)` 자체를 거부해 실제 uninterrupted baseline이 항상 실패한다.
+  따라서 직전 Python/PowerShell PASS는 synthetic pass fixture가 빈 control을 만들지 않은
+  회귀 공백 때문에 valid-run readiness 근거가 아니다. GPU/E2는 0이다. baseline은 control
+  부재 또는 **빈 regular non-link directory**만 허용하고 어떤 entry/link/history도
+  거부하며, pass fixture가 실제 빈 control을 만들도록 수정해 focused+전체 통합을 다시
+  실행한다. 수정·독립 P0/P1 0 전에는 full offline/commit/GPU/E2 금지를 유지한다.
+- `20260822-185826-p0b-expected-gate-integration-pass-audit`: exact identity와 child 0을
+  재확인한 뒤 leaked preflight PowerShell PID 19300을 `Stop-Process -Force`로 종료했다.
+  종료 대기 뒤 PID 부재, trainer/runner/planned root/fake trainer 관련 process 0이다.
+  최신 통합 receipt는 Python `72 passed, 1 skipped`, actual-process PowerShell PASS다.
+  GPU·서비스·E2는 0이다. verifier/test 최신 bytes를 독립 read-only 재감사해 expected
+  input/config/seed/batch/accumulation/pause gate와 기존 exact/atomic 계약에 P0/P1 0을
+  받기 전에는 full offline·stage/commit/GPU/E2로 이동하지 않는다.
+- `20260822-185752-p0b-preflight-shell-leak`: actual-process PowerShell durability
+  contract는 exit 0, `AIRI training durability contract: PASS`. 그러나 종료 후 related
+  PID 감사에서 trainer/runner가 아니라 첫 18:50 통합 preflight 명령 자체인 PowerShell
+  PID 19300이 도구 timeout 뒤에도 남은 것을 발견했다. exact executable은 Windows
+  PowerShell, creation `2026-08-22T18:50:17.0324210+09:00`, command에는 pinned planned
+  root와 `OLLAMA_PS_BEGIN` 이후 CUDA 조회가 결속돼 있고 direct child 0이다. 이는
+  `ollama ps` auto-start 부작용과 같은 실패 명령의 supervisor shell 누수이므로 이 exact
+  PID만 종료하고 fresh AIRI trainer/runner/preflight PID 0을 확인한다. 확인 전에는
+  PowerShell PASS를 전체 통합 완료로 승격하거나 독립 감사/GPU/E2로 이동하지 않는다.
+- `20260822-185705-p0b-expected-gate-python-pass`: 핀된 Python 3.12의 checkpoint/
+  trainer/runner/verifier py_compile exit 0, 4-suite focused exit 0,
+  `72 passed, 1 skipped in 17.21s`. skip은 CUDA 장비에서 gpu-less refusal 경로가
+  비적용인 기존 조건이다. GPU·서비스·모델 output은 0이다. 다음 exact 명령은
+  `powershell -NoProfile -ExecutionPolicy Bypass -File
+  .\test-airi-training-durability.ps1`; exit 0/PASS와 관련 PID 0이 완료 조건이며
+  실패하면 GPU/E2를 계속 금지한다.
+- `20260822-185558-p0b-expected-gate-integration-intent`: 두 owned 파일 worker
+  결과는 pycompile PASS, focused `17 passed, 1 skipped`, owned diff-check PASS다.
+  root diff 검토에서 expected input manifest SHA, canonical full config SHA, seed/batch/
+  accumulation, safe-pause microstep/optimizer step, exactly one event/history triple과 receipt
+  결속을 확인했다. actual worktree는 WORKING-STATE+verifier+test 세 modified뿐이며 GPU/
+  서비스/E2 실행은 0이다. root는 핀된 Python의 4-suite와 actual-process PowerShell을
+  fresh 실행하고 최신 독립 P0/P1 0 전에는 commit/GPU/E2로 이동하지 않는다.
+- `20260822-185441-p0b-preflight-partial-verifier-blocker`: quoting을 단순화한 핀된
+  Python CUDA env 조회 exit 0. Python 3.12.13, Torch 2.7.0+cu128, CUDA runtime 12.8,
+  transformers 4.48.2, peft 0.14.0, bitsandbytes 0.50.1, RTX 3060 Ti capability 8.6,
+  total 8,589,410,304 bytes, PyTorch 조회 free 7,472,152,576 bytes다. trainer 적용 전
+  deterministic/TF32 기본값은 고정값과 다르지만 `--deterministic-validation`이 이를
+  fail-closed로 설정하고 pins에 기록한다. 별도 NVIDIA 조회는 driver 591.74, total
+  8192 MiB, used/free 3942/4083 MiB, utilization 27%, 45°C였고 Ollama process 0으로
+  복구됐다. 그러나 독립 설계 감사에서 현재 verifier가 두 run의 input/config 동일성만
+  보고 계획된 input manifest SHA, 전체 training config SHA, seed/batch/gradient
+  accumulation과 단일 첫 optimizer 경계 safe-pause를 외부 expected 값으로 강제하지
+  않는 증거 결함을 확인했다. 따라서 preflight는 부분 PASS지만 GPU GO는 아니다.
+  verifier/test 두 파일에 expected gate와 mismatch fault를 추가해 offline PASS·독립
+  P0/P1 0·commit/push한 뒤 fresh target preflight를 반복한다. 실제 E2와 같은 batch 1,
+  grad accumulation 16을 고정하고, timing 표본은 최소 4구간 턱걸이 320 대신
+  max 480 microsteps/30 optimizer steps/checkpoint K=5의 정상 6구간으로 잡는다.
+- `20260822-185338-p0b-python-env-quoting-failure`: 핀된 Python 환경 조회는
+  약 2.3초 뒤 exit 1, `NameError: name 'python' is not defined`. 인라인 JSON key
+  quoting이 PowerShell→Python 전달에서 벗겨진 조회 명령 결함이며 학습·output은 0이다.
+  CUDA/package 값을 얻지 못했으므로 preflight PASS로 인정하지 않는다. Python dict key를
+  single quote로 고정한 단순 명령으로 한 번 fresh 재실행하고, 또 실패하면 blocker로
+  남기며 GPU를 시작하지 않는다.
+- `20260822-185302-p0b-ollama-side-effect-restored`: 기록된 PID 16312가
+  `ollama.exe`, creation `2026-08-22T18:50:23.7479920+09:00`, command suffix
+  `ollama.exe serve`와 exact 일치함을 확인한 뒤 `Stop-Process -Id 16312 -Force`
+  exit 0. 종료 대기 뒤 PID 부재, 전체 `ollama.exe` process 0이다. 이 프로세스는 직전
+  preflight가 자동 기동한 side effect이며 그 exact 대상만 원상 복구했다. GPU trainer/
+  runner/E2는 계속 0이다. 다음은 NVIDIA 조회와 핀된 Python 환경 확인을 별도 실행한다.
+- `20260822-185230-p0b-preflight-ollama-side-effect`: 첫 controlled GPU read-only
+  preflight는 HEAD=origin/main `f2c9a46`, WORKING-STATE 단독 diff, fresh planned D:
+  root/targets, fixed/non-reparse C: dataset·D: model/Python, dataset/base/config와 6개
+  code SHA, D: free 64,238,112,768 bytes, 관련 trainer/runner 0까지 확보했다. 그러나
+  `ollama ps`가 단순 조회 대신 `ollama.exe serve` PID 16312를 18:50:23 KST에 자동
+  기동했고 명령은 30초 창에서 후속 NVIDIA/Python env receipt 없이 중단됐다. 따라서
+  이 명령 전체를 완결 PASS로 인정하지 않는다. GPU trainer/E2는 0이다. 생성 시각·exe·
+  exact command가 일치하는 PID 16312만 `Stop-Process`로 종료하고 부재를 확인한 뒤,
+  NVIDIA와 핀된 Python CUDA/package env를 `ollama ps` 없이 분리 검사한다. 종료 identity가
+  달라졌으면 손대지 않고 blocker로 기록한다.
+- `20260822-184706-p0b-controlled-gpu-readonly-design`: final receipt commit
+  `f2c9a46dfb0b15b1e1a6340c84167b0a5f009119`을 origin/main에 push했다
+  (`74d8999..f2c9a46 main -> main`). 이후 HEAD=origin/main, worktree clean,
+  AIRI trainer/runner 0을 확인했다. P0-B gate code·SSoT receipt milestone은 durable하며
+  다음 단계는 GPU 실행이 아닌 exact paired command의 read-only 교차 감사다. controlled
+  GPU와 실제 E2 속도 구간은 여전히 0이므로 P0-B/E2를 승격하지 않는다.
 - `20260822-184552-p0b-final-receipt-staged`: exact 2-doc `git add` exit 0.
   staged 2, unstaged 0, untracked 0, cached diff-check exit 0이다. 이 WORKING-STATE
   stage receipt만 재stage하고 동일 2/0/0과 cached diff-check를 확인한 뒤 exact

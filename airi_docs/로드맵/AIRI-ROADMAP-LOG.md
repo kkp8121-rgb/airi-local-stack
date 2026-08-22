@@ -9,6 +9,31 @@
 
 ## 2026-08-22 P0-B 독립 감사·compact 복구 정정
 
+- full-offline receipt 두 문서를 재stage한 뒤 staged 4·unstaged 0·untracked 0,
+  cached diff-check PASS다. stage receipt 두 문서만 다시 stage·재검증하고 exact
+  implementation commit을 수행하며 실패 시 push/GPU/E2로 이동하지 않는다.
+- compact 뒤 지정 SSoT와 active goal을 복구하고 HEAD=origin/main `f2c9a46`, exact
+  4-file stage/unstaged 0/untracked 0, 고정 입력·E1 SHA exact, E2/T3/campaign 0,
+  AIRI trainer/runner 0을 재대조했다. 중복 실행 없이 기존 full-offline session을
+  회수해 `test-current-checkpoint.ps1` exit 0과 최종 offline checkpoint PASS를
+  확인했고 관련 PID도 0이다. receipt 두 문서를 재stage·cached diff-check한 뒤
+  `fix: bind GPU equivalence to expected run` commit/push하며, 실패하면 GPU/E2를
+  실행하지 않는다.
+- expected-gate exact 4-file stage exit 0, staged 4·unstaged 0·untracked 0,
+  cached diff-check PASS다. stage receipt 두 문서를 재stage·재검증한 뒤 full offline
+  checkpoint를 실행하며 실패 시 implementation commit/push/GPU/E2로 이동하지 않는다.
+- controlled GPU preflight 설계 감사에서 기존 verifier가 두 run의 상호 동일성은
+  보지만 계획된 input manifest/full config SHA, seed/batch/accumulation과 첫 optimizer
+  경계 pause를 expected 값으로 강제하지 않는 증거 결함을 발견했다. explicit gate와
+  mismatch fault를 추가하고, 실제 trainer가 만드는 빈 baseline `control/`을 처음에는
+  false reject한 P0도 empty regular만 허용·entry/link/reparse 거부로 수리했다. root
+  Python `73 passed, 2 skipped`, actual-process PowerShell PASS, 관련 PID 0, 최신 독립
+  재감사 P0 0/P1 0 `READY`다. exact stage 상태의 full offline PASS와 implementation
+  commit/push 전에는 controlled GPU/E2를 시작하지 않는다.
+- 첫 통합 preflight의 `ollama ps`가 조회 대신 hidden Ollama app/serve와 PowerShell
+  supervisor shell을 남긴 실패를 receipt로 기록했다. exact PID/creation/command를
+  대조해 leaked shell과 app/serve만 종료했고 최종 related/Ollama process 0이다. 해당
+  통합 명령은 완결 PASS로 인정하지 않고 CUDA/package 환경은 부작용 없이 분리 재검증했다.
 - docs receipt push 성공: `e970cf7..74d8999 main -> main`, HEAD=origin/main
   `74d8999`, AIRI trainer/runner 0이다. 이 actual push receipt 두 문서를 final
   focused 검증·commit/push해 clean GPU preflight 경계를 만들기 전에는 controlled

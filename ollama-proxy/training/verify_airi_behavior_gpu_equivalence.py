@@ -439,8 +439,8 @@ def _safe_pause_history(run_dir: Path, run_id: str,
     if any(not entry.is_file() or entry.is_symlink() for entry in entries):
         raise EquivalenceError("pause history contains a non-regular entry")
     requests = sorted(history.glob("*.request.json"))
-    if not requests:
-        raise EquivalenceError("safe-pause/resume run lacks retained pause history")
+    if len(requests) != 1:
+        raise EquivalenceError("safe-pause/resume run must retain exactly one pause history triple")
     expected_names: set[str] = set()
     event_refs = {(event["generation"], event["checkpoint_manifest_sha256"])
                   for event in events if event["reason"] == "safe-pause"}
@@ -478,21 +478,53 @@ def _safe_pause_history(run_dir: Path, run_id: str,
     return inventory
 
 
+def _require_no_safe_pause_evidence(run_dir: Path,
+                                    events: Sequence[Mapping[str, Any]]) -> None:
+    """An uninterrupted baseline must not retain any pause control evidence."""
+    if any(event["reason"] == "safe-pause" for event in events):
+        raise EquivalenceError("uninterrupted baseline contains a safe-pause event")
+    control = run_dir / "control"
+    if not os.path.lexists(control):
+        return
+    _require_local_fixed_path(control, "baseline control")
+    if (not control.is_dir() or control.is_symlink()
+            or any(control.iterdir())):
+        raise EquivalenceError("uninterrupted baseline retains safe-pause control evidence")
+
+
 def verify_equivalence(baseline_run_dir: Path, resumed_run_dir: Path, receipt_path: Path, *,
                        baseline_adapter_dir: Path | None = None, resumed_adapter_dir: Path | None = None,
                        expected_microsteps: int, expected_optimizer_steps: int,
                        expected_checkpoint_every_optimizer_steps: int,
+                       expected_input_manifest_sha256: str,
+                       expected_training_config_sha256: str,
+                       expected_seed: int, expected_batch_size: int,
+                       expected_gradient_accumulation: int,
+                       expected_safe_pause_microsteps: int,
+                       expected_safe_pause_optimizer_step: int,
                        tensor_loader: Callable[[Path], Mapping[str, Any]] = _load_safetensors,
                        state_loader: Callable[[Path, list[dict[str, Any]]], Any] = _latest_checkpoint_state) -> dict[str, Any]:
     if (expected_microsteps <= 0 or expected_optimizer_steps <= 0
-            or expected_checkpoint_every_optimizer_steps <= 0):
+            or expected_checkpoint_every_optimizer_steps <= 0 or expected_seed <= 0
+            or expected_batch_size <= 0 or expected_gradient_accumulation <= 0
+            or expected_safe_pause_microsteps <= 0
+            or expected_safe_pause_optimizer_step <= 0
+            or expected_safe_pause_microsteps
+            != expected_safe_pause_optimizer_step * expected_gradient_accumulation):
         raise EquivalenceError("controlled run arguments are invalid")
+    if (not isinstance(expected_input_manifest_sha256, str)
+            or not _HEX64.fullmatch(expected_input_manifest_sha256)
+            or not isinstance(expected_training_config_sha256, str)
+            or not _HEX64.fullmatch(expected_training_config_sha256)):
+        raise EquivalenceError("controlled input or training config SHA-256 is invalid")
     baseline_dir, resumed_dir = _local_dir(baseline_run_dir, "baseline run"), _local_dir(resumed_run_dir, "resumed run")
     if baseline_dir == resumed_dir:
         raise EquivalenceError("baseline and resumed runs must be distinct")
     baseline, resumed = _completed_run(baseline_dir), _completed_run(resumed_dir)
     if baseline.get("inputs") != resumed.get("inputs"):
         raise EquivalenceError("completed run input pins differ")
+    if baseline["inputs"].get("input_manifest_sha256") != expected_input_manifest_sha256:
+        raise EquivalenceError("completed run input manifest differs from the controlled target")
     for state in (baseline, resumed):
         progress = state["progress"]
         if (progress.get("microsteps_completed") != expected_microsteps
@@ -519,6 +551,9 @@ def verify_equivalence(baseline_run_dir: Path, resumed_run_dir: Path, receipt_pa
     if (not isinstance(config, dict) or config.get("mode") != "cuda-qlora"
             or config.get("max_steps") != expected_microsteps
             or config.get("checkpoint_every_optimizer_steps") != expected_checkpoint_every_optimizer_steps
+            or config.get("seed") != expected_seed
+            or config.get("batch_size") != expected_batch_size
+            or config.get("gradient_accumulation") != expected_gradient_accumulation
             or config.get("deterministic_validation") is not True
             or determinism != expected_determinism
             or not isinstance(cuda_identity, dict)
@@ -538,6 +573,8 @@ def verify_equivalence(baseline_run_dir: Path, resumed_run_dir: Path, receipt_pa
                                 "double_quant": True,
                                 "compute_dtype": "bfloat16"}):
         raise EquivalenceError("controlled CUDA determinism or checkpoint interval pins are invalid")
+    if _sha256_bytes(_canonical(config)) != expected_training_config_sha256:
+        raise EquivalenceError("full checkpoint training config differs from the controlled target")
     for key in ("dataset_sha256", "model_weight_sha256", "trainer_source_sha256"):
         if baseline["inputs"].get(key) != pins.get(key):
             raise EquivalenceError(f"run-state and full checkpoint pin differ: {key}")
@@ -555,8 +592,15 @@ def verify_equivalence(baseline_run_dir: Path, resumed_run_dir: Path, receipt_pa
                 or last_event.get("checkpoint_payload_sha256") != latest_payload.get("sha256")):
             raise EquivalenceError(
                 f"{label} latest checkpoint lacks its exact durable event receipt")
-    if any(event["reason"] == "safe-pause" for event in baseline_events):
-        raise EquivalenceError("uninterrupted baseline contains a safe-pause event")
+    _require_no_safe_pause_evidence(baseline_dir, baseline_events)
+    safe_pause_events = [event for event in resumed_events if event["reason"] == "safe-pause"]
+    if len(safe_pause_events) != 1:
+        raise EquivalenceError("safe-pause/resume run must retain exactly one safe-pause event")
+    safe_pause_event = safe_pause_events[0]
+    if (safe_pause_event.get("microsteps_completed") != expected_safe_pause_microsteps
+            or safe_pause_event.get("optimizer_steps") != expected_safe_pause_optimizer_step
+            or safe_pause_event.get("pending_microbatches") != 0):
+        raise EquivalenceError("safe-pause event progress differs from the controlled target")
     pause_history = _safe_pause_history(resumed_dir, resumed["run_id"], resumed_events)
     intervals = baseline_intervals
     if (len(intervals) < MIN_NORMAL_INTERVALS or not intervals
@@ -606,8 +650,24 @@ def verify_equivalence(baseline_run_dir: Path, resumed_run_dir: Path, receipt_pa
             "latest_checkpoint_manifest_sha256": resumed_latest["manifest_sha256"],
             "latest_checkpoint_payload_sha256": resumed_payload_sha,
             "event_count": len(resumed_events), "pause_history": pause_history,
+            "safe_pause_event": {
+                "generation": safe_pause_event["generation"],
+                "checkpoint_manifest_sha256": safe_pause_event["checkpoint_manifest_sha256"],
+                "microsteps_completed": safe_pause_event["microsteps_completed"],
+                "optimizer_steps": safe_pause_event["optimizer_steps"],
+                "pending_microbatches": safe_pause_event["pending_microbatches"],
+            },
         },
         "input_pins_sha256": _sha256_bytes(_canonical(pins)),
+        "expected_bindings": {
+            "input_manifest_sha256": expected_input_manifest_sha256,
+            "training_config_sha256": expected_training_config_sha256,
+            "seed": expected_seed,
+            "batch_size": expected_batch_size,
+            "gradient_accumulation": expected_gradient_accumulation,
+            "safe_pause_microsteps": expected_safe_pause_microsteps,
+            "safe_pause_optimizer_step": expected_safe_pause_optimizer_step,
+        },
         "max_normal_interval_seconds": max(intervals),
         "normal_interval_count": len(intervals),
         "normal_interval_gate_seconds": MAX_NORMAL_INTERVAL_SECONDS,
@@ -639,13 +699,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--expected-microsteps", type=int, required=True)
     parser.add_argument("--expected-optimizer-steps", type=int, required=True)
     parser.add_argument("--expected-checkpoint-every-optimizer-steps", type=int, required=True)
+    parser.add_argument("--expected-input-manifest-sha256", required=True)
+    parser.add_argument("--expected-training-config-sha256", required=True)
+    parser.add_argument("--expected-seed", type=int, required=True)
+    parser.add_argument("--expected-batch-size", type=int, required=True)
+    parser.add_argument("--expected-gradient-accumulation", type=int, required=True)
+    parser.add_argument("--expected-safe-pause-microsteps", type=int, required=True)
+    parser.add_argument("--expected-safe-pause-optimizer-step", type=int, required=True)
     args = parser.parse_args(argv)
     try:
         verify_equivalence(args.baseline_run_dir, args.safe_pause_resume_run_dir, args.receipt,
                            baseline_adapter_dir=args.baseline_adapter_dir, resumed_adapter_dir=args.safe_pause_resume_adapter_dir,
                            expected_microsteps=args.expected_microsteps,
                            expected_optimizer_steps=args.expected_optimizer_steps,
-                           expected_checkpoint_every_optimizer_steps=args.expected_checkpoint_every_optimizer_steps)
+                           expected_checkpoint_every_optimizer_steps=args.expected_checkpoint_every_optimizer_steps,
+                           expected_input_manifest_sha256=args.expected_input_manifest_sha256,
+                           expected_training_config_sha256=args.expected_training_config_sha256,
+                           expected_seed=args.expected_seed,
+                           expected_batch_size=args.expected_batch_size,
+                           expected_gradient_accumulation=args.expected_gradient_accumulation,
+                           expected_safe_pause_microsteps=args.expected_safe_pause_microsteps,
+                           expected_safe_pause_optimizer_step=args.expected_safe_pause_optimizer_step)
     except EquivalenceError as exc:
         print(f"GPU equivalence verification refused: {exc}", file=sys.stderr)
         return 2
