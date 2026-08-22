@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 03:07:09 +09:00"
-checkpoint_id: "20260823-030709-p0-receipt-docs-push-finalization-intent"
+updated_at_kst: "2026-08-23 03:09:37 +09:00"
+checkpoint_id: "20260823-030937-p0-milestone-final-receipt-controlled-gpu-next"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "p0-batch-final-receipt"
-git_head: "a898ff82939ab59dc3fd84d2fb6214ecf381113e"
-worktree_state: "5-final-receipt-docs-modified-head-origin-main-equal"
+active_phase: "p0-milestone-finalization"
+git_head: "187604b8437734c415b6a441aa00e0134e6b758a"
+worktree_state: "2-final-live-docs-modified-head-origin-main-equal"
 active_trainer_count: 0
 ---
 
@@ -49,10 +49,21 @@ active_trainer_count: 0
 | 출력 경로 | 저장소 owned code/test와 SSoT 문서만 변경. 모델·adapter·GGUF·runtime DB·로그 본문·D: P0-B root 출력 0 |
 | 완료 조건 | manifest mismatch/path fault, prearm fresh-only/first-boundary, exact runner-exit/timeout 회귀와 focused/full offline PASS, 독립 최신 P0/P1 0, diff/security PASS, milestone commit/push |
 | 중단·복구 | 회귀 실패·새 P0/P1·프로세스 누수 시 GPU/E2 금지를 유지하고 receipt를 기록한다. 기존 실행/산출물을 삭제하거나 재사용하지 않는다. |
-| 현재 행동 | implementation push receipt 5-doc commit `a898ff82939ab59dc3fd84d2fb6214ecf381113e`까지 origin/main에 push됐고 worktree clean/PID 0을 확인했다. 이 final receipt를 5-doc에 반영해 `docs: finalize P0 batch receipt`로 commit/push한 뒤 HEAD=origin/main·clean을 확인하고 controlled GPU preflight로 이동한다. |
+| 현재 행동 | final receipt docs commit `187604b8437734c415b6a441aa00e0134e6b758a`까지 origin/main에 push됐고 HEAD/local·remote origin/main exact, clean, PID/GPU workload 0, E2 microstep 0을 확인했다. 이 final live receipt 두 문서를 `docs: close P0 batch milestone`로 commit/push한 뒤 read-only equality를 확인하고 controlled GPU preflight로 이동한다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260823-030937-p0-milestone-final-receipt-controlled-gpu-next`: final 5-doc은
+  boundary/focused continuity/diff/security PASS 뒤 exact stage/cached diff PASS였다.
+  `git commit -m "docs: finalize P0 batch receipt"`는 exit 0, commit
+  `187604b8437734c415b6a441aa00e0134e6b758a`, 5 files, 51 insertions/
+  26 deletions; push exit 0, `a898ff8..187604b main -> main`이다. 이후 HEAD/local
+  origin/main/remote main은 모두 `187604b`, worktree clean, 관련 PID와 AIRI GPU workload
+  0, E2 microstep 0, E2 adapter/report absent다. P0 batch와 milestone receipt가
+  origin/main에 durable하므로 이 final live receipt 두 문서만 focused/diff/security 뒤
+  `docs: close P0 batch milestone`로 commit/push한다. 성공 뒤 자기 commit SHA를 문서가
+  자가 참조하지 않는 규칙대로 read-only HEAD=origin/main·clean/PID 0만 확인하고 fresh
+  controlled GPU preflight intent로 이동한다.
 - `20260823-030709-p0-receipt-docs-push-finalization-intent`: exact 5-doc stage는
   staged 5+unstaged/untracked 0, boundary/cached diff/security PASS였다. exact
   `git commit -m "docs: record durable training push"`는 exit 0, commit

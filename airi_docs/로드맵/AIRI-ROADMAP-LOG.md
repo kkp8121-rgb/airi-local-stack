@@ -9,6 +9,14 @@
 
 ## 2026-08-23 goal resume·P0 final validation
 
+- 03:09 KST final 5-doc boundary/focused/diff/security/cached 검증 뒤
+  `docs: finalize P0 batch receipt` commit
+  `187604b8437734c415b6a441aa00e0134e6b758a`, 5 files, 51 insertions/
+  26 deletions; push exit 0, `a898ff8..187604b main -> main`. 이후 HEAD/local·remote
+  origin/main exact, worktree clean, 관련 PID/AIRI GPU workload 0, E2 microstep 0,
+  adapter/report absent다. 이 final live receipt 두 문서를
+  `docs: close P0 batch milestone`로 commit/push하고 read-only clean 확인 뒤 controlled
+  GPU preflight로 이동한다.
 - 03:07 KST exact 5-doc stage/cached 검증 뒤 `docs: record durable training push`
   commit `a898ff82939ab59dc3fd84d2fb6214ecf381113e`, 5 files, 90 insertions/
   38 deletions. push exit 0, `911d082..a898ff8 main -> main`; HEAD/local·remote
