@@ -1,14 +1,15 @@
 # AIRI 다음 세션 안내
 
 > **2026-08-23 first controlled GPU/P0 correction receipt:** 최신 Goal status는 `active`,
-> `goal_status=active`다. HEAD/local·remote origin/main은 `5f2f50e`, 관련 durable
+> `goal_status=active`다. HEAD/local·remote origin/main은 `18d0bc6`, 관련 durable
 > runner/trainer/test PID는 0이다. 첫 K=5 baseline은 480/480 microsteps·30/30 optimizer
 > steps 계산 뒤 actual interval max `705.902827`초와 final-root 결속 오류로 FAIL했고,
 > failed root는 보존한다. producer internal artifact-manifest file SHA를 runner/pause가
 > adapter directory inventory SHA와 비교한 두 P0를 exact receipt row 결속으로 최소 수정했다.
 > pinned Python `146 passed, 5 skipped`, actual-process PowerShell durability literal PASS,
-> final offline checkpoint PASS, diff/security hit 0이다. verified local 배치의 docs·commit/push와
-> clean 재확인 뒤 K=3 fresh controlled GPU가 다음이다. 운영 채택과 기본 모델 변경 금지는
+> final offline checkpoint PASS, diff/security hit 0이다. 수정 배치는
+> `18d0bc6bc6df22e6667a4647945bfcff5701d420`으로 origin/main push됐고 actual push receipt
+> 5-doc commit/push와 clean 재확인 뒤 K=3 fresh controlled GPU가 다음이다. 운영 채택과 기본 모델 변경 금지는
 > 유지한다.
 >
 > 최신 권위 receipt는 핀된 Python `146 passed, 5 skipped`, actual-process PowerShell

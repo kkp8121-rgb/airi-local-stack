@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 05:03:43 +09:00"
-checkpoint_id: "20260823-050343-final-evidence-p0-staged-commit-intent"
+updated_at_kst: "2026-08-23 05:09:08 +09:00"
+checkpoint_id: "20260823-050908-final-evidence-p0-push-receipt-docs-staged-commit-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
 active_phase: "final-evidence-p0-verified-milestone-docs-commit-preflight"
-git_head: "5f2f50ec387a23d36d4ef3dee44963bc0f988e1e"
-worktree_state: "verified-p0-code-tests-and-milestone-docs-dirty; staged-untracked-zero"
+git_head: "18d0bc6bc6df22e6667a4647945bfcff5701d420"
+worktree_state: "implementation-pushed; five-doc-receipt-update-in-progress"
 active_trainer_count: 0
 ---
 
@@ -42,17 +42,54 @@ active_trainer_count: 0
 
 | 항목 | 값 |
 |---|---|
-| 의도 | 첫 controlled GPU 실패가 드러낸 두 final-evidence SHA 의미 혼동 P0를 최소 수정한 검증 배치를 milestone docs와 함께 commit/push해 clean GPU 경계를 복구한다. |
+| 의도 | push된 final-evidence P0 수정의 actual receipt를 다섯 SSoT에 결속해 별도 docs commit/push와 clean GPU 경계를 완성한다. |
 | 허용 범위 | runner final root의 internal artifact-manifest file receipt 결속, pause complete verifier의 동일 결속, 정확한 targeted/영향/final integration 회귀와 receipt 문서. 새 schema/기능/architecture와 운영 채택은 금지 |
-| 시작 전 증거 | Goal active, HEAD/local·remote origin/main `5f2f50e`, failed K=5 root 보존/PID 0, timing max `705.902827`초 FAIL, final root absent, source/chat/base/E1 exact, E2 microstep 0. |
+| 시작 전 증거 | Goal active, HEAD/local·remote origin/main `18d0bc6`, failed K=5 root 보존/PID 0, timing max `705.902827`초 FAIL, final root absent, source/chat/base/E1 exact, E2 microstep 0. |
 | exact 변경 | runner와 pause가 producer의 `adapter_artifact_manifest_sha256`을 closed adapter receipt의 exact `artifact-manifest.json` row SHA와 비교한다. synthetic PowerShell fixture도 실제 내부 manifest를 게시한다. |
 | 출력 경로 | 저장소 코드·회귀·SSoT 문서만 변경한다. failed GPU/synthetic roots는 Git 밖에 보존하고 모델·adapter·GGUF·로그·생성 산출물을 Git에 넣지 않는다. |
-| 완료 조건 | pinned Python 146/5, actual-process PowerShell PASS, final offline PASS, diff/security hit 0, exact docs validation, Conventional Commit/push, HEAD=origin/main·clean·PID 0 |
+| 완료 조건 | five-doc focused/boundary/diff/security와 cached 검증, docs Conventional Commit/push, HEAD=origin/main·clean·PID 0 |
 | 중단·복구 | gate 실패 root는 보존하고 원인 없이 반복하지 않는다. commit/push 실패 시 local 상태를 보존하며 fresh GPU/E2를 시작하지 않는다. |
-| 현재 행동 | P0 수정과 지정 integration/diff/security가 모두 PASS했다. WORKING·handoff·roadmap status/log·NEXT를 실제 receipt로 정리하고 focused continuity/diff/security 뒤 exact stage/commit/push한다. 다음 controlled GPU는 같은 K=5가 아니라 K=3을 결속한 fresh timestamped root다. |
+| 현재 행동 | implementation `18d0bc6` push receipt를 WORKING·handoff·roadmap status/log·NEXT에 반영하고 focused/cached 검증 뒤 `docs: record final adapter evidence push`로 commit/push한다. clean 확인 뒤 같은 K=5가 아닌 K=3 fresh timestamped controlled GPU로 이동한다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260823-050908-final-evidence-p0-push-receipt-docs-staged-commit-intent`: receipt 기록 뒤
+  final five-doc continuity/diff/security는 exact 5/boundary·staged·untracked 0으로 PASS했다.
+  exact 5-doc `git add --` exit 0 뒤 staged 5/unstaged 0/untracked 0, cached diff-check/
+  boundary/security hit 0, staged blob 554,483 bytes, index path+size+blob manifest
+  `fe18f981a03fc8c610f4a7b0f1ff2a6c01eb8c4c85ca1593a176a753386db3f8`다. 이 receipt로
+  바뀐 WORKING-STATE와 roadmap log 두 파일만 재stage해 같은 5/0/0과 cached 검증을 확인한
+  뒤 exact `git commit -m "docs: record final adapter evidence push"`를 실행한다. 실패하면
+  push/fresh K=3 GPU/E2로 이동하지 않고 staged 배치를 보존한다.
+- `20260823-050818-final-evidence-p0-push-receipt-docs-validation-pass-stage-intent`:
+  implementation push receipt를 반영한 five-doc focused continuity exit 0/literal PASS,
+  repo diff-check exit 0/expected line-ending warning 5줄이다. changed exact 5,
+  boundary/staged/untracked 0, forbidden artifact/oversize/binary/sensitive literal/personal
+  path hit 모두 0, 총 555,411 bytes, path+size+SHA manifest
+  `9c9990971a70af0d69adb8e5ca6cde21f631e984681fa0cacd9bf81c1ddd0496`, 관련 PID 0이다.
+  이 receipt 기록 뒤 final five-doc focused/diff/security를 확인하고 exact 5경로만 stage한다.
+  staged 5/unstaged 0/untracked 0과 cached boundary/diff/security가 PASS하면
+  `docs: record final adapter evidence push` commit/push를 실행하며, 실패 시 fresh K=3
+  GPU/E2로 이동하지 않는다.
+- `20260823-050530-final-evidence-p0-implementation-push-receipt-docs-intent`: receipt docs
+  두 경로의 focused continuity/diff/security PASS 뒤 exact `git push origin main` exit 0,
+  `5f2f50e..18d0bc6 main -> main`이다. 이후 HEAD/local origin/main/remote main은 모두
+  `18d0bc6bc6df22e6667a4647945bfcff5701d420`, 관련 PID 0이고 actual worktree는 push
+  receipt용 WORKING-STATE와 roadmap log 두 파일만 dirty다. final-evidence P0 code/test/
+  milestone docs commit은 origin/main에 durable하다. 이 actual receipt를 WORKING/handoff/
+  roadmap status/log/NEXT 다섯 SSoT에 반영해 focused boundary/diff/security, exact 5-doc
+  stage/cached 검증, `docs: record final adapter evidence push` commit/push를 수행한다.
+  HEAD=origin/main·clean·PID 0 전에는 fresh K=3 GPU/E2로 이동하지 않는다.
+- `20260823-050439-final-evidence-p0-commit-receipt-push-intent`: receipt docs restage 뒤
+  staged 9/unstaged 0/untracked 0, cached diff-check/boundary/security PASS, staged blob
+  909,464 bytes, index manifest
+  `3b2f925397eecd99eb63a4036180446544d2f514bc36ff65a8b76a891b125f46`, 관련 PID 0이다.
+  exact `git commit -m "fix: bind final adapter evidence"` exit 0, commit
+  `18d0bc6bc6df22e6667a4647945bfcff5701d420`, parent `5f2f50e`, 9 files,
+  593 insertions/63 deletions이다. commit 직후 worktree clean, local main은 origin/main보다
+  1 ahead, 관련 PID 0이다. 이 receipt로 dirty한 WORKING-STATE와 roadmap log 두 파일의
+  boundary/diff/security를 확인한 뒤 exact `git push origin main`을 실행한다. 실패하면 local
+  commit과 receipt docs를 보존하고 fresh K=3 GPU/E2로 이동하지 않는다.
 - `20260823-050343-final-evidence-p0-staged-commit-intent`: final pre-stage focused
   continuity/diff/security는 exact 9 paths, boundary/staged/untracked 0, 모든 security hit 0,
   총 910,318 bytes, manifest `2a7fd217...14a2f`로 PASS했다. exact 9-path `git add --`
