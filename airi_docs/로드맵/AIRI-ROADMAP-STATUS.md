@@ -17,8 +17,9 @@
 > 672 tensors exact/max abs·rel 0, normal interval 10개/max `551.5176357`초다. Windows
 > producer/verifier의 `README.md` 순서 false reject는 platform `Path` 순서 한 줄과 targeted
 > 회귀로 최소 수정했고 suite 62 passed/1 skipped, actual GPU verifier와 final offline gate도
-> PASS했다. HEAD/local·remote origin/main은 아직 `0454ca8`; verifier/test와 다섯 SSoT의
-> 검증·commit/push 및 clean 확인 뒤에만 authoritative E2를 step 0부터 시작한다.
+> PASS했다. verifier/test+five SSoT commit `87dfabd`와 commit receipt `29080be`는
+> `0454ca8..29080be main -> main`으로 origin/main push됐다. actual push receipt five-doc의
+> final commit/push 및 clean 확인 뒤에만 authoritative E2를 step 0부터 시작한다.
 > `goal_status=active`; E2 microstep 0, 운영 채택과 기본 모델 변경 금지는 유지한다.
 >
 > **이전 권한 이력 — 2026-08-22 goal resume:** 사용자 `/goal` 명령으로 당시 AIRI 본 goal은 `active`였다.
@@ -361,7 +362,8 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   diff/security PASS로 수리했고 `18d0bc6`으로 origin/main push했다. fresh K=3 baseline과
   실제 `SAFE_TO_POWER_OFF` safe arm은 terminal 480/30, paired receipt SHA
   `d913992e...e84b9`, 672 tensors exact, normal interval max 551.5176357초로 PASS했다.
-  Windows verifier receipt-order 한 줄과 회귀의 현재 milestone commit/push 뒤 E2로 이동한다.
+  Windows verifier receipt-order 한 줄과 회귀는 `87dfabd`/`29080be`로 origin/main push됐다.
+  actual push receipt five-doc finalization과 clean 확인 뒤 E2로 이동한다.
   이미 완료된 P0-A를 다시 넓게 감사하며 공회전하지 않는다.
 - [x] controlled GPU preflight: 입력 code/data clean, trainer 0, corpus/base/E1 SHA exact,
   fresh root와 E2 산출물 부재를 확인했다. E2 직전에는 현재 commit/push·clean과 같은 입력/

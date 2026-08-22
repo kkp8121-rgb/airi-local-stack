@@ -9,6 +9,12 @@
 
 ## 2026-08-23 goal resume·P0 final validation
 
+- 07:38 KST exact two-doc cached 검증 뒤 `docs: record controlled GPU milestone commit`
+  commit `29080bed9227887ff3336d7c2c42997440d39df9`, parent `87dfabd`를 만들고 exact
+  `git push origin main` exit 0, `0454ca8..29080be main -> main`이다. 이후 HEAD/local·remote
+  origin/main exact, worktree clean, 관련 PID 0이다. controlled GPU verifier fix와 milestone
+  docs는 origin/main에 durable하다. actual push receipt five-doc final commit/push와 clean
+  확인 전에는 E2를 금지한다.
 - 07:35 KST exact 7-path restage 뒤 staged 7/unstaged·untracked 0, cached diff/security
   PASS에서 `git commit -m "fix: verify Windows GPU artifact order"` exit 0. commit
   `87dfabdfa482a22694cdc343d8ec938d979b9665`, parent `0454ca8`, 7 files,

@@ -12,12 +12,13 @@
 > actual GPU verifier와 final offline checkpoint도 PASS했다. 운영 채택과 기본 모델 변경
 > 금지는 유지한다.
 >
-> 07:28 KST HEAD/local·remote origin/main은 아직 `0454ca8d9df9239cf7d6c063e5ed751235fb2ed1`,
-> 관련 durable runner/trainer/verifier/test PID와 AIRI GPU workload는 0이다. source/chat/base와
-> E1 adapter/config/report SHA는 exact, E2 adapter/report absent, 기존 로그 두 개 각 0 bytes,
-> E2 microstep 0이다. 현재 gate는 verifier/test와 WORKING/handoff/roadmap status/log/NEXT
-> exact 7-path focused continuity·diff/security, stage/cached 검증, Conventional Commit/push다.
-> HEAD=origin/main·clean·PID 0 뒤에만 fresh timestamped E2 root/manifest를 만들고 authoritative
+> 07:38 KST verifier/test+five SSoT commit `87dfabd`와 commit receipt `29080be`는
+> `0454ca8..29080be main -> main`으로 origin/main push됐다. push 직후 HEAD/local·remote
+> origin/main exact, worktree clean, 관련 durable runner/trainer/verifier/test PID와 AIRI GPU
+> workload 0이다. source/chat/base와 E1 adapter/config/report SHA는 exact, E2 adapter/report
+> absent, 기존 로그 두 개 각 0 bytes, E2 microstep 0이다. 현재 gate는 actual push receipt
+> five-doc final 검증·commit/push와 clean 재확인뿐이다. 그 뒤 fresh timestamped E2 root/
+> manifest를 만들고 authoritative
 > durable runner로 seed 42·1,600 microsteps를 step 0부터 시작한다. direct trainer는 금지한다.
 > 새 감사 라운드는 추가하지 않으며 문서 인덱스는 현행 handoff를 정확히 가리켜 변경하지 않는다.
 >

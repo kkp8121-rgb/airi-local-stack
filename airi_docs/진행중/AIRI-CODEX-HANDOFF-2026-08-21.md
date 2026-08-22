@@ -1,12 +1,13 @@
 # AIRI Codex GPU 인수인계 — broadcast continuity v4
 
-갱신: 2026-08-23 07:22 KST (파일명은 현행 GPU SSoT 식별자로 유지)
+갱신: 2026-08-23 07:38 KST (파일명은 현행 GPU SSoT 식별자로 유지)
 
 상태: **ACTIVE — K=3 CONTROLLED GPU PASS. E1 완료·미채택, E2 microstep/저장 산출물 0,
 merge/package 0, v4 T3 0, live campaign 0. baseline과 실제 `SAFE_TO_POWER_OFF` pause/resume는
 480/30 terminal이며 paired receipt가 672 tensors exact·최대 구간 551.5176357초로 PASS했다.
-Windows verifier receipt-order 최소 수정과 milestone docs를 검증·commit/push한 뒤에만
-authoritative E2를 step 0부터 시작한다.**
+Windows verifier receipt-order 최소 수정과 milestone docs는 origin/main에 push됐다. actual
+push receipt five-doc을 final commit/push하고 clean을 확인한 뒤에만 authoritative E2를
+step 0부터 시작한다.**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
@@ -40,10 +41,12 @@ authoritative E2를 step 0부터 시작한다.**
   672 tensors·rtol/atol 0·max abs/rel diff 0이다. governed normal interval count 10,
   minimum gate 4, max `551.5176357`초다. baseline/safe final-root·producer/progress/report/
   adapter manifest와 pause history를 모두 결속했다. controlled GPU P0-B는 완료다.
-- HEAD/local·remote origin/main은 아직 `0454ca8d9df9239cf7d6c063e5ed751235fb2ed1`이고
-  verifier/test와 다섯 milestone SSoT의 commit/push가 현재 gate다. E2 adapter/report는
-  absent, 기존 로그 각 0 bytes, E2 microstep 0이다. commit/push 뒤 HEAD=origin/main·clean·
-  PID 0 전에는 E2를 시작하지 않는다.
+- verifier/test+five SSoT commit `87dfabdfa482a22694cdc343d8ec938d979b9665`와 commit
+  receipt `29080bed9227887ff3336d7c2c42997440d39df9`는
+  `0454ca8..29080be main -> main`으로 origin/main push됐다. push 직후 HEAD/local·remote
+  origin/main exact, worktree clean, 관련 PID 0이다. E2 adapter/report는 absent, 기존 로그
+  각 0 bytes, E2 microstep 0이다. actual push receipt five-doc final commit/push와 다시
+  HEAD=origin/main·clean·PID 0을 확인하기 전에는 E2를 시작하지 않는다.
 - 04:30 KST 첫 controlled GPU K=5 baseline은 480/480 microsteps·30/30 optimizer
   steps까지 계산했으나 PASS가 아니다. authority state는 `failed` revision 392, exit 0/
   `supervisor-durablerunnererror`, latest checkpoint 7 SHA `c65f7bac...d04f1`, 관련 PID 0,
@@ -505,7 +508,8 @@ identity spoof, corrupt-current/valid-previous 회귀와 전체 offline checkpoi
    실제 `SAFE_TO_POWER_OFF` pause/resume arm을 모두 terminal 480/30으로 완주했다. final
    receipt SHA `d913992e...e84b9`는 672 tensors exact, max normal interval
    `551.5176357`초, `pass=true`, adoption false다. Windows receipt-order verifier 최소 수정과
-   이 milestone docs를 현재 commit/push하는 gate만 남았으며 GPU 실증 자체는 완료다.
+   milestone docs는 `87dfabd`/`29080be`로 origin/main push됐고 actual push receipt five-doc
+   finalization만 남았다. GPU 실증 자체는 완료다.
 4. [x] **controlled GPU preflight:** 입력 code/data clean, trainer 0, corpus source/chat,
    base model, E1 SHA exact, fresh root와 E2 adapter/report 부재를 확인하고 K3 실험을
    실행했다. E2-LAUNCH 직전에는 현재 verifier/docs commit push와 HEAD=origin/main·clean을

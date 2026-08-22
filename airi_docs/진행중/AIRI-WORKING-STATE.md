@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 07:36:56 +09:00"
-checkpoint_id: "20260823-073656-controlled-gpu-commit-receipt-docs-pass-stage-intent"
+updated_at_kst: "2026-08-23 07:39:40 +09:00"
+checkpoint_id: "20260823-073940-controlled-gpu-push-receipt-five-doc-pass-stage-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "controlled-gpu-k3-pass-receipt-docs-prepush"
-git_head: "87dfabdfa482a22694cdc343d8ec938d979b9665"
-worktree_state: "modified-exact2-working-log; staged-untracked-0; local-ahead-1"
+active_phase: "controlled-gpu-k3-pass-push-receipt-five-doc-finalization"
+git_head: "29080bed9227887ff3336d7c2c42997440d39df9"
+worktree_state: "modified-exact5-push-receipt-docs; staged-untracked-0"
 active_trainer_count: 0
 ---
 
@@ -43,17 +43,37 @@ active_trainer_count: 0
 
 | 항목 | 값 |
 |---|---|
-| 의도 | controlled GPU milestone commit `87dfabd` receipt를 WORKING/LOG에 기록하고 docs commit 뒤 두 commit을 origin/main에 push한다. |
-| 허용 범위 | WORKING-STATE와 roadmap log exact 2개만. 외부 GPU root와 committed code/test/다른 SSoT는 immutable, E2/서비스는 금지 |
-| 시작 전 증거 | main commit `87dfabdfa482a22694cdc343d8ec938d979b9665`, parent `0454ca8`, 7 files, worktree clean/local ahead 1, 관련 PID 0. |
-| exact 변경 | 두 문서에 actual commit SHA·검증 receipt·push intent만 추가한다. 새 코드/기능/감사는 없다. |
-| 출력 경로 | Git docs exact 2개만. 모델/adapter/checkpoint/receipt/log는 외부 root에 유지하고 stage하지 않는다. |
-| 완료 조건 | focused continuity, exact 2-path boundary/diff/security, staged 2/unstaged·untracked 0, cached PASS, docs commit, push, HEAD=origin/main·clean·PID 0. |
-| 중단·복구 | docs 검증/commit/push 실패 시 local commit과 docs diff를 보존하고 E2를 시작하지 않는다. 같은 GPU run/verifier를 반복하지 않는다. |
-| 현재 행동 | `87dfabd` commit receipt 두 문서를 검증·commit한 뒤 origin/main에 push한다. |
+| 의도 | controlled GPU milestone actual push receipt를 다섯 SSoT에 기록하고 final docs commit/push로 clean E2 경계를 만든다. |
+| 허용 범위 | WORKING/handoff/roadmap status/log/NEXT exact 5개만. 외부 GPU root와 pushed code/test는 immutable, E2/서비스는 금지 |
+| 시작 전 증거 | commits `87dfabd`/`29080be`, push `0454ca8..29080be`, HEAD=local·remote origin/main, worktree clean, 관련 PID 0. |
+| exact 변경 | 다섯 SSoT의 pre-push SHA/gate를 actual push receipt와 final docs closure로 갱신한다. 새 코드/기능/감사는 없다. |
+| 출력 경로 | Git docs exact 5개만. 모델/adapter/checkpoint/receipt/log는 외부 root에 유지하고 stage하지 않는다. |
+| 완료 조건 | focused continuity, exact 5-path boundary/diff/security, staged 5/unstaged·untracked 0, cached PASS, docs commit/push, HEAD=origin/main·clean·PID 0. |
+| 중단·복구 | docs 검증/commit/push 실패 시 current origin milestone과 docs diff/local commit을 보존하고 E2를 시작하지 않는다. |
+| 현재 행동 | actual push receipt 다섯 SSoT를 검증·commit/push한 뒤 clean E2 preflight로 이동한다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260823-073940-controlled-gpu-push-receipt-five-doc-pass-stage-intent`: actual push
+  receipt five-doc은 focused continuity exit 0/literal PASS, exact 5 paths, boundary/staged/
+  untracked 0, repo diff-check exit 0/expected warning 5줄이다. forbidden artifact/binary/
+  oversize/credential·민감 literal/개인 경로 hit 0, 관련 PID 0, 총 610,067 bytes, manifest
+  `9c037f5edd397065f0fb0eb202c138cb42ce2d63e011aa340f52ba0e63966425`다. 이 receipt로
+  WORKING bytes가 바뀌므로 exact 5경로만 stage하고 staged 5/unstaged·untracked 0,
+  cached diff/security를 확인한다. PASS하면 `docs: close controlled GPU milestone`로
+  commit하고 exact `git push origin main`을 실행한다. 이후 read-only HEAD/local·remote
+  origin/main exact, clean, 관련 PID 0 전에는 E2로 이동하지 않는다.
+- `20260823-073800-controlled-gpu-milestone-push-receipt-five-doc-intent`: exact 2-doc
+  stage/cached diff/security PASS 뒤 `git commit -m "docs: record controlled GPU milestone
+  commit"` exit 0, commit `29080bed9227887ff3336d7c2c42997440d39df9`, parent
+  `87dfabdfa482a22694cdc343d8ec938d979b9665`, 2 files다. 이어 exact
+  `git push origin main` exit 0, `0454ca8..29080be main -> main`이다. push 뒤 HEAD/local
+  origin/main/remote main은 모두 `29080bed9227887ff3336d7c2c42997440d39df9`, worktree clean,
+  관련 PID 0이다. controlled GPU verifier code/test와 milestone docs는 origin/main에
+  durable하다. 이 actual push receipt를 WORKING/handoff/roadmap status/log/NEXT exact
+  5개에 반영해 focused continuity/boundary/diff/security와 exact stage/cached 검증 뒤
+  `docs: close controlled GPU milestone`로 final commit/push한다. final HEAD=origin/main·
+  clean·PID 0 전에는 E2를 시작하지 않는다.
 - `20260823-073656-controlled-gpu-commit-receipt-docs-pass-stage-intent`: main commit
   receipt용 WORKING/LOG exact 2개는 focused continuity exit 0/literal PASS, boundary/staged/
   untracked 0, repo diff-check exit 0/expected warning 2줄이다. forbidden artifact/binary/
@@ -3189,12 +3209,10 @@ active_trainer_count: 0
 
 ## 4. 다음 허용 행동
 
-1. `87dfabd` actual commit receipt용 WORKING-STATE/roadmap log exact 2개를 focused
-   continuity·boundary·diff/security 뒤 stage/cached 검증한다.
-2. `docs: record controlled GPU milestone commit`으로 commit하고 두 local commit을
-   origin/main에 push한다.
-3. actual push receipt를 장기 state에 durable하게 마감하고 HEAD=origin/main·clean·PID 0을
-   확인한다. 문서 인덱스는 변경하지 않는다.
+1. actual `0454ca8..29080be` push receipt를 반영한 five-doc을 focused continuity·boundary·
+   diff/security 뒤 exact stage/cached 검증한다.
+2. `docs: close controlled GPU milestone`로 final commit/push한다.
+3. HEAD=origin/main·clean·PID 0을 read-only 확인한다. 문서 인덱스는 변경하지 않는다.
 4. 위 milestone push/clean 뒤에만 fresh timestamped E2 run root/input manifest를 준비하고
    authoritative durable runner로 seed 42·1,600 microsteps를 step 0부터 시작한다.
 5. direct trainer 실행과 운영 채택/기본 서비스 모델 변경은 계속 금지한다.
