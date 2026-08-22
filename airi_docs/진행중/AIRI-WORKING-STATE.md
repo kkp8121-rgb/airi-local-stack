@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 03:09:37 +09:00"
-checkpoint_id: "20260823-030937-p0-milestone-final-receipt-controlled-gpu-next"
+updated_at_kst: "2026-08-23 03:19:26 +09:00"
+checkpoint_id: "20260823-031926-reconcile-docs-commit-push-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "p0-milestone-finalization"
-git_head: "187604b8437734c415b6a441aa00e0134e6b758a"
-worktree_state: "2-final-live-docs-modified-head-origin-main-equal"
+active_phase: "controlled-gpu-preflight-reconciliation"
+git_head: "68343a43651ebc678a46e25f1c3b6cbcf1a961fc"
+worktree_state: "2-reconciliation-docs-modified-staged-0-untracked-0"
 active_trainer_count: 0
 ---
 
@@ -42,17 +42,38 @@ active_trainer_count: 0
 
 | 항목 | 값 |
 |---|---|
-| 의도 | 동결된 현재 로컬 P0 코드 배치를 범위 확장 없이 검증·마감해 origin/main에 push한다. |
-| 허용 범위 | 동결 P0/P1 기준의 최소 수정, 지정 gate·독립 감사·offline/security 검증, SSoT 갱신과 commit/push. 운영 채택은 금지 |
-| 시작 전 증거 | Goal active, HEAD=local/remote origin/main `32830a4`, modified 16+untracked 1+staged 0 exact, AIRI trainer/runner 0, planned GPU root/E2 adapter/report absent. source/chat/base/E1 크기·SHA exact, E2 logs 각 0 bytes. |
-| exact 변경 | checkpoint event-before-index 원자 권한·index-rooted hash chain, 누적 monotonic elapsed, payload/event/report/progress 결속, producer evidence root, Windows no-follow 입력 잠금, trainer/helper 실행 snapshot, authenticated run-state lineage를 구현한다. launcher는 Start-Process ancestry와 trainer parentage에 결속하고 marker 직전 deadline/state/PID를 재검증한다. |
-| 출력 경로 | 저장소 owned code/test와 SSoT 문서만 변경. 모델·adapter·GGUF·runtime DB·로그 본문·D: P0-B root 출력 0 |
-| 완료 조건 | manifest mismatch/path fault, prearm fresh-only/first-boundary, exact runner-exit/timeout 회귀와 focused/full offline PASS, 독립 최신 P0/P1 0, diff/security PASS, milestone commit/push |
-| 중단·복구 | 회귀 실패·새 P0/P1·프로세스 누수 시 GPU/E2 금지를 유지하고 receipt를 기록한다. 기존 실행/산출물을 삭제하거나 재사용하지 않는다. |
-| 현재 행동 | final receipt docs commit `187604b8437734c415b6a441aa00e0134e6b758a`까지 origin/main에 push됐고 HEAD/local·remote origin/main exact, clean, PID/GPU workload 0, E2 microstep 0을 확인했다. 이 final live receipt 두 문서를 `docs: close P0 batch milestone`로 commit/push한 뒤 read-only equality를 확인하고 controlled GPU preflight로 이동한다. |
+| 의도 | clean origin/main 경계에서 fresh 외부 root의 무중단 대 safe-pause/checkpoint/resume controlled GPU 동등성을 실증한다. |
+| 허용 범위 | seed 42, batch 1, gradient accumulation 16, 480 microsteps/30 optimizer steps, checkpoint 5 optimizer steps 간격의 두 authoritative durable-runner arm과 verifier receipt. 운영 채택은 금지 |
+| 시작 전 증거 | Goal active, HEAD/local·remote origin/main `68343a4`, clean, AIRI trainer/runner 0, 선택한 root와 E2 adapter/report absent. source/chat/base/E1 크기·SHA exact, E2 logs 각 0 bytes. |
+| exact 변경 | 외부 root에 canonical v2 input manifest를 non-replacing 생성하고 baseline을 완주한다. safe arm은 첫 optimizer 경계 prearm, 실제 `SAFE_TO_POWER_OFF`, 동일 run explicit resume를 거쳐 complete한 뒤 exact GPU equivalence verifier를 수행한다. 저장소 구현은 변경하지 않는다. |
+| 출력 경로 | `D:\AIRI-Models\airi-controlled-gpu-20260823-031152` 아래 input/receipts, 두 run, adapter/report. Git에는 모델·adapter·GGUF·로그·생성 산출물을 넣지 않는다. |
+| 완료 조건 | 두 arm 480/30 complete, 실제 interval 최소 4개·최대 600초 이하, safe pause 정확히 1회, adapter·optimizer/scheduler·RNG·cursor·loss·event/report exact, verifier `pass=true` receipt |
+| 중단·복구 | baseline 또는 safe pre-SAFE가 중단되면 해당 root를 보존하고 재사용/중복 시작하지 않는다. `SAFE_TO_POWER_OFF` 후에는 exact same run/manifest/config만 resume한다. 실패 receipt를 기록하고 E2를 열지 않는다. |
+| 현재 행동 | final live receipt commit `68343a43651ebc678a46e25f1c3b6cbcf1a961fc`까지 origin/main에 push됐고 HEAD/local·remote origin/main exact, clean, PID/GPU workload 0, E2 microstep 0을 재확인했다. 선택한 fresh root `D:\AIRI-Models\airi-controlled-gpu-20260823-031152`는 absent다. 이 reconciliation receipt를 먼저 기록한 뒤 root/manifest 생성 intent를 별도로 쓴다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260823-031926-reconcile-docs-commit-push-intent`: post-compact actual-state 정정 뒤
+  focused `test-airi-work-continuity.ps1` exit 0/PASS, repo exact diff-check exit 0/
+  whitespace error 0이다. changed는 WORKING-STATE와 roadmap log exact 2, staged/untracked 0,
+  boundary diff 0, added-line secret-value hit 0이다. input clean 규칙상 roadmap log dirty를
+  남긴 채 GPU root를 만들지 않고 이 두 문서만 exact stage한 뒤 staged 2/unstaged 0/
+  untracked 0과 cached diff/security를 확인한다. 통과하면
+  `git commit -m "docs: record controlled GPU preflight"`, `git push origin main` 순서로
+  실행하고 actual HEAD=origin/main·clean/PID 0/root absent를 다시 확인한다. 실패하면
+  stage/local commit을 보존하고 root/manifest/GPU/E2를 시작하지 않는다.
+- `20260823-031734-post-compact-controlled-gpu-preflight-reconcile`: compact 직후 지정
+  SSoT 5종을 순서대로 전체 재독하고 Goal/Git/PID/run-root/artifact를 read-only로
+  대조했다. Goal status=`active`; HEAD/local origin/main/remote main은 모두
+  `68343a43651ebc678a46e25f1c3b6cbcf1a961fc`, worktree clean, 관련 runner/trainer/
+  verifier/test PID 0, 식별 가능한 AIRI GPU workload 0이다. 선택한 fresh root
+  `D:\AIRI-Models\airi-controlled-gpu-20260823-031152`와 알려진 controlled run-state/
+  checkpoint는 absent, E2 adapter/report absent, E2 microstep 0이다. source/chat/base/E1
+  adapter/config/report는 각각 고정 크기·SHA와 exact 일치하고 E2 stdout/stderr는 각
+  0 bytes/SHA `e3b0c442...b855`, D: free는 `64,238,112,768` bytes다. 문서의 final
+  receipt commit 직전 표기만 actual과 달라 이 checkpoint와 roadmap log로 먼저 정정했다.
+  다음 상태 변경은 fresh root와 input/receipts 디렉터리 생성 및 v2 input manifest builder
+  1회 실행이며, 별도 intent와 exact expected config SHA 결속 전에는 실행하지 않는다.
 - `20260823-030937-p0-milestone-final-receipt-controlled-gpu-next`: final 5-doc은
   boundary/focused continuity/diff/security PASS 뒤 exact stage/cached diff PASS였다.
   `git commit -m "docs: finalize P0 batch receipt"`는 exit 0, commit
@@ -2326,14 +2347,15 @@ active_trainer_count: 0
 
 ## 4. 다음 허용 행동
 
-1. implementation push receipt를 WORKING-STATE, 현행 handoff, roadmap status/log,
-   NEXT에 반영하고 focused continuity/diff/security를 검증한다. 문서 인덱스는 현행
-   handoff를 이미 정확히 가리키므로 변경하지 않는다.
-2. exact 5-doc receipt batch를 Conventional Commit으로 commit/push하고 actual push
-   receipt를 최종 live 문서에 durable하게 남긴다.
-3. HEAD=origin/main과 clean worktree를 확인한 뒤 fresh timestamped 외부 root의 controlled
-   GPU 동등성·실제 checkpoint ≤600초/최소 4구간 실측 intent를 별도로 기록한다.
-4. controlled GPU receipt 전에는 authoritative E2를 시작하지 않는다.
+1. 이 reconciliation 문서 diff만 별도 검토한 뒤 fresh timestamped 외부 root와 input/
+   receipts 디렉터리 생성, input-manifest builder 1회 실행 intent를 기록한다.
+2. manifest receipt의 actual SHA와 expected config SHA
+   `fb21fb2e1eee8e749c270a94abc074d910ac2c1ae473c554b2803ef29b1a2ca8` exact를 확인한다.
+3. baseline 480 microsteps/30 optimizer steps GPU intent를 쓰고 authoritative durable runner로
+   무중단 arm을 시작한다. 실행 중 WORKING-STATE heartbeat 상한은 15분이다.
+4. baseline complete/PID 0 뒤 safe-pause arm을 prearm하고 실제
+   `SAFE_TO_POWER_OFF` receipt 후 resume·complete·GPU equivalence verifier를 수행한다.
+5. controlled GPU receipt 전에는 authoritative E2를 시작하지 않는다.
 
 ## 5. 갱신 트리거
 

@@ -9,6 +9,13 @@
 
 ## 2026-08-23 goal resume·P0 final validation
 
+- 03:17 KST compact 뒤 지정 SSoT 5종을 순서대로 전체 재독하고 actual 상태를
+  재대조했다. Goal active, HEAD/local·remote origin/main
+  `68343a43651ebc678a46e25f1c3b6cbcf1a961fc`, worktree clean, 관련 PID와 AIRI GPU
+  workload 0, 선택한 `airi-controlled-gpu-20260823-031152` root absent, E2 microstep 0이다.
+  source/chat/base/E1 크기·SHA exact, E2 adapter/report absent, 기존 E2 로그 각 0 bytes,
+  D: free `64,238,112,768` bytes다. 문서의 final receipt 직전 표기를 관측 사실로 먼저
+  정정했으며, 별도 root/manifest intent 전에는 외부 root나 GPU를 만들지 않는다.
 - 03:09 KST final 5-doc boundary/focused/diff/security/cached 검증 뒤
   `docs: finalize P0 batch receipt` commit
   `187604b8437734c415b6a441aa00e0134e6b758a`, 5 files, 51 insertions/
