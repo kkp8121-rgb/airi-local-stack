@@ -2,15 +2,22 @@
 param(
     [string]$RunDir,
 
-    [ValidateRange(10, 3600)]
+    [ValidateRange(1, 3600)]
     [int]$TimeoutSeconds = 600,
 
     [ValidateRange(1, 15)]
-    [int]$PollSeconds = 2
+    [int]$PollSeconds = 2,
+
+    [ValidateRange(0, 60000)]
+    [int]$TestOnlyFinalGateDelayMilliseconds = 0
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+if ($TestOnlyFinalGateDelayMilliseconds -gt 0 -and $env:AIRI_DURABILITY_TEST_HOOKS -ne '1') {
+    throw 'TestOnlyFinalGateDelayMilliseconds requires AIRI_DURABILITY_TEST_HOOKS=1'
+}
 
 function Resolve-RequiredLocalRunDirectory {
     param([Parameter(Mandatory = $true)][string]$Value)
@@ -62,6 +69,192 @@ function Get-Utf8Sha256 {
     }
 }
 
+function Get-BytesSha256 {
+    param([Parameter(Mandatory = $true)][byte[]]$Bytes)
+
+    $hash = [Security.Cryptography.SHA256]::Create()
+    try {
+        return ([BitConverter]::ToString($hash.ComputeHash($Bytes))).Replace('-', '').ToLowerInvariant()
+    }
+    finally {
+        $hash.Dispose()
+    }
+}
+
+function Read-AuthoritativeFileSnapshot {
+    <#
+    Read an authority file through one Windows handle.  Opening the final
+    component with OPEN_REPARSE_POINT lets us reject links rather than following
+    them; FILE_SHARE_READ denies delete/write replacement until the bytes and
+    file identity have both been observed.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    if (-not ('AiriPauseReadSnapshot' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
+public sealed class AiriPauseSnapshotValue {
+    public byte[] Bytes;
+    public long Length;
+    public uint VolumeSerialNumber;
+    public uint FileIndexHigh;
+    public uint FileIndexLow;
+}
+
+public static class AiriPauseReadSnapshot {
+    const uint GENERIC_READ = 0x80000000;
+    const uint FILE_SHARE_READ = 0x00000001;
+    const uint OPEN_EXISTING = 3;
+    const uint FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000;
+    const uint FILE_ATTRIBUTE_REPARSE_POINT = 0x00000400;
+    const uint FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
+    static readonly IntPtr INVALID_HANDLE_VALUE = new IntPtr(-1);
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct BY_HANDLE_FILE_INFORMATION {
+        public uint FileAttributes;
+        public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
+        public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
+        public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
+        public uint VolumeSerialNumber;
+        public uint FileSizeHigh;
+        public uint FileSizeLow;
+        public uint NumberOfLinks;
+        public uint FileIndexHigh;
+        public uint FileIndexLow;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern IntPtr CreateFileW(string name, uint access, uint share,
+        IntPtr security, uint creation, uint flags, IntPtr template);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool GetFileInformationByHandle(IntPtr handle,
+        out BY_HANDLE_FILE_INFORMATION information);
+
+    public static AiriPauseSnapshotValue Read(string path) {
+        IntPtr raw = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ,
+            IntPtr.Zero, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, IntPtr.Zero);
+        if (raw == INVALID_HANDLE_VALUE) {
+            throw new IOException("CreateFileW failed: " + Marshal.GetLastWin32Error());
+        }
+        using (var handle = new SafeFileHandle(raw, true)) {
+            BY_HANDLE_FILE_INFORMATION info;
+            if (!GetFileInformationByHandle(handle.DangerousGetHandle(), out info)) {
+                throw new IOException("GetFileInformationByHandle failed: " + Marshal.GetLastWin32Error());
+            }
+            if ((info.FileAttributes & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY)) != 0) {
+                throw new IOException("authority path is a reparse point or directory");
+            }
+            ulong size = ((ulong)info.FileSizeHigh << 32) | info.FileSizeLow;
+            if (size > Int32.MaxValue) {
+                throw new IOException("authority file is too large for an atomic snapshot");
+            }
+            byte[] bytes = new byte[(int)size];
+            using (var stream = new FileStream(handle, FileAccess.Read, 4096, false)) {
+                int offset = 0;
+                while (offset < bytes.Length) {
+                    int count = stream.Read(bytes, offset, bytes.Length - offset);
+                    if (count <= 0) throw new EndOfStreamException("authority file changed while being read");
+                    offset += count;
+                }
+                if (stream.ReadByte() != -1) throw new IOException("authority file length changed while being read");
+            }
+            return new AiriPauseSnapshotValue {
+                Bytes = bytes, Length = bytes.LongLength,
+                VolumeSerialNumber = info.VolumeSerialNumber,
+                FileIndexHigh = info.FileIndexHigh, FileIndexLow = info.FileIndexLow
+            };
+        }
+    }
+}
+'@
+    }
+    try {
+        return [AiriPauseReadSnapshot]::Read($Path)
+    }
+    catch {
+        throw "$Label cannot be read through a no-follow authority handle: $($_.Exception.Message)"
+    }
+}
+
+function Get-CanonicalJsonValue {
+    param([AllowNull()]$Value)
+
+    if ($null -eq $Value) { return 'null' }
+    if ($Value -is [bool]) { return $(if ($Value) { 'true' } else { 'false' }) }
+    if ($Value -is [string]) { return ($Value | ConvertTo-Json -Compress) }
+    if ($Value -is [byte] -or $Value -is [sbyte] -or $Value -is [int16] -or
+        $Value -is [uint16] -or $Value -is [int32] -or $Value -is [uint32] -or
+        $Value -is [int64] -or $Value -is [uint64]) {
+        return [Convert]::ToString($Value, [Globalization.CultureInfo]::InvariantCulture)
+    }
+    if ($Value -is [double] -or $Value -is [single] -or $Value -is [decimal]) {
+        # JSON authority files used here deliberately contain only integral
+        # counters outside the manifest pins object.  Refuse a representation
+        # PowerShell cannot prove byte-for-byte equivalent to Python JSON.
+        throw 'non-integral value is not permitted in a PowerShell authority JSON canonicalization'
+    }
+    if ($Value -is [Collections.IDictionary]) {
+        $names = @($Value.Keys | ForEach-Object { [string]$_ } | Sort-Object)
+        return '{' + (($names | ForEach-Object {
+                    (($_ | ConvertTo-Json -Compress) + ':' + (Get-CanonicalJsonValue $Value[$_]))
+                }) -join ',') + '}'
+    }
+    if ($Value -is [Collections.IEnumerable]) {
+        return '[' + ((@($Value) | ForEach-Object { Get-CanonicalJsonValue $_ }) -join ',') + ']'
+    }
+    $names = @($Value.PSObject.Properties.Name | Sort-Object)
+    return '{' + (($names | ForEach-Object {
+                (($_ | ConvertTo-Json -Compress) + ':' + (Get-CanonicalJsonValue $Value.$_))
+            }) -join ',') + '}'
+}
+
+function Read-CanonicalAuthorityJson {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    $snapshot = Read-AuthoritativeFileSnapshot $Path $Label
+    try {
+        $text = [Text.UTF8Encoding]::new($false, $true).GetString($snapshot.Bytes)
+        $value = $text | ConvertFrom-Json
+        if ($text -cne ((Get-CanonicalJsonValue $value) + "`n")) {
+            throw "$Label is not canonical JSON"
+        }
+        return [pscustomobject]@{ value = $value; bytes = $snapshot.Bytes; snapshot = $snapshot }
+    }
+    catch {
+        throw "$Label is not canonical UTF-8 authority JSON: $($_.Exception.Message)"
+    }
+}
+
+function Read-AuthorityJson {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    $snapshot = Read-AuthoritativeFileSnapshot $Path $Label
+    try {
+        return [pscustomobject]@{
+            value = ([Text.UTF8Encoding]::new($false, $true).GetString($snapshot.Bytes) | ConvertFrom-Json)
+            bytes = $snapshot.Bytes
+            snapshot = $snapshot
+        }
+    }
+    catch {
+        throw "$Label is not UTF-8 JSON: $($_.Exception.Message)"
+    }
+}
+
 function Test-ExactProcessRecord {
     param([AllowNull()]$Record)
 
@@ -78,6 +271,67 @@ function Test-ExactProcessRecord {
     return ($created -eq [string]$Record.creation_time_utc -and
         $executableHash -eq [string]$Record.executable_path_sha256 -and
         $commandHash -eq [string]$Record.command_line_sha256)
+}
+
+function Get-RecordedProcessExitStatus {
+    param([Parameter(Mandatory = $true)]$Record)
+
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$Record.pid)" -ErrorAction SilentlyContinue
+    if ($null -eq $process) {
+        return 'exited'
+    }
+    if (Test-ExactProcessRecord $Record) {
+        return 'live'
+    }
+    # A live process with this PID is not evidence that the recorded runner exited:
+    # it can be a reused PID or a replaced process.  Fail closed in that case.
+    return 'replaced'
+}
+
+function Start-RemainingDeadlineSleep {
+    param(
+        [Parameter(Mandatory = $true)][DateTime]$Deadline,
+        [Parameter(Mandatory = $true)][double]$MaximumSeconds
+    )
+
+    $remainingMilliseconds = ($Deadline - [DateTime]::UtcNow).TotalMilliseconds
+    if ($remainingMilliseconds -le 0) {
+        return $false
+    }
+    $sleepMilliseconds = [Math]::Max(1, [Math]::Ceiling([Math]::Min(
+            $remainingMilliseconds, $MaximumSeconds * 1000)))
+    Start-Sleep -Milliseconds ([int]$sleepMilliseconds)
+    return $true
+}
+
+function Assert-SameProcessRecord {
+    param(
+        [Parameter(Mandatory = $true)]$Expected,
+        [Parameter(Mandatory = $true)]$Actual,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    foreach ($property in @(
+            'pid', 'creation_time_utc', 'executable_path_sha256', 'command_line_sha256')) {
+        if ([string]$Expected.$property -ne [string]$Actual.$property) {
+            throw "$Label process identity changed while waiting for safe power-off"
+        }
+    }
+}
+
+function Assert-TerminalStateUnchanged {
+    param(
+        [Parameter(Mandatory = $true)]$Expected,
+        [Parameter(Mandatory = $true)]$Actual
+    )
+
+    if ([string]$Expected.run_id -ne [string]$Actual.run_id -or
+        [int64]$Expected.revision -ne [int64]$Actual.revision -or
+        [string]$Expected.status -ne [string]$Actual.status) {
+        throw 'Terminal run-state changed before SAFE_TO_POWER_OFF emission'
+    }
+    Assert-SameProcessRecord $Expected.runner $Actual.runner 'Runner'
+    Assert-SameProcessRecord $Expected.trainer $Actual.trainer 'Trainer'
 }
 
 function Assert-ExactJsonProperties {
@@ -114,7 +368,8 @@ function Read-ValidRunStateCandidate {
         return $null
     }
     try {
-        $candidate = Get-Content -LiteralPath $Path -Raw -Encoding utf8 | ConvertFrom-Json
+        $receipt = Read-AuthorityJson $Path 'run-state'
+        $candidate = $receipt.value
         Assert-ExactJsonProperties -Value $candidate -Names @(
             'schema_version', 'revision', 'run_id', 'status', 'created_at_utc',
             'updated_at_utc', 'runner', 'trainer', 'inputs', 'command', 'progress',
@@ -156,6 +411,36 @@ function Read-ValidRunStateCandidate {
             (-not $terminalStatus -and $null -ne $candidate.terminal)) {
             return $null
         }
+        if ([string]$candidate.status -eq 'paused-safe') {
+            try {
+                Assert-ExactJsonProperties -Value $candidate.terminal -Names @(
+                    'exit_code', 'reason', 'at_utc', 'checkpoint_verification') `
+                    -Label 'paused-safe terminal receipt'
+                Assert-ExactJsonProperties -Value $candidate.terminal.checkpoint_verification -Names @(
+                    'schema_version', 'checkpoint_relative_path',
+                    'checkpoint_manifest_sha256', 'checkpoint_payload_sha256',
+                    'checkpoint_payload_bytes', 'canonical_pins_sha256') `
+                    -Label 'paused-safe checkpoint verification receipt'
+            }
+            catch {
+                return $null
+            }
+            if ([int]$candidate.terminal.exit_code -ne 75 -or
+                [string]$candidate.terminal.reason -ne 'safe-optimizer-boundary' -or
+                [string]$candidate.terminal.checkpoint_verification.schema_version -ne
+                    'airi.behavior-checkpoint-verification.v1') {
+                return $null
+            }
+        }
+        # A terminal receipt is only useful for power-off when it freezes both
+        # process identities.  A null trainer would otherwise turn a replaced
+        # child into an unobservable success path.
+        if ($terminalStatus -and $null -eq $candidate.trainer) {
+            return $null
+        }
+        $candidate | Add-Member -NotePropertyName '__authority_sha256' -NotePropertyValue (Get-BytesSha256 $receipt.bytes) -Force
+        $candidate | Add-Member -NotePropertyName '__authority_run_id' -NotePropertyValue ([string]$candidate.run_id) -Force
+        $candidate | Add-Member -NotePropertyName '__authority_revision' -NotePropertyValue ([int64]$candidate.revision) -Force
         return $candidate
     }
     catch {
@@ -163,19 +448,60 @@ function Read-ValidRunStateCandidate {
     }
 }
 
+function Read-RunStateAnchor {
+    param([Parameter(Mandatory = $true)][string]$RunDirectory)
+    $receipt = Read-CanonicalAuthorityJson (Join-Path $RunDirectory 'run-state.anchor.json') 'run-state anchor'
+    $anchor = $receipt.value
+    Assert-ExactJsonProperties -Value $anchor -Names @('schema_version', 'run_id', 'current', 'previous') -Label 'run-state anchor'
+    if ([string]$anchor.schema_version -ne 'airi.behavior-durable-run-anchor.v1' -or
+            [string]::IsNullOrWhiteSpace([string]$anchor.run_id) -or $null -eq $anchor.current) {
+        throw 'run-state anchor schema is invalid'
+    }
+    foreach ($name in @('current', 'previous')) {
+        $entry = $anchor.$name
+        if ($null -eq $entry) { continue }
+        Assert-ExactJsonProperties -Value $entry -Names @('sha256', 'revision') -Label "run-state anchor $name"
+        if ([string]$entry.sha256 -notmatch '^[0-9a-f]{64}$' -or [int64]$entry.revision -lt 0) {
+            throw "run-state anchor $name is invalid"
+        }
+    }
+    return $anchor
+}
+
+function Test-AnchorAuthorizedRunState {
+    param(
+        [Parameter(Mandatory = $true)]$State,
+        [Parameter(Mandatory = $true)]$Anchor,
+        [Parameter(Mandatory = $true)][string]$ReceiptName
+    )
+    $entry = $Anchor.$ReceiptName
+    return ($null -ne $entry -and [string]$State.__authority_run_id -eq [string]$Anchor.run_id -and
+        [string]$State.__authority_sha256 -eq [string]$entry.sha256 -and
+        [int64]$State.__authority_revision -eq [int64]$entry.revision)
+}
+
 function Read-RunState {
     param(
         [Parameter(Mandatory = $true)][string]$CurrentPath,
         [Parameter(Mandatory = $true)][string]$PreviousPath
     )
+    $runDirectory = Split-Path -Parent $CurrentPath
+    $anchor = Read-RunStateAnchor $runDirectory
     $current = Read-ValidRunStateCandidate $CurrentPath
-    if ($null -ne $current) {
+    if ($null -ne $current -and (Test-AnchorAuthorizedRunState $current $anchor 'current')) {
         return $current
     }
     # Preserve a torn or malformed current receipt.  The durable runner owns its
     # quarantine/write-through protocol; pause only consumes a strict previous receipt.
     $previous = Read-ValidRunStateCandidate $PreviousPath
     if ($null -ne $previous) {
+        # A current absence/unanchored receipt is an interrupted publication:
+        # only the exact nonterminal predecessor committed as anchor.current
+        # may bridge it.  A terminal previous is never rollback authority here.
+        if ([string]$previous.status -in @('paused-safe', 'complete', 'failed', 'interrupted') -or
+                -not (Test-AnchorAuthorizedRunState $previous $anchor 'current')) {
+            throw 'An unanchored or terminal previous run-state cannot authorize power-off'
+        }
         return $previous
     }
     throw 'No valid current or previous run-state receipt is available'
@@ -262,7 +588,8 @@ function Find-ActiveDurableRunDirectory {
         catch { continue }
         try {
             Assert-ExactJsonProperties -Value $state.command -Names @(
-                'canonical_sha256', 'runner_source_sha256', 'trainer_source_sha256') -Label 'run-state command'
+                'canonical_sha256', 'base_canonical_sha256',
+                'runner_source_sha256', 'trainer_source_sha256') -Label 'run-state command'
             if ([string]$state.command.runner_source_sha256 -notmatch '^[0-9a-f]{64}$') { continue }
             $runnerScript = Resolve-RequiredLocalRunDirectory (Split-Path -Parent $binding.script_path)
             $runnerSourcePath = Join-Path $runnerScript (Split-Path -Leaf $binding.script_path)
@@ -347,15 +674,48 @@ public static class AiriPauseNativeFile {
     }
 }
 
+function Assert-DeadlineNotExpired {
+    param(
+        [Parameter(Mandatory = $true)][DateTime]$Deadline,
+        [Parameter(Mandatory = $true)][string]$Phase
+    )
+
+    if ([DateTime]::UtcNow -ge $Deadline) {
+        throw "Safe-pause deadline expired before $Phase"
+    }
+}
+
+function Invoke-TestOnlyFinalGateDelay {
+    if ($TestOnlyFinalGateDelayMilliseconds -gt 0) {
+        Start-Sleep -Milliseconds $TestOnlyFinalGateDelayMilliseconds
+    }
+}
+
 function Assert-VerifiedCheckpoint {
     param(
         [Parameter(Mandatory = $true)]$State,
         [Parameter(Mandatory = $true)]$Ack
     )
 
+    Assert-DeadlineNotExpired $deadline 'checkpoint verification'
+    $verification = $State.terminal.checkpoint_verification
+    Assert-ExactJsonProperties -Value $verification -Names @(
+        'schema_version', 'checkpoint_relative_path', 'checkpoint_manifest_sha256',
+        'checkpoint_payload_sha256', 'checkpoint_payload_bytes',
+        'canonical_pins_sha256') -Label 'authoritative checkpoint verification receipt'
+    if ([string]$verification.schema_version -ne 'airi.behavior-checkpoint-verification.v1' -or
+        [string]$verification.checkpoint_relative_path -notmatch '^checkpoint-[0-9]{8}$' -or
+        [string]$verification.checkpoint_manifest_sha256 -notmatch '^[0-9a-f]{64}$' -or
+        [string]$verification.checkpoint_payload_sha256 -notmatch '^[0-9a-f]{64}$' -or
+        [string]$verification.canonical_pins_sha256 -notmatch '^[0-9a-f]{64}$' -or
+        [int64]$verification.checkpoint_payload_bytes -lt 1) {
+        throw 'authoritative checkpoint verification receipt is invalid'
+    }
     if ($null -eq $State.checkpoint -or
         [string]$State.checkpoint.relative_path -ne [string]$Ack.checkpoint_relative_path -or
-        [string]$State.checkpoint.manifest_sha256 -ne [string]$Ack.checkpoint_manifest_sha256) {
+        [string]$State.checkpoint.manifest_sha256 -ne [string]$Ack.checkpoint_manifest_sha256 -or
+        [string]$verification.checkpoint_relative_path -ne [string]$Ack.checkpoint_relative_path -or
+        [string]$verification.checkpoint_manifest_sha256 -ne [string]$Ack.checkpoint_manifest_sha256) {
         throw 'run-state and pause ack checkpoint references differ'
     }
     $generation = [string]$Ack.checkpoint_relative_path
@@ -368,32 +728,206 @@ function Assert-VerifiedCheckpoint {
         throw 'checkpoint path escapes the run directory'
     }
     $manifestPath = Join-Path $generationDir 'manifest.json'
-    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+    if (-not (Test-Path -LiteralPath $generationDir -PathType Container) -or
+        ((Get-Item -LiteralPath $generationDir -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw 'checkpoint generation must be a regular non-reparse directory'
+    }
+    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf) -or
+        ((Get-Item -LiteralPath $manifestPath -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw 'checkpoint manifest is missing'
     }
-    $manifestHash = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($manifestHash -ne [string]$Ack.checkpoint_manifest_sha256) {
+    $manifestSnapshot = Read-AuthoritativeFileSnapshot $manifestPath 'checkpoint manifest'
+    $manifestBytes = [byte[]]$manifestSnapshot.Bytes
+    $manifestHash = Get-BytesSha256 $manifestBytes
+    if ($manifestHash -ne [string]$Ack.checkpoint_manifest_sha256 -or
+        $manifestHash -ne [string]$verification.checkpoint_manifest_sha256) {
         throw 'checkpoint manifest SHA does not match the pause ack'
     }
-    $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding utf8 | ConvertFrom-Json
+    $manifestText = [Text.UTF8Encoding]::new($false, $true).GetString($manifestBytes)
+    $manifest = $manifestText | ConvertFrom-Json
+    Assert-ExactJsonProperties -Value $manifest -Names @(
+        'schema_version', 'generation', 'run_id', 'payload', 'pins') -Label 'checkpoint manifest'
+    Assert-ExactJsonProperties -Value $manifest.payload -Names @(
+        'name', 'bytes', 'sha256') -Label 'checkpoint payload'
     if ([int]$manifest.schema_version -ne 1 -or
         [string]$manifest.generation -ne $generation -or
         [string]$manifest.run_id -ne [string]$State.run_id -or
-        [string]$manifest.payload.name -ne 'state.pt') {
+        [string]$manifest.payload.name -ne 'state.pt' -or
+        $manifest.pins -isnot [Collections.IDictionary] -and $manifest.pins -isnot [pscustomobject] -or
+        [int64]$manifest.payload.bytes -lt 1 -or
+        [string]$manifest.payload.sha256 -notmatch '^[0-9a-f]{64}$') {
         throw 'checkpoint manifest identity is invalid'
     }
+    Assert-ExactJsonProperties -Value $State.inputs -Names @(
+        'dataset_sha256', 'model_weight_sha256', 'input_manifest_path',
+        'input_manifest_sha256', 'input_manifest_training_config_sha256',
+        'trainer_source_sha256', 'checkpoint_helper_source_sha256') -Label 'run-state inputs'
+    if ([string]$State.inputs.checkpoint_helper_source_sha256 -notmatch '^[0-9a-f]{64}$') {
+        throw 'run-state checkpoint helper source SHA is invalid'
+    }
+    foreach ($key in @('dataset_sha256', 'model_weight_sha256', 'trainer_source_sha256')) {
+        if ([string]$State.inputs.$key -notmatch '^[0-9a-f]{64}$' -or
+            [string]$manifest.pins.$key -ne [string]$State.inputs.$key) {
+            throw "checkpoint pin differs from run-state input: $key"
+        }
+    }
+    # The exact runner has already proved Python canonical JSON.  Bind its pins
+    # receipt without reserializing floats in PowerShell: canonical top-level
+    # ordering gives us the exact raw pins value bytes from the manifest itself.
+    $manifestPrefix = '{"generation":"' + $generation +
+        '","payload":{"bytes":' + ([string][int64]$manifest.payload.bytes) +
+        ',"name":"state.pt","sha256":"' + [string]$manifest.payload.sha256 +
+        '"},"pins":'
+    $manifestSuffix = ',"run_id":"' + [string]$State.run_id +
+        '","schema_version":1}' + "`n"
+    if (-not $manifestText.StartsWith($manifestPrefix, [StringComparison]::Ordinal) -or
+        -not $manifestText.EndsWith($manifestSuffix, [StringComparison]::Ordinal) -or
+        $manifestText.Length -le ($manifestPrefix.Length + $manifestSuffix.Length)) {
+        throw 'checkpoint manifest does not match the authoritative canonical layout'
+    }
+    $pinsText = $manifestText.Substring(
+        $manifestPrefix.Length,
+        $manifestText.Length - $manifestPrefix.Length - $manifestSuffix.Length)
+    if (-not $pinsText.StartsWith('{', [StringComparison]::Ordinal) -or
+        -not $pinsText.EndsWith('}', [StringComparison]::Ordinal)) {
+        throw 'checkpoint canonical pins value is invalid'
+    }
+    $pinsBytes = [Text.UTF8Encoding]::new($false).GetBytes($pinsText + "`n")
+    if ((Get-BytesSha256 $pinsBytes) -ne [string]$verification.canonical_pins_sha256) {
+        throw 'checkpoint canonical pins SHA differs from the authoritative receipt'
+    }
     $payloadPath = Join-Path $generationDir 'state.pt'
-    if (-not (Test-Path -LiteralPath $payloadPath -PathType Leaf)) {
+    if (-not (Test-Path -LiteralPath $payloadPath -PathType Leaf) -or
+        ((Get-Item -LiteralPath $payloadPath -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw 'checkpoint payload is missing'
     }
-    $payload = Get-Item -LiteralPath $payloadPath
-    $payloadHash = (Get-FileHash -LiteralPath $payloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ([int64]$manifest.payload.bytes -ne $payload.Length -or
-        [string]$manifest.payload.sha256 -ne $payloadHash) {
+    $payloadSnapshot = Read-AuthoritativeFileSnapshot $payloadPath 'checkpoint payload'
+    $payloadBytes = [byte[]]$payloadSnapshot.Bytes
+    $payloadHash = Get-BytesSha256 $payloadBytes
+    if ([int64]$manifest.payload.bytes -ne $payloadBytes.LongLength -or
+        [int64]$verification.checkpoint_payload_bytes -ne $payloadBytes.LongLength -or
+        [string]$manifest.payload.sha256 -ne $payloadHash -or
+        [string]$verification.checkpoint_payload_sha256 -ne $payloadHash) {
         throw 'checkpoint payload integrity verification failed'
     }
     if ([int]$State.progress.pending_microbatches -ne 0) {
         throw 'checkpoint is not at a safe optimizer boundary'
+    }
+    Assert-VerifiedCheckpointTransaction -State $State -Generation $generation `
+        -ManifestHash $manifestHash -PayloadHash $payloadHash -PinsHash (Get-BytesSha256 $pinsBytes)
+}
+
+function Assert-VerifiedCheckpointTransaction {
+    param(
+        [Parameter(Mandatory = $true)]$State,
+        [Parameter(Mandatory = $true)][string]$Generation,
+        [Parameter(Mandatory = $true)][string]$ManifestHash,
+        [Parameter(Mandatory = $true)][string]$PayloadHash,
+        [Parameter(Mandatory = $true)][string]$PinsHash
+    )
+
+    $checkpointRoot = Join-Path $resolvedRunDir 'checkpoints'
+    $indexPath = Join-Path $checkpointRoot 'checkpoint-index.json'
+    $indexReceipt = Read-CanonicalAuthorityJson $indexPath 'current checkpoint index'
+    $index = $indexReceipt.value
+    Assert-ExactJsonProperties -Value $index -Names @(
+        'schema_version', 'run_id', 'latest', 'previous', 'previous_index_sha256') `
+        -Label 'checkpoint transaction index'
+    if ([string]$index.schema_version -ne 'airi.behavior-checkpoint-index.v2' -or
+        [string]$index.run_id -ne [string]$State.run_id -or $null -eq $index.latest -or
+        ([string]$index.previous_index_sha256 -ne '' -and
+            [string]$index.previous_index_sha256 -notmatch '^[0-9a-f]{64}$')) {
+        throw 'checkpoint transaction index schema/identity is invalid'
+    }
+    $referenceProperties = @('relative_path', 'manifest_sha256', 'event_relative_path', 'event_sha256')
+    foreach ($referenceLabel in @('latest', 'previous')) {
+        $reference = $index.$referenceLabel
+        if ($null -eq $reference) { continue }
+        Assert-ExactJsonProperties -Value $reference -Names $referenceProperties `
+            -Label "checkpoint transaction $referenceLabel reference"
+        if ([string]$reference.relative_path -notmatch '^checkpoint-[0-9]{8}$' -or
+            [string]$reference.event_relative_path -ne "checkpoint-events/$($reference.relative_path).json" -or
+            [string]$reference.manifest_sha256 -notmatch '^[0-9a-f]{64}$' -or
+            [string]$reference.event_sha256 -notmatch '^[0-9a-f]{64}$') {
+            throw 'checkpoint transaction reference is invalid'
+        }
+    }
+    if ([string]$index.latest.relative_path -ne $Generation -or
+        [string]$index.latest.manifest_sha256 -ne $ManifestHash) {
+        throw 'checkpoint transaction latest reference differs from the pause checkpoint'
+    }
+
+    $eventPath = Join-Path $resolvedRunDir ([string]$index.latest.event_relative_path).Replace('/', '\')
+    $eventReceipt = Read-CanonicalAuthorityJson $eventPath 'latest checkpoint event'
+    if ((Get-BytesSha256 $eventReceipt.bytes) -ne [string]$index.latest.event_sha256) {
+        throw 'latest checkpoint event SHA differs from the transaction index'
+    }
+    $event = $eventReceipt.value
+    Assert-ExactJsonProperties -Value $event -Names @(
+        'schema_version', 'run_id', 'generation', 'reason', 'microsteps_completed',
+        'optimizer_steps', 'pending_microbatches', 'training_elapsed_ns',
+        'checkpoint_payload_progress', 'checkpoint_manifest_sha256',
+        'checkpoint_payload_sha256', 'pins_sha256', 'previous_event_sha256',
+        'previous_index_sha256', 'publish_started_at_utc', 'checkpoint_durable_at_utc',
+        'publish_elapsed_ns') -Label 'latest checkpoint event'
+    Assert-ExactJsonProperties -Value $event.checkpoint_payload_progress -Names @(
+        'microsteps_completed', 'optimizer_steps', 'pending_microbatches') `
+        -Label 'latest checkpoint event payload progress'
+    foreach ($counter in @('microsteps_completed', 'optimizer_steps', 'training_elapsed_ns', 'publish_elapsed_ns')) {
+        if ($event.$counter -isnot [ValueType] -or [int64]$event.$counter -lt 0) {
+            throw "latest checkpoint event counter is invalid: $counter"
+        }
+    }
+    if ([string]$event.schema_version -ne 'airi.behavior-checkpoint-event.v2' -or
+        [string]$event.run_id -ne [string]$State.run_id -or
+        [string]$event.generation -ne $Generation -or
+        [string]$event.reason -notin @('interval', 'safe-pause', 'epoch-tail', 'epoch-complete') -or
+        [int64]$event.pending_microbatches -ne 0 -or
+        [int64]$event.optimizer_steps -gt [int64]$event.microsteps_completed -or
+        [string]$event.checkpoint_manifest_sha256 -ne $ManifestHash -or
+        [string]$event.checkpoint_payload_sha256 -ne $PayloadHash -or
+        [string]$event.pins_sha256 -ne $PinsHash -or
+        [string]$event.previous_index_sha256 -ne [string]$index.previous_index_sha256 -or
+        [string]::IsNullOrWhiteSpace([string]$event.publish_started_at_utc) -or
+        [string]::IsNullOrWhiteSpace([string]$event.checkpoint_durable_at_utc) -or
+        [int64]$event.checkpoint_payload_progress.microsteps_completed -ne [int64]$event.microsteps_completed -or
+        [int64]$event.checkpoint_payload_progress.optimizer_steps -ne [int64]$event.optimizer_steps -or
+        [int64]$event.checkpoint_payload_progress.pending_microbatches -ne 0 -or
+        [int64]$State.progress.microsteps_completed -ne [int64]$event.microsteps_completed -or
+        [int64]$State.progress.optimizer_steps -ne [int64]$event.optimizer_steps) {
+        throw 'latest checkpoint event does not bind the authoritative pause checkpoint/progress'
+    }
+    foreach ($predecessor in @('previous_event_sha256', 'previous_index_sha256')) {
+        if ($null -ne $event.$predecessor -and [string]$event.$predecessor -notmatch '^[0-9a-f]{64}$') {
+            throw "latest checkpoint event predecessor is invalid: $predecessor"
+        }
+    }
+    $previousIndexPath = Join-Path $checkpointRoot 'checkpoint-index.prev.json'
+    if ($null -eq $index.previous_index_sha256) {
+        if ($null -ne $index.previous -or $null -ne $event.previous_event_sha256 -or
+            (Test-Path -LiteralPath $previousIndexPath)) {
+            throw 'initial checkpoint transaction has an unexpected predecessor'
+        }
+    }
+    else {
+        if ($null -eq $index.previous -or $null -eq $event.previous_event_sha256 -or
+            -not (Test-Path -LiteralPath $previousIndexPath -PathType Leaf)) {
+            throw 'checkpoint transaction predecessor evidence is incomplete'
+        }
+        $previousIndexReceipt = Read-CanonicalAuthorityJson $previousIndexPath 'previous checkpoint index'
+        if ((Get-BytesSha256 $previousIndexReceipt.bytes) -ne [string]$index.previous_index_sha256) {
+            throw 'checkpoint predecessor index SHA differs from the current index'
+        }
+        $previousIndex = $previousIndexReceipt.value
+        Assert-ExactJsonProperties -Value $previousIndex -Names @(
+            'schema_version', 'run_id', 'latest', 'previous', 'previous_index_sha256') `
+            -Label 'previous checkpoint transaction index'
+        if ([string]$previousIndex.schema_version -ne 'airi.behavior-checkpoint-index.v2' -or
+            [string]$previousIndex.run_id -ne [string]$State.run_id -or
+            (Get-CanonicalJsonValue $previousIndex.latest) -ne (Get-CanonicalJsonValue $index.previous) -or
+            [string]$event.previous_event_sha256 -ne [string]$index.previous.event_sha256) {
+            throw 'checkpoint transaction predecessor chain is broken'
+        }
     }
 }
 
@@ -454,27 +988,26 @@ function Assert-VerifiedArtifactReceipt {
         }
         return
     }
-    $path = [IO.Path]::GetFullPath([string]$Receipt.path)
     if ([string]$Receipt.kind -eq 'file') {
         Assert-ExactJsonProperties -Value $Receipt -Names @(
             'path', 'kind', 'size', 'sha256') -Label 'file artifact receipt'
-        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-            throw 'completed file artifact is missing'
-        }
-        $item = Get-Item -LiteralPath $path -Force
-        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
-            [int64]$Receipt.size -ne $item.Length -or
-            [string]$Receipt.sha256 -ne
-                (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()) {
+    }
+    elseif ([string]$Receipt.kind -eq 'directory') {
+        Assert-ExactJsonProperties -Value $Receipt -Names @(
+            'path', 'kind', 'files', 'manifest_sha256') -Label 'directory artifact receipt'
+    }
+    else {
+        throw 'completed artifact receipt kind is invalid'
+    }
+    $path = [IO.Path]::GetFullPath([string]$Receipt.path)
+    if ([string]$Receipt.kind -eq 'file') {
+        $snapshot = Read-AuthoritativeFileSnapshot $path 'completed file artifact'
+        if ([int64]$Receipt.size -ne [int64]$snapshot.Length -or
+            [string]$Receipt.sha256 -ne (Get-BytesSha256 $snapshot.Bytes)) {
             throw 'completed file artifact receipt no longer matches disk'
         }
         return
     }
-    if ([string]$Receipt.kind -ne 'directory') {
-        throw 'completed artifact receipt kind is invalid'
-    }
-    Assert-ExactJsonProperties -Value $Receipt -Names @(
-        'path', 'kind', 'files', 'manifest_sha256') -Label 'directory artifact receipt'
     if (-not (Test-Path -LiteralPath $path -PathType Container)) {
         throw 'completed directory artifact is missing'
     }
@@ -510,9 +1043,9 @@ function Assert-VerifiedArtifactReceipt {
             throw 'completed directory artifact contains an unexpected file'
         }
         $row = $expected[$relative]
-        if ([int64]$row.size -ne $item.Length -or
-            [string]$row.sha256 -ne
-                (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash.ToLowerInvariant()) {
+        $snapshot = Read-AuthoritativeFileSnapshot $item.FullName 'completed directory artifact file'
+        if ([int64]$row.size -ne [int64]$snapshot.Length -or
+            [string]$row.sha256 -ne (Get-BytesSha256 $snapshot.Bytes)) {
             throw 'completed directory artifact file receipt no longer matches disk'
         }
     }
@@ -523,6 +1056,106 @@ function Assert-VerifiedArtifactReceipt {
     }
 }
 
+function Assert-VerifiedFinalEvidenceRoot {
+    param([Parameter(Mandatory = $true)]$State)
+
+    $receipt = $State.terminal.final_evidence_root
+    Assert-ExactJsonProperties -Value $receipt -Names @(
+        'relative_path', 'sha256', 'state_projection_sha256') -Label 'final evidence root receipt'
+    if ([string]$receipt.relative_path -ne 'final-evidence-root.json' -or
+        [string]$receipt.sha256 -notmatch '^[0-9a-f]{64}$' -or
+        [string]$receipt.state_projection_sha256 -notmatch '^[0-9a-f]{64}$') {
+        throw 'final evidence root receipt is invalid'
+    }
+    $rootPath = Join-Path $resolvedRunDir ([string]$receipt.relative_path)
+    $finalReceipt = Read-CanonicalAuthorityJson $rootPath 'final evidence root'
+    if ((Get-BytesSha256 $finalReceipt.bytes) -ne [string]$receipt.sha256) {
+        throw 'final evidence root SHA differs from terminal receipt'
+    }
+    $finalRoot = $finalReceipt.value
+    Assert-ExactJsonProperties -Value $finalRoot -Names @(
+        'schema_version', 'run_id', 'producer_evidence_root_sha256',
+        'checkpoint_index_sha256', 'latest_event_sha256',
+        'completed_progress_sha256', 'state_projection', 'state_projection_sha256') `
+        -Label 'final evidence root'
+    if ([string]$finalRoot.schema_version -ne 'airi.behavior-final-evidence-root.v1' -or
+        [string]$finalRoot.run_id -ne [string]$State.run_id -or
+        [string]$finalRoot.state_projection_sha256 -ne [string]$receipt.state_projection_sha256) {
+        throw 'final evidence root identity differs from complete terminal'
+    }
+    $projection = $finalRoot.state_projection
+    Assert-ExactJsonProperties -Value $projection -Names @(
+        'run_id', 'revision', 'status', 'inputs', 'outputs', 'progress_sha256',
+        'producer_evidence_root_sha256') -Label 'final evidence state projection'
+    if ([string]$projection.run_id -ne [string]$State.run_id -or
+        [int64]$projection.revision -ne [int64]$State.revision -or
+        [string]$projection.status -ne 'complete' -or
+        (Get-Utf8Sha256 ((Get-CanonicalJsonValue $projection) + "`n")) -ne
+            [string]$finalRoot.state_projection_sha256 -or
+        (Get-CanonicalJsonValue $projection.inputs) -ne (Get-CanonicalJsonValue $State.inputs) -or
+        (Get-CanonicalJsonValue $projection.outputs) -ne (Get-CanonicalJsonValue $State.outputs)) {
+        throw 'final evidence root state projection differs from terminal state'
+    }
+    $producerReceipt = Read-CanonicalAuthorityJson (Join-Path $resolvedRunDir 'producer-evidence-root.json') `
+        'producer evidence root'
+    $producer = $producerReceipt.value
+    Assert-ExactJsonProperties -Value $producer -Names @(
+        'schema_version', 'run_id', 'checkpoint_index_sha256', 'latest_checkpoint',
+        'adapter_artifact_manifest_sha256', 'report_sha256', 'progress') `
+        -Label 'producer evidence root'
+    if ([string]$producer.schema_version -ne 'airi.behavior-producer-evidence-root.v1' -or
+        [string]$producer.run_id -ne [string]$State.run_id -or
+        (Get-BytesSha256 $producerReceipt.bytes) -ne [string]$finalRoot.producer_evidence_root_sha256 -or
+        [string]$projection.producer_evidence_root_sha256 -ne [string]$finalRoot.producer_evidence_root_sha256) {
+        throw 'producer evidence root differs from the final evidence cut'
+    }
+    $indexReceipt = Read-CanonicalAuthorityJson (Join-Path $resolvedRunDir 'checkpoints\checkpoint-index.json') `
+        'completion checkpoint index'
+    $index = $indexReceipt.value
+    Assert-ExactJsonProperties -Value $index -Names @(
+        'schema_version', 'run_id', 'latest', 'previous', 'previous_index_sha256') `
+        -Label 'completion checkpoint index'
+    if ([string]$index.schema_version -ne 'airi.behavior-checkpoint-index.v2' -or
+        [string]$index.run_id -ne [string]$State.run_id -or $null -eq $index.latest -or
+        (Get-BytesSha256 $indexReceipt.bytes) -ne [string]$finalRoot.checkpoint_index_sha256 -or
+        (Get-CanonicalJsonValue $producer.latest_checkpoint) -ne (Get-CanonicalJsonValue $index.latest)) {
+        throw 'final/producer evidence root checkpoint index binding is invalid'
+    }
+    Assert-ExactJsonProperties -Value $index.latest -Names @(
+        'relative_path', 'manifest_sha256', 'event_relative_path', 'event_sha256') `
+        -Label 'completion latest checkpoint reference'
+    $eventReceipt = Read-CanonicalAuthorityJson (Join-Path $resolvedRunDir (
+            [string]$index.latest.event_relative_path).Replace('/', '\')) 'completion latest checkpoint event'
+    if ((Get-BytesSha256 $eventReceipt.bytes) -ne [string]$index.latest.event_sha256 -or
+        [string]$finalRoot.latest_event_sha256 -ne [string]$index.latest.event_sha256) {
+        throw 'final evidence root latest event binding is invalid'
+    }
+    $progressReceipt = Read-CanonicalAuthorityJson (Join-Path $resolvedRunDir 'progress.json') 'completed progress'
+    $progress = $progressReceipt.value
+    Assert-ExactJsonProperties -Value $progress -Names @(
+        'schema_version', 'run_id', 'status', 'epoch', 'next_batch_index',
+        'microsteps_completed', 'optimizer_steps', 'pending_microbatches',
+        'checkpoint', 'updated_at_utc', 'training_elapsed_ns') -Label 'completed progress'
+    Assert-ExactJsonProperties -Value $producer.progress -Names @(
+        'microsteps_completed', 'optimizer_steps', 'pending_microbatches', 'training_elapsed_ns') `
+        -Label 'producer evidence progress'
+    if ([string]$progress.schema_version -ne 'airi.behavior-training-progress.v2' -or
+        [string]$progress.run_id -ne [string]$State.run_id -or [string]$progress.status -ne 'completed' -or
+        [int64]$progress.pending_microbatches -ne 0 -or
+        (Get-BytesSha256 $progressReceipt.bytes) -ne [string]$finalRoot.completed_progress_sha256 -or
+        [string]$projection.progress_sha256 -ne [string]$finalRoot.completed_progress_sha256 -or
+        (Get-CanonicalJsonValue $producer.progress) -ne (Get-CanonicalJsonValue ([ordered]@{
+                    microsteps_completed = $progress.microsteps_completed
+                    optimizer_steps = $progress.optimizer_steps
+                    pending_microbatches = $progress.pending_microbatches
+                    training_elapsed_ns = $progress.training_elapsed_ns
+                })) -or
+        [string]$producer.adapter_artifact_manifest_sha256 -ne [string]$State.outputs.adapter.manifest_sha256 -or
+        [string]$producer.report_sha256 -ne [string]$State.outputs.report.sha256) {
+        throw 'completion progress/artifact receipts do not match the final evidence root'
+    }
+}
+
 function Assert-VerifiedCompletion {
     param([Parameter(Mandatory = $true)]$State)
 
@@ -530,7 +1163,7 @@ function Assert-VerifiedCompletion {
         throw 'run is not complete'
     }
     Assert-ExactJsonProperties -Value $State.terminal -Names @(
-        'exit_code', 'reason', 'at_utc') -Label 'complete terminal receipt'
+        'exit_code', 'reason', 'at_utc', 'final_evidence_root') -Label 'complete terminal receipt'
     Assert-ExactJsonProperties -Value $State.outputs -Names @(
         'adapter', 'report') -Label 'complete outputs receipt'
     if ([int]$State.terminal.exit_code -ne 0 -or
@@ -538,66 +1171,167 @@ function Assert-VerifiedCompletion {
         throw 'complete terminal receipt is invalid'
     }
     Assert-VerifiedArtifactReceipt $State.outputs.adapter $true
-    Assert-VerifiedArtifactReceipt $State.outputs.report $false
+    Assert-VerifiedArtifactReceipt $State.outputs.report $true
+    Assert-VerifiedFinalEvidenceRoot $State
+}
+
+function Get-TerminalPredecessor {
+    param([Parameter(Mandatory = $true)]$TerminalState)
+
+    $previous = Read-ValidRunStateCandidate $previousStatePath
+    $anchor = Read-RunStateAnchor $resolvedRunDir
+    if ($null -eq $previous -or
+        -not (Test-AnchorAuthorizedRunState $previous $anchor 'previous') -or
+        [string]$previous.run_id -ne [string]$TerminalState.run_id -or
+        [int64]$previous.revision -ge [int64]$TerminalState.revision) {
+        throw 'Terminal run-state has no earlier authoritative identity receipt'
+    }
+    Assert-SameProcessRecord $previous.runner $TerminalState.runner 'Runner'
+    Assert-SameProcessRecord $previous.trainer $TerminalState.trainer 'Trainer'
+    return $previous
+}
+
+function Wait-RecordedRunnerExit {
+    param(
+        [Parameter(Mandatory = $true)]$ExpectedState,
+        [Parameter(Mandatory = $true)][DateTime]$Deadline
+    )
+
+    do {
+        Assert-DeadlineNotExpired $Deadline 'recorded runner exit'
+        $state = Read-RunState $statePath $previousStatePath
+        if ([string]$state.run_id -ne [string]$ExpectedState.run_id) {
+            throw 'Run identity changed while waiting for recorded runner exit'
+        }
+        Assert-SameProcessRecord $ExpectedState.runner $state.runner 'Runner'
+        Assert-SameProcessRecord $ExpectedState.trainer $state.trainer 'Trainer'
+        $runnerExitStatus = Get-RecordedProcessExitStatus -Record ($ExpectedState.runner)
+        switch ($runnerExitStatus) {
+            'exited' { return $state }
+            'replaced' { throw 'Recorded durable runner PID is live with a different process identity' }
+        }
+        if (-not (Start-RemainingDeadlineSleep $Deadline $PollSeconds)) { break }
+    } while ($true)
+    throw 'Recorded durable runner did not exit before the safe power-off deadline'
+}
+
+function Wait-RecordedTrainerExit {
+    param(
+        [AllowNull()]$Record,
+        [Parameter(Mandatory = $true)][DateTime]$Deadline
+    )
+
+    if ($null -eq $Record) {
+        throw 'Recorded trainer identity is missing'
+    }
+    do {
+        Assert-DeadlineNotExpired $Deadline 'recorded trainer exit'
+        switch (Get-RecordedProcessExitStatus -Record $Record) {
+            'exited' { return }
+            'replaced' { throw 'Recorded trainer PID is live with a different process identity' }
+        }
+        if (-not (Start-RemainingDeadlineSleep $Deadline $PollSeconds)) { break }
+    } while ($true)
+    throw 'Recorded trainer did not exit before the safe power-off deadline'
+}
+
+function Assert-VerifiedSafePause {
+    param(
+        [Parameter(Mandatory = $true)]$State,
+        [Parameter(Mandatory = $true)]$Request,
+        [Parameter(Mandatory = $true)]$Ack
+    )
+
+    if ([string]$State.status -ne 'paused-safe' -or $null -eq $State.terminal -or
+        [int]$State.terminal.exit_code -ne 75 -or
+        [string]$State.terminal.reason -ne 'safe-optimizer-boundary') {
+        throw 'paused-safe state has an invalid terminal receipt'
+    }
+    Assert-ExactJsonProperties -Value $State.terminal -Names @(
+        'exit_code', 'reason', 'at_utc', 'checkpoint_verification') -Label 'paused-safe terminal receipt'
+    if ($null -eq $State.trainer) {
+        throw 'paused-safe state is missing its recorded trainer identity'
+    }
+    Assert-PauseReceiptIdentity $State $Request $Ack
+    Assert-VerifiedCheckpoint $State $Ack
 }
 
 function Wait-VerifiedCompletionPowerOff {
-    param([Parameter(Mandatory = $true)]$State)
+    param(
+        [Parameter(Mandatory = $true)]$State,
+        [Parameter(Mandatory = $true)][DateTime]$Deadline
+    )
 
-    $deadline = [DateTime]::UtcNow.AddSeconds([Math]::Min(30, $TimeoutSeconds))
     do {
+        Assert-DeadlineNotExpired $Deadline 'completed artifact verification'
         Assert-VerifiedCompletion $State
-        if (-not (Test-ExactProcessRecord $State.trainer) -and
-            -not (Test-ExactProcessRecord $State.runner)) {
+        $state = Wait-RecordedRunnerExit $State $Deadline
+        Assert-DeadlineNotExpired $Deadline 'completed artifact verification'
+        Assert-VerifiedCompletion $state
+        if ([string]$state.status -ne 'complete') {
+            throw "Training changed to '$($state.status)' while waiting for completion power-off"
+        }
+        Wait-RecordedTrainerExit $State.trainer $Deadline
+        Assert-DeadlineNotExpired $Deadline 'SAFE_TO_POWER_OFF emission'
+        $finalState = Read-RunState $statePath $previousStatePath
+        Assert-TerminalStateUnchanged $State $finalState
+        Assert-VerifiedCompletion $finalState
+        if ((Get-RecordedProcessExitStatus -Record ($State.runner)) -eq 'exited' -and
+            (Get-RecordedProcessExitStatus -Record ($State.trainer)) -eq 'exited') {
             [pscustomobject]@{
                 status = 'complete'
-                run_id = [string]$State.run_id
-                optimizer_steps = [int]$State.progress.optimizer_steps
-                microsteps_completed = [int]$State.progress.microsteps_completed
+                run_id = [string]$state.run_id
+                optimizer_steps = [int]$state.progress.optimizer_steps
+                microsteps_completed = [int]$state.progress.microsteps_completed
             }
+            Invoke-TestOnlyFinalGateDelay
+            $postDelayState = Read-RunState $statePath $previousStatePath
+            Assert-TerminalStateUnchanged $State $postDelayState
+            Assert-VerifiedCompletion $postDelayState
+            if ((Get-RecordedProcessExitStatus -Record ($State.runner)) -ne 'exited' -or
+                (Get-RecordedProcessExitStatus -Record ($State.trainer)) -ne 'exited') {
+                throw 'Recorded processes changed during final completion gate delay'
+            }
+            Assert-DeadlineNotExpired $Deadline 'SAFE_TO_POWER_OFF emission'
             Write-Output 'SAFE_TO_POWER_OFF'
             return
         }
-        Start-Sleep -Milliseconds 200
         $State = Read-RunState $statePath $previousStatePath
-    } while ([DateTime]::UtcNow -lt $deadline -and [string]$State.status -eq 'complete')
+    } while ([string]$State.status -eq 'complete')
     throw 'Completed artifacts are verified but trainer/runner did not exit in time'
 }
 
+Assert-DeadlineNotExpired $deadline 'run discovery'
 $initial = Read-RunState $statePath $previousStatePath
 if ([string]$initial.status -eq 'complete') {
-    Wait-VerifiedCompletionPowerOff $initial
+    [void](Get-TerminalPredecessor $initial)
+    Wait-VerifiedCompletionPowerOff $initial $deadline
     return
 }
 if ([string]$initial.status -eq 'paused-safe' -and
     [int]$initial.terminal.exit_code -eq 75 -and
     [string]$initial.terminal.reason -eq 'safe-optimizer-boundary') {
-    $requestPath = Join-Path $resolvedRunDir 'control\pause.request.json'
-    $ackPath = Join-Path $resolvedRunDir 'control\pause.ack.json'
-    if ((Test-Path -LiteralPath $requestPath) -and (Test-Path -LiteralPath $ackPath)) {
-        $request = Get-Content -LiteralPath $requestPath -Raw -Encoding utf8 | ConvertFrom-Json
-        $ack = Get-Content -LiteralPath $ackPath -Raw -Encoding utf8 | ConvertFrom-Json
-        Assert-PauseReceiptIdentity $initial $request $ack
-        Assert-VerifiedCheckpoint $initial $ack
-        Write-Output 'SAFE_TO_POWER_OFF'
-        return
-    }
+    throw 'Already-paused terminal cannot authorize power-off without runner and trainer identities observed live by this invocation'
 }
 
 if ([string]$initial.status -notin @('starting', 'running', 'pause-requested', 'checkpointing')) {
     throw "Run status '$($initial.status)' is not actively trainable"
 }
+$expectedRunner = $initial.runner
 $identityDeadline = [DateTime]::UtcNow.AddSeconds([Math]::Min(30, $TimeoutSeconds))
 while (-not (Test-ExactProcessRecord $initial.trainer)) {
+    Assert-SameProcessRecord $expectedRunner $initial.runner 'Runner'
     if ([string]$initial.status -notin @('starting', 'running', 'pause-requested', 'checkpointing')) {
         throw "Training became '$($initial.status)' before trainer identity was ready"
     }
+    $identityDeadline = if ($identityDeadline -lt $deadline) { $identityDeadline } else { $deadline }
     if ([DateTime]::UtcNow -ge $identityDeadline) {
         throw 'Recorded trainer PID/creation/executable/command identity did not become live; refusing blind pause'
     }
-    Start-Sleep -Milliseconds 200
+    [void](Start-RemainingDeadlineSleep $identityDeadline 0.2)
     $initial = Read-RunState $statePath $previousStatePath
 }
+Assert-SameProcessRecord $expectedRunner $initial.runner 'Runner'
 
 $controlDir = Join-Path $resolvedRunDir 'control'
 [IO.Directory]::CreateDirectory($controlDir) | Out-Null
@@ -620,9 +1354,8 @@ else {
     Write-AtomicUtf8NoBom $requestPath $requestJson
 }
 
-$deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 do {
-    Start-Sleep -Seconds $PollSeconds
+    if (-not (Start-RemainingDeadlineSleep $deadline $PollSeconds)) { break }
     try {
         $state = Read-RunState $statePath $previousStatePath
     }
@@ -632,6 +1365,7 @@ do {
     if ([string]$state.run_id -ne [string]$initial.run_id) {
         throw 'Run identity changed while waiting for safe pause'
     }
+    Assert-SameProcessRecord $expectedRunner $state.runner 'Runner'
     if ([string]$state.status -eq 'paused-safe' -and $null -ne $state.terminal) {
         if ([int]$state.terminal.exit_code -ne 75 -or
             [string]$state.terminal.reason -ne 'safe-optimizer-boundary') {
@@ -642,24 +1376,47 @@ do {
             throw 'Runner reported paused-safe without pause.ack.json'
         }
         $ack = Get-Content -LiteralPath $ackPath -Raw -Encoding utf8 | ConvertFrom-Json
-        Assert-PauseReceiptIdentity $state $request $ack
-        Assert-VerifiedCheckpoint $state $ack
-        if (Test-ExactProcessRecord $state.trainer) {
+        Assert-VerifiedSafePause $state $request $ack
+        Assert-SameProcessRecord $initial.trainer $state.trainer 'Trainer'
+        if (Test-ExactProcessRecord $initial.trainer) {
             continue
+        }
+        $pausedState = Wait-RecordedRunnerExit $initial $deadline
+        $ack = Get-Content -LiteralPath $ackPath -Raw -Encoding utf8 | ConvertFrom-Json
+        Assert-VerifiedSafePause $pausedState $request $ack
+        Wait-RecordedTrainerExit $initial.trainer $deadline
+        Assert-DeadlineNotExpired $deadline 'SAFE_TO_POWER_OFF emission'
+        $finalPausedState = Read-RunState $statePath $previousStatePath
+        Assert-TerminalStateUnchanged $pausedState $finalPausedState
+        Assert-VerifiedSafePause $finalPausedState $request $ack
+        if ((Get-RecordedProcessExitStatus -Record ($initial.runner)) -ne 'exited' -or
+            (Get-RecordedProcessExitStatus -Record ($initial.trainer)) -ne 'exited') {
+            throw 'Recorded processes are not both exited at SAFE_TO_POWER_OFF emission'
         }
         [pscustomobject]@{
             status = 'paused-safe'
-            run_id = [string]$state.run_id
-            optimizer_steps = [int]$state.progress.optimizer_steps
-            microsteps_completed = [int]$state.progress.microsteps_completed
-            checkpoint = [string]$state.checkpoint.relative_path
-            checkpoint_manifest_sha256 = [string]$state.checkpoint.manifest_sha256
+            run_id = [string]$pausedState.run_id
+            optimizer_steps = [int]$pausedState.progress.optimizer_steps
+            microsteps_completed = [int]$pausedState.progress.microsteps_completed
+            checkpoint = [string]$pausedState.checkpoint.relative_path
+            checkpoint_manifest_sha256 = [string]$pausedState.checkpoint.manifest_sha256
         }
+        Invoke-TestOnlyFinalGateDelay
+        $postDelayState = Read-RunState $statePath $previousStatePath
+        Assert-TerminalStateUnchanged $pausedState $postDelayState
+        Assert-VerifiedSafePause $postDelayState $request $ack
+        if ((Get-RecordedProcessExitStatus -Record ($initial.runner)) -ne 'exited' -or
+            (Get-RecordedProcessExitStatus -Record ($initial.trainer)) -ne 'exited') {
+            throw 'Recorded processes changed during final paused-safe gate delay'
+        }
+        Assert-DeadlineNotExpired $deadline 'SAFE_TO_POWER_OFF emission'
         Write-Output 'SAFE_TO_POWER_OFF'
         return
     }
     if ([string]$state.status -eq 'complete') {
-        Wait-VerifiedCompletionPowerOff $state
+        Assert-SameProcessRecord $expectedRunner $state.runner 'Runner'
+        Assert-SameProcessRecord $initial.trainer $state.trainer 'Trainer'
+        Wait-VerifiedCompletionPowerOff $state $deadline
         return
     }
     if ([string]$state.status -in @('failed', 'interrupted')) {

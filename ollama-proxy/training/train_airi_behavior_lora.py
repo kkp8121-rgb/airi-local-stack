@@ -24,6 +24,7 @@ directories, never hub names or network paths.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import importlib.metadata
 import io
@@ -45,7 +46,7 @@ if str(Path(__file__).parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).parent))
 from behavior_training_checkpoint import (
     CheckpointError, atomic_json, load_generation, publish_artifact_directory,
-    publish_checkpoint,
+    publish_checkpoint, publish_fresh_json,
 )
 
 CPU_SMOKE_MAX_SAMPLES = 16
@@ -66,13 +67,159 @@ class PauseRequested(SystemExit):
 
 
 CONTROL_SCHEMA_VERSION = 1
-CHECKPOINT_EVENT_SCHEMA = "airi.behavior-checkpoint-event.v1"
 DETERMINISTIC_CUBLAS_WORKSPACE = ":4096:8"
 
 
 def _file_sha256(path: Path) -> str:
     with path.open("rb") as handle:
         return hashlib.file_digest(handle, "sha256").hexdigest()
+
+
+class _HeldInputFiles:
+    """Keep immutable loader inputs open and identity-checked across loading."""
+    def __init__(self, paths: list[Path]) -> None:
+        self.paths = paths
+        self.handles: list[tuple[Path, int, os.stat_result, str]] = []
+
+    def __enter__(self):
+        try:
+            for path in self.paths:
+                flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+                descriptor = self._open_read_only(path, flags)
+                metadata = os.fstat(descriptor)
+                if not stat.S_ISREG(metadata.st_mode):
+                    os.close(descriptor)
+                    raise BehaviorTrainingError("loader input is not a regular file")
+                digest = hashlib.sha256()
+                while True:
+                    block = os.read(descriptor, 1024 * 1024)
+                    if not block:
+                        break
+                    digest.update(block)
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                self.handles.append((path, descriptor, metadata, digest.hexdigest()))
+        except Exception:
+            self.__exit__()
+            raise
+        return self
+
+    @staticmethod
+    def _open_read_only(path: Path, flags: int) -> int:
+        """Open a final component without granting replacement or deletion rights.
+
+        CRT ``os.open`` does not express Windows sharing semantics.  In
+        particular its default sharing permits a competing process to replace
+        a model file after we hash it but while transformers reopens it.  Hold
+        native handles with FILE_SHARE_READ only for the whole loader window.
+        OPEN_REPARSE_POINT makes a final symlink/junction itself observable so
+        it is rejected before a loader can follow it.
+        """
+        if os.name != "nt":
+            try:
+                return os.open(path, flags)
+            except OSError as exc:
+                raise BehaviorTrainingError("loader input cannot be opened safely") from exc
+        import ctypes  # noqa: PLC0415
+        import msvcrt  # noqa: PLC0415
+
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        create_file = kernel.CreateFileW
+        create_file.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32,
+                                ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32,
+                                ctypes.c_void_p]
+        create_file.restype = ctypes.c_void_p
+        # GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING,
+        # FILE_FLAG_OPEN_REPARSE_POINT.  Do not add FILE_SHARE_WRITE/DELETE.
+        handle = create_file(str(path), 0x80000000, 0x00000001, None, 3,
+                             0x00200000, None)
+        invalid = ctypes.c_void_p(-1).value
+        if handle == invalid:
+            raise BehaviorTrainingError("loader input cannot be opened safely")
+        close_handle = kernel.CloseHandle
+        close_handle.argtypes = [ctypes.c_void_p]
+        close_handle.restype = ctypes.c_int
+        get_attributes = kernel.GetFileInformationByHandle
+        class _FileTime(ctypes.Structure):
+            _fields_ = [("low", ctypes.c_uint32), ("high", ctypes.c_uint32)]
+        class _Info(ctypes.Structure):
+            _fields_ = [("attributes", ctypes.c_uint32), ("created", _FileTime),
+                       ("accessed", _FileTime), ("written", _FileTime),
+                       ("volume_serial", ctypes.c_uint32), ("size_high", ctypes.c_uint32),
+                       ("size_low", ctypes.c_uint32), ("links", ctypes.c_uint32),
+                       ("index_high", ctypes.c_uint32), ("index_low", ctypes.c_uint32)]
+        info = _Info()
+        get_attributes.argtypes = [ctypes.c_void_p, ctypes.POINTER(_Info)]
+        get_attributes.restype = ctypes.c_int
+        if not get_attributes(handle, ctypes.byref(info)) or info.attributes & 0x400:
+            close_handle(handle)
+            raise BehaviorTrainingError("loader input must be a non-reparse regular file")
+        try:
+            return msvcrt.open_osfhandle(handle, flags)
+        except OSError as exc:
+            close_handle(handle)
+            raise BehaviorTrainingError("loader input handle cannot be adopted safely") from exc
+
+    def verify(self) -> None:
+        for path, descriptor, before, digest in self.handles:
+            # On Windows FILE_SHARE_READ prevents path replacement/delete while
+            # this handle is alive.  On POSIX compare the pathname too because
+            # a rename can otherwise swap the file a later loader opens.
+            current = os.fstat(descriptor)
+            if (current.st_dev != before.st_dev or current.st_ino != before.st_ino
+                    or current.st_size != before.st_size):
+                raise BehaviorTrainingError("loader input identity changed during load")
+            if os.name != "nt":
+                named = os.stat(path, follow_symlinks=False)
+                if (named.st_dev != before.st_dev or named.st_ino != before.st_ino
+                        or named.st_size != before.st_size):
+                    raise BehaviorTrainingError("loader input pathname changed during load")
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            hasher = hashlib.sha256()
+            while block := os.read(descriptor, 1024 * 1024):
+                hasher.update(block)
+            if hasher.hexdigest() != digest:
+                raise BehaviorTrainingError("loader input bytes changed during load")
+
+    def sha256_for(self, path: Path) -> str:
+        for held_path, _descriptor, _before, digest in self.handles:
+            if held_path == path:
+                return digest
+        raise BehaviorTrainingError("required model weight is outside the held inventory")
+
+    def __exit__(self, *_exc: Any) -> None:
+        for _path, descriptor, _metadata, _digest in self.handles:
+            with contextlib.suppress(OSError):
+                os.close(descriptor)
+
+
+def _closed_model_loader_files(model_dir: Path) -> list[Path]:
+    """Enumerate a model tree without following a junction/symlink directory."""
+    pending = [model_dir]
+    files: list[Path] = []
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as scan:
+                entries = sorted(scan, key=lambda entry: entry.name, reverse=True)
+        except OSError as exc:
+            raise BehaviorTrainingError("model loader inventory cannot inspect a directory") from exc
+        for entry in entries:
+            path = Path(entry.path)
+            try:
+                metadata = entry.stat(follow_symlinks=False)
+            except OSError as exc:
+                raise BehaviorTrainingError("model loader inventory cannot inspect an entry") from exc
+            attributes = getattr(metadata, "st_file_attributes", 0)
+            if (entry.is_symlink()
+                    or attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
+                raise BehaviorTrainingError("model loader inventory cannot contain reparse points")
+            if stat.S_ISDIR(metadata.st_mode):
+                pending.append(path)
+            elif stat.S_ISREG(metadata.st_mode):
+                files.append(path)
+            else:
+                raise BehaviorTrainingError("model loader inventory cannot contain special entries")
+    return sorted(files)
 
 
 def _canonical_json_bytes(value: Any) -> bytes:
@@ -98,63 +245,6 @@ def _configure_deterministic_validation(torch: Any, enabled: bool) -> None:
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.allow_tf32 = False
     torch.backends.cuda.matmul.allow_tf32 = False
-
-
-def _publish_checkpoint_event(
-        run_dir: Path, run_id: str, generation: str, reason: str,
-        microsteps_completed: int, optimizer_steps: int, pending_microbatches: int,
-        publish_started_at_utc: str, checkpoint_durable_at_utc: str,
-        publish_elapsed_ns: int, published: dict[str, Any], pins: dict[str, Any]) -> dict[str, Any]:
-    """Bind wall-clock timing to a fully verified, durably indexed generation."""
-    if (not re.fullmatch(r"checkpoint-[0-9]{8}", generation)
-            or reason not in {"interval", "safe-pause", "epoch-tail", "epoch-complete"}
-            or microsteps_completed < 0 or optimizer_steps < 0
-            or pending_microbatches != 0 or publish_elapsed_ns < 0):
-        raise BehaviorTrainingError("checkpoint event identity or progress is invalid")
-    index_path = run_dir / "checkpoints" / "checkpoint-index.json"
-    try:
-        index_bytes = index_path.read_bytes()
-        index = json.loads(index_bytes)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise BehaviorTrainingError("checkpoint event cannot read durable index") from exc
-    if index_bytes != _canonical_json_bytes(index):
-        raise BehaviorTrainingError("checkpoint event index is not canonical")
-    latest = index.get("latest") if isinstance(index, dict) else None
-    manifest_sha256 = published.get("manifest_sha256")
-    manifest = published.get("manifest")
-    payload = manifest.get("payload") if isinstance(manifest, dict) else None
-    if (not isinstance(latest, dict)
-            or latest.get("relative_path") != generation
-            or latest.get("manifest_sha256") != manifest_sha256
-            or not isinstance(payload, dict)
-            or not re.fullmatch(r"[0-9a-f]{64}", str(payload.get("sha256", "")))):
-        raise BehaviorTrainingError("checkpoint event does not match durable generation")
-    event = {
-        "schema_version": CHECKPOINT_EVENT_SCHEMA,
-        "run_id": run_id,
-        "generation": generation,
-        "reason": reason,
-        "microsteps_completed": microsteps_completed,
-        "optimizer_steps": optimizer_steps,
-        "pending_microbatches": pending_microbatches,
-        "publish_started_at_utc": publish_started_at_utc,
-        "checkpoint_durable_at_utc": checkpoint_durable_at_utc,
-        "publish_elapsed_ns": publish_elapsed_ns,
-        "checkpoint_manifest_sha256": manifest_sha256,
-        "checkpoint_payload_sha256": payload["sha256"],
-        "checkpoint_index_sha256": hashlib.sha256(index_bytes).hexdigest(),
-        "checkpoint_index": index,
-        "pins_sha256": hashlib.sha256(_canonical_json_bytes(pins)).hexdigest(),
-    }
-    event_path = run_dir / "checkpoint-events" / f"{generation}.json"
-    if os.path.lexists(event_path):
-        raise BehaviorTrainingError("checkpoint event generation already exists")
-    atomic_json(event_path, event)
-    encoded = _canonical_json_bytes(event)
-    if event_path.read_bytes() != encoded:
-        raise BehaviorTrainingError("checkpoint event publication verification failed")
-    return {"relative_path": event_path.relative_to(run_dir).as_posix(),
-            "sha256": hashlib.sha256(encoded).hexdigest(), "event": event}
 
 
 def _source_pins(args: argparse.Namespace, model_dir: Path, tokenizer: Any) -> dict[str, Any]:
@@ -215,12 +305,13 @@ def _progress(run_dir: Path | None, value: dict[str, Any]) -> None:
             except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
                 raise BehaviorTrainingError("existing progress is invalid") from exc
         atomic_json(run_dir / "progress.json", {
-            "schema_version": "airi.behavior-training-progress.v1",
+            "schema_version": "airi.behavior-training-progress.v2",
             "run_id": value.get("run_id", previous.get("run_id")), "status": value.get("status", previous.get("status")),
             "epoch": value.get("epoch", previous.get("epoch", 0)), "next_batch_index": value.get("next_batch_index", previous.get("next_batch_index", 0)),
             "microsteps_completed": value.get("microsteps_completed", value.get("microsteps", previous.get("microsteps_completed", 0))),
             "optimizer_steps": value.get("optimizer_steps", previous.get("optimizer_steps", 0)),
             "pending_microbatches": value.get("pending_microbatches", previous.get("pending_microbatches", 0)),
+            "training_elapsed_ns": value.get("training_elapsed_ns", previous.get("training_elapsed_ns", 0)),
             "checkpoint": value.get("checkpoint", previous.get("checkpoint")),
             "updated_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         })
@@ -637,15 +728,24 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(args.seed)
 
-    tokenizer = AutoTokenizer.from_pretrained(str(model_dir), local_files_only=True)
-    if tokenizer.pad_token_id is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    pins = _source_pins(args, model_dir, tokenizer)
-    model_kwargs: dict[str, Any] = {"local_files_only": True}
-    if quantization is not None:
-        model_kwargs["quantization_config"] = quantization
-        model_kwargs["device_map"] = {"": 0}
-    model = AutoModelForCausalLM.from_pretrained(str(model_dir), **model_kwargs)
+    loader_files = _closed_model_loader_files(model_dir)
+    if not loader_files:
+        raise BehaviorTrainingError("model loader inventory is empty")
+    with _HeldInputFiles(loader_files) as held_inputs:
+        if args.mode == "cuda-qlora":
+            weights = sorted(model_dir.glob("*.safetensors"))
+            if len(weights) != 1 or held_inputs.sha256_for(weights[0]) != args.model_sha256:
+                raise BehaviorTrainingError("held model weight does not match its SHA-256 pin")
+        tokenizer = AutoTokenizer.from_pretrained(str(model_dir), local_files_only=True)
+        if tokenizer.pad_token_id is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        pins = _source_pins(args, model_dir, tokenizer)
+        model_kwargs: dict[str, Any] = {"local_files_only": True}
+        if quantization is not None:
+            model_kwargs["quantization_config"] = quantization
+            model_kwargs["device_map"] = {"": 0}
+        model = AutoModelForCausalLM.from_pretrained(str(model_dir), **model_kwargs)
+        held_inputs.verify()
     if quantization is None:
         model = model.to(device)
         cpu_weights = sorted(model_dir.glob("*.safetensors"))
@@ -720,6 +820,8 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
     pending_microbatches = 0
     optimizer_steps = 0
     checkpoint_generation = 0
+    training_elapsed_ns = 0
+    active_segment_started_ns = time.perf_counter_ns()
     if args.resume_from_checkpoint:
         try:
             requested = args.resume_from_checkpoint.resolve()
@@ -744,6 +846,9 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
         best_state = state["best_state"]
         step, epoch, batch_cursor = state["step"], state["epoch"], state["batch_cursor"]
         optimizer_steps, checkpoint_generation = state["optimizer_steps"], state["checkpoint_generation"]
+        training_elapsed_ns = state.get("training_elapsed_ns", 0)
+        if not isinstance(training_elapsed_ns, int) or training_elapsed_ns < 0:
+            raise BehaviorTrainingError("resume cumulative training elapsed time is invalid")
         reconstructed_order = hashlib.sha256("\n".join(
             row["id"] for row in epoch_group_order(rows, args.seed, epoch)).encode()).hexdigest()
         if state.get("row_order_hash") != reconstructed_order or state.get("seed") != args.seed:
@@ -752,14 +857,15 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
             run_dir, args.run_id, requested.name, loaded["manifest_sha256"])
 
     def checkpoint(reason: str) -> None:
-        nonlocal checkpoint_generation
+        nonlocal checkpoint_generation, training_elapsed_ns, active_segment_started_ns
         if run_dir is None:
             return
         if pending_microbatches != 0:
             raise BehaviorTrainingError("checkpoint requested outside optimizer boundary")
         checkpoint_generation += 1
-        publish_started_at_utc = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-        publish_started_ns = time.perf_counter_ns()
+        # Only active trainer time is cumulative.  Durable publication and
+        # pause/resume downtime cannot be used to fabricate interval evidence.
+        training_elapsed_ns += time.perf_counter_ns() - active_segment_started_ns
         state = {"run_id": args.run_id, "trainable_state": snapshot_trainable_state(model),
                  "optimizer": optimizer.state_dict(), "scheduler": scheduler.state_dict(),
                  "python_rng": random.getstate(), "torch_rng": torch.get_rng_state(),
@@ -767,23 +873,35 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
                  "epoch": epoch, "batch_cursor": batch_cursor, "step": step,
                  "pending_microbatches": pending_microbatches, "optimizer_steps": optimizer_steps,
                  "checkpoint_generation": checkpoint_generation, "losses": losses,
+                 "training_elapsed_ns": training_elapsed_ns,
                  "dev_loss_history": dev_loss_history, "best_state": best_state,
                  "row_order_hash": hashlib.sha256("\n".join(row["id"] for row in epoch_group_order(rows, args.seed, epoch)).encode()).hexdigest(),
                  "seed": args.seed}
         buffer = io.BytesIO()
         torch.save(state, buffer)
         generation = f"checkpoint-{checkpoint_generation:08d}"
-        published = publish_checkpoint(run_dir, args.run_id, generation, buffer.getvalue(), pins)
-        checkpoint_durable_at_utc = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-        checkpoint_event = _publish_checkpoint_event(
-            run_dir, args.run_id, generation, reason, step, optimizer_steps,
-            pending_microbatches, publish_started_at_utc, checkpoint_durable_at_utc,
-            time.perf_counter_ns() - publish_started_ns, published, pins)
+        # The payload commits the cumulative monotonic duration, so a resumed
+        # process cannot reset timing evidence by changing its wall clock.
+        state["training_elapsed_ns"] = training_elapsed_ns
+        buffer = io.BytesIO()
+        torch.save(state, buffer)
+        published = publish_checkpoint(
+            run_dir, args.run_id, generation, buffer.getvalue(), pins,
+            {"run_id": args.run_id, "generation": generation, "reason": reason,
+             "microsteps_completed": step, "optimizer_steps": optimizer_steps,
+             "pending_microbatches": pending_microbatches,
+             "training_elapsed_ns": training_elapsed_ns,
+             "checkpoint_payload_progress": {"microsteps_completed": step,
+                                              "optimizer_steps": optimizer_steps,
+                                              "pending_microbatches": pending_microbatches}})
+        active_segment_started_ns = time.perf_counter_ns()
+        checkpoint_event = published["event"]
         reference = {"relative_path": generation, "manifest_sha256": published["manifest_sha256"]}
         _progress(run_dir, {"run_id": args.run_id,
                             "status": "checkpointed", "safe_to_power_off": True,
                             "epoch": epoch, "next_batch_index": batch_cursor,
                             "optimizer_steps": optimizer_steps, "microsteps": step,
+                            "training_elapsed_ns": training_elapsed_ns,
                             "pending_microbatches": pending_microbatches, "checkpoint": reference,
                             "checkpoint_event": checkpoint_event})
         request_id = _pause_request(run_dir, args.run_id)
@@ -920,6 +1038,26 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
     }
     if report_path is not None:
         atomic_json(report_path, summary)
+    if run_dir is not None:
+        index_path = run_dir / "checkpoints" / "checkpoint-index.json"
+        if not index_path.is_file():
+            raise BehaviorTrainingError("completed run lacks an authoritative checkpoint index")
+        index_bytes = index_path.read_bytes()
+        latest = json.loads(index_bytes).get("latest")
+        if not isinstance(latest, dict):
+            raise BehaviorTrainingError("completed run has an invalid checkpoint index")
+        report_bytes = report_path.read_bytes() if report_path is not None else b""
+        evidence = {
+            "schema_version": "airi.behavior-producer-evidence-root.v1",
+            "run_id": args.run_id,
+            "checkpoint_index_sha256": hashlib.sha256(index_bytes).hexdigest(),
+            "latest_checkpoint": latest,
+            "adapter_artifact_manifest_sha256": artifact["manifest_sha256"],
+            "report_sha256": hashlib.sha256(report_bytes).hexdigest() if report_path is not None else None,
+            "progress": {"microsteps_completed": step, "optimizer_steps": optimizer_steps,
+                         "pending_microbatches": 0, "training_elapsed_ns": training_elapsed_ns},
+        }
+        publish_fresh_json(run_dir / "producer-evidence-root.json", evidence)
     _progress(run_dir, {"schema_version": CONTROL_SCHEMA_VERSION, "run_id": args.run_id,
                         "status": "completed", "safe_to_power_off": True,
                         "optimizer_steps": optimizer_steps, "microsteps": step})

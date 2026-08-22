@@ -1,21 +1,98 @@
 # AIRI Codex GPU 인수인계 — broadcast continuity v4
 
-갱신: 2026-08-22 KST (파일명은 현행 GPU SSoT 식별자로 유지)
+갱신: 2026-08-23 02:57 KST (파일명은 현행 GPU SSoT 식별자로 유지)
 
-상태: **ACTIVE — E1 완료·미채택, E2 저장 산출물 0, merge/package 0,
-v4 T3 0, live campaign 0; P0-A offline 구현·독립 감사 완료,
-P0-B timing/exact-equivalence gate `e970cf7`와 external expected-run 결속
-`8cd69b5` origin/main push 완료, safe-pause verified active-run 자동 탐지 offline 검증 완료,
-controlled GPU 동등성·10분 checkpoint 실측 대기**
+상태: **ACTIVE — P0 LOCAL BATCH VALIDATED, COMMIT/PUSH PENDING. E1 완료·미채택,
+E2 저장 산출물 0, merge/package 0, v4 T3 0, live campaign 0. 동결된 P0 후속
+코드 배치는 지정 Python/PowerShell/full-offline/diff/security gate를 모두 통과했다.**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
 기계 판독 계약: `goal_status=active`;
 `execution_order=P0_A>P0_B>E2_LAUNCH>E2_PROVENANCE>PACKAGE>T3_36>CAMPAIGN_3X500>USER_DECISION`
 
-재개 권한: 2026-08-22 사용자 `/goal`로 저장소 구현·GPU 학습·merge/package·
-로컬 서비스·T3·장시간 캠페인·검증된 milestone commit/push가 승인됐다. 단,
-운영 채택과 기본 서비스 모델 변경은 별도 사용자 승인 전까지 금지한다.
+현재 권한: 2026-08-23 최신 사용자 `/goal`로 저장소 구현·검증, GPU 학습,
+병합·패키징, 로컬 서비스, T3·장시간 캠페인, 검증된 milestone commit/push가
+명시적으로 재승인됐다. 운영 채택과 기본 서비스 모델 변경은 별도 사용자 승인 전까지
+계속 금지한다.
+
+## 0. 2026-08-23 P0 로컬 배치 최종 검증 receipt
+
+- 02:57 KST Goal 도구 status=`active`; local HEAD/local origin/main/remote main은 모두
+  `32830a43556ba7704a39bd9094f128a5a98dd7d7`, worktree는 modified 16+
+  untracked 1+staged 0이다. 관련 runner/trainer/test/verifier PID와 식별 가능한 AIRI GPU
+  workload는 0이고 E2 microstep은 0이다. source/chat/base/E1 크기·SHA는 exact,
+  E2 adapter/report·D: durable state·T3·campaign은 absent, E2 로그는 각 0 bytes다.
+- 최종 P0 코드 receipt: 핀된 5-module pycompile+네 Python suite exit 0,
+  `145 passed, 5 skipped in 34.84s`; actual-process PowerShell durability exit 0/literal
+  `AIRI training durability contract: PASS`; 전체 `test-current-checkpoint.ps1` exit 0/
+  최종 offline checkpoint PASS; 각 post-run 관련 PID 0이다.
+- 한 차례 독립 최신-byte 감사는 P0=0/P1=4였다. 고정된 네 원래 P1만 최소 수정했고
+  verifier targeted `61 passed, 1 skipped`, launcher dynamic/static/AST, 최종 Python과
+  actual-process PowerShell로 exact closure를 검증했다. 사용자 동결선대로 새 감사
+  라운드는 추가하지 않았으며 현재 잔여 로컬 P0/P1은 0이다.
+- final test/launcher/verifier SHA는 `738630d9...8756c6`/`856c4322...e9acda`/
+  `621de009...230799`, 12-file path+size+SHA manifest는
+  `5908729735313b72fedaa309c62d04a20472d049900de192817ea7fb975a4a5b`다.
+  repo 기본 diff-check exit 0/whitespace error 0, 17-path 1,167,298 bytes의 금지
+  산출물·credential·민감 literal·개인 경로 hit는 0이다.
+
+- 이전 01:00 pause 인계 당시 Goal 도구 status는 `paused`, 세부 상태명은
+  `goal_status=paused-user-session-handoff`였으며 complete/cancel은 아니었다. 최신
+  `/goal` resume가 이를 대체해 현재 실제 status는 `active`다.
+- Git: HEAD=`32830a43556ba7704a39bd9094f128a5a98dd7d7`,
+  origin/main=`32830a43556ba7704a39bd9094f128a5a98dd7d7`.
+- staged 0, modified 16, untracked 1이다. modified exact 목록:
+  `NEXT-SESSION.md`,
+  `airi_docs/로드맵/AIRI-ROADMAP-LOG.md`,
+  `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md`,
+  `airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-08-21.md`,
+  `airi_docs/진행중/AIRI-WORKING-STATE.md`,
+  `ollama-proxy/training/behavior_training_checkpoint.py`,
+  `ollama-proxy/training/durable_training_runner.py`,
+  `ollama-proxy/training/tests/test_behavior_training_checkpoint.py`,
+  `ollama-proxy/training/tests/test_durable_training_runner.py`,
+  `ollama-proxy/training/tests/test_train_airi_behavior_lora.py`,
+  `ollama-proxy/training/tests/test_verify_airi_behavior_gpu_equivalence.py`,
+  `ollama-proxy/training/train_airi_behavior_lora.py`,
+  `ollama-proxy/training/verify_airi_behavior_gpu_equivalence.py`,
+  `pause-airi-safely.ps1`, `run-airi-behavior-training-durable.ps1`,
+  `test-airi-training-durability.ps1`. untracked exact 목록:
+  `ollama-proxy/training/build_airi_behavior_input_manifest.py`.
+- AIRI 관련 Python/PowerShell PID와 실제 durable GPU trainer는 0이다. 따라서
+  `pause-airi-safely.ps1`은 실행하지 않았다. D:의 실제 durable `run-state.json`/
+  checkpoint도 0이다. 보존된 synthetic 실패 root의 state/anchor 파일은 삭제하지 않았다.
+- v4 source `7,056,597` bytes SHA `43f9c1ed...eba2ed`, chat `6,886,621` bytes
+  SHA `96cc223c...6eb44`, base `4,611,084,960` bytes SHA `394b6624...8f506`,
+  E1 adapter `56,318,520` bytes SHA `379b2a5a...305041`, config `863` bytes SHA
+  `930eddf6...3de2c`, report `1,287` bytes SHA `0f71b042...b41f41`로 고정값과
+  exact 일치한다.
+- E2 adapter/report, T3 matrix, live campaign은 없다. 기존 E2 stdout/stderr는 각각
+  0 bytes이며 본문은 읽지 않았다.
+- 이전 pause 당시 마지막 actual-process 실패 root `airi-durability-contract-ff7cec...`와
+  이후 fixture 원인 진단 root `dd1dbf...`/`24fed...`는 삭제하지 않고 보존한다. 최종
+  PowerShell PASS가 이 실패 receipt를 대체했으며 세 root의 로그 12개는 모두 0 bytes다.
+- 현재까지 검증·구현된 P0: origin/main의 P0-A full-state/RNG/provenance checkpoint,
+  same-volume atomic 승격·latest/previous·격리, exact-pin resume, durable runner와
+  run-state, optimizer-boundary safe-pause/자동 탐지의 이전 offline fault 계층이다.
+  로컬 배치의 no-follow input snapshot/manifest, authenticated run-state lineage와
+  recovery, producer evidence/index/event 결속, trainer-bound launcher, anchor-bound pause는
+  위 최종 통합·offline gate로 검증됐다.
+- 남은 P0-B 실증은 clean timestamped 외부 root의 controlled GPU 무중단 대 safe
+  pause/checkpoint/resume 동등성과 실제 checkpoint 간격 ≤600초·최소 4구간뿐이다.
+  이미 닫힌 P0-A나 현 로컬 배치를 새 기준으로 재감사하지 않는다.
+- 현재 배치는 **로컬 검증 완료·미커밋·미푸시**다. SSoT focused 검증과 exact stage/
+  Conventional Commit/push 뒤 HEAD=origin/main·clean worktree를 확인해야만 controlled
+  GPU로 이동한다. 운영 채택과 기본 모델 변경 금지는 유지한다.
+- 새 세션/compact는 다섯 SSoT 전체 읽기와 read-only 대조를 먼저 한다. 현재 다음
+  상태 변경은 exact 17-path stage/commit/push이며, 성공 뒤 clean GPU preflight를 별도
+  intent로 기록한다.
+- pause 인계 중 위 focused 검사 1회는 exit 1,
+  `Work-continuity contract missing: recognized goal status`였다. 검사기가 새 pause
+  상태를 아직 인식하지 못한 것이며 문서를 active로 되돌리거나 test를 수정·재실행하지
+  않았다. 같은 시점 tracked 16파일 scoped `git diff --check`는 exit 0이다. 따라서
+  continuity PASS는 없고 이 결과 자체가 명시적 failure receipt다. 새 세션에서 명시적
+  resume로 상태 문서를 갱신한 뒤 위 gate를 실행한다.
 
 세션 시작·goal resume·재부팅·compact 직후에는 이 문서보다 먼저
 `AIRI-WORKING-STATE.md`를 전체 읽고 실제 goal status, HEAD/worktree,
@@ -274,8 +351,10 @@ T3 우승 후보만 `run-airi-live-broadcast-campaign.ps1`로 3 seed × 500 turn
 
 ## 7. 직전 검증과 2026-08-22 상태 감사
 
-아래 테스트 수치는 2026-08-21 실행의 역사적 증거다. 2026-08-22 paused 문서
-배치에서는 GPU·서비스·전체 회귀를 재실행하지 않았다.
+2026-08-23 동결 P0 로컬 배치 최종 receipt는 핀된 Python `145 passed, 5 skipped`,
+actual-process PowerShell durability literal PASS, 전체 offline checkpoint PASS,
+repo diff-check와 17-path security hit 0, 관련 PID 0이다. GPU·서비스·E2 실행은 이
+검증 배치에서 0이며 commit/push는 아직 없다. 아래 2026-08-21 수치는 역사적 증거다.
 
 - v4 generator: 8 passed
 - LoRA trainer: 16 passed, 1 skipped(CUDA box라 gpu-less refusal skip)
@@ -365,8 +444,12 @@ identity spoof, corrupt-current/valid-previous 회귀와 전체 offline checkpoi
    `8cd69b5f455bd41b48faa5ed6e9cac1af00f8908`로 origin/main push됐다.
    `pause-airi-safely.ps1`의 RunDir 생략 모드는 exactly-one verified active run만 자동
    선택하고 0개·복수·spoof·명시적 empty를 거부하도록 actual-process 회귀를 통과했다.
-   controlled GPU 동등성과 실제 E2 속도 checkpoint 간격을 전원 종료 손실 상한 10분
-   이하로 실측·고정하는 단계가 남았다.
+   2026-08-23 후속 동결 배치는 authenticated run-state lineage, no-follow input lock,
+   producer evidence/index/event 결속, trainer-bound launcher와 anchor-bound pause를 추가했고
+   최종 Python `145 passed, 5 skipped`, actual-process PowerShell PASS, 전체 offline
+   checkpoint PASS, diff/security PASS로 잔여 로컬 P0/P1 0을 확인했다. 이 배치는 아직
+   commit/push 전이다. HEAD=origin/main·clean 뒤 controlled GPU 동등성과 실제 E2 속도
+   checkpoint 간격을 전원 종료 손실 상한 10분 이하로 실측·고정하는 단계가 남았다.
 4. [ ] preflight에서 입력 코드·데이터가 clean인지 확인한다. live heartbeat로 생긴
    `AIRI-WORKING-STATE.md` 단독 diff만 별도 검토 후 제외할 수 있고 다른 tracked/untracked
    변경은 금지한다. trainer 0, corpus source/chat SHA, base model SHA, E1 SHA,

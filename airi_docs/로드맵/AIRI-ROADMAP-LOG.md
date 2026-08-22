@@ -7,6 +7,557 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-23 goal resume·P0 final validation
+
+- 03:01 KST exact 17-path stage exit 0. staged 17/boundary diff 0/unstaged 0/untracked 0,
+  cached diff-check PASS, index blob 총 1,168,787 bytes와 manifest
+  `19a63ba8...8182b8`, cached security hit 0, 관련 PID 0이다. 문서 인덱스는 stage하지
+  않았다. 이 receipt 두 문서만 재stage해 동일 경계를 재확인한 뒤
+  `fix: harden durable training evidence`로 commit한다. 실패 시 push/GPU/E2는 금지다.
+- 03:00 KST milestone SSoT 정리 뒤 focused continuity와 repo diff-check PASS. actual
+  17경로는 expected boundary와 exact, staged 0, builder untracked 1, 관련 PID 0이다.
+  최신 1,170,513 bytes security hit 0, 17-file path+size+SHA manifest
+  `e4a183c7...e065a`다. receipt 문서 반영 뒤 focused/diff를 최종 확인하고 exact 17-path만
+  stage하여 staged 17/unstaged 0/untracked 0과 cached diff/security를 검증한다. 실패 시
+  commit/push/GPU/E2는 금지다.
+- 02:57 KST repo 기본 exact diff-check exit 0/whitespace error 0. 현재 17-path
+  1,167,298 bytes의 금지 `.env`/weight/adapter/GGUF/audio/DB/log filename, binary/과대
+  파일, 알려진 credential, 민감 literal 할당, 개인 경로 hit는 모두 0이고 staged 0이다.
+  동결 P0 로컬 코드 배치의 지정 검증이 완료됐다. WORKING·현행 handoff·STATUS·LOG·NEXT를
+  actual receipt로 정리하고 focused continuity/diff 뒤 exact stage/commit/push한다. 문서
+  인덱스는 현행 handoff를 정확히 가리켜 변경하지 않는다. push/clean 전 GPU/E2는 금지다.
+- 02:55 KST exact `test-current-checkpoint.ps1`은 exit 0. 내부 work-continuity와 actual-
+  process durability literal PASS, 최종 offline checkpoint PASS를 확인했고 post-run 관련
+  PID 0, worktree 16 modified+1 untracked+0 staged다. 지정 P0 Python/PowerShell/full-offline
+  gate가 모두 완료됐으므로 새 감사 라운드 없이 repo 기본 diff-check와 현재 17-path
+  금지 산출물·비밀정보 검사로 이동한다. 둘 다 PASS 전 stage/GPU/E2는 금지다.
+- 02:53 KST compact 뒤 SSoT 5종과 실제 Goal/Git/PID/SHA를 재대조했다. Goal active,
+  HEAD/local·remote origin/main `32830a4`, worktree 16 modified+1 untracked+0 staged,
+  관련 PID와 AIRI GPU workload 0, source/chat/base/E1 exact, E2 adapter/report·durable
+  state absent, E2 logs 각 0 bytes다. 02:43 exact fresh PowerShell contract는 exit 0,
+  literal PASS, post-run PID 0이며 final test/launcher/verifier SHA는 intent와 exact다.
+  한 차례 감사 P0=0과 감사가 고정한 원래 P1 네 건은 exact 수정+targeted+최종 Python
+  `145 passed, 5 skipped`+PowerShell PASS로 모두 닫혔다. 새 감사 라운드는 추가하지 않고
+  exact `test-current-checkpoint.ps1` 1회로 이동한다. offline PASS 전 GPU/E2는 금지다.
+- 02:41 KST orphan current canonical anchor 추가 뒤 dynamic exact anchor/AST/static/diff
+  PASS, test SHA `738630d9...8756c6`, 새 manifest `59087297...a4a5b`, PID 0이다. 제품/Python
+  unchanged로 exact fresh PowerShell final gate 한 번을 실행한다.
+- 02:38 KST raw-restore 뒤 PowerShell gate는 terminal-injection을 live receipt→verified
+  complete/anchor exact로 통과하고 다음 orphan-case에서 exit 1, `24fed...` root/PID 0이다.
+  orphan fixture가 authenticated state 계약과 달리 anchor 없이 current만 쓴 원인이므로
+  제품 unchanged로 canonical anchor 한 개만 추가해 기존 trainer-only duplicate 거부를
+  계속 검증한다.
+- 02:36 KST embedded fake가 captured authority raw bytes를 forgery 뒤 exact 복원하도록
+  test-only 수정했다. AST/embedded pycompile/static 5/5/diff PASS, test SHA
+  `2aa141d7...05d2b0`, 새 12-file manifest `a50787ac...200976`, PID 0이다. Python final
+  PASS는 유지하고 exact fresh PowerShell 영향/최종 gate 한 번을 실행한다.
+- 02:32 KST final PowerShell gate는 terminal-injection timeout으로 exit 1, `dd1dbf...`
+  root/PID 0이다. 보존 run은 이후 complete/anchor exact/artifacts verified이고 quarantine의
+  actual-identity state가 revision 202다. fixture가 authenticated revision 2를 복원하며
+  `+200`해 스스로 unanchored로 만들어 새 launcher가 정확히 거부한 원인이다. 제품 unchanged로
+  captured authority raw bytes를 byte-exact 복원하고 targeted actual job 뒤 새 manifest에서
+  영향/최종 gate를 한 번 재실행한다.
+- 02:28 KST finalized pinned 5-module pycompile+네 Python suite는 exit 0,
+  `145 passed, 5 skipped in 34.84s`, post-run 관련 PID 0이다. 같은 12-file manifest에서
+  exact `test-airi-training-durability.ps1 -KeepFailedArtifacts` 한 번을 영향/최종
+  PowerShell gate로 실행하며 exit 0/literal PASS/PID 0 전 offline/GPU는 금지한다.
+- 02:26 KST launcher snapshot 결함을 authority receipt bytes 보존으로 수리했고 worker
+  AST/dynamic candidate/static/diff가 PASS했다. root source 검토 뒤 finalized 12-file
+  manifest `64441cf4...2be00c`, 관련 PID 0에서 핀된 5-module pycompile+네 Python suite
+  전체를 final integration으로 한 번 실행한다. PASS 전 PowerShell/full offline/GPU는
+  금지한다.
+- 02:24 KST verifier 세 P1 최소 수정은 pinned pycompile과 focused `61 passed, 1 skipped`,
+  root producer/runner 계약 검토를 통과했다. launcher 담당의 AST/static receipt는 candidate
+  reader가 `.value`만 저장한 뒤 미정의 `$snapshot.Bytes`를 hash해 모든 실제 state를 null로
+  만드는 결함 때문에 승인하지 않았다. full contract를 실행하지 않고 exact authority
+  receipt bytes 보존과 full anchor-entry 검증을 같은 담당이 최소 수리·동적 확인한다.
+- 02:18 KST compact 직후 지정 SSoT 5종과 Goal/Git/PID/SHA를 재대조했다. Goal active,
+  HEAD/local·remote origin/main `32830a4`, worktree 16 modified+1 untracked+0 staged,
+  관련 PID 0, source/chat/base/E1 exact, E2 adapter/report·durable state absent다. 한 차례
+  독립 최신-byte 감사 판정은 `NOT READY`, P0=0/P1=4: checkpoint event payload-progress
+  schema 불일치, completed progress whole-object shape 불일치, nondeterministic cumulative
+  elapsed exact 비교, launcher existing/polling의 current anchor 미결속이다. 이 네 원래
+  safety/integrity/evaluator P1만 최소 수정하고 targeted+영향+최종 integration gate로
+  닫으며 새 감사 라운드·GPU/E2는 금지한다.
+- 02:06 KST exact fresh PowerShell contract exit 0/literal PASS, post-run PID 0,
+  test SHA `b93d29bd...03b6b0`, worktree 16 modified+1 untracked+0 staged다. Python
+  `139 passed, 5 skipped`와 함께 integration green이다. 동결 P0와 원래 safety/integrity/
+  evaluator P1만 현재 final bytes에서 한 차례 독립 감사하고 새 범위는 backlog로 분리한다.
+- 02:05 KST prearm launcher receipt+paused-safe verification과 post-hoc nonzero/no marker
+  rejection으로 fixture를 이관했다. AST/static 7/7/actual preserved subprocess/diff PASS,
+  test SHA `b93d29bd...03b6b0`, manifest `c588ddc3...f8ce11`, PID 0이다. exact fresh
+  full contract 한 번을 영향/최종 gate로 실행한다.
+- 02:04 KST fresh integration은 prearm paused-safe 뒤 별도 post-hoc pause가 unobserved
+  terminal SAFE를 거부해 exit 1, `408960...` root/PID 0이다. prearm state 자체는 exit 75,
+  checkpoint verification/request/ack/anchor를 갖췄다. launcher receipt를 검증하고 post-hoc
+  pause는 nonzero/no marker/exact 거부여야 한다고 fixture를 고쳐 unverified SAFE 금지선을
+  유지한다. 제품·GPU/E2는 unchanged다.
+- 02:01 KST current embedded fake actual job은 readiness/prime/forged, marker 시점 live,
+  launcher non-complete, final complete exit 0, PID 0 등 10/10 PASS다. 12-file manifest
+  `d5214cee...6aae3`에서 exact fresh full contract 한 번을 영향/최종 gate로 실행한다.
+- 01:59 KST revision>=2+anchor exact sync 뒤 AST/embedded Python compile/static 7/7/
+  diff-check PASS, test SHA `3b5a9359...68b00`, PID 0이다. 현재 embedded fake와 fresh
+  live sleeper identities로 terminal-prime actual job 한 건을 targeted 검증한 뒤에만
+  full contract를 실행한다.
+- 01:58 KST fresh integration은 terminal-injection line 1264에서 exit 1,
+  `9f6737...` root/PID 0이다. readiness/prime marker 뒤 unrelated revision 2를 runner의
+  즉시 두 번째 initial publication과 경쟁시켜 supervisor failure가 난 fixture race다.
+  fake trainer가 authenticated run revision >=2 뒤에만 prime/injection window를 시작하도록
+  test-only 동기화한다. 제품·GPU/E2는 변경하지 않는다.
+- 01:54 KST existing quarantine inventory와 original previous를 보존·원복하는 test-only
+  수정 뒤 AST/static 6/6/scoped diff-check PASS, test SHA `8e323230...90451b`, 12-file
+  manifest `002607b3...584b1`, PID 0이다. exact fresh contract 한 번을 영향/최종
+  integration gate로 실행하고 실패 시 반복 없이 보존 진단한다.
+- 01:53 KST fresh integration은 terminal injection/live pause 뒤 line 1820에서 exit 1,
+  `4e5aaf...` root를 보존했고 PID 0이다. quarantine 1개는 앞선 active corrupt-current
+  fault의 의도된 rev 7 격리인데 후반 fixture가 전체 count 0을 요구했다. 기존 inventory와
+  original previous를 기준선으로 보존해 launcher rejection/명시 복원 전후의 추가 mutation만
+  거부하도록 test-only 최소 수정한다. 제품·GPU/E2는 변경하지 않는다.
+- 01:51 KST actual JSON-job targeted run은 unrelated prime/forged marker 뒤 정상 complete로
+  수렴했고 post-run read-only 15-condition 검증이 모두 true, 관련 PID 0이다. 현재
+  12-file manifest `6d3c31f6...c4441`에서 exact `-KeepFailedArtifacts` contract 한 번을
+  영향/최종 PowerShell integration gate로 실행한다. 실패하면 반복 없이 보존 진단한다.
+- 01:48 KST JSON argument transport 수정 뒤 AST 0, job string[] 36개 exact round-trip,
+  static 5/5, scoped diff-check PASS; test SHA `47e3f302...afdabd`다. 별도 temp와 exact
+  live sleeper records로 forged gate/marker/launcher receipt 한 건을 targeted 검증한 뒤에만
+  full contract를 허용한다.
+- 01:47 KST exact binding probe로 36개 trainer arg가 job에서 ArrayList 하나가 되어 전체
+  단일 문자열로 변환되는 fixture 원인을 확정했다. terminal-injection 한 곳만 JSON
+  string 전달/child exact string[] 복원으로 최소 수정하고 AST/binding/static/diff 뒤
+  fresh integration을 별도 승인한다. 제품·GPU/E2는 변경하지 않는다.
+- 01:46 KST launcher 자체 deadline까지 회수한 targeted job은 child Failed,
+  `launch_shim_exited=True`; 약 31초 내내 RunDir/state/gate 0, sentinel만 존재하고
+  관련 PID 0이다. 10초 readiness 확대는 원인 수리가 아니다. launcher 없이 같은
+  `Start-Job -ArgumentList` binding의 실제 trainer argument type/count/value만 확인한다.
+- 01:45 KST 10초 sentinel 진단은 job script 진입은 즉시 확인했으나 RunDir/state/gate와
+  error/output은 0, Stop 뒤 관련 PID 0이었다. fresh job의 launcher preflight가 고정
+  readiness deadline보다 긴지 확정하기 위해 launcher 자체 30초 poll 종료까지 같은
+  synthetic 한 건만 회수한다. 제품/full contract/GPU는 건드리지 않는다.
+- 01:43 KST 첫 targeted job 진단은 30초 tool 창에서 receipt 없이 끊겼고 새 temp root는
+  file 0, 관련 child PID 0이다. 성공/진척으로 인정하지 않는다. job script 첫 줄 sentinel과
+  10초 bounded wait를 추가한 짧은 진단으로 job startup 대 launcher 진입을 분리하고,
+  full contract는 반복하지 않는다.
+- 01:41 KST 보존 ordinary fixture/current launcher를 별도 temp RunDir에서 사용해
+  terminal-injection `Start-Job` 한 건만 targeted 재현한다. 35초 안의 job state,
+  RunDir/gate, child output/error를 회수해 startup latency와 argument/preflight 실패를
+  분리한다. receipt 전에는 test/full contract를 수정·재실행하지 않는다.
+- 01:40 KST 세 번째 fresh exact PowerShell contract는 initial launcher/competitor fault 뒤
+  terminal-injection readiness gate line 1246에서 exit 1, `983f6d...` root를 보존했고
+  관련 PID 0이다. root에는 ordinary complete run과 unrelated prime만 있고 기대한
+  terminal-injection RunDir가 없어 forged-terminal 제품 승인 재현이 아니라 background
+  launcher job의 pre-RunDir 종료로 판정한다. compact 뒤 SSoT 5종과 Goal/Git/PID/SHA를
+  재대조해 active, HEAD=origin/main `32830a4`, 16 modified+1 untracked+0 staged,
+  source/chat/base/E1 exact, E2 absent를 확인했다. full retry 없이 보존 fixture로 job
+  exit/output을 targeted 회수한다. GPU/E2와 운영 채택은 계속 금지한다.
+- 01:33 KST competitor fixture를 background pause + parent synchronous mutation으로
+  결정론화했다. AST/job/static/diff-check PASS, test SHA `3f05d981...bd830`, 12-file
+  manifest `63e225eb...ca8d5`, 관련 PID 0에서 exact fresh contract를 실행한다.
+- 01:32 KST separate-copy competitor 진단은 exit 1/no marker/exact unanchored rejection으로
+  제품 PASS였다. full 실패는 3초 pause보다 늦을 수 있는 background mutator job 시작 경쟁이다.
+  pause를 job으로 시작하고 parent가 current를 동기 교체하도록 test-only sync를 고친다.
+- 01:29 KST observation fix 뒤 fresh contract는 initial launcher를 통과했지만 새
+  higher-revision competitor 결합 assertion에서 exit 1, `2846...` root를 보존했고 PID 0이다.
+  별도 temp 복제본에서 이 fault만 재현해 child exit/marker/error를 분리하기 전에는 수정이나
+  full retry를 하지 않는다.
+- 01:27 KST ordinary fake trainer 관찰 창만 0.5→2.0초로 늘렸다. AST/static/diff-check
+  PASS, test SHA `d8501b46...c8f5ff`, 12-file manifest `d81d781a...bba07`, 관련 PID 0이다.
+  exact fresh contract를 한 번 실행하며 실패 시 새 receipt를 보존한다.
+- 01:27 KST anchor 이관 뒤 fresh contract는 첫 synthetic launcher timeout으로 exit 1,
+  `c0d477...` root/실패 receipt를 보존했고 PID 0이다. terminal current/previous는 anchor에
+  exact, complete artifact/final evidence 존재, 같은 RunDir pause gateway는 exit 0/SAFE다.
+  fake trainer가 live 1,452ms(명시 sleep 500ms) 만에 terminal로 전환해 launcher의
+  provenance 관찰 전에 끝난 fixture 경쟁이므로 ordinary sleep만 2초로 늘리고 제품은
+  변경하지 않는다.
+- 01:23 KST 제품 변경 없이 PowerShell test fixture만 canonical anchor current/previous,
+  rollback/live-competitor rejection, 비동기 forged-terminal gate 관찰로 이관했다. root
+  AST/dynamic canonical·array/static probe/diff-check PASS, test SHA `7493d7f0...00450`,
+  12-file manifest `a2039e61...8b91a`, 관련 PID 0이다. exact full contract 1회를 실행한다.
+- 01:16 KST exact PowerShell contract는 runtime 생성 전 source-token preflight에서
+  구 `previous terminal...` 문구 부재로 exit 1; 관련 PID 0, 새 temp root 0이다. 제품은
+  최신 anchor-bound 문구를 사용하지만 test-only predecessor helper는 anchor를 쓰지 않는다.
+  제품을 약화하지 않고 fixture만 frozen rollback/authorized/competitor 계약으로 최소
+  이관하며 AST/targeted receipt 전에는 full contract를 재실행하지 않는다.
+- 01:15 KST 핀된 pycompile 5개와 네 Python suite는 exit 0,
+  `139 passed, 5 skipped in 33.12s`, post-run related PID 0이다. 현재 PowerShell 포함
+  12-file manifest `0fd3c06c...e5570`에 고정해 exact `-KeepFailedArtifacts` actual-process
+  contract를 한 번 실행한다. 실패 시 root를 보존하고 원인 없이 반복하지 않는다.
+- 01:13 KST resume 첫 continuity gate는 exit 0/PASS다. 핀된 Python 3.12.13과
+  관련 PID 0, checkpoint/trainer/runner/verifier/builder 및 네 suite 9-file manifest
+  `e9d180d9...d3a84`를 고정했다. py_compile 5개와 네 Python suite 전체를 한 번
+  순차 실행하며, 실패 시 PowerShell contract와 downstream gate를 열지 않는다.
+- 01:12 KST 최신 사용자 `/goal`로 Goal 도구 status를 `active`로 생성·확인했다.
+  local HEAD/local origin/main/remote main은 모두 `32830a4`, worktree는 handoff exact
+  modified 16+untracked 1+staged 0, 관련 runner/trainer/검증 PowerShell PID와 식별 가능한
+  AIRI GPU workload는 0이다. 보존 실패 root `ff7cec...`와 run-state/anchor/log 크기·SHA를
+  read-only로 회수했고 로그 본문은 읽지 않았다. source/chat/base/E1 크기·SHA는 exact,
+  E2 adapter/report·T3·campaign은 absent, 기존 E2 로그는 각 0 bytes다. pause 문서만 최신
+  명령과 달라 WORKING-STATE와 이 log를 관측 사실로 먼저 정정했다. 운영 채택/기본 모델
+  변경은 계속 금지하며, 다음 exact 동작은 resume 후 continuity gate 1회다.
+
+## 2026-08-23 paused-user-session-handoff
+
+- 01:00 KST 사용자 명령으로 goal을 `paused-user-session-handoff`로 전환했다. Goal
+  도구 status=`paused`; complete/cancel이 아니다. HEAD=origin/main `32830a4`, 관련
+  AIRI Python/PowerShell PID와 durable GPU trainer 0이므로 safe-pause 도구는 실행하지
+  않았다. source/chat/base/E1 SHA·크기는 exact이고 E2 adapter/report, T3, campaign은 0,
+  기존 E2 로그는 각 0 bytes다.
+- 인계 문서 반영 후 worktree는 modified 16, untracked 1, staged 0이며 현재 P0 코드
+  배치는 로컬 미검증·미커밋으로 동결한다. 마지막 권위 PASS는 Python
+  `139 passed, 5 skipped in 51.53s`; 마지막 actual-process PowerShell contract는
+  line 1160에서 exit 1이고 `ff7cec...` 실패 root를 보존했다. 이후 pause anchor static
+  receipt만 있으며 중단된 최신 Python 독립 감사와 launcher/test 후속은
+  `no-authoritative-receipt`다. 새 세션 resume 전 구현·테스트·GPU·E2·서비스·stage·
+  commit·push는 금지하며 운영 채택/기본 모델 변경 금지도 유지한다.
+- 01:04 KST 허용된 focused continuity 검사 1회는 새 pause 상태를 recognized goal로
+  인식하지 못해 exit 1이었다. 문서 상태를 되돌리거나 검사기를 수정·재실행하지 않았다.
+  같은 시점 tracked 16파일 scoped `git diff --check`는 exit 0이며, 이 배치는 여전히
+  P0 통합 PASS가 아닌 로컬 handoff다.
+
+## 2026-08-22 P0-B GPU preflight·증거 결함 정정
+
+- 00:52 KST (2026-08-23) independent PowerShell anchor audit is `NOT READY`, P0=1/P1=1.
+  Pause can accept an internally valid but unanchored rolled-back terminal pair and emit the
+  safety marker; launcher can return/derive its baseline from an unanchored live competitor before
+  Python quarantines it. Bind exact no-follow current/previous bytes and revisions to the anchor,
+  allow only nonterminal `previous == anchor.current` recovery, and add rollback/competitor faults.
+  Also make the terminal-injection test observe the actual gate asynchronously rather than rely on
+  child-start timing. No full retry or downstream work is authorized.
+- 00:50 KST (2026-08-23) nonterminal launcher success now requires a stable exact-live
+  trainer proven to be the observed runner's child; runner-only starting receipts cannot return.
+  Root AST/static/diff-check pass, related PID 0, launcher/test SHA `3a5b2738...9fb5a5`/
+  `016ced39...8f991`. Await the independent anchor-boundary review before a fresh full contract;
+  GPU/E2 stay closed.
+- 00:47 KST (2026-08-23) preserved evidence separates the terminal-injection failure:
+  the run later completed with consistent current/anchor and two forged receipts quarantined,
+  but launcher returned an initial exact-runner `starting` receipt while trainer was still null;
+  the gate appeared before the caller assertion. Strengthen live launch success to require an
+  observed exact child trainer, retain terminal verification, and make the fault trainer-bound.
+  Static checks precede any root retry; downstream gates remain closed.
+- 00:45 KST (2026-08-23) the single fresh PowerShell contract exited 1 at the terminal-
+  injection fault and preserved `airi-durability-contract-ff7c...`; related PID 0. The launcher
+  returned while `forged-complete-live.gate` still existed. This is failure, not progress or
+  corruption evidence. Diagnose the preserved run-state/anchor/gate and exact launcher cutpoints
+  before any retry; GPU/E2 stay closed.
+- 00:44 KST (2026-08-23) root pycompile and all four P0 Python suites passed:
+  `139 passed, 5 skipped in 51.53s`, scoped diff-check PASS and post-run related PID 0.
+  One fresh actual-process PowerShell contract is authorized on twelve-file manifest
+  `20e45732...d43fe`; exit 0/literal final PASS/PID 0 are mandatory and any failure root is
+  retained for diagnosis before retry. GPU/E2 remain closed.
+- 00:43 KST (2026-08-23) root pinned Python integration is authorized on nine-file
+  manifest `7be9afb6...14433` with related PID 0: pycompile the five producer/verifier/builder
+  modules, then run all four P0 Python suites sequentially. Exit 0, exact PASS receipt and
+  post-run PID 0 are mandatory; failure blocks the PowerShell contract and downstream gates.
+- 00:41 KST (2026-08-23) post-compact reconciliation found goal active,
+  HEAD=origin/main `32830a4`, the expected 13 modified+1 untracked P0 batch, related PID 0,
+  exact source/chat/base/E1 hashes, absent E2/T3 outputs and zero-byte historical E2 logs;
+  there is no repository/model corruption evidence. Authenticated run-state pre-rotation
+  recovery now quarantines unanchored/corrupt/competitor receipts, preserves only anchor-bound
+  predecessors and recovers current-before-anchor cuts. Worker receipt is pycompile PASS,
+  runner `48 passed, 2 skipped`, diff-check PASS; root integration and independent audit remain
+  mandatory before PowerShell retry or any downstream gate.
+- 00:37 KST (2026-08-23) the contract's seven-field schema and second safe-pause pass, but
+  live corrupt-current fallback drives the first runner to
+  `failed/supervisor-durablerunnererror`; preserved root `airi-durability-contract-d5db...`,
+  related PID 0. `_write_state` rotates corrupt current into `.prev`, publishes a valid current,
+  then fails parsing the corrupt predecessor before anchoring. Implement authenticated
+  current/previous pre-rotation recovery with quarantine and competitor/power-cut faults before
+  any PowerShell retry; all downstream gates remain closed.
+- 00:30 KST (2026-08-23) launcher/pause/manual fixture now share the seven-field v2 input
+  schema and bind the native-snapshot checkpoint-helper SHA in existing/live state. AST,
+  diff-check and static helper probe pass; related PID 0. One fresh root actual-process contract
+  is authorized under the same exit 0/PASS/PID 0 rule.
+- 00:26 KST (2026-08-23) the contract reached live-pause integration then failed because runner
+  v2 state adds `checkpoint_helper_source_sha256` while pause and launcher still enforce the old
+  six-field input schema. Preserved root `airi-durability-contract-15e8...`; brief synthetic
+  processes exited naturally and fresh related PID count is 0. Add/native-pin/compare the helper
+  field across pause, launcher and manual fixture before another intent; downstream gates stay closed.
+- 00:23 KST (2026-08-23) the disappeared-report fault now independently requires nonzero
+  exit, no exact marker and the completed-file-artifact error class; product no-follow checks
+  are unchanged. AST/diff-check pass, test SHA `9b93b81e...0d0618`, related PID 0. One fresh
+  exact root contract is authorized under the same fail-closed receipt rule.
+- 00:22 KST (2026-08-23) root contract reached the disappeared-report fault and exited 1;
+  preserved root `airi-durability-contract-030b...`, PID 0. Isolated child output proves product
+  correctly returned nonzero/no marker through its native no-follow file verifier; the fixture
+  incorrectly required a missing-receipt message although the receipt exists and only its target
+  is gone. Broaden only this test to the completed-file-artifact error class with independent
+  exit/marker/error diagnostics before another intent.
+- 00:21 KST (2026-08-23) pause completed-artifact verification now initializes the canonical
+  receipt path before file/directory use and retains native snapshot/reparse/inventory checks;
+  a parent-scope decoy regression and independent deadline diagnostics were added. Product/test
+  AST and diff-check pass, related PID 0. Root authorizes one fresh exact contract; PASS/PID 0
+  remains mandatory before integration/audit.
+- 00:19 KST (2026-08-23) isolated preserved-run output proves no literal marker: completion
+  validation fails first because `Assert-VerifiedArtifactReceipt` initializes `$path` only in
+  its file branch and then uses it unbound for directory adapters under StrictMode. This is a
+  real completed-adapter verification P0 availability defect. Initialize the canonical receipt
+  path before the kind split and regress a directory receipt without ambient `$path`; no full
+  retry or downstream work is authorized before static checks/new intent.
+- 00:18 KST (2026-08-23) exact-line marker parsing still fails at the final-completion
+  deadline fault; preserved root `airi-durability-contract-924f...`, related PID 0, and the v2
+  launcher run/output/report now exist. No full retry is allowed. Diagnose one preserved complete
+  RunDir invocation with the 1s deadline/1.5s hook and line-delimited child output to decide
+  whether a literal marker is emitted before an error.
+- 00:17 KST (2026-08-23) all subprocess safety-marker fault checks now require an exact
+  standalone marker line; deterministic assertions distinguish the deadline error token from
+  a real marker. AST/diff-check pass, source SHA `8aa629f6...f99500`, related PID 0. One fresh
+  root actual-process contract is authorized; exit 0/final PASS/PID 0 remains mandatory.
+- 00:16 KST (2026-08-23) root fresh contract exited 1 at the final-deadline fault, preserved
+  root `airi-durability-contract-c968...`, related PID 0. The product correctly rechecked the
+  deadline after the delay and threw `deadline expired before SAFE_TO_POWER_OFF emission`; the
+  fixture used a substring regex and misclassified the token inside this error text as a literal
+  marker. Convert all subprocess negative gates to exact standalone-line marker recognition and
+  regress error-text-vs-marker distinction before another fresh retry; downstream gates stay closed.
+- 00:14 KST (2026-08-23) both PowerShell initial/live-pause fixtures are now canonical
+  input-manifest v2 with actual dataset/model/helper/trainer hashes and full sorted model
+  inventory; all matching argv hashes were migrated and no v1 manifest literal remains.
+  AST/static checks and scoped diff-check pass, source SHA `2a14abfa...692162`, related PID 0.
+  Root authorizes one fresh exact actual-process contract and will retain a yielded exec session;
+  exit 0/literal PASS/PID 0 is required, otherwise diagnose the atomic failure receipt before retry.
+- 00:09 KST (2026-08-23) the diagnostic retry retained an exact initial-launch receipt:
+  launcher line 768 timed out with `launch_shim_exited=True`, no RunDir/state/log, related PID 0.
+  Static comparison identifies the fixture mismatch: the shared PowerShell manifest helper still
+  writes input-manifest v1 while the runner is now mandatory v2-only. Migrate both initial-launch
+  and live-pause fixtures to canonical v2 with actual input hashes, helper pin and closed model
+  inventory; no further contract is authorized before static checks and a new intent.
+- 00:05 KST (2026-08-23) read-only diagnosis located the unobserved boundary at the first
+  launcher invocation but the prior run retained no exception receipt. A test-only helper now
+  atomically writes a redacted initial-launch failure receipt before rethrow; AST parse and
+  scoped diff-check pass, test SHA `484794d3...f79f6a`, related PID 0. One exact diagnostic
+  `-KeepFailedArtifacts` retry is authorized; failure requires receipt-based diagnosis before
+  any further retry and keeps all downstream gates closed.
+- 00:03 KST (2026-08-23) the single authorized PowerShell contract produced no exit/PASS
+  receipt in the 30-second tool window, so it is recorded as failure. Related PID count is 0;
+  preserved temp root `airi-durability-contract-b0f79a3978864d6e9006dfd15f8c5a1b` contains
+  early synthetic/spoof/launcher setup but no observed first launcher run subdirectory. No retry
+  is allowed before read-only diagnosis locates the exact failure and a minimal fix; all later
+  gates remain closed.
+- 00:01 KST (2026-08-23) runner parent-held input lifecycle is implemented: v2-only
+  dataset/full model inventory handles are retained across Popen through child exit with
+  before/after descriptor/path/hash checks and partial-open/swap/write/delete/replace/junction/
+  terminal-failure faults. Pinned runner focused receipt is `43 passed, 2 skipped in 24.58s`,
+  pycompile/scoped diff-check pass, related PID 0. One fresh exact PowerShell actual-process
+  contract is now authorized with failed artifacts retained; exit 0/literal PASS/PID 0 is
+  required before integration/audit/full-offline, and GPU/E2 remain gated.
+- 23:54 KST post-compact integrity reconciliation: all five SSoTs were reread in order;
+  goal is active, HEAD=origin/main `32830a4`, actual worktree is 13 modified+1 untracked/
+  staged 0, and AIRI trainer/runner/pytest PID is 0. The extra modified path is an in-flight
+  checkpoint-helper native snapshot edit, not evidence of repository corruption. Corpus/base/E1
+  bytes and SHA are exact; E2/T3 remain absent and old E2 logs remain 0 bytes. Helper-focused
+  `12 passed` does not close the remaining parent-held runner inputs or the active PowerShell
+  v2/final-cut work, so integration/audit/GPU/E2 gates remain closed.
+- 23:45 KST producer native Windows locks/closed model inventory reached focused
+  `74 passed, 3 skipped`, then mandatory non-circular event v2 migration exposed 17 legacy
+  durable test fixtures with no explicit event; checkpoint-only 11/11 passes but no integrated
+  producer receipt is claimed. Verifier non-circular v2 focused is `51 passed, 1 skipped` with
+  predecessor-index exact parsing follow-up active. Independent PowerShell audit is NOT READY,
+  P0=4/P1=3: post-delay evidence mutation, forged paused terminal authority, missing v2
+  index/event validation, path-racy final-component reads, final-root completion and recovered
+  completion compatibility, and v1-only fixtures. Fault-driven producer/verifier/PowerShell
+  follow-ups run repository-only; full offline/stage/commit/GPU/E2 stay gated.
+- 23:30 KST goal resume reconciliation: goal active, HEAD=origin/main `32830a4`, actual
+  worktree 12 modified+1 untracked/staged 0, AIRI trainer/runner/pytest PID 0. Corpus/base/E1
+  SHA remain exact; E2 adapter/report and T3 output remain absent and old E2 logs are 0 bytes.
+  Producer follow-up ended with `72 passed, 1 skipped in 27.07s` and scoped diff-check clean.
+  Its held inputs and final evidence-root binding are partial: Windows native share-read-only
+  locks and the runner's legacy v1 resume-index parser remain open, so verifier/full-offline/
+  stage/commit/GPU/E2 gates stay closed.
+- 23:23 KST second producer partial receipt: input manifest v2 helper/model inventory pins,
+  run-local source snapshots, authenticated run-state anchor recovery and transaction-only v2
+  events pass focused pytest `72 passed, 1 skipped in 26.37s`, PID 0. Held model handles across
+  real loaders and runner terminal evidence-root/progress binding remain mandatory follow-up;
+  no downstream gate is cleared.
+- 23:17 KST producer v2 partial receipt: pinned focused pytest `72 passed, 1 skipped in
+  26.90s`, PID 0. Event-before-index chain, cumulative monotonic elapsed, initial evidence root,
+  and trainer/helper snapshots exist, but helper/model manifest pins, loader-held input locks,
+  authenticated run-state predecessor recovery, terminal-state/final-progress evidence binding,
+  remaining path reopens and their faults are still open. Partial receipt does not clear any
+  GPU/E2/full-offline/commit gate; producer follow-up continues before verifier integration.
+- 23:11 KST producer redesign intent: checkpoint/trainer/runner/input-manifest code will add
+  event-before-index authority, an index-rooted event chain, cumulative monotonic elapsed,
+  exact progress/output commitments, locked no-follow inputs, byte-exact trainer/helper
+  snapshots, and authenticated run-state lineage with deterministic fault tests. Verifier work
+  waits for actual producer fields; no GPU/model/service/D: output is authorized.
+- 23:07 KST independent latest-byte Python audit is `NOT READY`, P0=7/P1=3. Blockers are
+  injectable PASS loaders, unauthenticated rotated events, wall-only inter-checkpoint timing,
+  progress/payload/report and current-index/final-event gaps, trainer/model/path replacement and
+  unpinned helper source, unsafe direct checkpoint/trainer final-component/event publication,
+  unauthenticated predecessor recovery, index-before-event crash gap, and non-atomic cross-tree
+  evidence cuts. Architectural fixes plus fault regressions and another independent audit are
+  required; all GPU/E2/full-offline/stage/commit gates remain closed.
+- 23:01 KST independent latest-byte pause/launcher re-audit is `NOT READY`, P0=0/P1=3:
+  launch provenance can be primed with unrelated live identities, final hashing can overrun the
+  marker deadline, and final report/revision/PID-reuse/deadline fault coverage is incomplete.
+  Bind runner to Start-Process ancestry and trainer to runner, recheck deadline immediately
+  before every marker, add faults, then rerun integration/re-audit; GPU/E2 stays gated.
+- 22:57 KST synchronized fixture retry passed: exact PowerShell durability contract exit 0,
+  literal PASS, related PID 0; root pinned Python is `82 passed, 1 skipped in 22.46s`, and
+  diff-check has no error. Independent latest-byte P0/P1=0 audit remains the gate before full
+  offline/stage/GPU.
+- 22:54 KST root fresh actual-process contract exited 1 at line 829:
+  `Actual-process forged complete terminal was not injected`; PASS is not claimed and related
+  PID recount is 0. The default-cleaned new synthetic root is unavailable, so the fixture needs
+  deterministic injection synchronization/observability before one fresh retry. GPU/E2 stays gated.
+- 22:52 KST root fresh integration intent recorded with related PID 0: pinned focused Python
+  first, then one exact actual-process PowerShell durability contract, never concurrently.
+  Exit/PASS plus post-run PID 0 is required before independent audit; GPU/E2 remains gated.
+- 22:49 KST explicit receipt-substitution, Windows reparse-attribute inventory, and
+  asymmetric two-arm interval regressions pass: pinned focused pytest `81 passed, 1 skipped
+  in 22.42s`, related PID 0. Native Windows no-follow final-component handle reading remains
+  the last root-requested Python hardening before the fresh PowerShell contract/re-audit.
+- 22:46 KST final Python hardening receipt: missing-current predecessor authority is fully
+  refused; completed adapter/report receipts are checked against one cached evidence cut;
+  artifact inventory rejects reparse/symlink entries; and interval evidence combines both
+  controlled arms conservatively. Pinned focused pytest: `79 passed, 1 skipped in 22.64s`.
+  Pause/launcher now binds terminal receipts to live-observed process identities and rereads
+  unchanged terminal state plus both exited identities immediately before the marker. Its
+  worker-side PowerShell run had no conclusive exit/PASS receipt, so root fresh contract and
+  independent P0/P1 re-audit remain mandatory; GPU/E2 stays gated.
+- latest independent audit는 runner/verifier P0 3/P1 1, pause/launcher P0 1/P1 2로
+  `NOT READY`다. missing-current stale rollback, state checkpoint↔latest event/index 결속,
+  artifact/report/tensor evidence cut, resumed timing gate, substituted absent PID forged terminal,
+  marker 직전 state/process continuity와 required report를 fault 회귀와 함께 닫고 재통합한다.
+- current-invalid previous authority를 launcher에서도 무프로세스 거부하고 fixture를 분리한
+  뒤 single fresh actual-process durability contract PASS, 관련 PID 0이다. root pinned Python
+  `75 passed, 1 skipped`와 함께 latest runner/verifier 및 pause/launcher bytes를 독립 재감사한다.
+- 보존 live-pause state는 current corrupt 격리 뒤 stale paused-safe previous만 남아 resume
+  timeout한 것으로 확정됐다. launcher도 invalid current 존재 시 previous 권한을 즉시 거부하고,
+  test는 거부 뒤 원본 current 복원→정상 resume를 별도로 검증하도록 새 P0 계약과 맞췄다.
+- full receipt fixture 보강 뒤 actual-process contract는 약 65초에 launcher 30초 timeout,
+  SAFE marker 0, 관련 PID 0이다. 새 temp는 default cleanup돼 injected terminal 대 prearmed
+  paused-safe 거부를 분리할 수 없으므로 `-KeepFailedArtifacts` 한 번으로 final state를 보존한다.
+- forged fixture heartbeat 범위/continuation을 정정한 actual-process contract는 약 30초 뒤
+  terminal receipt의 `.Properties` 접근에서 exit 1, SAFE marker 0, 관련 PID 0이다. synthetic
+  temp root를 보존해 dictionary/PSCustomObject fixture 경계를 분리하며 PASS 전 gate를 유지한다.
+- root single fresh actual-process contract는 forged complete가 exact runner live 중
+  launcher receipt로 반환되어 약 20초 뒤 exit 1, SAFE marker 0, 관련 PID 0이다. terminal/
+  nonterminal 분기 또는 fixture 호출을 최소 수리하고 재통합하기 전 gate를 계속 닫는다.
+- latest audit P0/P1 수리본은 corrupt-current terminal previous 차단, input/checkpoint
+  regular-handle snapshot, verifier의 cached state.pt 포함 단일 evidence cut, terminal status만
+  verified terminal receipt를 허용하는 launcher 분기와 complete artifact semantics를 fault
+  회귀에 고정했다. 위임 focused `75 passed, 1 skipped`, parse/diff-check PASS 뒤 관련 PID 0을
+  확인했으며 root pinned Python→single fresh actual-process contract를 재검증한다.
+- compact 복구 뒤 SSoT·goal/Git/PID/E2 산출물을 재대조했고 HEAD=origin/main `32830a4`,
+  worktree 9 modified+generator 1 untracked, AIRI trainer/runner 0, E2 산출물 0이다. 최신
+  독립 재감사는 corrupt-current→stale-terminal previous resume, input path의 multi-lookup,
+  verifier multi-open evidence cut을 P0로, schema-valid forged terminal launcher 성공 수용을
+  P1로 판정해 `NOT READY`다. fault 회귀와 fresh 통합·독립 P0/P1 0 전에는 full offline/
+  stage/GPU/E2를 금지한다.
+- 네 P0 fault와 terminal injection/auto-discovery/pause→resume를 포함한 single fresh
+  actual-process PowerShell durability contract PASS, 관련 PID 0이다. Python `68 passed,
+  1 skipped`와 함께 최신 bytes 두 범위 독립 최종 재감사를 시작한다.
+- discovery schema 뒤 injection test는 raw forged `status=complete`만 보고 사후 wait를
+  중단한 fixture exit 1이다. exit 0/reason/artifacts 동시 조건으로 수리했고 parse PASS다.
+- base command 수리 뒤 contract는 auto-discovery가 2개 active를 0개로 본 exit 1이다.
+  discovery의 구 3필드 command schema를 새 4필드 schema로 동기화했고 parse PASS다.
+- base/actual command 분리 뒤 Python focused `68 passed, 1 skipped`, 관련 PID 0이다.
+  single fresh PowerShell actual-process contract PASS 전 gate를 유지한다.
+- 보존 run에서 ordinary/injected launcher와 pause→resume actual completion을 확인했다.
+  resume-only checkpoint path를 actual command SHA에 포함한 불일치는 별도 base command SHA를
+  state에 기록·launcher 결속하는 방식으로 수리했고 parse·pycompile·diff-check PASS다.
+- command SHA exact-match 뒤 contract는 약 51초에 새 terminal-injection launcher timeout,
+  SAFE marker 0, 관련 PID 0이다. 보존 재현으로 injection final state/outputs/binding을 분리한다.
+- effective trainer command에 runner가 추가하는 checkpoint interval이 더 빠져 있었다.
+  run-dir/run-id/interval 동일 순서와 explicit flatten 뒤 보존 state command SHA가 exact
+  일치했고 parse PASS다. single fresh contract를 다시 실행한다.
+- started-PID 제거 뒤 timeout은 launcher command SHA가 runner가 append하는 `--run-dir`/
+  `--run-id`를 빼고 계산한 계약 불일치였다. 같은 conflict/append 순서의 effective args SHA로
+  수리했고 parse·diff-check PASS 뒤 single contract를 재실행한다.
+- launcher timeout 보존 run은 실제 complete/artifacts verified였고 Windows Python launch
+  shim PID와 actual runner PID 불일치가 원인이었다. started PID 대신 strict state와 requested
+  manifest/source/command SHA를 결속했으며 parse·diff-check PASS 뒤 contract를 재실행한다.
+- single PowerShell contract는 launcher strict polling에서 30초 timeout exit 1,
+  launch shim exited, SAFE marker 0, 관련 PID 0이다. 보존 재현 한 번으로 strict reader 대
+  injection fixture를 분리하며 PASS 전에는 full offline/stage/GPU/E2를 금지한다.
+- 네 P0 fault를 포함한 핀된 Python focused는 `68 passed, 1 skipped`, 관련 PID 0이다.
+  single fresh actual-process PowerShell contract PASS 전 gate는 계속 닫는다.
+- 네 P0를 single-handle checkpoint snapshots, raw canonical pins bytes SHA 결속,
+  terminal previous fallback 금지, launcher strict state+started PID 결속으로 수리하고 네 fault
+  회귀를 추가했다. parse·핀된 pycompile·diff-check PASS 뒤 focused→actual contract를 검증한다.
+- 최신 독립 재감사는 runner P0 1/P1 0, pause/launcher P0 3으로 `NOT READY`다.
+  checkpoint manifest/payload multi-open TOCTOU, unverified pins receipt SHA, stale terminal
+  previous fallback, launcher terminal strict-reader 우회를 fault 회귀와 함께 닫고 재통합·
+  독립 P0/P1 0 전에는 full offline/stage/GPU/E2를 금지한다.
+- fresh actual-process PowerShell durability contract PASS, 관련 PID 0이다. prearm·float pins·
+  authoritative receipt·tamper 거부·자동 탐지·exact exit/SAFE marker를 포함한다. Python
+  `66 passed, 1 skipped`와 함께 최신 bytes 두 범위 독립 재감사를 시작한다.
+- paused-safe reader 실패는 존재하지 않는 `Test-ExactJsonProperties` 호출이 outer catch로
+  fail-closed된 구현 실수였다. 기존 Assert helper로 수리한 뒤 보존 state 직접 실행은
+  `SAFE_TO_POWER_OFF`, parse PASS, 관련 PID 0이며 fresh 전체 contract를 재실행한다.
+- 단일 PowerShell contract는 첫 synthetic paused-safe receipt reader에서 exit 1,
+  `No valid current or previous run-state receipt`, SAFE marker 0, 관련 PID 0이다. 보존
+  재현 한 번으로 schema fixture 대 reader를 분리하며 PASS 전 gate는 계속 닫는다.
+- authoritative checkpoint receipt focused Python은 `66 passed, 1 skipped`, 관련 PID 0이다.
+  실제 child process PowerShell contract를 단일 fresh 실행해 prearm·float·tamper·자동 탐지·
+  exact exit를 검증하며 PASS 전에는 full offline/stage/GPU/E2를 금지한다.
+- Python runner가 authoritative paused-safe checkpoint verification receipt를 쓰고 pause가
+  manifest/payload bytes·ack·state와 교차 검증하도록 바꿔 cross-language float 재직렬화를
+  제거했다. resume도 receipt를 재검증하며 float fixture와 receipt 변조 fault를 추가했다.
+  parse·pycompile·diff-check PASS 뒤 focused→단일 PowerShell contract 순으로 검증한다.
+- 보존 합성 temp root는 Temp 하위·live PID 0을 확인했지만 recursive cleanup 두 시도가
+  exec policy에서 실행 전 거부돼 보존한다. 다른 삭제 수단으로 우회하지 않는다.
+- 보존 prearm 진단에서 request/ack/checkpoint/progress와 exit 75를 확인했고 runner의 같은
+  checkpoint 재검증도 PASS했다. 실패는 첫 instruction 확인 직후 trainer가 너무 빨리
+  사라져 supervisor PID snapshot이 trainer null로 실패한 fixture 경쟁이다. 확인을 sleep
+  앞에 유지하고 이후 1.5초 생존하게 고친다. 진단 중 남은 self-enumerating PowerShell
+  PID 24932는 exact command 대조 후 종료했으며 다른 관련 PID는 0이다.
+- strict pause 수리 뒤 fresh PowerShell contract가 spawn-time prearm assertion에서 exit 1,
+  관련 child PID 0이다. 제품 source 순서는 prearm→state→Popen으로 보이므로 단일
+  `-KeepFailedArtifacts` 진단 재현으로 terminal receipt/log를 보존해 제품 대 fixture를
+  분리한다. 재현·수리·fresh 통합 전에는 full offline/stage/GPU/E2를 금지한다.
+- 실제 E2형 checkpoint float 대조에서 Python canonical JSON의 `2e-05`와 Windows
+  PowerShell 재직렬화의 `0.00002`가 달라, pause strict 수리본이 정상 checkpoint를
+  거짓 거부할 새 P0를 확인했다. 실제 float fixture와 권위 검증 결속으로 닫고 fresh
+  통합·독립 P0/P1 0 전에는 full offline/stage/GPU/E2를 금지한다.
+- 두 독립 최종 재감사는 pause P0 2/P1 4, manifest P0 3/P1 2로 `NOT READY`다.
+  terminal trainer continuity, PowerShell checkpoint 권위 검증, marker deadline,
+  recovered-complete와 already-running cross-contract, manifest single-snapshot,
+  evidence-tree 밖 verifier receipt, non-replacing prearm race, Windows write-through,
+  heartbeat finite gate를 fault test와 함께 닫기 전에는 full offline/stage/GPU/E2를 금지한다.
+- 두 번째 최신 bytes 재감사는 terminal state의 trainer identity continuity 공백을 새
+  P0로 확정해 `NOT READY`다. marker 전 deadline, recovered-complete reason, PowerShell
+  checkpoint canonical/schema/pin/reparse가 P1 후보이며, manifest single-read TOCTOU,
+  Windows non-replacing write-through와 heartbeat NaN도 최종 판정 중이다. fault 회귀와
+  fresh 통합·재감사 P0/P1 0 전에는 full offline/stage/GPU/E2를 금지한다.
+- non-finite case 표현 정정 뒤 targeted `4 passed`, runner+verifier 전체 focused
+  `58 passed, 1 skipped`. dropout/rate 각각 NaN/Infinity를 publication 전에 거부한다.
+  최신 독립 P0/P1 0 전에는 full offline/GPU/E2 gate를 유지한다.
+- 추가 non-finite 4-case targeted 회귀는 `--learning-rate -inf`를 argparse가 option으로
+  오인한 fixture 표현 때문에 `1 failed, 3 passed`; 제품 validation이나 publication에는
+  도달하지 않았다. case 표현을 정정하고 targeted/full focused를 재실행하며, PASS 전에는
+  독립 감사/full offline/GPU/E2로 이동하지 않는다.
+- 감사 수리 통합은 핀된 Python pycompile+runner/verifier exit 0,
+  `55 passed, 1 skipped`, 단일 fresh actual-process PowerShell durability exit 0/PASS,
+  종료 뒤 관련 PID 0이다. exact runner와 trainer의 exit/replacement 구분, global deadline,
+  actual manifest schema/config/hash/pin 검증, non-finite publication 선행 거부, launcher
+  fixed-drive gate가 fault 회귀에 결속됐다. 최신 독립 P0/P1 0 전에는 full offline,
+  stage/commit, controlled GPU/E2로 이동하지 않는다.
+- safe-pause actual-process 재검증 중 runner/trainer 필터만 0인 상태를 전체 contract
+  종료로 오판해 두 PowerShell contract가 동시에 실행되는 supervisor 중복을 만들었다.
+  관측 PID/command를 기록하고 추가 시작·임의 종료를 금지했다. 두 실행의 자연 종료와
+  exit를 회수하되 동시 결과는 PASS 근거로 쓰지 않고, 관련 test/runner/trainer PID 0 뒤
+  단일 fresh contract를 다시 실행한다. GPU/model/service/E2 실행은 0이다.
+- compact 복구 대조에서 goal active, HEAD=origin/main `32830a4`, worktree 9 modified+
+  generator 1 untracked, AIRI trainer/runner 0, old planned P0-B root와 E2 산출물 0을
+  확인했다. hardening 통합 PASS 뒤 두 독립 최신 바이트 감사는 P0 2/P1 4,
+  `NOT READY`다. SAFE marker 전 trainer exact `exited` 대 PID `replaced` 구분과 absolute
+  timeout, verifier의 actual manifest v1 schema/config/hash 해석, non-finite manifest
+  선행 거부, launcher fixed-drive gate 및 각 fault 회귀를 닫기 전에는 full offline,
+  stage/commit, controlled GPU와 E2를 모두 금지한다.
+- P0-B hardening 통합 구현은 canonical actual manifest schema/generator/path+SHA와
+  dataset/model/trainer/config 결속, fresh absent RunDir first-boundary prearm, 최종 verifier
+  rehash, 모든 SAFE marker 전 exact runner exit+receipt 재검증을 추가했다. fresh Python
+  `47 passed, 1 skipped`, actual-process PowerShell durability PASS, 관련 AIRI process 0이다.
+  중간 fake trainer argparse pin 오염은 fixture 결함으로 분리·수리했다. 독립 최신 바이트
+  P0/P1 0·full offline·diff/security·commit/push 전에는 controlled GPU/E2로 이동하지 않는다.
+- safe-pause final receipt `32830a4`가 origin/main과 일치하고, goal active,
+  WORKING-STATE 단독 live diff, AIRI trainer/runner 0, planned P0-B root와 E2
+  adapter/report absent를 20:07 KST에 재대조했다. 분리 preflight는 corpus/base/E1/code,
+  Python/CUDA/GPU/disk와 canonical config SHA를 exact 확인해 입력·환경 조회는 PASS했다.
+- 독립 command/sequence 감사에서 opaque input manifest, launch-time 첫 optimizer 경계
+  pause 선점 부재, `SAFE_TO_POWER_OFF` 전 exact durable runner 종료 대기 부재를 확인했다.
+  이를 P0-B GPU GO blocker로 승격한다. launcher/runner/pause와 fault 회귀를 offline
+  보강하고 독립 P0/P1 0·full checkpoint·commit/push하기 전에는 GPU root/E2를 만들지 않는다.
+
 ## 2026-08-22 P0-B 독립 감사·compact 복구 정정
 
 - actual safe-pause push receipt는 exact 2-doc boundary, continuity/diff-check PASS,

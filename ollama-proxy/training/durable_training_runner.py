@@ -12,6 +12,7 @@ import contextlib
 import hashlib
 import importlib.util
 import json
+import math
 import os
 import re
 import stat
@@ -25,10 +26,14 @@ from typing import Any, BinaryIO, Mapping, Sequence
 
 
 RUN_STATE_SCHEMA = "airi.behavior-durable-run.v1"
+RUN_STATE_ANCHOR_SCHEMA = "airi.behavior-durable-run-anchor.v1"
 PROGRESS_SCHEMA = "airi.behavior-training-progress.v1"
 CHECKPOINT_INDEX_SCHEMA = "airi.behavior-checkpoint-index.v1"
+TRANSACTION_CHECKPOINT_INDEX_SCHEMA = "airi.behavior-checkpoint-index.v2"
+CHECKPOINT_EVENT_SCHEMA = "airi.behavior-checkpoint-event.v2"
 PAUSE_ACK_SCHEMA = "airi.behavior-pause-ack.v1"
 RESUME_ACCEPTED_SCHEMA = "airi.behavior-resume-accepted.v1"
+CHECKPOINT_VERIFICATION_SCHEMA = "airi.behavior-checkpoint-verification.v1"
 SAFE_PAUSE_EXIT_CODE = 75
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 RUN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -53,7 +58,14 @@ def utc_now() -> str:
 
 def canonical_bytes(value: object) -> bytes:
     return (json.dumps(value, ensure_ascii=False, sort_keys=True,
-                       separators=(",", ":")) + "\n").encode("utf-8")
+                       separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")
+
+
+def checkpoint_canonical_bytes(value: object) -> bytes:
+    """Match behavior_training_checkpoint.py's byte-exact JSON contract."""
+
+    return (json.dumps(value, sort_keys=True, separators=(",", ":"),
+                       allow_nan=False) + "\n").encode("utf-8")
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -61,11 +73,7 @@ def sha256_bytes(value: bytes) -> str:
 
 
 def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+    return sha256_bytes(_read_regular_file_snapshot(path, "pinned file"))
 
 
 def _fsync_directory(path: Path) -> None:
@@ -83,6 +91,38 @@ def _write_fsynced(path: Path, payload: bytes) -> None:
         stream.write(payload)
         stream.flush()
         os.fsync(stream.fileno())
+
+
+def publish_new_bytes(path: Path, payload: bytes, label: str) -> None:
+    """Durably publish *payload* once; a concurrent creator always wins."""
+    parent = validate_local_path(path.parent, f"{label} parent")
+    if not parent.is_dir():
+        raise DurableRunnerError(f"{label} target is not a fresh local path")
+    if os.path.lexists(path):
+        raise DurableRunnerError(f"{label} target already exists")
+    stage = parent / f".{path.name}.tmp.{uuid.uuid4().hex}"
+    try:
+        _write_fsynced(stage, payload)
+        if os.name == "nt":
+            import ctypes  # noqa: PLC0415
+            move_file = ctypes.WinDLL("kernel32", use_last_error=True).MoveFileExW
+            move_file.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint]
+            move_file.restype = ctypes.c_int
+            # WRITE_THROUGH only: REPLACE_EXISTING would destroy a competitor.
+            if not move_file(str(stage), str(path), 0x8):
+                raise FileExistsError(ctypes.get_last_error(), "fresh publication failed")
+        else:
+            os.link(stage, path)
+            _fsync_directory(parent)
+            stage.unlink()
+            _fsync_directory(parent)
+        if path.read_bytes() != payload:
+            raise DurableRunnerError(f"{label} publication verification failed")
+    except FileExistsError as exc:
+        raise DurableRunnerError(f"{label} target appeared during publication") from exc
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            stage.unlink()
 
 
 def _replace_write_through(source: Path, target: Path) -> None:
@@ -131,8 +171,8 @@ def atomic_write_json(path: Path, value: Mapping[str, Any], *, keep_previous: bo
 
 def _load_json(path: Path) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        value = json.loads(_read_regular_file_snapshot(path, "JSON receipt").decode("utf-8"))
+    except (DurableRunnerError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise DurableRunnerError(f"invalid JSON receipt: {path.name}") from exc
     if not isinstance(value, dict):
         raise DurableRunnerError(f"JSON receipt must be an object: {path.name}")
@@ -186,36 +226,113 @@ def validate_run_state(value: Mapping[str, Any]) -> dict[str, Any]:
         raise DurableRunnerError("terminal run-state is missing its receipt")
     if value["status"] not in terminal_statuses and value["terminal"] is not None:
         raise DurableRunnerError("nonterminal run-state has a terminal receipt")
+    if value["status"] == "paused-safe":
+        terminal = value["terminal"]
+        verification = terminal.get("checkpoint_verification") if terminal else None
+        if (value["trainer"] is None
+                or set(terminal) != {
+                    "exit_code", "reason", "at_utc", "checkpoint_verification"}
+                or terminal["exit_code"] != SAFE_PAUSE_EXIT_CODE
+                or terminal["reason"] != "safe-optimizer-boundary"
+                or not isinstance(terminal["at_utc"], str)
+                or not terminal["at_utc"]
+                or not isinstance(verification, dict)
+                or set(verification) != {
+                    "schema_version", "checkpoint_relative_path",
+                    "checkpoint_manifest_sha256", "checkpoint_payload_sha256",
+                    "checkpoint_payload_bytes", "canonical_pins_sha256"}
+                or verification["schema_version"] != CHECKPOINT_VERIFICATION_SCHEMA
+                or not isinstance(verification["checkpoint_relative_path"], str)
+                or not re.fullmatch(
+                    r"checkpoint-[0-9]{8}", verification["checkpoint_relative_path"])
+                or not isinstance(verification["checkpoint_payload_bytes"], int)
+                or isinstance(verification["checkpoint_payload_bytes"], bool)
+                or verification["checkpoint_payload_bytes"] < 1
+                or any(not isinstance(verification[key], str)
+                       or not HEX64.fullmatch(verification[key]) for key in (
+                           "checkpoint_manifest_sha256", "checkpoint_payload_sha256",
+                           "canonical_pins_sha256"))):
+            raise DurableRunnerError("paused-safe checkpoint verification receipt is invalid")
     return dict(value)
 
 
 def _quarantine_file(run_dir: Path, path: Path, label: str) -> Path:
-    payload = path.read_bytes() if path.is_file() else b""
+    payload = _read_regular_file_snapshot(path, f"{label} quarantine source")
     quarantine = run_dir / "quarantine"
     quarantine.mkdir(parents=True, exist_ok=True)
     target = quarantine / (
         f"{label}.corrupt.{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}."
-        f"{sha256_bytes(payload)[:12]}.json"
+        f"{sha256_bytes(payload)[:12]}.{uuid.uuid4().hex}.json"
     )
     _replace_write_through(path, target)
     _fsync_directory(quarantine)
     return target
 
 
+def _load_run_state_anchor(run_dir: Path) -> dict[str, Any] | None:
+    path = run_dir / "run-state.anchor.json"
+    if not path.is_file():
+        return None
+    anchor = _load_json(path)
+    if (set(anchor) != {"schema_version", "run_id", "current", "previous"}
+            or anchor["schema_version"] != RUN_STATE_ANCHOR_SCHEMA
+            or not isinstance(anchor["run_id"], str) or not RUN_ID.fullmatch(anchor["run_id"])):
+        raise DurableRunnerError("run-state anchor schema mismatch")
+    for name in ("current", "previous"):
+        receipt = anchor[name]
+        if receipt is None:
+            continue
+        if (not isinstance(receipt, dict) or set(receipt) != {"sha256", "revision"}
+                or not isinstance(receipt["sha256"], str) or not HEX64.fullmatch(receipt["sha256"])
+                or not isinstance(receipt["revision"], int) or isinstance(receipt["revision"], bool)
+                or receipt["revision"] < 0):
+            raise DurableRunnerError("run-state anchor receipt is invalid")
+    if anchor["current"] is None:
+        raise DurableRunnerError("run-state anchor current receipt is invalid")
+    return anchor
+
+
+def _state_receipt_if_matches(path: Path, anchor: Mapping[str, Any], receipt: Any) -> bool:
+    if not path.is_file() or not isinstance(receipt, dict):
+        return False
+    try:
+        state = validate_run_state(_load_json(path))
+        return (state["run_id"] == anchor["run_id"]
+                and state["revision"] == receipt["revision"]
+                and sha256_file(path) == receipt["sha256"])
+    except DurableRunnerError:
+        return False
+
+
 def load_run_state_with_previous(run_dir: Path) -> tuple[dict[str, Any] | None, str | None]:
     current = run_dir / "run-state.json"
     previous = run_dir / "run-state.prev.json"
+    anchor_path = run_dir / "run-state.anchor.json"
+    anchor = _load_run_state_anchor(run_dir)
     if current.is_file():
         try:
-            return validate_run_state(_load_json(current)), "current"
+            state = validate_run_state(_load_json(current))
+            if anchor is not None:
+                if not _state_receipt_if_matches(current, anchor, anchor["current"]):
+                    raise DurableRunnerError("run-state current is not anchor-authorized")
+            return state, "current"
         except DurableRunnerError:
             _quarantine_file(run_dir, current, "run-state")
-    if previous.is_file():
-        try:
-            return validate_run_state(_load_json(previous)), "previous"
-        except DurableRunnerError:
-            _quarantine_file(run_dir, previous, "run-state-prev")
-            raise
+            if anchor is not None and previous.is_file():
+                candidate = validate_run_state(_load_json(previous))
+                if (_state_receipt_if_matches(previous, anchor, anchor["current"])
+                        and candidate["status"] not in {"complete", "paused-safe"}):
+                    return candidate, "anchor-authorized-predecessor"
+            return None, None
+    if previous.is_file() and anchor is not None:
+        # A predecessor is only a durability companion to an existing current
+        # receipt.  Atomic publication never intentionally leaves current
+        # absent, so no predecessor can authorize launch or resume alone.
+        candidate = validate_run_state(_load_json(previous))
+        if (_state_receipt_if_matches(previous, anchor, anchor["current"])
+                and candidate["status"] not in {"complete", "paused-safe"}):
+            return candidate, "anchor-authorized-predecessor"
+        return None, None
     return None, None
 
 
@@ -248,14 +365,388 @@ def _reject_remote_or_reparse_path(value: Path, label: str) -> Path:
     return resolved
 
 
-def validate_local_run_dir(value: Path) -> Path:
+def validate_local_run_dir(value: Path, *, create: bool = True) -> Path:
     resolved = _reject_remote_or_reparse_path(value, "run directory")
-    resolved.mkdir(parents=True, exist_ok=True)
+    if create:
+        resolved.mkdir(parents=True, exist_ok=True)
     return resolved
 
 
 def validate_local_path(value: Path, label: str) -> Path:
     return _reject_remote_or_reparse_path(value, label)
+
+
+def _read_regular_file_snapshot(path: Path, label: str,
+                                error_type: type[DurableRunnerError] = DurableRunnerError) -> bytes:
+    """Read one local regular-file handle; never validate a pathname then reopen it."""
+
+    resolved = validate_local_path(path, label)
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    if os.name == "nt":
+        import ctypes  # noqa: PLC0415
+        import msvcrt  # noqa: PLC0415
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        create_file = kernel.CreateFileW
+        create_file.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32,
+                                ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32,
+                                ctypes.c_void_p]
+        create_file.restype = ctypes.c_void_p
+        handle = create_file(str(resolved), 0x80000000, 0x1, None, 3,
+                             0x00200000, None)  # OPEN_EXISTING | OPEN_REPARSE_POINT
+        if handle == ctypes.c_void_p(-1).value:
+            raise error_type(f"{label} is missing or cannot be opened safely")
+        class _FileTime(ctypes.Structure):
+            _fields_ = [("low", ctypes.c_uint32), ("high", ctypes.c_uint32)]
+
+        class _Info(ctypes.Structure):
+            _fields_ = [("attributes", ctypes.c_uint32), ("created", _FileTime),
+                       ("accessed", _FileTime), ("written", _FileTime),
+                       ("volume_serial", ctypes.c_uint32), ("size_high", ctypes.c_uint32),
+                       ("size_low", ctypes.c_uint32), ("links", ctypes.c_uint32),
+                       ("index_high", ctypes.c_uint32), ("index_low", ctypes.c_uint32)]
+        info = _Info()
+        kernel.GetFileInformationByHandle.argtypes = [ctypes.c_void_p, ctypes.POINTER(_Info)]
+        kernel.GetFileInformationByHandle.restype = ctypes.c_int
+        kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+        kernel.CloseHandle.restype = ctypes.c_int
+        if not kernel.GetFileInformationByHandle(handle, ctypes.byref(info)):
+            kernel.CloseHandle(handle)
+            raise error_type(f"{label} handle cannot be classified")
+        if info.attributes & 0x400:
+            kernel.CloseHandle(handle)
+            raise error_type(f"{label} must be a local regular file")
+        try:
+            descriptor = msvcrt.open_osfhandle(handle, flags)
+        except OSError as exc:
+            kernel.CloseHandle(handle)
+            raise error_type(f"{label} handle cannot be adopted safely") from exc
+        try:
+            with os.fdopen(descriptor, "rb") as stream:
+                return stream.read()
+        except OSError as exc:
+            raise error_type(f"{label} is missing or unreadable") from exc
+    try:
+        descriptor = os.open(resolved, flags | nofollow)
+    except OSError as exc:
+        raise error_type(f"{label} is missing or cannot be opened safely") from exc
+    try:
+        metadata = os.fstat(descriptor)
+        attributes = getattr(metadata, "st_file_attributes", 0)
+        if (not stat.S_ISREG(metadata.st_mode)
+                or attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
+            raise error_type(f"{label} must be a local regular file")
+        with os.fdopen(descriptor, "rb", closefd=False) as stream:
+            return stream.read()
+    finally:
+        os.close(descriptor)
+
+
+class _HeldRegularInput:
+    """A no-follow immutable-input handle kept open for the child lifetime."""
+
+    def __init__(self, path: Path, label: str, descriptor: int, identity: tuple[int, ...],
+                 payload: bytes) -> None:
+        self.path = path
+        self.label = label
+        self.descriptor = descriptor
+        self.identity = identity
+        self.payload = payload
+        self.sha256 = sha256_bytes(payload)
+
+    def close(self) -> None:
+        if self.descriptor >= 0:
+            os.close(self.descriptor)
+            self.descriptor = -1
+
+    def verify_held_bytes(self) -> None:
+        try:
+            os.lseek(self.descriptor, 0, os.SEEK_SET)
+            chunks: list[bytes] = []
+            while True:
+                chunk = os.read(self.descriptor, 1024 * 1024)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+        except OSError as exc:
+            raise DurableRunnerError(f"{self.label} held handle is unreadable") from exc
+        payload = b"".join(chunks)
+        if len(payload) != len(self.payload) or sha256_bytes(payload) != self.sha256:
+            raise DurableRunnerError(f"{self.label} changed while held for training")
+
+    def verify_path_still_matches(self) -> None:
+        """Detect POSIX rename/symlink swaps; Windows locks prevent those changes."""
+        try:
+            current = _open_held_regular_input(self.path, self.label)
+        except DurableRunnerError as exc:
+            raise DurableRunnerError(f"{self.label} path changed while held for training") from exc
+        try:
+            if (current.identity != self.identity or len(current.payload) != len(self.payload)
+                    or current.sha256 != self.sha256):
+                raise DurableRunnerError(f"{self.label} path changed while held for training")
+        finally:
+            current.close()
+
+    def verify_unchanged(self) -> None:
+        self.verify_held_bytes()
+        self.verify_path_still_matches()
+
+
+def _input_identity(metadata: os.stat_result) -> tuple[int, ...]:
+    return (int(metadata.st_dev), int(metadata.st_ino), int(metadata.st_size),
+            int(metadata.st_mtime_ns))
+
+
+def _open_held_regular_input(path: Path, label: str) -> _HeldRegularInput:
+    """Open a file once with no-follow semantics and retain a read-only share lock.
+
+    On Windows CreateFileW permits only subsequent readers, so writes, deletes and
+    replacements are denied until ``close``.  POSIX uses O_NOFOLLOW plus fstat;
+    the post-exit identity check closes the rename gap POSIX intentionally permits.
+    """
+    resolved = validate_local_path(path, label)
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+    if os.name == "nt":
+        import ctypes  # noqa: PLC0415
+        import msvcrt  # noqa: PLC0415
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        create_file = kernel.CreateFileW
+        create_file.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32,
+                                ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32,
+                                ctypes.c_void_p]
+        create_file.restype = ctypes.c_void_p
+        # GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, OPEN_REPARSE_POINT.
+        handle = create_file(str(resolved), 0x80000000, 0x1, None, 3, 0x00200000, None)
+        if handle == ctypes.c_void_p(-1).value:
+            raise DurableRunnerError(f"{label} is missing or cannot be held safely")
+        try:
+            descriptor = msvcrt.open_osfhandle(handle, flags)
+        except OSError as exc:
+            kernel.CloseHandle(handle)
+            raise DurableRunnerError(f"{label} handle cannot be adopted safely") from exc
+    else:
+        try:
+            descriptor = os.open(resolved, flags | getattr(os, "O_NOFOLLOW", 0))
+        except OSError as exc:
+            raise DurableRunnerError(f"{label} is missing or cannot be held safely") from exc
+    try:
+        metadata = os.fstat(descriptor)
+        attributes = getattr(metadata, "st_file_attributes", 0)
+        if (not stat.S_ISREG(metadata.st_mode)
+                or attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
+            raise DurableRunnerError(f"{label} must be a local regular file")
+        payload_parts: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            payload_parts.append(chunk)
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        return _HeldRegularInput(resolved, label, descriptor, _input_identity(metadata),
+                                 b"".join(payload_parts))
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _hold_training_inputs(dataset: Path, dataset_sha256: str, model_dir: Path,
+                          inventory: list[dict[str, Any]] | None) -> list[_HeldRegularInput]:
+    """Acquire all v2 loader inputs atomically enough to leave no launch gap."""
+    held: list[_HeldRegularInput] = []
+    try:
+        dataset_handle = _open_held_regular_input(dataset, "dataset")
+        held.append(dataset_handle)
+        if dataset_handle.sha256 != dataset_sha256:
+            raise DurableRunnerError("dataset changed after manifest publication")
+        if inventory is not None:
+            for row in inventory:
+                handle = _open_held_regular_input(model_dir / row["path"],
+                                                  "pinned model inventory file")
+                held.append(handle)
+                if len(handle.payload) != row["bytes"] or handle.sha256 != row["sha256"]:
+                    raise DurableRunnerError("model inventory changed after manifest publication")
+        return held
+    except BaseException:
+        for handle in reversed(held):
+            handle.close()
+        raise
+
+
+def _verify_held_training_inputs(handles: Sequence[_HeldRegularInput]) -> None:
+    for handle in handles:
+        handle.verify_unchanged()
+
+
+def _read_checkpoint_snapshot(path: Path, label: str) -> bytes:
+    try:
+        return _read_regular_file_snapshot(path, label)
+    except DurableRunnerError as exc:
+        raise CheckpointIntegrityError(str(exc)) from exc
+
+
+def validate_input_manifest(path: Path, expected_sha256: str) -> tuple[Path, str]:
+    """Return a fixed-local regular manifest only when its exact bytes are pinned."""
+
+    if not isinstance(expected_sha256, str) or not HEX64.fullmatch(expected_sha256):
+        raise DurableRunnerError("input manifest SHA-256 is required and invalid")
+    resolved = validate_local_path(path, "input manifest")
+    raw = _read_regular_file_snapshot(resolved, "input manifest")
+    actual_sha256 = sha256_bytes(raw)
+    if actual_sha256 != expected_sha256:
+        raise DurableRunnerError("input manifest SHA-256 does not match its bytes")
+    return resolved, actual_sha256
+
+
+def _manifest_training_config(arguments: Sequence[str], checkpoint_interval: int) -> dict[str, Any]:
+    fields: tuple[tuple[str, str, type], ...] = (
+        ("mode", "--mode", str), ("seed", "--seed", int),
+        ("lora_r", "--lora-r", int), ("lora_alpha", "--lora-alpha", int),
+        ("lora_dropout", "--lora-dropout", float),
+        ("learning_rate", "--learning-rate", float),
+        ("max_steps", "--max-steps", int), ("batch_size", "--batch-size", int),
+        ("gradient_accumulation", "--gradient-accumulation", int),
+        ("max_seq_len", "--max-seq-len", int),
+    )
+    config: dict[str, Any] = {"checkpoint_every_optimizer_steps": checkpoint_interval,
+                              "deterministic_validation": "--deterministic-validation" in arguments}
+    for name, flag, converter in fields:
+        value = _argument_value(arguments, flag, required=True)
+        try:
+            config[name] = converter(value or "")
+        except ValueError as exc:
+            raise DurableRunnerError(f"training configuration value is invalid: {flag}") from exc
+    return _validate_manifest_training_config(config)
+
+
+def _validate_manifest_training_config(value: Any) -> dict[str, Any]:
+    """Validate the full, typed config that an input manifest commits to."""
+
+    required = {
+        "mode", "seed", "lora_r", "lora_alpha", "lora_dropout",
+        "learning_rate", "max_steps", "batch_size", "gradient_accumulation",
+        "max_seq_len", "checkpoint_every_optimizer_steps",
+        "deterministic_validation",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        raise DurableRunnerError("input manifest training configuration schema mismatch")
+    if value["mode"] not in {"cuda-qlora", "cpu-smoke"}:
+        raise DurableRunnerError("input manifest training mode is invalid")
+    for key in ("seed", "lora_r", "lora_alpha", "max_steps", "batch_size",
+                "gradient_accumulation", "max_seq_len",
+                "checkpoint_every_optimizer_steps"):
+        if (not isinstance(value[key], int) or isinstance(value[key], bool)
+                or value[key] <= 0):
+            raise DurableRunnerError(f"input manifest training configuration is invalid: {key}")
+    for key in ("lora_dropout", "learning_rate"):
+        if not isinstance(value[key], float) or not math.isfinite(value[key]):
+            raise DurableRunnerError(f"input manifest training configuration is non-finite: {key}")
+    if not 0 <= value["lora_dropout"] < 1 or value["learning_rate"] <= 0:
+        raise DurableRunnerError("input manifest dropout/learning-rate contract failure")
+    if not isinstance(value["deterministic_validation"], bool):
+        raise DurableRunnerError("input manifest deterministic validation is invalid")
+    return dict(value)
+
+
+def _validate_closed_model_inventory(model_dir: Path, inventory: list[dict[str, Any]]) -> None:
+    """Require a v2 manifest to enumerate every file a local loader may see."""
+    root = validate_local_path(model_dir, "model directory")
+    if not root.is_dir():
+        raise DurableRunnerError("model directory is missing")
+    declared = {row["path"]: {"bytes": row["bytes"], "sha256": row["sha256"]}
+                for row in inventory}
+    actual: dict[str, dict[str, Any]] = {}
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as scan:
+                entries = sorted(scan, key=lambda entry: entry.name, reverse=True)
+        except OSError as exc:
+            raise DurableRunnerError("model inventory directory cannot be inspected") from exc
+        for entry in entries:
+            candidate = Path(entry.path)
+            try:
+                metadata = entry.stat(follow_symlinks=False)
+            except OSError as exc:
+                raise DurableRunnerError("model inventory entry cannot be inspected") from exc
+            attributes = getattr(metadata, "st_file_attributes", 0)
+            if (entry.is_symlink()
+                    or attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
+                raise DurableRunnerError("model inventory cannot contain links or reparse points")
+            if stat.S_ISDIR(metadata.st_mode):
+                pending.append(candidate)
+                continue
+            if not stat.S_ISREG(metadata.st_mode):
+                raise DurableRunnerError("model inventory cannot contain special entries")
+            relative = candidate.relative_to(root).as_posix()
+            data = _read_regular_file_snapshot(candidate, "model inventory entry")
+            actual[relative] = {"bytes": len(data), "sha256": sha256_bytes(data)}
+    if actual != declared:
+        raise DurableRunnerError("input manifest model inventory is not a closed exact file set")
+
+
+def validate_input_manifest_content(path: Path, expected_sha256: str,
+                                    trainer_args: Sequence[str], trainer_sha256: str,
+                                    dataset_sha256: str, model_sha256: str,
+                                    checkpoint_interval: int,
+                                    helper_sha256: str | None = None) -> dict[str, Any]:
+    """Require canonical schema and bind every immutable launch input to it."""
+
+    # One immutable observation: never hash then reopen an attacker-replaced path.
+    resolved = validate_local_path(path, "input manifest")
+    raw = _read_regular_file_snapshot(resolved, "input manifest")
+    actual_sha256 = sha256_bytes(raw)
+    if actual_sha256 != expected_sha256:
+        raise DurableRunnerError("input manifest SHA-256 does not match its bytes")
+    try:
+        manifest = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise DurableRunnerError("input manifest is not valid UTF-8 JSON") from exc
+    try:
+        canonical_manifest = canonical_bytes(manifest)
+    except (TypeError, ValueError) as exc:
+        raise DurableRunnerError("input manifest contains non-canonical values") from exc
+    if raw != canonical_manifest:
+        raise DurableRunnerError("input manifest is not canonical JSON")
+    required_v2 = {"schema_version", "dataset_sha256", "model_weight_sha256",
+                   "trainer_source_sha256", "training_config", "training_config_sha256",
+                   "checkpoint_helper_source_sha256", "model_inventory"}
+    if (manifest.get("schema_version") != "airi.behavior-input-manifest.v2"
+            or set(manifest) != required_v2):
+        raise DurableRunnerError("input manifest schema mismatch")
+    config = _manifest_training_config(trainer_args, checkpoint_interval)
+    manifest_config = _validate_manifest_training_config(manifest["training_config"])
+    if (manifest_config != config
+            or not isinstance(manifest["training_config_sha256"], str)
+            or not HEX64.fullmatch(manifest["training_config_sha256"])
+            or manifest["training_config_sha256"] != sha256_bytes(canonical_bytes(manifest_config))):
+        raise DurableRunnerError("input manifest training configuration mismatch")
+    expected = {"dataset_sha256": dataset_sha256, "model_weight_sha256": model_sha256,
+                "trainer_source_sha256": trainer_sha256}
+    for key, value in expected.items():
+        if not isinstance(manifest[key], str) or manifest[key] != value or not HEX64.fullmatch(value):
+            raise DurableRunnerError(f"input manifest {key} mismatch")
+    if not helper_sha256 or manifest["checkpoint_helper_source_sha256"] != helper_sha256:
+        raise DurableRunnerError("input manifest checkpoint helper mismatch")
+    inventory = manifest["model_inventory"]
+    if not isinstance(inventory, list) or not inventory:
+        raise DurableRunnerError("input manifest model inventory is invalid")
+    seen: set[str] = set()
+    for row in inventory:
+        if (not isinstance(row, dict) or set(row) != {"path", "bytes", "sha256"}
+                or not isinstance(row["path"], str) or row["path"] in seen
+                or Path(row["path"]).is_absolute() or ".." in Path(row["path"]).parts
+                or not isinstance(row["bytes"], int) or not HEX64.fullmatch(str(row["sha256"]))):
+            raise DurableRunnerError("input manifest model inventory row is invalid")
+        seen.add(row["path"])
+    # The builder validates a manifest before it has a launch command;
+    # only a real runner invocation can compare the declaration to disk.
+    model_dir_value = _argument_value(trainer_args, "--model-dir")
+    if model_dir_value is not None:
+        _validate_closed_model_inventory(Path(model_dir_value), inventory)
+    return {"path": str(resolved), "sha256": actual_sha256,
+            "training_config_sha256": manifest["training_config_sha256"],
+            "model_inventory": inventory}
 
 
 def _relative_inside(root: Path, path: Path) -> str:
@@ -373,9 +864,8 @@ def _validate_checkpoint_manifest(checkpoint_dir: Path,
             or not HEX64.fullmatch(payload["sha256"])):
         raise CheckpointIntegrityError("checkpoint payload metadata is invalid")
     path = checkpoint_dir / payload["name"]
-    if not path.is_file() or path.is_symlink():
-        raise CheckpointIntegrityError("checkpoint payload file is missing or linked")
-    if path.stat().st_size != payload["bytes"] or sha256_file(path) != payload["sha256"]:
+    data = _read_checkpoint_snapshot(path, "checkpoint payload")
+    if len(data) != payload["bytes"] or sha256_bytes(data) != payload["sha256"]:
         raise CheckpointIntegrityError("checkpoint payload integrity mismatch")
 
 
@@ -392,14 +882,20 @@ def validate_checkpoint_reference(run_dir: Path, reference: Mapping[str, Any]) -
     checkpoint_dir = (run_dir / "checkpoints" / relative).resolve()
     _relative_inside(run_dir / "checkpoints", checkpoint_dir)
     manifest_path = checkpoint_dir / "manifest.json"
-    if not manifest_path.is_file() or sha256_file(manifest_path) != digest:
+    manifest_bytes = _read_checkpoint_snapshot(manifest_path, "checkpoint manifest")
+    if sha256_bytes(manifest_bytes) != digest:
         raise CheckpointIntegrityError("checkpoint manifest integrity mismatch")
     try:
-        manifest = _load_json(manifest_path)
-    except DurableRunnerError as exc:
+        manifest = json.loads(manifest_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise CheckpointIntegrityError("checkpoint manifest JSON is invalid") from exc
-    expected_manifest = canonical_bytes(manifest)
-    if manifest_path.read_bytes() != expected_manifest:
+    if not isinstance(manifest, dict):
+        raise CheckpointIntegrityError("checkpoint manifest must be an object")
+    try:
+        expected_manifest = checkpoint_canonical_bytes(manifest)
+    except (TypeError, ValueError) as exc:
+        raise CheckpointIntegrityError("checkpoint manifest values are invalid") from exc
+    if manifest_bytes != expected_manifest:
         raise CheckpointIntegrityError("checkpoint manifest is not canonical")
     _validate_checkpoint_manifest(checkpoint_dir, manifest)
     return {"relative_path": relative, "manifest_sha256": digest,
@@ -419,33 +915,129 @@ def _quarantine_checkpoint(run_dir: Path, reference: Mapping[str, Any]) -> None:
     _replace_write_through(source, target)
 
 
-def _load_checkpoint_index_with_previous(run_dir: Path) -> dict[str, Any]:
-    checkpoints = run_dir / "checkpoints"
-    for name, label in (("checkpoint-index.json", "checkpoint-index"),
-                        ("checkpoint-index.prev.json", "checkpoint-index-prev")):
-        path = checkpoints / name
-        if not path.is_file():
+def _checkpoint_event(run_dir: Path, reference: Mapping[str, Any], run_id: str) -> dict[str, Any]:
+    """Validate the immutable event that a v2 index commits, byte for byte."""
+    event_path = run_dir / str(reference["event_relative_path"])
+    raw = _read_checkpoint_snapshot(event_path, "checkpoint event")
+    if sha256_bytes(raw) != reference["event_sha256"]:
+        raise CheckpointIntegrityError("checkpoint event hash mismatch")
+    try:
+        event = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CheckpointIntegrityError("checkpoint event JSON is invalid") from exc
+    if not isinstance(event, dict) or raw != checkpoint_canonical_bytes(event):
+        raise CheckpointIntegrityError("checkpoint event is not canonical")
+    required = {
+        "schema_version", "run_id", "generation", "reason", "microsteps_completed",
+        "optimizer_steps", "pending_microbatches", "training_elapsed_ns",
+        "checkpoint_payload_progress", "checkpoint_manifest_sha256",
+        "checkpoint_payload_sha256", "pins_sha256", "previous_event_sha256",
+        "previous_index_sha256", "publish_started_at_utc", "checkpoint_durable_at_utc",
+        "publish_elapsed_ns",
+    }
+    if (set(event) != required or event["schema_version"] != CHECKPOINT_EVENT_SCHEMA
+            or event["run_id"] != run_id or event["generation"] != reference["relative_path"]
+            or event["checkpoint_manifest_sha256"] != reference["manifest_sha256"]
+            or event["reason"] not in {"interval", "safe-pause", "epoch-tail", "epoch-complete"}
+            or any(not isinstance(event[key], int) or isinstance(event[key], bool) or event[key] < 0
+                   for key in ("microsteps_completed", "optimizer_steps", "training_elapsed_ns", "publish_elapsed_ns"))
+            or event["pending_microbatches"] != 0
+            or not isinstance(event["checkpoint_payload_progress"], dict)
+            or event["checkpoint_payload_progress"] != {
+                "microsteps_completed": event["microsteps_completed"],
+                "optimizer_steps": event["optimizer_steps"],
+                "pending_microbatches": 0}
+            or event["optimizer_steps"] > event["microsteps_completed"]
+            or not all(isinstance(event[key], str) and event[key]
+                       for key in ("publish_started_at_utc", "checkpoint_durable_at_utc"))
+            or not isinstance(event["previous_event_sha256"], (str, type(None)))
+            or not isinstance(event["previous_index_sha256"], (str, type(None)))
+            or (isinstance(event["previous_event_sha256"], str)
+                and not HEX64.fullmatch(event["previous_event_sha256"]))
+            or (isinstance(event["previous_index_sha256"], str)
+                and not HEX64.fullmatch(event["previous_index_sha256"]))
+            or not all(isinstance(event[key], str) and HEX64.fullmatch(event[key])
+                       for key in ("checkpoint_payload_sha256", "pins_sha256"))):
+        raise CheckpointIntegrityError("checkpoint event schema/identity mismatch")
+    return event
+
+
+def _validate_transaction_index(run_dir: Path, raw: bytes) -> dict[str, Any]:
+    try:
+        index = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise DurableRunnerError("checkpoint index JSON is invalid") from exc
+    if not isinstance(index, dict) or raw != checkpoint_canonical_bytes(index):
+        raise DurableRunnerError("checkpoint index is not canonical")
+    required = {"schema_version", "run_id", "latest", "previous", "previous_index_sha256"}
+    if set(index) != required or index["schema_version"] != TRANSACTION_CHECKPOINT_INDEX_SCHEMA:
+        raise DurableRunnerError("checkpoint index must use the current v2 transaction schema")
+    if (not isinstance(index["run_id"], str) or not index["run_id"]
+            or not isinstance(index["previous_index_sha256"], (str, type(None)))
+            or (isinstance(index["previous_index_sha256"], str)
+                and not HEX64.fullmatch(index["previous_index_sha256"]))):
+        raise DurableRunnerError("checkpoint index predecessor is invalid")
+    for name in ("latest", "previous"):
+        reference = index[name]
+        if reference is None:
             continue
-        try:
-            index = _load_json(path)
-            if (set(index) != {"schema_version", "latest", "previous"}
-                    or index["schema_version"] != CHECKPOINT_INDEX_SCHEMA):
-                raise DurableRunnerError("checkpoint index schema mismatch")
-            for position in ("latest", "previous"):
-                reference = index[position]
-                if reference is None:
-                    continue
-                if (not isinstance(reference, dict)
-                        or set(reference) != {"relative_path", "manifest_sha256"}
-                        or not isinstance(reference["relative_path"], str)
-                        or not re.fullmatch(r"checkpoint-[0-9]{8}", reference["relative_path"])
-                        or not isinstance(reference["manifest_sha256"], str)
-                        or not HEX64.fullmatch(reference["manifest_sha256"])):
-                    raise DurableRunnerError("checkpoint index reference is invalid")
-            return index
-        except DurableRunnerError:
-            _quarantine_file(run_dir, path, label)
-    raise DurableRunnerError("no valid checkpoint index is available")
+        if (not isinstance(reference, dict)
+                or set(reference) != {"relative_path", "manifest_sha256", "event_relative_path", "event_sha256"}
+                or not isinstance(reference["relative_path"], str)
+                or not re.fullmatch(r"checkpoint-[0-9]{8}", reference["relative_path"])
+                or reference["event_relative_path"] != f"checkpoint-events/{reference['relative_path']}.json"
+                or not all(isinstance(reference[key], str) and HEX64.fullmatch(reference[key])
+                           for key in ("manifest_sha256", "event_sha256"))):
+            raise DurableRunnerError("checkpoint index reference is invalid")
+    if index["latest"] is None:
+        raise DurableRunnerError("checkpoint index lacks a latest transaction")
+    latest_event = _checkpoint_event(run_dir, index["latest"], index["run_id"])
+    if latest_event["previous_index_sha256"] != index["previous_index_sha256"]:
+        raise DurableRunnerError("checkpoint event/index predecessor commitment differs")
+    if index["previous"] is None:
+        if latest_event["previous_event_sha256"] is not None:
+            raise DurableRunnerError("initial checkpoint event has a predecessor")
+    else:
+        previous_event = _checkpoint_event(run_dir, index["previous"], index["run_id"])
+        if latest_event["previous_event_sha256"] != index["previous"]["event_sha256"]:
+            raise DurableRunnerError("checkpoint event-before-index chain is broken")
+        # Force validation of the predecessor event before it can authorize a
+        # fallback, even though its body is not otherwise returned.
+        del previous_event
+    return index
+
+
+def _load_checkpoint_index_with_previous(run_dir: Path) -> dict[str, Any]:
+    """Load only current v2 evidence; a .prev is valid only as its bound predecessor."""
+    checkpoints = run_dir / "checkpoints"
+    current = checkpoints / "checkpoint-index.json"
+    previous = checkpoints / "checkpoint-index.prev.json"
+    if not current.is_file():
+        # A predecessor alone is not an authenticated resume anchor: accepting
+        # it would turn deletion/replacement of current evidence into rollback.
+        raise DurableRunnerError("current checkpoint index is required for resume")
+    try:
+        current_raw = _read_regular_file_snapshot(current, "checkpoint index")
+        index = _validate_transaction_index(run_dir, current_raw)
+        if index["previous_index_sha256"] is None:
+            if previous.is_file():
+                raise DurableRunnerError("unexpected checkpoint predecessor index")
+        else:
+            if not previous.is_file():
+                raise DurableRunnerError("checkpoint predecessor index is missing")
+            previous_raw = _read_regular_file_snapshot(previous, "checkpoint predecessor index")
+            if sha256_bytes(previous_raw) != index["previous_index_sha256"]:
+                raise DurableRunnerError("checkpoint predecessor index hash mismatch")
+            predecessor = _validate_transaction_index(run_dir, previous_raw)
+            if (predecessor["run_id"] != index["run_id"]
+                    or predecessor["latest"] != index["previous"]):
+                raise DurableRunnerError("checkpoint predecessor/index chain is broken")
+        return index
+    except DurableRunnerError:
+        # Never fall back to an unbound predecessor.  Quarantine only current
+        # evidence; preserving previous makes power-cut forensics recoverable.
+        _quarantine_file(run_dir, current, "checkpoint-index")
+        raise
 
 
 def resolve_resume_checkpoint(run_dir: Path, run_id: str,
@@ -456,7 +1048,8 @@ def resolve_resume_checkpoint(run_dir: Path, run_id: str,
         if reference is None:
             continue
         try:
-            validated = validate_checkpoint_reference(run_dir, reference)
+            validated = validate_checkpoint_reference(
+                run_dir, {key: reference[key] for key in ("relative_path", "manifest_sha256")})
             manifest = validated["manifest"]
             if manifest["run_id"] != run_id:
                 raise DurableRunnerError("checkpoint run_id mismatch")
@@ -483,20 +1076,24 @@ def _load_progress(run_dir: Path, run_id: str) -> dict[str, Any] | None:
     if not path.is_file():
         return None
     value = _load_json(path)
-    required_keys = {
+    required_keys_v1 = {
         "schema_version", "run_id", "status", "epoch", "next_batch_index",
         "microsteps_completed", "optimizer_steps", "pending_microbatches",
         "checkpoint", "updated_at_utc",
     }
-    if set(value) != required_keys:
+    required_keys_v2 = required_keys_v1 | {"training_elapsed_ns"}
+    if set(value) not in (required_keys_v1, required_keys_v2):
         raise DurableRunnerError("trainer progress keys do not match the v1 schema")
-    if value.get("schema_version") != PROGRESS_SCHEMA or value.get("run_id") != run_id:
+    if value.get("schema_version") not in {PROGRESS_SCHEMA, "airi.behavior-training-progress.v2"} or value.get("run_id") != run_id:
         raise DurableRunnerError("trainer progress identity mismatch")
     counters = ("epoch", "next_batch_index", "microsteps_completed",
-                "optimizer_steps", "pending_microbatches")
+                 "optimizer_steps", "pending_microbatches")
     if any(not isinstance(value[key], int) or isinstance(value[key], bool)
            or value[key] < 0 for key in counters):
-        raise DurableRunnerError("trainer progress counters are invalid")
+            raise DurableRunnerError("trainer progress counters are invalid")
+    if "training_elapsed_ns" in value and (not isinstance(value["training_elapsed_ns"], int)
+                                             or value["training_elapsed_ns"] < 0):
+        raise DurableRunnerError("trainer progress elapsed time is invalid")
     if value["optimizer_steps"] > value["microsteps_completed"]:
         raise DurableRunnerError("trainer progress optimizer count is impossible")
     checkpoint = value["checkpoint"]
@@ -562,6 +1159,53 @@ def _validate_completed_outputs(state: Mapping[str, Any]) -> None:
         raise DurableRunnerError("completed run outputs schema is invalid")
     _validate_artifact_receipt(outputs["adapter"], required=True)
     _validate_artifact_receipt(outputs["report"], required=False)
+
+
+def _bind_final_evidence_root(run_dir: Path, run_id: str, state: Mapping[str, Any],
+                              progress: Mapping[str, Any], inputs: Mapping[str, Any]) -> dict[str, Any]:
+    """Commit one non-circular terminal evidence cut before complete state publication."""
+    producer_path = run_dir / "producer-evidence-root.json"
+    producer_raw = _read_regular_file_snapshot(producer_path, "producer evidence root")
+    producer = json.loads(producer_raw.decode("utf-8"))
+    if producer_raw != canonical_bytes(producer) or producer.get("schema_version") != "airi.behavior-producer-evidence-root.v1" or producer.get("run_id") != run_id:
+        raise DurableRunnerError("producer evidence root is invalid")
+    index_path = run_dir / "checkpoints" / "checkpoint-index.json"
+    index_raw = _read_regular_file_snapshot(index_path, "checkpoint index")
+    index = json.loads(index_raw.decode("utf-8"))
+    latest = index.get("latest") if isinstance(index, dict) else None
+    if (producer.get("checkpoint_index_sha256") != sha256_bytes(index_raw)
+            or producer.get("latest_checkpoint") != latest):
+        raise DurableRunnerError("producer evidence root index commitment mismatch")
+    if not isinstance(latest, dict) or not isinstance(latest.get("event_relative_path"), str):
+        raise DurableRunnerError("producer evidence root lacks transaction event")
+    event_raw = _read_regular_file_snapshot(run_dir / latest["event_relative_path"], "latest checkpoint event")
+    if sha256_bytes(event_raw) != latest.get("event_sha256"):
+        raise DurableRunnerError("producer evidence root latest event mismatch")
+    progress_raw = _read_regular_file_snapshot(run_dir / "progress.json", "completed progress")
+    if (progress_raw != canonical_bytes(dict(progress)) or progress.get("status") != "completed"
+            or producer.get("progress") != {key: progress.get(key) for key in ("microsteps_completed", "optimizer_steps", "pending_microbatches", "training_elapsed_ns")}):
+        raise DurableRunnerError("producer evidence root progress mismatch")
+    outputs = state["outputs"]
+    report = outputs.get("report")
+    if report is not None and producer.get("report_sha256") != report.get("sha256"):
+        raise DurableRunnerError("producer evidence root report mismatch")
+    if producer.get("adapter_artifact_manifest_sha256") != outputs["adapter"].get("manifest_sha256"):
+        raise DurableRunnerError("producer evidence root adapter mismatch")
+    projection = {"run_id": run_id, "revision": state["revision"], "status": "complete",
+                  "inputs": dict(inputs), "outputs": outputs,
+                  "progress_sha256": sha256_bytes(progress_raw),
+                  "producer_evidence_root_sha256": sha256_bytes(producer_raw)}
+    root = {"schema_version": "airi.behavior-final-evidence-root.v1", "run_id": run_id,
+            "producer_evidence_root_sha256": sha256_bytes(producer_raw),
+            "checkpoint_index_sha256": sha256_bytes(index_raw),
+            "latest_event_sha256": latest["event_sha256"],
+            "completed_progress_sha256": sha256_bytes(progress_raw),
+            "state_projection": projection,
+            "state_projection_sha256": sha256_bytes(canonical_bytes(projection))}
+    path = run_dir / "final-evidence-root.json"
+    publish_new_bytes(path, canonical_bytes(root), "final evidence root")
+    return {"relative_path": path.name, "sha256": sha256_file(path),
+            "state_projection_sha256": root["state_projection_sha256"]}
 
 
 def _quarantine_runtime_artifact(run_dir: Path, path: Path, label: str) -> None:
@@ -673,6 +1317,17 @@ def _reconcile_interrupted_final_artifacts(
         elif progress.get("status") != "completed":
             raise DurableRunnerError("interrupted output lacks completed progress")
 
+        # This receipt is published by the recovery supervisor, not the stale
+        # supervisor that originally recorded the interrupted state.  Preserve
+        # its trainer identity so pause recovery can prove both lifecycles.
+        recovery_snapshot = _process_snapshot(os.getpid())
+        if recovery_snapshot is None:
+            recovery_snapshot = {
+                "pid": os.getpid(), "creation_time_utc": utc_now(),
+                "executable_path": sys.executable,
+                "command_line": "durable-runner-redacted",
+            }
+        state["runner"] = _process_record(recovery_snapshot)
         state["revision"] += 1
         state["updated_at_utc"] = utc_now()
         state["status"] = "complete"
@@ -755,7 +1410,8 @@ def exclusive_run_lock(run_dir: Path):
             stream.close()
 
 
-def _base_state(args: argparse.Namespace, command: Sequence[str], inputs: Mapping[str, str],
+def _base_state(args: argparse.Namespace, command: Sequence[str],
+                base_command_sha256: str, inputs: Mapping[str, str],
                 logs: Mapping[str, Any], outputs: Mapping[str, Any], status: str,
                 previous: Mapping[str, Any] | None) -> dict[str, Any]:
     created = previous["created_at_utc"] if previous else utc_now()
@@ -777,6 +1433,7 @@ def _base_state(args: argparse.Namespace, command: Sequence[str], inputs: Mappin
         "inputs": dict(inputs),
         "command": {
             "canonical_sha256": sha256_bytes(canonical_bytes(list(command))),
+            "base_canonical_sha256": base_command_sha256,
             "runner_source_sha256": sha256_file(Path(__file__)),
             "trainer_source_sha256": sha256_file(args.trainer),
         },
@@ -792,7 +1449,40 @@ def _base_state(args: argparse.Namespace, command: Sequence[str], inputs: Mappin
 
 def _write_state(run_dir: Path, state: dict[str, Any]) -> None:
     validate_run_state(state)
-    atomic_write_json(run_dir / "run-state.json", state, keep_previous=True)
+    current = run_dir / "run-state.json"
+    previous = run_dir / "run-state.prev.json"
+    anchor = _load_run_state_anchor(run_dir)
+    if anchor is None:
+        if current.is_file() or previous.is_file():
+            raise DurableRunnerError("existing run-state receipt lacks an anchor")
+    elif anchor["run_id"] != state["run_id"]:
+        raise DurableRunnerError("run-state anchor belongs to a different run_id")
+    elif current.is_file() and not _state_receipt_if_matches(current, anchor, anchor["current"]):
+        # A torn/current competitor must never be rotated into predecessor.
+        # Keep only an exact anchor-authorized predecessor for the replacement.
+        _quarantine_file(run_dir, current, "run-state")
+        if previous.is_file() and not (
+                _state_receipt_if_matches(previous, anchor, anchor["current"])
+                or _state_receipt_if_matches(previous, anchor, anchor["previous"])):
+            _quarantine_file(run_dir, previous, "run-state-prev")
+    elif anchor is not None and previous.is_file() and not (
+            _state_receipt_if_matches(previous, anchor, anchor["current"])
+            or _state_receipt_if_matches(previous, anchor, anchor["previous"])):
+        # A stale/forged predecessor is not allowed to become the anchor's
+        # retained history during an otherwise normal current rotation.
+        _quarantine_file(run_dir, previous, "run-state-prev")
+
+    atomic_write_json(current, state, keep_previous=True)
+    current_sha = sha256_file(current)
+    previous_receipt = None
+    if previous.is_file():
+        previous_state = validate_run_state(_load_json(previous))
+        previous_receipt = {"sha256": sha256_file(previous), "revision": previous_state["revision"]}
+    atomic_write_json(run_dir / "run-state.anchor.json", {
+        "schema_version": RUN_STATE_ANCHOR_SCHEMA, "run_id": state["run_id"],
+        "current": {"sha256": current_sha, "revision": state["revision"]},
+        "previous": previous_receipt,
+    }, keep_previous=False)
 
 
 def _update_runtime_state(state: dict[str, Any], run_dir: Path, progress: dict[str, Any] | None,
@@ -840,6 +1530,27 @@ def _pause_request_exists(run_dir: Path) -> bool:
     return (run_dir / "control" / "pause.request.json").is_file()
 
 
+def _prearm_first_optimizer_boundary(run_dir: Path, run_id: str) -> str:
+    """Durably publish a fresh-run pause request before the trainer can start."""
+
+    control = run_dir / "control"
+    control.mkdir(parents=True, exist_ok=True)
+    request_path = control / "pause.request.json"
+    if request_path.exists():
+        raise DurableRunnerError("fresh prearm refuses an existing pause request")
+    request_id = f"prearm-{uuid.uuid4().hex}"
+    request = {
+        "schema_version": "airi.behavior-pause-request.v1",
+        "run_id": run_id,
+        "request_id": request_id,
+    }
+    publish_new_bytes(request_path, canonical_bytes(request), "fresh prearm pause request")
+    # Verify via the same strict reader used by the normal pause/ack flow.
+    if _load_pause_request_path(request_path, run_id)["request_id"] != request_id:
+        raise DurableRunnerError("fresh prearm pause request verification failed")
+    return request_id
+
+
 def _load_pause_request_path(path: Path, run_id: str) -> dict[str, Any]:
     request = _load_json(path)
     if (set(request) != {"schema_version", "run_id", "request_id"}
@@ -858,7 +1569,8 @@ def _load_pause_request(run_dir: Path, run_id: str) -> dict[str, Any]:
 
 def _validate_safe_pause(run_dir: Path, run_id: str,
                          checkpoint: Mapping[str, Any] | None,
-                         progress: Mapping[str, Any] | None) -> None:
+                         progress: Mapping[str, Any] | None,
+                         expected_inputs: Mapping[str, str]) -> dict[str, Any]:
     request = _load_pause_request(run_dir, run_id)
     ack_path = run_dir / "control" / "pause.ack.json"
     if not ack_path.is_file() or checkpoint is None or progress is None:
@@ -875,7 +1587,23 @@ def _validate_safe_pause(run_dir: Path, run_id: str,
     if (ack["checkpoint_manifest_sha256"] != checkpoint["manifest_sha256"]
             or ack["checkpoint_relative_path"] != checkpoint["relative_path"]):
         raise DurableRunnerError("safe pause ack checkpoint mismatch")
-    validate_checkpoint_reference(run_dir, checkpoint)
+    validated = validate_checkpoint_reference(run_dir, checkpoint)
+    manifest = validated["manifest"]
+    if manifest["run_id"] != run_id:
+        raise DurableRunnerError("safe pause checkpoint run_id mismatch")
+    pins = manifest["pins"]
+    for key in ("dataset_sha256", "model_weight_sha256", "trainer_source_sha256"):
+        if pins.get(key) != expected_inputs.get(key):
+            raise DurableRunnerError(f"safe pause checkpoint input pin mismatch: {key}")
+    payload = manifest["payload"]
+    return {
+        "schema_version": CHECKPOINT_VERIFICATION_SCHEMA,
+        "checkpoint_relative_path": checkpoint["relative_path"],
+        "checkpoint_manifest_sha256": checkpoint["manifest_sha256"],
+        "checkpoint_payload_sha256": payload["sha256"],
+        "checkpoint_payload_bytes": payload["bytes"],
+        "canonical_pins_sha256": sha256_bytes(checkpoint_canonical_bytes(pins)),
+    }
 
 
 def _archive_accepted_pause_control(
@@ -987,10 +1715,45 @@ def _stop_child(process: subprocess.Popen[bytes], timeout_seconds: float = 10.0)
         process.wait(timeout=timeout_seconds)
 
 
+def _verified_source_snapshot(run_dir: Path, trainer: Path) -> tuple[Path, str | None]:
+    """Execute run-local bytes so post-hash pathname replacement cannot win."""
+    source = _read_regular_file_snapshot(trainer, "trainer")
+    digest = sha256_bytes(source)
+    directory = run_dir / "source-snapshot"
+    snapshot = directory / trainer.name
+    helper_source = trainer.parent / "behavior_training_checkpoint.py"
+    helper = directory / helper_source.name
+    if directory.exists():
+        if _read_regular_file_snapshot(snapshot, "trainer snapshot") != source:
+            raise DurableRunnerError("existing trainer snapshot does not match pinned source")
+        return snapshot, sha256_file(helper) if helper.exists() else None
+    directory.mkdir(parents=True, exist_ok=False)
+    publish_new_bytes(snapshot, source, "trainer snapshot")
+    helper_digest = None
+    if helper_source.is_file():
+        helper_bytes = _read_regular_file_snapshot(helper_source, "checkpoint helper")
+        helper_digest = sha256_bytes(helper_bytes)
+        publish_new_bytes(helper, helper_bytes, "checkpoint helper snapshot")
+    if sha256_file(snapshot) != digest:
+        raise DurableRunnerError("trainer snapshot byte verification failed")
+    return snapshot, helper_digest
+
+
 def run_supervisor(args: argparse.Namespace) -> int:
-    run_dir = validate_local_run_dir(args.run_dir)
+    run_dir = validate_local_run_dir(args.run_dir, create=False)
     if not RUN_ID.fullmatch(args.run_id):
         raise DurableRunnerError("run_id is invalid")
+    if args.pause_at_first_optimizer_boundary and args.resume_interrupted:
+        raise DurableRunnerError("fresh prearm cannot be used with --resume-interrupted")
+    if (args.pause_at_first_optimizer_boundary
+            and not getattr(args, "_prearm_run_dir_created", False)
+            and os.path.lexists(run_dir)):
+        raise DurableRunnerError("fresh prearm requires an absent run directory")
+    if args.pause_at_first_optimizer_boundary and any(
+            os.path.lexists(path) for path in (
+                run_dir / "run-state.json", run_dir / "run-state.prev.json",
+                run_dir / "control")):
+        raise DurableRunnerError("fresh prearm refuses pre-existing run/control state")
     python = validate_local_path(args.python, "pinned Python")
     trainer = validate_local_path(args.trainer, "trainer")
     working_directory = validate_local_path(args.working_directory, "working directory")
@@ -1006,6 +1769,8 @@ def run_supervisor(args: argparse.Namespace) -> int:
     _ensure_argument(trainer_args, "--run-id", args.run_id)
     _ensure_argument(trainer_args, "--checkpoint-every-optimizer-steps",
                      str(args.checkpoint_every_optimizer_steps))
+    base_command_sha256 = sha256_bytes(canonical_bytes(
+        [str(python), str(trainer), *trainer_args]))
     dataset_sha = _argument_value(trainer_args, "--dataset-sha256", required=True)
     model_sha = _argument_value(trainer_args, "--model-sha256") or ""
     dataset_value = _argument_value(trainer_args, "--dataset", required=True)
@@ -1027,13 +1792,29 @@ def run_supervisor(args: argparse.Namespace) -> int:
             or (report_path is not None
                 and report_path.resolve().anchor.lower() != runtime_anchor)):
         raise DurableRunnerError("run directory and final artifacts must share one volume")
+    trainer_source_sha256 = sha256_file(trainer)
+    helper_source = trainer.parent / "behavior_training_checkpoint.py"
+    helper_source_sha256 = sha256_file(helper_source) if helper_source.is_file() else None
+    manifest_identity = validate_input_manifest_content(
+        args.input_manifest_path, args.input_manifest_sha256, trainer_args,
+        trainer_source_sha256, dataset_sha or "", model_sha,
+        args.checkpoint_every_optimizer_steps, helper_source_sha256)
     inputs = {"dataset_sha256": dataset_sha or "", "model_weight_sha256": model_sha,
-              "input_manifest_sha256": args.input_manifest_sha256 or "",
-              "trainer_source_sha256": sha256_file(trainer)}
-    for value in inputs.values():
+              "input_manifest_path": manifest_identity["path"],
+              "input_manifest_sha256": manifest_identity["sha256"],
+              "input_manifest_training_config_sha256": manifest_identity["training_config_sha256"],
+              "trainer_source_sha256": trainer_source_sha256}
+    for key, value in inputs.items():
+        if key == "input_manifest_path":
+            continue
         if value and not HEX64.fullmatch(value):
             raise DurableRunnerError("input SHA-256 is invalid")
 
+    run_dir.mkdir(parents=True, exist_ok=True)
+    trainer, snapshot_helper_source_sha256 = _verified_source_snapshot(run_dir, trainer)
+    # The helper digest is a run-state input even when a synthetic test trainer
+    # has no helper sibling; production manifests require the nonempty pin.
+    inputs["checkpoint_helper_source_sha256"] = snapshot_helper_source_sha256 or ""
     previous, source = load_run_state_with_previous(run_dir)
     if previous and previous["run_id"] != args.run_id:
         raise DurableRunnerError("run directory belongs to a different run_id")
@@ -1087,9 +1868,8 @@ def run_supervisor(args: argparse.Namespace) -> int:
             raise DurableRunnerError("resume inputs differ from the recorded run")
         if previous["command"].get("runner_source_sha256") != sha256_file(Path(__file__)):
             raise DurableRunnerError("runner source changed since the recorded run")
-        requested_command = [str(python), str(trainer), *trainer_args]
-        requested_command_sha = sha256_bytes(canonical_bytes(requested_command))
-        if previous["command"].get("canonical_sha256") != requested_command_sha:
+        if previous["command"].get("base_canonical_sha256",
+                                   previous["command"].get("canonical_sha256")) != base_command_sha256:
             raise DurableRunnerError("resume trainer command differs from the recorded run")
         checkpoint = resolve_resume_checkpoint(run_dir, args.run_id, inputs)
         resume_checkpoint = checkpoint
@@ -1108,10 +1888,15 @@ def run_supervisor(args: argparse.Namespace) -> int:
                 raise DurableRunnerError("accepted pause controls were not fully archived")
         elif request_exists and ack_exists:
             pause_progress = _load_progress(run_dir, args.run_id)
-            _validate_safe_pause(
+            pause_verification = _validate_safe_pause(
                 run_dir, args.run_id,
                 {key: checkpoint[key] for key in ("relative_path", "manifest_sha256")},
-                pause_progress)
+                pause_progress, inputs)
+            if (previous["status"] == "paused-safe"
+                    and previous["terminal"].get("checkpoint_verification")
+                    != pause_verification):
+                raise DurableRunnerError(
+                    "paused-safe terminal checkpoint verification receipt mismatch")
             requires_resume_acceptance = True
         elif request_exists:
             if previous["status"] == "paused-safe":
@@ -1130,15 +1915,23 @@ def run_supervisor(args: argparse.Namespace) -> int:
             "stderr": _log_receipt(run_dir, stderr_log)}
     outputs = {"adapter": {"path": str(output_path)},
                "report": {"path": str(report_path)} if report_path else None}
-    state = _base_state(args, command, inputs, logs, outputs,
+    state = _base_state(args, command, base_command_sha256, inputs, logs, outputs,
                         "resuming" if args.resume_interrupted else "starting", previous)
+    if args.pause_at_first_optimizer_boundary:
+        _prearm_first_optimizer_boundary(run_dir, args.run_id)
     _write_state(run_dir, state)
 
     trainer_process: subprocess.Popen[bytes] | None = None
+    held_inputs: list[_HeldRegularInput] = []
     try:
         with (stdout_log.open("ab", buffering=0) as stdout_stream,
               stderr_log.open("ab", buffering=0) as stderr_stream):
             creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+            # This is deliberately adjacent to Popen: validation and launch use
+            # the same held descriptors, leaving no path re-open window.
+            held_inputs = _hold_training_inputs(
+                dataset_path, dataset_sha or "", model_path,
+                manifest_identity["model_inventory"])
             trainer_process = subprocess.Popen(
                 command, cwd=str(working_directory), stdout=stdout_stream,
                 stderr=stderr_stream, stdin=subprocess.DEVNULL,
@@ -1168,6 +1961,11 @@ def run_supervisor(args: argparse.Namespace) -> int:
                 time.sleep(args.heartbeat_seconds)
             exit_code = int(trainer_process.returncode)
 
+        # Do this before accepting progress or promoting terminal output
+        # receipts.  A child that mutates/replaces an input never gets a
+        # verified-complete terminal state.
+        _verify_held_training_inputs(held_inputs)
+
         if not resume_accepted:
             resume_accepted = _archive_accepted_pause_control(
                 run_dir, args.run_id, inputs)
@@ -1178,8 +1976,10 @@ def run_supervisor(args: argparse.Namespace) -> int:
 
         progress = _load_progress(run_dir, args.run_id)
         checkpoint = _checkpoint_from_progress(progress)
+        checkpoint_verification = None
         if exit_code == SAFE_PAUSE_EXIT_CODE:
-            _validate_safe_pause(run_dir, args.run_id, checkpoint, progress)
+            checkpoint_verification = _validate_safe_pause(
+                run_dir, args.run_id, checkpoint, progress, inputs)
             terminal_status = "paused-safe"
             reason = "safe-optimizer-boundary"
         elif exit_code == 0:
@@ -1205,6 +2005,11 @@ def run_supervisor(args: argparse.Namespace) -> int:
             terminal_status, persist=False)
         state["terminal"] = {
             "exit_code": exit_code, "reason": reason, "at_utc": utc_now()}
+        if checkpoint_verification is not None:
+            state["terminal"]["checkpoint_verification"] = checkpoint_verification
+        if terminal_status == "complete" and (run_dir / "producer-evidence-root.json").is_file():
+            state["terminal"]["final_evidence_root"] = _bind_final_evidence_root(
+                run_dir, args.run_id, state, progress or {}, inputs)
         _write_state(run_dir, state)
         return exit_code
     except BaseException as exc:
@@ -1231,6 +2036,9 @@ def run_supervisor(args: argparse.Namespace) -> int:
         if isinstance(exc, (DurableRunnerError, KeyboardInterrupt)):
             raise
         raise DurableRunnerError("supervisor failed before terminal receipt") from exc
+    finally:
+        for held_input in reversed(held_inputs):
+            held_input.close()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1240,21 +2048,55 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--python", type=Path, required=True)
     parser.add_argument("--trainer", type=Path, required=True)
     parser.add_argument("--working-directory", type=Path, required=True)
-    parser.add_argument("--input-manifest-sha256", default="")
+    parser.add_argument("--input-manifest-path", type=Path, required=True)
+    parser.add_argument("--input-manifest-sha256", required=True)
     parser.add_argument("--checkpoint-every-optimizer-steps", type=int, default=5)
     parser.add_argument("--heartbeat-seconds", type=float, default=10.0)
     parser.add_argument("--resume-interrupted", action="store_true")
+    parser.add_argument("--pause-at-first-optimizer-boundary", action="store_true")
     parser.add_argument("trainer_args", nargs=argparse.REMAINDER)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if args.heartbeat_seconds <= 0 or args.heartbeat_seconds > 15:
+    if (not math.isfinite(args.heartbeat_seconds)
+            or args.heartbeat_seconds <= 0 or args.heartbeat_seconds > 15):
         raise DurableRunnerError("heartbeat must be in (0, 15] seconds")
     if args.checkpoint_every_optimizer_steps <= 0:
         raise DurableRunnerError("checkpoint interval must be positive")
-    with exclusive_run_lock(validate_local_run_dir(args.run_dir)):
+    if args.pause_at_first_optimizer_boundary and args.resume_interrupted:
+        raise DurableRunnerError("fresh prearm cannot be used with --resume-interrupted")
+    # Validate the immutable manifest before creating the run directory or lock.
+    run_dir = validate_local_run_dir(args.run_dir, create=False)
+    if args.pause_at_first_optimizer_boundary and os.path.lexists(run_dir):
+        raise DurableRunnerError("fresh prearm requires an absent run directory")
+    preflight_trainer_args = list(args.trainer_args)
+    if preflight_trainer_args and preflight_trainer_args[0] == "--":
+        preflight_trainer_args.pop(0)
+    _validate_trainer_arguments(preflight_trainer_args)
+    preflight_trainer = validate_local_path(args.trainer, "trainer")
+    if not preflight_trainer.is_file():
+        raise DurableRunnerError("trainer path is missing")
+    preflight_helper = preflight_trainer.parent / "behavior_training_checkpoint.py"
+    if not preflight_helper.is_file():
+        raise DurableRunnerError("checkpoint helper path is missing")
+    validate_input_manifest_content(
+        args.input_manifest_path, args.input_manifest_sha256,
+        preflight_trainer_args, sha256_file(preflight_trainer),
+        _argument_value(preflight_trainer_args, "--dataset-sha256", required=True) or "",
+        _argument_value(preflight_trainer_args, "--model-sha256") or "",
+        args.checkpoint_every_optimizer_steps, sha256_file(preflight_helper))
+    if args.pause_at_first_optimizer_boundary:
+        try:
+            run_dir.mkdir(parents=True, exist_ok=False)
+        except FileExistsError as exc:
+            raise DurableRunnerError(
+                "fresh prearm run directory appeared during preflight") from exc
+        args._prearm_run_dir_created = True
+    else:
+        run_dir.mkdir(parents=True, exist_ok=True)
+    with exclusive_run_lock(run_dir):
         return run_supervisor(args)
 
 

@@ -1,8 +1,10 @@
 import importlib.util
 import json
+import sys
 import tempfile
 from contextlib import ExitStack
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -15,8 +17,6 @@ SPEC = importlib.util.spec_from_file_location(
 assert SPEC and SPEC.loader
 verifier = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(verifier)
-
-
 class ArtifactVerifier:
     def verify_artifact_directory(self, directory, pins, run_id):
         return {"manifest_sha256": "a" * 64}
@@ -40,8 +40,10 @@ def _pins():
         "dataset_sha256": "1" * 64,
         "model_weight_sha256": "2" * 64,
         "trainer_source_sha256": "3" * 64,
-        "config": {"mode": "cuda-qlora", "seed": 42, "max_steps": 320,
-                   "batch_size": 1, "gradient_accumulation": 16,
+        "config": {"mode": "cuda-qlora", "seed": 42, "lora_r": 8,
+                   "lora_alpha": 16, "lora_dropout": 0.05,
+                   "learning_rate": 0.00002, "max_steps": 320,
+                   "batch_size": 1, "gradient_accumulation": 16, "max_seq_len": 2048,
                    "checkpoint_every_optimizer_steps": 5,
                    "deterministic_validation": True},
         "determinism": {"validation_enabled": True, "algorithms_enabled": True,
@@ -57,19 +59,46 @@ def _pins():
     }
 
 
+def _manifest_payload():
+    config = _pins()["config"]
+    return {
+        "schema_version": "airi.behavior-input-manifest.v2",
+        "dataset_sha256": "1" * 64,
+        "model_weight_sha256": "2" * 64,
+        "trainer_source_sha256": "3" * 64,
+        "training_config": config,
+        "training_config_sha256": verifier._sha256_bytes(verifier._canonical(config)),
+        "checkpoint_helper_source_sha256": "4" * 64,
+        "model_inventory": [{"path": "model.safetensors", "bytes": 1,
+                             "sha256": "5" * 64}],
+    }
+
+
+_MANIFEST_TEMPORARY = tempfile.TemporaryDirectory()
+TEST_MANIFEST_PATH = Path(_MANIFEST_TEMPORARY.name) / "input-manifest.json"
+TEST_MANIFEST_PATH.write_bytes(verifier._canonical(_manifest_payload()))
+TEST_MANIFEST_SHA256 = verifier._sha256_file(TEST_MANIFEST_PATH)
+
+
 def _state(run_id: str):
     return {"run_id": run_id,
             "inputs": {"dataset_sha256": "1" * 64,
                        "model_weight_sha256": "2" * 64,
                        "trainer_source_sha256": "3" * 64,
-                       "input_manifest_sha256": "4" * 64},
+                       "input_manifest_path": str(TEST_MANIFEST_PATH),
+                       "input_manifest_sha256": TEST_MANIFEST_SHA256,
+                       "input_manifest_training_config_sha256": verifier._sha256_bytes(
+                           verifier._canonical(_pins()["config"])),
+                       "checkpoint_helper_source_sha256": "4" * 64},
             "progress": {"microsteps_completed": 320, "optimizer_steps": 20},
+            "checkpoint": {"relative_path": "checkpoint-00000001",
+                           "manifest_sha256": "b" * 64},
             "status": "complete"}
 
 
 def _expected_bindings(**overrides):
     bindings = {
-        "expected_input_manifest_sha256": "4" * 64,
+        "expected_input_manifest_sha256": TEST_MANIFEST_SHA256,
         "expected_training_config_sha256": verifier._sha256_bytes(
             verifier._canonical(_pins()["config"])),
         "expected_seed": 42,
@@ -104,7 +133,7 @@ def _write_pause_history(run: Path, run_id: str = "resume",
         verifier._canonical(accepted))
 
 
-def test_pass_receipt_is_canonical_atomic_and_never_authorizes_adoption() -> None:
+def test_injected_loaders_cannot_publish_a_pass_receipt() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
         baseline, resumed = root / "baseline", root / "resumed"
@@ -120,32 +149,358 @@ def test_pass_receipt_is_canonical_atomic_and_never_authorizes_adoption() -> Non
                   "manifest_sha256": "b" * 64}
         with patch.object(verifier, "_completed_run", side_effect=[_state("base"), _state("resume")]), \
                 patch.object(verifier, "_latest_verified_generation", side_effect=[latest, latest]), \
-                patch.object(verifier, "_events", side_effect=[([_event("base", "checkpoint-00000001")], [1, 2, 3, 4]), ([_event("resume", "checkpoint-00000001", "safe-pause")], [])]), \
+                patch.object(verifier, "_events", side_effect=[([_event("base", "checkpoint-00000001")], [3, 4, 5, 6]), ([_event("resume", "checkpoint-00000001", "safe-pause")], [1, 2, 3, 4, 5])]), \
                 patch.object(verifier, "_safe_pause_history", return_value=[{"path": "control/history/x.request.json", "sha256": "c" * 64}]), \
-                patch.object(verifier, "_load_module", return_value=ArtifactVerifier()), \
+                patch.object(verifier, "_verify_artifact_snapshot", return_value={"manifest_sha256": "a" * 64, "files": {"adapter_model.safetensors": b"x"}}), \
                 patch.object(verifier, "_report_fields", return_value={"mode": "cuda-qlora", "steps": 2}), \
                 patch.object(verifier, "_tensor_report", return_value={"mode": "exact", "max_abs_diff": 0.0, "max_rel_diff": 0.0, "tensor_names": [], "tensor_count": 0}):
-            result = verifier.verify_equivalence(
-                baseline, resumed, receipt,
-                baseline_adapter_dir=baseline / "adapter", resumed_adapter_dir=resumed / "adapter",
-                expected_microsteps=320, expected_optimizer_steps=20,
-                expected_checkpoint_every_optimizer_steps=5,
-                **_expected_bindings(),
-                tensor_loader=lambda _path: {}, state_loader=lambda _dir, _events: {"run_id": "different", "checkpoint_generation": "different", "same": [1]})
-        assert result["pass"] is True
-        assert result["adoption_authorized"] is False
-        raw = receipt.read_bytes()
-        assert raw == verifier._canonical(json.loads(raw))
-        assert b"not-model-bytes" not in raw
-        assert result["baseline"]["latest_checkpoint_payload_sha256"] == "c" * 64
-        assert result["safe_pause_resume"]["latest_checkpoint_payload_sha256"] == "c" * 64
-        assert result["comparator"]["schema_version"] == verifier.COMPARATOR_SCHEMA
-        assert result["comparator"]["exact"] is True
-        assert result["expected_bindings"] == {
-            key.removeprefix("expected_"): value
-            for key, value in _expected_bindings().items()
+            with pytest.raises(verifier.EquivalenceError, match="non-production injected"):
+                verifier.verify_equivalence(
+                    baseline, resumed, receipt,
+                    baseline_adapter_dir=baseline / "adapter", resumed_adapter_dir=resumed / "adapter",
+                    expected_microsteps=320, expected_optimizer_steps=20,
+                    expected_checkpoint_every_optimizer_steps=5,
+                    **_expected_bindings(),
+                    tensor_loader=lambda _path: {}, state_loader=lambda _dir, _events: {"run_id": "different", "checkpoint_generation": "different", "same": [1]})
+        assert not receipt.exists()
+
+
+@pytest.mark.parametrize("name", [
+    "run-state.json", "checkpoint-index.json", "checkpoint-00000001.json",
+    "pause-001.ack.json",
+])
+def test_evidence_cut_keeps_json_evidence_hash_after_path_replacement(name: str) -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        state_path = root / name
+        original = b'{"evidence":"original"}\n'
+        state_path.write_bytes(original)
+        verifier._EVIDENCE_CUT = {}
+        try:
+            assert verifier._evidence_bytes(state_path, "run-state") == original
+            state_path.write_bytes(b'{"evidence":"replacement"}\n')
+            assert verifier._sha256_file(state_path) == verifier._sha256_bytes(original)
+        finally:
+            verifier._EVIDENCE_CUT = None
+
+
+def test_latest_checkpoint_state_loads_cached_payload_after_path_replacement() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        checkpoints = root / "checkpoints"
+        generation = "checkpoint-00000001"
+        payload_path = checkpoints / generation / "state.pt"
+        payload_path.parent.mkdir(parents=True)
+        original = b"original-checkpoint"
+        payload_path.write_bytes(original)
+        (checkpoints / "checkpoint-index.json").write_bytes(verifier._canonical({
+            "schema_version": "airi.behavior-checkpoint-index.v1",
+            "latest": {"relative_path": generation, "manifest_sha256": "a" * 64},
+            "previous": None,
+        }))
+        original_snapshot = verifier._evidence_bytes
+
+        def replace_after_snapshot(path, label):
+            value = original_snapshot(path, label)
+            if label == "latest checkpoint state":
+                payload_path.write_bytes(b"replacement-checkpoint")
+            return value
+
+        loaded: dict[str, bytes] = {}
+
+        def load(stream, **_kwargs):
+            loaded["bytes"] = stream.read()
+            return {"loaded": loaded["bytes"]}
+
+        verifier._EVIDENCE_CUT = {}
+        try:
+            with patch.object(verifier, "_evidence_bytes", side_effect=replace_after_snapshot), \
+                    patch.dict(sys.modules, {"torch": SimpleNamespace(load=load)}):
+                assert verifier._latest_checkpoint_state(root, []) == {"loaded": original}
+        finally:
+            verifier._EVIDENCE_CUT = None
+        assert payload_path.read_bytes() == b"replacement-checkpoint"
+
+
+def test_artifact_snapshot_keeps_manifest_and_file_bytes_after_replacement() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        directory = Path(temporary) / "adapter"
+        directory.mkdir()
+        weights = directory / "adapter_model.safetensors"
+        original = b"original-safetensors"
+        weights.write_bytes(original)
+        manifest = {
+            "schema_version": "airi.behavior-adapter-artifact.v1", "run_id": "base",
+            "pins": _pins(), "files": [{"path": "adapter_model.safetensors",
+                                            "bytes": len(original),
+                                            "sha256": verifier._sha256_bytes(original)}],
         }
-        assert result["safe_pause_resume"]["safe_pause_event"]["generation"] == "checkpoint-00000001"
+        manifest_path = directory / "artifact-manifest.json"
+        manifest_path.write_bytes(verifier._canonical(manifest))
+        original_snapshot = verifier._evidence_bytes
+
+        def replace_after_snapshot(path, label):
+            value = original_snapshot(path, label)
+            if label == "adapter artifact file":
+                weights.write_bytes(b"replacement-safetensors")
+            return value
+
+        verifier._EVIDENCE_CUT = {}
+        try:
+            with patch.object(verifier, "_evidence_bytes", side_effect=replace_after_snapshot):
+                verified = verifier._verify_artifact_snapshot(directory, _pins(), "base")
+        finally:
+            verifier._EVIDENCE_CUT = None
+        assert verified["manifest_sha256"] == verifier._sha256_bytes(verifier._canonical(manifest))
+        assert verified["files"]["adapter_model.safetensors"] == original
+        assert weights.read_bytes() == b"replacement-safetensors"
+
+
+def test_report_fields_keep_cached_report_after_path_replacement() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        report_path = Path(temporary) / "report.json"
+        manifest_sha = "a" * 64
+        report = {"mode": "cuda-qlora", "steps": 1, "optimizer_steps": 1,
+                  "checkpoint_every_optimizer_steps": 5, "deterministic_validation": True,
+                  "determinism": _pins()["determinism"],
+                  "adapter_artifact_manifest_sha256": manifest_sha,
+                  "dataset_sha256": _pins()["dataset_sha256"],
+                  "model_weight_sha256": _pins()["model_weight_sha256"], "seed": 42,
+                  "training_authorization": True, "adoption_authorized": False,
+                  "t3_status": "pending"}
+        report_path.write_bytes(verifier._canonical(report))
+        state = {"outputs": {"report": {"path": str(report_path)}}}
+        original_snapshot = verifier._evidence_bytes
+
+        def replace_after_snapshot(path, label):
+            value = original_snapshot(path, label)
+            if label == "training report":
+                report_path.write_bytes(b'{"replacement":true}\n')
+            return value
+
+        verifier._EVIDENCE_CUT = {}
+        try:
+            with patch.object(verifier, "_evidence_bytes", side_effect=replace_after_snapshot):
+                assert verifier._report_fields(state, manifest_sha, _pins())["steps"] == 1
+        finally:
+            verifier._EVIDENCE_CUT = None
+        assert report_path.read_bytes() == b'{"replacement":true}\n'
+
+
+def test_completed_output_receipts_refuse_adapter_and_report_substitution() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        adapter = root / "adapter"; adapter.mkdir()
+        manifest_path = adapter / "artifact-manifest.json"
+        manifest_path.write_bytes(b"{}\n")
+        weight = adapter / "adapter_model.safetensors"; weight.write_bytes(b"weights")
+        report = root / "report.json"; report.write_bytes(b"{}\n")
+        artifact = {"files": {"adapter_model.safetensors": b"weights"}}
+        rows = [
+            {"path": "adapter_model.safetensors", "size": 7,
+             "sha256": verifier._sha256_bytes(b"weights")},
+            {"path": "artifact-manifest.json", "size": 3,
+             "sha256": verifier._sha256_bytes(b"{}\n")},
+        ]
+        state = {"outputs": {
+            "adapter": {"path": str(adapter), "kind": "directory", "files": rows,
+                        "manifest_sha256": "0" * 64},
+            "report": {"path": str(report), "kind": "file", "size": 2,
+                       "sha256": "0" * 64},
+        }}
+        with pytest.raises(verifier.EquivalenceError, match="adapter output receipt"):
+            verifier._bind_completed_output_receipts(state, adapter, artifact)
+        state["outputs"]["adapter"]["manifest_sha256"] = verifier._sha256_bytes(
+            verifier._canonical(rows))
+        with pytest.raises(verifier.EquivalenceError, match="report output receipt"):
+            verifier._bind_completed_output_receipts(state, adapter, artifact)
+
+
+def test_artifact_inventory_rejects_windows_reparse_attribute() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        directory = Path(temporary) / "adapter"; directory.mkdir()
+        item = directory / "adapter_model.safetensors"; item.write_bytes(b"x")
+        manifest = {
+            "schema_version": "airi.behavior-adapter-artifact.v1", "run_id": "base",
+            "pins": _pins(), "files": [{"path": item.name, "bytes": 1,
+                                           "sha256": verifier._sha256_bytes(b"x")}],
+        }
+        (directory / "artifact-manifest.json").write_bytes(verifier._canonical(manifest))
+        original_lstat = verifier.os.lstat
+
+        def reparse(path):
+            value = original_lstat(path)
+            if Path(path) == item:
+                return SimpleNamespace(st_file_attributes=0x400)
+            return value
+
+        with patch.object(verifier.os, "lstat", side_effect=reparse):
+            with pytest.raises(verifier.EquivalenceError, match="reparse point|linked entry"):
+                verifier._verify_artifact_snapshot(directory, _pins(), "base")
+
+
+@pytest.mark.parametrize("receipt_name", [
+    "baseline/evidence/receipt.json", "resumed/logs/receipt.json",
+    "baseline/adapter/receipt.json", "resumed/adapter/checkpoints/receipt.json",
+])
+def test_receipt_refuses_every_run_and_adapter_evidence_tree_before_publication(receipt_name) -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        baseline, resumed = root / "baseline", root / "resumed"
+        for directory in (baseline, resumed):
+            directory.mkdir(); (directory / "run-state.json").write_bytes(b"{}\n")
+            adapter = directory / "adapter"; adapter.mkdir()
+            (adapter / "adapter_model.safetensors").write_bytes(b"x")
+        (baseline / "control").mkdir()
+        receipt = root / receipt_name
+        latest = {"manifest": {"pins": _pins(), "generation": "checkpoint-00000001",
+                               "payload": {"sha256": "c" * 64}}, "manifest_sha256": "b" * 64}
+        with patch.object(verifier, "_completed_run", side_effect=[_state("base"), _state("resume")]), \
+                patch.object(verifier, "_latest_verified_generation", side_effect=[latest, latest]), \
+                patch.object(verifier, "_events", side_effect=[([_event("base", "checkpoint-00000001")], [1, 2, 3, 4]), ([_event("resume", "checkpoint-00000001", "safe-pause")], [1, 2, 3, 4])]), \
+                patch.object(verifier, "_safe_pause_history", return_value=[]), \
+                patch.object(verifier, "_verify_artifact_snapshot", return_value={"manifest_sha256": "a" * 64, "files": {"adapter_model.safetensors": b"x"}}), \
+                patch.object(verifier, "_report_fields", return_value={"mode": "cuda-qlora", "steps": 2}), \
+                patch.object(verifier, "_tensor_report", return_value={"mode": "exact", "max_abs_diff": 0.0, "max_rel_diff": 0.0, "tensor_names": [], "tensor_count": 0}):
+            with pytest.raises(verifier.EquivalenceError, match="non-production injected"):
+                verifier.verify_equivalence(
+                    baseline, resumed, receipt, baseline_adapter_dir=baseline / "adapter",
+                    resumed_adapter_dir=resumed / "adapter", expected_microsteps=320,
+                    expected_optimizer_steps=20, expected_checkpoint_every_optimizer_steps=5,
+                    **_expected_bindings(), tensor_loader=lambda _path: {},
+                    state_loader=lambda _dir, _events: {"run_id": "different", "checkpoint_generation": "different", "same": [1]})
+        assert not receipt.exists()
+
+
+def test_input_manifest_binding_requires_a_canonical_actual_file_and_current_hash() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        manifest = Path(temporary) / "manifest.json"
+        manifest.write_bytes(verifier._canonical(_manifest_payload()))
+        digest = verifier._sha256_file(manifest)
+        state = _state("base")
+        state["inputs"] = {**state["inputs"], "input_manifest_path": str(manifest.resolve()),
+                           "input_manifest_sha256": digest}
+        expected_config = _expected_bindings()["expected_training_config_sha256"]
+        assert verifier._input_manifest_binding(state, digest, expected_config) == {
+            "path": str(manifest.resolve()), "sha256": digest,
+            "training_config_sha256": expected_config}
+        manifest.unlink()
+        with pytest.raises(verifier.EquivalenceError, match="missing"):
+            verifier._input_manifest_binding(state, digest, expected_config)
+
+
+def test_manifest_binding_uses_one_snapshot_across_hash_parse_cutpoint() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        manifest = Path(temporary) / "manifest.json"
+        payload = verifier._canonical(_manifest_payload())
+        manifest.write_bytes(payload)
+        digest = verifier._sha256_bytes(payload)
+        state = _state("base")
+        state["inputs"] = {**state["inputs"], "input_manifest_path": str(manifest.resolve()),
+                           "input_manifest_sha256": digest}
+        original_loads = verifier.json.loads
+
+        def replace_after_snapshot(value, *args, **kwargs):
+            manifest.write_bytes(b'{"replaced":true}\n')
+            return original_loads(value, *args, **kwargs)
+
+        with patch.object(verifier.json, "loads", side_effect=replace_after_snapshot):
+            result = verifier._input_manifest_binding(
+                state, digest, _expected_bindings()["expected_training_config_sha256"])
+        assert result["sha256"] == digest
+        assert manifest.read_bytes() == b'{"replaced":true}\n'
+
+
+def test_input_manifest_binding_refuses_mutation_and_reparse_simulation() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        manifest = root / "manifest.json"
+        manifest.write_bytes(b"original\n")
+        digest = verifier._sha256_file(manifest)
+        state = _state("base")
+        state["inputs"] = {**state["inputs"], "input_manifest_path": str(manifest.resolve()),
+                           "input_manifest_sha256": digest}
+        manifest.write_bytes(b"mutated\n")
+        with pytest.raises(verifier.EquivalenceError, match="bytes differ"):
+            verifier._input_manifest_binding(
+                state, digest, _expected_bindings()["expected_training_config_sha256"])
+        manifest.write_bytes(b"original\n")
+        with patch.object(verifier, "_require_local_fixed_path",
+                          side_effect=verifier.EquivalenceError("completed run input manifest cannot traverse a reparse point")):
+            with pytest.raises(verifier.EquivalenceError, match="reparse point"):
+                verifier._input_manifest_binding(
+                    state, digest, _expected_bindings()["expected_training_config_sha256"])
+
+
+def test_input_manifest_binding_refuses_malformed_training_config_sha256() -> None:
+    state = _state("base")
+    state["inputs"] = {**state["inputs"],
+                       "input_manifest_training_config_sha256": "not-a-sha256"}
+    with pytest.raises(verifier.EquivalenceError, match="identity is malformed"):
+        verifier._input_manifest_binding(
+            state, TEST_MANIFEST_SHA256,
+            _expected_bindings()["expected_training_config_sha256"])
+
+
+@pytest.mark.parametrize(("mutation", "message"), [
+    (lambda value: value.update({"schema_version": "wrong"}), "schema mismatch"),
+    (lambda value: value.update({"unexpected": True}), "schema mismatch"),
+    (lambda value: value["training_config"].pop("max_seq_len"), "configuration schema mismatch"),
+    (lambda value: value.update({"training_config_sha256": "0" * 64}), "config hash is invalid"),
+    (lambda value: value.update({"dataset_sha256": "4" * 64}), "pin differs"),
+])
+def test_input_manifest_binding_refuses_content_schema_hash_and_pin_faults(mutation, message) -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        manifest = Path(temporary) / "manifest.json"
+        payload = _manifest_payload()
+        mutation(payload)
+        manifest.write_bytes(verifier._canonical(payload))
+        digest = verifier._sha256_file(manifest)
+        state = _state("base")
+        state["inputs"] = {**state["inputs"], "input_manifest_path": str(manifest.resolve()),
+                           "input_manifest_sha256": digest}
+        with pytest.raises(verifier.EquivalenceError, match=message):
+            verifier._input_manifest_binding(
+                state, digest, _expected_bindings()["expected_training_config_sha256"])
+
+
+def test_input_manifest_binding_refuses_nonfinite_manifest_config() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        manifest = Path(temporary) / "manifest.json"
+        payload = _manifest_payload()
+        payload["training_config"]["learning_rate"] = float("inf")
+        manifest.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+                            encoding="utf-8", newline="\n")
+        digest = verifier._sha256_file(manifest)
+        state = _state("base")
+        state["inputs"] = {**state["inputs"], "input_manifest_path": str(manifest.resolve()),
+                           "input_manifest_sha256": digest}
+        with pytest.raises(verifier.EquivalenceError, match="non-canonical values"):
+            verifier._input_manifest_binding(
+                state, digest, _expected_bindings()["expected_training_config_sha256"])
+
+
+def test_equivalence_refuses_same_bytes_manifest_path_swap() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        baseline, resumed = root / "baseline", root / "resumed"
+        baseline.mkdir(); resumed.mkdir()
+        first, second = root / "first.json", root / "second.json"
+        first.write_bytes(verifier._canonical(_manifest_payload()))
+        second.write_bytes(verifier._canonical(_manifest_payload()))
+        digest = verifier._sha256_file(first)
+        base_state, resume_state = _state("base"), _state("resume")
+        base_state["inputs"] = {**base_state["inputs"], "input_manifest_path": str(first.resolve()),
+                                "input_manifest_sha256": digest}
+        resume_state["inputs"] = {**resume_state["inputs"], "input_manifest_path": str(second.resolve()),
+                                  "input_manifest_sha256": digest}
+        with patch.object(verifier, "_completed_run", side_effect=[base_state, resume_state]):
+            with pytest.raises(verifier.EquivalenceError, match="different canonical input manifest paths"):
+                verifier.verify_equivalence(
+                    baseline, resumed, root / "receipt.json",
+                    expected_microsteps=320, expected_optimizer_steps=20,
+                    expected_checkpoint_every_optimizer_steps=5,
+                    **_expected_bindings(expected_input_manifest_sha256=digest))
 
 
 def test_failure_never_publishes_a_pass_receipt() -> None:
@@ -174,8 +529,59 @@ def test_failure_never_publishes_a_pass_receipt() -> None:
         assert not receipt.exists()
 
 
+def test_completed_run_without_final_evidence_root_is_not_publishable() -> None:
+    state = _state("base")
+    state["terminal"] = {"exit_code": 0}
+    with tempfile.TemporaryDirectory() as temporary:
+        with pytest.raises(verifier.EquivalenceError, match="final producer evidence receipt"):
+            verifier._closed_producer_evidence(
+                state, Path(temporary), {"index_sha256": "a" * 64},
+                {"microsteps_completed": 320, "optimizer_steps": 20,
+                 "pending_microbatches": 0, "training_elapsed_ns": 1})
+
+
+def test_completed_run_state_checkpoint_must_match_latest_index_and_event() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        baseline, resumed = root / "baseline", root / "resumed"
+        baseline.mkdir(); resumed.mkdir()
+        latest = {"manifest": {"pins": _pins(), "generation": "checkpoint-00000001",
+                               "payload": {"sha256": "c" * 64}}, "manifest_sha256": "b" * 64}
+        bad = _state("base")
+        bad["checkpoint"] = {"relative_path": "checkpoint-00000002", "manifest_sha256": "b" * 64}
+        with patch.object(verifier, "_completed_run", side_effect=[bad, _state("resume")]), \
+                patch.object(verifier, "_latest_verified_generation", side_effect=[latest, latest]), \
+                patch.object(verifier, "_events", side_effect=[([_event("base", "checkpoint-00000001")], [1, 2, 3, 4]), ([_event("resume", "checkpoint-00000001", "safe-pause")], [1, 2, 3, 4])]):
+            with pytest.raises(verifier.EquivalenceError, match="run-state/latest checkpoint"):
+                verifier.verify_equivalence(
+                    baseline, resumed, root / "receipt.json", expected_microsteps=320,
+                    expected_optimizer_steps=20, expected_checkpoint_every_optimizer_steps=5,
+                    **_expected_bindings())
+
+
 def test_normalization_only_ignores_identity_fields() -> None:
-    assert verifier._normalise_state({"run_id": "a", "x": [{"checkpoint_generation": "g", "v": 1}]}) == {"x": [{"v": 1}]}
+    assert verifier._normalise_state({"run_id": "a", "training_elapsed_ns": 1,
+                                      "x": [{"checkpoint_generation": "g", "v": 1}]}) == {"x": [{"v": 1}]}
+
+
+@pytest.mark.parametrize("field, incorrect", [
+    ("epoch", 2),
+    ("next_batch_index", 3),
+    ("microsteps_completed", 319),
+    ("optimizer_steps", 19),
+    ("pending_microbatches", 1),
+])
+def test_runner_progress_rejects_each_compact_projection_mismatch(field, incorrect) -> None:
+    progress = {"epoch": 1, "next_batch_index": 2, "microsteps_completed": 320,
+                "optimizer_steps": 20, "pending_microbatches": 0,
+                "training_elapsed_ns": 123}
+    state = {"progress": {key: progress[key] for key in (
+        "epoch", "next_batch_index", "microsteps_completed", "optimizer_steps",
+        "pending_microbatches")}}
+    verifier._require_runner_progress_projection(state, progress)
+    state["progress"][field] = incorrect
+    with pytest.raises(verifier.EquivalenceError, match="progress differs"):
+        verifier._require_runner_progress_projection(state, progress)
 
 
 def test_nested_checkpoint_tensor_comparison_is_exact() -> None:
@@ -194,7 +600,18 @@ def test_nested_checkpoint_tensor_comparison_is_exact() -> None:
         raise AssertionError("changed optimizer tensor unexpectedly passed")
 
 
-def test_event_intervals_use_durable_timestamps_and_interval_reason() -> None:
+def test_checkpoint_state_ignores_elapsed_time_but_not_deterministic_state() -> None:
+    baseline = {"run_id": "baseline", "training_elapsed_ns": 1,
+                "optimizer": {"step": 20}, "losses": [0.5]}
+    resumed = {"run_id": "resumed", "training_elapsed_ns": 2,
+               "optimizer": {"step": 20}, "losses": [0.5]}
+    verifier._compare_state(baseline, resumed)
+    resumed["optimizer"]["step"] = 21
+    with pytest.raises(verifier.EquivalenceError, match="value differs"):
+        verifier._compare_state(baseline, resumed)
+
+
+def test_real_shaped_event_uses_three_field_payload_progress_and_top_level_timing() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         run = Path(temporary)
         events = run / "checkpoint-events"
@@ -202,11 +619,13 @@ def test_event_intervals_use_durable_timestamps_and_interval_reason() -> None:
         pins = _pins()
         run_state = {"created_at_utc": "2026-08-22T00:00:00Z"}
         (run / "run-state.json").write_bytes(verifier._canonical(run_state))
+        previous = None
         for number, second in enumerate((100, 200, 300, 400), start=1):
             generation = f"checkpoint-{number:08d}"
-            index = {"schema_version": "airi.behavior-checkpoint-index.v1",
-                     "latest": {"relative_path": generation,
-                                "manifest_sha256": "a" * 64}, "previous": None}
+            index = {"schema_version": verifier.TRANSACTION_INDEX_SCHEMA, "run_id": "base",
+                     "latest": {"relative_path": generation, "manifest_sha256": "a" * 64,
+                                "event_relative_path": f"checkpoint-events/{generation}.json", "event_sha256": "c" * 64},
+                     "previous": None, "previous_index_sha256": None}
             event = {
                 "schema_version": verifier.EVENT_SCHEMA, "run_id": "base",
                 "generation": generation, "reason": "interval",
@@ -217,14 +636,20 @@ def test_event_intervals_use_durable_timestamps_and_interval_reason() -> None:
                 "publish_elapsed_ns": 1_000_000_000,
                 "checkpoint_manifest_sha256": "a" * 64,
                 "checkpoint_payload_sha256": "b" * 64,
-                "checkpoint_index_sha256": verifier._sha256_bytes(verifier._canonical(index)),
-                "checkpoint_index": index,
+                "checkpoint_payload_progress": {"microsteps_completed": number * 80,
+                                                "optimizer_steps": number * 5,
+                                                 "pending_microbatches": 0},
                 "pins_sha256": verifier._sha256_bytes(verifier._canonical(pins)),
+                "previous_event_sha256": previous,
+                "previous_index_sha256": None,
+                "training_elapsed_ns": second * 1_000_000_000,
             }
-            (events / f"{generation}.json").write_bytes(verifier._canonical(event))
+            raw = verifier._canonical(event)
+            (events / f"{generation}.json").write_bytes(raw)
+            previous = verifier._sha256_bytes(raw)
         found, intervals = verifier._events(run, "base", pins)
         assert len(found) == 4
-        assert intervals == [100.0, 100.0, 100.0, 100.0]
+        assert intervals == [101.0, 101.0, 101.0, 101.0]
 
 
 def test_event_inventory_rejects_a_generation_gap() -> None:
@@ -235,9 +660,10 @@ def test_event_inventory_rejects_a_generation_gap() -> None:
         pins = _pins()
         for number in (1, 3):
             generation = f"checkpoint-{number:08d}"
-            index = {"schema_version": "airi.behavior-checkpoint-index.v1",
-                     "latest": {"relative_path": generation,
-                                "manifest_sha256": "a" * 64}, "previous": None}
+            index = {"schema_version": verifier.TRANSACTION_INDEX_SCHEMA, "run_id": "base",
+                     "latest": {"relative_path": generation, "manifest_sha256": "a" * 64,
+                                "event_relative_path": f"checkpoint-events/{generation}.json", "event_sha256": "c" * 64},
+                     "previous": None, "previous_index_sha256": None}
             event = {
                 "schema_version": verifier.EVENT_SCHEMA, "run_id": "base",
                 "generation": generation, "reason": "interval",
@@ -248,9 +674,13 @@ def test_event_inventory_rejects_a_generation_gap() -> None:
                 "publish_elapsed_ns": 1_000_000_000,
                 "checkpoint_manifest_sha256": "a" * 64,
                 "checkpoint_payload_sha256": "b" * 64,
-                "checkpoint_index_sha256": verifier._sha256_bytes(
-                    verifier._canonical(index)), "checkpoint_index": index,
+                "checkpoint_payload_progress": {"microsteps_completed": number,
+                                                "optimizer_steps": number,
+                                                 "pending_microbatches": 0},
                 "pins_sha256": verifier._sha256_bytes(verifier._canonical(pins)),
+                "previous_event_sha256": None,
+                "previous_index_sha256": None,
+                "training_elapsed_ns": number * 1_000_000_000,
             }
             (events / f"{generation}.json").write_bytes(verifier._canonical(event))
         with pytest.raises(verifier.EquivalenceError, match="generation sequence"):
@@ -264,9 +694,10 @@ def test_event_inventory_rejects_wall_monotonic_clock_mismatch() -> None:
         events.mkdir()
         pins = _pins()
         generation = "checkpoint-00000001"
-        index = {"schema_version": "airi.behavior-checkpoint-index.v1",
-                 "latest": {"relative_path": generation,
-                            "manifest_sha256": "a" * 64}, "previous": None}
+        index = {"schema_version": verifier.TRANSACTION_INDEX_SCHEMA, "run_id": "base",
+                 "latest": {"relative_path": generation, "manifest_sha256": "a" * 64,
+                            "event_relative_path": f"checkpoint-events/{generation}.json", "event_sha256": "c" * 64},
+                 "previous": None, "previous_index_sha256": None}
         event = {
             "schema_version": verifier.EVENT_SCHEMA, "run_id": "base",
             "generation": generation, "reason": "interval",
@@ -277,13 +708,122 @@ def test_event_inventory_rejects_wall_monotonic_clock_mismatch() -> None:
             "publish_elapsed_ns": 1_000_000_000,
             "checkpoint_manifest_sha256": "a" * 64,
             "checkpoint_payload_sha256": "b" * 64,
-            "checkpoint_index_sha256": verifier._sha256_bytes(
-                verifier._canonical(index)), "checkpoint_index": index,
+            "checkpoint_payload_progress": {"microsteps_completed": 1, "optimizer_steps": 1,
+                                             "pending_microbatches": 0},
             "pins_sha256": verifier._sha256_bytes(verifier._canonical(pins)),
+            "previous_event_sha256": None,
+            "previous_index_sha256": None,
+            "training_elapsed_ns": 1_000_000_000,
         }
         (events / f"{generation}.json").write_bytes(verifier._canonical(event))
         with pytest.raises(verifier.EquivalenceError, match="wall/monotonic"):
             verifier._events(run, "base", pins)
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda index: index["latest"].__setitem__("event_sha256", "d" * 64),
+    lambda index: index.__setitem__("previous", {"event_sha256": "e" * 64}),
+    lambda index: index.__setitem__("previous_index_sha256", "f" * 64),
+])
+def test_current_index_rejects_wrong_event_or_predecessor(mutate) -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        run = Path(temporary)
+        generation = "checkpoint-00000001"
+        index = {"schema_version": verifier.TRANSACTION_INDEX_SCHEMA, "run_id": "base",
+                 "latest": {"relative_path": generation, "manifest_sha256": "a" * 64,
+                            "event_relative_path": f"checkpoint-events/{generation}.json", "event_sha256": "c" * 64},
+                 "previous": None, "previous_index_sha256": None}
+        mutate(index)
+        event = {"generation": generation, "checkpoint_manifest_sha256": "a" * 64,
+                 "previous_event_sha256": None, "previous_index_sha256": None}
+        with pytest.raises(verifier.EquivalenceError, match="checkpoint index"):
+            verifier._bind_current_index_event(run, {"index": index, "event_sha256": "c" * 64}, event)
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda index: index.__setitem__("schema_version", "wrong"),
+    lambda index: index.__setitem__("extra", True),
+])
+def test_current_index_rejects_wrong_schema_or_extra_field(mutate) -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        run = Path(temporary)
+        generation = "checkpoint-00000001"
+        event_path = run / "checkpoint-events" / f"{generation}.json"
+        event_path.parent.mkdir(parents=True)
+        event_path.write_bytes(b"{}\n")
+        index = {"schema_version": verifier.TRANSACTION_INDEX_SCHEMA, "run_id": "base",
+                 "latest": {"relative_path": generation, "manifest_sha256": "a" * 64,
+                            "event_relative_path": f"checkpoint-events/{generation}.json",
+                            "event_sha256": verifier._sha256_bytes(b"{}\n")},
+                 "previous": None, "previous_index_sha256": None}
+        mutate(index)
+        path = run / "checkpoints" / "checkpoint-index.json"
+        path.parent.mkdir()
+        path.write_bytes(verifier._canonical(index))
+        with pytest.raises(verifier.EquivalenceError, match="checkpoint index"):
+            verifier._latest_verified_generation(run, "base")
+
+
+@pytest.mark.parametrize("fault", ["malformed", "wrong-run", "wrong-latest"])
+def test_current_index_rejects_malformed_or_unlinked_retained_predecessor(fault) -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        run = Path(temporary)
+        checkpoints = run / "checkpoints"
+        checkpoints.mkdir(parents=True)
+        previous = {"relative_path": "checkpoint-00000001", "manifest_sha256": "a" * 64,
+                    "event_relative_path": "checkpoint-events/checkpoint-00000001.json", "event_sha256": "b" * 64}
+        predecessor = {"schema_version": verifier.TRANSACTION_INDEX_SCHEMA, "run_id": "base",
+                       "latest": previous, "previous": None, "previous_index_sha256": None}
+        path = checkpoints / "checkpoint-index.prev.json"
+        if fault == "malformed":
+            path.write_bytes(b"not-json\n")
+        else:
+            if fault == "wrong-run":
+                predecessor["run_id"] = "other"
+            else:
+                predecessor["latest"] = {**previous, "event_sha256": "c" * 64}
+            path.write_bytes(verifier._canonical(predecessor))
+        index = {"schema_version": verifier.TRANSACTION_INDEX_SCHEMA, "run_id": "base",
+                 "latest": {"relative_path": "checkpoint-00000002", "manifest_sha256": "d" * 64,
+                            "event_relative_path": "checkpoint-events/checkpoint-00000002.json", "event_sha256": "e" * 64},
+                 "previous": previous,
+                 "previous_index_sha256": verifier._sha256_bytes(path.read_bytes())}
+        event = {"generation": "checkpoint-00000002", "checkpoint_manifest_sha256": "d" * 64,
+                 "previous_event_sha256": "b" * 64,
+                 "previous_index_sha256": index["previous_index_sha256"]}
+        with pytest.raises(verifier.EquivalenceError, match="previous checkpoint index|retained previous"):
+            verifier._bind_current_index_event(run, {"index": index, "event_sha256": "e" * 64}, event)
+
+
+def test_event_counters_reject_bool_values() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        run = Path(temporary)
+        events = run / "checkpoint-events"
+        events.mkdir()
+        event = {"schema_version": verifier.EVENT_SCHEMA, "run_id": "base", "generation": "checkpoint-00000001",
+                 "reason": "interval", "microsteps_completed": True, "optimizer_steps": 1,
+                 "pending_microbatches": 0, "publish_started_at_utc": "2026-08-22T00:00:00Z",
+                 "checkpoint_durable_at_utc": "2026-08-22T00:00:01Z", "publish_elapsed_ns": 1_000_000_000,
+                 "training_elapsed_ns": 1_000_000_000, "checkpoint_manifest_sha256": "a" * 64,
+                 "checkpoint_payload_sha256": "b" * 64,
+                 "checkpoint_payload_progress": {"microsteps_completed": True, "optimizer_steps": 1,
+                                                  "pending_microbatches": 0},
+                 "pins_sha256": verifier._sha256_bytes(verifier._canonical(_pins())),
+                 "previous_event_sha256": None, "previous_index_sha256": None}
+        (events / "checkpoint-00000001.json").write_bytes(verifier._canonical(event))
+        with pytest.raises(verifier.EquivalenceError, match="progress fields"):
+            verifier._events(run, "base", _pins())
+
+
+def test_producer_output_root_hashes_must_match_verified_receipts() -> None:
+    state = {"outputs": {"report": {"sha256": "r" * 64}}}
+    artifact = {"manifest_sha256": "a" * 64}
+    evidence = {"adapter_artifact_manifest_sha256": "a" * 64, "report_sha256": "r" * 64}
+    verifier._bind_producer_output_hashes("baseline", state, artifact, evidence)
+    with pytest.raises(verifier.EquivalenceError, match="output receipts"):
+        verifier._bind_producer_output_hashes(
+            "baseline", state, artifact,
+            {"adapter_artifact_manifest_sha256": "b" * 64, "report_sha256": "r" * 64})
 
 
 def test_latest_checkpoint_without_matching_event_is_refused() -> None:

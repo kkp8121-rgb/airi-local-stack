@@ -62,6 +62,55 @@ def pinned_payload(rows: list[dict]) -> tuple[bytes, str]:
 
 
 class ContractTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "native sharing semantics are Windows-only")
+    def test_held_windows_loader_handle_blocks_replace_delete_and_final_reparse(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target = root / "config.json"
+            target.write_bytes(b"pinned")
+            generation = root / "generation_config.json"
+            generation.write_bytes(b"also-pinned")
+            self.assertEqual(
+                {target, generation}, set(trainer._closed_model_loader_files(root)))
+            replacement = root / "replacement.json"
+            replacement.write_bytes(b"replacement")
+            with trainer._HeldInputFiles([target, generation]) as held:
+                with self.assertRaises(PermissionError):
+                    os.replace(replacement, target)
+                with self.assertRaises(PermissionError):
+                    generation.unlink()
+                held.verify()
+            link = root / "linked.json"
+            try:
+                link.symlink_to(target)
+            except OSError as exc:
+                self.skipTest(f"symlink privilege unavailable: {exc}")
+            with self.assertRaisesRegex(trainer.BehaviorTrainingError, "reparse"):
+                with trainer._HeldInputFiles([link]):
+                    pass
+
+    def test_held_input_partial_open_failure_closes_prior_descriptor(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first = root / "first.json"
+            first.write_bytes(b"first")
+            missing = root / "missing.json"
+            opened: list[int] = []
+            original = trainer._HeldInputFiles._open_read_only
+
+            def record_open(path: Path, flags: int) -> int:
+                descriptor = original(path, flags)
+                opened.append(descriptor)
+                return descriptor
+
+            with mock.patch.object(trainer._HeldInputFiles, "_open_read_only",
+                                   side_effect=record_open):
+                with self.assertRaises(trainer.BehaviorTrainingError):
+                    trainer._HeldInputFiles([first, missing]).__enter__()
+            self.assertEqual(1, len(opened))
+            with self.assertRaises(OSError):
+                os.fstat(opened[0])
+
     def test_deterministic_validation_configures_exact_cuda_controls(self) -> None:
         fake_torch = mock.Mock()
         fake_torch.backends.cudnn.deterministic = False
@@ -122,34 +171,28 @@ class ContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
             generation = "checkpoint-00000001"
-            manifest_sha = "a" * 64
-            payload_sha = "b" * 64
-            index = {
-                "schema_version": "airi.behavior-checkpoint-index.v1",
-                "latest": {"relative_path": generation,
-                           "manifest_sha256": manifest_sha},
-                "previous": None,
-            }
-            trainer.atomic_json(run_dir / "checkpoints" / "checkpoint-index.json", index)
-            published = {"manifest_sha256": manifest_sha,
-                         "manifest": {"payload": {"sha256": payload_sha}}}
             pins = {"dataset_sha256": "c" * 64}
-            receipt = trainer._publish_checkpoint_event(
-                run_dir, "p0b-run", generation, "interval", 80, 5, 0,
-                "2026-08-22T08:00:00Z", "2026-08-22T08:00:02Z", 2_000_000_000,
-                published, pins)
+            # v2 events are only published by the checkpoint transaction; a
+            # public standalone event writer would reintroduce self-authentication.
+            receipt = trainer.publish_checkpoint(
+                run_dir, "p0b-run", generation, b"payload", pins,
+                {"run_id": "p0b-run", "generation": generation, "reason": "interval",
+                 "microsteps_completed": 80, "optimizer_steps": 5,
+                 "pending_microbatches": 0, "training_elapsed_ns": 2_000_000_000,
+                 "checkpoint_payload_progress": {"microsteps_completed": 80,
+                                                  "optimizer_steps": 5,
+                                                  "pending_microbatches": 0}})["event"]
             event_path = run_dir / receipt["relative_path"]
             event_bytes = event_path.read_bytes()
             self.assertEqual(hashlib.sha256(event_bytes).hexdigest(), receipt["sha256"])
             event = json.loads(event_bytes)
-            self.assertEqual(event["checkpoint_index"], index)
-            self.assertEqual(event["checkpoint_payload_sha256"], payload_sha)
+            self.assertEqual(event["schema_version"], "airi.behavior-checkpoint-event.v2")
+            self.assertEqual(event["checkpoint_manifest_sha256"], hashlib.sha256(
+                (run_dir / "checkpoints" / generation / "manifest.json").read_bytes()).hexdigest())
+            self.assertEqual(event["checkpoint_payload_sha256"], hashlib.sha256(b"payload").hexdigest())
             self.assertEqual(event["pending_microbatches"], 0)
-            with self.assertRaisesRegex(trainer.BehaviorTrainingError, "already exists"):
-                trainer._publish_checkpoint_event(
-                    run_dir, "p0b-run", generation, "interval", 80, 5, 0,
-                    "2026-08-22T08:00:00Z", "2026-08-22T08:00:02Z", 1,
-                    published, pins)
+            with self.assertRaisesRegex(trainer.CheckpointError, "already exists"):
+                trainer.publish_checkpoint(run_dir, "p0b-run", generation, b"payload", pins, event)
 
     def test_v4_metadata_and_native_context_are_accepted(self) -> None:
         row = v4_row("v4-1")
@@ -534,6 +577,10 @@ class CpuSmokeTests(unittest.TestCase):
         resumed_state = latest_state(resumed_args.run_dir)
         uninterrupted_state.pop("run_id")
         resumed_state.pop("run_id")
+        # Cumulative monotonic evidence deliberately includes real publication
+        # time, unlike deterministic optimizer/model state.
+        uninterrupted_state.pop("training_elapsed_ns")
+        resumed_state.pop("training_elapsed_ns")
         assert_equal(uninterrupted_state, resumed_state)
 
     def test_cpu_resume_full_pin_mismatch_preserves_live_pause_evidence(self) -> None:

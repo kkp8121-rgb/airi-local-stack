@@ -10,7 +10,10 @@ import json
 import os
 import re
 import shutil
+import stat
+import time
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +31,8 @@ class CheckpointIdentityError(CheckpointError):
 
 
 SCHEMA_VERSION = 1
-INDEX_SCHEMA = "airi.behavior-checkpoint-index.v1"
+TRANSACTION_INDEX_SCHEMA = "airi.behavior-checkpoint-index.v2"
+CHECKPOINT_EVENT_SCHEMA = "airi.behavior-checkpoint-event.v2"
 ARTIFACT_SCHEMA = "airi.behavior-adapter-artifact.v1"
 
 
@@ -99,18 +103,104 @@ def atomic_json(path: Path, value: dict[str, Any], *, keep_previous: bool = Fals
         temporary.unlink(missing_ok=True)
 
 
+def publish_fresh_json(path: Path, value: dict[str, Any]) -> bytes:
+    """Publish an immutable canonical receipt without replacing a competitor."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with temporary.open("xb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if os.name == "nt":
+            import ctypes  # noqa: PLC0415
+            move_file = ctypes.WinDLL("kernel32", use_last_error=True).MoveFileExW
+            move_file.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint]
+            move_file.restype = ctypes.c_int
+            # WRITE_THROUGH only; never REPLACE_EXISTING for immutable evidence.
+            if not move_file(str(temporary), str(path), 0x8):
+                raise CheckpointError("immutable receipt target appeared during publication")
+        else:
+            os.link(temporary, path)
+            _fsync_dir(path.parent)
+            temporary.unlink()
+        if path.read_bytes() != payload:
+            raise CheckpointIntegrityError("immutable receipt publication verification failed")
+        return payload
+    except FileExistsError as exc:
+        raise CheckpointError("immutable receipt target appeared during publication") from exc
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def _manifest_path(run_dir: Path, generation: str) -> Path:
     return run_dir / "checkpoints" / generation / "manifest.json"
 
 
 def _read_json(path: Path) -> dict[str, Any]:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(_read_regular_file_snapshot(path).decode("utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise CheckpointError(f"invalid JSON: {path}") from exc
     if not isinstance(data, dict):
         raise CheckpointError(f"JSON object required: {path}")
     return data
+
+
+def _read_regular_file_snapshot(path: Path) -> bytes:
+    """One no-follow regular-file observation for all authoritative evidence."""
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    if os.name == "nt":
+        import ctypes  # noqa: PLC0415
+        import msvcrt  # noqa: PLC0415
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        create = kernel.CreateFileW
+        create.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32,
+                           ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p]
+        create.restype = ctypes.c_void_p
+        # GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, OPEN_REPARSE_POINT.
+        handle = create(str(path), 0x80000000, 0x1, None, 3, 0x00200000, None)
+        if handle == ctypes.c_void_p(-1).value:
+            raise CheckpointIntegrityError("checkpoint evidence cannot be opened safely")
+        close = kernel.CloseHandle
+        close.argtypes = [ctypes.c_void_p]
+        close.restype = ctypes.c_int
+        class _Info(ctypes.Structure):
+            _fields_ = [("attributes", ctypes.c_uint32), ("pad", ctypes.c_byte * 48)]
+        info = _Info()
+        get_info = kernel.GetFileInformationByHandle
+        get_info.argtypes = [ctypes.c_void_p, ctypes.POINTER(_Info)]
+        get_info.restype = ctypes.c_int
+        if not get_info(handle, ctypes.byref(info)) or info.attributes & 0x400:
+            close(handle)
+            raise CheckpointIntegrityError("checkpoint evidence must be a regular non-reparse file")
+        try:
+            descriptor = msvcrt.open_osfhandle(handle, flags)
+        except OSError as exc:
+            close(handle)
+            raise CheckpointIntegrityError("checkpoint evidence cannot be adopted safely") from exc
+        try:
+            metadata = os.fstat(descriptor)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise CheckpointIntegrityError("checkpoint evidence must be a regular file")
+            return os.read(descriptor, metadata.st_size)
+        finally:
+            os.close(descriptor)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise CheckpointIntegrityError("checkpoint evidence cannot be opened safely") from exc
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode) or getattr(metadata, "st_file_attributes", 0) & 0x400:
+            raise CheckpointIntegrityError("checkpoint evidence must be a regular non-reparse file")
+        chunks: list[bytes] = []
+        while block := os.read(descriptor, 1024 * 1024):
+            chunks.append(block)
+        return b"".join(chunks)
+    finally:
+        os.close(descriptor)
 
 
 def _quarantine_file(run_dir: Path, path: Path, label: str) -> None:
@@ -136,18 +226,26 @@ def _quarantine_generation(run_dir: Path, generation: str) -> None:
 
 def _validated_index(path: Path) -> dict[str, Any]:
     index = _read_json(path)
-    if set(index) != {"schema_version", "latest", "previous"} or index["schema_version"] != INDEX_SCHEMA:
-        raise CheckpointIntegrityError("checkpoint index schema mismatch")
+    required_index = {"schema_version", "run_id", "latest", "previous", "previous_index_sha256"}
+    if (set(index) != required_index or index.get("schema_version") != TRANSACTION_INDEX_SCHEMA
+            or not isinstance(index["run_id"], str) or not index["run_id"]):
+        raise CheckpointIntegrityError("checkpoint index must use the current v2 transaction schema")
+    if index["previous_index_sha256"] is not None and not re.fullmatch(r"[0-9a-f]{64}", index["previous_index_sha256"]):
+        raise CheckpointIntegrityError("checkpoint transaction predecessor hash invalid")
     for position in ("latest", "previous"):
         entry = index[position]
         if entry is None:
             continue
-        if (not isinstance(entry, dict) or set(entry) != {"relative_path", "manifest_sha256"}
+        required = {"relative_path", "manifest_sha256", "event_relative_path", "event_sha256"}
+        if (not isinstance(entry, dict) or set(entry) != required
                 or not isinstance(entry["relative_path"], str)
                 or not re.fullmatch(r"checkpoint-[0-9]{8}", entry["relative_path"])
                 or not isinstance(entry["manifest_sha256"], str)
                 or not re.fullmatch(r"[0-9a-f]{64}", entry["manifest_sha256"])):
             raise CheckpointIntegrityError("checkpoint index entry invalid")
+        if (entry["event_relative_path"] != f"checkpoint-events/{entry['relative_path']}.json"
+                or not re.fullmatch(r"[0-9a-f]{64}", entry["event_sha256"])):
+            raise CheckpointIntegrityError("checkpoint event index entry invalid")
     return index
 
 
@@ -163,6 +261,22 @@ def _load_index_with_previous(run_dir: Path) -> dict[str, Any] | None:
         except CheckpointError:
             _quarantine_file(run_dir, path, label)
     return None
+
+
+def _verify_index_event(run_dir: Path, entry: dict[str, Any], run_id: str) -> None:
+    """An event is evidence only when its index commits its exact bytes."""
+    path = run_dir / entry["event_relative_path"]
+    try:
+        raw = _read_regular_file_snapshot(path)
+        event = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CheckpointIntegrityError("indexed checkpoint event is missing or invalid") from exc
+    if raw != (json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8"):
+        raise CheckpointIntegrityError("indexed checkpoint event is not canonical")
+    if (_sha256(raw) != entry["event_sha256"] or event.get("schema_version") != CHECKPOINT_EVENT_SCHEMA
+            or event.get("run_id") != run_id or event.get("generation") != entry["relative_path"]
+            or event.get("checkpoint_manifest_sha256") != entry["manifest_sha256"]):
+        raise CheckpointIntegrityError("indexed checkpoint event does not bind its generation")
 
 
 def verify_generation(run_dir: Path, generation: str,
@@ -184,15 +298,13 @@ def verify_generation(run_dir: Path, generation: str,
         raise CheckpointIntegrityError("checkpoint payload metadata invalid")
     payload_path = manifest_path.parent / payload["name"]
     try:
-        data = payload_path.read_bytes()
-    except OSError as exc:
+        data = _read_regular_file_snapshot(payload_path)
+    except CheckpointError as exc:
         raise CheckpointIntegrityError("checkpoint payload missing") from exc
-    if payload_path.is_symlink():
-        raise CheckpointIntegrityError("checkpoint payload symlink is forbidden")
     if len(data) != payload["bytes"] or _sha256(data) != payload["sha256"]:
         raise CheckpointIntegrityError("checkpoint payload integrity mismatch")
     canonical = (json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
-    if manifest_path.read_bytes() != canonical:
+    if _read_regular_file_snapshot(manifest_path) != canonical:
         raise CheckpointIntegrityError("checkpoint manifest is not canonical")
     if expected_pins is not None and manifest["pins"] != expected_pins:
         raise CheckpointIdentityError("checkpoint exact pins mismatch")
@@ -217,7 +329,7 @@ def verify_artifact_directory(directory: Path,
     if expected_pins is not None and manifest["pins"] != expected_pins:
         raise CheckpointIdentityError("adapter artifact exact pins mismatch")
     canonical = (json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
-    if manifest_path.read_bytes() != canonical:
+    if _read_regular_file_snapshot(manifest_path) != canonical:
         raise CheckpointIntegrityError("adapter artifact manifest is not canonical")
     seen: set[str] = set()
     for entry in manifest["files"]:
@@ -234,9 +346,11 @@ def verify_artifact_directory(directory: Path,
             raise CheckpointIntegrityError("adapter artifact file entry is invalid")
         seen.add(entry["path"])
         path = directory / Path(entry["path"])
-        if not path.is_file() or path.is_symlink():
-            raise CheckpointIntegrityError("adapter artifact file is missing or linked")
-        if path.stat().st_size != entry["bytes"] or _sha256(path.read_bytes()) != entry["sha256"]:
+        try:
+            data = _read_regular_file_snapshot(path)
+        except CheckpointError as exc:
+            raise CheckpointIntegrityError("adapter artifact file is missing or linked") from exc
+        if len(data) != entry["bytes"] or _sha256(data) != entry["sha256"]:
             raise CheckpointIntegrityError("adapter artifact file integrity mismatch")
     actual = {
         path.relative_to(directory).as_posix()
@@ -281,11 +395,14 @@ def publish_artifact_directory(stage: Path, final: Path, run_id: str,
 
 
 def publish_checkpoint(run_dir: Path, run_id: str, generation: str, payload: bytes,
-                       pins: dict[str, Any]) -> dict[str, Any]:
+                       pins: dict[str, Any], event: dict[str, Any]) -> dict[str, Any]:
     """Publish one immutable generation after staging and re-verifying it."""
     if (not run_id or not re.fullmatch(r"checkpoint-[0-9]{8}", generation)
-            or not isinstance(payload, bytes) or not payload or not isinstance(pins, dict)):
+            or not isinstance(payload, bytes) or not payload or not isinstance(pins, dict)
+            or not isinstance(event, dict)):
         raise CheckpointError("checkpoint identity and payload are required")
+    publish_started_ns = time.perf_counter_ns()
+    publish_started_at_utc = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     control_keep = _live_control_checkpoint_generations(run_dir, run_id)
     checkpoints = run_dir / "checkpoints"
     checkpoints.mkdir(parents=True, exist_ok=True)
@@ -303,6 +420,9 @@ def publish_checkpoint(run_dir: Path, run_id: str, generation: str, payload: byt
         # later index replacement.  Preserve that orphan for diagnosis, then
         # allow deterministic replay to publish the same generation number.
         _quarantine_generation(run_dir, generation)
+        orphan_event = run_dir / "checkpoint-events" / f"{generation}.json"
+        if orphan_event.is_file():
+            _quarantine_file(run_dir, orphan_event, "checkpoint-event")
         if os.path.lexists(final):
             raise CheckpointError("unindexed checkpoint generation could not be quarantined")
     stage = checkpoints / f".{generation}.{uuid.uuid4().hex}.tmp"
@@ -325,6 +445,8 @@ def publish_checkpoint(run_dir: Path, run_id: str, generation: str, payload: byt
     _replace_write_through(stage, final)
     published = verify_generation(run_dir, generation, pins, run_id)
     index_path = checkpoints / "checkpoint-index.json"
+    previous_index_sha256 = (_sha256(index_path.read_bytes())
+                             if old is not None and index_path.is_file() else None)
     previous = None
     if old is not None:
         for position in ("latest", "previous"):
@@ -344,13 +466,45 @@ def publish_checkpoint(run_dir: Path, run_id: str, generation: str, payload: byt
                 if position == "latest":
                     _quarantine_generation(run_dir, candidate["relative_path"])
                 continue
-    index = {"schema_version": INDEX_SCHEMA,
-             "latest": {"relative_path": generation, "manifest_sha256": published["manifest_sha256"]},
-             "previous": previous}
+    # The immutable event is deliberately published before the authoritative
+    # index. A crash here leaves an unreferenced generation/event pair which
+    # recovery quarantines; it cannot create a sequence gap or self-authenticate.
+    if (event.get("run_id") != run_id
+            or event.get("generation") != generation):
+        raise CheckpointError("checkpoint event identity mismatch")
+    previous_event_sha256 = None
+    if isinstance((old or {}).get("latest"), dict):
+        previous_event_sha256 = old["latest"].get("event_sha256")
+    event = dict(event)
+    event.update({
+        "schema_version": CHECKPOINT_EVENT_SCHEMA,
+        "checkpoint_manifest_sha256": published["manifest_sha256"],
+        "checkpoint_payload_sha256": published["manifest"]["payload"]["sha256"],
+        "pins_sha256": _sha256((json.dumps(pins, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")),
+        "previous_event_sha256": previous_event_sha256,
+        "previous_index_sha256": previous_index_sha256,
+        "publish_started_at_utc": publish_started_at_utc,
+        "checkpoint_durable_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "publish_elapsed_ns": time.perf_counter_ns() - publish_started_ns,
+    })
+    event_path = run_dir / "checkpoint-events" / f"{generation}.json"
+    event_bytes = publish_fresh_json(event_path, event)
+    event_receipt = {"relative_path": event_path.relative_to(run_dir).as_posix(),
+                     "sha256": _sha256(event_bytes)}
+    latest = {"relative_path": generation,
+              "manifest_sha256": published["manifest_sha256"],
+              "event_relative_path": event_receipt["relative_path"],
+              "event_sha256": event_receipt["sha256"]}
+    index = {"schema_version": TRANSACTION_INDEX_SCHEMA, "run_id": run_id,
+             "latest": latest, "previous": previous,
+             "previous_index_sha256": previous_index_sha256}
     atomic_json(index_path, index, keep_previous=True)
     keep = {generation, previous.get("relative_path") if isinstance(previous, dict) else None}
     keep.update(control_keep)
     _retain_last_two(run_dir, keep)
+    published = dict(published)
+    published["event"] = event_receipt
+    published["index_sha256"] = _sha256(index_path.read_bytes())
     return published
 
 
@@ -471,6 +625,7 @@ def load_latest_or_previous(run_dir: Path, expected_pins: dict[str, Any],
             loaded = verify_generation(run_dir, generation, expected_pins, expected_run_id)
             if loaded["manifest_sha256"] != entry["manifest_sha256"]:
                 raise CheckpointError("checkpoint index manifest hash mismatch")
+            _verify_index_event(run_dir, entry, loaded["manifest"]["run_id"])
             loaded["position"] = position
             return loaded
         except CheckpointIdentityError:

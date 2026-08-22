@@ -11,6 +11,26 @@ SPEC = importlib.util.spec_from_file_location("behavior_training_checkpoint_test
 assert SPEC and SPEC.loader
 checkpoint = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(checkpoint)
+_publish_checkpoint = checkpoint.publish_checkpoint
+
+
+def _event(run_id: str, generation: str) -> dict:
+    return {"run_id": run_id, "generation": generation, "reason": "interval",
+            "microsteps_completed": 1, "optimizer_steps": 1,
+            "pending_microbatches": 0, "training_elapsed_ns": 1,
+            "checkpoint_payload_progress": {"microsteps_completed": 1,
+                                            "optimizer_steps": 1,
+                                            "pending_microbatches": 0}}
+
+
+def _test_publish_checkpoint(run_dir, run_id, generation, payload, pins, event=None):
+    return _publish_checkpoint(run_dir, run_id, generation, payload, pins,
+                               _event(run_id, generation) if event is None else event)
+
+
+# Existing integrity scenarios focus on rotation/fault behavior; supply their
+# deterministic producer event explicitly through this test-local fixture.
+checkpoint.publish_checkpoint = _test_publish_checkpoint
 
 
 def pause_receipts(run_id: str, generation: str, manifest_sha256: str):
@@ -28,6 +48,35 @@ def pause_receipts(run_id: str, generation: str, manifest_sha256: str):
     return ack, accepted
 
 
+def test_checkpoint_events_commit_monotonic_active_elapsed_and_publish_duration() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        pins = {"input": "exact"}
+        elapsed = (101, 303)
+        events = []
+        for sequence, active_ns in enumerate(elapsed, start=1):
+            generation = f"checkpoint-{sequence:08d}"
+            payload = json.dumps({"training_elapsed_ns": active_ns}).encode("utf-8")
+            published = _publish_checkpoint(
+                root, "timing-run", generation, payload, pins,
+                {"run_id": "timing-run", "generation": generation, "reason": "interval",
+                 "microsteps_completed": sequence, "optimizer_steps": sequence,
+                 "pending_microbatches": 0, "training_elapsed_ns": active_ns,
+                 "checkpoint_payload_progress": {"microsteps_completed": sequence,
+                                                  "optimizer_steps": sequence,
+                                                  "pending_microbatches": 0}})
+            raw = (root / published["event"]["relative_path"]).read_bytes()
+            event = json.loads(raw)
+            state = json.loads((root / "checkpoints" / generation / "state.pt").read_bytes())
+            assert event["training_elapsed_ns"] == state["training_elapsed_ns"] == active_ns
+            assert event["checkpoint_payload_progress"]["microsteps_completed"] == sequence
+            assert event["publish_elapsed_ns"] >= 0
+            events.append(event)
+        assert events[1]["training_elapsed_ns"] > events[0]["training_elapsed_ns"]
+        assert events[1]["previous_event_sha256"] == hashlib.sha256(
+            (root / "checkpoint-events" / "checkpoint-00000001.json").read_bytes()).hexdigest()
+
+
 def test_publishes_verified_rotating_generations() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
@@ -36,7 +85,7 @@ def test_publishes_verified_rotating_generations() -> None:
         two = checkpoint.publish_checkpoint(root, "run-1", "checkpoint-00000002", b"two", pins)
         checkpoint.publish_checkpoint(root, "run-1", "checkpoint-00000003", b"three", pins)
         index = json.loads((root / "checkpoints" / "checkpoint-index.json").read_text())
-        assert index["schema_version"] == "airi.behavior-checkpoint-index.v1"
+        assert index["schema_version"] == "airi.behavior-checkpoint-index.v2"
         assert index["latest"]["relative_path"] == "checkpoint-00000003"
         assert index["previous"]["manifest_sha256"] == two["manifest_sha256"]
         assert not (root / "checkpoints" / "checkpoint-00000001").exists()
