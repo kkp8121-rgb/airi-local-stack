@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-22 19:10:20 +09:00"
-checkpoint_id: "20260822-191020-p0b-expected-gate-commit-intent"
+updated_at_kst: "2026-08-22 19:16:30 +09:00"
+checkpoint_id: "20260822-191630-p0b-doc-receipt-commit-intent"
 goal_status: "active"
 authorization: "repo-gpu-package-test-commit-push; operational-adoption-forbidden"
 active_phase: "p0-controlled-gpu-validation"
-git_head: "f2c9a46dfb0b15b1e1a6340c84167b0a5f009119"
-worktree_state: "staged-four-file-full-offline-receipt-before-final-restage"
+git_head: "8cd69b5f455bd41b48faa5ed6e9cac1af00f8908"
+worktree_state: "six-document-push-receipt-staged-before-final-restage"
 active_trainer_count: 0
 ---
 
@@ -30,28 +30,64 @@ active_trainer_count: 0
   trainer/runner workload는 0이다.
 - v4 파인튜닝은 E1 adapter/report까지만 완료·검증됐고 아직 미채택이다.
 - E2 adapter/report, merge/package, v4 T3, live campaign 산출물은 0이다.
-- HEAD와 origin/main은 P0-B gate receipt
-  `f2c9a46dfb0b15b1e1a6340c84167b0a5f009119`로 일치한다. source/chat/base와
+- HEAD와 origin/main은 expected gate implementation
+  `8cd69b5f455bd41b48faa5ed6e9cac1af00f8908`로 일치한다. source/chat/base와
   E1 adapter/config/report의 크기·SHA는 고정값과 exact 일치한다. E2 adapter/report/
-  durable run, T3와 campaign은 없고 기존 E2 stdout/stderr는 각 0 bytes다. compact
-  복구 뒤 expected gate 네 파일만 staged, unstaged/untracked 0이며 AIRI
-  trainer/runner는 0이다.
+  durable run, T3와 campaign은 없고 기존 E2 stdout/stderr는 각 0 bytes다. 현재
+  implementation push receipt용 exact 6개 문서만 dirty, staged/untracked 0이며
+  AIRI trainer/runner와 Ollama process는 0이다.
 
 ## 2. 현재 작업 트랜잭션
 
 | 항목 | 값 |
 |---|---|
-| 의도 | controlled GPU 전에 verifier가 계획된 input/config SHA·seed·batch·accumulation·단일 첫 optimizer 경계 pause를 외부 기대값으로 fail-closed 고정하도록 보강한다. |
-| 허용 범위 | verifier와 owned test, WORKING-STATE의 offline 구현·회귀만 허용; GPU·서비스·E2 실행 금지 |
-| 시작 전 증거 | HEAD=origin/main `f2c9a46`; AIRI trainer/runner/Ollama 0; worktree는 live WORKING-STATE와 worker 소유 verifier/test 2개만 modified. verifier `9d723c99...4bc4` 41,278 B, test `61288966...8d23` 22,698 B |
-| exact 명령 | 핀된 Python 3.12로 verifier py_compile과 checkpoint/trainer/runner/verifier 4-suite pytest, actual-process `test-airi-training-durability.ps1`; PASS 뒤 최신 bytes 독립 P0/P1 감사, exact stage 상태의 `test-current-checkpoint.ps1`, diff/security |
-| 출력 경로 | Git tracked verifier/test와 WORKING-STATE/roadmap receipt 문서만. GPU runtime·모델 산출물 0 |
-| 완료 조건 | explicit expected input/config/shape/pause mismatch fault가 PASS하고 전체 P0 회귀·PowerShell·full offline PASS, 독립 P0/P1 0, 구현·receipt commit이 origin/main push됨 |
-| 중단·복구 | quota/PC 중단 시 origin/main `f2c9a46`과 exact 3-file diff에서 재개한다. 구현 push 전에는 fresh GPU target이나 E2를 만들지 않는다. |
-| 현재 행동 | exact 4-file staged 상태의 full offline checkpoint가 exit 0/PASS했다. receipt 두 문서를 재stage하고 4/0/0·cached diff-check를 재검증한 뒤 implementation commit/push를 수행한다. |
+| 의도 | origin/main `8cd69b5` expected-run gate push receipt를 6개 현행 SSoT에 정합하게 승격한다. |
+| 허용 범위 | WORKING-STATE, 현행 handoff, roadmap status/log, NEXT, docs index의 문서 receipt만 허용; 코드·GPU·서비스·E2 실행 금지 |
+| 시작 전 증거 | HEAD=origin/main `8cd69b5`; AIRI trainer/runner/Ollama 0; source/chat/base/E1 SHA exact; E2/T3/campaign 0; exact 6-doc diff, staged/untracked 0 |
+| exact 명령 | `test-airi-work-continuity.ps1`, repo 기본 diff-check, 문서 boundary/security와 독립 P0/P1 감사; PASS 뒤 exact 6-doc stage/cached diff-check, docs commit/push |
+| 출력 경로 | 위 6개 Git tracked 문서만. GPU runtime·모델·로그·DB 산출물 0 |
+| 완료 조건 | exact 6-doc boundary, continuity/diff/security PASS, 독립 P0/P1 0, docs receipt commit이 origin/main push되고 HEAD=origin/main·관련 PID 0 |
+| 중단·복구 | quota/PC 중단 시 origin/main `8cd69b5`와 exact 6-doc diff에서 재개한다. staged/commit 상태가 생겼으면 실제 Git 경계를 먼저 대조하며 fresh GPU target이나 E2를 만들지 않는다. |
+| 현재 행동 | exact 6-doc stage와 cached diff-check가 PASS했다. stage receipt 두 문서를 재stage·재검증한 뒤 docs commit을 수행한다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260822-191630-p0b-doc-receipt-commit-intent`: exact 6-doc `git add` exit 0.
+  staged 6, unstaged 0, untracked 0, cached diff-check exit 0이다. 이 stage receipt를
+  담은 WORKING-STATE/roadmap log만 다시 stage하고 동일 6/0/0과 cached diff-check를
+  확인한 뒤 exact `git commit -m "docs: record expected GPU gate receipt"`을
+  실행한다. commit 실패 시 push/GPU/E2를 실행하지 않고 staged 배치를 보존한다.
+- `20260822-191600-p0b-doc-receipt-ready-stage-intent`: P1 정정 뒤 fresh root
+  검증은 changed 6, staged/untracked 0, boundary diff 0, continuity PASS, repo
+  diff-check exit 0이다. 독립 재감사는 root `NEXT-SESSION.md` 존재, exact diff 6,
+  HEAD=origin/main `8cd69b5`, current transaction과 active/adoption/P0-before-E2/
+  GPU-E2-zero 경계를 확인해 P0 0/P1 0 `READY`다. 이는 문서 stage/commit/push만
+  허용한다. 다음 상태 변경은 exact 6-doc `git add`; staged 6·unstaged 0·untracked 0과
+  cached diff-check를 확인하며 실패하면 commit/push/GPU/E2를 실행하지 않는다.
+- `20260822-191445-p0b-doc-audit-p1-correction`: 6-doc validation은 exact changed 6,
+  staged/untracked 0, boundary diff 0, continuity PASS, repo diff-check exit 0,
+  forbidden filename/secret-value hit 0이다. 첫 독립 문서 감사는 P0 0/P1 2,
+  `NOT READY`. P1 중 actual diff 3/NEXT 부재 주장은 root fresh read-only
+  `NEXT_EXISTS=True`, resolved root path, `git diff HEAD` exact 6으로 반증됐다. 그러나
+  active transaction의 recovery가 stale `f2c9a46`/3-file을 가리킨 P1은 확정됐다.
+  live scope를 HEAD=origin/main `8cd69b5`와 exact 6-doc receipt로 정정했으며, 같은
+  담당의 fresh 재감사에서 P0/P1 0 전에는 stage/commit/GPU/E2로 이동하지 않는다.
+- `20260822-191126-p0b-expected-gate-push-receipt-doc-intent`: exact
+  `git push origin main` exit 0, `f2c9a46..8cd69b5 main -> main`. 이후
+  HEAD=origin/main `8cd69b5f455bd41b48faa5ed6e9cac1af00f8908`, AIRI trainer/runner와
+  Ollama process 0이며 post-push receipt용 WORKING-STATE/roadmap log 두 파일만
+  dirty다. expected external input/config/seed/batch/accumulation/single-first-pause gate
+  구현은 origin/main에 durable하지만 controlled GPU paired run과 실제 E2 속도
+  ≤600초 실측은 0이다. 이 receipt를 6개 SSoT에 반영해 focused continuity/diff/security,
+  exact docs commit/push를 완료하기 전에는 GPU/E2를 실행하지 않는다.
+- `20260822-191052-p0b-expected-gate-push-intent`: final restage 뒤 staged 4,
+  unstaged 0, untracked 0, boundary diff 0, cached diff-check exit 0. exact
+  `git commit -m "fix: bind GPU equivalence to expected run"` exit 0, commit
+  `8cd69b5f455bd41b48faa5ed6e9cac1af00f8908`, 4 files, 405 insertions/
+  27 deletions이다. commit 직후 worktree clean, local main은 origin/main `f2c9a46`보다
+  1 ahead이고 AIRI trainer/runner 0이다. 다음 exact 상태 변경은
+  `git push origin main`; 실패하면 local commit과 receipt 문서를 보존하고 GPU/E2를
+  실행하지 않는다.
 - `20260822-191020-p0b-expected-gate-commit-intent`: full-offline receipt 두 문서의
   exact `git add` exit 0. staged 4, unstaged 0, untracked 0, cached diff-check exit 0이다.
   이 stage receipt를 담은 두 문서만 다시 stage하고 동일 4/0/0과 cached diff-check를

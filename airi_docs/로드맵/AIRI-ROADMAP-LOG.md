@@ -9,6 +9,27 @@
 
 ## 2026-08-22 P0-B 독립 감사·compact 복구 정정
 
+- exact 6-doc stage exit 0, staged 6·unstaged 0·untracked 0, cached diff-check PASS다.
+  이 stage receipt 두 문서를 재stage·재검증한 뒤 docs receipt commit을 수행하며
+  실패 시 push/GPU/E2로 이동하지 않는다.
+- P1 정정 뒤 root fresh exact 6-doc boundary/continuity/diff-check PASS. 독립 재감사도
+  root NEXT 존재, diff exact 6, HEAD=origin/main `8cd69b5`, current transaction과
+  active/adoption/P0-before-E2/GPU-E2-zero 정합을 확인해 P0 0/P1 0 `READY`다.
+  이 판정은 exact 6-doc stage/commit/push만 허용하며 controlled GPU/E2는 아니다.
+- 6-doc receipt batch는 boundary/continuity/diff/security PASS 뒤 첫 독립 감사에서
+  P0 0/P1 2 `NOT READY`였다. diff 3/NEXT 부재 주장은 root fresh `NEXT_EXISTS=True`와
+  `git diff HEAD` exact 6으로 반증됐지만, WORKING transaction recovery가 stale
+  `f2c9a46`/3-file을 가리킨 P1은 확정됐다. HEAD=origin/main `8cd69b5`와 exact 6-doc
+  scope로 정정해 fresh 재감사 P0/P1 0 전에는 stage/GPU/E2로 이동하지 않는다.
+- expected gate implementation push 성공: `f2c9a46..8cd69b5 main -> main`,
+  HEAD=origin/main `8cd69b5`, AIRI trainer/runner와 Ollama process 0이다. 실제
+  controlled GPU paired run과 E2 속도 ≤600초 실측은 여전히 0이다. actual push
+  receipt를 6개 SSoT에 반영해 docs receipt commit/push를 마치기 전에는 GPU/E2를
+  실행하지 않는다.
+- expected gate implementation commit 성공: `8cd69b5f455bd41b48faa5ed6e9cac1af00f8908`
+  (`fix: bind GPU equivalence to expected run`), 4 files, 405 insertions/27 deletions.
+  직후 worktree clean, local main은 origin/main보다 1 ahead, AIRI trainer/runner 0이다.
+  exact push 성공 전에는 controlled GPU/E2를 시작하지 않는다.
 - full-offline receipt 두 문서를 재stage한 뒤 staged 4·unstaged 0·untracked 0,
   cached diff-check PASS다. stage receipt 두 문서만 다시 stage·재검증하고 exact
   implementation commit을 수행하며 실패 시 push/GPU/E2로 이동하지 않는다.

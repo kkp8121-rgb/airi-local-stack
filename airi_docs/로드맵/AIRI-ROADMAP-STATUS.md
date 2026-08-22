@@ -12,8 +12,9 @@
 > 검증된 milestone commit/push가 승인됐다. 운영 채택과 기본 모델 변경은 별도
 > 사용자 승인 전까지 금지한다. E1 adapter/report만 존재하고 E2·후속 산출물은 0이며,
 > P0-A offline 구현·fault 실증과 독립 P0/P1 0 감사는 완료되어 `6f0c1358`로
-> origin/main push됐다. P0-B checkpoint timing/exact-equivalence evidence gate도
-> offline 회귀·독립 P0/P1 0 감사를 거쳐 `e970cf7`로 origin/main push됐으며, E2보다 먼저
+> origin/main push됐다. P0-B checkpoint timing/exact-equivalence evidence gate와
+> external expected-run 결속도 offline 회귀·독립 P0/P1 0 감사를 거쳐
+> `e970cf7`·`8cd69b5`로 origin/main push됐으며, E2보다 먼저
 > P0-B controlled GPU 동등성·실제 속도 10분 checkpoint 상한을 실증한다.
 > `goal_status=active`; `adoption_authorized=false`;
 > `execution_order=P0_A>P0_B>E2_LAUNCH>E2_PROVENANCE>PACKAGE>T3_36>CAMPAIGN_3X500>USER_DECISION`
@@ -326,7 +327,8 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
 - [~] **P0-B:** exact-pin CPU 중단/재개 동등성, durable runner/run-state, safe pause,
   PID/command/checkpoint SHA 재부팅 복구의 offline 실증은 완료. checkpoint별 durable
   timing event, deterministic pin, 허용오차 0 full-state comparator, 600초/최소 4구간
-  gate와 fault 회귀도 `e970cf7`로 origin/main push됐다. controlled GPU 동등성과 실제
+  gate와 fault 회귀는 `e970cf7`, external input/config/seed/batch/accumulation/first-pause
+  expected 결속은 `8cd69b5`로 origin/main push됐다. controlled GPU 동등성과 실제
   E2 속도 손실 상한 10분 이하 실측이 남음
 - [ ] preflight: live-state 단독 diff를 제외한 입력 code/data clean, trainer 0,
   corpus/base/E1 SHA exact, E2 산출물 부재 재확인
