@@ -4,8 +4,8 @@
 
 상태: **ACTIVE — E1 완료·미채택, E2 저장 산출물 0, merge/package 0,
 v4 T3 0, live campaign 0; P0-A offline 구현·독립 감사 완료,
-implementation `6f0c1358` origin/main push 완료, P0-B controlled GPU 동등성·
-10분 checkpoint 실측 대기**
+P0-B timing/exact-equivalence evidence gate `e970cf7` origin/main push 완료,
+controlled GPU 동등성·10분 checkpoint 실측 대기**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
@@ -314,6 +314,18 @@ Python `39 passed, 1 skipped`, actual-process PowerShell PASS, 전체 offline ch
 구현 commit `6f0c1358d2acd18b828ebc0ae8482a348712c461`은 origin/main push됐다.
 P0-B의 controlled GPU 동등성과 실제 E2 속도 checkpoint ≤10분 실측 전에는 E2 금지다.
 
+2026-08-22 P0-B evidence gate implementation receipt: checkpoint generation마다
+manifest/payload/index/pins SHA와 publish wall/monotonic timing을 연속 atomic event로
+보존하고, deterministic CUDA/cuDNN/TF32/CUBLAS/quantization identity를 exact pins에
+결속했다. verifier는 무중단 대 safe-pause/resume의 adapter·report·recursive full
+checkpoint state를 허용오차 0으로 비교하며, 고정 상한 600초와 최소 4개 정상 구간,
+closed control-history inventory, latest event 결속을 fail-closed로 강제한다. fresh
+Python `68 passed, 1 skipped`, actual-process PowerShell durability PASS,
+`test-current-checkpoint.ps1` PASS, 독립 최신 감사 P0/P1 0을 거쳐 implementation
+`e970cf7e4c3a4685fd8bce23c659a1c9aa93c21e`이 origin/main에 push됐다. 이 receipt는
+GPU 실험을 증거로 만들 수 있는 코드 gate의 완료이지 P0-B 실증 완료가 아니다.
+controlled GPU paired run과 실제 E2 속도 ≤600초 실측은 아직 0이며 E2는 계속 금지다.
+
 ## 8. active goal fail-closed 실행 체크리스트
 
 1. [x] 사용자 `/goal`의 재개 권한과 운영 채택 금지선을 확인했다(2026-08-22).
@@ -326,6 +338,9 @@ P0-B의 controlled GPU 동등성과 실제 E2 속도 checkpoint ≤10분 실측 
    `run-state.json` durable runner, optimizer 경계 safe-pause와 `SAFE_TO_POWER_OFF`,
    PID/command/checkpoint SHA 기반 재부팅 복구를 자동 회귀와 통제 GPU 실험으로 증명한다.
    CPU exact resume와 offline actual-process runner/safe-pause/reboot fault는 완료했다.
+   checkpoint timing/exact full-state comparator·deterministic pin·600초/4구간 gate와
+   offline fault 회귀도 `e970cf7e4c3a4685fd8bce23c659a1c9aa93c21e`로 origin/main
+   push됐다.
    controlled GPU 동등성과 실제 E2 속도 checkpoint 간격을 전원 종료 손실 상한 10분
    이하로 실측·고정하는 단계가 남았다.
 4. [ ] preflight에서 입력 코드·데이터가 clean인지 확인한다. live heartbeat로 생긴

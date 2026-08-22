@@ -9,6 +9,22 @@
 
 ## 2026-08-22 P0-B 독립 감사·compact 복구 정정
 
+- exact 6-doc stage exit 0, staged 6·unstaged 0·untracked 0, cached diff-check PASS다.
+  stage receipt 두 문서를 재stage·재검증한 뒤 docs receipt commit/push를 수행한다.
+- P0-B gate actual push receipt를 SSoT 6종에 반영한 뒤 continuity PASS, exact
+  6-doc boundary, untracked 0, repo 기본 diff-check whitespace error 0, 금지 산출물
+  filename·비밀 값 형태 content hit 0을 확인했다. exact stage·docs receipt commit/push가
+  실패하면 controlled GPU/E2로 이동하지 않는다.
+- compact 뒤 actual push receipt를 재대조했다. `git push origin main` exit 0,
+  `59a2363..e970cf7 main -> main`; HEAD=origin/main `e970cf7`, AIRI trainer/runner 0,
+  고정 입력/E1 SHA exact, E2/T3/campaign 0, E2 로그 각 0 bytes다. 이전 live 문서의
+  local-ahead/구현 10-file 상태는 stale였고 실제 worktree는 receipt용 WORKING-STATE와
+  이 log 두 파일만 dirty였다. 이를 먼저 정정한 뒤 SSoT 6-doc receipt commit/push를
+  마칠 때까지 controlled GPU/E2는 시작하지 않는다.
+- 구현 commit 성공: `e970cf7e4c3a4685fd8bce23c659a1c9aa93c21e`
+  (`feat: add GPU training equivalence gate`), 10 files, 1,703 insertions/52 deletions.
+  직후 worktree clean, local main은 origin/main보다 1 ahead다. exact push 성공과 receipt
+  문서 commit/push 전에는 controlled GPU/E2를 시작하지 않는다.
 - exact staged 10-file 상태에서 전체 offline checkpoint exit 0/PASS. continuity,
   actual-process durability와 CI manifest 포함 기존 핵심 회귀가 통과했고 관련 PID 0이다.
   receipt 재stage·cached diff-check 뒤 `feat: add GPU training equivalence gate`로

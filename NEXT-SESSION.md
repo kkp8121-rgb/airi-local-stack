@@ -3,8 +3,10 @@
 > **2026-08-22 goal resume:** 사용자 `/goal` 명령으로 AIRI 본 goal은 `active`다.
 > 운영 모델 채택과 기본 서비스 모델 변경만 별도 사용자 승인 전까지 금지한다.
 > 전원 종료 복구용 P0-A checkpoint/full-state/atomic fault 계층은 offline 구현·독립
-> P0/P1 0 감사까지 완료되어 `6f0c1358`로 origin/main push됐다. P0-B controlled GPU 동등성과 실제 E2 속도 10분
-> checkpoint 상한을 실증한 뒤에만 E2를 시작한다.
+> P0/P1 0 감사까지 완료되어 `6f0c1358`로 origin/main push됐다. P0-B timing/
+> exact-equivalence evidence gate도 offline 회귀·독립 P0/P1 0을 거쳐 `e970cf7`로
+> origin/main push됐다. controlled GPU 동등성과 실제 E2 속도 10분 checkpoint 상한은
+> 아직 미실측이며, 둘을 실증한 뒤에만 E2를 시작한다.
 > `goal_status=active`; `adoption_authorized=false`
 > `execution_order=P0_A>P0_B>E2_LAUNCH>E2_PROVENANCE>PACKAGE>T3_36>CAMPAIGN_3X500>USER_DECISION`
 
@@ -15,8 +17,9 @@
    PID, 산출물과 대조하고 불일치하면 이 문서를 먼저 정정한다. active goal에서는
    최대 60분 heartbeat와 단계 전후 intent/receipt checkpoint를 유지한다.
 2. `airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-08-21.md` — **현행 GPU 인계 단일
-   SSoT.** runtime-shaped v4 1,000행의 exact SHA, E1 완료 결과, P0-A offline 완료와 E2 전 P0-B 내구성
-   게이트와 중단한 E2의 step 0 재실행 명령, merge/GGUF 핀, calibration 2종+blind 180분 T3의
+   SSoT.** runtime-shaped v4 1,000행의 exact SHA, E1 완료 결과, P0-A offline 완료와
+   `e970cf7` P0-B timing/exact-equivalence gate, E2 전 controlled GPU 내구성 실증,
+   중단한 E2의 step 0 재실행 명령, merge/GGUF 핀, calibration 2종+blind 180분 T3의
    36-report 행렬, 이후 3×500 live campaign 순서를 고정한다. 현재 E1은
    `adoption_authorized=false`, `t3_status=pending`이며 서비스 모델은 바꾸지 않았다.
    코덱스든 클로드든 먼저 이 문서부터 읽는다. 08-20판의 greybox·추출 이력은

@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-22 18:35:02 +09:00"
-checkpoint_id: "20260822-183502-p0b-full-offline-pass-commit-intent"
+updated_at_kst: "2026-08-22 18:43:02 +09:00"
+checkpoint_id: "20260822-184302-p0b-receipt-doc-staged"
 goal_status: "active"
 authorization: "repo-gpu-package-test-commit-push; operational-adoption-forbidden"
 active_phase: "p0-controlled-gpu-validation"
-git_head: "59a2363e3340c0e3a59eebf58f7b5f17de29bb1f"
-worktree_state: "staged-p0b-evidence-code-10-files"
+git_head: "e970cf7e4c3a4685fd8bce23c659a1c9aa93c21e"
+worktree_state: "staged-six-doc-receipt-batch-before-receipt-restage"
 active_trainer_count: 0
 ---
 
@@ -25,31 +25,67 @@ active_trainer_count: 0
 - 저장소 구현·수정, GPU 학습, merge/package, 로컬 서비스, T3·campaign 및
   검증된 milestone commit/push가 허가됐다. 운영 모델 채택과 기본 모델 변경은
   별도 사용자 승인 전까지 금지한다.
-- 2026-08-22 18:11 KST compact 복구 재확인: Python trainer/durable runner
-  프로세스 0. GPU process 목록에도 AIRI trainer/runner workload는 0이다.
+- 2026-08-22 18:40 KST compact 복구 재확인: Python trainer/durable runner
+  프로세스 0. GPU process 목록에는 OS/app 프로세스가 있지만 식별 가능한 AIRI
+  trainer/runner workload는 0이다.
 - v4 파인튜닝은 E1 adapter/report까지만 완료·검증됐고 아직 미채택이다.
 - E2 adapter/report, merge/package, v4 T3, live campaign 산출물은 0이다.
-- HEAD와 origin/main은 P0-A receipt commit
-  `59a2363e3340c0e3a59eebf58f7b5f17de29bb1f`로 일치한다. receipt push 뒤
-  worktree clean을 확인한 뒤 P0-B 배치를 시작했으며, 현재 실제 worktree는
-  P0-B 구현 확장으로 현재는 8 modified+2 untracked의 정확히 10개 경로다.
-  AIRI trainer/runner는 0이다.
+- HEAD와 origin/main은 P0-B evidence gate implementation
+  `e970cf7e4c3a4685fd8bce23c659a1c9aa93c21e`로 일치한다. source/chat/base와
+  E1 adapter/config/report의 크기·SHA는 고정값과 exact 일치한다. E2 adapter/report/
+  durable run, T3와 campaign은 없고 기존 E2 stdout/stderr는 각 0 bytes다. compact
+  복구 전 receipt용 WORKING-STATE와 roadmap log 두 파일만 dirty이며 AIRI
+  trainer/runner는 0이다.
 
 ## 2. 현재 작업 트랜잭션
 
 | 항목 | 값 |
 |---|---|
-| 의도 | P0-B GPU 실행 전에 checkpoint별 durable timing event, deterministic-validation pin, baseline 대 pause/resume 정식 comparator·receipt를 구현한다. |
-| 허용 범위 | trainer와 새 verifier/tests의 저장소 구현·offline 회귀만 허용; GPU·서비스·E2 실행 금지 |
-| 시작 전 증거 | HEAD=origin/main `59a2363`; AIRI trainer/runner 0. trainer `890dd7bf...b7960` 42,663 B, trainer test `0995d10d...53a6` 26,678 B, checkpoint `89785d37...f4f96`, runner `900db00e...37526` |
-| exact 명령 | 핀된 Python 3.12의 `-m py_compile` checkpoint+trainer+runner+verifier, 이어 `-m pytest -q`로 `test_behavior_training_checkpoint.py test_train_airi_behavior_lora.py test_durable_training_runner.py test_verify_airi_behavior_gpu_equivalence.py`; PASS 뒤 PowerShell durability와 독립 재감사 |
-| 출력 경로 | Git: trainer/test와 새 GPU equivalence verifier/test. GPU runtime 경로는 이 코드 배치가 검증·commit/push된 뒤 별도 intent에서 fresh D: 경로로 고정 |
-| 완료 조건 | 각 generation의 manifest/payload/index/pins SHA와 publish wall/monotonic time을 atomic receipt로 보존, deterministic CUDA 설정을 exact pins에 결속, 두 complete run의 artifact/report/latest full state와 정상 interval ≤600초를 fail-closed 판정하는 canonical receipt 및 offline fault PASS |
-| 중단·복구 | quota/PC 중단은 Git diff와 이 intent부터 재개한다. offline PASS·독립 검토·commit/push 전에는 GPU를 시작하지 않고 P0-B/E2를 승격하지 않는다. |
-| 현재 행동 | 최신 독립 감사 P0 5/P1 3 blocker와 fault 회귀를 코드에 반영했다. 현재 바이트의 py_compile+4-suite focused를 실행하며 실패 시 GPU/E2 금지와 diff를 보존한다. |
+| 의도 | origin/main에 push된 P0-B evidence gate implementation receipt를 장기 SSoT 6종에 반영하고 별도 docs receipt로 commit/push한다. |
+| 허용 범위 | WORKING-STATE, 현행 handoff, roadmap status/log, NEXT, 문서 인덱스의 receipt 갱신과 offline 문서 검증만 허용; GPU·서비스·E2 실행 금지 |
+| 시작 전 증거 | goal active; HEAD=origin/main `e970cf7`; AIRI trainer/runner 0; 고정 입력/E1 SHA exact; E2/T3/campaign 0; 기존 E2 로그 각 0 bytes; 시작 worktree는 receipt 문서 2개만 dirty |
+| exact 명령 | SSoT 6종 갱신 뒤 `test-airi-work-continuity.ps1`, repo 기본 `git diff --check`, exact 6-doc boundary·금지 파일명·비밀 값 형태 scan; PASS 시 exact stage, staged boundary/diff-check, `git commit -m "docs: record GPU equivalence gate receipt"`, `git push origin main` |
+| 출력 경로 | Git tracked 문서 6종만. 모델·GPU runtime 산출물과 로그 본문은 생성하거나 Git에 넣지 않는다. |
+| 완료 조건 | P0-B evidence gate `e970cf7` push, offline `68 passed, 1 skipped`, PowerShell PASS, full checkpoint PASS, 독립 감사 P0/P1 0과 controlled GPU 미실행 상태가 6종에 일치하고 docs receipt가 origin/main에 push됨 |
+| 중단·복구 | quota/PC 중단은 마지막 정상 `e970cf7`과 문서 diff에서 재개한다. docs commit/push 전에는 controlled GPU/E2를 시작하지 않는다. |
+| 현재 행동 | exact 6-doc stage와 cached diff-check가 PASS했다. 이 stage receipt를 WORKING-STATE와 roadmap log에 기록해 두 파일을 재stage한 뒤 동일 6/0/0 경계를 확인하고 docs receipt commit을 실행한다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260822-184302-p0b-receipt-doc-staged`: exact 6-doc `git add` exit 0.
+  staged 6, unstaged 0, untracked 0, cached diff-check exit 0이고 최초 staged 통계는
+  99 insertions/32 deletions다. 이 receipt를 담은 WORKING-STATE와 roadmap log만
+  재stage하고 staged 6·unstaged 0·untracked 0 및 cached diff-check를 다시 확인한다.
+  통과하면 exact `git commit -m "docs: record GPU equivalence gate receipt"`를
+  실행한다. commit 실패 시 push/GPU/E2를 실행하지 않고 staged 배치에서 복구한다.
+- `20260822-184229-p0b-receipt-doc-validation`: P0-B implementation push receipt와
+  controlled GPU 미실행 경계를 SSoT 6종에 반영했다. 변경 경로 exact 6,
+  untracked 0, boundary diff 0, focused `test-airi-work-continuity.ps1` exit 0/PASS,
+  repo 기본 diff-check exit 0/whitespace error 0, 금지 산출물 filename 0, 비밀 값 형태
+  content hit 0이다. 다음 상태 변경은 이 6개만 exact stage하고 staged 6·unstaged 0·
+  untracked 0 및 cached diff-check를 재확인하는 것이다. 통과하면
+  `git commit -m "docs: record GPU equivalence gate receipt"`, `git push origin main`
+  순서로 실행하며 하나라도 실패하면 controlled GPU/E2를 시작하지 않는다.
+- `20260822-184022-post-compact-p0b-push-reconcile`: 지정 SSoT 5종을 순서대로
+  전체 재독하고 goal `active`를 확인했다. 실제 HEAD=origin/main
+  `e970cf7e4c3a4685fd8bce23c659a1c9aa93c21e`; push 출력은
+  `59a2363..e970cf7 main -> main` exit 0이다. AIRI trainer/runner 0이며 GPU에는
+  OS/app 프로세스가 있지만 식별 가능한 AIRI workload는 0이다. source/chat/base와
+  E1 adapter/config/report 크기·SHA exact, E2 adapter/report/durable run과 T3/campaign
+  부재, E2 stdout/stderr 각 0 bytes를 대조했다. 실제 worktree는 이전 receipt용
+  WORKING-STATE와 roadmap log 두 파일만 dirty여서 문서의 local-ahead/10-file 구현
+  상태를 관측 사실로 먼저 정정한다. implementation `e970cf7`은 durable하지만 controlled
+  GPU 동등성 및 실제 E2 속도 checkpoint ≤600초 실측은 아직 0이므로 P0-B/E2를 완료로
+  승격하지 않는다. 다음은 SSoT 6-doc receipt 검증·commit/push다.
+- `20260822-183559-p0b-implementation-commit-push-intent`: exact staged 배치의
+  `git commit -m "feat: add GPU training equivalence gate"` exit 0. commit
+  `e970cf7e4c3a4685fd8bce23c659a1c9aa93c21e`, 10 files, 1,703 insertions/
+  52 deletions, verifier/test 신규 2개다. commit 직후 worktree clean, local main은
+  origin/main `59a2363`보다 1 ahead이고 AIRI trainer/runner PID 0이다. 다음 exact
+  상태 변경은 `git push origin main`; 실패하면 이 local commit과 receipt 문서를
+  보존하고 controlled GPU/E2를 실행하지 않는다. 성공 뒤 HEAD=origin/main/PID 0을
+  대조하고 long-lived SSoT receipt 문서의 별도 commit/push를 완료한 뒤에만 controlled
+  GPU intent로 이동한다.
 - `20260822-183502-p0b-full-offline-pass-commit-intent`: exact staged 10/unstaged 0/
   untracked 0과 cached diff-check PASS 상태에서 `test-current-checkpoint.ps1` exit 0,
   최종 `Current checkpoint contract: PASS (offline synthetic ASAR only; no installed
