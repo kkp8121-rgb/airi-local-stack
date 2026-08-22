@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-22 19:53:39 +09:00"
-checkpoint_id: "20260822-195339-p0-safe-pause-auto-discovery-commit-intent"
+updated_at_kst: "2026-08-22 19:55:40 +09:00"
+checkpoint_id: "20260822-195540-p0-safe-pause-auto-discovery-final-docs-intent"
 goal_status: "active"
 authorization: "repo-gpu-package-test-commit-push; operational-adoption-forbidden"
 active_phase: "p0-controlled-gpu-validation"
-git_head: "e3a8819fe2b9edacbb2567bead26ccb8f4086404"
-worktree_state: "eight-staged-before-stage-receipt-restage"
+git_head: "d8f393625a4898b41d605f4955064f246990f7fe"
+worktree_state: "two-final-push-receipt-docs-staged-before-restage"
 active_trainer_count: 0
 ---
 
@@ -48,10 +48,28 @@ active_trainer_count: 0
 | 출력 경로 | tracked pause/test와 receipt 문서만. system temp synthetic runtime 외 모델/GPU output 0 |
 | 완료 조건 | RunDir 생략이 prompt 없이 fail-closed하고 정확히 한 active verified runner만 선택; manual override 유지; focused/full offline와 P0/P1 감사 PASS; commit/push |
 | 중단·복구 | quota/PC 중단 시 HEAD `e3a8819`과 owned 2-file diff 및 문서 receipt를 대조한다. 검증 전에는 자동 탐지를 사용하거나 controlled GPU/E2를 시작하지 않는다. |
-| 현재 행동 | exact 8-file stage와 cached diff-check가 PASS했다. stage receipt 두 문서를 restage·재검증한 뒤 Conventional Commit을 만든다. |
+| 현재 행동 | actual push receipt 두 문서의 continuity·diff·stage 검증이 PASS했다. stage receipt를 restage한 뒤 final docs commit/push한다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260822-195540-p0-safe-pause-auto-discovery-final-docs-intent`: actual push receipt
+  exact 2-doc boundary, continuity PASS, repo diff-check PASS 뒤 stage exit 0. staged 2,
+  unstaged 0, untracked 0, cached diff-check PASS다. 이 stage receipt를 restage·재검증한 뒤
+  exact `git commit -m "docs: record safe-pause push"`, `git push origin main`을 순서대로
+  실행한다. 실패하면 receipt 상태를 보존하고 GPU/E2를 실행하지 않는다.
+- `20260822-195505-p0-safe-pause-auto-discovery-push-receipt`: exact
+  `git push origin main` exit 0, `e3a8819..d8f3936 main -> main`. 이후 HEAD=origin/main
+  `d8f393625a4898b41d605f4955064f246990f7fe`, AIRI runner/trainer 0이고 actual push
+  receipt용 WORKING-STATE/roadmap log 두 파일만 dirty다. automatic safe-pause code,
+  actual-process regression과 6개 SSoT는 origin/main에 durable하다. 두 receipt 문서를
+  focused boundary/diff-check 뒤 final docs commit/push하고 clean 경계를 확인해야만
+  controlled GPU intent로 이동하며 E2는 계속 금지한다.
+- `20260822-195422-p0-safe-pause-auto-discovery-push-intent`: stage receipt 두 문서
+  restage 뒤 staged 8·unstaged 0·untracked 0, cached diff-check PASS. exact commit exit 0,
+  `d8f393625a4898b41d605f4955064f246990f7fe` (`fix: auto-detect durable training run`),
+  8 files, 404 insertions/39 deletions이다. commit 직후 worktree clean, local main은
+  origin/main `e3a8819`보다 1 ahead다. 다음 상태 변경은 exact `git push origin main`;
+  실패하면 local commit과 두 receipt 문서를 보존하고 GPU/E2를 실행하지 않는다.
 - `20260822-195339-p0-safe-pause-auto-discovery-commit-intent`: exact 8-path `git add`
   exit 0. staged 8, unstaged 0, untracked 0, cached diff-check PASS다. 이 stage receipt로
   dirty해진 WORKING-STATE/roadmap log만 restage하고 동일 8/0/0과 cached diff-check를

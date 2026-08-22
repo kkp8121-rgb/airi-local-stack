@@ -9,6 +9,17 @@
 
 ## 2026-08-22 P0-B 독립 감사·compact 복구 정정
 
+- actual safe-pause push receipt는 exact 2-doc boundary, continuity/diff-check PASS,
+  staged 2·unstaged 0·untracked 0, cached diff-check PASS다. stage receipt를 restage한 뒤
+  `docs: record safe-pause push` commit/push하며 실패 시 GPU/E2를 실행하지 않는다.
+- safe-pause implementation/docs push 성공: `e3a8819..d8f3936 main -> main`.
+  HEAD=origin/main `d8f3936`, AIRI runner/trainer 0, actual push receipt 두 문서만 dirty다.
+  code/test와 6개 SSoT는 origin/main에 durable하며 final two-doc receipt를
+  commit/push하기 전에는 controlled GPU/E2로 이동하지 않는다.
+- safe-pause implementation/docs commit 성공:
+  `d8f393625a4898b41d605f4955064f246990f7fe` (`fix: auto-detect durable training run`),
+  8 files, 404 insertions/39 deletions. 직후 worktree clean, origin/main보다 1 ahead다.
+  exact push 성공 전에는 GPU/E2로 이동하지 않는다.
 - exact 8-path stage exit 0, staged 8·unstaged 0·untracked 0, cached diff-check PASS다.
   stage receipt 두 문서를 restage·재검증한 뒤 `fix: auto-detect durable training run`으로
   commit하며 실패하면 push/GPU/E2로 이동하지 않는다.
