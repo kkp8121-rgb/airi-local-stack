@@ -26,13 +26,24 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib.metadata
+import io
 import json
 import re
 import sys
 import random
+from datetime import UTC, datetime
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+# Tests load this file by path; direct script execution has the same parent on
+# sys.path, so make that relationship explicit without requiring a package.
+if str(Path(__file__).parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).parent))
+from behavior_training_checkpoint import (
+    CheckpointError, atomic_json, load_generation, publish_artifact_directory,
+    publish_checkpoint,
+)
 
 CPU_SMOKE_MAX_SAMPLES = 16
 CPU_SMOKE_MAX_STEPS = 20
@@ -45,6 +56,156 @@ DEFAULTS = {
 
 class BehaviorTrainingError(ValueError):
     """Fail closed on anything that is not a pinned, reviewed, local setup."""
+
+
+class PauseRequested(SystemExit):
+    """A verified checkpoint made it safe for the durable runner to stop."""
+
+
+CONTROL_SCHEMA_VERSION = 1
+
+
+def _file_sha256(path: Path) -> str:
+    with path.open("rb") as handle:
+        return hashlib.file_digest(handle, "sha256").hexdigest()
+
+
+def _source_pins(args: argparse.Namespace, model_dir: Path, tokenizer: Any) -> dict[str, Any]:
+    """Pins are intentionally exact: a resume never quietly changes inputs."""
+    import torch
+
+    tokenizer_files = sorted(path for path in model_dir.iterdir()
+                             if path.is_file() and ("token" in path.name or path.name in {"special_tokens_map.json", "config.json"}))
+    weights = sorted(model_dir.glob("*.safetensors"))
+    local_weight = _file_sha256(weights[0]) if len(weights) == 1 else "cpu-smoke-weight-unavailable"
+    versions = {"python": sys.version.split()[0], "torch": torch.__version__,
+                "transformers": importlib.metadata.version("transformers"),
+                "peft": importlib.metadata.version("peft")}
+    cuda_identity = None
+    quantization = None
+    if args.mode == "cuda-qlora":
+        versions["bitsandbytes"] = importlib.metadata.version("bitsandbytes")
+        properties = torch.cuda.get_device_properties(0)
+        cuda_identity = {
+            "torch_cuda_runtime": torch.version.cuda,
+            "device_name": properties.name,
+            "device_capability": list(torch.cuda.get_device_capability(0)),
+            "total_memory_bytes": int(properties.total_memory),
+        }
+        quantization = {"load_in_4bit": True, "quant_type": "nf4",
+                        "double_quant": True, "compute_dtype": "bfloat16"}
+    return {
+        "dataset_sha256": args.dataset_sha256,
+        "model_weight_sha256": args.model_sha256 if args.mode == "cuda-qlora" else local_weight,
+        "model_config_sha256": _file_sha256(model_dir / "config.json"),
+        "tokenizer_files": {path.name: _file_sha256(path) for path in tokenizer_files},
+        "trainer_source_sha256": _file_sha256(Path(__file__)),
+        "versions": versions,
+        "cuda_identity": cuda_identity,
+        "quantization": quantization,
+        "config": {key: getattr(args, key) for key in ("mode", "seed", "lora_r", "lora_alpha", "lora_dropout", "learning_rate", "max_steps", "batch_size", "gradient_accumulation", "max_seq_len")},
+        "tokenizer_class": tokenizer.__class__.__name__,
+        "order_strategy": "seeded-scenario-group-then-row-shuffle.v1",
+    }
+
+
+def _progress(run_dir: Path | None, value: dict[str, Any]) -> None:
+    if run_dir is not None:
+        path = run_dir / "progress.json"
+        previous: dict[str, Any] = {}
+        if path.exists():
+            try:
+                previous = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise BehaviorTrainingError("existing progress is invalid") from exc
+        atomic_json(run_dir / "progress.json", {
+            "schema_version": "airi.behavior-training-progress.v1",
+            "run_id": value.get("run_id", previous.get("run_id")), "status": value.get("status", previous.get("status")),
+            "epoch": value.get("epoch", previous.get("epoch", 0)), "next_batch_index": value.get("next_batch_index", previous.get("next_batch_index", 0)),
+            "microsteps_completed": value.get("microsteps_completed", value.get("microsteps", previous.get("microsteps_completed", 0))),
+            "optimizer_steps": value.get("optimizer_steps", previous.get("optimizer_steps", 0)),
+            "pending_microbatches": value.get("pending_microbatches", previous.get("pending_microbatches", 0)),
+            "checkpoint": value.get("checkpoint", previous.get("checkpoint")),
+            "updated_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        })
+
+
+def _pause_request(run_dir: Path | None, run_id: str | None) -> str | None:
+    if run_dir is None:
+        return None
+    path = run_dir / "control" / "pause.request.json"
+    if not path.exists():
+        return None
+    try:
+        request = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise BehaviorTrainingError("invalid pause request") from exc
+    if set(request) != {"schema_version", "run_id", "request_id"} or request["schema_version"] != "airi.behavior-pause-request.v1":
+        raise BehaviorTrainingError("pause request schema mismatch")
+    if request["run_id"] != run_id or not isinstance(request["request_id"], str) or not request["request_id"]:
+        raise BehaviorTrainingError("pause request identity mismatch")
+    accepted_path = run_dir / "control" / "resume.accepted.json"
+    if accepted_path.exists():
+        try:
+            accepted = json.loads(accepted_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise BehaviorTrainingError("invalid resume acceptance receipt") from exc
+        required = {"schema_version", "run_id", "request_id",
+                    "checkpoint_relative_path", "checkpoint_manifest_sha256"}
+        if (set(accepted) != required
+                or accepted["schema_version"] != "airi.behavior-resume-accepted.v1"
+                or accepted["run_id"] != run_id
+                or accepted["request_id"] != request["request_id"]
+                or not isinstance(accepted["checkpoint_relative_path"], str)
+                or not isinstance(accepted["checkpoint_manifest_sha256"], str)):
+            raise BehaviorTrainingError("resume acceptance identity mismatch")
+        return None
+    ack = run_dir / "control" / "pause.ack.json"
+    if ack.exists():
+        existing = json.loads(ack.read_text(encoding="utf-8"))
+        if existing.get("request_id") != request["request_id"]:
+            raise BehaviorTrainingError("competing pause request ids")
+    return request["request_id"]
+
+
+def _accept_resumed_pause_control(run_dir: Path, run_id: str,
+                                  checkpoint_relative_path: str,
+                                  checkpoint_manifest_sha256: str) -> None:
+    control = run_dir / "control"
+    request_path = control / "pause.request.json"
+    ack_path = control / "pause.ack.json"
+    if not request_path.exists() and not ack_path.exists():
+        return
+    if not request_path.is_file() or not ack_path.is_file():
+        raise BehaviorTrainingError("resumed pause control is incomplete")
+    try:
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+        ack = json.loads(ack_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise BehaviorTrainingError("resumed pause control is invalid") from exc
+    if (set(request) != {"schema_version", "run_id", "request_id"}
+            or request["schema_version"] != "airi.behavior-pause-request.v1"
+            or request["run_id"] != run_id
+            or not isinstance(request["request_id"], str)
+            or not request["request_id"]):
+        raise BehaviorTrainingError("resumed pause request identity mismatch")
+    ack_keys = {"schema_version", "run_id", "request_id", "checkpoint_manifest_sha256",
+                "checkpoint_relative_path", "acknowledged_at_utc", "safe_to_power_off"}
+    if (set(ack) != ack_keys
+            or ack["schema_version"] != "airi.behavior-pause-ack.v1"
+            or ack["run_id"] != run_id
+            or ack["request_id"] != request["request_id"]
+            or ack["checkpoint_relative_path"] != checkpoint_relative_path
+            or ack["checkpoint_manifest_sha256"] != checkpoint_manifest_sha256
+            or ack["safe_to_power_off"] is not True):
+        raise BehaviorTrainingError("resumed pause ack does not match checkpoint")
+    atomic_json(control / "resume.accepted.json", {
+        "schema_version": "airi.behavior-resume-accepted.v1",
+        "run_id": run_id,
+        "request_id": request["request_id"],
+        "checkpoint_relative_path": checkpoint_relative_path,
+        "checkpoint_manifest_sha256": checkpoint_manifest_sha256,
+    })
 
 
 V4_SCHEMA_VERSION = "airi.broadcast-continuity.v4"
@@ -302,6 +463,12 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
         raise BehaviorTrainingError("dataset has no train split")
     model_dir = require_local_model_dir(args.model_dir)
     output = reject_network_path(Path(args.output), "output")
+    report_path = reject_network_path(args.report, "report") if args.report else None
+    run_dir = reject_network_path(Path(args.run_dir), "run dir") if args.run_dir else None
+    if args.mode == "cuda-qlora" and (run_dir is None or not args.run_id):
+        raise BehaviorTrainingError("cuda-qlora requires --run-dir and --run-id for durable checkpoints")
+    if args.resume_from_checkpoint and run_dir is None:
+        raise BehaviorTrainingError("--resume-from-checkpoint requires --run-dir")
 
     if args.mode == "cpu-smoke":
         rows = rows[:CPU_SMOKE_MAX_SAMPLES]
@@ -326,13 +493,20 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
 
     if output.exists():
         raise BehaviorTrainingError("output path already exists; use a fresh adapter directory")
+    if report_path is not None and report_path.exists():
+        raise BehaviorTrainingError("report path already exists; use a fresh receipt path")
+    if run_dir is not None:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "control").mkdir(exist_ok=True)
     torch.manual_seed(args.seed)
+    random.seed(args.seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(args.seed)
 
     tokenizer = AutoTokenizer.from_pretrained(str(model_dir), local_files_only=True)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
+    pins = _source_pins(args, model_dir, tokenizer)
     model_kwargs: dict[str, Any] = {"local_files_only": True}
     if quantization is not None:
         model_kwargs["quantization_config"] = quantization
@@ -340,7 +514,9 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
     model = AutoModelForCausalLM.from_pretrained(str(model_dir), **model_kwargs)
     if quantization is None:
         model = model.to(device)
-        verified_model_sha256 = "cpu-smoke-not-pinned"
+        cpu_weights = sorted(model_dir.glob("*.safetensors"))
+        verified_model_sha256 = (_file_sha256(cpu_weights[0]) if len(cpu_weights) == 1
+                                 else "cpu-smoke-weight-unavailable")
     else:
         # QLoRA needs frozen k-bit parameters and input gradients; checkpointing
         # is what keeps a 2.3B, 48-layer model within the supported 8 GiB card.
@@ -398,6 +574,7 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
     optimizer = torch.optim.AdamW(
         (parameter for parameter in model.parameters() if parameter.requires_grad),
         lr=args.learning_rate)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda _step: 1.0)
     model.train()
     losses: list[float] = []
     dev_loss_history: list[dict[str, Any]] = []
@@ -405,13 +582,91 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
     encoded_by_row = {id(row): example for row, example in zip(rows, encoded)}
     step = 0
     epoch = 0
+    batch_cursor = 0
     pending_microbatches = 0
     optimizer_steps = 0
+    checkpoint_generation = 0
+    if args.resume_from_checkpoint:
+        try:
+            requested = args.resume_from_checkpoint.resolve()
+            checkpoint_root = (run_dir / "checkpoints").resolve()
+            if requested.parent != checkpoint_root or requested.name.startswith("."):
+                raise BehaviorTrainingError("resume checkpoint must be an exact generation under run-dir/checkpoints")
+            loaded = load_generation(run_dir, requested.name, pins, args.run_id)
+        except CheckpointError as exc:
+            raise BehaviorTrainingError(f"cannot resume checkpoint: {exc}") from exc
+        state = torch.load(io.BytesIO(loaded["payload"]), map_location="cpu", weights_only=False)
+        if state.get("run_id") != args.run_id or state.get("pending_microbatches") != 0:
+            raise BehaviorTrainingError("resume state is not an optimizer boundary for this run")
+        restore_trainable_state(model, state["trainable_state"])
+        optimizer.load_state_dict(state["optimizer"])
+        scheduler.load_state_dict(state["scheduler"])
+        random.setstate(state["python_rng"])
+        torch.set_rng_state(state["torch_rng"])
+        if torch.cuda.is_available() and state.get("cuda_rng") is not None:
+            torch.cuda.set_rng_state_all(state["cuda_rng"])
+        losses = state["losses"]
+        dev_loss_history = state["dev_loss_history"]
+        best_state = state["best_state"]
+        step, epoch, batch_cursor = state["step"], state["epoch"], state["batch_cursor"]
+        optimizer_steps, checkpoint_generation = state["optimizer_steps"], state["checkpoint_generation"]
+        reconstructed_order = hashlib.sha256("\n".join(
+            row["id"] for row in epoch_group_order(rows, args.seed, epoch)).encode()).hexdigest()
+        if state.get("row_order_hash") != reconstructed_order or state.get("seed") != args.seed:
+            raise BehaviorTrainingError("resume deterministic row order mismatch")
+        _accept_resumed_pause_control(
+            run_dir, args.run_id, requested.name, loaded["manifest_sha256"])
+
+    def checkpoint(reason: str) -> None:
+        nonlocal checkpoint_generation
+        if run_dir is None:
+            return
+        if pending_microbatches != 0:
+            raise BehaviorTrainingError("checkpoint requested outside optimizer boundary")
+        checkpoint_generation += 1
+        state = {"run_id": args.run_id, "trainable_state": snapshot_trainable_state(model),
+                 "optimizer": optimizer.state_dict(), "scheduler": scheduler.state_dict(),
+                 "python_rng": random.getstate(), "torch_rng": torch.get_rng_state(),
+                 "cuda_rng": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
+                 "epoch": epoch, "batch_cursor": batch_cursor, "step": step,
+                 "pending_microbatches": pending_microbatches, "optimizer_steps": optimizer_steps,
+                 "checkpoint_generation": checkpoint_generation, "losses": losses,
+                 "dev_loss_history": dev_loss_history, "best_state": best_state,
+                 "row_order_hash": hashlib.sha256("\n".join(row["id"] for row in epoch_group_order(rows, args.seed, epoch)).encode()).hexdigest(),
+                 "seed": args.seed}
+        buffer = io.BytesIO()
+        torch.save(state, buffer)
+        generation = f"checkpoint-{checkpoint_generation:08d}"
+        published = publish_checkpoint(run_dir, args.run_id, generation, buffer.getvalue(), pins)
+        reference = {"relative_path": generation, "manifest_sha256": published["manifest_sha256"]}
+        _progress(run_dir, {"run_id": args.run_id,
+                            "status": "checkpointed", "safe_to_power_off": True,
+                            "epoch": epoch, "next_batch_index": batch_cursor,
+                            "optimizer_steps": optimizer_steps, "microsteps": step,
+                            "pending_microbatches": pending_microbatches, "checkpoint": reference})
+        request_id = _pause_request(run_dir, args.run_id)
+        if request_id:
+            atomic_json(run_dir / "control" / "pause.ack.json", {
+                "schema_version": "airi.behavior-pause-ack.v1", "run_id": args.run_id,
+                "request_id": request_id, "checkpoint_manifest_sha256": published["manifest_sha256"],
+                "checkpoint_relative_path": generation,
+                "acknowledged_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                "safe_to_power_off": True})
+            _progress(run_dir, {"run_id": args.run_id,
+                                "status": "paused-safe", "safe_to_power_off": True,
+                                "epoch": epoch, "next_batch_index": batch_cursor,
+                                "optimizer_steps": optimizer_steps, "microsteps": step,
+                                "pending_microbatches": 0, "checkpoint": reference})
+            raise PauseRequested(75)
     while step < max_steps:
         ordered = epoch_group_order(rows, args.seed, epoch)
         epoch_examples = [encoded_by_row[id(row)] for row in ordered]
+        epoch_batches = list(batches(epoch_examples))
+        if batch_cursor > len(epoch_batches):
+            raise BehaviorTrainingError("resume batch cursor exceeds deterministic epoch")
         completed_epoch = True
-        for input_ids, labels, attention in batches(epoch_examples):
+        for cursor in range(batch_cursor, len(epoch_batches)):
+            input_ids, labels, attention = epoch_batches[cursor]
             if step >= max_steps:
                 completed_epoch = False
                 break
@@ -419,17 +674,33 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
             (loss / args.gradient_accumulation).backward()
             step += 1
             pending_microbatches += 1
+            batch_cursor = cursor + 1
+            losses.append(float(loss.detach()))
             if pending_microbatches == args.gradient_accumulation:
                 optimizer.step()
+                scheduler.step()
                 optimizer.zero_grad()
                 optimizer_steps += 1
                 pending_microbatches = 0
-            losses.append(float(loss.detach()))
+                _progress(run_dir, {"schema_version": CONTROL_SCHEMA_VERSION, "run_id": args.run_id,
+                                    "status": "running", "safe_to_power_off": False,
+                                    "optimizer_steps": optimizer_steps, "microsteps": step})
+                if (optimizer_steps % args.checkpoint_every_optimizer_steps == 0
+                        or _pause_request(run_dir, args.run_id) is not None):
+                    checkpoint("interval")
         # Selection must observe a post-optimizer model.  Flush both a normal
         # epoch tail and the final partial epoch rather than carrying gradients
         # across their evaluation boundary.
-        optimizer_steps += flush_epoch_accumulation(optimizer, pending_microbatches)
+        flushed = flush_epoch_accumulation(optimizer, pending_microbatches)
+        if flushed:
+            scheduler.step()
+        optimizer_steps += flushed
         pending_microbatches = 0
+        if flushed:
+            _progress(run_dir, {"schema_version": CONTROL_SCHEMA_VERSION, "run_id": args.run_id,
+                                "status": "running", "safe_to_power_off": False,
+                                "optimizer_steps": optimizer_steps, "microsteps": step})
+            checkpoint("epoch-tail")
         # CUDA selects on every full epoch and the final partial epoch. CPU
         # deliberately records that it made no selection to keep smoke bounded.
         if args.mode == "cuda-qlora" and (completed_epoch or step == max_steps):
@@ -438,6 +709,10 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
             dev_loss_history.append(record)
             best_state = consider_best_state(best_state, current_dev_loss, step, epoch + 1, model)
         epoch += 1
+        batch_cursor = 0
+        # Persist the evaluated epoch/best-selection state too.  This is also
+        # the safe-pause seam for a request that arrives during dev evaluation.
+        checkpoint("epoch-complete")
 
     if best_state is not None:
         restore_trainable_state(model, best_state["state"])
@@ -454,7 +729,9 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
         raise BehaviorTrainingError("temporary adapter output already exists")
     temporary_output.mkdir()
     model.save_pretrained(str(temporary_output))
-    temporary_output.replace(output)
+    artifact = publish_artifact_directory(
+        temporary_output, output,
+        args.run_id or f"standalone-{args.dataset_sha256[:16]}", pins)
     trainable = sum(parameter.numel() for parameter in model.parameters()
                     if parameter.requires_grad)
     total = sum(parameter.numel() for parameter in model.parameters())
@@ -473,6 +750,7 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
         "selected_dev_loss": best_state["loss"] if best_state is not None else None,
         "loss_first3_mean": round(first, 4), "loss_last3_mean": round(last, 4),
         "adapter_dir": str(output),
+        "adapter_artifact_manifest_sha256": artifact["manifest_sha256"],
         "dataset_sha256": args.dataset_sha256,
         "model_weight_sha256": verified_model_sha256,
         "trainable_parameters": trainable,
@@ -494,14 +772,11 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
         "note": ("plumbing smoke only — NOT a trained adapter"
                  if args.mode == "cpu-smoke" else "adapter must pass the T3 gate before adoption"),
     }
-    if args.report is not None:
-        report = reject_network_path(args.report, "report")
-        report.parent.mkdir(parents=True, exist_ok=True)
-        temporary = report.with_name(report.name + ".tmp")
-        temporary.write_text(
-            json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8", newline="\n")
-        temporary.replace(report)
+    if report_path is not None:
+        atomic_json(report_path, summary)
+    _progress(run_dir, {"schema_version": CONTROL_SCHEMA_VERSION, "run_id": args.run_id,
+                        "status": "completed", "safe_to_power_off": True,
+                        "optimizer_steps": optimizer_steps, "microsteps": step})
     return summary
 
 
@@ -517,6 +792,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="선택적 원자적 JSON 학습 영수증 경로")
     parser.add_argument("--mode", choices=["cuda-qlora", "cpu-smoke"], required=True)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--run-dir", type=Path,
+                        help="durable checkpoint/control directory (required for cuda-qlora)")
+    parser.add_argument("--run-id", help="immutable durable-run identity (required for cuda-qlora)")
+    parser.add_argument("--checkpoint-every-optimizer-steps", type=int, default=5)
+    parser.add_argument("--resume-from-checkpoint", type=Path,
+                        help="exact immutable generation directory under run-dir/checkpoints")
     for key, value in DEFAULTS.items():
         flag = "--" + key.replace("_", "-")
         parser.add_argument(flag, type=type(value), default=value)
@@ -525,7 +806,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    summary = run_training(args)
+    if args.checkpoint_every_optimizer_steps <= 0:
+        raise BehaviorTrainingError("checkpoint-every-optimizer-steps must be positive")
+    try:
+        summary = run_training(args)
+    except PauseRequested as exc:
+        return int(exc.code)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0
 

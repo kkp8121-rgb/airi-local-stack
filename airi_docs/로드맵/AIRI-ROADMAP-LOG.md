@@ -7,6 +7,153 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-22 P0-A offline milestone compact 복구 대조
+
+- exact 16-file `git add` exit 0, staged 16개·unstaged 0·untracked 0, staged
+  diff-check exit 0이다. 최초 staged 통계는 5,124 insertions/48 deletions이며 이 receipt
+  두 문서를 재-stage·재검증한 뒤 구현 commit을 실행한다. commit 실패 시 push/GPU/E2를
+  실행하지 않는다.
+- post-compact 정정 뒤 continuity PASS, repo 기본 diff-check whitespace error 0,
+  exact 16개 파일의 금지 산출물 filename·비밀 값 형태 content hit 0을 확인했다.
+  10개 구현/회귀 payload manifest SHA는 `dc8fca8e...6463e`다. exact 16-file stage,
+  staged 경계 재검증, `feat: add durable AIRI training recovery` commit/push 중 하나라도
+  실패하면 controlled GPU를 시작하지 않으며 P0-B GPU receipt 전 E2 금지를 유지한다.
+- 17:40 KST 지정 SSoT 5종을 순서대로 전체 재독하고 active goal, HEAD=origin/main
+  `e93d552`, corpus/base/E1 exact SHA, E2/T3/campaign 부재, E2 로그 각 0 bytes,
+  AIRI trainer/runner 0을 재확인했다. GPU에는 비-AIRI OS/game process가 있으나 AIRI
+  workload는 0이다. 직전 milestone 문서 갱신으로 실제 worktree가 9 modified +
+  7 untracked, 총 16개가 됐지만 live state에 이전 12개가 남은 차이를 관측값으로
+  정정했다. 16개 배치 continuity/diff/security와 exact commit/push 전에는 controlled
+  GPU를 시작하지 않으며 P0-B GPU receipt 전에는 E2를 계속 금지한다.
+
+## 2026-08-22 코덱스 PC P0 구현 compact 복구 대조
+
+- live-control retention 뒤 재감사는 P0 0/P1 2, GPU NOT READY다. control 검증이
+  index commit 뒤라 정상 archive race/invalid receipt에서 API 실패와 durable index 전진이
+  갈리고, dangling symlink가 exists 검사에서 빠진다. side-effect 전 immutable bytes
+  snapshot+lexists 검증과 index 불변 fault로 수리한다.
+- N/N+1과 pause/supervisor P1 수정 뒤 재감사는 P0 1/P1 0, GPU NOT READY다.
+  acceptance N 뒤 runner heartbeat 전 N+1·N+2가 publish되면 retention이 N을
+  archive해 재부팅 acceptance 검증을 막는다. live ack/acceptance reference를
+  control archive 전 keep-set에 결속하고 N+2 회전 fault를 추가한다.
+- 최신 handshake 뒤 독립 감사는 P0 1/P1 2+가용성 P1 1로 GPU NOT READY다.
+  accepted pause checkpoint N과 archive 전 새 latest N+1을 잘못 동일시하는 P0,
+  pause 도구의 junction/mapped 선행 검증·corrupt current→previous fallback 부재,
+  supervisor-failed 뒤 verified final reconciliation 제한을 fault 회귀와 함께 보강한다.
+- 17:09 KST compact 복구에서 SSoT 5종과 active goal, HEAD/origin, 5 modified+
+  7 untracked, AIRI trainer/runner 0, corpus/base/E1 exact SHA, E2/T3/campaign 0을
+  재대조했다. 직전 focused receipt 뒤 full-pin acceptance handshake와 fake-trainer
+  회귀가 부분 편집됐지만 아직 실행 검증되지 않았으므로 direct-trainer mismatch와
+  request-only power-cut 복구, 전체 재검증·독립 재감사 전에는 GPU/E2 금지를 유지한다.
+- 두 전원차단 P0를 구현해 focused `17 passed`. unindexed same-name generation은
+  quarantine/replay하고, final artifact는 full manifest+pins+report+completed progress면
+  complete terminal을 복구하며 partial/tmp는 same-volume quarantine 후 resume한다.
+  full-pin acceptance 전 pause-control 보존 P1과 전체 재감사 전에는 GPU/E2 금지다.
+- 최신 독립 재감사는 새 전원차단 창 P0 2/P1 1로 GPU NOT READY. generation publish→index
+  사이 unindexed same-name 충돌, final adapter/report→runner terminal 사이 existing-output
+  복구 부재가 P0이며, child full pins 전 pause-control archive가 P1이다. unindexed 격리,
+  verified-complete 승격/partial quarantine, full-pin acceptance 회귀 전에는 GPU/E2 금지다.
+- resume argv canonical SHA와 run-state process identity strict schema를 양쪽에 추가하고
+  parseable malformed current→valid previous quarantine 회귀로 강화했다. 전체 Python
+  `30 passed, 1 skipped`, PowerShell PASS를 유지했다. 독립 재감사 전에는 GPU/E2 금지다.
+- Python 위임 diff를 root 검토·보강한 전체 P0 focused는 `30 passed, 1 skipped`, 강화
+  PowerShell fault contract는 PASS. torn/structural index, invalid manifest, generation
+  격리, cursor/checkpoint 단조성, exact changed-command 거부+pause 증거 보존, corrupt
+  run-state/junction/orphan/late-complete/live resume를 모두 포함한다. 독립 재감사와
+  controlled GPU/10분 실측 전에는 E2를 계속 차단한다.
+- PowerShell 강화 fault contract 최종 PASS. malformed paused ack 거부, late pause의 durable
+  complete artifact receipt/PID 0→SAFE, actual orphan 거부, junction 선행 생성 0,
+  corrupt current 격리→previous resume→complete와 기존 live pause/resume를 모두 실증했다.
+  Python 위임 diff와 전체 재감사 전에는 controlled GPU/E2를 계속 차단한다.
+- dictionary schema 수리 뒤 late-complete/orphan/junction/corrupt-state resume 본경로는
+  모두 통과했고, 실제 quarantine 파일도 생성됐다. 네 번째 실패는 test glob의 토큰
+  순서 오타뿐이므로 actual `run-state.corrupt.*.json` 규약으로 고쳐 재실행한다.
+- named parameter 수정 뒤에도 active request가 `[ordered]` dictionary인 경계에서 JSON
+  property helper가 dictionary 메타속성을 읽어 같은 실패가 재현됐다. helper를
+  `IDictionary.Keys`/PSCustomObject 양쪽 계약으로 수정해 실제 schema만 판정하게 한다.
+- complete receipt의 trailing-LF canonical hash를 맞춘 뒤 두 번째 PowerShell 실행은 strict
+  property helper의 positional array binding 결함으로 fail-closed했다. 모든 JSON property
+  검증 호출을 named parameter로 고정하고 같은 synthetic fault 계약을 재실행한다.
+- PowerShell corrupt-state/ack/late-complete/orphan/reparse fault 회귀 첫 실행은 complete
+  directory receipt의 Python-vs-PowerShell canonical row-list hash 차이로 exit 1했다.
+  개별 file inventory/SHA 뒤 fail-closed한 synthetic 실패이며 로그 본문은 읽지 않는다.
+  canonical bytes를 exact 재현해 재실행하기 전에는 PowerShell P0/P1을 승격하지 않는다.
+- 최신 독립 재감사는 P0 2/P1 6, controlled GPU NOT READY다. torn index previous 복구와
+  PowerShell corrupt current run-state 진입이 P0이고, cursor/checkpoint 단조성·publish-time
+  corrupt generation 격리·paused ack schema·final pause/complete race·pause control 보존·
+  reparse/mapped 선행 부작용이 P1이다. final artifact/complete revalidation, stale revision,
+  orphan 분류, CUDA/BnB pins, child reap/single terminal write는 양호로 확인했다.
+- artifact manifest SHA를 실제 bytes와 결속하고 run identity만 분리한 pins/file inventory
+  및 학습 상태 exact 비교로 회귀를 정정했다. 동일 focused Python은
+  `24 passed, 1 skipped`, PowerShell live pause/resume durability는 PASS. final adapter
+  flush/fsync/inventory/write-through publication과 CPU 중단·재개 exact 증거를 확보했지만,
+  남은 P0/P1 fault 회귀와 controlled GPU/10분 실측 전에는 E2를 차단한다.
+- `_fsync_file`을 write-capable descriptor로 수리해 final artifact 관련 기존 3실패를
+  제거했다. 재검증은 Python `23 passed, 1 skipped, 1 failed`, PowerShell PASS이며,
+  남은 한 건은 서로 다른 run identity가 결속된 artifact manifest SHA까지 학습 summary
+  exact 비교에 포함한 새 회귀 계약 문제다. 학습 상태 동등성과 artifact identity/무결성을
+  분리해 재검증하기 전에는 exact-resume/P0를 완료 처리하지 않는다.
+- 16:31 KST compact 복구에서 SSoT 5종, active goal, HEAD/origin, PID와 모든
+  corpus/base/E1/E2 후속 산출물을 재대조했다. 실제 worktree는 5 modified + 7 untracked,
+  trainer/runner와 E2/T3/campaign 산출물은 0이다. 최종 adapter write-through 승격 보강 뒤
+  Python focused는 read-only descriptor `os.fsync`의 Windows `Bad file descriptor`로
+  `21 passed, 1 skipped, 3 failed`; PowerShell durability는 PASS였다. 동일 원인의
+  `_fsync_file`을 수리·재검증하기 전에는 P0/GPU/E2를 승격하지 않는다.
+- startup identity wait와 중복 redirect 제거 뒤 강화 live PowerShell contract PASS.
+  active trainer PID/command 대조→pause checkpoint/ack→SAFE→관련 PID 0→explicit resume→
+  control archive→terminal artifact receipt 전 경로를 실증했다. 재감사 P0 3건과 GPU/10분
+  실측 전에는 controlled GPU와 E2를 계속 차단한다.
+- launcher의 verified starting receipt와 trainer PID 게시 사이 startup race에서
+  safe-pause가 거부되는 회귀를 검출했다. starting/running 상태에서는 bounded exact
+  trainer identity 대기를 추가하며 terminal 전환은 fail-closed한다.
+- runner PID 종료 뒤에도 남은 stderr lock을 Start-Process redirector Process 객체의
+  명시 Dispose 누락으로 분리했다. launcher handle 누수를 수리하고 contract를 재실행한다.
+- 강화된 live PowerShell pause→checkpoint→ack→SAFE→explicit resume→artifact receipt
+  본경로는 통과했지만 terminal 직후 runner stderr handle 종료 전 temp cleanup이 경합해
+  test exit 1. runner PID 종료 대기 뒤 재실행해야 최종 PASS로 인정한다.
+- venv redirector와 실제 runner PID를 분리한 뒤 PowerShell durability contract PASS.
+  공백 경로+hidden background launcher의 독립 runner/run-state/heartbeat/PID-command/
+  terminal artifact receipt와 verified `SAFE_TO_POWER_OFF` 경로를 offline 실증했다.
+  controlled GPU/10분 checkpoint 실측 전까지 P0-B는 미완료다.
+- Windows venv의 단명 redirector PID와 실제 interpreter runner PID가 다른 경계를
+  launcher가 잘못 동일시한 추가 실패를 확인했다. 새 run-state의 exact process identity를
+  권위로 삼고 redirector exit만으로 실패하지 않도록 수정한다.
+- executable hash 수리 뒤 launcher는 state-read와 terminal-write/exit 사이 final race로
+  다시 실패했다. `HasExited` 직후 terminal run-state를 최종 재확인하는 회귀를 추가하며
+  launcher 검증 전에는 P0/E2를 승격하지 않는다.
+- launcher 계약을 핀된 venv Python으로 재실행했지만 별도 원인으로 run-state 전 종료했고
+  exit code도 비어 있었다. 실패 runtime stderr/command quoting을 다시 대조하며 hidden
+  background launcher는 계속 미검증이다.
+- epoch-complete checkpoint 보강 뒤 Python focused는 `23 passed, 1 skipped`지만,
+  PowerShell hidden-background launcher 통합은 run-state 전에 runner가 종료해 FAIL했다.
+  임시 로그가 test cleanup으로 제거돼 원인 receipt가 부족하므로 진단 로그를 보존해
+  quoting/Start-Process 경계를 재현하며 launcher는 아직 검증 완료가 아니다.
+- 실행되는 CPU 중단·재개 동등성 회귀를 추가해 무중단 대 optimizer 경계
+  pause/checkpoint/resume 실행의 LoRA tensor, AdamW/LambdaLR, 모든 RNG, loss/cursor/
+  counter/summary exact 일치를 `1 passed in 8.53s`로 증명했다. 기존 1 skip은 CUDA
+  장비에서 gpu-less refusal만 생략한 것이며, controlled GPU/10분 실측은 아직 남았다.
+- 두 번째 수정 뒤 focused pytest는 `22 passed, 1 skipped`, 실제 subprocess
+  safe-pause→checkpoint→explicit resume→terminal receipt와 PowerShell safe-pause
+  contract가 PASS했다. 남은 Torch-stack skip 때문에 tensor 동등성은 미증명이며
+  P0-A/P0-B와 E2 gate는 계속 미완료다.
+- 첫 실패 수정 뒤 PowerShell durability contract는 PASS했고 Python focused는
+  `21 passed, 1 skipped, 1 failed`다. 남은 실패는 초단명 fake trainer가 Windows
+  CIM PID identity 캡처 전에 끝난 테스트 경쟁으로, runner 자체는 fail-closed 및
+  terminal failure receipt를 남겼다. 관측 창을 추가해 pause/resume 본경로를 재검증한다.
+- 첫 통합 focused 회귀는 `20 passed, 1 skipped, 2 failed`, Python py_compile PASS,
+  PowerShell durability contract FAIL이었다. 두 Python 실패는 heartbeat가 빠진 테스트
+  fixture와 같은 runner 프로세스 안의 즉시 재진입이 종료 전 runner PID와 일치한
+  회귀 설계 문제이고, PowerShell 실패는 script 호출 뒤 미설정 `$LASTEXITCODE` 참조다.
+  실제 GPU/서비스/E2는 0이며 수정·재검증 전까지 P0 완료로 승격하지 않는다.
+- compact 직후 지정 SSoT 5종을 순서대로 전체 재독하고 goal active,
+  HEAD=origin/main `e93d552`, Python trainer/durable runner 0을 read-only로 확인했다.
+  E2 adapter/report·T3 manifest/output·durable run directory는 없고 기존 E2 로그 2개만
+  각 0 bytes다. GPU·서비스 실행은 0이다.
+- worktree에는 15:37 P0 intent 뒤 만들어진 trainer/checkpoint/runner 부분 구현
+  2 modified + 3 untracked만 존재한다. live state에 남아 있던 pre-milestone
+  HEAD/worktree와 다음 행동을 관측 사실로 정정했으며, exact 인터페이스 통합과
+  offline 회귀가 끝날 때까지 P0-A/P0-B와 E2 gate는 미완료로 유지한다.
+
 ## 2026-08-22 코덱스 PC goal 재개 + P0 내구성 게이트 (intent)
 
 - 사용자 `/goal` 명령으로 기존 pause가 해제됐고 goal은 `active`다. 저장소 구현,

@@ -3,7 +3,8 @@
 갱신: 2026-08-22 KST (파일명은 현행 GPU SSoT 식별자로 유지)
 
 상태: **ACTIVE — E1 완료·미채택, E2 저장 산출물 0, merge/package 0,
-v4 T3 0, live campaign 0; E2 전 P0 전원 종료 내구성 구현·실증 중**
+v4 T3 0, live campaign 0; P0-A offline 구현·독립 감사 완료,
+P0-B controlled GPU 동등성·10분 checkpoint 실측 대기**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
@@ -301,17 +302,29 @@ manifest/output, live campaign output은 모두 0이었다. 15:09 KST goal resum
 확인했다. focused/full offline/reference 회귀와 diff/security 검증, 독립 재감사는
 P0/P1 0이었다. GPU·서비스·E2 실행은 이 milestone에서 0이다.
 
+2026-08-22 P0-A offline implementation receipt: trainer full-state/RNG/order/loss/pins,
+same-volume staged flush/verify/write-through generation+index, latest/previous와 corrupt
+quarantine, final adapter/report recovery, exact resume handshake, durable run-state/PID,
+safe-pause/`SAFE_TO_POWER_OFF`, reboot duplicate refusal를 구현했다. CPU uninterrupted 대
+pause/resume는 LoRA/AdamW/LambdaLR/RNG/cursor/loss가 exact이며, generation/index/final
+artifact/control archive/N+2 retention, reparse/mapped/corrupt state fault를 포함한 focused
+Python `39 passed, 1 skipped`, actual-process PowerShell PASS, 전체 offline checkpoint PASS.
+최신 독립 감사 P0/P1 0, controlled GPU READY다. 모델/GPU/서비스/E2 실행은 0이며,
+P0-B의 controlled GPU 동등성과 실제 E2 속도 checkpoint ≤10분 실측 전에는 E2 금지다.
+
 ## 8. active goal fail-closed 실행 체크리스트
 
 1. [x] 사용자 `/goal`의 재개 권한과 운영 채택 금지선을 확인했다(2026-08-22).
-2. [ ] **P0-A checkpoint:** 트레이너가 LoRA·optimizer/scheduler·Python/Torch/CUDA RNG·epoch/microstep/
+2. [x] **P0-A checkpoint (offline 구현·fault 실증 완료, 2026-08-22):** 트레이너가 LoRA·optimizer/scheduler·Python/Torch/CUDA RNG·epoch/microstep/
    optimizer step·데이터 순서/seed·loss/dev/best와 dataset/base/config SHA를 주기적으로
    같은 볼륨 임시 경로에 flush·검증하고 원자 승격하도록 구현한다. latest와 직전 정상본을
    유지하고 깨진 checkpoint는 삭제하지 않고 격리한다.
-3. [ ] **P0-B runner/recovery:** exact SHA·seed·config 일치 시에만 허용하는 `--resume-from-checkpoint`, 원자적
+3. [~] **P0-B runner/recovery:** exact SHA·seed·config 일치 시에만 허용하는 `--resume-from-checkpoint`, 원자적
    `run-state.json` durable runner, optimizer 경계 safe-pause와 `SAFE_TO_POWER_OFF`,
    PID/command/checkpoint SHA 기반 재부팅 복구를 자동 회귀와 통제 GPU 실험으로 증명한다.
-   실제 E2 속도 checkpoint 간격은 전원 종료 손실 상한 10분 이하로 고정한다.
+   CPU exact resume와 offline actual-process runner/safe-pause/reboot fault는 완료했다.
+   controlled GPU 동등성과 실제 E2 속도 checkpoint 간격을 전원 종료 손실 상한 10분
+   이하로 실측·고정하는 단계가 남았다.
 4. [ ] preflight에서 입력 코드·데이터가 clean인지 확인한다. live heartbeat로 생긴
    `AIRI-WORKING-STATE.md` 단독 diff만 별도 검토 후 제외할 수 있고 다른 tracked/untracked
    변경은 금지한다. trainer 0, corpus source/chat SHA, base model SHA, E1 SHA,

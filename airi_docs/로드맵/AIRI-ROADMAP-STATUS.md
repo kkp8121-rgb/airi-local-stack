@@ -11,7 +11,8 @@
 > 저장소 구현·GPU 학습·모델 병합/패키징·로컬 서비스·T3·장시간 캠페인과
 > 검증된 milestone commit/push가 승인됐다. 운영 채택과 기본 모델 변경은 별도
 > 사용자 승인 전까지 금지한다. E1 adapter/report만 존재하고 E2·후속 산출물은 0이며,
-> E2보다 먼저 P0 전원 종료 내구성 계층을 구현·실증한다.
+> P0-A offline 구현·fault 실증과 독립 P0/P1 0 감사는 완료됐고, E2보다 먼저
+> P0-B controlled GPU 동등성·실제 속도 10분 checkpoint 상한을 실증한다.
 > `goal_status=active`; `adoption_authorized=false`;
 > `execution_order=P0_A>P0_B>E2_LAUNCH>E2_PROVENANCE>PACKAGE>T3_36>CAMPAIGN_3X500>USER_DECISION`
 
@@ -317,10 +318,11 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
 - [x] 공식 방송 event reference 30건·continuity arc 7건과 v4 1,000행 SHA 고정
 - [x] E1 QLoRA 및 adapter/report provenance 검증
 - [x] 사용자 `/goal` 재개 권한과 운영 채택 금지선 확인
-- [ ] **P0-A:** checkpoint를 E2보다 먼저 구현: 전체 학습/RNG/순서/loss/provenance 상태, 같은 볼륨
+- [x] **P0-A (2026-08-22 offline 완료):** checkpoint를 E2보다 먼저 구현: 전체 학습/RNG/순서/loss/provenance 상태, 같은 볼륨
   원자 승격·latest/previous 회전·깨진 checkpoint 격리 구현 및 회귀
-- [ ] **P0-B:** exact-pin resume와 중단/재개 동등성, durable runner/run-state, safe pause,
-  PID/command/checkpoint SHA 재부팅 복구, 실제 E2 속도 손실 상한 10분 이하 실증
+- [~] **P0-B:** exact-pin CPU 중단/재개 동등성, durable runner/run-state, safe pause,
+  PID/command/checkpoint SHA 재부팅 복구의 offline 실증은 완료. controlled GPU 동등성과
+  실제 E2 속도 손실 상한 10분 이하 실측이 남음
 - [ ] preflight: live-state 단독 diff를 제외한 입력 code/data clean, trainer 0,
   corpus/base/E1 SHA exact, E2 산출물 부재 재확인
 - [ ] **E2-LAUNCH:** P0 receipt의 authoritative durable runner로만 seed 42·1,600

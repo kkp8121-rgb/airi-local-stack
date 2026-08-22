@@ -332,9 +332,157 @@ class CpuSmokeTests(unittest.TestCase):
         adapter_dir = Path(summary["adapter_dir"])
         self.assertTrue(adapter_dir.name.endswith("-SMOKE"))
         self.assertTrue((adapter_dir / "adapter_config.json").is_file())
+        self.assertTrue((adapter_dir / "artifact-manifest.json").is_file())
+        self.assertRegex(summary["adapter_artifact_manifest_sha256"], r"^[0-9a-f]{64}$")
 
         with self.assertRaises(trainer.BehaviorTrainingError):
             trainer.run_training(args)
+
+    def test_cpu_uninterrupted_and_safe_pause_resume_are_exact(self) -> None:
+        import torch
+        from safetensors.torch import load_file
+
+        def arguments(name: str, run_id: str, resume: Path | None = None):
+            values = [
+                "--dataset", str(self.dataset), "--dataset-sha256", self.sha,
+                "--model-dir", str(self.model_dir),
+                "--output", str(self.tmp / name), "--mode", "cpu-smoke",
+                "--max-steps", "8", "--batch-size", "2",
+                "--gradient-accumulation", "2", "--run-id", run_id,
+                "--run-dir", str(self.tmp / f"{name}-run"),
+                "--checkpoint-every-optimizer-steps", "1",
+            ]
+            if resume is not None:
+                values.extend(("--resume-from-checkpoint", str(resume)))
+            return trainer.build_parser().parse_args(values)
+
+        def latest_state(run_dir: Path):
+            index = json.loads(
+                (run_dir / "checkpoints" / "checkpoint-index.json").read_text())
+            generation = index["latest"]["relative_path"]
+            return torch.load(
+                run_dir / "checkpoints" / generation / "state.pt",
+                map_location="cpu", weights_only=False)
+
+        def assert_equal(left, right, path: str = "state") -> None:
+            if isinstance(left, torch.Tensor):
+                self.assertTrue(
+                    torch.equal(left, right), f"tensor mismatch at {path}")
+            elif isinstance(left, dict):
+                self.assertEqual(set(left), set(right), f"keys mismatch at {path}")
+                for key in left:
+                    assert_equal(left[key], right[key], f"{path}.{key}")
+            elif isinstance(left, (list, tuple)):
+                self.assertEqual(len(left), len(right), f"length mismatch at {path}")
+                for index, (left_item, right_item) in enumerate(zip(left, right)):
+                    assert_equal(left_item, right_item, f"{path}[{index}]")
+            else:
+                self.assertEqual(left, right, f"value mismatch at {path}")
+
+        uninterrupted_args = arguments("exact-uninterrupted", "exact-run-a")
+        uninterrupted = trainer.run_training(uninterrupted_args)
+
+        resumed_args = arguments("exact-resumed", "exact-run-b")
+        control = resumed_args.run_dir / "control"
+        control.mkdir(parents=True)
+        trainer.atomic_json(control / "pause.request.json", {
+            "schema_version": "airi.behavior-pause-request.v1",
+            "run_id": "exact-run-b", "request_id": "pause-exact-001",
+        })
+        with self.assertRaises(trainer.PauseRequested) as paused:
+            trainer.run_training(resumed_args)
+        self.assertEqual(paused.exception.code, 75)
+        paused_index = json.loads(
+            (resumed_args.run_dir / "checkpoints" / "checkpoint-index.json").read_text())
+        resume_path = (resumed_args.run_dir / "checkpoints" /
+                       paused_index["latest"]["relative_path"])
+        resumed = trainer.run_training(
+            arguments("exact-resumed", "exact-run-b", resume_path))
+        accepted = json.loads((control / "resume.accepted.json").read_text())
+        self.assertEqual(accepted["request_id"], "pause-exact-001")
+        self.assertEqual(accepted["checkpoint_relative_path"], resume_path.name)
+        self.assertTrue((control / "pause.request.json").is_file())
+        self.assertTrue((control / "pause.ack.json").is_file())
+
+        uninterrupted_comparable = dict(uninterrupted)
+        resumed_comparable = dict(resumed)
+        uninterrupted_comparable.pop("adapter_dir")
+        resumed_comparable.pop("adapter_dir")
+        uninterrupted_manifest_sha = uninterrupted_comparable.pop(
+            "adapter_artifact_manifest_sha256")
+        resumed_manifest_sha = resumed_comparable.pop(
+            "adapter_artifact_manifest_sha256")
+        self.assertEqual(uninterrupted_comparable, resumed_comparable)
+
+        uninterrupted_manifest_path = (
+            self.tmp / "exact-uninterrupted-SMOKE" / "artifact-manifest.json")
+        resumed_manifest_path = (
+            self.tmp / "exact-resumed-SMOKE" / "artifact-manifest.json")
+        self.assertEqual(
+            hashlib.sha256(uninterrupted_manifest_path.read_bytes()).hexdigest(),
+            uninterrupted_manifest_sha)
+        self.assertEqual(
+            hashlib.sha256(resumed_manifest_path.read_bytes()).hexdigest(),
+            resumed_manifest_sha)
+        uninterrupted_manifest = json.loads(
+            uninterrupted_manifest_path.read_text(encoding="utf-8"))
+        resumed_manifest = json.loads(
+            resumed_manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(uninterrupted_manifest.pop("run_id"), "exact-run-a")
+        self.assertEqual(resumed_manifest.pop("run_id"), "exact-run-b")
+        self.assertEqual(uninterrupted_manifest, resumed_manifest)
+
+        uninterrupted_tensors = load_file(
+            str(self.tmp / "exact-uninterrupted-SMOKE" / "adapter_model.safetensors"))
+        resumed_tensors = load_file(
+            str(self.tmp / "exact-resumed-SMOKE" / "adapter_model.safetensors"))
+        assert_equal(uninterrupted_tensors, resumed_tensors, "adapter")
+
+        uninterrupted_state = latest_state(uninterrupted_args.run_dir)
+        resumed_state = latest_state(resumed_args.run_dir)
+        uninterrupted_state.pop("run_id")
+        resumed_state.pop("run_id")
+        assert_equal(uninterrupted_state, resumed_state)
+
+    def test_cpu_resume_full_pin_mismatch_preserves_live_pause_evidence(self) -> None:
+        def arguments(resume: Path | None = None):
+            values = [
+                "--dataset", str(self.dataset), "--dataset-sha256", self.sha,
+                "--model-dir", str(self.model_dir),
+                "--output", str(self.tmp / "pin-mismatch"), "--mode", "cpu-smoke",
+                "--max-steps", "8", "--batch-size", "2",
+                "--gradient-accumulation", "2", "--run-id", "pin-mismatch-run",
+                "--run-dir", str(self.tmp / "pin-mismatch-run-dir"),
+                "--checkpoint-every-optimizer-steps", "1",
+            ]
+            if resume is not None:
+                values.extend(("--resume-from-checkpoint", str(resume)))
+            return trainer.build_parser().parse_args(values)
+
+        initial = arguments()
+        control = initial.run_dir / "control"
+        control.mkdir(parents=True)
+        trainer.atomic_json(control / "pause.request.json", {
+            "schema_version": "airi.behavior-pause-request.v1",
+            "run_id": "pin-mismatch-run", "request_id": "pin-mismatch-pause",
+        })
+        with self.assertRaises(trainer.PauseRequested):
+            trainer.run_training(initial)
+        index = json.loads(
+            (initial.run_dir / "checkpoints" / "checkpoint-index.json").read_text())
+        resume_path = (initial.run_dir / "checkpoints" /
+                       index["latest"]["relative_path"])
+        extra_tokenizer_pin = self.model_dir / "token-durability-probe.txt"
+        try:
+            extra_tokenizer_pin.write_text("changed after checkpoint\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                    trainer.BehaviorTrainingError, "checkpoint exact pins mismatch"):
+                trainer.run_training(arguments(resume_path))
+        finally:
+            extra_tokenizer_pin.unlink(missing_ok=True)
+        self.assertTrue((control / "pause.request.json").is_file())
+        self.assertTrue((control / "pause.ack.json").is_file())
+        self.assertFalse((control / "resume.accepted.json").exists())
 
     def test_cuda_mode_refuses_a_gpu_less_box(self) -> None:
         import torch
