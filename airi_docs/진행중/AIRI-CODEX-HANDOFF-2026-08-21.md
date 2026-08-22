@@ -296,6 +296,11 @@ manifest/output, live campaign output은 모두 0이었다. 15:09 KST goal resum
 같은 HEAD 위 기존 문서 배치 9 modified + 2 untracked, trainer/Python 0, 동일 SHA exact와
 동일 후속 산출물 0을 재확인했다.
 
+2026-08-22 continuity milestone receipt: active goal/P0-before-E2 문서·회귀 배치를
+`e822f9f120e27e561d2e90353da4ba8315e4e3dd`로 commit했고 origin/main push를
+확인했다. focused/full offline/reference 회귀와 diff/security 검증, 독립 재감사는
+P0/P1 0이었다. GPU·서비스·E2 실행은 이 milestone에서 0이다.
+
 ## 8. active goal fail-closed 실행 체크리스트
 
 1. [x] 사용자 `/goal`의 재개 권한과 운영 채택 금지선을 확인했다(2026-08-22).

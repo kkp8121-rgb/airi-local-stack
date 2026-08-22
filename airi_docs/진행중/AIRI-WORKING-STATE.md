@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-22 15:28:35 +09:00"
-checkpoint_id: "20260822-1528-staged-batch-receipt"
+updated_at_kst: "2026-08-22 15:30:26 +09:00"
+checkpoint_id: "20260822-1530-receipt-doc-validation"
 goal_status: "active"
 authorization: "repo-gpu-package-test-commit-push; operational-adoption-forbidden"
 active_phase: "milestone-1-documentation-durability-audit"
-git_head: "0c0ffbe6a90e2ddbb911c1ca17d470f367ee9ddd"
-worktree_state: "dirty-9-modified-2-untracked-documentation-batch"
+git_head: "e822f9f120e27e561d2e90353da4ba8315e4e3dd"
+worktree_state: "dirty-working-state-after-successful-push"
 active_trainer_count: 0
 ---
 
@@ -35,17 +35,28 @@ active_trainer_count: 0
 
 | 항목 | 값 |
 |---|---|
-| 의도 | 기존 미커밋 문서·지속성 배치를 active goal과 E2 전 P0 내구성 게이트에 맞춰 정정·검증하고 첫 milestone으로 commit/push |
+| 의도 | 첫 문서·지속성 milestone push receipt를 장기 SSoT 5종에 기록하고 receipt commit/push 후 P0 구현으로 전환 |
 | 허용 범위 | 이 milestone은 저장소 문서·오프라인 계약 테스트·Git commit/push만 수행; GPU·서비스·E2는 P0 구현·실증 전 실행 금지 |
 | 시작 전 증거 | goal `active`; HEAD `0c0ffbe`; 9 modified + 2 untracked; trainer 0; corpus/base/E1 SHA exact; E2와 후속 산출물 0 |
-| exact 명령 | 최종 `.\test-airi-work-continuity.ps1`와 `git diff --check -- . ':(exclude)airi_docs/patches/*.patch'`; `git add -- AGENTS.md NEXT-SESSION.md airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md airi_docs/로드맵/AIRI-ROADMAP-LOG.md airi_docs/로드맵/AIRI-ROADMAP-STATUS.md airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-08-20.md airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-08-21.md airi_docs/진행중/AIRI-WORKING-STATE.md airi_docs/참조/AIRI-KR-BROADCAST-REGISTER-REFERENCE-2026-08-21.md test-airi-work-continuity.ps1 test-current-checkpoint.ps1`; `git commit -m "docs: harden long-goal continuity"`; `git push origin main` |
-| 출력 경로 | 추적 문서·계약 테스트만 Git에 반영; 모델·로그·런타임 산출물은 생성하거나 Git에 추가하지 않음 |
-| 완료 조건 | active/P0 순서 문서 정합, focused/full offline PASS, whitespace 오류 0, 금지 데이터 0, origin/main push receipt |
-| 중단·복구 | 테스트/검토 실패 시 commit/push하지 않고 실패 receipt 기록; quota/PC 중단 시 이 intent와 실제 Git 상태부터 재대조 |
-| 현재 행동 | exact 11-file stage/cached diff-check PASS — state receipt 재stage 후 commit/push |
+| exact 명령 | `.\test-airi-work-continuity.ps1`; `git diff --check -- . ':(exclude)airi_docs/patches/*.patch'`; `git add -- airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md airi_docs/로드맵/AIRI-ROADMAP-LOG.md airi_docs/로드맵/AIRI-ROADMAP-STATUS.md airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-08-21.md airi_docs/진행중/AIRI-WORKING-STATE.md`; `git commit -m "docs: record continuity milestone receipt"`; `git push origin main` |
+| 출력 경로 | SSoT receipt 문서 5개만 Git에 반영; 모델·로그·런타임 산출물 생성 0 |
+| 완료 조건 | receipt 문서 focused/diff-check PASS, receipt commit이 origin/main과 일치, worktree clean |
+| 중단·복구 | commit/push 실패 시 e822f9f 본체 push는 완료 상태로 보존하고 receipt 문서만 재개 |
+| 현재 행동 | 5-file receipt focused/diff-check PASS — exact receipt commit/push 실행 |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260822-1530-receipt-doc-validation`: push receipt를 SSoT 5종에 반영한 뒤
+  focused continuity exit 0/PASS, repo 기본 diff-check exit 0/출력 0, untracked 0.
+  exact 5-file stage와 receipt commit/push를 실행한다.
+- `20260822-1529-milestone-push-receipt-intent`: `git push origin main` exit 0,
+  `0c0ffbe..e822f9f`, HEAD와 origin/main이 모두
+  `e822f9f120e27e561d2e90353da4ba8315e4e3dd`. 첫 milestone 본체 push는 완료됐다.
+  이 사실을 SSoT 5종에 기록해 receipt commit/push한 뒤 P0 구현으로 이동한다.
+- `20260822-1529-milestone-commit-receipt`: `git commit -m "docs: harden long-goal
+  continuity"` exit 0. commit `e822f9f120e27e561d2e90353da4ba8315e4e3dd`, 11 files,
+  645 insertions/54 deletions, 신규 live state와 continuity test 2개. commit 직후
+  worktree clean, `main`은 origin/main보다 1 ahead였으며 다음 명령은 exact push다.
 - `20260822-1528-staged-batch-receipt`: exact 11개 검토 파일만 `git add`; staged
   diff-check exit 0/출력 0, unstaged 0, untracked 0, 총 642 insertions/54 deletions.
   이 receipt를 재stage한 뒤 동일 commit 명령을 실행한다.

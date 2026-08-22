@@ -4,6 +4,7 @@
 지속성 프로토콜, E2 전 P0 전원 종료 내구성 게이트, event reference 30건·
 continuity arc 7건 정합, E1 QLoRA 완료, E2 처음부터 재실행 명령, isolated T3
 36-run 및 승자 3×500 fail-closed 체크리스트 확정).
+continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
 직전 현행화 2026-08-20 (클로드 PC — 17커밋 배치 산출 문서 6종 등록:
 인계문 신설·근거 계약 2종·토큰 예산·GLiNER 실측·추출 검수 폼).
 직전 현행화 2026-08-19 (로드맵 v3 개편 + 레거시 정리: 이동 22건 전부

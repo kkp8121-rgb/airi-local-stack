@@ -30,6 +30,9 @@
 - focused continuity PASS, 전체 offline checkpoint PASS(19.06초), 핀된 Python 3.12의
   reference/pilot 회귀 7/7 PASS, repo 기본 `git diff --check` exit 0, secret/금지
   산출물 hit 0. 독립 재감사 P0/P1 0, READY로 첫 milestone commit을 승인했다.
+- 첫 milestone 본체를 `e822f9f120e27e561d2e90353da4ba8315e4e3dd`
+  (`docs: harden long-goal continuity`)로 commit하고 `origin/main` push를 확인했다.
+  이 배치에서 GPU·서비스·E2 실행과 운영 모델 변경은 0이다.
 
 ## 2026-08-22 코덱스 PC 문서 배치 (paused checkpoint + 재개 체크리스트)
 

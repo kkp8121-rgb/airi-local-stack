@@ -312,7 +312,8 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
 
 ### v4 active fail-closed 체크리스트 (2026-08-22)
 
-- [x] live working-state와 60분 heartbeat·intent/receipt·재독/대조 프로토콜 도입
+- [x] live working-state와 60분/장기작업 15분 heartbeat·intent/receipt·재독/대조
+  프로토콜 도입 — `e822f9f` origin/main push(2026-08-22), 독립 P0/P1 0
 - [x] 공식 방송 event reference 30건·continuity arc 7건과 v4 1,000행 SHA 고정
 - [x] E1 QLoRA 및 adapter/report provenance 검증
 - [x] 사용자 `/goal` 재개 권한과 운영 채택 금지선 확인
