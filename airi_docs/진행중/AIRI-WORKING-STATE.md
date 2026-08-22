@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-22 18:43:02 +09:00"
-checkpoint_id: "20260822-184302-p0b-receipt-doc-staged"
+updated_at_kst: "2026-08-22 18:45:52 +09:00"
+checkpoint_id: "20260822-184552-p0b-final-receipt-staged"
 goal_status: "active"
 authorization: "repo-gpu-package-test-commit-push; operational-adoption-forbidden"
 active_phase: "p0-controlled-gpu-validation"
-git_head: "e970cf7e4c3a4685fd8bce23c659a1c9aa93c21e"
-worktree_state: "staged-six-doc-receipt-batch-before-receipt-restage"
+git_head: "74d8999bdfba7cc1bf45749b9e110379853b8bac"
+worktree_state: "staged-two-doc-final-receipt-before-working-restage"
 active_trainer_count: 0
 ---
 
@@ -41,17 +41,43 @@ active_trainer_count: 0
 
 | 항목 | 값 |
 |---|---|
-| 의도 | origin/main에 push된 P0-B evidence gate implementation receipt를 장기 SSoT 6종에 반영하고 별도 docs receipt로 commit/push한다. |
-| 허용 범위 | WORKING-STATE, 현행 handoff, roadmap status/log, NEXT, 문서 인덱스의 receipt 갱신과 offline 문서 검증만 허용; GPU·서비스·E2 실행 금지 |
-| 시작 전 증거 | goal active; HEAD=origin/main `e970cf7`; AIRI trainer/runner 0; 고정 입력/E1 SHA exact; E2/T3/campaign 0; 기존 E2 로그 각 0 bytes; 시작 worktree는 receipt 문서 2개만 dirty |
-| exact 명령 | SSoT 6종 갱신 뒤 `test-airi-work-continuity.ps1`, repo 기본 `git diff --check`, exact 6-doc boundary·금지 파일명·비밀 값 형태 scan; PASS 시 exact stage, staged boundary/diff-check, `git commit -m "docs: record GPU equivalence gate receipt"`, `git push origin main` |
-| 출력 경로 | Git tracked 문서 6종만. 모델·GPU runtime 산출물과 로그 본문은 생성하거나 Git에 넣지 않는다. |
-| 완료 조건 | P0-B evidence gate `e970cf7` push, offline `68 passed, 1 skipped`, PowerShell PASS, full checkpoint PASS, 독립 감사 P0/P1 0과 controlled GPU 미실행 상태가 6종에 일치하고 docs receipt가 origin/main에 push됨 |
-| 중단·복구 | quota/PC 중단은 마지막 정상 `e970cf7`과 문서 diff에서 재개한다. docs commit/push 전에는 controlled GPU/E2를 시작하지 않는다. |
-| 현재 행동 | exact 6-doc stage와 cached diff-check가 PASS했다. 이 stage receipt를 WORKING-STATE와 roadmap log에 기록해 두 파일을 재stage한 뒤 동일 6/0/0 경계를 확인하고 docs receipt commit을 실행한다. |
+| 의도 | P0-B gate SSoT receipt commit `74d8999`의 actual push 성공을 durable하게 기록하고 clean GPU preflight 경계를 만든다. |
+| 허용 범위 | WORKING-STATE와 roadmap log의 push receipt 갱신·offline 문서 검증만 허용; GPU·서비스·E2 실행 금지 |
+| 시작 전 증거 | `git push origin main` exit 0, `e970cf7..74d8999 main -> main`; HEAD=origin/main `74d8999`; AIRI trainer/runner 0; post-push receipt 문서 2개만 dirty |
+| exact 명령 | 두 문서 갱신 뒤 focused continuity와 repo 기본 diff-check, exact 2-doc boundary 확인; PASS 시 exact stage/cached diff-check, `git commit -m "docs: record P0-B gate push"`, `git push origin main` |
+| 출력 경로 | Git tracked WORKING-STATE와 roadmap log만. GPU runtime 산출물·로그 본문은 생성하지 않는다. |
+| 완료 조건 | actual `74d8999` push receipt가 두 SSoT에 보존되고 final receipt commit이 origin/main에 push되어 worktree clean, AIRI trainer/runner 0 |
+| 중단·복구 | quota/PC 중단은 origin/main `74d8999`과 두 문서 diff에서 재개한다. final receipt push 전에는 controlled GPU/E2를 시작하지 않는다. |
+| 현재 행동 | exact 2-doc stage와 cached diff-check가 PASS했다. WORKING-STATE의 stage receipt를 재stage한 뒤 동일 2/0/0 경계를 확인하고 final receipt commit을 실행한다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260822-184552-p0b-final-receipt-staged`: exact 2-doc `git add` exit 0.
+  staged 2, unstaged 0, untracked 0, cached diff-check exit 0이다. 이 WORKING-STATE
+  stage receipt만 재stage하고 동일 2/0/0과 cached diff-check를 확인한 뒤 exact
+  `git commit -m "docs: record P0-B gate push"`를 실행한다. commit 실패 시
+  push/GPU/E2를 실행하지 않고 staged 배치에서 복구한다.
+- `20260822-184529-p0b-final-receipt-validation`: actual `74d8999` push receipt의
+  변경 경로 exact 2, boundary diff 0, untracked 0, focused continuity exit 0/PASS,
+  repo 기본 diff-check exit 0/whitespace error 0이다. 다음은 두 문서만 exact stage하고
+  staged 2·unstaged 0·untracked 0 및 cached diff-check를 확인한 뒤 기록된 final receipt
+  commit/push를 수행한다. 실패하면 controlled GPU/E2를 시작하지 않는다.
+- `20260822-184446-p0b-receipt-doc-pushed`: exact `git push origin main` exit 0,
+  `e970cf7..74d8999 main -> main`. 이후 HEAD=origin/main
+  `74d8999bdfba7cc1bf45749b9e110379853b8bac`, AIRI trainer/runner 0이고
+  post-commit receipt용 WORKING-STATE와 roadmap log 두 파일만 dirty다. P0-B evidence
+  gate code와 장기 SSoT receipt는 origin/main에 durable하다. controlled GPU paired run과
+  실제 E2 속도 ≤600초 실측은 여전히 0이므로 P0-B/E2 완료로 승격하지 않는다. 이 actual
+  push receipt 두 문서를 focused 검증·final receipt commit/push해 clean GPU preflight
+  경계를 만든다.
+- `20260822-184352-p0b-receipt-doc-commit-push-intent`: 재stage 뒤 staged 6,
+  unstaged 0, untracked 0, cached diff-check exit 0 상태에서 exact
+  `git commit -m "docs: record GPU equivalence gate receipt"` exit 0. commit
+  `74d8999bdfba7cc1bf45749b9e110379853b8bac`, 6 files, 107 insertions/
+  32 deletions이다. commit 직후 worktree clean, local main은 origin/main
+  `e970cf7`보다 1 ahead다. 다음 exact 상태 변경은 `git push origin main`; 실패 시
+  이 commit과 post-commit receipt 문서를 보존하고 controlled GPU/E2를 실행하지 않는다.
+  성공 뒤 HEAD=origin/main·AIRI PID 0을 대조한 뒤 controlled GPU intent를 별도로 쓴다.
 - `20260822-184302-p0b-receipt-doc-staged`: exact 6-doc `git add` exit 0.
   staged 6, unstaged 0, untracked 0, cached diff-check exit 0이고 최초 staged 통계는
   99 insertions/32 deletions다. 이 receipt를 담은 WORKING-STATE와 roadmap log만

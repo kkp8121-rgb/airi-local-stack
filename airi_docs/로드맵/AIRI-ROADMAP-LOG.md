@@ -9,6 +9,14 @@
 
 ## 2026-08-22 P0-B 독립 감사·compact 복구 정정
 
+- docs receipt push 성공: `e970cf7..74d8999 main -> main`, HEAD=origin/main
+  `74d8999`, AIRI trainer/runner 0이다. 이 actual push receipt 두 문서를 final
+  focused 검증·commit/push해 clean GPU preflight 경계를 만들기 전에는 controlled
+  GPU/E2를 시작하지 않는다.
+- docs receipt commit 성공: `74d8999bdfba7cc1bf45749b9e110379853b8bac`
+  (`docs: record GPU equivalence gate receipt`), 6 files, 107 insertions/32 deletions.
+  직후 worktree clean, local main은 origin/main보다 1 ahead다. exact push 성공 전에는
+  controlled GPU/E2를 시작하지 않는다.
 - exact 6-doc stage exit 0, staged 6·unstaged 0·untracked 0, cached diff-check PASS다.
   stage receipt 두 문서를 재stage·재검증한 뒤 docs receipt commit/push를 수행한다.
 - P0-B gate actual push receipt를 SSoT 6종에 반영한 뒤 continuity PASS, exact
