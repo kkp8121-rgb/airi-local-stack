@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 07:34:42 +09:00"
-checkpoint_id: "20260823-073442-controlled-gpu-milestone-staged-commit-intent"
+updated_at_kst: "2026-08-23 07:36:56 +09:00"
+checkpoint_id: "20260823-073656-controlled-gpu-commit-receipt-docs-pass-stage-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "controlled-gpu-k3-pass-milestone-docs-precommit"
-git_head: "0454ca8d9df9239cf7d6c063e5ed751235fb2ed1"
-worktree_state: "staged-exact7-unstaged-untracked-0"
+active_phase: "controlled-gpu-k3-pass-receipt-docs-prepush"
+git_head: "87dfabdfa482a22694cdc343d8ec938d979b9665"
+worktree_state: "modified-exact2-working-log; staged-untracked-0; local-ahead-1"
 active_trainer_count: 0
 ---
 
@@ -43,17 +43,36 @@ active_trainer_count: 0
 
 | 항목 | 값 |
 |---|---|
-| 의도 | controlled GPU K3 PASS와 Windows verifier receipt-order 최소 수정/검증을 milestone docs와 함께 commit/push한다. |
-| 허용 범위 | verifier/test exact 2개와 WORKING/handoff/roadmap status/log/NEXT exact 5개. 외부 GPU root는 immutable, E2/서비스는 금지 |
-| 시작 전 증거 | GPU equivalence receipt 48,323 bytes SHA `d913992e...e84b9` PASS, targeted/suite/actual verifier/final offline/diff-security PASS, 관련 PID 0. |
-| exact 변경 | verifier row 정렬 한 줄을 producer platform `Path` 순서에 맞추고 uppercase README targeted 회귀 1건 추가; 다섯 SSoT를 actual receipt로 갱신. |
-| 출력 경로 | Git에는 code/test/docs만. 모델/adapter/checkpoint/receipt/log는 외부 root에 유지하고 stage하지 않는다. |
-| 완료 조건 | focused continuity, exact 7-path boundary/diff/security, staged 7/unstaged·untracked 0, cached PASS, Conventional Commit/push, HEAD=origin/main·clean·PID 0. |
-| 중단·복구 | 검증/stage/commit/push 실패 시 현재 diff/local commit을 보존하고 E2를 시작하지 않는다. 같은 GPU run/verifier를 반복하지 않는다. |
-| 현재 행동 | 다섯 milestone SSoT를 controlled GPU PASS와 verifier fix receipt에 맞춰 정리한다. 문서 인덱스는 변경하지 않는다. |
+| 의도 | controlled GPU milestone commit `87dfabd` receipt를 WORKING/LOG에 기록하고 docs commit 뒤 두 commit을 origin/main에 push한다. |
+| 허용 범위 | WORKING-STATE와 roadmap log exact 2개만. 외부 GPU root와 committed code/test/다른 SSoT는 immutable, E2/서비스는 금지 |
+| 시작 전 증거 | main commit `87dfabdfa482a22694cdc343d8ec938d979b9665`, parent `0454ca8`, 7 files, worktree clean/local ahead 1, 관련 PID 0. |
+| exact 변경 | 두 문서에 actual commit SHA·검증 receipt·push intent만 추가한다. 새 코드/기능/감사는 없다. |
+| 출력 경로 | Git docs exact 2개만. 모델/adapter/checkpoint/receipt/log는 외부 root에 유지하고 stage하지 않는다. |
+| 완료 조건 | focused continuity, exact 2-path boundary/diff/security, staged 2/unstaged·untracked 0, cached PASS, docs commit, push, HEAD=origin/main·clean·PID 0. |
+| 중단·복구 | docs 검증/commit/push 실패 시 local commit과 docs diff를 보존하고 E2를 시작하지 않는다. 같은 GPU run/verifier를 반복하지 않는다. |
+| 현재 행동 | `87dfabd` commit receipt 두 문서를 검증·commit한 뒤 origin/main에 push한다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260823-073656-controlled-gpu-commit-receipt-docs-pass-stage-intent`: main commit
+  receipt용 WORKING/LOG exact 2개는 focused continuity exit 0/literal PASS, boundary/staged/
+  untracked 0, repo diff-check exit 0/expected warning 2줄이다. forbidden artifact/binary/
+  oversize/credential·민감 literal/개인 경로 hit 0, 관련 PID 0, 총 530,687 bytes, manifest
+  `15c145f824239e354b82e7bc7902d0bcca10449a91f4b53d28fb7fa20086d781`다. 이 receipt로
+  WORKING bytes가 바뀌므로 exact 두 문서만 stage하고 staged 2/unstaged·untracked 0,
+  cached diff/security를 검증한다. PASS하면 `docs: record controlled GPU milestone commit`
+  commit을 실행하고 두 local commit을 push한다. 실패하면 stage/local commits를 보존하고
+  E2를 금지한다.
+- `20260823-073549-controlled-gpu-milestone-commit-receipt-docs-intent`: WORKING receipt
+  restage 뒤 staged 7/unstaged·untracked 0, cached diff/security PASS에서 exact
+  `git commit -m "fix: verify Windows GPU artifact order"` exit 0이다. commit은
+  `87dfabdfa482a22694cdc343d8ec938d979b9665`, parent
+  `0454ca8d9df9239cf7d6c063e5ed751235fb2ed1`, 7 files, 624 insertions/84 deletions이다.
+  commit 직후 worktree clean, local main은 origin/main보다 1 ahead, 관련 PID 0이다. 이
+  receipt용 WORKING-STATE와 roadmap log exact 2개만 갱신해 focused continuity/boundary/
+  diff/security와 stage/cached PASS 뒤 `docs: record controlled GPU milestone commit`으로
+  commit한다. 이어 두 local commit을 exact `git push origin main`으로 push하며 실패하면
+  local commits/docs를 보존하고 E2를 금지한다.
 - `20260823-073442-controlled-gpu-milestone-staged-commit-intent`: receipt 기록 전 final
   exact 7-path pre-stage 검사는 exit 0, boundary/staged/untracked 0, diff/security hit 0,
   총 737,165 bytes, manifest `cba054a7...c1e2b1`이다. exact `git add --` exit 0 뒤
@@ -3170,12 +3189,13 @@ active_trainer_count: 0
 
 ## 4. 다음 허용 행동
 
-1. WORKING-STATE, 현행 handoff, roadmap status/log, NEXT를 actual controlled GPU PASS와
-   verifier fix receipt에 맞춰 정리한다. 문서 인덱스는 변경하지 않는다.
-2. focused continuity와 exact 7-path boundary/repo diff/security를 검증한다.
-3. exact 7경로만 stage하고 staged 7/unstaged·untracked 0, cached diff/security 뒤
-   Conventional Commit/push, actual HEAD=origin/main·clean·PID 0을 확인한다.
-4. 위 milestone push 뒤에만 fresh timestamped E2 run root/input manifest를 준비하고
+1. `87dfabd` actual commit receipt용 WORKING-STATE/roadmap log exact 2개를 focused
+   continuity·boundary·diff/security 뒤 stage/cached 검증한다.
+2. `docs: record controlled GPU milestone commit`으로 commit하고 두 local commit을
+   origin/main에 push한다.
+3. actual push receipt를 장기 state에 durable하게 마감하고 HEAD=origin/main·clean·PID 0을
+   확인한다. 문서 인덱스는 변경하지 않는다.
+4. 위 milestone push/clean 뒤에만 fresh timestamped E2 run root/input manifest를 준비하고
    authoritative durable runner로 seed 42·1,600 microsteps를 step 0부터 시작한다.
 5. direct trainer 실행과 운영 채택/기본 서비스 모델 변경은 계속 금지한다.
 

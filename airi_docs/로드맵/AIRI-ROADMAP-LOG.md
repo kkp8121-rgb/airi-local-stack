@@ -9,6 +9,12 @@
 
 ## 2026-08-23 goal resume·P0 final validation
 
+- 07:35 KST exact 7-path restage 뒤 staged 7/unstaged·untracked 0, cached diff/security
+  PASS에서 `git commit -m "fix: verify Windows GPU artifact order"` exit 0. commit
+  `87dfabdfa482a22694cdc343d8ec938d979b9665`, parent `0454ca8`, 7 files,
+  624 insertions/84 deletions이다. commit 직후 worktree clean/local ahead 1, 관련 PID 0이다.
+  WORKING/LOG exact 2개에 이 receipt를 기록해 focused/cached 검증과 docs commit 뒤 두
+  local commit을 push하며, 실패 시 E2는 금지다.
 - 07:28 KST compact 직후 지정 SSoT 5종을 순서대로 EOF까지 재독하고 actual 상태를
   대조했다. Goal active, HEAD/local·remote origin/main `0454ca8`, actual modified exact 4
   (WORKING/handoff/verifier/test), staged·untracked 0, 관련 AIRI PID/workload 0이다. K3
