@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-22 19:18:44 +09:00"
-checkpoint_id: "20260822-191844-p0b-final-receipt-commit-push-intent"
+updated_at_kst: "2026-08-22 19:53:39 +09:00"
+checkpoint_id: "20260822-195339-p0-safe-pause-auto-discovery-commit-intent"
 goal_status: "active"
 authorization: "repo-gpu-package-test-commit-push; operational-adoption-forbidden"
 active_phase: "p0-controlled-gpu-validation"
-git_head: "248e5481b50658ecd6da6d4bc9675f7ff3971d77"
-worktree_state: "two-final-push-receipt-docs-staged-before-restage"
+git_head: "e3a8819fe2b9edacbb2567bead26ccb8f4086404"
+worktree_state: "eight-staged-before-stage-receipt-restage"
 active_trainer_count: 0
 ---
 
@@ -30,28 +30,72 @@ active_trainer_count: 0
   trainer/runner workload는 0이다.
 - v4 파인튜닝은 E1 adapter/report까지만 완료·검증됐고 아직 미채택이다.
 - E2 adapter/report, merge/package, v4 T3, live campaign 산출물은 0이다.
-- HEAD와 origin/main은 expected gate implementation
-  `8cd69b5f455bd41b48faa5ed6e9cac1af00f8908`로 일치한다. source/chat/base와
+- HEAD와 origin/main은 expected gate final receipt
+  `e3a8819fe2b9edacbb2567bead26ccb8f4086404`로 일치한다. source/chat/base와
   E1 adapter/config/report의 크기·SHA는 고정값과 exact 일치한다. E2 adapter/report/
-  durable run, T3와 campaign은 없고 기존 E2 stdout/stderr는 각 0 bytes다. 현재
-  actual docs push receipt용 WORKING-STATE와 roadmap log만 dirty, staged/untracked 0이며
-  AIRI trainer/runner와 Ollama process는 0이다.
+  durable run, T3와 campaign은 없고 기존 E2 stdout/stderr는 각 0 bytes다. 사용량
+  초기화 후 지정 SSoT를 다시 읽고 19:27 KST actual worktree clean, AIRI
+  trainer/runner 0, 기존 planned P0-B root와 E2 adapter/report 부재를 대조했다.
 
 ## 2. 현재 작업 트랜잭션
 
 | 항목 | 값 |
 |---|---|
-| 의도 | 6개 SSoT receipt commit `248e548`의 actual push를 두 live receipt 문서에 닫아 clean GPU preflight 경계를 만든다. |
-| 허용 범위 | WORKING-STATE와 roadmap log 두 문서만 허용; 코드·GPU·서비스·E2 실행 금지 |
-| 시작 전 증거 | HEAD=origin/main `248e548`; AIRI trainer/runner/Ollama 0; actual `8cd69b5..248e548 main -> main`; 두 receipt 문서만 dirty |
-| exact 명령 | exact 2-doc boundary, continuity/diff/security, stage/cached diff-check, final receipt commit/push |
-| 출력 경로 | 위 2개 Git tracked 문서만. GPU runtime·모델·로그·DB 산출물 0 |
-| 완료 조건 | final receipt commit이 origin/main push되고 HEAD=origin/main, worktree clean, AIRI trainer/runner/Ollama 0 |
-| 중단·복구 | quota/PC 중단 시 origin/main `248e548`과 exact 2-doc diff 또는 staged/local commit 경계를 먼저 대조하고 GPU/E2를 시작하지 않는다. |
-| 현재 행동 | exact 2-doc stage와 cached diff-check가 PASS했다. stage receipt를 재stage·재검증한 뒤 final receipt commit/push한다. |
+| 의도 | `pause-airi-safely.ps1`의 필수 RunDir 입력을 생략 가능하게 하되 정확히 한 개의 검증된 active durable AIRI run만 자동 선택한다. |
+| 허용 범위 | pause script, actual-process PowerShell contract, WORKING-STATE/roadmap log의 offline 구현·회귀만 허용; GPU·서비스·E2 실행 금지 |
+| 시작 전 증거 | HEAD=origin/main `e3a8819`, worktree clean, AIRI trainer/runner 0. pause `60d8fcf1...59cdd` 22,399 B, test `826788f3...017c` 30,311 B |
+| exact 명령 | omitted RunDir의 0/1/multiple/spoof/corrupt-current-valid-previous 회귀를 actual process로 보강; `test-airi-training-durability.ps1`, full offline checkpoint, diff/security/독립 감사 |
+| 출력 경로 | tracked pause/test와 receipt 문서만. system temp synthetic runtime 외 모델/GPU output 0 |
+| 완료 조건 | RunDir 생략이 prompt 없이 fail-closed하고 정확히 한 active verified runner만 선택; manual override 유지; focused/full offline와 P0/P1 감사 PASS; commit/push |
+| 중단·복구 | quota/PC 중단 시 HEAD `e3a8819`과 owned 2-file diff 및 문서 receipt를 대조한다. 검증 전에는 자동 탐지를 사용하거나 controlled GPU/E2를 시작하지 않는다. |
+| 현재 행동 | exact 8-file stage와 cached diff-check가 PASS했다. stage receipt 두 문서를 restage·재검증한 뒤 Conventional Commit을 만든다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260822-195339-p0-safe-pause-auto-discovery-commit-intent`: exact 8-path `git add`
+  exit 0. staged 8, unstaged 0, untracked 0, cached diff-check PASS다. 이 stage receipt로
+  dirty해진 WORKING-STATE/roadmap log만 restage하고 동일 8/0/0과 cached diff-check를
+  확인한 뒤 exact `git commit -m "fix: auto-detect durable training run"`을 실행한다.
+  commit 실패 시 push/GPU/E2를 실행하지 않고 staged 배치를 보존한다.
+- `20260822-195306-p0-safe-pause-auto-discovery-stage-intent`: final docs 뒤 exact changed
+  8(code/test+6 SSoT), boundary diff 0, staged 0, untracked 0, forbidden artifact path 0,
+  AIRI runner/trainer 0, final full offline checkpoint와 diff-check PASS다. 독립 최종 감사도
+  P0 0/P1 0 `READY`이며 batch 미commit/mispush 주장이 없음을 확인했다. 다음 상태 변경은
+  exact 8-path `git add`; staged 8·unstaged 0·untracked 0과 cached diff-check가 모두
+  PASS하지 않으면 commit/push/GPU/E2를 실행하지 않는다.
+- `20260822-195017-p0-safe-pause-auto-discovery-review-receipt`: 첫 독립 리뷰는 P0 2/
+  P1 1로 explicit empty가 auto mode로 승격되는 문제, zero-run test가 ambient workload를
+  멈출 위험, `--` 뒤 decoy runner token 오인을 검출했다. `PSBoundParameters`로 omission과
+  invalid manual 값을 분리하고, 테스트는 모든 process command line에 대한 보수적 ambient
+  guard 뒤에만 zero-run을 호출하며, runner script 탐색 범위를 첫 standalone `--` 앞으로
+  제한했다. 첫 수정 재리뷰의 잔여 P1(python.exe에만 한정된 ambient guard)도 all-process로
+  정정했다. 이후 focused actual-process PASS, full offline checkpoint PASS, diff-check PASS,
+  최종 독립 리뷰 P0/P1 0이다. 최종 pause 28,150 B
+  `2616402b...22bbce`, test 37,269 B `0bea228c...ebaf0`, AIRI trainer/runner 0이다.
+  6개 SSoT receipt를 포함한 exact 8-file batch stage/commit/push 전에는 GPU/E2를 실행하지 않는다.
+- `20260822-194410-p0-safe-pause-auto-discovery-offline-receipt`: RunDir 생략 자동 탐지를
+  구현했다. live Windows command line을 `CommandLineToArgvW` Unicode로 파싱해 standalone
+  `--` 앞의 exact `--run-dir`/`--run-id`만 허용하고, strict current→previous state,
+  runner source SHA, state runner PID/creation/executable/command identity와 active status를
+  모두 결속한다. 정확히 1개만 선택하며 0개는 prompt 없이 nonzero, 복수는 run ID/RunDir
+  후보를 표시하고 nonzero다. manual RunDir와 기존 checkpoint/ack/artifact/
+  `SAFE_TO_POWER_OFF` gate는 유지했다. 첫 actual-process 회귀는 Unicode marshaling 누락으로
+  정상 runner 2개를 0개로 오판해 FAIL했고 이를 receipt로 남겨 `CharSet.Unicode`로
+  정정했다. 이후 process-identity spoof, 0/1/multiple, corrupt-current/valid-previous를
+  포함한 `test-airi-training-durability.ps1` exit 0 PASS, `test-current-checkpoint.ps1`
+  exit 0 PASS, repo diff-check exit 0이다. pause 27,927 B
+  `db9a72a...34d81`, test 36,383 B `04a9fc8...bc33c`, AIRI trainer/runner 0이다.
+  당시 독립 review와 6-doc receipt·commit/push 전에는 controlled GPU/E2를 실행하지 않았다.
+- `20260822-192728-p0-safe-pause-auto-discovery-intent`: 사용량 초기화 후 user는
+  `pause-airi-safely.ps1`을 매개변수 없이 쓸 수 있도록 개선한 뒤 goal을 계속하라고
+  요청했다. SSoT 전량 재독과 fresh 감사에서 goal active, HEAD=origin/main `e3a8819`,
+  worktree clean, AIRI trainer/runner 0, E2 adapter/report와 old planned P0-B root 부재다.
+  자동 탐지는 live `durable_training_runner.py` command line에서 exact `--run-dir`/
+  `--run-id`를 파싱하고 run-state current→previous strict schema, runner PID/creation/
+  executable/command hashes, active status를 모두 결속한다. 0개면 prompt 없이 명확히
+  중단, 2개 이상이면 안전한 후보만 표시하고 거부하며 mtime/newest/광범위 재귀 탐색은
+  금지한다. manual `-RunDir`과 기존 checkpoint/ack/`SAFE_TO_POWER_OFF` 검증은 유지한다.
+  owned pause/test 구현·회귀·독립 감사·commit/push 전에는 GPU/E2를 시작하지 않는다.
 - `20260822-191844-p0b-final-receipt-commit-push-intent`: actual docs push receipt의
   exact 2-doc boundary, continuity PASS, repo diff-check exit 0 뒤 `git add` exit 0.
   staged 2, unstaged 0, untracked 0, cached diff-check exit 0이다. 이 stage receipt를

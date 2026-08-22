@@ -5,7 +5,9 @@
 > 전원 종료 복구용 P0-A checkpoint/full-state/atomic fault 계층은 offline 구현·독립
 > P0/P1 0 감사까지 완료되어 `6f0c1358`로 origin/main push됐다. P0-B timing/
 > exact-equivalence evidence gate와 external expected-run 결속도 offline 회귀·독립
-> P0/P1 0을 거쳐 `e970cf7`·`8cd69b5`로 origin/main push됐다. controlled GPU 동등성과 실제 E2 속도 10분 checkpoint 상한은
+> P0/P1 0을 거쳐 `e970cf7`·`8cd69b5`로 origin/main push됐다. `pause-airi-safely.ps1`은
+> RunDir 생략 시 exactly-one verified active durable run만 자동 선택하도록 actual-process
+> 0/1/multiple/spoof/fallback 회귀와 독립 P0/P1 0을 통과했다. controlled GPU 동등성과 실제 E2 속도 10분 checkpoint 상한은
 > 아직 미실측이며, 둘을 실증한 뒤에만 E2를 시작한다.
 > `goal_status=active`; `adoption_authorized=false`
 > `execution_order=P0_A>P0_B>E2_LAUNCH>E2_PROVENANCE>PACKAGE>T3_36>CAMPAIGN_3X500>USER_DECISION`
@@ -41,6 +43,17 @@ Serena MCP는 로컬 A/B 순손실로 등록 롤백됐고 Caveman trial은 미�
 **매 배치 커밋마다 LOG에 기록**하고, STATUS는 상태 변화 시에만 고친다.
 과거 인계 문서(2026-08-13 이전)는 전부 `airi_docs/아카이브/`로 이동했다 —
 현재 상태 검증에 사용 금지.
+
+학습 중 사용량 종료나 PC 종료 준비에는 저장소 루트에서 다음만 실행한다.
+
+```powershell
+.\pause-airi-safely.ps1
+```
+
+검증된 active durable run이 정확히 하나면 자동 선택한다. 0개면 실행 중 학습 없음으로,
+2개 이상이면 후보를 표시하고 중단한다. 수동 지정은 계속
+`.\pause-airi-safely.ps1 -RunDir '<run-state가 있는 폴더>'`로 가능하다. 두 경우 모두
+`SAFE_TO_POWER_OFF`가 출력되기 전에는 전원을 끄지 않는다.
 
 현행 순서는 GPU 인계 §8의 체크리스트 한 곳만 따른다:
 `P0 전원 종료 내구성 구현·실증 → E2 preflight/step 0 → provenance →

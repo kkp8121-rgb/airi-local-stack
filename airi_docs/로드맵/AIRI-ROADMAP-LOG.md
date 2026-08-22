@@ -9,6 +9,33 @@
 
 ## 2026-08-22 P0-B 독립 감사·compact 복구 정정
 
+- exact 8-path stage exit 0, staged 8·unstaged 0·untracked 0, cached diff-check PASS다.
+  stage receipt 두 문서를 restage·재검증한 뒤 `fix: auto-detect durable training run`으로
+  commit하며 실패하면 push/GPU/E2로 이동하지 않는다.
+- final 8-file batch는 changed 8·boundary diff 0·staged/untracked 0, forbidden artifact
+  path 0, AIRI runner/trainer 0, focused/full offline와 diff-check PASS다. 독립 final audit
+  P0 0/P1 0 `READY`; exact 8-path stage와 cached 경계가 PASS해야만 commit/push한다.
+- 첫 safe-pause 독립 리뷰 P0 2/P1 1과 수정 재리뷰 P1 1을 모두 닫았다. omission과
+  explicit empty 분리, all-process ambient workload guard, 첫 `--` 앞 runner script
+  범위 제한을 구현하고 source-decoy/empty-manual 회귀를 추가했다. fresh focused와 full
+  offline checkpoint, diff-check PASS, 최종 독립 리뷰 P0/P1 0이다. pause
+  `2616402b...22bbce` 28,150 B, test `0bea228c...ebaf0` 37,269 B, AIRI runner/trainer 0.
+  code/test+6 SSoT exact 8-file stage/commit/push 전에는 GPU/E2를 시작하지 않는다.
+- safe-pause auto-discovery 구현은 exact Windows argv(`--` 경계), strict current→previous
+  run-state, actual runner source SHA와 PID/creation/executable/command identity를 결속한다.
+  최초 focused 회귀가 Unicode P/Invoke 선언 누락을 검출해 two live runners를 0으로
+  오판한 결함을 수정했다. 강화된 0/1/multiple/process-spoof/corrupt-current fallback과
+  manual SAFE gate 회귀 PASS, full `test-current-checkpoint.ps1` PASS, diff-check PASS다.
+  독립 리뷰와 milestone 6-doc receipt·commit/push 전에는 GPU/E2를 시작하지 않는다.
+- 사용량 초기화 뒤 사용자는 `pause-airi-safely.ps1`의 verified active run 자동 탐지를
+  먼저 구현하고 goal을 계속하라고 요청했다. HEAD=origin/main `e3a8819`, worktree clean,
+  AIRI trainer/runner 0, E2/old P0-B root 0에서 pause/test 두 파일을 owned scope로
+  지정했다. exact runner command→run-state/process identity만 허용하고 0개는 noninteractive
+  중단, multiple/spoof는 거부, manual RunDir와 기존 SAFE 검증은 유지한다. offline
+  P0/P1 검증·commit/push 전에는 controlled GPU/E2를 시작하지 않는다.
+- final expected-gate push receipt `e3a8819fe2b9edacbb2567bead26ccb8f4086404`
+  (`docs: record expected gate push`)은 origin/main에 push됐고, 복구 시 실제 clean
+  HEAD로 확인됐다.
 - actual docs push receipt 2개는 boundary/continuity/diff-check PASS, exact stage 뒤
   staged 2·unstaged 0·untracked 0, cached diff-check PASS다. stage receipt를
   재stage·재검증하고 final receipt commit/push하며 실패 시 GPU/E2를 실행하지 않는다.

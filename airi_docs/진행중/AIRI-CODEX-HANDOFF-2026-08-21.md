@@ -5,7 +5,7 @@
 상태: **ACTIVE — E1 완료·미채택, E2 저장 산출물 0, merge/package 0,
 v4 T3 0, live campaign 0; P0-A offline 구현·독립 감사 완료,
 P0-B timing/exact-equivalence gate `e970cf7`와 external expected-run 결속
-`8cd69b5` origin/main push 완료,
+`8cd69b5` origin/main push 완료, safe-pause verified active-run 자동 탐지 offline 검증 완료,
 controlled GPU 동등성·10분 checkpoint 실측 대기**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
@@ -337,6 +337,16 @@ SHA, seed, batch, gradient accumulation, 단일 첫 optimizer 경계 pause를 �
 controlled GPU 실험의 명령·입력 결속을 강화한 offline gate receipt이며, paired GPU
 실험이나 실제 E2 속도 증거는 아직 0이므로 P0-B 완료나 E2 허가로 승격하지 않는다.
 
+2026-08-22 safe-pause auto-discovery receipt: `pause-airi-safely.ps1`은 `-RunDir`를
+생략하면 live Windows command line의 runner 영역(`--` 앞)에서 exact run ID/RunDir를
+읽고, strict current→previous receipt, runner source SHA와 PID/creation/executable/
+command identity, active status가 모두 일치하는 durable run만 후보로 인정한다. 정확히
+1개일 때만 선택하고 0개·복수·process spoof는 noninteractive fail-closed다. 명시한
+빈/공백 RunDir는 자동 모드로 바꾸지 않고 거부한다. manual `-RunDir`와 checkpoint/ack/
+artifact/`SAFE_TO_POWER_OFF` 검증은 유지된다. actual-process 0/1/multiple, source decoy,
+identity spoof, corrupt-current/valid-previous 회귀와 전체 offline checkpoint가 PASS했고
+최종 독립 리뷰 P0/P1 0이다. 이 편의 개선은 controlled GPU 실증을 대체하지 않는다.
+
 ## 8. active goal fail-closed 실행 체크리스트
 
 1. [x] 사용자 `/goal`의 재개 권한과 운영 채택 금지선을 확인했다(2026-08-22).
@@ -353,6 +363,8 @@ controlled GPU 실험의 명령·입력 결속을 강화한 offline gate receipt
    offline fault 회귀는 `e970cf7e4c3a4685fd8bce23c659a1c9aa93c21e`, 계획된
    input/config/shape/first-pause 외부 기대값 결속은
    `8cd69b5f455bd41b48faa5ed6e9cac1af00f8908`로 origin/main push됐다.
+   `pause-airi-safely.ps1`의 RunDir 생략 모드는 exactly-one verified active run만 자동
+   선택하고 0개·복수·spoof·명시적 empty를 거부하도록 actual-process 회귀를 통과했다.
    controlled GPU 동등성과 실제 E2 속도 checkpoint 간격을 전원 종료 손실 상한 10분
    이하로 실측·고정하는 단계가 남았다.
 4. [ ] preflight에서 입력 코드·데이터가 clean인지 확인한다. live heartbeat로 생긴

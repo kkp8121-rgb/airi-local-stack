@@ -1,6 +1,5 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)]
     [string]$RunDir,
 
     [ValidateRange(10, 3600)]
@@ -48,14 +47,6 @@ function Resolve-RequiredLocalRunDirectory {
         $probe = $parent
     }
     return $full
-}
-
-$resolvedRunDir = Resolve-RequiredLocalRunDirectory $RunDir
-$statePath = Join-Path $resolvedRunDir 'run-state.json'
-$previousStatePath = Join-Path $resolvedRunDir 'run-state.prev.json'
-if (-not (Test-Path -LiteralPath $statePath -PathType Leaf) -and
-    -not (Test-Path -LiteralPath $previousStatePath -PathType Leaf)) {
-    throw 'run-state current and previous receipts are missing; no training run can be reconciled'
 }
 
 function Get-Utf8Sha256 {
@@ -173,17 +164,143 @@ function Read-ValidRunStateCandidate {
 }
 
 function Read-RunState {
-    $current = Read-ValidRunStateCandidate $statePath
+    param(
+        [Parameter(Mandatory = $true)][string]$CurrentPath,
+        [Parameter(Mandatory = $true)][string]$PreviousPath
+    )
+    $current = Read-ValidRunStateCandidate $CurrentPath
     if ($null -ne $current) {
         return $current
     }
     # Preserve a torn or malformed current receipt.  The durable runner owns its
     # quarantine/write-through protocol; pause only consumes a strict previous receipt.
-    $previous = Read-ValidRunStateCandidate $previousStatePath
+    $previous = Read-ValidRunStateCandidate $PreviousPath
     if ($null -ne $previous) {
         return $previous
     }
     throw 'No valid current or previous run-state receipt is available'
+}
+
+function ConvertFrom-WindowsCommandLine {
+    param([Parameter(Mandatory = $true)][string]$CommandLine)
+
+    if (-not ('AiriPauseCommandLine' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class AiriPauseCommandLine {
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern IntPtr CommandLineToArgvW(string commandLine, out int argc);
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr LocalFree(IntPtr hMem);
+}
+'@
+    }
+    $count = 0
+    $pointer = [AiriPauseCommandLine]::CommandLineToArgvW($CommandLine, [ref]$count)
+    if ($pointer -eq [IntPtr]::Zero -or $count -lt 1) {
+        throw 'runner command line cannot be parsed'
+    }
+    try {
+        $arguments = [Collections.Generic.List[string]]::new()
+        for ($index = 0; $index -lt $count; $index++) {
+            $itemAddress = [IntPtr]($pointer.ToInt64() + ($index * [IntPtr]::Size))
+            $item = [Runtime.InteropServices.Marshal]::ReadIntPtr($itemAddress)
+            $arguments.Add([Runtime.InteropServices.Marshal]::PtrToStringUni($item))
+        }
+        return $arguments.ToArray()
+    }
+    finally {
+        [void][AiriPauseCommandLine]::LocalFree($pointer)
+    }
+}
+
+function Get-RunnerCommandBinding {
+    param([Parameter(Mandatory = $true)][string]$CommandLine)
+
+    try { $arguments = @(ConvertFrom-WindowsCommandLine $CommandLine) }
+    catch { return $null }
+    $separatorIndex = [Array]::IndexOf($arguments, '--')
+    $runnerArgumentCount = if ($separatorIndex -ge 0) { $separatorIndex } else { $arguments.Count }
+    $scriptIndexes = @()
+    for ($index = 0; $index -lt $runnerArgumentCount; $index++) {
+        if ([string]$arguments[$index] -match '(?i)(^|[\\/])durable_training_runner\.py$') {
+            $scriptIndexes += $index
+        }
+    }
+    if ($scriptIndexes.Count -ne 1) { return $null }
+    $scriptIndex = [int]$scriptIndexes[0]
+    $runDirValues = @()
+    $runIdValues = @()
+    for ($index = $scriptIndex + 1; $index -lt $runnerArgumentCount; $index++) {
+        if ($arguments[$index] -in @('--run-dir', '--run-id')) {
+            if ($index + 1 -ge $arguments.Count -or $arguments[$index + 1].StartsWith('--')) { return $null }
+            if ($arguments[$index] -eq '--run-dir') { $runDirValues += $arguments[$index + 1] }
+            else { $runIdValues += $arguments[$index + 1] }
+            $index++
+        }
+    }
+    if ($runDirValues.Count -ne 1 -or $runIdValues.Count -ne 1) { return $null }
+    return [pscustomobject]@{
+        script_path = [string]$arguments[$scriptIndex]
+        run_dir = [string]$runDirValues[0]
+        run_id = [string]$runIdValues[0]
+    }
+}
+
+function Find-ActiveDurableRunDirectory {
+    $candidates = [Collections.Generic.List[object]]::new()
+    foreach ($process in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)) {
+        if ([string]::IsNullOrWhiteSpace([string]$process.CommandLine)) { continue }
+        $binding = Get-RunnerCommandBinding ([string]$process.CommandLine)
+        if ($null -eq $binding) { continue }
+        try { $candidateDir = Resolve-RequiredLocalRunDirectory $binding.run_dir }
+        catch { continue }
+        $currentPath = Join-Path $candidateDir 'run-state.json'
+        $previousPath = Join-Path $candidateDir 'run-state.prev.json'
+        try { $state = Read-RunState $currentPath $previousPath }
+        catch { continue }
+        try {
+            Assert-ExactJsonProperties -Value $state.command -Names @(
+                'canonical_sha256', 'runner_source_sha256', 'trainer_source_sha256') -Label 'run-state command'
+            if ([string]$state.command.runner_source_sha256 -notmatch '^[0-9a-f]{64}$') { continue }
+            $runnerScript = Resolve-RequiredLocalRunDirectory (Split-Path -Parent $binding.script_path)
+            $runnerSourcePath = Join-Path $runnerScript (Split-Path -Leaf $binding.script_path)
+            if ((Split-Path -Leaf $runnerSourcePath) -ne 'durable_training_runner.py' -or
+                -not (Test-Path -LiteralPath $runnerSourcePath -PathType Leaf) -or
+                ((Get-FileHash -LiteralPath $runnerSourcePath -Algorithm SHA256).Hash.ToLowerInvariant() -ne
+                    [string]$state.command.runner_source_sha256)) { continue }
+        }
+        catch { continue }
+        if ([string]$state.status -notin @('starting', 'running', 'pause-requested', 'checkpointing') -or
+            [string]$state.run_id -ne $binding.run_id -or
+            [int]$state.runner.pid -ne [int]$process.ProcessId -or
+            -not (Test-ExactProcessRecord $state.runner)) { continue }
+        $candidates.Add([pscustomobject]@{ run_dir = $candidateDir; run_id = [string]$state.run_id })
+    }
+    $unique = @($candidates | Group-Object run_dir | ForEach-Object { $_.Group[0] })
+    if ($unique.Count -eq 0) {
+        throw 'no active durable AIRI training run was found; specify -RunDir explicitly'
+    }
+    if ($unique.Count -ne 1) {
+        $identifiers = @($unique | ForEach-Object { "run_id=$($_.run_id); RunDir=$($_.run_dir)" }) -join [Environment]::NewLine
+        throw "more than one active durable AIRI training run was found; refusing automatic selection:$([Environment]::NewLine)$identifiers"
+    }
+    return [string]$unique[0].run_dir
+}
+
+if (-not $PSBoundParameters.ContainsKey('RunDir')) {
+    $RunDir = Find-ActiveDurableRunDirectory
+}
+elseif ([string]::IsNullOrWhiteSpace($RunDir)) {
+    throw 'RunDir cannot be empty when specified explicitly'
+}
+$resolvedRunDir = Resolve-RequiredLocalRunDirectory $RunDir
+$statePath = Join-Path $resolvedRunDir 'run-state.json'
+$previousStatePath = Join-Path $resolvedRunDir 'run-state.prev.json'
+if (-not (Test-Path -LiteralPath $statePath -PathType Leaf) -and
+    -not (Test-Path -LiteralPath $previousStatePath -PathType Leaf)) {
+    throw 'run-state current and previous receipts are missing; no training run can be reconciled'
 }
 
 function Write-AtomicUtf8NoBom {
@@ -442,12 +559,12 @@ function Wait-VerifiedCompletionPowerOff {
             return
         }
         Start-Sleep -Milliseconds 200
-        $State = Read-RunState
+        $State = Read-RunState $statePath $previousStatePath
     } while ([DateTime]::UtcNow -lt $deadline -and [string]$State.status -eq 'complete')
     throw 'Completed artifacts are verified but trainer/runner did not exit in time'
 }
 
-$initial = Read-RunState
+$initial = Read-RunState $statePath $previousStatePath
 if ([string]$initial.status -eq 'complete') {
     Wait-VerifiedCompletionPowerOff $initial
     return
@@ -479,7 +596,7 @@ while (-not (Test-ExactProcessRecord $initial.trainer)) {
         throw 'Recorded trainer PID/creation/executable/command identity did not become live; refusing blind pause'
     }
     Start-Sleep -Milliseconds 200
-    $initial = Read-RunState
+    $initial = Read-RunState $statePath $previousStatePath
 }
 
 $controlDir = Join-Path $resolvedRunDir 'control'
@@ -507,7 +624,7 @@ $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 do {
     Start-Sleep -Seconds $PollSeconds
     try {
-        $state = Read-RunState
+        $state = Read-RunState $statePath $previousStatePath
     }
     catch {
         continue

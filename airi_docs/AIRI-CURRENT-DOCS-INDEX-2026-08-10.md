@@ -4,6 +4,7 @@
 지속성 프로토콜, P0-A offline checkpoint/durable-runner/safe-pause 구현·독립 P0/P1 0·
 `6f0c1358` origin/main push, P0-B timing/exact-equivalence evidence gate와 external
 expected-run 결속 offline 회귀·독립 P0/P1 0·`e970cf7`/`8cd69b5` origin/main push,
+safe-pause exactly-one verified active-run 자동 탐지 actual-process 회귀·독립 P0/P1 0,
 E2 전 controlled GPU/10분 실측 게이트, event reference 30건·
 continuity arc 7건 정합, E1 QLoRA 완료, E2 처음부터 재실행 명령, isolated T3
 36-run 및 승자 3×500 fail-closed 체크리스트 확정).
@@ -41,7 +42,9 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
   runner/safe-pause offline 구현·독립 P0/P1 0은 완료되어 `6f0c1358`로
   origin/main push됐고, P0-B timing/exact-equivalence evidence gate와 external
   expected-run 결속도 `e970cf7`·`8cd69b5`로 origin/main push됐다. E2 전 controlled GPU 동등성·실제 속도 10분 checkpoint
-  실증은 여전히 필수다. 운영 채택·기본 모델 변경은 계속 금지한다.
+  실증은 여전히 필수다. RunDir 생략 safe-pause는 exact command/state/source/process
+  identity가 맞는 active run 정확히 1개만 자동 선택하도록 offline 검증됐다.
+  운영 채택·기본 모델 변경은 계속 금지한다.
   runtime-shaped broadcast continuity v4 1,000행의 source/chat SHA, seq2048
   token 실측, E1 adapter/report/hash, checkpoint 없이 세 차례 중단된 E2의 step 0 재실행 명령,
   safe-merge/GGUF 도구 핀, baseline/E1/E2 × calibration/heldout/blind 36-report

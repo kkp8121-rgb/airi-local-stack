@@ -40,7 +40,9 @@ foreach ($token in @(
     'SAFE_TO_POWER_OFF', 'Test-ExactProcessRecord', 'pause.request.json',
     'pause.ack.json', 'checkpoint_manifest_sha256', 'pending_microbatches',
     'complete outputs receipt', 'Assert-ExactJsonProperties', 'MoveFileEx',
-    'DriveType]::Fixed', 'cannot traverse a reparse point', 'run-state.prev.json')) {
+    'DriveType]::Fixed', 'cannot traverse a reparse point', 'run-state.prev.json',
+    'Find-ActiveDurableRunDirectory', 'durable_training_runner',
+    'no active durable AIRI training run', 'more than one active durable AIRI training run')) {
     if (-not $pause.Contains($token)) {
         throw "Safe-pause contract token is missing: $token"
     }
@@ -80,7 +82,37 @@ function Get-ContractProcessRecord {
     }
 }
 
+function Invoke-OmittedRunDirPause {
+    param([int]$TimeoutSeconds = 10)
+
+    $savedPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $pausePath `
+            -TimeoutSeconds $TimeoutSeconds -PollSeconds 1 2>&1)
+        return [pscustomobject]@{ exit_code = $LASTEXITCODE; output = ($output -join "`n") }
+    }
+    finally {
+        $ErrorActionPreference = $savedPreference
+    }
+}
+
 try {
+    # This contract suite must begin without a durable runner.  Omitted RunDir must
+    # refuse rather than selecting a directory by recency or prompting for input.
+    $ambientDurableRunners = @(Get-CimInstance Win32_Process | Where-Object {
+            -not [string]::IsNullOrWhiteSpace([string]$_.CommandLine) -and
+            [string]$_.CommandLine -like '*durable_training_runner.py*'
+        })
+    if ($ambientDurableRunners.Count -ne 0) {
+        throw 'Durability contract refuses to invoke auto-pause while an ambient durable runner is active'
+    }
+    $noActiveResult = Invoke-OmittedRunDirPause
+    if ($noActiveResult.exit_code -eq 0 -or
+        $noActiveResult.output -notmatch 'no active durable AIRI training run') {
+        throw 'Omitted RunDir accepted an absent active durable runner'
+    }
+
     $runDir = Join-Path $temporaryRoot 'run'
     $generation = 'checkpoint-00000001'
     $generationDir = Join-Path $runDir "checkpoints\$generation"
@@ -239,6 +271,59 @@ progress = {
     }
     else {
         (Get-Command python -ErrorAction Stop).Source
+    }
+    $spoofSourceDir = Join-Path $temporaryRoot 'spoof-source'
+    $spoofRunDir = Join-Path $temporaryRoot 'spoof-run'
+    [IO.Directory]::CreateDirectory($spoofSourceDir) | Out-Null
+    [IO.Directory]::CreateDirectory($spoofRunDir) | Out-Null
+    $spoofRunnerPath = Join-Path $spoofSourceDir 'durable_training_runner.py'
+    [IO.File]::WriteAllText(
+        $spoofRunnerPath, "import time`ntime.sleep(20)`n", [Text.UTF8Encoding]::new($false))
+    $spoofProcess = Start-Process -FilePath $pythonPath -ArgumentList @(
+        $spoofRunnerPath, '--run-dir', $spoofRunDir, '--run-id', 'spoof-run') `
+        -WindowStyle Hidden -PassThru
+    try {
+        Start-Sleep -Milliseconds 200
+        $spoofRunnerRecord = Get-ContractProcessRecord $spoofProcess.Id
+        # Everything except the persisted process identity is plausible.  Discovery
+        # must reject this live same-name/source-bound process rather than trusting argv.
+        $spoofRunnerRecord.command_line_sha256 = '0' * 64
+        $spoofState = [ordered]@{
+            schema_version = 'airi.behavior-durable-run.v1'
+            revision = 0
+            run_id = 'spoof-run'
+            status = 'running'
+            created_at_utc = '2026-08-22T00:00:00Z'
+            updated_at_utc = '2026-08-22T00:00:00Z'
+            runner = $spoofRunnerRecord
+            trainer = $null
+            inputs = [ordered]@{}
+            command = [ordered]@{
+                canonical_sha256 = '1' * 64
+                runner_source_sha256 = (
+                    Get-FileHash -LiteralPath $spoofRunnerPath -Algorithm SHA256
+                ).Hash.ToLowerInvariant()
+                trainer_source_sha256 = '2' * 64
+            }
+            progress = [ordered]@{}
+            heartbeat = [ordered]@{}
+            checkpoint = $null
+            logs = [ordered]@{}
+            outputs = [ordered]@{}
+            terminal = $null
+        }
+        [IO.File]::WriteAllText(
+            (Join-Path $spoofRunDir 'run-state.json'),
+            (($spoofState | ConvertTo-Json -Compress -Depth 10) + "`n"),
+            [Text.UTF8Encoding]::new($false))
+        $spoofResult = Invoke-OmittedRunDirPause
+        if ($spoofResult.exit_code -eq 0 -or
+            $spoofResult.output -notmatch 'no active durable AIRI training run') {
+            throw 'Omitted RunDir accepted a runner whose persisted process identity was spoofed'
+        }
+    }
+    finally {
+        if (-not $spoofProcess.HasExited) { Stop-Process -Id $spoofProcess.Id -Force }
     }
     $launchReceipt = & $launcherPath `
         -RunDir $launcherRun `
@@ -523,7 +608,8 @@ raise SystemExit(75)
     $pauseTrainerArguments = @(
         '--dataset', $pauseDataset, '--dataset-sha256', ('d' * 64),
         '--model-dir', $pauseModel, '--model-sha256', ('e' * 64),
-        '--output', $pauseOutput, '--report', $pauseReport)
+        '--output', $pauseOutput, '--report', $pauseReport,
+        '--decoy-runner-path', $runnerPath)
     $pauseLaunch = & $launcherPath `
         -RunDir $pauseRun `
         -RunId 'live-pause-contract' `
@@ -549,6 +635,63 @@ raise SystemExit(75)
     if ($null -eq $liveState.runner -or $null -eq $liveState.trainer) {
         throw 'Live pause runner did not publish exact runner and trainer identities'
     }
+    if ([string]$liveState.command.runner_source_sha256 -ne
+        (Get-FileHash -LiteralPath $runnerPath -Algorithm SHA256).Hash.ToLowerInvariant()) {
+        throw 'Live pause runner did not bind its runner source hash'
+    }
+    $emptyManualRunDirRejected = $false
+    try {
+        & $pausePath -RunDir '' -TimeoutSeconds 10 -PollSeconds 1 | Out-Null
+    }
+    catch {
+        if ($_.Exception.Message -match 'RunDir cannot be empty') {
+            $emptyManualRunDirRejected = $true
+        }
+        else {
+            throw
+        }
+    }
+    if (-not $emptyManualRunDirRejected) {
+        throw 'Explicit empty RunDir unexpectedly entered automatic discovery'
+    }
+    $secondPauseRun = Join-Path $pauseCase 'second durable run'
+    $secondPauseOutput = Join-Path $pauseCase 'second adapter output'
+    $secondPauseReport = Join-Path $pauseCase 'second report.json'
+    $secondPauseArguments = @(
+        '--dataset', $pauseDataset, '--dataset-sha256', ('d' * 64),
+        '--model-dir', $pauseModel, '--model-sha256', ('e' * 64),
+        '--output', $secondPauseOutput, '--report', $secondPauseReport)
+    & $launcherPath `
+        -RunDir $secondPauseRun `
+        -RunId 'second-live-pause-contract' `
+        -PythonPath $pythonPath `
+        -TrainerPath $pauseTrainer `
+        -WorkingDirectory $pauseCase `
+        -InputManifestSha256 ('f' * 64) `
+        -CheckpointEveryOptimizerSteps 5 `
+        -HeartbeatSeconds 1 `
+        -TrainerArguments $secondPauseArguments | Out-Null
+    $secondStatePath = Join-Path $secondPauseRun 'run-state.json'
+    $secondLiveDeadline = [DateTime]::UtcNow.AddSeconds(30)
+    do {
+        Start-Sleep -Milliseconds 100
+        $secondLiveState = Get-Content -LiteralPath $secondStatePath -Raw -Encoding utf8 | ConvertFrom-Json
+    } while (($null -eq $secondLiveState.runner -or $null -eq $secondLiveState.trainer) -and
+        [DateTime]::UtcNow -lt $secondLiveDeadline)
+    if ($null -eq $secondLiveState.runner -or $null -eq $secondLiveState.trainer) {
+        throw 'Second live pause runner did not publish exact identities'
+    }
+    $multipleActiveResult = Invoke-OmittedRunDirPause
+    if ($multipleActiveResult.exit_code -eq 0 -or
+        $multipleActiveResult.output -notmatch 'more than one active durable AIRI training run' -or
+        -not $multipleActiveResult.output.Contains($pauseRun) -or
+        -not $multipleActiveResult.output.Contains($secondPauseRun)) {
+        throw "Omitted RunDir did not refuse multiple active durable runners: $($multipleActiveResult.output)"
+    }
+    $secondSafePause = & $pausePath -RunDir $secondPauseRun -TimeoutSeconds 30 -PollSeconds 1
+    if (-not ($secondSafePause -contains 'SAFE_TO_POWER_OFF')) {
+        throw 'Second active trainer did not stop after automatic-discovery ambiguity test'
+    }
     $liveCurrentStatePath = Join-Path $pauseRun 'run-state.json'
     $livePreviousStatePath = Join-Path $pauseRun 'run-state.prev.json'
     [IO.File]::WriteAllBytes($livePreviousStatePath, [IO.File]::ReadAllBytes($liveCurrentStatePath))
@@ -558,7 +701,9 @@ raise SystemExit(75)
         $liveCurrentStatePath,
         (($parseableCorruptLiveState | ConvertTo-Json -Compress -Depth 10) + "`n"),
         [Text.UTF8Encoding]::new($false))
-    $safePauseResult = & $pausePath -RunDir $pauseRun -TimeoutSeconds 30 -PollSeconds 1
+    # Omitted RunDir must select this sole live runner using its exact command line
+    # and the valid previous receipt after the current receipt is corrupted.
+    $safePauseResult = & $pausePath -TimeoutSeconds 30 -PollSeconds 1
     if (-not ($safePauseResult -contains 'SAFE_TO_POWER_OFF')) {
         throw 'Active trainer safe-pause did not produce SAFE_TO_POWER_OFF'
     }

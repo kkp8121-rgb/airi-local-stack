@@ -15,6 +15,8 @@
 > origin/main push됐다. P0-B checkpoint timing/exact-equivalence evidence gate와
 > external expected-run 결속도 offline 회귀·독립 P0/P1 0 감사를 거쳐
 > `e970cf7`·`8cd69b5`로 origin/main push됐으며, E2보다 먼저
+> safe-pause의 exactly-one verified active-run 자동 탐지도 0/1/multiple/spoof/
+> corrupt-current actual-process 회귀와 독립 P0/P1 0을 통과했다. 이어서
 > P0-B controlled GPU 동등성·실제 속도 10분 checkpoint 상한을 실증한다.
 > `goal_status=active`; `adoption_authorized=false`;
 > `execution_order=P0_A>P0_B>E2_LAUNCH>E2_PROVENANCE>PACKAGE>T3_36>CAMPAIGN_3X500>USER_DECISION`
@@ -328,7 +330,9 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   PID/command/checkpoint SHA 재부팅 복구의 offline 실증은 완료. checkpoint별 durable
   timing event, deterministic pin, 허용오차 0 full-state comparator, 600초/최소 4구간
   gate와 fault 회귀는 `e970cf7`, external input/config/seed/batch/accumulation/first-pause
-  expected 결속은 `8cd69b5`로 origin/main push됐다. controlled GPU 동등성과 실제
+  expected 결속은 `8cd69b5`로 origin/main push됐다. RunDir 생략 safe-pause는 exact
+  command/state/source/process identity가 일치하는 active run 정확히 1개만 선택하고
+  0개·복수·spoof·명시적 empty를 거부하도록 offline 검증됐다. controlled GPU 동등성과 실제
   E2 속도 손실 상한 10분 이하 실측이 남음
 - [ ] preflight: live-state 단독 diff를 제외한 입력 code/data clean, trainer 0,
   corpus/base/E1 SHA exact, E2 산출물 부재 재확인
