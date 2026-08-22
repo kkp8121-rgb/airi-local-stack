@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 03:06:05 +09:00"
-checkpoint_id: "20260823-030605-p0-push-receipt-docs-stage-intent"
+updated_at_kst: "2026-08-23 03:07:09 +09:00"
+checkpoint_id: "20260823-030709-p0-receipt-docs-push-finalization-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "p0-batch-receipt-docs"
-git_head: "911d082dcf1768a5145bd34d56a19f82deb9d248"
-worktree_state: "5-receipt-docs-prestage-pass-head-origin-main-equal"
+active_phase: "p0-batch-final-receipt"
+git_head: "a898ff82939ab59dc3fd84d2fb6214ecf381113e"
+worktree_state: "5-final-receipt-docs-modified-head-origin-main-equal"
 active_trainer_count: 0
 ---
 
@@ -49,10 +49,20 @@ active_trainer_count: 0
 | 출력 경로 | 저장소 owned code/test와 SSoT 문서만 변경. 모델·adapter·GGUF·runtime DB·로그 본문·D: P0-B root 출력 0 |
 | 완료 조건 | manifest mismatch/path fault, prearm fresh-only/first-boundary, exact runner-exit/timeout 회귀와 focused/full offline PASS, 독립 최신 P0/P1 0, diff/security PASS, milestone commit/push |
 | 중단·복구 | 회귀 실패·새 P0/P1·프로세스 누수 시 GPU/E2 금지를 유지하고 receipt를 기록한다. 기존 실행/산출물을 삭제하거나 재사용하지 않는다. |
-| 현재 행동 | actual implementation push receipt 5-doc의 exact boundary/focused continuity/diff/security가 PASS했다. 이 5경로만 stage해 staged 5/unstaged 0/untracked 0과 cached diff/security를 확인하고 `git commit -m "docs: record durable training push"` 뒤 push한다. |
+| 현재 행동 | implementation push receipt 5-doc commit `a898ff82939ab59dc3fd84d2fb6214ecf381113e`까지 origin/main에 push됐고 worktree clean/PID 0을 확인했다. 이 final receipt를 5-doc에 반영해 `docs: finalize P0 batch receipt`로 commit/push한 뒤 HEAD=origin/main·clean을 확인하고 controlled GPU preflight로 이동한다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260823-030709-p0-receipt-docs-push-finalization-intent`: exact 5-doc stage는
+  staged 5+unstaged/untracked 0, boundary/cached diff/security PASS였다. exact
+  `git commit -m "docs: record durable training push"`는 exit 0, commit
+  `a898ff82939ab59dc3fd84d2fb6214ecf381113e`, 5 files, 90 insertions/38 deletions이다.
+  이어 exact push exit 0, `911d082..a898ff8 main -> main`; 이후 HEAD/local origin/main/
+  remote main은 모두 `a898ff8`, worktree clean, 관련 PID 0, E2 adapter/report absent다.
+  P0 implementation과 5-doc receipt는 origin/main에 durable하다. 이 actual docs-push
+  receipt를 최종 5-doc에 반영해 focused/diff/security, exact stage/cached 검증,
+  `docs: finalize P0 batch receipt` commit/push를 수행한다. 성공 뒤 read-only
+  HEAD=origin/main·clean/PID 0을 확인해야만 controlled GPU intent를 쓴다.
 - `20260823-030605-p0-push-receipt-docs-stage-intent`: implementation push receipt를
   반영한 WORKING-STATE, 현행 handoff, roadmap status/log, NEXT exact 5경로만 dirty이며
   boundary diff 0, staged/untracked 0이다. focused continuity exit 0/PASS, repo diff-check

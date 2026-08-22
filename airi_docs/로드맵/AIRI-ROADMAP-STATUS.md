@@ -13,9 +13,10 @@
 > GPU workload는 0이다. 동결 P0 후속 배치는 최종 Python `145 passed, 5 skipped`,
 > actual-process PowerShell durability literal PASS, 전체 offline checkpoint PASS,
 > repo diff-check와 17-path security hit 0을 통과해 잔여 로컬 P0/P1이 0이다.
-> commit `911d082dcf1768a5145bd34d56a19f82deb9d248`은 origin/main push됐고
-> HEAD/local·remote origin/main이 exact다. actual push receipt 5-doc commit/push와 clean
-> worktree 뒤 controlled GPU로 이동한다. `goal_status=active`; E2 microstep 0,
+> commit `911d082dcf1768a5145bd34d56a19f82deb9d248`과 actual push receipt docs
+> `a898ff82939ab59dc3fd84d2fb6214ecf381113e`은 origin/main push됐다. final live
+> receipt commit/push와 HEAD/local·remote origin/main·clean worktree 재확인 뒤 controlled
+> GPU로 이동한다. `goal_status=active`; E2 microstep 0,
 > 운영 채택과 기본 모델 변경 금지는 유지한다.
 >
 > **이전 권한 이력 — 2026-08-22 goal resume:** 사용자 `/goal` 명령으로 당시 AIRI 본 goal은 `active`였다.
@@ -352,7 +353,8 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   네 원래 P1만 최소 수정하고 targeted+최종 Python `145 passed, 5 skipped`+actual-process
   PowerShell+전체 offline+diff/security gate로 잔여 로컬 P0/P1 0을 확인했다. 새 감사
   라운드는 추가하지 않는다. 검증 완료 commit `911d082`은 origin/main push됐으며 actual
-  push receipt docs와 clean 경계 뒤에만 controlled GPU로 이동한다. 이미 완료된 P0-A를
+  push receipt docs `a898ff8`도 origin/main에 durable하다. final live receipt와 clean
+  경계 뒤에만 controlled GPU로 이동한다. 이미 완료된 P0-A를
   다시 넓게 감사하며 공회전하지 않는다.
 - [ ] preflight: live-state 단독 diff를 제외한 입력 code/data clean, trainer 0,
   corpus/base/E1 SHA exact, E2 산출물 부재 재확인

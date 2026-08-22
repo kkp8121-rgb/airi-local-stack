@@ -4,18 +4,19 @@
 > `active`, `goal_status=active`다. local HEAD/local origin/main/remote main은
 > `32830a43556ba7704a39bd9094f128a5a98dd7d7`, 관련 AIRI Python/PowerShell PID와
 > durable GPU trainer는 0이다. 동결 P0 code/validation commit
-> `911d082dcf1768a5145bd34d56a19f82deb9d248`은 origin/main에 push됐고
-> HEAD/local·remote origin/main이 exact다. actual push receipt 5-doc commit/push만
-> 남아 있다. 운영 채택과 기본 모델 변경 금지는 유지한다.
+> `911d082dcf1768a5145bd34d56a19f82deb9d248`과 actual push receipt docs
+> `a898ff82939ab59dc3fd84d2fb6214ecf381113e`은 origin/main에 push됐다.
+> final live receipt commit/push와 clean 재확인 뒤 controlled GPU가 다음이다. 운영 채택과
+> 기본 모델 변경 금지는 유지한다.
 >
 > 최신 권위 receipt는 핀된 Python `145 passed, 5 skipped`, actual-process PowerShell
 > durability literal PASS, 전체 offline checkpoint PASS, repo diff-check와 17-path
 > security hit 0, post-run PID 0이다. 한 차례 독립 감사의 P0=0/P1=4 중 고정된 네
 > 원래 P1만 최소 수정했고 targeted/integration gate로 모두 닫았다. 새 감사 라운드는
-> 추가하지 않는다. 현재 다음 상태 변경은 actual implementation push receipt가 반영된
-> WORKING·현행 handoff·STATUS·LOG·NEXT exact 5-doc focused 검증/commit/push다. 문서
-> 인덱스는 현행 handoff를 정확히 가리켜 변경하지 않는다. HEAD=origin/main과 clean
-> worktree 전에는 controlled GPU/E2를 시작하지 않는다.
+> 추가하지 않는다. 새 세션/compact는 다섯 SSoT 전체 재독 뒤 HEAD=origin/main·clean,
+> PID 0, source/chat/base/E1 exact와 E2 absence를 대조한다. 모두 맞으면 fresh timestamped
+> 외부 root의 controlled GPU 동등성 preflight가 다음이다. 문서 인덱스는 현행 handoff를
+> 정확히 가리켜 변경하지 않는다. controlled GPU receipt 전에는 E2를 시작하지 않는다.
 >
 > **이전 권한 이력 — 2026-08-22 goal resume:** 사용자 `/goal` 명령으로 당시 AIRI 본 goal은 `active`였다.
 > 운영 모델 채택과 기본 서비스 모델 변경만 별도 사용자 승인 전까지 금지한다.

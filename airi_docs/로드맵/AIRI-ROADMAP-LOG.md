@@ -9,6 +9,12 @@
 
 ## 2026-08-23 goal resume·P0 final validation
 
+- 03:07 KST exact 5-doc stage/cached 검증 뒤 `docs: record durable training push`
+  commit `a898ff82939ab59dc3fd84d2fb6214ecf381113e`, 5 files, 90 insertions/
+  38 deletions. push exit 0, `911d082..a898ff8 main -> main`; HEAD/local·remote
+  origin/main `a898ff8`, worktree clean, 관련 PID 0, E2 adapter/report absent다. 이 actual
+  docs-push receipt를 최종 5-doc에 반영해 `docs: finalize P0 batch receipt`로
+  commit/push하고 clean 확인 뒤 controlled GPU preflight로 이동한다.
 - 03:06 KST actual implementation push receipt 5-doc은 exact boundary/focused continuity/
   diff/security PASS, staged/untracked 0, 총 506,017 bytes manifest
   `66f49a42...15305b`다. exact 5-doc stage/cached 검증 뒤
