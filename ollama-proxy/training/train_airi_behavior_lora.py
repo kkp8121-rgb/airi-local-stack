@@ -28,9 +28,12 @@ import hashlib
 import importlib.metadata
 import io
 import json
+import os
 import re
 import sys
 import random
+import stat
+import time
 from datetime import UTC, datetime
 from collections import Counter
 from pathlib import Path
@@ -63,11 +66,95 @@ class PauseRequested(SystemExit):
 
 
 CONTROL_SCHEMA_VERSION = 1
+CHECKPOINT_EVENT_SCHEMA = "airi.behavior-checkpoint-event.v1"
+DETERMINISTIC_CUBLAS_WORKSPACE = ":4096:8"
 
 
 def _file_sha256(path: Path) -> str:
     with path.open("rb") as handle:
         return hashlib.file_digest(handle, "sha256").hexdigest()
+
+
+def _canonical_json_bytes(value: Any) -> bytes:
+    return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+
+
+def _prepare_deterministic_validation(enabled: bool) -> None:
+    if not enabled:
+        return
+    existing = os.environ.get("CUBLAS_WORKSPACE_CONFIG")
+    if existing not in {None, DETERMINISTIC_CUBLAS_WORKSPACE}:
+        raise BehaviorTrainingError(
+            "deterministic validation requires CUBLAS_WORKSPACE_CONFIG=:4096:8")
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = DETERMINISTIC_CUBLAS_WORKSPACE
+
+
+def _configure_deterministic_validation(torch: Any, enabled: bool) -> None:
+    if not enabled:
+        return
+    _prepare_deterministic_validation(True)
+    torch.use_deterministic_algorithms(True)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.allow_tf32 = False
+    torch.backends.cuda.matmul.allow_tf32 = False
+
+
+def _publish_checkpoint_event(
+        run_dir: Path, run_id: str, generation: str, reason: str,
+        microsteps_completed: int, optimizer_steps: int, pending_microbatches: int,
+        publish_started_at_utc: str, checkpoint_durable_at_utc: str,
+        publish_elapsed_ns: int, published: dict[str, Any], pins: dict[str, Any]) -> dict[str, Any]:
+    """Bind wall-clock timing to a fully verified, durably indexed generation."""
+    if (not re.fullmatch(r"checkpoint-[0-9]{8}", generation)
+            or reason not in {"interval", "safe-pause", "epoch-tail", "epoch-complete"}
+            or microsteps_completed < 0 or optimizer_steps < 0
+            or pending_microbatches != 0 or publish_elapsed_ns < 0):
+        raise BehaviorTrainingError("checkpoint event identity or progress is invalid")
+    index_path = run_dir / "checkpoints" / "checkpoint-index.json"
+    try:
+        index_bytes = index_path.read_bytes()
+        index = json.loads(index_bytes)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise BehaviorTrainingError("checkpoint event cannot read durable index") from exc
+    if index_bytes != _canonical_json_bytes(index):
+        raise BehaviorTrainingError("checkpoint event index is not canonical")
+    latest = index.get("latest") if isinstance(index, dict) else None
+    manifest_sha256 = published.get("manifest_sha256")
+    manifest = published.get("manifest")
+    payload = manifest.get("payload") if isinstance(manifest, dict) else None
+    if (not isinstance(latest, dict)
+            or latest.get("relative_path") != generation
+            or latest.get("manifest_sha256") != manifest_sha256
+            or not isinstance(payload, dict)
+            or not re.fullmatch(r"[0-9a-f]{64}", str(payload.get("sha256", "")))):
+        raise BehaviorTrainingError("checkpoint event does not match durable generation")
+    event = {
+        "schema_version": CHECKPOINT_EVENT_SCHEMA,
+        "run_id": run_id,
+        "generation": generation,
+        "reason": reason,
+        "microsteps_completed": microsteps_completed,
+        "optimizer_steps": optimizer_steps,
+        "pending_microbatches": pending_microbatches,
+        "publish_started_at_utc": publish_started_at_utc,
+        "checkpoint_durable_at_utc": checkpoint_durable_at_utc,
+        "publish_elapsed_ns": publish_elapsed_ns,
+        "checkpoint_manifest_sha256": manifest_sha256,
+        "checkpoint_payload_sha256": payload["sha256"],
+        "checkpoint_index_sha256": hashlib.sha256(index_bytes).hexdigest(),
+        "checkpoint_index": index,
+        "pins_sha256": hashlib.sha256(_canonical_json_bytes(pins)).hexdigest(),
+    }
+    event_path = run_dir / "checkpoint-events" / f"{generation}.json"
+    if os.path.lexists(event_path):
+        raise BehaviorTrainingError("checkpoint event generation already exists")
+    atomic_json(event_path, event)
+    encoded = _canonical_json_bytes(event)
+    if event_path.read_bytes() != encoded:
+        raise BehaviorTrainingError("checkpoint event publication verification failed")
+    return {"relative_path": event_path.relative_to(run_dir).as_posix(),
+            "sha256": hashlib.sha256(encoded).hexdigest(), "event": event}
 
 
 def _source_pins(args: argparse.Namespace, model_dir: Path, tokenizer: Any) -> dict[str, Any]:
@@ -103,7 +190,16 @@ def _source_pins(args: argparse.Namespace, model_dir: Path, tokenizer: Any) -> d
         "versions": versions,
         "cuda_identity": cuda_identity,
         "quantization": quantization,
-        "config": {key: getattr(args, key) for key in ("mode", "seed", "lora_r", "lora_alpha", "lora_dropout", "learning_rate", "max_steps", "batch_size", "gradient_accumulation", "max_seq_len")},
+        "config": {key: getattr(args, key) for key in ("mode", "seed", "lora_r", "lora_alpha", "lora_dropout", "learning_rate", "max_steps", "batch_size", "gradient_accumulation", "max_seq_len", "checkpoint_every_optimizer_steps", "deterministic_validation")},
+        "determinism": {
+            "validation_enabled": bool(args.deterministic_validation),
+            "algorithms_enabled": bool(torch.are_deterministic_algorithms_enabled()),
+            "cudnn_deterministic": bool(torch.backends.cudnn.deterministic),
+            "cudnn_benchmark": bool(torch.backends.cudnn.benchmark),
+            "cudnn_allow_tf32": bool(torch.backends.cudnn.allow_tf32),
+            "cuda_matmul_allow_tf32": bool(torch.backends.cuda.matmul.allow_tf32),
+            "cublas_workspace_config": os.environ.get("CUBLAS_WORKSPACE_CONFIG"),
+        },
         "tokenizer_class": tokenizer.__class__.__name__,
         "order_strategy": "seeded-scenario-group-then-row-shuffle.v1",
     }
@@ -174,9 +270,13 @@ def _accept_resumed_pause_control(run_dir: Path, run_id: str,
     control = run_dir / "control"
     request_path = control / "pause.request.json"
     ack_path = control / "pause.ack.json"
-    if not request_path.exists() and not ack_path.exists():
+    request_exists = os.path.lexists(request_path)
+    ack_exists = os.path.lexists(ack_path)
+    if not request_exists and not ack_exists:
         return
-    if not request_path.is_file() or not ack_path.is_file():
+    if (request_exists != ack_exists or not request_path.is_file()
+            or not ack_path.is_file() or request_path.is_symlink()
+            or ack_path.is_symlink()):
         raise BehaviorTrainingError("resumed pause control is incomplete")
     try:
         request = json.loads(request_path.read_text(encoding="utf-8"))
@@ -333,13 +433,31 @@ def reject_network_path(path: Path, label: str) -> Path:
     # 2자 이상 스킴 + 구분자를 거부한다(1글자 "C:"는 드라이브라 허용).
     if text.startswith(("\\\\", "//")) or re.match(r"^[A-Za-z][A-Za-z0-9+.\-]+:[\\/]", text):
         raise BehaviorTrainingError(f"{label} must be a local path")
-    return path
+    absolute = path.expanduser().absolute()
+    existing = absolute
+    while not os.path.lexists(existing) and existing != existing.parent:
+        existing = existing.parent
+    for candidate in (existing, *existing.parents):
+        try:
+            attributes = os.lstat(candidate).st_file_attributes
+        except (AttributeError, OSError):
+            attributes = 0
+        if (candidate.is_symlink()
+                or attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
+            raise BehaviorTrainingError(f"{label} cannot traverse a reparse point")
+    if os.name == "nt":
+        import ctypes  # noqa: PLC0415
+        if ctypes.WinDLL("kernel32").GetDriveTypeW(str(absolute.anchor)) != 3:
+            raise BehaviorTrainingError(f"{label} must use a local fixed volume")
+    resolved = absolute.resolve()
+    if resolved == Path(resolved.anchor):
+        raise BehaviorTrainingError(f"{label} cannot be a volume root")
+    return resolved
 
 
 def require_local_model_dir(value: str) -> Path:
     """A model is a local directory snapshot, never a hub name."""
-    path = Path(value)
-    reject_network_path(path, "model dir")
+    path = reject_network_path(Path(value), "model dir")
     if not path.is_dir() or not (path / "config.json").is_file():
         raise BehaviorTrainingError("model dir must be a local directory with config.json")
     return path
@@ -361,6 +479,9 @@ def verify_model_weight_sha256(model_dir: Path, expected_sha256: str) -> str:
 
 
 def load_pinned_dataset(dataset_path: Path, expected_sha256: str) -> list[dict[str, Any]]:
+    dataset_path = reject_network_path(dataset_path, "dataset")
+    if not dataset_path.is_file() or dataset_path.is_symlink():
+        raise BehaviorTrainingError("dataset must be a local regular file")
     payload = dataset_path.read_bytes()
     digest = hashlib.sha256(payload).hexdigest()
     if digest != expected_sha256:
@@ -445,9 +566,12 @@ def encode_example(tokenizer: Any, messages: list[dict[str, str]], max_seq_len: 
 
 
 def run_training(args: argparse.Namespace) -> dict[str, Any]:
+    _prepare_deterministic_validation(args.deterministic_validation)
     import torch  # noqa: PLC0415 — heavy import stays inside the entrypoint
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
     from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    _configure_deterministic_validation(torch, args.deterministic_validation)
 
     for name in ("lora_r", "lora_alpha", "max_steps", "batch_size",
                  "gradient_accumulation", "max_seq_len"):
@@ -467,6 +591,16 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
     run_dir = reject_network_path(Path(args.run_dir), "run dir") if args.run_dir else None
     if args.mode == "cuda-qlora" and (run_dir is None or not args.run_id):
         raise BehaviorTrainingError("cuda-qlora requires --run-dir and --run-id for durable checkpoints")
+    if run_dir is not None:
+        # Dataset/model are immutable, SHA-pinned read-only inputs.  The run,
+        # adapter and report are the mutable publication set that must share
+        # one volume for same-volume atomic promotion.
+        run_anchor = run_dir.anchor.casefold()
+        if (output.anchor.casefold() != run_anchor
+                or (report_path is not None
+                    and report_path.anchor.casefold() != run_anchor)):
+            raise BehaviorTrainingError(
+                "run directory and final artifacts must share one fixed volume")
     if args.resume_from_checkpoint and run_dir is None:
         raise BehaviorTrainingError("--resume-from-checkpoint requires --run-dir")
 
@@ -624,6 +758,8 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
         if pending_microbatches != 0:
             raise BehaviorTrainingError("checkpoint requested outside optimizer boundary")
         checkpoint_generation += 1
+        publish_started_at_utc = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        publish_started_ns = time.perf_counter_ns()
         state = {"run_id": args.run_id, "trainable_state": snapshot_trainable_state(model),
                  "optimizer": optimizer.state_dict(), "scheduler": scheduler.state_dict(),
                  "python_rng": random.getstate(), "torch_rng": torch.get_rng_state(),
@@ -638,12 +774,18 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
         torch.save(state, buffer)
         generation = f"checkpoint-{checkpoint_generation:08d}"
         published = publish_checkpoint(run_dir, args.run_id, generation, buffer.getvalue(), pins)
+        checkpoint_durable_at_utc = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        checkpoint_event = _publish_checkpoint_event(
+            run_dir, args.run_id, generation, reason, step, optimizer_steps,
+            pending_microbatches, publish_started_at_utc, checkpoint_durable_at_utc,
+            time.perf_counter_ns() - publish_started_ns, published, pins)
         reference = {"relative_path": generation, "manifest_sha256": published["manifest_sha256"]}
         _progress(run_dir, {"run_id": args.run_id,
                             "status": "checkpointed", "safe_to_power_off": True,
                             "epoch": epoch, "next_batch_index": batch_cursor,
                             "optimizer_steps": optimizer_steps, "microsteps": step,
-                            "pending_microbatches": pending_microbatches, "checkpoint": reference})
+                            "pending_microbatches": pending_microbatches, "checkpoint": reference,
+                            "checkpoint_event": checkpoint_event})
         request_id = _pause_request(run_dir, args.run_id)
         if request_id:
             atomic_json(run_dir / "control" / "pause.ack.json", {
@@ -685,9 +827,10 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
                 _progress(run_dir, {"schema_version": CONTROL_SCHEMA_VERSION, "run_id": args.run_id,
                                     "status": "running", "safe_to_power_off": False,
                                     "optimizer_steps": optimizer_steps, "microsteps": step})
+                pause_pending = _pause_request(run_dir, args.run_id) is not None
                 if (optimizer_steps % args.checkpoint_every_optimizer_steps == 0
-                        or _pause_request(run_dir, args.run_id) is not None):
-                    checkpoint("interval")
+                        or pause_pending):
+                    checkpoint("safe-pause" if pause_pending else "interval")
         # Selection must observe a post-optimizer model.  Flush both a normal
         # epoch tail and the final partial epoch rather than carrying gradients
         # across their evaluation boundary.
@@ -742,6 +885,9 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
         "training_samples": len(rows),
         "samples": len(rows), "steps": max_steps,
         "optimizer_steps": optimizer_steps,
+        "checkpoint_every_optimizer_steps": args.checkpoint_every_optimizer_steps,
+        "deterministic_validation": bool(args.deterministic_validation),
+        "determinism": pins["determinism"],
         "order_strategy": "seeded-scenario-group-then-row-shuffle",
         "order_seed": args.seed,
         "dev_loss_history": dev_loss_history,
@@ -798,6 +944,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--checkpoint-every-optimizer-steps", type=int, default=5)
     parser.add_argument("--resume-from-checkpoint", type=Path,
                         help="exact immutable generation directory under run-dir/checkpoints")
+    parser.add_argument("--deterministic-validation", action="store_true",
+                        help="fail closed on nondeterministic CUDA operations for equivalence proof")
     for key, value in DEFAULTS.items():
         flag = "--" + key.replace("_", "-")
         parser.add_argument(flag, type=type(value), default=value)

@@ -1,11 +1,13 @@
 import hashlib
 import importlib.util
 import json
+import stat
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 import pytest
 
@@ -125,6 +127,14 @@ progress_path.write_bytes(canonical(progress))
 
 
 def _arguments(root: Path, trainer: Path, *, resume: bool = False) -> list[str]:
+    dataset = root / "dataset.jsonl"
+    model_dir = root / "model"
+    if not dataset.exists():
+        dataset.write_bytes(b"{}\n")
+    model_dir.mkdir(exist_ok=True)
+    config = model_dir / "config.json"
+    if not config.exists():
+        config.write_bytes(b"{}\n")
     values = [
         "--run-dir", str(root / "run"), "--run-id", "integration-run",
         "--python", sys.executable, "--trainer", str(trainer),
@@ -134,7 +144,8 @@ def _arguments(root: Path, trainer: Path, *, resume: bool = False) -> list[str]:
     if resume:
         values.append("--resume-interrupted")
     values.extend([
-        "--", "--dataset-sha256", "a" * 64, "--model-sha256", "b" * 64,
+        "--", "--dataset", str(dataset), "--dataset-sha256", "a" * 64,
+        "--model-dir", str(model_dir), "--model-sha256", "b" * 64,
         "--output", str(root / "adapter"), "--report", str(root / "report.json"),
     ])
     return values
@@ -248,6 +259,129 @@ def test_resume_acceptance_for_n_survives_n_plus_two_rotation_and_archive_fault(
             {**pins, "input_manifest_sha256": "c" * 64})
         assert selected["relative_path"] == "checkpoint-00000003"
         assert selected["manifest_sha256"] == third["manifest_sha256"]
+
+
+@pytest.mark.parametrize(
+    "already_archived",
+    [
+        {"request"}, {"ack"}, {"accepted"},
+        {"request", "ack"}, {"request", "accepted"},
+        {"ack", "accepted"}, {"request", "ack", "accepted"},
+    ],
+)
+def test_pause_archive_recovers_every_power_cut_subset(already_archived) -> None:
+    checkpoint_spec = importlib.util.spec_from_file_location(
+        "behavior_checkpoint_archive_cutpoints_test",
+        HERE / "behavior_training_checkpoint.py")
+    assert checkpoint_spec and checkpoint_spec.loader
+    checkpoint = importlib.util.module_from_spec(checkpoint_spec)
+    checkpoint_spec.loader.exec_module(checkpoint)
+    with tempfile.TemporaryDirectory() as temporary:
+        run_dir = Path(temporary) / "run"
+        pins = {"dataset_sha256": "a" * 64, "model_weight_sha256": "b" * 64,
+                "trainer_source_sha256": "d" * 64}
+        published = checkpoint.publish_checkpoint(
+            run_dir, "archive-cutpoints", "checkpoint-00000001", b"state", pins)
+        request_id = "pause-cutpoint-001"
+        control = run_dir / "control"
+        history = control / "history"
+        history.mkdir(parents=True)
+        values = {
+            "request": {
+                "schema_version": "airi.behavior-pause-request.v1",
+                "run_id": "archive-cutpoints", "request_id": request_id,
+            },
+            "ack": {
+                "schema_version": "airi.behavior-pause-ack.v1",
+                "run_id": "archive-cutpoints", "request_id": request_id,
+                "checkpoint_manifest_sha256": published["manifest_sha256"],
+                "checkpoint_relative_path": "checkpoint-00000001",
+                "acknowledged_at_utc": "2026-08-22T00:00:00Z",
+                "safe_to_power_off": True,
+            },
+            "accepted": {
+                "schema_version": "airi.behavior-resume-accepted.v1",
+                "run_id": "archive-cutpoints", "request_id": request_id,
+                "checkpoint_relative_path": "checkpoint-00000001",
+                "checkpoint_manifest_sha256": published["manifest_sha256"],
+            },
+        }
+        live = {
+            "request": control / "pause.request.json",
+            "ack": control / "pause.ack.json",
+            "accepted": control / "resume.accepted.json",
+        }
+        archived = {
+            "request": history / f"{request_id}.request.json",
+            "ack": history / f"{request_id}.ack.json",
+            "accepted": history / f"{request_id}.resume-accepted.json",
+        }
+        for name, path in live.items():
+            path.write_bytes(runner.canonical_bytes(values[name]))
+        for name in already_archived:
+            live[name].replace(archived[name])
+
+        recovered = runner._archive_accepted_pause_control(
+            run_dir, "archive-cutpoints",
+            {**pins, "input_manifest_sha256": "c" * 64})
+        assert recovered is (already_archived != {"request", "ack", "accepted"})
+        for name in values:
+            assert not live[name].exists()
+            assert archived[name].read_bytes() == runner.canonical_bytes(values[name])
+
+
+def test_pause_archive_removes_identical_live_history_duplicate() -> None:
+    checkpoint_spec = importlib.util.spec_from_file_location(
+        "behavior_checkpoint_archive_duplicate_test",
+        HERE / "behavior_training_checkpoint.py")
+    assert checkpoint_spec and checkpoint_spec.loader
+    checkpoint = importlib.util.module_from_spec(checkpoint_spec)
+    checkpoint_spec.loader.exec_module(checkpoint)
+    with tempfile.TemporaryDirectory() as temporary:
+        run_dir = Path(temporary) / "run"
+        pins = {"dataset_sha256": "a" * 64, "model_weight_sha256": "b" * 64,
+                "trainer_source_sha256": "d" * 64}
+        published = checkpoint.publish_checkpoint(
+            run_dir, "archive-duplicate", "checkpoint-00000001", b"state", pins)
+        control = run_dir / "control"
+        history = control / "history"
+        history.mkdir(parents=True)
+        request_id = "pause-duplicate-001"
+        request = {"schema_version": "airi.behavior-pause-request.v1",
+                   "run_id": "archive-duplicate", "request_id": request_id}
+        ack = {"schema_version": "airi.behavior-pause-ack.v1",
+               "run_id": "archive-duplicate", "request_id": request_id,
+               "checkpoint_manifest_sha256": published["manifest_sha256"],
+               "checkpoint_relative_path": "checkpoint-00000001",
+               "acknowledged_at_utc": "2026-08-22T00:00:00Z",
+               "safe_to_power_off": True}
+        accepted = {"schema_version": "airi.behavior-resume-accepted.v1",
+                    "run_id": "archive-duplicate", "request_id": request_id,
+                    "checkpoint_relative_path": "checkpoint-00000001",
+                    "checkpoint_manifest_sha256": published["manifest_sha256"]}
+        (control / "pause.request.json").write_bytes(runner.canonical_bytes(request))
+        (history / f"{request_id}.request.json").write_bytes(
+            runner.canonical_bytes(request))
+        (control / "pause.ack.json").write_bytes(runner.canonical_bytes(ack))
+        (control / "resume.accepted.json").write_bytes(
+            runner.canonical_bytes(accepted))
+        assert runner._archive_accepted_pause_control(
+            run_dir, "archive-duplicate",
+            {**pins, "input_manifest_sha256": "c" * 64})
+        assert not (control / "pause.request.json").exists()
+        assert (history / f"{request_id}.request.json").read_bytes() == runner.canonical_bytes(request)
+
+
+def test_runner_path_validation_rejects_reparse_attributes() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        path = Path(temporary) / "dataset.jsonl"
+        path.write_bytes(b"{}\n")
+        fake_stat = SimpleNamespace(
+            st_file_attributes=0x400,
+            st_mode=stat.S_IFREG)
+        with mock.patch.object(runner.os, "lstat", return_value=fake_stat):
+            with pytest.raises(runner.DurableRunnerError, match="reparse"):
+                runner.validate_local_path(path, "dataset")
 
 
 def test_torn_current_index_recovers_only_through_previous_index() -> None:

@@ -7,6 +7,44 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-22 P0-B 독립 감사·compact 복구 정정
+
+- exact staged 10-file 상태에서 전체 offline checkpoint exit 0/PASS. continuity,
+  actual-process durability와 CI manifest 포함 기존 핵심 회귀가 통과했고 관련 PID 0이다.
+  receipt 재stage·cached diff-check 뒤 `feat: add GPU training equivalence gate`로
+  commit/push하며 실패 시 controlled GPU/E2로 이동하지 않는다.
+- closed history/live inventory와 non-replacing atomic-new receipt 보강 뒤 최신 독립
+  재감사는 P0 0/P1 0, controlled GPU READY다. fresh Python `68 passed, 1 skipped`,
+  actual-process PowerShell PASS, diff-check PASS와 관련 PID 0을 확보했다. exact stage
+  상태의 full offline checkpoint·commit/push 전에는 GPU/E2를 시작하지 않는다.
+- 첫 blocker 수정 뒤 Python `63 passed, 1 skipped`, actual-process PowerShell PASS였지만
+  독립 재감사는 P0 2/P1 1로 아직 NOT READY다. 확정 P0인 live+history/extra history
+  동시 허용과 P1 receipt fresh-path overwrite/delete race를 exact closed inventory와
+  non-replacing atomic-new publication으로 수리했다. dataset/model은 SHA-pinned read-only
+  input이라 서로 다른 fixed local volume을 허용하고, mutable run/output/report만 atomic
+  promotion을 위해 같은 volume으로 묶는 명시적 계약을 유지해 재감사받는다.
+- compact 뒤 지정 SSoT 5종과 active goal을 순서대로 복구하고 HEAD=origin/main
+  `59a2363`, 실제 6 modified+2 untracked의 8개 worktree 경로, AIRI trainer/runner 0,
+  corpus/base/E1 exact SHA, E2/T3/campaign 부재와 E2 로그 각 0 bytes를 재대조했다.
+  GPU에는 비-AIRI OS/app process가 있지만 AIRI workload는 0이다. 문서의 6-file 표기를
+  8-file 관측값으로 정정했다.
+- 최신 독립 감사 판정은 P0 5/P1 3, controlled GPU `NOT READY`다. checkpoint-event
+  연속성·latest 결속, safe-pause 부분 archive 전원차단 복구, exact/600초/4구간 고정,
+  TF32 포함 deterministic 환경 pin, end-to-end fixed-volume/reparse가 P0다. wall/monotonic
+  대조, payload/comparator identity receipt, safe `torch.load`가 P1이다. runner archive
+  idempotency와 runner/trainer path 검증의 직전 부분 수정은 미검증이므로 전체 blocker와
+  fault 회귀를 수리해 독립 P0/P1 0·offline PASS·commit/push 전에는 GPU/E2를 실행하지 않는다.
+
+## 2026-08-22 P0-B GPU 증거 계층 구현 intent
+
+- HEAD=origin/main `59a2363`, AIRI trainer/runner 0에서 두 독립 read-only 탐색을
+  수행했다. P0-A는 full-state 복구에는 충분하지만 checkpoint별 durable wall-clock
+  event와 GPU baseline 대 pause/resume 정식 comparator/determinism pin이 없어 현재
+  실행은 P0-B 증거로 승격할 수 없다. root는 trainer timing/determinism, 분리 worker는
+  verifier/test만 소유해 offline 구현하며 검증·commit/push 전에는 GPU/E2를 실행하지 않는다.
+- live state의 직전 수동 `17:56` 시각이 실제 `Get-Date 17:51`보다 미래였던 문서 오차를
+  관측 시각으로 정정했다. 기계/Git/runtime 상태 차이는 없었다.
+
 ## 2026-08-22 P0-A offline milestone compact 복구 대조
 
 - actual implementation push receipt의 SSoT 6종 반영 뒤 continuity PASS, repo 기본

@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-22 17:52:00 +09:00"
-checkpoint_id: "20260822-1752-p0a-receipt-doc-validation"
+updated_at_kst: "2026-08-22 18:35:02 +09:00"
+checkpoint_id: "20260822-183502-p0b-full-offline-pass-commit-intent"
 goal_status: "active"
 authorization: "repo-gpu-package-test-commit-push; operational-adoption-forbidden"
-active_phase: "p0-checkpoint-resume-implementation"
-git_head: "6f0c1358d2acd18b828ebc0ae8482a348712c461"
-worktree_state: "dirty-p0a-receipt-docs-only"
+active_phase: "p0-controlled-gpu-validation"
+git_head: "59a2363e3340c0e3a59eebf58f7b5f17de29bb1f"
+worktree_state: "staged-p0b-evidence-code-10-files"
 active_trainer_count: 0
 ---
 
@@ -25,29 +25,216 @@ active_trainer_count: 0
 - 저장소 구현·수정, GPU 학습, merge/package, 로컬 서비스, T3·campaign 및
   검증된 milestone commit/push가 허가됐다. 운영 모델 채택과 기본 모델 변경은
   별도 사용자 승인 전까지 금지한다.
-- 2026-08-22 17:40 KST compact 복구 재확인: Python trainer/durable runner
+- 2026-08-22 18:11 KST compact 복구 재확인: Python trainer/durable runner
   프로세스 0. GPU process 목록에도 AIRI trainer/runner workload는 0이다.
 - v4 파인튜닝은 E1 adapter/report까지만 완료·검증됐고 아직 미채택이다.
 - E2 adapter/report, merge/package, v4 T3, live campaign 산출물은 0이다.
-- HEAD와 origin/main은 P0-A 구현 commit
-  `6f0c1358d2acd18b828ebc0ae8482a348712c461`로 일치한다. 구현 push 뒤
-  AIRI trainer/runner 0이며 이 milestone receipt 문서 갱신만 dirty다.
+- HEAD와 origin/main은 P0-A receipt commit
+  `59a2363e3340c0e3a59eebf58f7b5f17de29bb1f`로 일치한다. receipt push 뒤
+  worktree clean을 확인한 뒤 P0-B 배치를 시작했으며, 현재 실제 worktree는
+  P0-B 구현 확장으로 현재는 8 modified+2 untracked의 정확히 10개 경로다.
+  AIRI trainer/runner는 0이다.
 
 ## 2. 현재 작업 트랜잭션
 
 | 항목 | 값 |
 |---|---|
-| 의도 | trainer full-state atomic checkpoint/exact resume와 agent-independent runner/safe-pause/reboot recovery의 P0 코드·회귀 구현 |
-| 허용 범위 | 저장소 Python/PowerShell/테스트 구현과 offline CPU 회귀만 허용; GPU·서비스·E2 실행 금지 |
-| 시작 전 증거 | HEAD=origin/main `e93d552`; live-state 단독 dirty; actual Python trainer 0. trainer SHA `3e6fb394...fa880`, trainer test `e69086b7...ad19e`, background pattern `ef651e44...e2eb`, campaign pattern `431bfb55...0102`, atomic merge pattern `e54207d8...aeb5` |
-| exact 명령 | `D:\AIRI-Models\venv-midm-broadcast-qlora-py312\Scripts\python.exe -m pytest -q ollama-proxy/training/tests/test_behavior_training_checkpoint.py ollama-proxy/training/tests/test_train_airi_behavior_lora.py ollama-proxy/training/tests/test_durable_training_runner.py`; root PowerShell contract test와 `python -m py_compile`은 새 파일 확정 뒤 receipt에 exact 기록; 관련 offline checkpoint와 diff-check |
-| 출력 경로 | Git: trainer+checkpoint module/tests, Python durable runner, `run-airi-behavior-training-durable.ps1`, `pause-airi-safely.ps1`, root runner contract test. Runtime 설계: `D:\AIRI-Models\airi-broadcast-v4-20260821\runs\e2-seed42\{run-state.json,control,checkpoints,logs}`; final E2 adapter/report 기존 경로 유지 |
-| 완료 조건 | optimizer 경계 full-state checkpoint, same-volume fsync/verify/immutable publish+latest/previous, exact pin resume, corrupt latest quarantine/previous fallback, pause ack, durable run-state/PID identity/reboot duplicate 방지, CPU 중단/재개 exact 동등성 회귀 PASS |
-| 중단·복구 | 구현 중 quota/PC 중단은 Git diff와 이 intent부터 재개; runner/GPU가 0이므로 런타임 진척 없음. 테스트 실패 시 P0 완료·E2 허용으로 승격하지 않음 |
-| 현재 행동 | P0-A 구현 `6f0c1358...c461` origin/main push 완료. SSoT 6종에 actual receipt를 반영해 continuity/diff/security, exact docs commit/push를 완료한 뒤 clean HEAD에서 P0-B controlled GPU intent로 이동한다. E2 금지. |
+| 의도 | P0-B GPU 실행 전에 checkpoint별 durable timing event, deterministic-validation pin, baseline 대 pause/resume 정식 comparator·receipt를 구현한다. |
+| 허용 범위 | trainer와 새 verifier/tests의 저장소 구현·offline 회귀만 허용; GPU·서비스·E2 실행 금지 |
+| 시작 전 증거 | HEAD=origin/main `59a2363`; AIRI trainer/runner 0. trainer `890dd7bf...b7960` 42,663 B, trainer test `0995d10d...53a6` 26,678 B, checkpoint `89785d37...f4f96`, runner `900db00e...37526` |
+| exact 명령 | 핀된 Python 3.12의 `-m py_compile` checkpoint+trainer+runner+verifier, 이어 `-m pytest -q`로 `test_behavior_training_checkpoint.py test_train_airi_behavior_lora.py test_durable_training_runner.py test_verify_airi_behavior_gpu_equivalence.py`; PASS 뒤 PowerShell durability와 독립 재감사 |
+| 출력 경로 | Git: trainer/test와 새 GPU equivalence verifier/test. GPU runtime 경로는 이 코드 배치가 검증·commit/push된 뒤 별도 intent에서 fresh D: 경로로 고정 |
+| 완료 조건 | 각 generation의 manifest/payload/index/pins SHA와 publish wall/monotonic time을 atomic receipt로 보존, deterministic CUDA 설정을 exact pins에 결속, 두 complete run의 artifact/report/latest full state와 정상 interval ≤600초를 fail-closed 판정하는 canonical receipt 및 offline fault PASS |
+| 중단·복구 | quota/PC 중단은 Git diff와 이 intent부터 재개한다. offline PASS·독립 검토·commit/push 전에는 GPU를 시작하지 않고 P0-B/E2를 승격하지 않는다. |
+| 현재 행동 | 최신 독립 감사 P0 5/P1 3 blocker와 fault 회귀를 코드에 반영했다. 현재 바이트의 py_compile+4-suite focused를 실행하며 실패 시 GPU/E2 금지와 diff를 보존한다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260822-183502-p0b-full-offline-pass-commit-intent`: exact staged 10/unstaged 0/
+  untracked 0과 cached diff-check PASS 상태에서 `test-current-checkpoint.ps1` exit 0,
+  최종 `Current checkpoint contract: PASS (offline synthetic ASAR only; no installed
+  archive/service/model access)`. continuity, actual-process durability, manifest/source/
+  entrypoint와 기존 Python/Node/PowerShell 핵심 회귀가 모두 PASS했다. 종료 뒤 관련
+  Python PID 0, staged 10/0/0이며 최초 staged 통계는 1,687 insertions/52 deletions다.
+  직전 frontmatter와 두 수동 checkpoint ID를 실제 clock보다 최대 약 2분 앞선
+  `18:36`/`18:37`로 적은 문서 오차를 실제 `Get-Date 18:35:02`로 정정한다. 작업·receipt
+  순서는 변하지 않으며 이 checkpoint가 권위 시각이다. 이 receipt 문서들을 재stage해
+  staged 경계/diff-check를 다시 확인한 뒤 exact `git commit -m
+  "feat: add GPU training equivalence gate"`를 실행한다. commit 실패 시 push/GPU/E2를
+  실행하지 않고 staged 배치에서 복구한다.
+- `20260822-1837-p0b-staged-full-offline-intent`: exact 10-file `git add` exit 0.
+  최초 stage receipt는 staged 10, unstaged 0, untracked 0이고 cached diff-check exit 0/
+  whitespace error 0이다. 이 receipt를 담은 WORKING-STATE만 다시 stage한 뒤 동일
+  10/0/0 경계와 cached diff-check를 재검증한다. 다음 exact 명령은
+  `.\test-current-checkpoint.ps1`; 새 verifier test와 P0-A checkpoint/runner tests가
+  staged tracked inventory 및 CI training shard에 모두 보이는 상태여야 한다. 완료 조건은
+  exit 0과 최종 `Current checkpoint contract: PASS`, 관련 PID 0이다. 실패하면 commit/
+  push/GPU/E2를 실행하지 않고 stage를 보존해 수리한다.
+- `20260822-1836-p0b-prestage-pass-stage-intent`: `core.quotePath=false`로 Unicode
+  경로를 보존한 fresh pre-stage 감사 exit 0. exact 10개 경로, boundary diff 0,
+  금지 산출물 filename 0, 비밀 값 형태 content hit 0, repo 기본 diff-check exit 0/
+  whitespace error 0이다. 핵심 구현 SHA는 verifier `c5e2075c...fd99`, verifier test
+  `15c5ef6f...b6ad`, runner `8cd24b45...1d803`, runner test `13ba0ba5...392b9`,
+  trainer `d61c167c...6ad8e`, trainer test `5cc55944...ccf65`, PowerShell contract
+  `826788f3...b017c`, CI workflow `e5116e7d...f044`다. 다음 상태 변경은 이 10경로만
+  exact `git add --`하고 staged 10·unstaged 0·untracked 0 및 cached diff-check를
+  확인하는 것이다. 실패하면 commit/push/full offline/GPU/E2를 실행하지 않는다.
+- `20260822-1835-prestage-quotepath-audit-failure`: 첫 pre-stage 감사 스크립트는
+  stage/Git mutation 없이 종료됐지만 Git 기본 `core.quotePath`가 두 한글 문서 경로를
+  quoted octal 문자열로 반환해 `Compare-Object` boundary diff 4와 두 파일의
+  `Illegal characters in path` ReadAllText/Get-FileHash 오류를 냈다. 따라서 출력된
+  secret hit 0과 boundary 판정은 완결 receipt로 인정하지 않는다. 별도로 실행된 repo
+  기본 diff-check는 exit 0/whitespace error 0이고 나머지 8개 SHA는 읽혔다. exact 같은
+  10경로 배열을 유지하되 `git -c core.quotePath=false diff --name-only`와 동일 untracked
+  조회로 Unicode 실제 경로를 받아 boundary/security/SHA를 fresh 재실행한다. 통과 전에는
+  stage/commit/push/GPU/E2를 실행하지 않는다.
+- `20260822-1833-p0b-ready-prestage-audit-intent`: 최신 독립 read-only 재감사는
+  closed safe-pause inventory, non-replacing receipt, fixed-local/non-reparse 5-path와
+  mutable publication same-volume 경계를 확인해 P0 0/P1 0, controlled GPU `READY`다.
+  static audit로 테스트/Git/GPU는 실행하지 않았고 직전 fresh 통합
+  `68 passed, 1 skipped`, PowerShell PASS, diff-check PASS, PID 0이 실행 근거다.
+  다음은 현재 exact 10개 경로의 status/diff/security/SHA preflight다. 통과하면 exact
+  10-file `git add`, staged 경계와 `git diff --cached --check`를 검증한 상태에서
+  `test-current-checkpoint.ps1`을 실행한다. 새 untracked verifier test는 staged여야
+  `git ls-files` CI manifest gate가 보므로 staging 전 full offline은 유효 근거가 아니다.
+  실패 시 stage/commit/push/GPU/E2를 중단하고 현 배치에서 수리한다.
+- `20260822-1831-p0b-second-integration-pass-reaudit`: closed control/history와
+  non-replacing receipt fault 보강 뒤 pycompile exit 0, 4-suite focused exit 0,
+  `68 passed, 1 skipped in 17.90s`; actual-process PowerShell durability exit 0/PASS.
+  종료 뒤 관련 Python PID 0이고 repo 기본 diff-check exit 0/whitespace error 0
+  (LF→CRLF 경고만)이다. 독립 감사 담당에게 최신 bytes와 명시된 immutable-input 대
+  mutable-publication volume 경계를 다시 판정시킨다. P0/P1 0 `READY`와 staged full
+  offline 전에는 GPU/E2를 시작하지 않는다.
+- `20260822-1829-p0b-reaudit-fix-retest-intent`: 최신 독립 재감사는 이전 event,
+  archive cutpoint, exact fixed gate, TF32/CUDA/quantization, timing, payload/comparator,
+  safe load를 해소로 확인했지만 P0 2/P1 1, `NOT READY`로 판정했다. 확정 P0는
+  verifier가 완전한 history triple과 동시에 남은 live controls 및 extra/orphan history를
+  거부하지 않은 점이고, P1은 receipt freshness 확인 뒤 다른 writer의 파일을 덮거나
+  실패 cleanup에서 지울 수 있는 race다. verifier가 control root를 history-only,
+  history를 exact canonical triple inventory로 닫고 live 3종을 `lexists`로 거부하게
+  했으며, receipt는 same-parent staged fsync 뒤 Windows non-replacing write-through move/
+  POSIX exclusive link로 fresh publish해 타 파일을 덮거나 지우지 않는다. 나머지 P0는
+  dataset/model까지 run과 같은 drive여야 한다는 조건부 해석이다. 이는 read-only pinned
+  input은 서로 다른 fixed local volume을 허용하고 mutable run/output/report만 same-volume
+  원자 승격한다는 설계이므로 양쪽 코드에 명시해 재판정을 요청한다. 최신 verifier/test
+  SHA는 `36487/c5e2075c...fd99`, `16856/15c5ef6f...b6ad`; runner/trainer는 주석 포함
+  `60565/8cd24b45...1d803`, `50680/d61c167c...6ad8e`. exact 다음 명령은 pycompile+
+  4-suite focused와 PowerShell durability이며, PASS 뒤 독립 재감사를 반복한다.
+- `20260822-1825-p0b-integration-pass-reaudit-intent`: 수정된 actual-process
+  `test-airi-training-durability.ps1` exit 0, `AIRI training durability contract: PASS`.
+  종료 뒤 trainer/runner/fake trainer 관련 Python PID 0이며 actual worktree는 기록된
+  8 modified+2 untracked의 10개 경로와 일치한다. 최신 통합 증거는 Python
+  `63 passed, 1 skipped`와 PowerShell PASS다. 직전 P0-B 감사 담당에게 최신 전체 diff를
+  read-only로 재감사시켜 event 최신 결속/전원차단 cutpoint/fixed exact gate/TF32·path/
+  timing·payload receipt/안전 load 각각의 해소 여부와 새 P0/P1을 판정받는다. P0/P1 0
+  `READY` 전에는 full offline·stage/commit이나 GPU/E2로 이동하지 않는다.
+- `20260822-1824-powershell-fixture-retry-intent`: 실패 뒤 관련 process 필터는
+  검사 명령 자신의 PowerShell 외 AIRI trainer/runner 0이고, default contract가 실패
+  temp를 정리해 stderr 본문은 남지 않았다. source 검사에서 launcher-case 3곳과
+  live-pause 공통 `TrainerArguments`가 새 필수 `--dataset`/`--model-dir` 없이 SHA만
+  전달한 동일 fixture 결함을 확인했다. 각 temp case에 regular dataset과 config model
+  dir를 만들고 네 argument block에 exact path를 추가했다. 수정된 contract는
+  `30311` bytes, SHA `826788f3...b017c`; 실제 worktree는 이 test와 runner test를 포함해
+  8 modified+2 untracked, 10개다. exact 다음 명령은 같은 PowerShell durability
+  contract이며 exit 0/PASS와 관련 PID 0이 완료 조건이다. 실패 시 이번에는 원인을
+  다시 receipt로 기록하고 GPU/E2 금지를 유지한다.
+- `20260822-1823-p0b-powershell-launch-failure`: actual-process PowerShell durability
+  contract는 약 30초 뒤 exit 1. launcher가 `Durable runner did not publish a verified
+  run-state within 30 seconds; launch_shim_exited=True`로 중단했다. 검증된 run-state나
+  제품 경로 receipt가 없으므로 PASS/진척으로 승격하지 않는다. 먼저 관련 Python/
+  launcher PID와 실패 temp 보존 여부, runner stderr와 exact trainer args를 read-only로
+  대조한다. 새 dataset/model-dir 필수 path 계약 누락이면 PowerShell synthetic fixture를
+  실제 계약에 맞게 고치고 같은 contract를 재실행하며, 다른 원인이면 해당 fault를 먼저
+  수리한다. 성공 receipt·독립 P0/P1 0 전에는 GPU/E2를 계속 금지한다.
+- `20260822-1822-p0b-focused-pass-powershell-intent`: fake fixture에 local regular
+  dataset과 config model dir exact 인자를 추가한 뒤 동일 pycompile exit 0,
+  4-suite focused exit 0, `63 passed, 1 skipped in 17.79s`. 종료 뒤 trainer/runner/
+  fake-trainer Python PID 0이다. skip은 CUDA 장비에서 gpu-less refusal 경로가
+  비적용인 기존 조건이다. 최신 핵심 SHA는 직전 intent와 같고 runner test만
+  `34334/13ba0ba5...92b9`로 바뀌었다. 다음 exact 명령은
+  `powershell -NoProfile -ExecutionPolicy Bypass -File
+  .\test-airi-training-durability.ps1`; 출력은 system temp synthetic runtime과 console
+  receipt이며 contract가 자체 정리한다. exit 0/PASS와 관련 PID 0이 완료 조건이고,
+  실패하면 산출물을 진단용으로 보존해 수리하며 독립 P0/P1 0 전에는 GPU/E2를 금지한다.
+- `20260822-1821-p0b-focused-fixture-failure`: py_compile exit 0 뒤 최신 4-suite
+  focused는 exit 1, `2 failed, 61 passed, 1 skipped in 9.02s`. 두 실패는
+  `test_resume_pin_mismatch_preserves_pause_request_and_ack`와
+  `test_safe_pause_then_explicit_resume_reaches_atomic_terminal_receipt`가 공통으로
+  `missing trainer argument: --dataset`에서 의도된 fake trainer 실행 전에 차단된 것이다.
+  runner가 새로 강제한 dataset/model-dir end-to-end path 계약에 기존 `_arguments`
+  fixture가 두 인자를 제공하지 않은 테스트 정합 결함이며 archive 제품 경로 판정에는
+  도달하지 않았다. fixture가 local regular dataset과 config.json model dir를 만들고
+  exact 인자를 전달하도록 고친 뒤 동일 pycompile+4-suite를 재실행한다. PASS receipt와
+  독립 P0/P1 0 전에는 GPU/E2를 계속 금지한다.
+- `20260822-1820-p0b-blocker-fix-test-intent`: event generation 1부터의 무결한
+  연속성+latest/payload 결속, wall/monotonic publish 대조, 고정 600초·최소 4구간·exact
+  comparator, full deterministic/TF32·CUDA/quantization pin, safe `weights_only=True`,
+  payload/comparator receipt를 verifier에 반영했다. runner는 acceptance-first 포함 모든
+  live/history 부분 archive와 동일 중복을 idempotent하게 수렴시키고 dataset/model/output/
+  report fixed-path를 선행 검증한다. trainer는 all-history/no-live resume를 no-op으로
+  수용하고 dataset/output/report/run fixed/reparse·same-volume을 독립 강제한다. 6개
+  핵심 파일의 현재 bytes/SHA는 trainer `50470/4ca2409f...0d05d`, runner
+  `60343/7a50bfbb...68e0e`, verifier `33610/105414b5...85764`, 세 test
+  `31667/5cc55944...ccf65`, `33996/1480e5a6...d78bf`,
+  `14114/b3939f57...4ddaa`다. exact 다음 명령은 위 표의 py_compile+4-suite focused다.
+  출력은 console test receipt뿐이며 실패하면 현재 diff에서 수리하고 독립 P0/P1 0,
+  offline commit/push 전에는 GPU/E2를 실행하지 않는다.
+- `20260822-1811-post-compact-p0b-audit-reconcile`: compact 뒤 지정 SSoT 5종을
+  순서대로 전체 재독하고 goal `active`, HEAD=origin/main `59a2363`, 실제 worktree
+  6 modified+2 untracked의 8개 경로, AIRI trainer/runner 0을 대조했다. source/chat/base와
+  E1 adapter/config/report의 크기·SHA는 exact 일치하고 E2 adapter/report/run-dir,
+  T3/campaign은 없으며 기존 E2 stdout/stderr는 각 0 bytes다. GPU에는 비-AIRI OS/app
+  process가 있으나 AIRI workload는 0이다. 첫 통합 SHA 명령은 30초 창에서 receipt 없이
+  끝나 PASS로 인정하지 않았고, 남은 process 0 확인 뒤 분리 재실행해 위 exact 값을
+  확보했다. 최신 독립 P0-B 감사 결과는 P0 5/P1 3, controlled GPU `NOT READY`다:
+  최신 checkpoint와 event의 결속/연속성, safe-pause 부분 archive 전원차단 복구,
+  comparator의 600초·4구간·exact 고정, TF32 포함 deterministic/환경 pin,
+  dataset/model/output/report fixed-volume·reparse 검증이 P0이며 wall/monotonic 대조,
+  receipt payload/comparator identity, `weights_only=True`가 P1이다. 직전 compact 직전에
+  runner archive idempotency와 runner/trainer fixed-path 검증을 부분 수정했지만 아직
+  테스트하지 않았다. 이 관측 정정을 먼저 기록하고 모든 blocker 수리·회귀·독립
+  P0/P1 0·commit/push 전에는 controlled GPU/E2를 시작하지 않는다.
+- `20260822-1804-full-offline-ci-matrix-failure`: `test-current-checkpoint.ps1`은
+  continuity와 actual-process durability를 PASS한 뒤 exit 1. P0-A에서 새로 commit된
+  `test_behavior_training_checkpoint.py`, `test_durable_training_runner.py`가 CI Python
+  matrix에 없어 manifest gate가 차단했다. 이전 full offline 때는 두 파일이 untracked라
+  `git ls-files` 기반 검사가 보지 못한 사후 통합 결함이다. 기존 두 테스트와 이번
+  `test_verify_airi_behavior_gpu_equivalence.py`를 training shard에 등록하고, 새 파일을
+  intent-to-add가 아닌 최종 exact stage한 상태에서 manifest/full offline을 재실행한다.
+  GPU·서비스·E2는 0이며 이 실패를 P0-B 진척으로 승격하지 않는다.
+- `20260822-1803-p0b-evidence-integration-pass`: fresh-parent 경로 수리 뒤 trainer+
+  verifier focused exit 0, `25 passed, 1 skipped in 6.81s`; exact/tolerance tensor
+  dtype 경계 보강 뒤 checkpoint+trainer+runner+verifier 전체 P0 Python exit 0,
+  `47 passed, 1 skipped in 17.13s`. actual-process PowerShell durability contract도
+  exit 0/PASS다. skip은 CUDA 장비에서 gpu-less refusal 경로가 비적용인 기존 조건이다.
+  최신 바이트 독립 P0/P1 감사와 full offline checkpoint, diff/security 전에는 GPU/E2를
+  시작하지 않는다.
+- `20260822-1800-p0b-integrated-focused-path-failure`: root가 worker verifier를
+  통합 검토하며 full pins, deterministic controls, durable-to-durable interval,
+  retained safe-pause history, recursive optimizer/RNG/tensor 비교를 보강했다. py_compile
+  뒤 첫 통합 focused는 exit 1, `1 failed, 24 passed, 1 skipped in 7.08s`. 유일한
+  실패는 fresh receipt의 아직 없는 부모를 reparse 검사기가 즉시 `stat`해 거부한
+  경로 검증 결함이다. 가장 가까운 existing ancestor까지 올라가 검사하도록 수정했고
+  동일 exact 묶음을 재실행한다. GPU·서비스·E2 실행은 0이며 PASS로 승격하지 않는다.
+- `20260822-1755-trainer-focused-no-receipt`: timing/determinism 보강 뒤 py_compile과
+  trainer focused pytest를 한 명령으로 시작했으나 도구가 30초 창에서 exit/output/session
+  receipt 없이 반환했다. actual pytest redirector/worker PID `4068`/`18228`을 확인해
+  중복 실행하지 않고 종료를 기다렸으며 둘 다 종료됐다. exit/test output receipt가
+  없으므로 PASS/진척으로 승격하지 않고 동일 focused test를 한 번 fresh 재실행한다.
+  GPU·서비스·E2 실행은 0이다. 분리 verifier는 owned 2개 파일, py_compile exit 0,
+  focused `3 passed in 0.11s`, diff-check PASS를 보고했으며 root 통합 검토 전이다.
+- `20260822-1751-p0b-evidence-code-intent`: 두 독립 read-only 탐색에서 현재 P0-A는
+  full-state 복구에 충분하지만 per-generation wall-clock durable receipt와 GPU 정식
+  comparator/determinism 정책이 없어 지금 GPU를 돌리면 P0-B 완료 증거가 되지 않음을
+  확인했다. 실제 `Get-Date 17:51`보다 앞선 직전 수동 `17:56` live timestamp도 관측값으로
+  정정했다. root/worker 소유권, 입력 SHA, offline 명령과 실패 폐쇄 조건을 위 표에
+  고정했으며 GPU·서비스·E2 실행은 0이다.
+- `20260822-1751-p0a-milestone-pushed`: receipt docs commit
+  `59a2363e3340c0e3a59eebf58f7b5f17de29bb1f`, 6 files, 53 insertions/
+  15 deletions을 origin/main에 push했다(`6f0c135..59a2363`). 이후 HEAD=origin/main,
+  worktree clean, AIRI trainer/runner 0이다. P0-A offline milestone은 durable하게
+  완료됐고 다음은 별도 intent가 필요한 P0-B controlled GPU equivalence와 실제 E2
+  속도의 ≤10분 checkpoint 간격 실측이다. P0-B receipt 전에는 E2를 시작하지 않는다.
 - `20260822-1752-p0a-receipt-doc-validation`: actual implementation push receipt를
   SSoT 6종에 반영한 뒤 focused continuity exit 0/PASS, repo 기본 diff-check exit 0/
   whitespace error 0, 변경 경로 exact 6개, 금지 산출물 filename·비밀 값 형태 content
@@ -520,11 +707,11 @@ active_trainer_count: 0
 
 ## 4. 다음 허용 행동
 
-1. P0-A의 16개 코드·문서 배치에 focused continuity, diff/security 검증을 수행한다.
-2. exact 16개만 stage해 `feat: add durable AIRI training recovery`로 commit/push하고
-   HEAD=origin/main, clean worktree, 관련 PID 0 receipt를 남긴다.
-3. clean HEAD에서 별도 intent를 기록한 뒤 controlled GPU 중단·재개 동등성과 실제
-   E2 속도의 checkpoint 손실 상한 10분 이하를 실측·고정한다.
+1. checkpoint timing event와 deterministic-validation pin, GPU equivalence verifier/test를
+   offline 구현·검토한다.
+2. 관련 Python/PowerShell/전체 offline 회귀와 독립 P0/P1 감사를 통과해 commit/push한다.
+3. clean HEAD에서 fresh D: 경로·exact paired command·허용오차 0·≤600초 조건을 별도
+   GPU intent로 기록하고 baseline 및 safe-pause/resume를 실행한다.
 4. P0-B GPU receipt 전에는 E2를 시작하지 않는다.
 
 ## 5. 갱신 트리거

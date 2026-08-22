@@ -1,11 +1,14 @@
 import hashlib
 import importlib.util
 import json
+import os
+import stat
 import shutil
 import tempfile
 import unittest
 from unittest import mock
 from pathlib import Path
+from types import SimpleNamespace
 
 
 HERE = Path(__file__).resolve().parent.parent
@@ -59,6 +62,95 @@ def pinned_payload(rows: list[dict]) -> tuple[bytes, str]:
 
 
 class ContractTests(unittest.TestCase):
+    def test_deterministic_validation_configures_exact_cuda_controls(self) -> None:
+        fake_torch = mock.Mock()
+        fake_torch.backends.cudnn.deterministic = False
+        fake_torch.backends.cudnn.benchmark = True
+        fake_torch.backends.cudnn.allow_tf32 = True
+        fake_torch.backends.cuda.matmul.allow_tf32 = True
+        with mock.patch.dict(os.environ, {}, clear=True):
+            trainer._configure_deterministic_validation(fake_torch, True)
+            self.assertEqual(os.environ["CUBLAS_WORKSPACE_CONFIG"], ":4096:8")
+        fake_torch.use_deterministic_algorithms.assert_called_once_with(True)
+        self.assertIs(fake_torch.backends.cudnn.deterministic, True)
+        self.assertIs(fake_torch.backends.cudnn.benchmark, False)
+        self.assertIs(fake_torch.backends.cudnn.allow_tf32, False)
+        self.assertIs(fake_torch.backends.cuda.matmul.allow_tf32, False)
+
+    def test_deterministic_validation_rejects_conflicting_cublas_contract(self) -> None:
+        with mock.patch.dict(os.environ, {"CUBLAS_WORKSPACE_CONFIG": ":16:8"}, clear=True):
+            with self.assertRaisesRegex(trainer.BehaviorTrainingError, "CUBLAS_WORKSPACE_CONFIG"):
+                trainer._prepare_deterministic_validation(True)
+
+    def test_resumed_pause_acceptance_is_noop_after_complete_archive(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = Path(temporary)
+            (run_dir / "control" / "history").mkdir(parents=True)
+            trainer._accept_resumed_pause_control(
+                run_dir, "archived-run", "checkpoint-00000001", "a" * 64)
+            self.assertFalse((run_dir / "control" / "resume.accepted.json").exists())
+
+    def test_resumed_pause_acceptance_rejects_one_live_control(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = Path(temporary)
+            control = run_dir / "control"
+            control.mkdir(parents=True)
+            trainer.atomic_json(control / "pause.request.json", {
+                "schema_version": "airi.behavior-pause-request.v1",
+                "run_id": "partial-run", "request_id": "partial-request",
+            })
+            with self.assertRaisesRegex(
+                    trainer.BehaviorTrainingError, "incomplete"):
+                trainer._accept_resumed_pause_control(
+                    run_dir, "partial-run", "checkpoint-00000001", "a" * 64)
+
+    def test_dataset_path_rejects_reparse_attributes_before_read(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "dataset.jsonl"
+            payload = dataset_lines(1)
+            path.write_bytes(payload)
+            fake_stat = SimpleNamespace(
+                st_file_attributes=0x400,
+                st_mode=stat.S_IFREG)
+            with mock.patch.object(trainer.os, "lstat", return_value=fake_stat):
+                with self.assertRaisesRegex(
+                        trainer.BehaviorTrainingError, "reparse"):
+                    trainer.load_pinned_dataset(
+                        path, hashlib.sha256(payload).hexdigest())
+
+    def test_checkpoint_event_is_canonical_hash_bound_and_immutable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            generation = "checkpoint-00000001"
+            manifest_sha = "a" * 64
+            payload_sha = "b" * 64
+            index = {
+                "schema_version": "airi.behavior-checkpoint-index.v1",
+                "latest": {"relative_path": generation,
+                           "manifest_sha256": manifest_sha},
+                "previous": None,
+            }
+            trainer.atomic_json(run_dir / "checkpoints" / "checkpoint-index.json", index)
+            published = {"manifest_sha256": manifest_sha,
+                         "manifest": {"payload": {"sha256": payload_sha}}}
+            pins = {"dataset_sha256": "c" * 64}
+            receipt = trainer._publish_checkpoint_event(
+                run_dir, "p0b-run", generation, "interval", 80, 5, 0,
+                "2026-08-22T08:00:00Z", "2026-08-22T08:00:02Z", 2_000_000_000,
+                published, pins)
+            event_path = run_dir / receipt["relative_path"]
+            event_bytes = event_path.read_bytes()
+            self.assertEqual(hashlib.sha256(event_bytes).hexdigest(), receipt["sha256"])
+            event = json.loads(event_bytes)
+            self.assertEqual(event["checkpoint_index"], index)
+            self.assertEqual(event["checkpoint_payload_sha256"], payload_sha)
+            self.assertEqual(event["pending_microbatches"], 0)
+            with self.assertRaisesRegex(trainer.BehaviorTrainingError, "already exists"):
+                trainer._publish_checkpoint_event(
+                    run_dir, "p0b-run", generation, "interval", 80, 5, 0,
+                    "2026-08-22T08:00:00Z", "2026-08-22T08:00:02Z", 1,
+                    published, pins)
+
     def test_v4_metadata_and_native_context_are_accepted(self) -> None:
         row = v4_row("v4-1")
         row["messages"] = row["messages"][:-1] + [

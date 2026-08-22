@@ -221,6 +221,15 @@ progress = {
     encoding="utf-8")
 '@
     [IO.File]::WriteAllText($fakeTrainer, $fakeSource, [Text.UTF8Encoding]::new($false))
+    $launcherDataset = Join-Path $launcherCase 'dataset.jsonl'
+    $launcherModel = Join-Path $launcherCase 'model'
+    [IO.File]::WriteAllText(
+        $launcherDataset, "{}$([Environment]::NewLine)",
+        [Text.UTF8Encoding]::new($false))
+    [IO.Directory]::CreateDirectory($launcherModel) | Out-Null
+    [IO.File]::WriteAllText(
+        (Join-Path $launcherModel 'config.json'), "{}$([Environment]::NewLine)",
+        [Text.UTF8Encoding]::new($false))
     $launcherRun = Join-Path $launcherCase 'run with spaces'
     $launcherOutput = Join-Path $launcherCase 'adapter output'
     $launcherReport = Join-Path $launcherCase 'report output.json'
@@ -241,7 +250,8 @@ progress = {
         -CheckpointEveryOptimizerSteps 5 `
         -HeartbeatSeconds 1 `
         -TrainerArguments @(
-            '--dataset-sha256', ('a' * 64), '--model-sha256', ('b' * 64),
+            '--dataset', $launcherDataset, '--dataset-sha256', ('a' * 64),
+            '--model-dir', $launcherModel, '--model-sha256', ('b' * 64),
             '--output', $launcherOutput, '--report', $launcherReport)
     if ([string]$launchReceipt.run_id -ne 'launcher-contract' -or
         [int]$launchReceipt.runner_pid -le 0) {
@@ -324,7 +334,8 @@ progress = {
             -WorkingDirectory $launcherCase `
             -InputManifestSha256 ('d' * 64) `
             -TrainerArguments @(
-                '--dataset-sha256', ('a' * 64), '--model-sha256', ('b' * 64),
+                '--dataset', $launcherDataset, '--dataset-sha256', ('a' * 64),
+                '--model-dir', $launcherModel, '--model-sha256', ('b' * 64),
                 '--output', (Join-Path $orphanCase 'adapter'),
                 '--report', (Join-Path $orphanCase 'report.json')) | Out-Null
     }
@@ -354,7 +365,8 @@ progress = {
             -TrainerPath $fakeTrainer `
             -WorkingDirectory $launcherCase `
             -TrainerArguments @(
-                '--dataset-sha256', ('a' * 64), '--model-sha256', ('b' * 64),
+                '--dataset', $launcherDataset, '--dataset-sha256', ('a' * 64),
+                '--model-dir', $launcherModel, '--model-sha256', ('b' * 64),
                 '--output', (Join-Path $junctionTarget 'adapter'),
                 '--report', (Join-Path $junctionTarget 'report.json')) | Out-Null
     }
@@ -496,11 +508,21 @@ raise SystemExit(75)
 '@
     [IO.File]::WriteAllText(
         $pauseTrainer, $pauseTrainerSource, [Text.UTF8Encoding]::new($false))
+    $pauseDataset = Join-Path $pauseCase 'dataset.jsonl'
+    $pauseModel = Join-Path $pauseCase 'model'
+    [IO.File]::WriteAllText(
+        $pauseDataset, "{}$([Environment]::NewLine)",
+        [Text.UTF8Encoding]::new($false))
+    [IO.Directory]::CreateDirectory($pauseModel) | Out-Null
+    [IO.File]::WriteAllText(
+        (Join-Path $pauseModel 'config.json'), "{}$([Environment]::NewLine)",
+        [Text.UTF8Encoding]::new($false))
     $pauseRun = Join-Path $pauseCase 'durable run'
     $pauseOutput = Join-Path $pauseCase 'adapter output'
     $pauseReport = Join-Path $pauseCase 'report.json'
     $pauseTrainerArguments = @(
-        '--dataset-sha256', ('d' * 64), '--model-sha256', ('e' * 64),
+        '--dataset', $pauseDataset, '--dataset-sha256', ('d' * 64),
+        '--model-dir', $pauseModel, '--model-sha256', ('e' * 64),
         '--output', $pauseOutput, '--report', $pauseReport)
     $pauseLaunch = & $launcherPath `
         -RunDir $pauseRun `

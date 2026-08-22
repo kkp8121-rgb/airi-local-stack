@@ -186,7 +186,10 @@ jobs:
               ollama-proxy/training/tests/test_synthesize_broadcast_behavior_v2.py
               ollama-proxy/training/tests/test_synthesize_broadcast_continuity_v3.py
               ollama-proxy/training/tests/test_synthesize_broadcast_continuity_v4.py
+              ollama-proxy/training/tests/test_behavior_training_checkpoint.py
+              ollama-proxy/training/tests/test_durable_training_runner.py
               ollama-proxy/training/tests/test_train_airi_behavior_lora.py
+              ollama-proxy/training/tests/test_verify_airi_behavior_gpu_equivalence.py
               ollama-proxy/training/tests/test_synthesize_extraction_sft.py
               ollama-proxy/training/tests/test_build_extraction_review_form.py
               ollama-proxy/training/tests/test_extraction_review_pipeline.py

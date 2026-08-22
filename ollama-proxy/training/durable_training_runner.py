@@ -221,26 +221,28 @@ def load_run_state_with_previous(run_dir: Path) -> tuple[dict[str, Any] | None, 
 
 def _reject_remote_or_reparse_path(value: Path, label: str) -> Path:
     raw = str(value)
-    if raw.startswith(("\\\\", "//")) or "://" in raw:
+    if (raw.startswith(("\\\\", "//"))
+            or re.match(r"^[A-Za-z][A-Za-z0-9+.\-]+:[\\/]", raw)):
         raise DurableRunnerError(f"{label} must be a local filesystem path")
     absolute = value.expanduser().absolute()
     existing = absolute
-    while not existing.exists() and existing != existing.parent:
+    while not os.path.lexists(existing) and existing != existing.parent:
         existing = existing.parent
     for candidate in (existing, *existing.parents):
         try:
             attributes = os.lstat(candidate).st_file_attributes
         except (AttributeError, OSError):
             attributes = 0
-        if attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400):
+        if (candidate.is_symlink()
+                or attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
             raise DurableRunnerError(f"{label} cannot traverse a reparse point")
     if os.name == "nt":
         import ctypes  # noqa: PLC0415
 
         drive_type = ctypes.WinDLL("kernel32").GetDriveTypeW(str(absolute.anchor))
-        if drive_type == 4:
-            raise DurableRunnerError(f"{label} cannot use a mapped network drive")
-    resolved = value.expanduser().resolve()
+        if drive_type != 3:
+            raise DurableRunnerError(f"{label} must use a local fixed volume")
+    resolved = absolute.resolve()
     if resolved == Path(resolved.anchor):
         raise DurableRunnerError(f"{label} cannot be a volume root")
     return resolved
@@ -881,9 +883,27 @@ def _archive_accepted_pause_control(
         expected_inputs: Mapping[str, str]) -> bool:
     control = run_dir / "control"
     accepted_path = control / "resume.accepted.json"
-    if not accepted_path.is_file():
+    request_path = control / "pause.request.json"
+    ack_path = control / "pause.ack.json"
+    history = control / "history"
+    live_request_id: str | None = None
+    if request_path.is_file():
+        live_request_id = _load_pause_request_path(request_path, run_id)["request_id"]
+    if ack_path.is_file():
+        live_ack = _load_json(ack_path)
+        ack_request_id = live_ack.get("request_id") if isinstance(live_ack, dict) else None
+        if (not isinstance(ack_request_id, str)
+                or (live_request_id is not None and ack_request_id != live_request_id)):
+            raise DurableRunnerError("live pause controls have competing request ids")
+        live_request_id = ack_request_id
+    accepted_source = accepted_path if accepted_path.is_file() else None
+    if accepted_source is None and live_request_id is not None:
+        history_candidate = history / f"{live_request_id}.resume-accepted.json"
+        if history_candidate.is_file():
+            accepted_source = history_candidate
+    if accepted_source is None:
         return False
-    accepted = _load_json(accepted_path)
+    accepted = _load_json(accepted_source)
     accepted_keys = {"schema_version", "run_id", "request_id",
                      "checkpoint_relative_path", "checkpoint_manifest_sha256"}
     if (set(accepted) != accepted_keys
@@ -905,11 +925,10 @@ def _archive_accepted_pause_control(
         expected = expected_inputs.get(key, "")
         if expected and manifest["pins"].get(key) != expected:
             raise DurableRunnerError(f"accepted checkpoint input pin mismatch: {key}")
-    history = control / "history"
     history.mkdir(parents=True, exist_ok=True)
     request_id = accepted["request_id"]
-    request_path = control / "pause.request.json"
-    ack_path = control / "pause.ack.json"
+    if live_request_id is not None and live_request_id != request_id:
+        raise DurableRunnerError("live pause controls do not match acceptance history")
     request_history = history / f"{request_id}.request.json"
     ack_history = history / f"{request_id}.ack.json"
     request_source = request_path if request_path.is_file() else request_history
@@ -933,8 +952,12 @@ def _archive_accepted_pause_control(
             (accepted_path, history / f"{request_id}.resume-accepted.json")):
         if source.is_file():
             if target.exists():
-                raise DurableRunnerError("pause control history target already exists")
-            _replace_write_through(source, target)
+                if source.read_bytes() != target.read_bytes():
+                    raise DurableRunnerError("pause control history target differs")
+                source.unlink()
+                _fsync_directory(source.parent)
+            else:
+                _replace_write_through(source, target)
     _fsync_directory(history)
     return True
 
@@ -985,12 +1008,21 @@ def run_supervisor(args: argparse.Namespace) -> int:
                      str(args.checkpoint_every_optimizer_steps))
     dataset_sha = _argument_value(trainer_args, "--dataset-sha256", required=True)
     model_sha = _argument_value(trainer_args, "--model-sha256") or ""
+    dataset_value = _argument_value(trainer_args, "--dataset", required=True)
+    model_value = _argument_value(trainer_args, "--model-dir", required=True)
     output_value = _argument_value(trainer_args, "--output", required=True)
     report_value = _argument_value(trainer_args, "--report")
+    dataset_path = validate_local_path(Path(dataset_value or ""), "dataset")
+    model_path = validate_local_path(Path(model_value or ""), "model directory")
+    if not dataset_path.is_file() or not model_path.is_dir():
+        raise DurableRunnerError("dataset/model trainer paths are invalid")
     output_path = validate_local_path(Path(output_value or ""), "adapter output")
     report_path = (validate_local_path(Path(report_value), "report output")
                    if report_value else None)
     runtime_anchor = run_dir.resolve().anchor.lower()
+    # Dataset/model are immutable, SHA-pinned read-only inputs and may reside
+    # on other fixed local volumes.  Only mutable publication targets must
+    # share the run volume so their staged promotion remains atomic.
     if (output_path.resolve().anchor.lower() != runtime_anchor
             or (report_path is not None
                 and report_path.resolve().anchor.lower() != runtime_anchor)):
@@ -1065,9 +1097,15 @@ def run_supervisor(args: argparse.Namespace) -> int:
         request_exists = (control / "pause.request.json").is_file()
         ack_exists = (control / "pause.ack.json").is_file()
         accepted_exists = (control / "resume.accepted.json").is_file()
-        if accepted_exists:
-            if not _archive_accepted_pause_control(run_dir, args.run_id, inputs):
-                raise DurableRunnerError("resume acceptance receipt disappeared")
+        archived_accepted = _archive_accepted_pause_control(
+            run_dir, args.run_id, inputs)
+        if accepted_exists and not archived_accepted:
+            raise DurableRunnerError("resume acceptance receipt disappeared")
+        if archived_accepted:
+            request_exists = (control / "pause.request.json").is_file()
+            ack_exists = (control / "pause.ack.json").is_file()
+            if request_exists or ack_exists:
+                raise DurableRunnerError("accepted pause controls were not fully archived")
         elif request_exists and ack_exists:
             pause_progress = _load_progress(run_dir, args.run_id)
             _validate_safe_pause(
