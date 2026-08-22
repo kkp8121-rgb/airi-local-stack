@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-22 17:45:00 +09:00"
-checkpoint_id: "20260822-1745-p0a-staged-batch-receipt"
+updated_at_kst: "2026-08-22 17:52:00 +09:00"
+checkpoint_id: "20260822-1752-p0a-receipt-doc-validation"
 goal_status: "active"
 authorization: "repo-gpu-package-test-commit-push; operational-adoption-forbidden"
 active_phase: "p0-checkpoint-resume-implementation"
-git_head: "e93d55283006045eaaa745cff1122340d61a6476"
-worktree_state: "staged-p0-implementation-16-files"
+git_head: "6f0c1358d2acd18b828ebc0ae8482a348712c461"
+worktree_state: "dirty-p0a-receipt-docs-only"
 active_trainer_count: 0
 ---
 
@@ -29,9 +29,9 @@ active_trainer_count: 0
   프로세스 0. GPU process 목록에도 AIRI trainer/runner workload는 0이다.
 - v4 파인튜닝은 E1 adapter/report까지만 완료·검증됐고 아직 미채택이다.
 - E2 adapter/report, merge/package, v4 T3, live campaign 산출물은 0이다.
-- HEAD와 origin/main은 `e93d55283006045eaaa745cff1122340d61a6476`로 일치한다.
-  worktree는 P0 구현·문서 배치 9 modified + 7 untracked, 총 16개이며 아직
-  commit하지 않았다.
+- HEAD와 origin/main은 P0-A 구현 commit
+  `6f0c1358d2acd18b828ebc0ae8482a348712c461`로 일치한다. 구현 push 뒤
+  AIRI trainer/runner 0이며 이 milestone receipt 문서 갱신만 dirty다.
 
 ## 2. 현재 작업 트랜잭션
 
@@ -44,10 +44,30 @@ active_trainer_count: 0
 | 출력 경로 | Git: trainer+checkpoint module/tests, Python durable runner, `run-airi-behavior-training-durable.ps1`, `pause-airi-safely.ps1`, root runner contract test. Runtime 설계: `D:\AIRI-Models\airi-broadcast-v4-20260821\runs\e2-seed42\{run-state.json,control,checkpoints,logs}`; final E2 adapter/report 기존 경로 유지 |
 | 완료 조건 | optimizer 경계 full-state checkpoint, same-volume fsync/verify/immutable publish+latest/previous, exact pin resume, corrupt latest quarantine/previous fallback, pause ack, durable run-state/PID identity/reboot duplicate 방지, CPU 중단/재개 exact 동등성 회귀 PASS |
 | 중단·복구 | 구현 중 quota/PC 중단은 Git diff와 이 intent부터 재개; runner/GPU가 0이므로 런타임 진척 없음. 테스트 실패 시 P0 완료·E2 허용으로 승격하지 않음 |
-| 현재 행동 | 최신 독립 재감사 P0/P1 0, controlled GPU READY. P0-A offline 구현 milestone 문서·diff/security를 확정해 commit/push한 뒤 clean HEAD에서 P0-B controlled GPU/10분 실측 intent로 이동한다. E2 금지. |
+| 현재 행동 | P0-A 구현 `6f0c1358...c461` origin/main push 완료. SSoT 6종에 actual receipt를 반영해 continuity/diff/security, exact docs commit/push를 완료한 뒤 clean HEAD에서 P0-B controlled GPU intent로 이동한다. E2 금지. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260822-1752-p0a-receipt-doc-validation`: actual implementation push receipt를
+  SSoT 6종에 반영한 뒤 focused continuity exit 0/PASS, repo 기본 diff-check exit 0/
+  whitespace error 0, 변경 경로 exact 6개, 금지 산출물 filename·비밀 값 형태 content
+  hit 0이다. 다음은 exact 6-doc stage와 staged 경계/diff-check, `git commit -m
+  "docs: record P0 durability milestone receipt"`, `git push origin main`이다.
+  실패 시 P0-A receipt 배치에서 복구하고 controlled GPU/E2를 시작하지 않는다.
+- `20260822-1750-p0a-implementation-push-receipt`: exact `git push origin main`
+  exit 0, `e93d552..6f0c135`, main→main. 이후 HEAD=origin/main
+  `6f0c1358d2acd18b828ebc0ae8482a348712c461`, AIRI trainer/runner 0을 대조했고
+  기존 receipt용 WORKING-STATE/roadmap log 두 파일만 dirty였다. 이 actual receipt를
+  WORKING-STATE, handoff, roadmap status/log, NEXT, 문서 인덱스 6종에 반영해 focused
+  continuity/diff/security 후 `docs: record P0 durability milestone receipt`로
+  commit/push한다. docs commit/push 실패 시 controlled GPU와 E2를 시작하지 않는다.
+- `20260822-1747-p0a-implementation-commit-receipt`: exact 16-file commit 명령
+  `git commit -m "feat: add durable AIRI training recovery"` exit 0. commit
+  `6f0c1358d2acd18b828ebc0ae8482a348712c461`, 16 files, 5,134 insertions/
+  48 deletions이며 commit 직후 worktree clean, local main은 origin/main보다 1 ahead다.
+  다음 상태 변경은 exact `git push origin main`; 실패 시 이 commit과 receipt 문서를
+  보존하고 GPU/E2를 실행하지 않는다. 성공 뒤 HEAD=origin/main/PID 0을 read-only 대조해
+  SSoT receipt 문서의 별도 commit/push를 수행한다.
 - `20260822-1745-p0a-staged-batch-receipt`: 기록된 exact 16개에 대한 `git add`
   exit 0. staged 16개, unstaged 0, untracked 0이며 staged diff-check exit 0/출력 0,
   최초 staged 통계는 5,124 insertions/48 deletions다. 이 receipt를 담은 live state와

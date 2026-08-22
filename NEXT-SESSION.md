@@ -3,7 +3,7 @@
 > **2026-08-22 goal resume:** 사용자 `/goal` 명령으로 AIRI 본 goal은 `active`다.
 > 운영 모델 채택과 기본 서비스 모델 변경만 별도 사용자 승인 전까지 금지한다.
 > 전원 종료 복구용 P0-A checkpoint/full-state/atomic fault 계층은 offline 구현·독립
-> P0/P1 0 감사까지 완료됐다. P0-B controlled GPU 동등성과 실제 E2 속도 10분
+> P0/P1 0 감사까지 완료되어 `6f0c1358`로 origin/main push됐다. P0-B controlled GPU 동등성과 실제 E2 속도 10분
 > checkpoint 상한을 실증한 뒤에만 E2를 시작한다.
 > `goal_status=active`; `adoption_authorized=false`
 > `execution_order=P0_A>P0_B>E2_LAUNCH>E2_PROVENANCE>PACKAGE>T3_36>CAMPAIGN_3X500>USER_DECISION`

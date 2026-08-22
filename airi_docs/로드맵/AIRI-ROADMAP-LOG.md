@@ -9,6 +9,17 @@
 
 ## 2026-08-22 P0-A offline milestone compact 복구 대조
 
+- actual implementation push receipt의 SSoT 6종 반영 뒤 continuity PASS, repo 기본
+  diff-check whitespace error 0, exact 6-doc 변경, 금지 filename/content hit 0이다.
+  exact 6-doc receipt commit/push 실패 시 controlled GPU/E2로 이동하지 않는다.
+- 구현 commit `6f0c1358d2acd18b828ebc0ae8482a348712c461`을 origin/main에 push했고
+  HEAD=origin/main, AIRI trainer/runner 0을 대조했다. actual receipt를 SSoT 6종에
+  반영해 focused continuity/diff/security와 별도 docs receipt commit/push를 마치기
+  전에는 controlled GPU/E2를 시작하지 않는다.
+- exact 16-file 구현 commit 성공: `6f0c1358d2acd18b828ebc0ae8482a348712c461`
+  (`feat: add durable AIRI training recovery`), 16 files, 5,134 insertions/48 deletions.
+  직후 worktree clean, local main은 origin/main보다 1 ahead다. exact push가 실패하면
+  controlled GPU/E2로 이동하지 않고 이 commit에서 복구한다.
 - exact 16-file `git add` exit 0, staged 16개·unstaged 0·untracked 0, staged
   diff-check exit 0이다. 최초 staged 통계는 5,124 insertions/48 deletions이며 이 receipt
   두 문서를 재-stage·재검증한 뒤 구현 commit을 실행한다. commit 실패 시 push/GPU/E2를
