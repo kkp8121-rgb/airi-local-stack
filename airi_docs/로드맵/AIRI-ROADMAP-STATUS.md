@@ -7,18 +7,19 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
-> **2026-08-23 first controlled GPU/P0 correction receipt:** Goal status는 `active`,
-> HEAD/local·remote origin/main은 `18d0bc6`이다. 첫 K=5 baseline은 480/480·30/30 계산 뒤
-> actual checkpoint interval max `705.902827`초와 `supervisor-durablerunnererror`로 FAIL,
-> related PID 0/final evidence root absent이며 root는 보존한다. 원인은 producer internal
-> artifact-manifest file SHA를 runner와 pause가 adapter directory inventory SHA와 비교한
-> 두 P0 의미 혼동이었다. exact internal manifest receipt row 결속으로 최소 수정했고
-> pinned Python `146 passed, 5 skipped`, actual-process PowerShell durability literal PASS,
-> final offline checkpoint PASS, exact diff/security hit 0이다. 수정 배치는
-> `18d0bc6`으로 origin/main push됐고 actual push receipt 5-doc commit/push만 남았다.
-> HEAD=origin/main·clean 뒤 K=3 fresh controlled
-> GPU로 재실증한다. `goal_status=active`; E2 microstep 0, 운영 채택과 기본 모델 변경 금지는
-> 유지한다.
+> **2026-08-23 controlled GPU P0-B PASS receipt:** Goal status는 `active`다. 첫 K=5
+> baseline은 480/30 계산 뒤 actual checkpoint interval max `705.902827`초와 final-evidence
+> 결속 실패로 FAIL해 보존했고 같은 K=5를 반복하지 않았다. final-evidence SHA 의미 혼동을
+> exact internal manifest receipt row에 결속해 pinned Python `146 passed, 5 skipped`,
+> actual-process PowerShell durability와 final offline gate로 최소 수리했다. fresh K=3 root의
+> 무중단 baseline과 실제 `SAFE_TO_POWER_OFF` pause/checkpoint/resume arm은 모두 terminal
+> 480/30이다. 권위 equivalence receipt SHA `d913992e...e84b9`는 `pass=true`, adoption false,
+> 672 tensors exact/max abs·rel 0, normal interval 10개/max `551.5176357`초다. Windows
+> producer/verifier의 `README.md` 순서 false reject는 platform `Path` 순서 한 줄과 targeted
+> 회귀로 최소 수정했고 suite 62 passed/1 skipped, actual GPU verifier와 final offline gate도
+> PASS했다. HEAD/local·remote origin/main은 아직 `0454ca8`; verifier/test와 다섯 SSoT의
+> 검증·commit/push 및 clean 확인 뒤에만 authoritative E2를 step 0부터 시작한다.
+> `goal_status=active`; E2 microstep 0, 운영 채택과 기본 모델 변경 금지는 유지한다.
 >
 > **이전 권한 이력 — 2026-08-22 goal resume:** 사용자 `/goal` 명령으로 당시 AIRI 본 goal은 `active`였다.
 > 저장소 구현·GPU 학습·모델 병합/패키징·로컬 서비스·T3·장시간 캠페인과
@@ -341,7 +342,7 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
 - [x] **P0-A (2026-08-22 offline 완료):** checkpoint를 E2보다 먼저 구현: 전체 학습/RNG/순서/loss/provenance 상태, 같은 볼륨
   원자 승격·latest/previous 회전·깨진 checkpoint 격리 구현 및 회귀 —
   `6f0c1358d2acd18b828ebc0ae8482a348712c461` origin/main push
-- [~] **P0-B:** exact-pin CPU 중단/재개 동등성, durable runner/run-state, safe pause,
+- [x] **P0-B (controlled GPU 완료, 2026-08-23):** exact-pin CPU 중단/재개 동등성, durable runner/run-state, safe pause,
   PID/command/checkpoint SHA 재부팅 복구의 offline 실증은 완료. checkpoint별 durable
   timing event, deterministic pin, 허용오차 0 full-state comparator, 600초/최소 4구간
   gate와 fault 회귀는 `e970cf7`, external input/config/seed/batch/accumulation/first-pause
@@ -357,10 +358,14 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   origin/main에 durable하다. 첫 K=5 controlled baseline은 480/30 계산 뒤 interval max
   705.902827초와 final-root adapter SHA 의미 혼동으로 FAIL했다. runner/pause 두 P0를 exact
   internal manifest receipt row에 결속해 pinned Python 146/5, actual PowerShell, final offline,
-  diff/security PASS로 수리했고 `18d0bc6`으로 origin/main push했다. docs receipt push/clean 뒤 K=3 fresh baseline+
-  safe arm으로 재실증한다. 이미 완료된 P0-A를 다시 넓게 감사하며 공회전하지 않는다.
-- [ ] preflight: live-state 단독 diff를 제외한 입력 code/data clean, trainer 0,
-  corpus/base/E1 SHA exact, E2 산출물 부재 재확인
+  diff/security PASS로 수리했고 `18d0bc6`으로 origin/main push했다. fresh K=3 baseline과
+  실제 `SAFE_TO_POWER_OFF` safe arm은 terminal 480/30, paired receipt SHA
+  `d913992e...e84b9`, 672 tensors exact, normal interval max 551.5176357초로 PASS했다.
+  Windows verifier receipt-order 한 줄과 회귀의 현재 milestone commit/push 뒤 E2로 이동한다.
+  이미 완료된 P0-A를 다시 넓게 감사하며 공회전하지 않는다.
+- [x] controlled GPU preflight: 입력 code/data clean, trainer 0, corpus/base/E1 SHA exact,
+  fresh root와 E2 산출물 부재를 확인했다. E2 직전에는 현재 commit/push·clean과 같은 입력/
+  PID/E2 부재를 fresh timestamped run root 기준으로 다시 확인한다.
 - [ ] **E2-LAUNCH:** P0 receipt의 authoritative durable runner로만 seed 42·1,600
   microsteps를 step 0부터 완주하고 report/SHA/manifest 검증
 - [ ] E1/E2 각각 safe-merge → BF16 GGUF → Q4_K_M 패키징

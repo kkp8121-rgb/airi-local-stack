@@ -1,11 +1,12 @@
 # AIRI Codex GPU 인수인계 — broadcast continuity v4
 
-갱신: 2026-08-23 05:05 KST (파일명은 현행 GPU SSoT 식별자로 유지)
+갱신: 2026-08-23 07:22 KST (파일명은 현행 GPU SSoT 식별자로 유지)
 
-상태: **ACTIVE — FIRST CONTROLLED GPU BASELINE FAILED; FINAL-EVIDENCE P0 FIX VERIFIED
-AND PUSHED, DOCS RECEIPT COMMIT/PUSH PENDING. E1 완료·미채택, E2 microstep/저장 산출물 0, merge/package 0,
-v4 T3 0, live campaign 0. K=5 root는 timing max 705.902827초와 final-root 결속 실패
-증거로 보존하며, docs receipt push·clean 확인 뒤 K=3 fresh controlled GPU를 실행한다.**
+상태: **ACTIVE — K=3 CONTROLLED GPU PASS. E1 완료·미채택, E2 microstep/저장 산출물 0,
+merge/package 0, v4 T3 0, live campaign 0. baseline과 실제 `SAFE_TO_POWER_OFF` pause/resume는
+480/30 terminal이며 paired receipt가 672 tensors exact·최대 구간 551.5176357초로 PASS했다.
+Windows verifier receipt-order 최소 수정과 milestone docs를 검증·commit/push한 뒤에만
+authoritative E2를 step 0부터 시작한다.**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
@@ -19,6 +20,30 @@ v4 T3 0, live campaign 0. K=5 root는 timing max 705.902827초와 final-root 결
 
 ## 0. 2026-08-23 P0 로컬 배치 최종 검증 receipt
 
+- 07:18 KST fresh K=3 controlled GPU root
+  `airi-controlled-gpu-20260823-051231`의 무중단 baseline과 실제 optimizer-boundary
+  `SAFE_TO_POWER_OFF` pause/checkpoint/resume arm이 모두 terminal 480 microsteps/30 optimizer
+  steps로 완료됐다. safe arm은 checkpoint event 12개, request/ack/resume-accepted history
+  exact 3개/live control 0이고 관련 PID 0이다. 두 arm의 정상 checkpoint 구간은 각 최소 4개,
+  실제 event 기준 baseline max training/durable `549.6979634`/`552.845175`초,
+  safe arm `230.3527189`/`234.870925`초로 모두 600초 아래다.
+- paired verifier 첫 실행은 actual adapter row 집합과 SHA가 exact인데 Windows producer의
+  case-insensitive `Path` 순서와 verifier의 case-sensitive 문자열 순서가 `README.md` 위치를
+  달리해 exit 2/receipt absent로 거짓 거부했다. verifier 정렬 한 줄을 producer와 같은
+  platform `Path` 순서로 바꾸고 targeted 회귀를 추가했다. pinned pycompile+targeted
+  `1 passed, 62 deselected`, verifier suite `62 passed, 1 skipped`, actual preserved GPU
+  verifier 재실행 exit 0, final `test-current-checkpoint.ps1` PASS다.
+- 권위 GPU equivalence receipt는 48,323 bytes SHA
+  `d913992e93ab81035e586fcd5587b7f565ad58fd685759f61adb035d688e84b9`, schema v1,
+  `pass=true`, `adoption_authorized=false`다. manifest/config SHA, seed 42, batch 1,
+  accumulation 16, K=3, safe pause 16/1이 exact하고, recursive checkpoint comparator는
+  672 tensors·rtol/atol 0·max abs/rel diff 0이다. governed normal interval count 10,
+  minimum gate 4, max `551.5176357`초다. baseline/safe final-root·producer/progress/report/
+  adapter manifest와 pause history를 모두 결속했다. controlled GPU P0-B는 완료다.
+- HEAD/local·remote origin/main은 아직 `0454ca8d9df9239cf7d6c063e5ed751235fb2ed1`이고
+  verifier/test와 다섯 milestone SSoT의 commit/push가 현재 gate다. E2 adapter/report는
+  absent, 기존 로그 각 0 bytes, E2 microstep 0이다. commit/push 뒤 HEAD=origin/main·clean·
+  PID 0 전에는 E2를 시작하지 않는다.
 - 04:30 KST 첫 controlled GPU K=5 baseline은 480/480 microsteps·30/30 optimizer
   steps까지 계산했으나 PASS가 아니다. authority state는 `failed` revision 392, exit 0/
   `supervisor-durablerunnererror`, latest checkpoint 7 SHA `c65f7bac...d04f1`, 관련 PID 0,
@@ -460,7 +485,7 @@ identity spoof, corrupt-current/valid-previous 회귀와 전체 offline checkpoi
    같은 볼륨 임시 경로에 flush·검증하고 원자 승격하도록 구현한다. latest와 직전 정상본을
    유지하고 깨진 checkpoint는 삭제하지 않고 격리한다. 구현·회귀·문서는
    `6f0c1358d2acd18b828ebc0ae8482a348712c461`로 origin/main push됐다.
-3. [~] **P0-B runner/recovery:** exact SHA·seed·config 일치 시에만 허용하는 `--resume-from-checkpoint`, 원자적
+3. [x] **P0-B runner/recovery (controlled GPU 완료, 2026-08-23):** exact SHA·seed·config 일치 시에만 허용하는 `--resume-from-checkpoint`, 원자적
    `run-state.json` durable runner, optimizer 경계 safe-pause와 `SAFE_TO_POWER_OFF`,
    PID/command/checkpoint SHA 기반 재부팅 복구를 자동 회귀와 통제 GPU 실험으로 증명한다.
    CPU exact resume와 offline actual-process runner/safe-pause/reboot fault는 완료했다.
@@ -472,19 +497,19 @@ identity spoof, corrupt-current/valid-previous 회귀와 전체 offline checkpoi
    선택하고 0개·복수·spoof·명시적 empty를 거부하도록 actual-process 회귀를 통과했다.
    2026-08-23 후속 동결 배치는 authenticated run-state lineage, no-follow input lock,
    producer evidence/index/event 결속, trainer-bound launcher와 anchor-bound pause를 추가했고
-   최종 Python `145 passed, 5 skipped`, actual-process PowerShell PASS, 전체 offline
-   checkpoint PASS, diff/security PASS로 잔여 로컬 P0/P1 0을 확인했다. commit
-   `911d082`과 receipt docs `a898ff8`은 origin/main push됐다. final live receipt와
-   HEAD=origin/main·clean 뒤
-   첫 K=5 controlled baseline은 480/30 계산 뒤 actual interval max 705.902827초와
-   final-root SHA 의미 혼동으로 FAIL했다. 두 final-evidence P0는 pinned Python
-   `146 passed, 5 skipped`, actual-process PowerShell와 final offline PASS로 최소 수리·
-   검증했고 `18d0bc6`으로 origin/main push했다. docs receipt push/clean 뒤 K=3 fresh baseline과 safe-pause arm으로
-   controlled GPU 동등성과 checkpoint 간격을 전원 종료 손실 상한 10분 이하로 다시 실측한다.
-4. [ ] preflight에서 입력 코드·데이터가 clean인지 확인한다. live heartbeat로 생긴
-   `AIRI-WORKING-STATE.md` 단독 diff만 별도 검토 후 제외할 수 있고 다른 tracked/untracked
-   변경은 금지한다. trainer 0, corpus source/chat SHA, base model SHA, E1 SHA,
-   E2 adapter/report 부재도 다시 확인하며 하나라도 다르면 중단한다.
+   final Python/PowerShell/offline gate와 한 차례 감사의 고정 P0/P1을 모두 닫아
+   `911d082`·`18d0bc6`과 receipt docs를 origin/main에 push했다. 첫 K=5 controlled
+   baseline은 480/30 계산 뒤 actual interval max 705.902827초와 final-root SHA 의미 혼동으로
+   FAIL해 보존했다. 두 final-evidence P0를 pinned Python `146 passed, 5 skipped`,
+   actual-process PowerShell와 final offline PASS로 최소 수리한 뒤 K=3 fresh baseline과
+   실제 `SAFE_TO_POWER_OFF` pause/resume arm을 모두 terminal 480/30으로 완주했다. final
+   receipt SHA `d913992e...e84b9`는 672 tensors exact, max normal interval
+   `551.5176357`초, `pass=true`, adoption false다. Windows receipt-order verifier 최소 수정과
+   이 milestone docs를 현재 commit/push하는 gate만 남았으며 GPU 실증 자체는 완료다.
+4. [x] **controlled GPU preflight:** 입력 code/data clean, trainer 0, corpus source/chat,
+   base model, E1 SHA exact, fresh root와 E2 adapter/report 부재를 확인하고 K3 실험을
+   실행했다. E2-LAUNCH 직전에는 현재 verifier/docs commit push와 HEAD=origin/main·clean을
+   확인한 뒤 같은 입력·PID·E2 부재 preflight를 fresh timestamped root 기준으로 반복한다.
 5. [ ] **E2-LAUNCH:** 기존 0-byte 로그를 삭제하지 않고 P0 receipt에서 검증·고정한
    authoritative durable runner 명령으로만 새 timestamped stdout/stderr 경로와
    run-state를 생성해 step 0부터 시작한다. direct trainer/임의 hidden process 실행은

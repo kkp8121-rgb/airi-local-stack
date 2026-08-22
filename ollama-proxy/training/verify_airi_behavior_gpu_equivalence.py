@@ -442,7 +442,7 @@ def _bind_completed_output_receipts(state: Mapping[str, Any], directory: Path,
     files["artifact-manifest.json"] = _evidence_bytes(
         directory / "artifact-manifest.json", "adapter artifact manifest")
     rows = [{"path": name, "size": len(data), "sha256": _sha256_bytes(data)}
-            for name, data in sorted(files.items())]
+            for name, data in sorted(files.items(), key=lambda item: Path(item[0]))]
     expected_adapter = {"path": str(directory), "kind": "directory", "files": rows,
                         "manifest_sha256": _sha256_bytes(_canonical(rows))}
     if adapter != expected_adapter:

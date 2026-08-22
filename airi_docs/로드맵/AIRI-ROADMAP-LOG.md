@@ -9,6 +9,22 @@
 
 ## 2026-08-23 goal resume·P0 final validation
 
+- 07:28 KST compact 직후 지정 SSoT 5종을 순서대로 EOF까지 재독하고 actual 상태를
+  대조했다. Goal active, HEAD/local·remote origin/main `0454ca8`, actual modified exact 4
+  (WORKING/handoff/verifier/test), staged·untracked 0, 관련 AIRI PID/workload 0이다. K3
+  equivalence receipt 48,323 bytes SHA `d913992e...e84b9`와 두 complete state/final-root/
+  latest checkpoint SHA는 기존 receipt와 exact하다. source/chat/base/E1도 exact, E2
+  adapter/report absent·로그 각 0 bytes·microstep 0이다. stale frontmatter와 장기 SSoT를
+  관측 사실로 먼저 정정하고 exact 7-path milestone 검증·commit/push 전에는 E2를 금지한다.
+- 07:18 KST fresh K=3 controlled GPU baseline과 실제 optimizer-boundary
+  `SAFE_TO_POWER_OFF` pause/checkpoint/resume arm은 모두 terminal 480/30이다. final paired
+  receipt는 `pass=true`, adoption false, 672 tensors exact/max abs·rel 0, governed normal
+  interval 10개/max `551.5176357`초로 600초/최소 4구간 gate를 통과했다. 첫 verifier의
+  Windows `README.md` receipt-order false reject는 producer와 같은 platform `Path` 순서 한
+  줄과 targeted 회귀로 최소 수정했다. pinned targeted 1 PASS, suite 62 passed/1 skipped,
+  actual preserved GPU verifier PASS와 final offline checkpoint PASS, exact 3-path
+  diff/security hit 0이며 관련 PID 0이다. verifier/test와 다섯 SSoT commit/push 뒤에만
+  authoritative E2를 step 0부터 시작한다.
 - 05:10 KST two-doc continuity/diff/security PASS 뒤 `git push origin main` exit 0,
   `18d0bc6..57cd999 main -> main`. HEAD/local·remote origin/main은 모두
   `57cd9994e11d87bb2fb2801661d5e32da7de2195`, 관련 PID 0이며 actual push receipt용

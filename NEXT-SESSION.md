@@ -1,25 +1,25 @@
 # AIRI 다음 세션 안내
 
-> **2026-08-23 first controlled GPU/P0 correction receipt:** 최신 Goal status는 `active`,
-> `goal_status=active`다. HEAD/local·remote origin/main은 `18d0bc6`, 관련 durable
-> runner/trainer/test PID는 0이다. 첫 K=5 baseline은 480/480 microsteps·30/30 optimizer
-> steps 계산 뒤 actual interval max `705.902827`초와 final-root 결속 오류로 FAIL했고,
-> failed root는 보존한다. producer internal artifact-manifest file SHA를 runner/pause가
-> adapter directory inventory SHA와 비교한 두 P0를 exact receipt row 결속으로 최소 수정했다.
-> pinned Python `146 passed, 5 skipped`, actual-process PowerShell durability literal PASS,
-> final offline checkpoint PASS, diff/security hit 0이다. 수정 배치는
-> `18d0bc6bc6df22e6667a4647945bfcff5701d420`으로 origin/main push됐고 actual push receipt
-> 5-doc commit/push와 clean 재확인 뒤 K=3 fresh controlled GPU가 다음이다. 운영 채택과 기본 모델 변경 금지는
-> 유지한다.
+> **2026-08-23 controlled GPU P0-B PASS receipt:** 최신 Goal status는 `active`,
+> `goal_status=active`다. 첫 K=5 baseline은 480/30 계산 뒤 actual interval max
+> `705.902827`초와 final-evidence 결속 실패로 FAIL해 보존했고 같은 K=5를 반복하지 않았다.
+> exact internal manifest receipt row 결속으로 최소 수정한 뒤 fresh K=3 baseline과 실제
+> `SAFE_TO_POWER_OFF` pause/checkpoint/resume arm을 모두 terminal 480/30으로 완주했다.
+> final equivalence receipt는 48,323 bytes SHA `d913992e...e84b9`, `pass=true`, adoption
+> false, 672 tensors exact/max abs·rel 0, normal interval 10개/max `551.5176357`초다.
+> Windows producer/verifier의 `README.md` receipt-order false reject는 platform `Path` 순서
+> 한 줄과 targeted 회귀로 최소 수정했고 targeted 1 PASS, suite 62 passed/1 skipped,
+> actual GPU verifier와 final offline checkpoint도 PASS했다. 운영 채택과 기본 모델 변경
+> 금지는 유지한다.
 >
-> 최신 권위 receipt는 핀된 Python `146 passed, 5 skipped`, actual-process PowerShell
-> durability literal PASS, 전체 offline checkpoint PASS, repo diff-check와 17-path
-> security hit 0, post-run PID 0이다. 한 차례 독립 감사의 P0=0/P1=4 중 고정된 네
-> 원래 P1만 최소 수정했고 targeted/integration gate로 모두 닫았다. 새 감사 라운드는
-> 추가하지 않는다. 새 세션/compact는 다섯 SSoT 전체 재독 뒤 actual Git/PID/artifact를
-> 대조한다. 현재 배치가 push/clean이면 같은 K=5를 반복하지 않고 checkpoint interval K=3의
-> fresh timestamped 외부 root/manifest를 만든다. 문서 인덱스는 현행 handoff를 정확히
-> 가리켜 변경하지 않는다. controlled GPU PASS receipt 전에는 E2를 시작하지 않는다.
+> 07:28 KST HEAD/local·remote origin/main은 아직 `0454ca8d9df9239cf7d6c063e5ed751235fb2ed1`,
+> 관련 durable runner/trainer/verifier/test PID와 AIRI GPU workload는 0이다. source/chat/base와
+> E1 adapter/config/report SHA는 exact, E2 adapter/report absent, 기존 로그 두 개 각 0 bytes,
+> E2 microstep 0이다. 현재 gate는 verifier/test와 WORKING/handoff/roadmap status/log/NEXT
+> exact 7-path focused continuity·diff/security, stage/cached 검증, Conventional Commit/push다.
+> HEAD=origin/main·clean·PID 0 뒤에만 fresh timestamped E2 root/manifest를 만들고 authoritative
+> durable runner로 seed 42·1,600 microsteps를 step 0부터 시작한다. direct trainer는 금지한다.
+> 새 감사 라운드는 추가하지 않으며 문서 인덱스는 현행 handoff를 정확히 가리켜 변경하지 않는다.
 >
 > **이전 권한 이력 — 2026-08-22 goal resume:** 사용자 `/goal` 명령으로 당시 AIRI 본 goal은 `active`였다.
 > 운영 모델 채택과 기본 서비스 모델 변경만 별도 사용자 승인 전까지 금지한다.

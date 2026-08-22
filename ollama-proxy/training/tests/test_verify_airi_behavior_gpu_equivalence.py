@@ -316,6 +316,34 @@ def test_completed_output_receipts_refuse_adapter_and_report_substitution() -> N
             verifier._bind_completed_output_receipts(state, adapter, artifact)
 
 
+def test_completed_output_receipts_follow_platform_path_order() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        adapter = Path(temporary) / "adapter"; adapter.mkdir()
+        payloads = {
+            "adapter_config.json": b"config",
+            "adapter_model.safetensors": b"weights",
+            "artifact-manifest.json": b"{}\n",
+            "README.md": b"readme",
+        }
+        for name, payload in payloads.items():
+            (adapter / name).write_bytes(payload)
+        rows = [
+            {"path": path.relative_to(adapter).as_posix(), "size": path.stat().st_size,
+             "sha256": verifier._sha256_bytes(path.read_bytes())}
+            for path in sorted(adapter.rglob("*")) if path.is_file()
+        ]
+        state = {"outputs": {"adapter": {
+            "path": str(adapter), "kind": "directory", "files": rows,
+            "manifest_sha256": verifier._sha256_bytes(verifier._canonical(rows)),
+        }}}
+        artifact = {"files": {
+            name: payload for name, payload in payloads.items()
+            if name != "artifact-manifest.json"
+        }}
+
+        verifier._bind_completed_output_receipts(state, adapter, artifact)
+
+
 def test_artifact_inventory_rejects_windows_reparse_attribute() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         directory = Path(temporary) / "adapter"; directory.mkdir()

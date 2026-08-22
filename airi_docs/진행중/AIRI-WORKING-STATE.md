@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 05:10:31 +09:00"
-checkpoint_id: "20260823-051031-final-evidence-p0-docs-push-receipt-finalization-intent"
+updated_at_kst: "2026-08-23 07:34:42 +09:00"
+checkpoint_id: "20260823-073442-controlled-gpu-milestone-staged-commit-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "final-evidence-p0-verified-milestone-docs-commit-preflight"
-git_head: "57cd9994e11d87bb2fb2801661d5e32da7de2195"
-worktree_state: "implementation-and-five-doc-receipt-pushed; final-two-doc-receipt-dirty"
+active_phase: "controlled-gpu-k3-pass-milestone-docs-precommit"
+git_head: "0454ca8d9df9239cf7d6c063e5ed751235fb2ed1"
+worktree_state: "staged-exact7-unstaged-untracked-0"
 active_trainer_count: 0
 ---
 
@@ -31,28 +31,495 @@ active_trainer_count: 0
   trainer/runner workload는 0이다.
 - v4 파인튜닝은 E1 adapter/report까지만 완료·검증됐고 아직 미채택이다.
 - E2 adapter/report, merge/package, v4 T3, live campaign 산출물은 0이다.
-- HEAD와 origin/main은 safe-pause final receipt
-  `32830a43556ba7704a39bd9094f128a5a98dd7d7`로 일치한다. source/chat/base와
-  E1 adapter/config/report의 크기·SHA는 고정값과 exact 일치한다. E2 adapter/report/
-  durable run, T3와 campaign은 없고 기존 E2 stdout/stderr는 각 0 bytes다. 사용량
-  초기화 후 지정 SSoT를 다시 읽고 19:27 KST actual worktree clean, AIRI
-  trainer/runner 0, 기존 planned P0-B root와 E2 adapter/report 부재를 대조했다.
+- 2026-08-23 07:28 KST HEAD/local·remote origin/main은
+  `0454ca8d9df9239cf7d6c063e5ed751235fb2ed1`로 일치한다. K3 controlled GPU
+  equivalence receipt SHA `d913992e...e84b9`는 PASS이고 baseline/safe arm은 complete
+  480/30, 관련 PID 0이다. source/chat/base와 E1 adapter/config/report의 크기·SHA는
+  고정값과 exact 일치한다. E2 adapter/report/durable run, T3와 campaign은 없고 기존
+  E2 stdout/stderr는 각 0 bytes다. 현재 verifier/test와 다섯 SSoT를 actual receipt로
+  갱신 중이며 이 exact 7-file milestone commit/push 뒤 clean을 확인해야만 E2를 시작한다.
 
 ## 2. 현재 작업 트랜잭션
 
 | 항목 | 값 |
 |---|---|
-| 의도 | implementation과 five-doc receipt push의 actual receipt를 마지막 두 문서에 결속해 final docs commit/push와 clean GPU 경계를 완성한다. |
-| 허용 범위 | runner final root의 internal artifact-manifest file receipt 결속, pause complete verifier의 동일 결속, 정확한 targeted/영향/final integration 회귀와 receipt 문서. 새 schema/기능/architecture와 운영 채택은 금지 |
-| 시작 전 증거 | Goal active, HEAD/local·remote origin/main `57cd999`, failed K=5 root 보존/PID 0, timing max `705.902827`초 FAIL, final root absent, source/chat/base/E1 exact, E2 microstep 0. |
-| exact 변경 | runner와 pause가 producer의 `adapter_artifact_manifest_sha256`을 closed adapter receipt의 exact `artifact-manifest.json` row SHA와 비교한다. synthetic PowerShell fixture도 실제 내부 manifest를 게시한다. |
-| 출력 경로 | 저장소 코드·회귀·SSoT 문서만 변경한다. failed GPU/synthetic roots는 Git 밖에 보존하고 모델·adapter·GGUF·로그·생성 산출물을 Git에 넣지 않는다. |
-| 완료 조건 | two-doc focused/boundary/diff/security와 cached 검증, final docs Conventional Commit/push, HEAD=origin/main·clean·PID 0 |
-| 중단·복구 | gate 실패 root는 보존하고 원인 없이 반복하지 않는다. commit/push 실패 시 local 상태를 보존하며 fresh GPU/E2를 시작하지 않는다. |
-| 현재 행동 | five-doc receipt `57cd999` push 사실을 WORKING/LOG에 final 기록하고 focused/cached 검증 뒤 `docs: close final evidence P0 milestone`로 commit/push한다. 그 commit 뒤 read-only clean 확인만 하고 같은 K=5가 아닌 K=3 fresh controlled GPU preflight로 이동한다. |
+| 의도 | controlled GPU K3 PASS와 Windows verifier receipt-order 최소 수정/검증을 milestone docs와 함께 commit/push한다. |
+| 허용 범위 | verifier/test exact 2개와 WORKING/handoff/roadmap status/log/NEXT exact 5개. 외부 GPU root는 immutable, E2/서비스는 금지 |
+| 시작 전 증거 | GPU equivalence receipt 48,323 bytes SHA `d913992e...e84b9` PASS, targeted/suite/actual verifier/final offline/diff-security PASS, 관련 PID 0. |
+| exact 변경 | verifier row 정렬 한 줄을 producer platform `Path` 순서에 맞추고 uppercase README targeted 회귀 1건 추가; 다섯 SSoT를 actual receipt로 갱신. |
+| 출력 경로 | Git에는 code/test/docs만. 모델/adapter/checkpoint/receipt/log는 외부 root에 유지하고 stage하지 않는다. |
+| 완료 조건 | focused continuity, exact 7-path boundary/diff/security, staged 7/unstaged·untracked 0, cached PASS, Conventional Commit/push, HEAD=origin/main·clean·PID 0. |
+| 중단·복구 | 검증/stage/commit/push 실패 시 현재 diff/local commit을 보존하고 E2를 시작하지 않는다. 같은 GPU run/verifier를 반복하지 않는다. |
+| 현재 행동 | 다섯 milestone SSoT를 controlled GPU PASS와 verifier fix receipt에 맞춰 정리한다. 문서 인덱스는 변경하지 않는다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260823-073442-controlled-gpu-milestone-staged-commit-intent`: receipt 기록 전 final
+  exact 7-path pre-stage 검사는 exit 0, boundary/staged/untracked 0, diff/security hit 0,
+  총 737,165 bytes, manifest `cba054a7...c1e2b1`이다. exact `git add --` exit 0 뒤
+  staged 7/unstaged·untracked 0, cached diff-check/boundary와 forbidden artifact/oversize/
+  binary/credential·민감 literal/개인 경로 hit 모두 0이다. staged blob 총 734,996 bytes,
+  index path/mode/blob/size manifest는
+  `58494ad17b487c68dde992c551a8d1c940af145c217522e466d85156aa54ff48`다. 이 receipt로
+  바뀐 WORKING-STATE만 재stage해 동일 7/0/0과 cached diff/security를 확인한 뒤 exact
+  `git commit -m "fix: verify Windows GPU artifact order"`를 실행한다. 실패하면 push/E2로
+  이동하지 않고 staged 배치를 보존한다.
+- `20260823-073318-controlled-gpu-milestone-diff-security-pass-stage-intent`: native stderr를
+  비종료 처리한 corrected wrapper는 exit 0이다. actual modified exact 7, boundary diff 0,
+  staged/untracked 0, repo 기본 diff-check exit 0/expected line-ending warning 7줄이다.
+  forbidden artifact path/binary/5 MiB 초과/credential·민감 literal/개인 경로 hit는 모두 0,
+  관련 PID 0, 총 736,276 bytes, path+size+SHA manifest
+  `51960273f73e85470b9d775ff22a21a8837c269c3ca79797e3adefa778b9f74c`다. 이 receipt로
+  WORKING bytes가 바뀌었으므로 exact 7-path boundary/diff/security를 최종 한 번 확인한 뒤
+  다음 상태 변경은 기록된 7경로만 `git add --`하는 것이다. 완료 조건은 staged 7,
+  unstaged/untracked 0과 cached boundary/diff/security PASS다. 실패하면 commit/push/E2로
+  이동하지 않고 stage 상태를 보존한다.
+- `20260823-073300-controlled-gpu-milestone-diff-wrapper-failure-corrected-intent`:
+  첫 exact 7-path diff/security wrapper는 검증 receipt 조립 전에 `git diff --name-only`의
+  expected LF→CRLF warning이 outer `ErrorActionPreference=Stop`에 승격돼 exit 1로 중단했다.
+  stage/Git/file mutation과 완결 security 판정은 0이며 이 실행을 PASS로 쓰지 않는다. 원인은
+  native stderr 처리로 확정했으므로 `$ErrorActionPreference='Continue'`에서 Git stderr를
+  캡처하고 검사 판정은 각 native exit code와 명시 hit count로 수행하는 수정 wrapper를 한 번
+  실행한다. exact 7/boundary·staged·untracked 0, diff-check exit 0, 모든 security hit 0,
+  관련 PID 0과 path+size+SHA manifest 전에는 stage/commit/push/E2를 금지한다.
+- `20260823-073200-controlled-gpu-milestone-continuity-pass-diff-security-intent`:
+  focused `test-airi-work-continuity.ps1`은 exit 0/literal PASS이고 post-run 관련 PID 0이다.
+  actual 변경은 exact 7, staged/untracked 0으로 유지된다. code/test final diff도 verifier의
+  producer-platform `Path` 정렬 한 줄과 uppercase `README.md` 포함 targeted 회귀 한 건뿐임을
+  직접 확인했다. 다음 read-only gate는 repo 기본
+  `git diff --check -- . ':(exclude)airi_docs/patches/*.patch'`와 exact 7-path boundary,
+  forbidden artifact filename/binary/5 MiB 초과/credential·민감 literal/개인 경로 added
+  content scan이다. exit 0/hit 0, path+size+SHA manifest와 관련 PID 0 전에는 stage/commit/
+  push/E2로 이동하지 않는다. expected line-ending warning은 오류가 아니며 native stderr를
+  비종료 캡처해 receipt 조립을 보존한다.
+- `20260823-073105-controlled-gpu-milestone-docs-updated-continuity-intent`: WORKING,
+  handoff, roadmap status/log, NEXT를 actual K3 PASS와 verifier fix receipt에 맞춰 갱신했다.
+  handoff/roadmap의 P0-B와 controlled GPU preflight는 완료로 표시했고 E2는 current milestone
+  push/clean 뒤 step 0으로 유지했다. 문서 인덱스 diff는 0이다. actual 변경은 verifier/test와
+  다섯 SSoT exact 7, staged/untracked 0이다. exact
+  `powershell -NoProfile -ExecutionPolicy Bypass -File .\test-airi-work-continuity.ps1`을
+  focused 문서 계약으로 한 번 실행한다. 완료 조건은 exit 0/literal PASS와 post-run 관련
+  PID 0이다. 실패하면 원인 없이 반복하지 않고 exact 7-path diff/security·stage/commit/push와
+  E2를 금지한다. PASS 뒤에는 이 7경로의 boundary/repo diff/security만 수행한다.
+- `20260823-072830-post-compact-controlled-gpu-pass-reconcile`: compact 직후 지정 SSoT
+  5종을 순서대로 EOF까지 재독하고 Goal/Git/PID/K3/E2 authority를 read-only로 대조했다.
+  Goal status는 `active`; HEAD/local origin/main/remote main은 모두
+  `0454ca8d9df9239cf7d6c063e5ed751235fb2ed1`이다. actual worktree는 WORKING-STATE,
+  handoff, verifier와 verifier test exact 4 modified, staged/untracked 0이다. 관련
+  runner/trainer/verifier/contract PID와 식별 가능한 AIRI GPU workload는 0이고 GPU는
+  480 MiB used다. K3 equivalence receipt는 48,323 bytes SHA
+  `d913992e93ab81035e586fcd5587b7f565ad58fd685759f61adb035d688e84b9`, `pass=true`,
+  adoption false, 672 tensors max abs/rel 0, normal interval 10개/max `551.5176357`초다.
+  baseline/safe state는 complete revision 384/245·480/30, final-root SHA와 latest retained
+  checkpoint 11/12 SHA가 기존 receipt와 exact하다. 로그는 size/SHA만 대조하고 본문은 읽지
+  않았다. source/chat/base/E1 6종의 크기·SHA도 고정값과 exact하고 E2 adapter/report는
+  absent, 기존 로그 두 개 각 0 bytes/SHA empty, microstep 0이다. frontmatter가 live-state
+  단독 diff를 가리킨 점과 장기 SSoT 일부가 controlled GPU PASS 전 상태인 점만 actual과
+  달랐으므로 이 checkpoint와 roadmap log로 먼저 정정한다. 다음은 handoff checklist,
+  roadmap status, NEXT를 PASS receipt로 갱신한 뒤 focused continuity와 exact 7-path
+  diff/security를 수행하는 것이다. 이미 PASS한 GPU/verifier/Python/PowerShell gate는 반복하지
+  않으며 commit/push·HEAD=origin/main clean 전에는 E2를 시작하지 않는다.
+- `20260823-072216-controlled-gpu-fix-diff-security-pass-docs-intent`: repo 기본 exact
+  diff-check exit 0/expected LF→CRLF warning 3줄이다. actual 변경은 live state/verifier/test
+  exact 3, boundary/staged/untracked 0이고 forbidden artifact path/binary/5 MiB 초과/
+  credential·민감 literal·개인 경로 hit 모두 0, 총 417,310 bytes, path+size+SHA manifest
+  `533ebc963e589fdd28d3f2a2d340cc8b4baa12693f315ad3d07092d9e9df7f71`다. 첫 wrapper는
+  expected Git stderr를 terminating native error로 승격해 receipt 조립 전에 중단했고,
+  stderr를 비종료 캡처한 위 결과만 권위로 쓴다. WORKING/handoff/roadmap status/log/NEXT를
+  actual controlled GPU PASS와 verifier fix receipt에 맞춰 갱신한다. 문서 인덱스는 현행
+  handoff를 정확히 가리켜 변경하지 않는다. focused continuity와 final 7-path diff/security
+  전에는 stage/commit/push/E2로 이동하지 않는다.
+- `20260823-072117-controlled-gpu-fix-offline-pass-diff-security-intent`: exact
+  `test-current-checkpoint.ps1` 세션은 continuity PASS, actual-process training durability
+  literal PASS와 최종 `Current checkpoint contract: PASS (offline synthetic ASAR only; no
+  installed archive/service/model access)`로 종료했다. post-run 관련 PID 0이다. actual
+  변경은 live state/verifier/test exact 3, staged/untracked 0이며 HEAD=local origin/main
+  `0454ca8d9df9239cf7d6c063e5ed751235fb2ed1`이다. 최신 권위 gate는 targeted 1 PASS,
+  verifier suite 62 passed/1 skipped, actual GPU equivalence receipt PASS, final offline PASS다.
+  이미 PASS한 Python/PowerShell gate는 다시 실행하지 않는다. 다음은 repo 기본 exact
+  diff-check와 세 변경 경로의 boundary·금지 artifact/binary/oversize/credential·민감 literal/
+  개인 경로 scan이다. exit 0/hit 0 전에는 milestone docs/stage/commit/push/E2로 이동하지 않는다.
+- `20260823-071919-controlled-gpu-k3-pass-final-offline-intent`: Windows receipt-order
+  원인 수정 뒤 실제 보존 GPU evidence verifier는 exit 0이고 fresh receipt는 48,323 bytes,
+  SHA `d913992e...e84b9`, schema `airi.behavior-gpu-equivalence-receipt.v1`, `pass=true`,
+  `adoption_authorized=false`다. comparator source SHA `2a15333c...a98b`, exact/rtol 0/
+  atol 0/weights-only이며 672 tensors의 max abs/rel diff가 모두 0이다. expected manifest
+  `1f54fc45...b4e58`, config `c99eba22...5f89`, seed 42, batch 1, accumulation 16,
+  safe pause 16/1과 input pins `fb75566e...e66f`가 exact다. governed normal interval은
+  count 10, minimum gate 4, max `551.5176357`초로 600초 아래다. baseline/safe final-root,
+  producer/progress/report/adapter manifest, latest checkpoint payload, safe-pause event와
+  request/ack/resume-accepted history 3종을 모두 exact 결속한다. selected dev loss는
+  두 arm `3.0225894427291413`, report는 training true/adoption false/T3 pending이다.
+  post-run 관련 PID 0이다. 이 receipt로 controlled GPU K3는 PASS이며 계산 시간만으로
+  승격한 것이 아니다. E2 전 verifier/test 수정과 GPU milestone을 검증·commit/push한다.
+  최종 repository integration은 exact `powershell -NoProfile -ExecutionPolicy Bypass -File
+  .\test-current-checkpoint.ps1` 한 번이다. exit 0/final offline PASS/PID 0 실패 시 diff/
+  security/docs/commit/push/E2로 이동하지 않고 원인 없이 반복하지 않는다.
+- `20260823-071808-equivalence-suite-pass-gpu-verifier-retry-intent`: pinned verifier 전체
+  suite는 exit 0, `62 passed, 1 skipped in 12.03s`; post-run 관련 PID 0이다. baseline/safe
+  state는 complete, equivalence receipt는 여전히 absent다. actual 변경은 live state와
+  verifier/test exact 3개, staged/untracked 0이다. 같은 immutable baseline/safe evidence와
+  expected manifest/config/seed/batch/accumulation/K/first-pause를 사용해 고정 verifier를
+  원인 수정 뒤 정확히 한 번 재실행한다. exit 0, fresh receipt PASS, exact evidence/tensor/
+  state/timing 결속과 post-run PID 0 전에는 controlled GPU PASS로 승격하지 않는다.
+  실패하면 이 두 번째 명령도 반복하지 않고 root/bytes를 보존하며 E2를 금지한다.
+- `20260823-071727-equivalence-receipt-order-targeted-pass-suite-intent`: verifier 한 줄과
+  targeted 회귀 한 건 수정 뒤 pinned pycompile exit 0, targeted pytest exit 0,
+  `1 passed, 62 deselected in 0.16s`, scoped diff-check exit 0/관련 PID 0이다. verifier는
+  76,773 bytes SHA `2a15333c...a98b`, test는 54,995 bytes SHA
+  `c57e3f8d...b6a7e`다. next impact gate는 pinned verifier suite 전체 한 번이며 exit 0/
+  exact count/post-run PID 0을 요구한다. PASS 뒤에만 absent GPU equivalence receipt에 같은
+  고정 expected 명령을 원인 수정 후 한 번 재실행한다. 실패하면 원인 없이 반복하거나
+  PowerShell/offline/E2로 이동하지 않는다.
+- `20260823-071625-equivalence-windows-receipt-order-fix-intent`: 실제 두 adapter에서
+  state receipt와 verifier 재계산 row set/size/SHA는 exact하지만 순서만 다름을 재현했다.
+  runner `_artifact_receipt`는 `sorted(Path)`의 Windows case-insensitive 경로 순서로
+  `adapter_config`, `adapter_model`, `artifact-manifest`, `README`를 기록한다. verifier는
+  `sorted(files.items())` 문자열 순서로 uppercase `README`를 먼저 배치해 baseline/safe
+  directory receipt SHA를 각각 `69dd4aac...fc2c` 대 `43e06df8...4b39`,
+  `51d2e5aa...a1c0` 대 `f2caf085...78d5`로 거짓 불일치시켰다. verifier의 row 정렬을
+  producer와 같은 platform `Path` 순서로 바꾸는 한 줄과 uppercase `README.md`를 포함한
+  completed-output targeted 회귀만 수정한다. schema, evidence cut, file SHA, report,
+  comparator, GPU 산출물은 변경하지 않는다. pinned pycompile+targeted PASS 뒤 verifier
+  suite와 실제 보존 GPU evidence verifier를 영향 gate로 실행하고, 이후 frozen final
+  Python/PowerShell/offline gate 범위는 결과에 따라 별도 intent로 고정한다. 같은 실패
+  verifier 명령을 원인 수정 전 반복하지 않으며 E2는 금지한다.
+- `20260823-071432-controlled-gpu-k3-equivalence-verifier-failure-receipt`: 고정 paired
+  verifier 1회는 4.44초 뒤 exit 2, exact error `completed adapter output receipt differs from
+  evidence cut`로 종료했고 `receipts/gpu-equivalence.json`은 absent다. post-run 관련 PID 0,
+  Git은 live state 단독 diff/staged·untracked 0이며 E2는 microstep 0이다. baseline/safe
+  state는 각각 complete revision 384/245이고 두 adapter의 actual 4-file size/SHA inventory는
+  각 state output receipt와 exact해 verifier가 산출물을 변경하거나 외부 변조가 생긴 증거는
+  없다. verifier bytes는 76,741 bytes SHA `621de009...30799`로 pinned final Python PASS
+  receipt와 같다. 같은 verifier 명령을 반복하지 않는다. error source line 449의 exact
+  evidence-cut 비교를 좁게 읽어 internal artifact-manifest file SHA와 directory inventory
+  SHA 의미 혼동인지, 다른 final-root 결속인지 확정한 뒤 frozen P0의 최소 수정/targeted
+  회귀만 허용한다. 원인 확정과 영향 gate 전에는 controlled GPU PASS/E2를 금지한다.
+- `20260823-071331-controlled-gpu-k3-equivalence-verifier-intent`: verifier 직전 baseline은
+  `complete` revision 384·480/30, safe arm은 `complete` revision 245·480/30이며 관련
+  runner/trainer/verifier PID 0이다. manifest SHA `1f54fc45...b4e58`, config SHA
+  `c99eba22...5f89`, seed 42, batch 1, accumulation 16, K=3이 exact이고
+  `receipts/gpu-equivalence.json`은 absent다. Git은 live state 단독 diff, staged/untracked 0,
+  E2 adapter/report absent·microstep 0이다. 핀된 Python으로 baseline/safe RunDir와 adapter를
+  입력하고 expected 480 microsteps·30 optimizer·K=3·manifest/config·seed/batch/
+  accumulation·safe pause 16/1을 고정해 verifier를 한 번 실행한다. 출력은 외부 root의
+  fresh `receipts/gpu-equivalence.json` 하나뿐이다. exit 0, fresh receipt schema/PASS와
+  exact evidence 결속, post-run PID 0 실패 시 같은 명령을 반복하지 않고 receipt/root를
+  보존하며 E2를 금지한다.
+- `20260823-071238-controlled-gpu-k3-safe-arm-terminal-receipt`: safe arm authority state는
+  `complete` revision 245, terminal exit 0/`trainer-complete`, epoch 1,
+  480/480 microsteps·30/30 optimizer steps·pending 0이다. state 3,516 bytes SHA
+  `b899cc2c...5b3d`와 anchor current SHA/revision, anchor top-level run ID가 exact하며
+  runner/trainer/verifier 관련 PID는 0이다. final evidence root는 2,451 bytes SHA
+  `2c79f4c9...1f3b`, state projection SHA `7756c27b...c4c1`, producer root SHA
+  `534d913e...7620`, current index SHA `744e23a7...24ca`, completed progress SHA
+  `4fbbece7...8f5`, latest event 12 SHA `4d504cf1...fad3`를 exact 결속한다. adapter
+  model SHA `7b7ff274...dcc7`, internal artifact manifest SHA `eed0a48a...f732`, directory
+  receipt SHA `51d2e5aa...a1c0`; report는 1,493 bytes SHA `8cb80351...eebd`, selected dev
+  loss `3.0225894427291413`, peak CUDA 6,178,299,904 bytes, training authorization true,
+  adoption false, T3 pending이며 actual files/state/producer가 exact하다. 12-event predecessor
+  chain은 safe-pause 1, interval 10, epoch-complete 1로 exact하고, resume 경계 event 2를
+  제외한 normal interval 9개 max는 training/durable `230.3527189`/`234.870925`초로
+  600초 아래다. control은 request/ack/resume-accepted history exact 3개, live 0이다.
+  trainer stdout/stderr는 1,792/1,000 bytes SHA `59f0dc01...072bf`/
+  `9933ca52...b7557`이며 본문은 읽지 않았다. GPU는 457 MiB로 반환됐다. terminal arm은
+  검증됐지만 paired equivalence receipt가 absent이므로 controlled GPU PASS는 계속 보류한다.
+- `20260823-071053-controlled-gpu-k3-safe-arm-epoch-complete-checkpoint-12`: authority state는
+  아직 `running` revision 244이지만 epoch 1, 480/480 microsteps·30/30 optimizer steps·
+  pending 0이다. event 12는 normal K=3 interval이 아니라 `epoch-complete`이고 manifest
+  SHA `7669adcb...11d8`, payload SHA `f9ccf836...33b0a`, event SHA
+  `4d504cf1...fad3`가 event 11 `d0209476...edae9`와 previous index
+  `ae16457e...190d`를 exact 결속한다. current index SHA는 `744e23a7...24ca`다. event 11
+  뒤 elapsed `106.2563222`/`109.948895`초는 normal interval count/max에 포함하지 않는다.
+  trainer가 종료해 GPU는 457 MiB/26%/47°C로 반환됐고 adapter directory와 report 1,493 bytes
+  SHA `8cb80351...eebd`가 게시됐다. runner process tree는 final evidence를 결속 중이며
+  final-root와 terminal state는 아직 absent다. terminal/PID 0 전에는 PASS로 승격하지 않는다.
+- `20260823-070916-controlled-gpu-k3-safe-arm-resume-checkpoint-11`: authority state는 아직
+  `running` revision 238이지만 480/480 microsteps·30/30 optimizer steps·pending 0에
+  도달했다. checkpoint 11 manifest SHA `1f93aa7d...afca6`, payload SHA
+  `09eb8fdf...5d1f2`, event SHA `d0209476...edae9`는 event 10
+  `2a5f66c0...04f4`와 previous index `2306868b...52e1`을 exact 결속하고 current index
+  SHA는 `ae16457e...190d`다. 아홉 번째 normal training/durable interval은
+  `199.1957881`/`202.333512`초이고 safe arm 9개 max는 계속
+  `230.3527189`/`234.870925`초로 600초 아래다. GPU는 7,976 MiB/100%/67°C다.
+  adapter/report/final-root는 아직 absent이고 final publication 중이므로 계산 완료를
+  terminal 또는 controlled GPU PASS로 승격하지 않는다. 기존 monitor session만 회수한다.
+- `20260823-070719-post-compact-controlled-gpu-k3-safe-arm-checkpoint-10-reconcile`:
+  compact 직후 지정 SSoT 5종을 순서대로 전체 재독하고 Goal/Git/PID/K3 authority를
+  read-only로 대조했다. Goal status는 `active`; HEAD/local origin/main/remote main은 모두
+  `0454ca8d9df9239cf7d6c063e5ed751235fb2ed1`, actual worktree는 이 live state 한
+  파일만 dirty이고 staged/untracked 0이다. safe arm authority state는 `running` revision
+  227, 464/480 microsteps·29/30 optimizer steps·pending 0이며 state의 runner PID 3848과
+  trainer PID 29324 creation/executable/command SHA가 live process와 exact하다. venv
+  redirector child/parent를 포함한 동일 process tree만 존재하고 중복 launch/resume는 없다.
+  checkpoint event 10은 432/480·27/30, manifest SHA `124d92dc...36470`, payload SHA
+  `aef66a07...71af9`, event SHA `2a5f66c0...04f4`이고 predecessor event 9
+  `09765c8e...f96d`와 previous index `69f7dc3f...7bef`를 exact 결속한다. 여덟 번째 normal
+  training/durable interval은 `222.7224903`/`227.046717`초이고 current index SHA는
+  `2306868b...52e1`로 600초 아래다. control은 request/ack/resume-accepted history exact
+  3개, live control 0이며 adapter/report/final-root/equivalence receipt는 아직 absent다.
+  GPU는 7,976 MiB/100%/68°C다. E2 adapter/report는 absent, 기존 E2 logs는 각 0 bytes,
+  E2 microstep 0이다. terminal/verifier 전 PASS는 보류하고 기존 monitor/session만 회수한다.
+- `20260823-070128-controlled-gpu-k3-safe-arm-resume-checkpoint-9`: authority state는
+  `running` revision 193, 384/480 microsteps·24/30 optimizer steps·pending 0이다.
+  checkpoint 9 manifest SHA `ff101754...4ad9`, event SHA `09765c8e...f96d`는 event 8
+  `31ace88b...e095`를 exact 결속하고 current index SHA는 `69f7dc3f...7bef`다.
+  일곱 번째 normal training/durable interval은 `230.3527189`/`234.870925`초이고 safe
+  arm 7개 max도 이 값으로 600초 아래다. GPU는 7,967 MiB/97%/66°C다.
+  terminal/verifier 전 PASS는 보류하며 동일 run을 계속 monitor한다.
+- `20260823-065739-controlled-gpu-k3-safe-arm-resume-checkpoint-8`: authority state는
+  `running` revision 170, 336/480 microsteps·21/30 optimizer steps·pending 0이다.
+  checkpoint 8 manifest SHA `0bea039e...e9cf`, event SHA `31ace88b...e095`는 event 7
+  `32ff9b98...1af9`를 exact 결속하고 current index SHA는 `d08322e7...08e1`이다.
+  여섯 번째 normal training/durable interval은 `226.0341128`/`230.227894`초이고 safe
+  arm 6개 max도 이 값으로 600초 아래다. GPU는 7,967 MiB/99%/66°C다.
+  terminal/verifier 전 PASS는 보류하며 동일 run을 계속 monitor한다.
+- `20260823-065358-controlled-gpu-k3-safe-arm-resume-checkpoint-7`: authority state는
+  `running` revision 149, 288/480 microsteps·18/30 optimizer steps·pending 0이다.
+  checkpoint 7 manifest SHA `f3a0e16b...932b`, event SHA `32ff9b98...1af9`는 event 6
+  `7c13d301...36ae`를 exact 결속하고 current index SHA는 `0747289a...6f59`다.
+  다섯 번째 normal training/durable interval은 `223.4969564`/`226.975636`초이고 safe
+  arm 5개 max도 이 값으로 600초 아래다. GPU는 7,974 MiB/100%/64°C다.
+  terminal/verifier 전 PASS는 보류하며 동일 run을 계속 monitor한다.
+- `20260823-065014-controlled-gpu-k3-safe-arm-resume-checkpoint-6`: authority state는
+  `running` revision 128, 240/480 microsteps·15/30 optimizer steps·pending 0이다.
+  checkpoint 6 manifest SHA `2d40eb13...e3e4`, event SHA `7c13d301...36ae`는 event 5
+  `b49f9d46...d2fa`를 exact 결속하고 current index SHA는 `49d17418...b384`다.
+  네 번째 normal training/durable interval은 `218.9984426`/`222.290735`초이며 safe arm
+  normal 4개 max는 `222.8801128`/`226.451554`초로 최소 구간 수와 600초 상한을
+  충족한다. GPU는 7,975 MiB/100%/67°C다. 이는 timing receipt이나 terminal 및 paired
+  verifier 전 controlled GPU PASS로 승격하지 않는다. 동일 run을 계속 monitor한다.
+- `20260823-064626-controlled-gpu-k3-safe-arm-resume-checkpoint-5`: authority state는
+  `running` revision 105, 192/480 microsteps·12/30 optimizer steps·pending 0이다.
+  checkpoint 5 manifest SHA `60b84622...5a47`, event SHA `b49f9d46...d2fa`는 event 4
+  `ea279fb0...bba4`를 exact 결속하고 current index SHA는 `200ad9de...d68a`다.
+  세 번째 normal training/durable interval은 `222.0515693`/`225.410476`초이며 현재
+  3개 max는 `222.8801128`/`226.451554`초로 600초 아래다. GPU는
+  7,975 MiB/99%/66°C다. minimum 4 normal interval까지 하나 남았고 terminal/verifier
+  전 PASS는 보류한다.
+- `20260823-064244-controlled-gpu-k3-safe-arm-resume-checkpoint-4`: authority state는
+  `running` revision 84, 144/480 microsteps·9/30 optimizer steps·pending 0이다.
+  checkpoint 4 manifest SHA `a6170b34...1b78`, event SHA `ea279fb0...bba4`는 event 3
+  `311369f5...eacc`를 exact 결속하고 current index SHA는 `991ae76f...d7c5`다.
+  safe arm 두 번째 normal training/durable interval은 `221.8360794`/`225.311893`초,
+  현재 2개 max는 `222.8801128`/`226.451554`초로 600초 아래다. GPU는
+  7,975 MiB/100%/66°C다. terminal/verifier 전 PASS는 보류하며 계속 monitor한다.
+- `20260823-063857-controlled-gpu-k3-safe-arm-resume-checkpoint-3`: authority state는
+  `running` revision 62, 96/480 microsteps·6/30 optimizer steps·pending 0, history 3종이다.
+  checkpoint 3 manifest SHA `cef9244b...31b8`, event SHA `311369f5...eacc`는 resume
+  interval event 2 `3d2b0af4...e79c`를 exact 결속하고 current index SHA는
+  `e4c3dd49...16a1`이다. safe arm의 첫 normal training/durable interval은
+  `222.8801128`/`226.451554`초로 600초 아래다. GPU는 7,975 MiB/100%/66°C다.
+  terminal/verifier 전 PASS는 보류하며 동일 run을 계속 monitor한다.
+- `20260823-063512-controlled-gpu-k3-safe-arm-resume-checkpoint-2`: authority state는
+  `running` revision 40, 48/480 microsteps·3/30 optimizer steps·pending 0이고 history 3종을
+  유지한다. resume 뒤 첫 interval checkpoint 2 manifest SHA `ee8d3404...68ad`, event SHA
+  `3d2b0af4...e79c`는 safe-pause event 1 `46d94d28...52b8`을 exact 결속하고 current
+  index SHA는 `6ddd8259...a22a`다. training delta는 `153.5404856`초, pause wall time을
+  포함한 durable delta는 `314.304217`초다. predecessor reason이 `safe-pause`이므로 이
+  경계 delta를 normal consecutive interval count/max에 포함하지 않는다. GPU는
+  7,975 MiB/100%/65°C다. 다음 interval event부터 normal 간격을 계산하며 terminal까지
+  동일 run을 monitor한다.
+- `20260823-063301-controlled-gpu-k3-safe-arm-resume-accepted-receipt`: authority state는
+  `running` revision 27, checkpoint 1에서 16/480 microsteps·1/30 optimizer step·pending 0,
+  runner/trainer PID 3848/29324 live다. live control은 empty이고 동일 prearm request의
+  request/ack/resume-accepted 세 history가 exact 1개씩 게시됐다. SHA는
+  `f081601e...c316`/`f15aed4b...8f82`/`0b556792...3ae6`이다. GPU는
+  7,949 MiB/100%/63°C로 실제 resume compute가 시작됐다. 동일 process tree를 중복·
+  중단 없이 terminal 480/30까지 monitor한다.
+- `20260823-063149-controlled-gpu-k3-safe-arm-resume-live-receipt`: authoritative resume
+  launcher 1회는 runner PID 3848을 반환했다. authority state revision 20은 checkpoint 1에서
+  복원한 16/480 microsteps·1/30 optimizer step·pending 0이며 새 runner 3848·trainer
+  29324 creation/executable/command SHA가 live CIM과 exact하고 trainer parent는 runner다.
+  transition status는 아직 `pause-requested`이고 request/ack는 live, history는 0이므로
+  resume acceptance 전 상태다. GPU는 1,897 MiB/25%/44°C다. 같은 resume를 재호출하지
+  않고 acceptance/control archive와 running 전환, 이후 terminal 480/30을 monitor한다.
+- `20260823-063033-controlled-gpu-k3-safe-poweroff-receipt-resume-intent`: 실제 pause
+  gateway 세션은 verified status object 뒤 exact standalone `SAFE_TO_POWER_OFF`를 출력하고
+  exit 0으로 종료했다. authority state는 `paused-safe` revision 16, terminal exit 75/
+  `safe-optimizer-boundary`, 16 microsteps·optimizer 1·pending 0이며 state/anchor current와
+  runner/trainer 종료가 exact하다. request SHA `f081601e...c316`과 ack SHA
+  `f15aed4b...8f82`는 같은 prearm request ID/run ID를 결속하고 ack는 checkpoint 1
+  manifest SHA `46f51b6e...6190`/safe_to_power_off true다. event SHA
+  `46d94d28...52b8`, index SHA `5edc6394...7794`, payload 169,502,549 bytes SHA
+  `2291f167...90d5`, canonical pins SHA `fb75566e...e66f`가 terminal verification과
+  exact하다. logs는 stdout/stderr 0/500 bytes SHA `e3b0c442...b855`/
+  `8546fe69...0e52`이며 본문은 읽지 않았다. 관련 PID 0, adapter/report absent다.
+  동일 manifest/config/TrainerArguments에 `-ResumeInterrupted`만 추가하고 prearm switch는
+  제거해 authoritative launcher를 정확히 한 번 호출한다. verified live receipt가 없으면
+  반복하지 않고 E2를 금지한다.
+- `20260823-062718-controlled-gpu-k3-safe-arm-live-pause-gateway-intent`: authoritative
+  launcher 1회는 run id `controlled-k3-safe-pause-480`, status `pause-requested`, runner
+  PID 19268 receipt로 정상 반환했다. authority state revision 3의 runner 19268·trainer
+  8968 creation/executable/command SHA는 live CIM과 exact이고 trainer parent는 runner다.
+  state input manifest/config/dataset/base pins도 baseline과 exact하다. prearm
+  `pause.request.json`은 147 bytes SHA `f081601e...c316`, event/checkpoint는 아직 0이고
+  GPU는 491 MiB다. 동일 launch를 반복하지 않는다. 실제 pause gateway를 RunDir 명시,
+  timeout 600초/poll 2초로 정확히 한 번 호출한다. 성공 조건은 exit 0, 출력의 exact
+  standalone `SAFE_TO_POWER_OFF`, terminal paused-safe exit 75 at 16/1 pending 0,
+  request/ack/checkpoint exact와 runner/trainer PID 0이다. 하나라도 아니면 resume/E2를
+  금지하고 root를 보존한다.
+- `20260823-062616-controlled-gpu-k3-safe-arm-launch-intent`: current CLI와 독립
+  read-only 재감사가 exact 일치한다. launch 직전 HEAD=origin/main `0454ca8`, live-state
+  단독 diff, staged/untracked 0, manifest 1,637 bytes SHA `1f54fc45...b4e58`, baseline
+  complete revision 384·480/30, 관련 PID 0, GPU 487 MiB이며 safe run/adapter/report와
+  `receipts/gpu-equivalence.json`은 모두 absent다. authoritative launcher를 run id
+  `controlled-k3-safe-pause-480`, seed 42, batch 1, accumulation 16, max 480, K=3,
+  heartbeat 10초, deterministic validation, `-PauseAtFirstOptimizerBoundary`로 정확히
+  한 번 호출한다. trainer args에는 checkpoint interval을 중복하지 않는다. verified live
+  runner+trainer receipt가 없거나 terminal failure면 같은 launch를 반복하지 않고 root를
+  보존하며 실제 pause gateway/resume/E2를 실행하지 않는다.
+- `20260823-062439-k3-baseline-verified-safe-arm-command-audit-intent`: corrected
+  schema-aware final verification에서 state/anchor current+previous, terminal final-root,
+  current index/latest event/completed progress/producer root, projected report와 internal
+  adapter manifest row, producer index/event/progress/adapter/report, actual artifact rows,
+  dataset/base/seed/K=3/480/30/adoption-false report pins, 11-event predecessor chain,
+  9개 normal interval와 600초 상한, empty baseline control, self-excluded 관련 PID 0이
+  모두 exact true다. 첫 probe의 세 false는 final-root field name 오인, 다음 probe의 두
+  false는 anchor run ID 위치와 self PID filter 오인이었고 실제 파일 불일치가 아니다.
+  baseline selected dev loss는 `3.0225894427291413`, peak CUDA는 6,188,922,880 bytes다.
+  safe arm 세 target absent와 PID 0을 launch 직전 다시 확인한다. exact command는 current
+  script parameter와 별도 read-only CLI 재감사 결과로 고정하며 그 전에는 시작하지 않는다.
+- `20260823-062227-controlled-gpu-k3-baseline-terminal-receipt`: baseline authority
+  state는 `complete` revision 384, exit 0/`trainer-complete`, epoch 1,
+  480/480 microsteps·30/30 optimizer steps·pending 0이다. runner/trainer와 이 root에
+  결속한 관련 PID는 0이고 GPU는 487 MiB/28%/41°C로 반환됐다. terminal은
+  `final-evidence-root.json` 2,429 bytes SHA `aa72e364...c7851`과 state projection SHA
+  `238eafdf...bbaa`를 게시했다. adapter는 internal artifact manifest SHA
+  `b9820a7e...eebc`, model SHA `7b7ff274...dcc7`, directory receipt SHA
+  `69dd4aac...fc2c`; report는 1,484 bytes SHA `c5340b6c...51f1`이며 state output과
+  actual files가 exact하다. baseline `control/`은 empty이고 pause evidence 0이다.
+  trainer stdout/stderr는 1,783/500 bytes, SHA `9e22fa79...10b3`/
+  `8546fe69...0e52`이며 본문은 읽지 않았다. 11-event chain에서 10개 interval event와
+  마지막 epoch-complete event가 존재하고 normal 9개 interval max는
+  `549.6979634`/`552.845175`초로 600초 아래다. safe arm 전 final-root 내부 결속을
+  read-only로 한 번 더 확인하며 그 PASS 전에는 새 run을 시작하지 않는다.
+- `20260823-062126-controlled-gpu-k3-baseline-epoch-complete-checkpoint-11`: authority
+  state는 아직 `running` revision 383이지만 epoch 1, 480/480 microsteps·30/30 optimizer
+  steps·pending 0이다. 추가 event 11은 normal K=3 interval이 아니라 reason
+  `epoch-complete`이며 manifest SHA `4e3f7a2a...a146`, event SHA
+  `59588e3d...655e`, predecessor event 10 `d34cb8c6...c385`, current index SHA
+  `a657db96...c54e`로 exact 결속된다. event 10 뒤 elapsed는
+  `263.6729086`/`267.348082`초지만 normal interval count/max에는 포함하지 않는다.
+  final adapter/report/state terminal과 PID 0 전에는 PASS로 승격하지 않는다.
+- `20260823-061651-controlled-gpu-k3-baseline-checkpoint-10-receipt`: authority state는
+  아직 `running` revision 360이지만 480/480 microsteps·30/30 optimizer steps·pending 0에
+  도달했다. 열 번째 checkpoint manifest SHA `8b3edb05...9a70`, event SHA
+  `d34cb8c6...c385`는 event 9 `e721bd22...a9c9`를 exact 결속하고 current index SHA는
+  `765991b7...2979`다. 아홉 번째 normal training/durable interval은
+  `549.6979634`/`552.845175`초이며 총 9개 max도 이 값으로 600초 아래다. GPU는
+  7,903 MiB/100%/61°C다. adapter/report는 아직 absent이고 final publication 중이므로
+  계산 완료를 terminal PASS로 승격하지 않는다. state complete, final evidence,
+  adapter/report receipt와 runner/trainer PID 0을 기다린다.
+- `20260823-060745-controlled-gpu-k3-baseline-checkpoint-9-receipt`: authority state는
+  `running` revision 307, 432/480 microsteps·27/30 optimizer steps·pending 0이다.
+  아홉 번째 checkpoint manifest SHA `12de9dae...2b15`, event SHA
+  `e721bd22...a9c9`는 event 8 `85d9d0a5...5f0e`를 exact 결속하고 current index SHA는
+  `0d29f3bd...b6cc`다. 여덟 번째 normal training/durable interval은
+  `545.4722811`/`548.390182`초이며 총 8개 max도 이 값으로 600초 아래다. GPU는
+  7,903 MiB/100%/57°C다. 한 final interval과 terminal publication이 남았으며 최종
+  verifier 전 PASS는 보류한다. 동일 run을 계속 monitor한다.
+- `20260823-055813-controlled-gpu-k3-baseline-checkpoint-8-receipt`: authority state는
+  `running` revision 251, 384/480 microsteps·24/30 optimizer steps·pending 0이다.
+  여덟 번째 checkpoint manifest SHA `77512f76...9153`, event SHA
+  `85d9d0a5...5f0e`는 event 7 `e3dcb33a...f568`을 exact 결속하고 current index SHA는
+  `5a52c310...8dad`다. 일곱 번째 normal training/durable interval은
+  `509.1081895`/`512.146446`초이며 총 7개 max도 이 값으로 600초 아래다. GPU는
+  7,919 MiB/100%/57°C다. timing 여유가 줄었으나 실제 상한은 통과 중이고 terminal/
+  paired verifier 전 PASS는 보류한다. 동일 run을 중복·중단 없이 계속 monitor한다.
+- `20260823-055002-controlled-gpu-k3-baseline-checkpoint-7-receipt`: authority state는
+  `running` revision 203, 336/480 microsteps·21/30 optimizer steps·pending 0이다.
+  일곱 번째 checkpoint manifest SHA `90b6cc1e...5c66`, event SHA
+  `e3dcb33a...f568`은 event 6 `9f552577...4b08`을 exact 결속하고 current index SHA는
+  `d7f89a27...9f9f`다. 여섯 번째 normal training/durable interval은
+  `214.8702328`/`218.332694`초이며 총 6개 max는 계속
+  `304.5580034`/`309.214826`초로 600초 아래다. GPU는 7,919 MiB/100%/63°C다.
+  baseline terminal과 paired verifier 전 PASS는 보류하고 동일 run을 계속 monitor한다.
+- `20260823-054617-controlled-gpu-k3-baseline-checkpoint-6-receipt`: authority state는
+  `running` revision 181, 288/480 microsteps·18/30 optimizer steps·pending 0이다.
+  여섯 번째 checkpoint manifest SHA `df35934c...58b5`, event SHA
+  `9f552577...4b08`은 event 5 `d89707c2...cfead`를 exact 결속하고 current index SHA는
+  `e1c0166c...dee4`다. 다섯 번째 normal training/durable interval은
+  `304.5580034`/`309.214826`초이며 총 5개 max도 이 값으로 모두 600초 아래다.
+  GPU는 7,952 MiB/98%/64°C다. baseline terminal과 paired verifier 전 PASS는 보류하고
+  동일 run을 중복·중단 없이 계속 monitor한다.
+- `20260823-054459-post-compact-k3-baseline-checkpoint-5-reconcile`: compact 직후 지정
+  SSoT 5종을 순서대로 전체 재독하고 Goal/Git/PID/K3 authority를 read-only로 대조했다.
+  Goal status는 `active`; HEAD/local origin/main/remote main은 모두
+  `0454ca8d9df9239cf7d6c063e5ed751235fb2ed1`, actual worktree는 이 live state 한
+  파일만 dirty이고 staged/untracked 0이다. baseline authority state는 `running`
+  revision 172, 272/480 microsteps·17/30 optimizer steps·pending 0이며 state의 runner
+  PID 3920과 trainer PID 12776 command SHA가 live process와 exact 일치한다. GPU는
+  7,964 MiB/99%/64°C다. 다섯 번째 checkpoint event는 240/480·15/30,
+  manifest SHA `f639c7b0...b64a0`, event SHA `d89707c2...cfead`이고 predecessor
+  `a1063ba1...c396c`를 exact 결속한다. 네 번째 normal training/durable interval은
+  `280.9572595`/`285.399628`초이며 총 4개 max는 `302.8974796`/`306.323465`초로
+  모두 600초 아래다. 이는 최소 interval 수 충족 receipt지만 baseline terminal과 paired
+  safe-pause/resume verifier 전에는 controlled GPU PASS로 승격하지 않는다. safe arm,
+  equivalence receipt와 E2 adapter/report는 absent다. 실행 중 로그 두 개는 500/0 bytes이며
+  live lock 때문에 SHA를 읽지 않고 본문도 열지 않았다. 동일 run을 중복·중단 없이
+  terminal 480/30까지 monitor한다.
+- `20260823-053622-controlled-gpu-k3-baseline-checkpoint-4-heartbeat`: authority state는
+  running revision 123, 192/480 microsteps·12/30 optimizer steps·pending 0이며 네 번째
+  checkpoint `checkpoint-00000004`, manifest SHA `82dfd331...239f0`다. event 4 SHA
+  `a1063ba1...c396c`는 event 3 SHA `3e4cfe9b...b8654`를 exact 결속한다. 세 번째 normal
+  training/durable interval은 `294.9433384`/`300.154295`초, 현재 3개 max는
+  `302.8974796`/`306.323465`초다. 최소 4개까지 한 interval이 남았고 terminal/verifier 전
+  PASS는 보류한다. 동일 run을 중복·중단 없이 계속 monitor한다.
+- `20260823-053125-controlled-gpu-k3-baseline-checkpoint-3-heartbeat`: event 3 durable
+  publication이 먼저 관측되고 state가 144/480 microsteps·9/30 optimizer steps·pending 0,
+  `checkpoint-00000003`, manifest SHA `1d6fa401...568e4`로 따라붙었다. event 3 SHA
+  `3e4cfe9b...b8654`는 event 2 SHA `02c756f3...905`를 exact 결속한다. 두 번째 normal
+  training/durable interval은 `294.6465635`/`298.686808`초이며 현재 2개 normal interval의
+  max는 `302.8974796`/`306.323465`초다. GPU 7,949 MiB/99%/64°C, run은 running revision
+  96이다. 최소 4 interval과 terminal/verifier 전 PASS는 보류하며 동일 run을 monitor한다.
+- `20260823-052613-controlled-gpu-k3-baseline-checkpoint-2-receipt`: authority state는
+  running revision 65, 96/480 microsteps·6/30 optimizer steps·pending 0이며 두 번째
+  checkpoint `checkpoint-00000002`, manifest SHA `a813e837...5ea6a`를 게시했다. event 2
+  SHA `02c756f3...905`는 event 1 SHA `d1b22c5c...37e15`를 exact predecessor로 결속한다.
+  첫 consecutive normal training interval은 `302.8974796`초, durable publication interval은
+  `306.323465`초로 600초 아래다. 이는 1/최소 4 normal interval 증거이며 baseline 전체와
+  final verifier 전에는 timing PASS로 승격하지 않는다. 동일 PID/GPU run을 terminal까지
+  계속 monitor한다.
+- `20260823-052122-controlled-gpu-k3-baseline-checkpoint-1-receipt`: authority state는
+  running, 48/480 microsteps·3/30 optimizer steps·pending 0이며 첫 interval checkpoint
+  `checkpoint-00000001`을 게시했다. manifest SHA
+  `b189c62b4eae11cd0bb9ffd6036597fc228b34aa16c4f2ba285939fc029060ea`, event v2는
+  832 bytes SHA `d1b22c5c...37e15`, current index SHA `4dcfad78...8593c`다. event의
+  training elapsed는 `296.6264947`초, durable publish는 약 1.553초이며 schema/progress/pins
+  결속과 manifest file hash가 exact하다. 첫 event 자체는 normal consecutive interval 수로
+  승격하지 않고 다음 event부터 차이를 계산하며, final verifier 전 timing PASS를 주장하지
+  않는다. 두 PID/GPU run을 중복·중단 없이 terminal까지 monitor한다.
+- `20260823-051533-controlled-gpu-k3-baseline-live-receipt`: baseline run/output/report
+  absent와 관련 PID 0에서 authoritative launcher를 정확히 1회 호출했다. launcher receipt는
+  run id `controlled-k3-baseline-480`, status running, runner PID 3920이다. authority state는
+  revision 3, 0/480 microsteps·0/30 optimizer steps·pending 0이며 trainer PID 12776도
+  게시됐다. runner/trainer creation UTC와 executable/command SHA가 live CIM process,
+  parent 12776→3920과 exact 일치한다. command line 원문의 개인 경로는 기록하지 않고 hash와
+  비민감 root/config만 보존한다. GPU는 total/used/free 8192/513/7512 MiB, utilization 27%,
+  42°C였다. 이는 process-start receipt이며 계산 완료가 아니다. 같은 run을 중복 시작하거나
+  safe arm/E2로 이동하지 않고 terminal까지 15분 이내 heartbeat로 monitor한다.
+- `20260823-051409-controlled-gpu-k3-root-manifest-receipt-baseline-launch-intent`: fresh
+  root/input/receipts 생성과 pinned builder 1회는 exit 0이다. manifest는 1,637 bytes,
+  SHA `1f54fc455b627fe090feec05b873fb6cf618f093cb4fc3d6495ac46be0bb4e58`이며 builder
+  receipt와 exact하다. schema v2, dataset SHA `96cc223c...6eb44`, model weight SHA
+  `394b6624...8f506`, seed 42/batch 1/accumulation 16/max 480/K=3/deterministic config SHA
+  `c99eba222610d09875f753a912b958f611658303652caca4974a1398cb515f89`가 모두 exact다.
+  첫 wrapper의 schema pin 경로 오인으로 dataset/model을 null로 표시한 값은 manifest 실제
+  top-level fields를 재독해 정정했다. root inventory는 input/receipts와 manifest뿐, 관련
+  PID 0/GPU launch 0이다. baseline run/adapter/report absent를 확인해 run id
+  `controlled-k3-baseline-480`을 authoritative durable launcher에서 1회 시작한다. verified
+  live identity 뒤 state를 terminal까지 monitor하며 중복 launch/safe arm/E2는 금지다.
+- `20260823-051231-controlled-gpu-k3-root-manifest-intent`: final two-doc milestone commit
+  `0454ca8d9df9239cf7d6c063e5ed751235fb2ed1` push 뒤 HEAD/local origin/main/remote main
+  exact, worktree clean, 관련 PID 0을 read-only 확인했다. failed K=5 root는 failed revision
+  392·480/30·checkpoint 7 SHA exact/final root absent, E2 adapter/report absent, D: free
+  `62,937,473,024` bytes다. fresh candidate root
+  `D:\AIRI-Models\airi-controlled-gpu-20260823-051231`은 absent다. 같은 K=5를 반복하지 않고
+  K=3, seed 42, batch 1, accumulation 16, max 480, deterministic validation의 canonical v2
+  manifest를 pinned builder로 1회 게시한다. builder exit 0, manifest/config SHA exact,
+  root inventory와 PID/GPU 생성 0을 receipt로 확인하기 전에는 baseline/safe arm/E2를
+  시작하지 않는다. GPU 장기 heartbeat 15분 상한은 baseline launch부터 적용한다.
 - `20260823-051031-final-evidence-p0-docs-push-receipt-finalization-intent`: docs commit
   receipt 두 경로의 focused continuity/diff/security PASS 뒤 exact `git push origin main`
   exit 0, `18d0bc6..57cd999 main -> main`이다. 이후 HEAD/local origin/main/remote main은
@@ -2703,15 +3170,14 @@ active_trainer_count: 0
 
 ## 4. 다음 허용 행동
 
-1. WORKING-STATE, 현행 handoff, roadmap status/log, NEXT를 actual receipt에 맞춰 정리하고
-   focused continuity, repo diff/security를 재검증한다. 문서 인덱스는 변경하지 않는다.
-2. exact 변경 경로만 stage하고 cached boundary/diff/security 뒤 Conventional Commit/push,
-   actual HEAD=origin/main·clean·PID 0을 확인한다.
-3. clean 경계 뒤에만 checkpoint interval K=3을 결속한 fresh timestamped 외부 root/manifest
-   intent를 기록한다. 같은 K=5 명령은 반복하지 않는다.
-4. 새 baseline complete/PID 0 뒤 safe-pause arm을 prearm하고 실제 `SAFE_TO_POWER_OFF`
-   receipt 후 resume·complete·GPU equivalence verifier를 수행한다.
-5. controlled GPU PASS receipt 전에는 authoritative E2를 시작하지 않는다.
+1. WORKING-STATE, 현행 handoff, roadmap status/log, NEXT를 actual controlled GPU PASS와
+   verifier fix receipt에 맞춰 정리한다. 문서 인덱스는 변경하지 않는다.
+2. focused continuity와 exact 7-path boundary/repo diff/security를 검증한다.
+3. exact 7경로만 stage하고 staged 7/unstaged·untracked 0, cached diff/security 뒤
+   Conventional Commit/push, actual HEAD=origin/main·clean·PID 0을 확인한다.
+4. 위 milestone push 뒤에만 fresh timestamped E2 run root/input manifest를 준비하고
+   authoritative durable runner로 seed 42·1,600 microsteps를 step 0부터 시작한다.
+5. direct trainer 실행과 운영 채택/기본 서비스 모델 변경은 계속 금지한다.
 
 ## 5. 갱신 트리거
 
