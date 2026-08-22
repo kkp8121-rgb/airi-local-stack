@@ -1,7 +1,9 @@
 # AIRI Documentation Index
 
-최종 현행화 2026-08-21 (Codex GPU — broadcast continuity v4 1,000행,
-E1 QLoRA 완료, E2 재개 명령, isolated T3 36-run launcher 확정).
+최종 현행화 2026-08-22 (Codex GPU — 사용자 `/goal`로 `active`, live working-state
+지속성 프로토콜, E2 전 P0 전원 종료 내구성 게이트, event reference 30건·
+continuity arc 7건 정합, E1 QLoRA 완료, E2 처음부터 재실행 명령, isolated T3
+36-run 및 승자 3×500 fail-closed 체크리스트 확정).
 직전 현행화 2026-08-20 (클로드 PC — 17커밋 배치 산출 문서 6종 등록:
 인계문 신설·근거 계약 2종·토큰 예산·GLiNER 실측·추출 검수 폼).
 직전 현행화 2026-08-19 (로드맵 v3 개편 + 레거시 정리: 이동 22건 전부
@@ -25,9 +27,16 @@ E1 QLoRA 완료, E2 재개 명령, isolated T3 36-run launcher 확정).
 
 ## 진행중 — 현행 계약
 
+- `AIRI-WORKING-STATE.md` — **세션 시작·goal resume·재부팅·compact 직후 가장
+  먼저 읽는 가변 live SSoT.** 실제 goal status·HEAD/worktree·PID·산출물과 대조한
+  현재 행동, 권한, 마지막 receipt, 다음 한 동작을 보존한다. active goal은 최대
+  60분 heartbeat와 단계 전후 intent/receipt를 기록하고, milestone만 handoff와
+  roadmap에 승격한다. 자동 compact 직전 신호에 의존하지 않는다.
 - `AIRI-CODEX-HANDOFF-2026-08-21.md` — **현행 코덱스(GPU) 인계 단일 SSoT.**
+  2026-08-22 사용자 `/goal`로 goal은 `active`지만 E2 전 P0 checkpoint/resume/
+  durable runner/safe-pause 실증이 필수다. 운영 채택·기본 모델 변경은 계속 금지한다.
   runtime-shaped broadcast continuity v4 1,000행의 source/chat SHA, seq2048
-  token 실측, E1 adapter/report/hash, checkpoint 없이 중단된 E2의 처음부터 재실행 명령,
+  token 실측, E1 adapter/report/hash, checkpoint 없이 세 차례 중단된 E2의 step 0 재실행 명령,
   safe-merge/GGUF 도구 핀, baseline/E1/E2 × calibration/heldout/blind 36-report
   T3와 승자 3×500 live campaign 순서를 고정한다. 검증 완료된 isolated T3 launcher의
   manifest/health/DB/capability/report/비교/evidence 계약과 실행 명령도 포함한다.
@@ -36,9 +45,9 @@ E1 QLoRA 완료, E2 재개 명령, isolated T3 36-run launcher 확정).
 - `AIRI-CODEX-HANDOFF-2026-08-20.md` — 이전 greybox·추출·사용자 총평 인계.
   방송 GPU 진행 상태는 08-21판이 대체한다.
   2026-08-21 사용자 총평 반영본. 기존 행동 181·affect 행동 120은 짧고 기계적인
-  챗봇형 Q→A로 반려돼 회신 적용·QLoRA가 금지됐고, 공식 방송 반응 7건의 비식별
-  event/beat 데이터와 AIRI 고유 파일럿 24건이 준비됐다. 현행 다음은 행별 승인 없는
-  사용자 총평 반영이다. 앞선 구조 변화(브리핑 근거 신호 계약·
+  챗봇형 Q→A로 반려돼 회신 적용·QLoRA가 금지됐고, 현재 공식 방송 반응 30건의
+  비식별 event/beat 데이터·별도 continuity arc 7건과 AIRI 고유 파일럿 24건이
+  준비됐다. 사용자 총평은 후속 v2→v3→v4 재설계에 반영됐다. 앞선 구조 변화(브리핑 근거 신호 계약·
   좁힌 정의·검수 폼 v2 큐 결속·v3-span greybox·alias/택소노미 greybox·
   결정론 발화 격리·사전 결함 3건 수리), GPU 재실측 큐 7건,
   **활성화 선행 조건 8건**(span 4·
@@ -46,11 +55,11 @@ E1 QLoRA 완료, E2 재개 명령, isolated T3 36-run launcher 확정).
   stall·루프백 전용 계약), 최종 리뷰 추적 항목 6건.
   08-19판(`AIRI-CODEX-HANDOFF-2026-08-19.md`)을 **대체**한다 — 08-19판은
   아카이브 이동 예정이며 현재 상태 검증에 쓰지 말 것.
-- `AIRI-CODEX-SERENA-TOKEN-ORDER-2026-08-20.md` — 코덱스 PC 앞 작업 명령
-  (병행). Codex CLI에 Serena MCP를 붙여 파일 통짜 read·grep 반복 체인을 심볼
-  단위 조회로 대체하는 토큰 절감 도입 절차 — 설치·등록·인덱싱·AGENTS.md 정책·
-  A/B 실측 의무·롤백 경계. **변경 허용 범위는 코덱스 PC 환경 4가지뿐이며 AIRI
-  레포 코드·운영 설정은 무접촉.** §7 결과표를 코덱스가 채우면 종결.
+- `AIRI-CODEX-SERENA-TOKEN-ORDER-2026-08-20.md` — 코덱스 PC 토큰 절감 실측 기록.
+  Serena ON/OFF 완료 표본에서 ON이 평균 `+136.6%` 순손실이고 MCP 미노출 실패가
+  2회 발생해 등록을 롤백했다. 실행 파일·인덱스·선택적 심볼 정책은 보존하지만
+  Serena MCP는 상시 등록하지 않는다. Caveman trial 결과는 비어 있고 설치하지 않았다.
+  AIRI 코드·운영 설정은 이 실험에서 무접촉이다.
 - `AIRI-BROADCAST-SIM-REVIEW-2026-08-18.md` — 100인 시청자 방송 시뮬레이션
   원문 검토 packet(기억 3-arm + named 변형). 수치 요약·판단은
   `완료/AIRI-BROADCAST-SIM-3ARM-2026-08-18.md`. 결정 큐 1~3(thank 배선·
@@ -502,10 +511,10 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
   한정 프리필터로 유효, item 제외, `{{user}}`는 규칙 기반 별도 처리, 조사 잔차
   흡수 후처리 필수, CC-BY-NC-4.0은 상용 배포 시 재검토.
 - `AIRI-KR-BROADCAST-REGISTER-REFERENCE-2026-08-21.md` — **현행 행동 재설계
-  SSoT.** 사용자 총평을 반영해 탬탬버린·아리사 공식 1차 출처의 후원/선택 채팅
+  SSoT.** 공식 1차 출처 30건·11명의 후원/구독/선택·집계 채팅/화면 이벤트
   반응을 비식별 event/beat로 코딩했다. 실제 방송인 문체 모방 없이 AIRI 고유
   파일럿을 저작하는 계약과 기존 181+120 학습 금지선을 기록한다. 부속
-  `참조/data/`에는 출처 원장·학습 금지 추상 관찰 7건·JSON Schema가 있고,
+  `참조/data/`에는 출처 원장·학습 금지 추상 관찰 30건·continuity arc 7건·JSON Schema가 있고,
   `ollama-proxy/training/seed/airi_broadcast_response_pilot_pending.jsonl`에는
   batch 총평용 AIRI 원본 24건이 있다(전건 training-ineligible). 사람이 읽는 전체
   묶음은 `진행예정/AIRI-KR-BROADCAST-RESPONSE-PILOT-2026-08-21.md`다.

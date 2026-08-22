@@ -7,6 +7,19 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
+> **2026-08-22 goal resume:** 사용자 `/goal` 명령으로 AIRI 본 goal은 `active`다.
+> 저장소 구현·GPU 학습·모델 병합/패키징·로컬 서비스·T3·장시간 캠페인과
+> 검증된 milestone commit/push가 승인됐다. 운영 채택과 기본 모델 변경은 별도
+> 사용자 승인 전까지 금지한다. E1 adapter/report만 존재하고 E2·후속 산출물은 0이며,
+> E2보다 먼저 P0 전원 종료 내구성 계층을 구현·실증한다.
+> `goal_status=active`; `adoption_authorized=false`;
+> `execution_order=P0_A>P0_B>E2_LAUNCH>E2_PROVENANCE>PACKAGE>T3_36>CAMPAIGN_3X500>USER_DECISION`
+
+> **장기 작업 지속성:** 세션 시작·goal resume·재부팅·compact 직후에는
+> `진행중/AIRI-WORKING-STATE.md`를 먼저 전체 읽고 실제 goal status·HEAD·PID·
+> 산출물과 대조한다. active goal은 최대 60분 heartbeat 및 단계 전후
+> intent/receipt checkpoint를 남긴다.
+
 - 표기: `[x]` 완료(일자) / `[~]` 진행중·부분 / `[ ]` 미착수 /
   `(보류: 재개 조건)`. 완료 표시는 근거 문서·커밋 필수.
 
@@ -155,13 +168,16 @@ I2a 기존 기반) · 방송 구간/경과 · 최근 화제 · 여론 현황 · 
   입력→반응 장면을 비식별 코딩했다. 공통 단위는 `인지/감사 → 메시지별 반응 →
   의견·에피소드 확장 → 복귀·다음 훅`이며, 길이와 존댓말/반말은 전역 규칙이 아니라
   이벤트·beat별 계약이어야 한다. 실제 방송인의 고유 문체를 복제하지 않고 AIRI
-  고유 합성 target을 새 큐로 저작한다. **2026-08-21 데이터화 완료:** 탬탬버린
-  5건+아리사 2건을 원문·PII 없는 observation-only event/beat JSONL과 별도 출처
-  원장으로 분리했다. AIRI 원본 파일럿 24건도 train/dev/test 16/4/4,
+  고유 합성 target을 새 큐로 저작한다. **2026-08-22 현행 데이터:** 공식 1차
+  출처 30건·11명과 결속된 원문·PII 없는 observation-only event/beat 30행을 별도
+  출처 원장으로 분리했고, 수 시간 연속성 arc 7건은 독립 데이터로 유지한다. 사용자
+  지정 진행자 가설 선언 장면도 `OBS-S01` partial-evidence로 포함한다. 출처 식별자는
+  비공개 원장에만 둔다.
+  AIRI 원본 파일럿 24건도 train/dev/test 16/4/4,
   single/burst 15/9, compact/standard/expanded 4/10/10으로 작성했으며 target
   길이 중앙값 98자·입력보다 짧은 답 0건·전건 training-ineligible이다.
-  **잔여:** 24건 묶음에 대한 사용자 총평 반영(행별 approve/rewrite/reject 없음),
-  아리사 추가 공식 사례는 자막 접근이 복구될 때만 확정 표본으로 승격.
+  24건 묶음 총평은 후속 v2→v3→v4 재설계에 반영됐다. 아리사 추가 공식 사례는
+  자막 접근이 복구될 때만 확정 표본으로 승격한다.
   근거: `참조/AIRI-KR-BROADCAST-REGISTER-REFERENCE-2026-08-21.md`,
   `진행예정/AIRI-KR-BROADCAST-RESPONSE-PILOT-2026-08-21.md`
 
@@ -170,8 +186,9 @@ I2a 기존 기반) · 방송 구간/경과 · 최근 화제 · 여론 현황 · 
   이 총평을 반영한 broadcast v2 240행 선행 학습은 T3에서 두 방송 사실 활용
   기준을 소폭 밑돌아 채택하지 않았다. 현행 v3는 120 card×10 연속성 변형+
   v2 240으로 **1,440행**이며, group split 1,148/146/146, 한국어 전수 감사
-  blocker 0건·quality gate PASS다. RTX 3060 Ti 전체 QLoRA가 진행 중이며
-  T3+사용자 승인 전에는 어댑터·양자화 모델을 운영 채택하지 않는다.
+  blocker 0건·quality gate PASS였다. v3 QLoRA 실행은 현행 v4 트랙으로 대체됐고,
+  현재 학습 프로세스는 0이다. T3+사용자 승인 전에는 어떤 어댑터·양자화 모델도
+  운영 채택하지 않는다.
 
 ### P3. 생성 상한 재검토 — **게이트 열림 (2026-08-19 실측 판정)**
 
@@ -226,7 +243,14 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   updates)는 train first3 3.3845→last3 2.9151, dev loss 2.8938로 완료했지만
   `adoption_authorized=false`, `t3_status=pending`이다. E2는 사용량 한계에 따른
   사용자 요청으로 중단해 산출물 없이 다음 세션 재실행으로 넘겼다. 정확한 명령과
-  해시는 `진행중/AIRI-CODEX-HANDOFF-2026-08-21.md`에 고정했다.
+  해시는 `진행중/AIRI-CODEX-HANDOFF-2026-08-21.md`에 고정했다. **2026-08-22
+  재감사:** 재부팅 후 세 번째 시작도 pause 요청 직후 checkpoint 전에 종료했으며,
+  trainer 0, E2 adapter/report 0, 시작 로그 2개는 각각 0 bytes다. 계산 이력은 있으나
+  재개 가능한 상태가 아니므로 P0 내구성 실증 뒤 동일 seed의 step 0부터 다시 실행한다.
+- [ ] **P3-T2b E1/E2 병합·GGUF 패키징** — P0 실증과 E2 provenance 검증 뒤
+  E1/E2 각각 HF safe-merge → BF16 GGUF → Q4_K_M 순서로 만든다. 후보별
+  artifact manifest, SHA, `package-evidence.json`의 최종 tag/digest가 완료 증거다.
+  패키징은 후보 생성일 뿐 운영 채택이 아니다.
 - [ ] **P3-T3 전/후 게이트** — 시뮬 하네스 그대로. **캘리브레이션 완료
   (2026-08-19 4-시드)**: 사실 활용은 12% 노이즈 천장 상회 필수, 결정론
   축 만점·존댓말 0 유지, 앵커·다양성은 3시드 평균 비교
@@ -285,6 +309,32 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
 - [ ] M5: 비공개 리허설 → 데뷔 (조건 기반, 날짜 고정 없음 — 결정 4)
 
 ## 5. 코덱스(GPU) 대기열
+
+### v4 active fail-closed 체크리스트 (2026-08-22)
+
+- [x] live working-state와 60분 heartbeat·intent/receipt·재독/대조 프로토콜 도입
+- [x] 공식 방송 event reference 30건·continuity arc 7건과 v4 1,000행 SHA 고정
+- [x] E1 QLoRA 및 adapter/report provenance 검증
+- [x] 사용자 `/goal` 재개 권한과 운영 채택 금지선 확인
+- [ ] **P0-A:** checkpoint를 E2보다 먼저 구현: 전체 학습/RNG/순서/loss/provenance 상태, 같은 볼륨
+  원자 승격·latest/previous 회전·깨진 checkpoint 격리 구현 및 회귀
+- [ ] **P0-B:** exact-pin resume와 중단/재개 동등성, durable runner/run-state, safe pause,
+  PID/command/checkpoint SHA 재부팅 복구, 실제 E2 속도 손실 상한 10분 이하 실증
+- [ ] preflight: live-state 단독 diff를 제외한 입력 code/data clean, trainer 0,
+  corpus/base/E1 SHA exact, E2 산출물 부재 재확인
+- [ ] **E2-LAUNCH:** P0 receipt의 authoritative durable runner로만 seed 42·1,600
+  microsteps를 step 0부터 완주하고 report/SHA/manifest 검증
+- [ ] E1/E2 각각 safe-merge → BF16 GGUF → Q4_K_M 패키징
+- [ ] exact baseline/E1/E2 tag+digest manifest 작성
+- [ ] isolated 36-report T3 및 baseline↔E1/E2 두 comparator 완주
+- [ ] T3 승자 1개만 3 seed × 500 turn full-stack live campaign 완주
+- [ ] 실제 응답 묶음·실패 사례·지연·receipt·hash 증거를 사용자에게 제출
+- [ ] 사용자 승인 뒤에만 운영 채택 판단; 그전까지 `adoption_authorized=false`
+
+각 단계의 fail-closed 완료 증거와 정확한 명령은
+`진행중/AIRI-CODEX-HANDOFF-2026-08-21.md` §8을 따른다.
+
+### 기존 GPU 대기열
 
 - [~] GPU 재실측 — ctx/narrow/Qwen3-8B span은 2026-08-20 실행 완료.
   marker 실제 render TTFT A/B는 외부 GPT-SoVITS venv 불완전으로 보류,

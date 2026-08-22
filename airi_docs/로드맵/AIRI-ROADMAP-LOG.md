@@ -7,6 +7,55 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-22 코덱스 PC goal 재개 + P0 내구성 게이트 (intent)
+
+- 사용자 `/goal` 명령으로 기존 pause가 해제됐고 goal은 `active`다. 저장소 구현,
+  GPU 학습, merge/package, 로컬 서비스, T3·campaign, 검증된 milestone commit/push가
+  허가됐지만 운영 모델 채택과 기본 서비스 모델 변경은 별도 승인 전까지 금지한다.
+  아래의 paused checkpoint 항목은 당시 receipt로 보존하며 현행 권한으로 사용하지 않는다.
+- 15:09 KST read-only 독립 감사에서 HEAD `0c0ffbe`, 9 modified + 2 untracked,
+  trainer/Python 0을 확인했다. corpus source/chat, base model, E1 adapter/config/report
+  SHA와 E1 dev `2.8938066467`은 exact이고 E2 adapter/report·merge/package·T3·campaign
+  산출물은 0이다.
+- 첫 milestone은 기존 문서·지속성 배치를 active 상태와 아래 P0 순서에 맞춰 정정한 뒤
+  focused/full offline test와 `git diff --check`를 통과시켜 commit/push하는 것이다.
+  그전과 P0 실증 전에는 GPU·서비스·E2를 실행하지 않는다.
+- 다음 실행 순서는 `P0 power-off durability(checkpoint/exact resume/atomic rotation/
+  durable runner/safe pause/reboot recovery/10분 손실 상한 실증) → E2 preflight → E2
+  step 0 → provenance → merge/package → 36 T3 → 승자 3×500 → 사용자 증거 제출`이다.
+- continuity 회귀가 세 SSoT의 P0/E2 lexical 순서 결함을 차례로 검출해 정정했다.
+  direct trainer block은 PRE-P0 실행 금지 참고로 격리하고 실제 E2는 P0 receipt의
+  authoritative durable runner만 사용하도록 결속했다. 공통 goal/adoption/order token,
+  strict frontmatter, git ancestor, P0-A→P0-B→E2-LAUNCH 구조 회귀를 추가했다.
+- focused continuity PASS, 전체 offline checkpoint PASS(19.06초), 핀된 Python 3.12의
+  reference/pilot 회귀 7/7 PASS, repo 기본 `git diff --check` exit 0, secret/금지
+  산출물 hit 0. 독립 재감사 P0/P1 0, READY로 첫 milestone commit을 승인했다.
+
+## 2026-08-22 코덱스 PC 문서 배치 (paused checkpoint + 재개 체크리스트)
+
+- compact·재부팅·goal resume 누수를 막기 위해 `AIRI-WORKING-STATE.md`를 신설했다.
+  세션/compact 후 문서 재독과 실상 대조, active goal 최대 60분 heartbeat,
+  10분 이상 명령 및 checklist 전후 intent/receipt, milestone 장기 문서 승격을
+  `AGENTS.md`에 의무화하고 offline checkpoint에 문서 계약 테스트를 편입했다.
+  첫 focused 실행에서 PowerShell 5.1의 BOM 없는 UTF-8 한글 스크립트 parse 실패를
+  검출해 테스트를 ASCII-only 파일 탐색으로 수정했고, focused contract와 전체
+  offline checkpoint가 최종 PASS했다.
+- 사용자 요청에 따라 AIRI 본 goal을 `paused`로 명시했다. 명시적 “재개” 전에는
+  GPU 학습, merge/package, 서비스, T3, live campaign을 실행하지 않는다.
+- current-state read-only 감사에서 HEAD `0c0ffbe` clean, trainer 0, v4 corpus 두 SHA와
+  E1 adapter/config/report SHA exact를 확인했다. E2 adapter/report, E1/E2 merge/package,
+  v4 T3 manifest/output, live campaign output은 모두 0이다. 2026-08-22 세 번째 E2 시작
+  흔적인 stdout/stderr 두 파일은 각각 0 bytes이며 checkpoint가 아니다.
+- 설명 문서에 남은 초기 7건은 현행 event reference 30건·11명과 별도 continuity arc
+  7건으로 정정했다. 사용자 지정 사례는 `OBS-S01`로 결속했고 식별자는 원장에만 둔다.
+- 재개 순서를 `명시적 재개 → E2 step 0 완주 → provenance → E1/E2 merge/package →
+  36-report T3 → 승자 3×500 → 실제 응답·증거 제출 → 사용자 채택 판단`으로 고정했다.
+  08-21 테스트 수치는 역사적 증거이며 이번 paused 문서 배치에서 GPU·서비스 테스트는
+  재실행하지 않았다.
+- 문서 갱신 뒤 방송 reference/pilot 회귀 테스트 **7/7 PASS**, 오프라인 checkpoint
+  contract **PASS**, `git diff --check` whitespace 오류 0을 확인했다. checkpoint 검증은
+  synthetic ASAR만 사용했으며 설치본·서비스·모델에 접근하거나 goal을 재개하지 않았다.
+
 ## 2026-08-21 코덱스 PC 배치 (isolated T3 36-run launcher 확정)
 
 - `run-airi-broadcast-t3-matrix.ps1`을 새로 추가해 baseline/E1/E2 × 세 fixture ×

@@ -1,10 +1,23 @@
 # AIRI Codex GPU 인수인계 — broadcast continuity v4
 
-갱신: 2026-08-21 KST
+갱신: 2026-08-22 KST (파일명은 현행 GPU SSoT 식별자로 유지)
 
-상태: **v4 corpus 확정, E1 QLoRA 완료, E2 사용자 요청으로 중단, T3 런처 검증 완료·실측 미실행**
+상태: **ACTIVE — E1 완료·미채택, E2 저장 산출물 0, merge/package 0,
+v4 T3 0, live campaign 0; E2 전 P0 전원 종료 내구성 구현·실증 중**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
+
+기계 판독 계약: `goal_status=active`;
+`execution_order=P0_A>P0_B>E2_LAUNCH>E2_PROVENANCE>PACKAGE>T3_36>CAMPAIGN_3X500>USER_DECISION`
+
+재개 권한: 2026-08-22 사용자 `/goal`로 저장소 구현·GPU 학습·merge/package·
+로컬 서비스·T3·장시간 캠페인·검증된 milestone commit/push가 승인됐다. 단,
+운영 채택과 기본 서비스 모델 변경은 별도 사용자 승인 전까지 금지한다.
+
+세션 시작·goal resume·재부팅·compact 직후에는 이 문서보다 먼저
+`AIRI-WORKING-STATE.md`를 전체 읽고 실제 goal status, HEAD/worktree,
+PID·command line, 산출물·SHA와 대조한다. live state는 현재 행동과 receipt를,
+이 인계서는 검증된 장기 기준과 exact 명령을 담당한다.
 
 이 문서가 다음 Codex/Claude PC 세션의 GPU 작업 단일 진입점이다. 이전
 `AIRI-CODEX-HANDOFF-2026-08-20.md`의 방송 학습 진행 상태를 대체하되,
@@ -12,6 +25,8 @@
 
 ## 1. 반드시 지킬 상태
 
+- P0 checkpoint/resume/durable runner/safe-pause와 전원 종료 복구 실증 전에는
+  E2를 시작하지 않는다. 이후 단계도 §8 순서를 fail-closed로 따른다.
 - 현재 서비스 모델이나 기본 태그를 v4로 바꾸지 않는다.
 - 외부 chat/search, 기억 추출, greybox는 계속 OFF다.
 - E1/E2는 실제 11435 live-context T3와 사용자 승인 전까지 후보일 뿐이다.
@@ -103,16 +118,23 @@ batch=1, gradient_accumulation=16, seed=42
 ### 3.3 E2 — 중단, 재실행 필요
 
 사용량 한계가 가까워졌다는 사용자 요청에 따라 첫 실행은 약 14분, 인계 재검증 중
-시작한 두 번째 실행은 약 3분 시점에 각각 Ctrl+C로 안전 중단했다. 두 실행 모두
-checkpoint 저장 전이며 GPU는 520MiB 수준으로 해제됐다. 다음 두 경로는 **둘 다
-존재하지 않는다**. 재개가 아니라 처음부터 동일 seed로 재실행한다.
+시작한 두 번째 실행은 약 3분 시점에 각각 Ctrl+C로 안전 중단했다. 컴퓨터 재부팅 후
+세 번째로 독립 프로세스를 시작했지만 pause 요청 직후 checkpoint 전에 안전 종료했다.
+2026-08-22 read-only 재감사에서 trainer 0, 다음 두 경로 0을 확인했고, 세 번째 시작
+흔적인 `e2-train.stdout.log`와 `e2-train.stderr.log`도 각각 0 bytes다. 계산 이력은
+있지만 재개 가능한 상태는 없으므로 동일 seed의 step 0부터 다시 실행한다.
 
 ```text
 D:\AIRI-Models\airi-broadcast-v4-20260821\adapter-r8-seq2048-e2-lr2e5
 D:\AIRI-Models\airi-broadcast-v4-20260821\adapter-r8-seq2048-e2-lr2e5-report.json
 ```
 
-정확한 재실행 명령:
+### 3.3.1 PRE-P0 PARAMETER REFERENCE — DO NOT RUN
+
+아래 direct trainer block은 검증된 E2 파라미터를 보존하는 **참고용**이며 실행
+명령이 아니다. 아직 checkpoint/durable runner 인터페이스가 없으므로 직접 실행하면
+§8의 P0 gate를 우회한다. P0 구현 receipt에서 이 파라미터를 감싼 authoritative
+durable runner 명령으로 교체하기 전에는 E2 실행 근거로 사용할 수 없다.
 
 ```powershell
 $Py = 'D:\AIRI-Models\venv-midm-broadcast-qlora-py312\Scripts\python.exe'
@@ -247,7 +269,10 @@ T3 우승 후보만 `run-airi-live-broadcast-campaign.ps1`로 3 seed × 500 turn
 
 캠페인 통과 전에는 live adoption도, Claude PC 전달용 완료 주장도 하지 않는다.
 
-## 7. 직전 검증
+## 7. 직전 검증과 2026-08-22 상태 감사
+
+아래 테스트 수치는 2026-08-21 실행의 역사적 증거다. 2026-08-22 paused 문서
+배치에서는 GPU·서비스·전체 회귀를 재실행하지 않았다.
 
 - v4 generator: 8 passed
 - LoRA trainer: 16 passed, 1 skipped(CUDA box라 gpu-less refusal skip)
@@ -256,7 +281,7 @@ T3 우승 후보만 `run-airi-live-broadcast-campaign.ps1`로 3 seed × 500 turn
   merge/package, stack/campaign launcher): **131 passed**
 - `git diff --check -- . ':(exclude)airi_docs/patches/*.patch'`: whitespace error 0
 - E1 artifact 독립 provenance audit: blocker 0
-- E2: 두 번 모두 사용자 인계 요청에 따라 checkpoint 전 중단, 불완전 산출물 0
+- E2: 세 번 모두 checkpoint 전 중단, adapter/report 0, 마지막 시작 로그 2개 각 0 bytes
 - T3 matrix launcher: 계약 unittest 8 passed, 시뮬/비교기 unittest 75 passed
   (1 skipped), PowerShell AST·py_compile·diff-check PASS
 - T3 matrix launcher 독립 최종 감사: P0/P1 0, READY. 실제 서비스/GPU 실행은 E2 부재로 0
@@ -265,5 +290,44 @@ T3 우승 후보만 `run-airi-live-broadcast-campaign.ps1`로 3 seed × 500 turn
   dry-run stream terminal 증적 누락을 발견해 각각 CI 등록·pin 재결속·synthetic terminal
   회귀 수정했다. B3-d 16/16, B4c rehearsal 83/83 PASS
 
-다음 세션 첫 순서: **E2 재실행 → E1/E2 merge/package → isolated 36-report
-T3 → 승자만 3×500 live campaign → 사용자에게 실제 응답 묶음 제출**.
+2026-08-22 pause 시점 실파일 감사: HEAD `0c0ffbe` clean, trainer 0, v4 corpus 두
+SHA와 E1 adapter/config/report SHA exact. E2, E1/E2 merge/package, v4 T3
+manifest/output, live campaign output은 모두 0이었다. 15:09 KST goal resume 감사에서는
+같은 HEAD 위 기존 문서 배치 9 modified + 2 untracked, trainer/Python 0, 동일 SHA exact와
+동일 후속 산출물 0을 재확인했다.
+
+## 8. active goal fail-closed 실행 체크리스트
+
+1. [x] 사용자 `/goal`의 재개 권한과 운영 채택 금지선을 확인했다(2026-08-22).
+2. [ ] **P0-A checkpoint:** 트레이너가 LoRA·optimizer/scheduler·Python/Torch/CUDA RNG·epoch/microstep/
+   optimizer step·데이터 순서/seed·loss/dev/best와 dataset/base/config SHA를 주기적으로
+   같은 볼륨 임시 경로에 flush·검증하고 원자 승격하도록 구현한다. latest와 직전 정상본을
+   유지하고 깨진 checkpoint는 삭제하지 않고 격리한다.
+3. [ ] **P0-B runner/recovery:** exact SHA·seed·config 일치 시에만 허용하는 `--resume-from-checkpoint`, 원자적
+   `run-state.json` durable runner, optimizer 경계 safe-pause와 `SAFE_TO_POWER_OFF`,
+   PID/command/checkpoint SHA 기반 재부팅 복구를 자동 회귀와 통제 GPU 실험으로 증명한다.
+   실제 E2 속도 checkpoint 간격은 전원 종료 손실 상한 10분 이하로 고정한다.
+4. [ ] preflight에서 입력 코드·데이터가 clean인지 확인한다. live heartbeat로 생긴
+   `AIRI-WORKING-STATE.md` 단독 diff만 별도 검토 후 제외할 수 있고 다른 tracked/untracked
+   변경은 금지한다. trainer 0, corpus source/chat SHA, base model SHA, E1 SHA,
+   E2 adapter/report 부재도 다시 확인하며 하나라도 다르면 중단한다.
+5. [ ] **E2-LAUNCH:** 기존 0-byte 로그를 삭제하지 않고 P0 receipt에서 검증·고정한
+   authoritative durable runner 명령으로만 새 timestamped stdout/stderr 경로와
+   run-state를 생성해 step 0부터 시작한다. direct trainer/임의 hidden process 실행은
+   무효다. PID와 exact command identity, CUDA 메모리 사용을 기록한다.
+6. [ ] E2 1,600 microsteps를 완주한다. 완료 증거는 adapter model/config/report,
+   dataset/base pin, optimizer step, epoch 1/2 dev loss, selected epoch, SHA와 artifact
+   manifest다. 로그나 GPU 사용 시간만으로 완료 처리하지 않는다.
+7. [ ] E1/E2 provenance를 독립 재감사하고 E1 dev `2.8938066467`과 E2 epoch 1/2를
+   비교한다. 두 후보 모두 계속 `adoption_authorized=false`다.
+8. [ ] E1/E2 각각 HF safe-merge → BF16 GGUF → Q4_K_M을 수행한다. 후보별
+   manifest/SHA와 `package-evidence.json`의 최종 tag/digest를 보존한다.
+9. [ ] 서로 다른 exact baseline/E1/E2 tag+64-hex digest로 T3 model manifest를
+   만들고 승인 fixture raw/canonical retained SHA를 재검증한다.
+10. [ ] isolated T3 36 reports와 baseline↔E1/E2 두 comparator를 완주한다. report,
+   health, contract, stream plan, SQLite/sidecar hash inventory 누락이 있으면 승자 없음이다.
+11. [ ] T3 통과 승자 1개만 3 seed × 500 turn live campaign을 실행한다. semantic/decoy,
+   RAG receipt, durable journal, answer→spoken→TTS SHA, 인과 순서, close·latency·stability
+   증거와 retained hashes를 모두 요구한다.
+12. [ ] 실제 응답 비교 묶음, 실패 사례, 점수와 증거를 사용자에게 제출한다.
+    사용자 승인 전에는 서비스 모델·운영 태그를 바꾸지 않는다.

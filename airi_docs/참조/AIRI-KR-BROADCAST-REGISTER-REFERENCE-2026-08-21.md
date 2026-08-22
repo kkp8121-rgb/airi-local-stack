@@ -192,23 +192,22 @@ acknowledgment? + message_specific_reaction + expansion? + handoff_or_hook?
 6. 자동 길이 점수만으로 승인하지 않고, 블라인드 인간 검수에서 `로봇 단답`,
    `과장된 연기`, `개인방송 모방`, `주제 미확장`, `복귀 실패`를 독립 사유로 둔다.
 
-## 6. 다음 수집 게이트
+## 6. 수집 게이트와 현행 상태 (2026-08-22 정정)
 
-현 단계는 메타 방향을 확인한 **관찰 설계 1차**이며 아직 새 SFT 큐를 만들지 않는다.
-다음 순서를 지킨다.
+아래 순서는 최초 관찰 설계 게이트였고 현재는 다음과 같이 이행됐다.
 
-1. 탬탬버린 기존 전수 관찰을 event/beat 코딩으로 다시 집계한다.
-2. 아리사는 공식 1차 출처에서 입력→반응이 확인되는 사례를 추가 확보한다. 확보하지
+1. [x] 공식 1차 출처 30건·11명을 event/beat 코딩하고 출처 원장과 exact 결속했다.
+2. [~] 아리사는 공식 1차 출처에서 입력→반응이 확인되는 사례를 추가 확보한다. 확보하지
    못하면 2건 한계를 유지하고 특정 방송인 스타일 결론을 내리지 않는다.
-3. 공통 메타만 사용해 AIRI 고유 합성 초안 소량을 새 ID·새 큐로 저작한다.
-4. 사용자는 20~30건의 소규모 파일럿을 한 묶음으로 보고 길이·위트·감정·방송성에
+3. [x] 공통 메타만 사용해 AIRI 고유 24건을 새 ID·새 큐로 저작했다.
+4. [x] 사용자는 24건 파일럿을 한 묶음으로 보고 길이·위트·감정·방송성에
    대한 **총평만** 준다. 행별 approve/rewrite/reject 작업을 요구하지 않는다.
-   총평을 반영한 뒤 대량 생성과 별도 전량 검수 방식을 정한다.
-5. 기존 행동 181·affect 120과 섞지 않고, 새 held-out에도 실제 방송 원문을 넣지 않는다.
+   총평은 후속 broadcast v2→continuity v3→runtime-shaped v4 1,000행에 반영됐다.
+5. [x] 기존 행동 181·affect 120과 섞지 않고, held-out에도 실제 방송 원문을 넣지 않는다.
 
-이 게이트와 새 큐의 전량 검수 계약을 닫기 전에는 행동 QLoRA, 기존 두 행동 검수 회신 적용, affect 운영 ON을
-진행하지 않는다. 추출 검수 102건은 기술적으로 별도지만, 행동 데이터 재설계 순서를
-혼동하지 않도록 현재 배치에서는 함께 보류한다.
+관찰 데이터는 계속 `training_permitted=false`이며 기존 181/120 큐의 회신 적용과 affect
+운영 ON도 금지다. 현행 다음 단계는 추가 합성 자체가 아니라 GPU 인계 SSoT의
+`P0 전원 종료 내구성 → E2 → merge/package → 36 T3 → 승자 3×500` 검증이다.
 
 ## 7. 기계 판독 레퍼런스와 AIRI 원본 파일럿 (2026-08-21)
 
@@ -217,10 +216,14 @@ acknowledgment? + message_specific_reaction + expansion? + handoff_or_hook?
 | 층 | 파일 | 역할 | 학습 허용 |
 |---|---|---|---|
 | 출처 원장 | `참조/data/AIRI-KR-BROADCAST-REFERENCE-SOURCE-LEDGER-2026-08-21.json` | 공식 영상·타임스탬프·증거 한계. 방송인 이름과 URL은 이 연구 원장에만 존재 | 금지 |
-| 추상 관찰 | `참조/data/airi_kr_broadcast_reference_events_2026-08-21.jsonl` | 7건의 event/pressure/beat/register/handoff만 저장. 원문·닉네임·금액·영상 ID 없음 | 금지 |
+| 추상 관찰 | `참조/data/airi_kr_broadcast_reference_events_2026-08-21.jsonl` | 30건의 event/pressure/beat/register/handoff만 저장. 원문·닉네임·금액·영상 ID 없음 | 금지 |
 | AIRI 파일럿 | `ollama-proxy/training/seed/airi_broadcast_response_pilot_pending.jsonl` | 관찰 구조만 참고해 새로 저작한 AIRI 고유 24건. batch 총평용 | 현재 금지 |
 
-추상 관찰 7건은 탬탬버린 5건·아리사 2건이며 전건
+추상 관찰은 30건·11명이며 evidence tier는 contiguous 21건·partial 9건이다.
+이벤트는 donation 22, subscription 5, selected/batched chat 각 1, screen event 1이다.
+사용자 지정 가설 선언 장면은 `OBS-S01` partial-evidence로 결속했다. 영상 식별자는
+출처 원장에만 보존한다.
+전건
 `dataset_role=observation_only`, `contains_transcript=false`, `contains_pii=false`,
 `training_permitted=false`다. JSON Schema는
 `참조/data/airi_kr_broadcast_reference_event_v1.schema.json`이다.
@@ -255,7 +258,7 @@ acknowledgment? + message_specific_reaction + expansion? + handoff_or_hook?
 
 반복 가능한 검증은
 `ollama-proxy/training/tests/test_broadcast_reference_and_pilot_data.py`가 담당한다.
-7건 관찰-원장 결속, 24건 분포·split·큐 압력, beat/register 정렬, 기존 301건과
+30건 관찰-원장 결속, 24건 분포·split·큐 압력, beat/register 정렬, 기존 301건과
 target exact 비중복, 출처/PII/금액/URL/개인 경험 누출, 안전 행 필수 문구와
 전건 학습 금지를 검사한다. 사용자에게 행별 승인 작업을 요구하지 않으며, 다음 입력은
 24건 전체에 대한 길이·위트·방송성 **총평**이다.
