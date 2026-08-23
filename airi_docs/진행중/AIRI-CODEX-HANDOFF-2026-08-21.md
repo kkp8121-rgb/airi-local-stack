@@ -39,6 +39,10 @@ false-success로 확인해 최소 수정했고, baseline/승인 fixture/seed 11 
   response-bearing report/packet과 runtime DB는 Git 금지 외부 산출물로 유지한다.
 - smoke 종료 뒤 관련 service/listener는 0이다. GPU 학습은 없고 Ollama baseline 추론
   모델만 로드돼 있다. authoritative T3 36과 승자 campaign은 아직 PASS가 아니다.
+- fix/test와 필수 SSoT 5종은 Conventional commit
+  `80160a14179a0685a0b15b6bdbc724cd68c2e5b1`로 묶여
+  `9724833..80160a1 main -> main` push됐다. push 직후 HEAD/local/remote exact, worktree
+  clean이었다. 이 push receipt 문서 commit 뒤 다시 clean을 확인하고 T3 36으로 간다.
 
 ## 0. 2026-08-23 P0 로컬 배치 최종 검증 receipt
 

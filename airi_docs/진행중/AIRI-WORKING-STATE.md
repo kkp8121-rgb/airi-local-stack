@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 17:49:03 +09:00"
-checkpoint_id: "20260823-174903-t3-journal-fix-gates-pass"
+updated_at_kst: "2026-08-23 17:50:50 +09:00"
+checkpoint_id: "20260823-175050-t3-journal-fix-pushed"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "t3-journal-fix-commit-push"
-git_head: "9724833faebd4a111b93288dc4d441174b60c845"
-worktree_state: "t3-journal-fix-and-five-doc-receipt-dirty; staged-untracked-0"
+active_phase: "t3-36-prelaunch"
+git_head: "80160a14179a0685a0b15b6bdbc724cd68c2e5b1"
+worktree_state: "five-doc-push-receipt-dirty; staged-untracked-0"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-23 17:49 KST receipt: journal false-success fix is verified by py_compile, targeted 2/2, impacted 113/113, full proxy 370/370, simulator 63/63, work-continuity PASS after correcting only the live-state goal enum fixture, and final test-current-checkpoint PASS. Isolated live smoke receipt/hashes and listener-0 cleanup remain exact. Modified scope is two product/test files plus required five SSoT docs; staged/untracked 0 before review. Next state change: diff/security review, Conventional Commit and origin/main push; authoritative T3 36 remains forbidden until HEAD=origin/main and clean."
+reconciliation_receipt: "2026-08-23 17:50 KST receipt: exact seven-path cached review had forbidden-name 0, secret-pattern 0 and diff-check PASS. Conventional commit 80160a14179a0685a0b15b6bdbc724cd68c2e5b1 (fix: preserve durable T3 fallback receipts) was pushed 9724833..80160a1 to origin/main; HEAD/local/remote are exact and worktree was clean immediately after push. This five-doc receipt is the only new dirty batch. Next: validate and push the docs receipt, re-confirm HEAD=origin/main/clean/listener 0, then create one fresh external authoritative T3 root."
 ---
 
 # AIRI live working state

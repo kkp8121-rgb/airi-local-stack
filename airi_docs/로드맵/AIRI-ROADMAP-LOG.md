@@ -17,6 +17,9 @@
   실서비스 1-turn smoke도 transport failure 0·durable receipt true로 PASS했고 report/packet
   SHA를 결속했다. 관련 listener는 cleanup 뒤 0이다. authoritative T3 36과 campaign은 아직
   미실행이며 adoption은 계속 false다.
+- exact seven-path staged review 뒤 commit `80160a14179a0685a0b15b6bdbc724cd68c2e5b1`
+  (`fix: preserve durable T3 fallback receipts`)을 만들고 `9724833..80160a1 main -> main`
+  push했다. push 직후 HEAD/local/remote exact·worktree clean이었다.
 
 ## 2026-08-23 E2 terminal receipt
 

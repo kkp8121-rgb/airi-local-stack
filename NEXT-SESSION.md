@@ -12,6 +12,9 @@
 > 다음 exact gate는 이 수정·문서 commit/push와 HEAD=origin/main·clean 확인, 그다음 새 외부
 > root의 authoritative T3 36이다. T3 `summary.json`, 승자, 3×500 campaign은 아직 없다.
 > 운영 채택과 기본 서비스 모델 변경은 계속 금지한다.
+> 수정/test/필수 SSoT는 commit `80160a14179a0685a0b15b6bdbc724cd68c2e5b1`로
+> `9724833..80160a1 main -> main` push됐고, 직후 HEAD/local/remote exact·worktree
+> clean이었다. 이 push receipt 문서 commit 뒤 다시 clean을 확인하고 T3 36을 시작한다.
 
 > **2026-08-23 controlled GPU P0-B PASS receipt:** 최신 Goal status는 `active`,
 > `goal_status=active`다. 첫 K=5 baseline은 480/30 계산 뒤 actual interval max

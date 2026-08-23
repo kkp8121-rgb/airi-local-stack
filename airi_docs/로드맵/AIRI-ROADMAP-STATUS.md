@@ -19,6 +19,9 @@
 > `6193fb80...26886`이다. authoritative T3 36 `summary.json`과 campaign은 아직 0이며,
 > 수정 commit/push·clean 뒤 새 외부 root에서 T3 36을 실행한다. GPU 학습은 없고 baseline
 > Ollama 추론 모델만 로드돼 있다. `adoption_authorized=false`를 유지한다.
+> fix/test+필수 SSoT commit `80160a1`은 `9724833..80160a1 main -> main`으로 push됐고
+> 직후 HEAD/local/remote exact·worktree clean이었다. push receipt 문서 commit 뒤
+> authoritative T3 36으로 이동한다.
 
 > **2026-08-23 controlled GPU P0-B PASS receipt:** Goal status는 `active`다. 첫 K=5
 > baseline은 480/30 계산 뒤 actual checkpoint interval max `705.902827`초와 final-evidence
