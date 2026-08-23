@@ -7,8 +7,21 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-23 E2 terminal receipt
+
+- Authoritative E2 `v4-e2-seed42-1600-20260823-074326` reached `complete`/`trainer-complete` at 1,600/1,600 microsteps and 100/100 optimizer steps. Adapter/report are published and pinned; selected epoch 2 dev loss is `2.735453106217887`; adoption remains unauthorized and T3 is pending. Terminal PID reconciliation is 0. Next gates are merge/package, T3 36, and campaign evidence.
+
 ## 2026-08-23 goal resume·P0 final validation
 
+- 07:51 KST compact 직후 지정 SSoT 5종을 순서대로 EOF까지 재독하고 actual E2 authority를
+  대조했다. Goal active, HEAD/local·remote origin/main `92df0c5`, actual worktree는
+  WORKING 단독 diff/staged·untracked 0이다. authoritative launcher는 fresh intent 뒤 한 번만
+  실행됐고 state/anchor revision 23은 SHA exact, E2 16/1,600 microsteps·1/100 optimizer,
+  pending 0이다. runner/trainer PID 3716/18280 creation/executable/command SHA가 live와 exact하고
+  동일 venv redirector ancestry만 있어 duplicate 0이다. GPU는 7,978/8,192 MiB·57%·63°C로
+  compute 중이다. first K=3 checkpoint와 fixed adapter/report는 아직 absent, live logs는
+  size 0/500 bytes만 확인하고 본문/hash를 읽지 않았다. 같은 launch/resume/pause 없이 15분
+  heartbeat로 terminal까지 monitor하며 운영 채택 금지는 유지한다.
 - 07:38 KST exact two-doc cached 검증 뒤 `docs: record controlled GPU milestone commit`
   commit `29080bed9227887ff3336d7c2c42997440d39df9`, parent `87dfabd`를 만들고 exact
   `git push origin main` exit 0, `0454ca8..29080be main -> main`이다. 이후 HEAD/local·remote
