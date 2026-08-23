@@ -37,6 +37,11 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
   현재 행동, 권한, 마지막 receipt, 다음 한 동작을 보존한다. active goal은 최대
   60분 heartbeat와 단계 전후 intent/receipt를 기록하고, milestone만 handoff와
   roadmap에 승격한다. 자동 compact 직전 신호에 의존하지 않는다.
+- `AIRI-E2-C1-CONTRACT-DRAFT-2026-08-24.md` — **E2-C1 설계·데이터·retained blind·
+  학습·평가 계약의 검토 PC용 현행 초안.** 현재는 `DRAFT / NOT FROZEN`이며 correction
+  target의 `으로/로` 오류 5건 때문에 `freeze_status=fail`, `gpu_authorized=false`다.
+  current checkpoint SHA와 최소 수리·재개 순서를 보존한다. frozen milestone 문서로
+  오인하지 않는다.
 - `AIRI-CODEX-HANDOFF-2026-08-21.md` — **현행 코덱스(GPU) 인계 단일 SSoT.**
   2026-08-22 사용자 `/goal`로 goal은 `active`다. P0-A checkpoint/resume/durable
   runner/safe-pause offline 구현·독립 P0/P1 0은 완료되어 `6f0c1358`로

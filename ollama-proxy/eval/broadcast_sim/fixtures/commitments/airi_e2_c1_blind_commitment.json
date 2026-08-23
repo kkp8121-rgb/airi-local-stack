@@ -1,0 +1,43 @@
+{
+  "schema_version": "airi.e2-c1-blind-commitment.v1",
+  "root_id": "airi-e2-c1-blind-freeze-20260824-000430",
+  "fixture_schema_version": "airi.broadcast-sim-fixture.v1",
+  "canonicalization": {
+    "algorithm": "utf-8 JSON: sort_keys=true, separators=(',', ':'), ensure_ascii=false",
+    "canonicalization_schema_version": "airi.broadcast-sim-canonical-json.v1"
+  },
+  "seeds": [73, 89, 97, 20260824],
+  "arms": ["baseline", "e2", "e2-c1"],
+  "expected_matrix_reports": 36,
+  "fixtures": [
+    {
+      "filename": "identity_unknown_and_donation_ritual.json",
+      "logical_role": "identity_unknown_and_donation_ritual",
+      "size_bytes": 2378,
+      "raw_sha256": "fdf0a26a976542e9a47d9b1f0b5d24d31d571bf4b48b7930806f04be12f26162",
+      "canonical_sha256": "62accd68e1b40d7c57f6b3b85a61dc9bc24696dc121c80b5fb152e8bf0ca912d"
+    },
+    {
+      "filename": "long_continuity_and_stale_transition.json",
+      "logical_role": "long_continuity_and_stale_transition",
+      "size_bytes": 2803,
+      "raw_sha256": "71010d62b9b609370521912d434777d7759cd862dbd2c9e82447adc0ea9b2fee",
+      "canonical_sha256": "3a33a467f3997a780b3ce17393af5c85d0d58577f9005615507888fec2cbeab5"
+    },
+    {
+      "filename": "factual_grounding_and_complete_show_arc.json",
+      "logical_role": "factual_grounding_and_complete_show_arc",
+      "size_bytes": 2953,
+      "raw_sha256": "13b433cf26da8ab4f938dd9886d664b681971663c8f70ba1bebde17707868e40",
+      "canonical_sha256": "d021b6b3f2026c12b961472eca98af1322b800843567e745bba706db38401e30"
+    }
+  ],
+  "pre_result_attestation": {
+    "blind_bodies_sealed": true,
+    "correction_data_path_disjoint": true,
+    "old_public_fixture_reused": false,
+    "old_report_selection_rationale_reused": false,
+    "response_viewed": false,
+    "thresholds_frozen": true
+  }
+}

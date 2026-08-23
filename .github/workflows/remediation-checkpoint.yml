@@ -155,6 +155,7 @@ jobs:
               ollama-proxy/eval/broadcast_chat/test_run_broadcast_rehearsal.py
               ollama-proxy/eval/broadcast_sim/test_broadcast_sim.py
               ollama-proxy/eval/broadcast_sim/test_compare_broadcast_t3.py
+              ollama-proxy/eval/broadcast_sim/test_e2_c1_blind_commitment.py
               ollama-proxy/eval/broadcast_sim/test_long_broadcast_continuity.py
               ollama-proxy/eval/broadcast_sim/test_third_long_broadcast_heldout.py
               ollama-proxy/eval/live_broadcast_campaign/test_live_campaign.py
@@ -186,10 +187,12 @@ jobs:
               ollama-proxy/training/tests/test_synthesize_broadcast_behavior_v2.py
               ollama-proxy/training/tests/test_synthesize_broadcast_continuity_v3.py
               ollama-proxy/training/tests/test_synthesize_broadcast_continuity_v4.py
+              ollama-proxy/training/tests/test_synthesize_broadcast_e2_c1.py
               ollama-proxy/training/tests/test_behavior_training_checkpoint.py
               ollama-proxy/training/tests/test_durable_training_runner.py
               ollama-proxy/training/tests/test_train_airi_behavior_lora.py
               ollama-proxy/training/tests/test_verify_airi_behavior_gpu_equivalence.py
+              ollama-proxy/training/tests/test_verify_e2_c1_frozen_contract.py
               ollama-proxy/training/tests/test_synthesize_extraction_sft.py
               ollama-proxy/training/tests/test_build_extraction_review_form.py
               ollama-proxy/training/tests/test_extraction_review_pipeline.py

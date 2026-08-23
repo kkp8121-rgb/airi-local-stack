@@ -1,5 +1,27 @@
 # AIRI 다음 세션 안내
 
+> **2026-08-24 01:41 KST 검토 PC 최우선 진입점 — E2-C1 checkpoint, NOT FROZEN:**
+> latest Goal은 E2 adapter weight를 초기값으로 쓰고 optimizer/scheduler/RNG/cursor는
+> 새로 시작하는 `E2-C1` 교정 후보다. correction 480, v4 replay 200, mixture 680과
+> 새 retained blind 3종/4 seeds/3 arms의 계약 초안은 준비됐지만 final 감사에서 exact
+> five `으로/로` target 오류를 확인했다: `e2c1-long_callback-001-v3`,
+> `e2c1-complete_show_arc-002-v2`, `-003-v1`, `-010-v2`, `-011-v1`. 현 helper와
+> independent verifier에는 `(으로,로)` 및 받침 ㄹ의 `로` 예외가 없다. 현재
+> `freeze_status=fail`, `gpu_authorized=false`, E2-C1 0 microstep/0 optimizer step,
+> related AIRI durable runner/trainer/service PID 0이다. 사용량 경고로 current work를
+> known FAIL이 명시된 비-milestone checkpoint로 GitHub에 보존한다.
+>
+> 새 PC에서는 다른 실행보다 먼저 `AGENTS.md` → `AIRI-WORKING-STATE.md` → 현행 handoff →
+> `AIRI-ROADMAP-STATUS.md` → 이 파일을 전체 읽고 Goal/Git/PID/E2/T3/blind를 read-only로
+> 대조한다. PID 0이면 `pause-airi-safely.ps1`을 실행하지 않는다. 현재 checkpoint의
+> exact 설계·SHA·blind gate는
+> `airi_docs/진행중/AIRI-E2-C1-CONTRACT-DRAFT-2026-08-24.md`에 있다. 다음 무-GPU 동작은
+> `(으로,로)` helper/template/independent validator/mutation test 최소 수리 intent다.
+> write-free PASS 뒤 generator overwrite는 한 번만 실행한다. counts/splits/replay,
+> v4/base/E2, seed 42·batch 1·accumulation 16·seq 2048·512 microsteps·LR 1e-5·constant/K=3,
+> blind fixture/seed/threshold는 변경하지 않는다. first milestone PASS/commit/push와
+> HEAD=origin/main clean/PID 0 전에는 GPU로 이동하지 않는다.
+
 > **2026-08-23 22:38 KST E1/E2 사용자 검토 경계:** baseline/E1/E2는 모두 같은
 > Mi:dm 계열의 기존 broadcast v3/continuity-v4 1 epoch/2 epoch 후보다. E2는 E1 대비
 > topic 572→586, fact 180→193, memory 8→11, invented handle 46→37, callback 6→8,

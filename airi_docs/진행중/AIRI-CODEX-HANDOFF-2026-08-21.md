@@ -1,14 +1,16 @@
 # AIRI Codex GPU 인수인계 — broadcast continuity v4
 
-갱신: 2026-08-23 22:38 KST (파일명은 현행 GPU SSoT 식별자로 유지)
+갱신: 2026-08-24 01:41 KST (파일명은 현행 GPU SSoT 식별자로 유지)
 
-상태: **ACTIVE, T3 FAILED CLOSED — K=3 controlled GPU와 authoritative E2
+상태: **ACTIVE, E2-C1 FIRST MILESTONE GRAMMAR FAIL — K=3 controlled GPU와 authoritative E2
 1,600/1,600, E1/E2 merge·BF16/Q4_K_M package는 완료·미채택이다. authoritative T3는
 baseline/E1/E2 각 12, 총 36 reports와 두 comparator까지 실행했으나 두 comparison이 모두
 `status=fail`, paired reports 0, reason `polite violation or invented handle`로 종료해 launcher
 exit 1이고 `summary.json`은 없다. winner 0이므로 3×500 campaign은 금지한다. 실패 root를
-보존하고 같은 matrix나 hard gate를 반복·약화하지 않는다. 사용자는 E1/E2 원본 기록을
-검토 중이며, E2는 교정 학습의 상대 우세 출발점일 뿐 승자·채택 모델이 아니다.**
+보존하고 같은 matrix나 hard gate를 반복·약화하지 않는다. E2를 초기 weight로 쓰는 새
+교정 후보 E2-C1의 데이터·비오염 평가 계약을 작성 중이나 현재 합성 target의 `으로/로`
+오류 5건 때문에 freeze는 FAIL이다. 이 상태는 검토 PC 이관용 비-milestone checkpoint로
+push하며 E2-C1 GPU는 0/0, 승자·채택 모델도 아니다.**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
@@ -19,6 +21,36 @@ exit 1이고 `summary.json`은 없다. winner 0이므로 3×500 campaign은 금�
 병합·패키징, 로컬 서비스, T3·장시간 캠페인, 검증된 milestone commit/push가
 명시적으로 재승인됐다. 운영 채택과 기본 서비스 모델 변경은 별도 사용자 승인 전까지
 계속 금지한다.
+
+## -4. 2026-08-24 E2-C1 검토 PC checkpoint
+
+- latest Goal은 E2 adapter weight를 검증된 초기값으로 쓰되 fresh optimizer/scheduler/RNG/
+  cursor로 새 교정 후보 `E2-C1`을 만드는 것이다. 같은 v4의 E3 반복이 아니다.
+- 첫 milestone은 GPU가 아니라 correction 480 + v4 replay 200 + mixture 680, retained blind
+  3종, split/seed/max-step/LR/scheduler/checkpoint/metric 계약의 동결·검증·origin/main
+  push다. 현재 E2-C1 progress는 0 microstep/0 optimizer step이고 durable runner/trainer 0,
+  GPU 학습 0이다.
+- 2026-08-24 01:41 KST compact 후 mandatory 5문서와 actual Goal/Git/PID/E2/T3/blind를
+  재대조했다. HEAD/local origin/main/remote main은 `911179286ae32c7d5922358bcc5cb1741e58a5c9`
+  exact, pre-checkpoint worktree는 modified 3/staged 0/untracked 13, related AIRI PID 0이다.
+  E2 terminal state/checkpoint/adapter/report와 T3 36/36/89/72/2 failure root, external blind
+  5-file sealed receipt는 기존 크기·SHA와 exact하고 response는 보지 않았다.
+- final sample/조사 감사는 exact five malformed targets를 확정했다:
+  `e2c1-long_callback-001-v3`, `e2c1-complete_show_arc-002-v2`, `-003-v1`, `-010-v2`,
+  `-011-v1`. 모두 받침 있는 말 뒤 `로`가 쓰였고 `으로`가 필요하다. 현 generator/helper와
+  independent verifier는 `(으로,로)` 및 받침 ㄹ의 `로` 예외를 지원하지 않는다. 따라서
+  기존 unit/CLI PASS는 milestone PASS가 아니며 현재 `freeze_status=fail`,
+  `gpu_authorized=false`다.
+- 최신 사용량 경고와 사용자 요청에 따라 current code/data/commitment/policy/workflow와
+  모든 SSoT를 known FAIL이 명시된 **비-milestone checkpoint**로 GitHub에 먼저 push한다.
+  이는 frozen contract나 품질 진척이 아니다. 세부 draft와 exact SHA는
+  `AIRI-E2-C1-CONTRACT-DRAFT-2026-08-24.md`를 따른다.
+- 검토 PC의 첫 동작은 mandatory 5문서→Goal/Git/PID/E2/T3/blind read-only 대조다.
+  PID 0이면 pause를 호출하지 않는다. 다음 무-GPU 수리는 `(으로,로)` helper/template/
+  independent validator/mutation test만 최소 변경하고 write-free PASS 뒤 새 intent로
+  generator overwrite 1회를 실행하는 것이다. counts/splits/replay, v4/base/E2,
+  seed 42·batch 1·accumulation 16·seq 2048·512 microsteps·LR 1e-5·constant/K=3,
+  blind fixture/seed/threshold는 바꾸지 않는다.
 
 ## -3. 2026-08-23 E1/E2 사용자 검토와 교정 학습 경계
 
