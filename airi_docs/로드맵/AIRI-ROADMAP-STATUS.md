@@ -18,6 +18,8 @@
 > `e5241341...16b4`/`00b90c95...859a`/`7cb97aea...3dee`/
 > `0417f814...4e8a`/`5a4793b9...d75`다. 관련 PID/listener 0, winner 0이므로 campaign과
 > adoption을 금지한다. blind가 공개된 같은 matrix를 반복하거나 hard gate를 낮추지 않는다.
+> terminal failure 다섯 SSoT commit `d3724b1`은 `90a436e..d3724b1 main -> main`으로
+> origin/main push됐고 HEAD/local·remote exact, 관련 PID/listener 0을 확인했다.
 
 > **2026-08-23 T3 journal blocker 최소 수정·실서비스 smoke PASS:** E2는
 > 1,600/1,600 microsteps·100/100 optimizer steps, selected epoch 2 dev loss
@@ -405,7 +407,8 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
 - [~] isolated 36-report T3와 두 comparator는 terminal 실행 완료이나 양쪽 hard-gate FAIL,
   PASS summary/winner 0
 - [ ] T3 승자 0이므로 3 seed × 500 turn full-stack live campaign 차단
-- [ ] 실제 응답 묶음·실패 사례·지연·receipt·hash 증거를 사용자에게 제출
+- [~] T3 terminal 실패 aggregate·receipt·hash 증거를 사용자에게 제출한다. 실제 승자 응답·
+  지연·TTS/RAG campaign 묶음은 winner 0으로 생성 금지
 - [ ] 사용자 승인 뒤에만 운영 채택 판단; 그전까지 `adoption_authorized=false`
 
 각 단계의 fail-closed 완료 증거와 정확한 명령은

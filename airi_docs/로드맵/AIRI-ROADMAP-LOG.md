@@ -9,6 +9,18 @@
 
 ## 2026-08-23 authoritative T3 36 post-compact reconciliation
 
+- 21:09 KST commit-receipt WORKING/LOG exact 2개는 focused continuity와 diff/security
+  PASS, staged/untracked 0, manifest `67ad51f7...4d93`이었다. exact
+  `git push origin main` exit 0, `90a436e..d3724b1 main -> main`; 이후 HEAD/local·remote
+  origin/main은 모두 `d3724b1`, launcher/관련 PID/owned listener 0, comparison SHA unchanged,
+  summary absent다. terminal failure milestone은 origin/main에 durable하며 winner/campaign은
+  계속 0이다.
+- 21:07 KST exact five-doc final cached 검증은 staged 5, unstaged/untracked 0,
+  diff/security PASS, staged blob 656,954 bytes, index manifest `b4e78d82...68fc`였다.
+  `git commit -m "docs: record authoritative T3 failure"` exit 0, commit `d3724b1`, parent
+  `90a436e`, 5 files, 309 insertions/70 deletions이다. commit 직후 worktree clean, local main은
+  origin/main보다 1 ahead다. WORKING/LOG commit receipt를 검증한 뒤 exact push를 실행하며
+  campaign/adoption은 계속 금지한다.
 - 20:56 KST 동일 authoritative launcher는 모든 36 reports를 게시한 뒤 두 comparator가
   모두 `status=fail`, adoption false, paired reports 0, reason `polite violation or invented
   handle`을 반환해 exit 1했다. final E2 blind report는 419,613 bytes SHA

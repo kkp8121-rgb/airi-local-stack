@@ -12,7 +12,10 @@
 > `00b90c95...859a`/`7cb97aea...3dee`/`0417f814...4e8a`/`5a4793b9...d75`다.
 > launcher/관련 PID/owned listener는 0이다. winner 0이므로 3×500 campaign과 운영 채택을
 > 금지하며, 실패 root를 보존하고 같은 공개 blind matrix나 hard gate를 반복·약화하지 않는다.
-> 다음 gate는 이 terminal receipt의 SSoT 검증·commit/push와 HEAD=origin/main·clean 확인이다.
+> terminal failure 다섯 SSoT commit `d3724b1ea3d0df7cff8e14fd511f4b8244b8838c`은
+> `90a436e..d3724b1 main -> main`으로 origin/main push됐고 HEAD/local·remote exact,
+> 관련 PID/listener 0을 확인했다. 다음 실행 gate는 campaign이 아니라, 공개된 blind를
+> 재사용하지 않는 새 모델링/evaluation iteration에 대한 사용자 방향이다.
 
 > **2026-08-23 controlled GPU P0-B PASS receipt:** 최신 Goal status는 `active`,
 > `goal_status=active`다. 첫 K=5 baseline은 480/30 계산 뒤 actual interval max

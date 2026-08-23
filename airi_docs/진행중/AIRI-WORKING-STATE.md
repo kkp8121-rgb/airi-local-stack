@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 21:06:36 +09:00"
-checkpoint_id: "20260823-210636-t3-fail-staged-commit-intent"
+updated_at_kst: "2026-08-23 21:10:39 +09:00"
+checkpoint_id: "20260823-211039-t3-fail-final-docs-pass-stage-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
 active_phase: "t3-36-failed-closed"
-git_head: "90a436ee4f1eaea46a139e1f6d30da3d28cfaebc"
-worktree_state: "terminal-failure-five-ssot-staged; unstaged-untracked-0-before-receipt"
+git_head: "d3724b1ea3d0df7cff8e14fd511f4b8244b8838c"
+worktree_state: "t3-failure-pushed; final-receipt-five-ssot-dirty; staged-untracked-0"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-23 21:06 KST exact five-doc git add exit 0. Initial cached receipt is staged 5, unstaged/untracked 0, boundary and cached diff-check PASS, forbidden path/over-5MiB/credential-sensitive literal/personal-path hits 0, staged blob bytes 656,287 and index manifest 3da54976...0927. Restage this WORKING receipt only, require the same 5/0/0 and cached PASS, then commit with subject docs: record authoritative T3 failure. On commit failure preserve stage and do not push."
+reconciliation_receipt: "2026-08-23 21:10 KST final push-receipt five SSoT validation passed: focused continuity exit 0/literal PASS, repo diff-check exit 0 with expected five line-ending warnings, exact five paths, staged/untracked 0, forbidden path/binary/oversize/credential-sensitive literal/personal-path hits 0, total 662,542 bytes and manifest 2516a672...56aa. Stage only these five docs, require cached 5/0/0 and security PASS, commit as docs: close authoritative T3 failure receipt, push, then verify HEAD=origin/main clean and no related PID/listener."
 ---
 
 # AIRI live working state
@@ -58,6 +58,30 @@ reconciliation_receipt: "2026-08-23 21:06 KST exact five-doc git add exit 0. Ini
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260823-211039-t3-fail-final-docs-pass-stage-intent`: final push-receipt five SSoT는
+  focused continuity exit 0/literal PASS, repo diff-check exit 0/expected warning 5줄이다.
+  actual exact 5, staged/untracked 0, forbidden artifact path/binary/oversize/credential·민감
+  literal/개인 경로 hit 0, 총 662,542 bytes, manifest
+  `2516a6721b320730a77d1d512f13c075b19b1e54f820e4feb48d3369860556aa`다.
+  exact 5개만 stage해 cached 5/0/0과 security PASS를 확인한 뒤
+  `docs: close authoritative T3 failure receipt`로 commit/push한다. 이후 read-only
+  HEAD=origin/main clean과 관련 PID/listener 0을 확인한다.
+- `20260823-210909-t3-fail-push-receipt-final-docs-intent`: commit-receipt WORKING/
+  roadmap log exact 2개는 focused continuity와 diff/security PASS, staged/untracked 0,
+  manifest `67ad51f7...4d93`이었다. exact `git push origin main` exit 0,
+  `90a436e..d3724b1 main -> main`이다. 이후 HEAD/local origin/main/remote main은 모두
+  `d3724b1ea3d0df7cff8e14fd511f4b8244b8838c`, launcher/관련 process/owned listener 0,
+  comparison SHA unchanged, summary absent다. 이 actual push receipt와 no-winner 다음 경계를
+  다섯 SSoT에 반영해 exact five-doc final receipt commit/push를 수행한다. campaign/adoption은
+  계속 금지한다.
+- `20260823-210751-t3-fail-commit-receipt-push-intent`: final restage 뒤 staged 5,
+  unstaged/untracked 0, cached diff/security PASS, staged blob 656,954 bytes, index manifest
+  `b4e78d82a0fca5eeeef6331b9dd7c44503eab240b190f9e03cdc3b29ab5668fc`였다. exact
+  `git commit -m "docs: record authoritative T3 failure"` exit 0, commit
+  `d3724b1ea3d0df7cff8e14fd511f4b8244b8838c`, parent `90a436e`, 5 files,
+  309 insertions/70 deletions이다. commit 직후 worktree clean, local main은 origin/main보다
+  1 ahead다. 이 receipt용 WORKING/roadmap log exact 2개를 focused/diff/security로 검증한
+  뒤 exact `git push origin main`을 실행한다. 실패하면 local commit/docs를 보존한다.
 - `20260823-210636-t3-fail-staged-commit-intent`: exact five-doc `git add` exit 0 뒤
   staged 5, unstaged/untracked 0, boundary/cached diff-check PASS, forbidden artifact path/
   5 MiB 초과/credential·민감 literal/개인 경로 hit 0이다. staged blob 총 656,287 bytes,

@@ -42,6 +42,9 @@ exit 1이고 `summary.json`은 없다. winner 0이므로 3×500 campaign은 금�
 - T3 winner와 campaign output은 0이다. hard gate 우회나 같은 공개 blind matrix 반복은
   증거가 아니므로 금지한다. 후속 학습 iteration에는 오염되지 않은 새 평가 설계와 별도
   intent가 필요하다. 운영 채택과 기본 서비스 모델 변경 금지는 유지한다.
+- terminal failure 다섯 SSoT commit `d3724b1ea3d0df7cff8e14fd511f4b8244b8838c`은
+  `90a436e..d3724b1 main -> main`으로 origin/main push됐다. push 뒤 HEAD/local·remote
+  origin/main exact, launcher/관련 process/owned listener 0, summary absent를 확인했다.
 
 ## -1. 2026-08-23 T3 journal false-success 수정 receipt
 
@@ -588,4 +591,6 @@ identity spoof, corrupt-current/valid-previous 회귀와 전체 offline checkpoi
    RAG receipt, durable journal, answer→spoken→TTS SHA, 인과 순서, close·latency·stability
    증거와 retained hashes를 모두 요구한다.
 12. [ ] 실제 응답 비교 묶음, 실패 사례, 점수와 증거를 사용자에게 제출한다.
-    사용자 승인 전에는 서비스 모델·운영 태그를 바꾸지 않는다.
+    현재는 T3 terminal 실패 aggregate/inventory를 제출하고, 새 모델링/evaluation iteration은
+    공개된 blind를 재사용하지 않는 별도 사용자 방향이 필요하다. 사용자 승인 전에는 서비스
+    모델·운영 태그를 바꾸지 않는다.
