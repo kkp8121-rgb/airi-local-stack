@@ -9,6 +9,14 @@
 
 ## 2026-08-24 E2-C1 frozen-contract first milestone
 
+- 03:23 KST final cached gate exact 13 paths/index SHA `e86c8788...1902`/related PID 0
+  PASS 뒤 `fix: add E2-C1 adapter initialization` commit
+  `6dd24129d3d374fb9add1080aca2838ada1267b0`, parent `3d7d0e3`, 13 files,
+  1,471 insertions/98 deletions이 exit 0으로 생성됐다. post-commit clean, local ahead 1이다.
+  이 receipt WORKING/LOG exact 2개만 `docs: record E2-C1 adapter-init commit`으로 commit한 뒤
+  두 commit을 origin/main에 push한다. 실패하면 local commit을 보존하고 force/retry/GPU를
+  금지하며 quota 복구 identity는 `6dd2412`, pre-push remote `3d7d0e3`, PID 0이다.
+
 - 03:22 KST exact 13 paths `git add` exit 0 뒤 corrected cached identity는 indexed rows 13,
   manifest SHA `f7528afe...67c4`, 1,453 insertions/98 deletions, unstaged/untracked 0,
   cached diff/security PASS다. 첫 aggregate SHA helper는 unavailable static .NET `HashData`로

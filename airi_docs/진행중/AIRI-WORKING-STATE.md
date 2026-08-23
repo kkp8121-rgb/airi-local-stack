@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 03:22:18 +09:00"
-checkpoint_id: "20260824-032218-e2-c1-adapter-init-stage-receipt-commit-intent"
+updated_at_kst: "2026-08-24 03:23:14 +09:00"
+checkpoint_id: "20260824-032314-e2-c1-adapter-init-commit-receipt-push-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
 active_phase: "e2-c1-adapter-init-offline-validation"
-git_head: "3d7d0e342dca32a432b46de4ff77f7a7a5aa83a7"
-worktree_state: "HEAD-local-main-local-origin-main-remote-main-exact-3d7d0e3; exact-nine-allowed-paths-modified-unstaged; 1331-insertions-74-deletions-before-doc-publication-batch; adapter-init-minimal-implementation-offline-pass; publication-pending"
+git_head: "6dd24129d3d374fb9add1080aca2838ada1267b0"
+worktree_state: "HEAD-local-main-6dd2412; local-origin-main-3d7d0e3; clean-before-this-receipt; local-ahead-one; adapter-init-implementation-commit-created; push-pending"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-24 03:22 KST stage receipt/commit intent: git add exact 13 paths exit 0. Corrected cached identity is indexed rows 13, manifest SHA f7528afea628ebb3f79283418122bed8cfd9808978069f87a69bf097257f67c4, 1,453 insertions/98 deletions, unstaged/untracked 0, cached diff/security PASS. The first aggregate SHA helper used an unavailable static .NET HashData API and returned null as a non-authoritative subreceipt; stage bytes were unaffected, and the compatible SHA256.Create probe produced the authoritative value. Exact next state change is restage this receipt in WORKING/LOG, revalidate cached 13 paths/security/PID 0, then commit once as `fix: add E2-C1 adapter initialization`. All input pins, frozen training settings, output scope, success/failure/quota recovery and duplicate identity remain the 03:21 intent; no GPU or adoption mutation."
+reconciliation_receipt: "2026-08-24 03:23 KST implementation commit receipt/push intent: final cached gate PASS with exact 13 paths, index SHA e86c8788b3bbd261313c877780d95e63b8f84a3a9cc725276d03e4b07edf1902 and related PID 0. Commit `fix: add E2-C1 adapter initialization` is 6dd24129d3d374fb9add1080aca2838ada1267b0, parent 3d7d0e3, 13 files, 1,471 insertions/98 deletions, exit 0. Post-commit worktree is clean and local is ahead origin/main by one. Exact next purpose is commit this receipt in WORKING/LOG only as `docs: record E2-C1 adapter-init commit`, then push both commits to origin/main. Inputs/frozen settings stay exact; output is receipt commit and remote main only; run root absent, authoritative state this file, expected PID 0. Success requires docs cached PASS, commit/push exit 0, refs exact clean/PID 0. Failure preserves commits and stops without force/retry/GPU. Quota recovery and duplicate identity use mandatory five docs, 6dd2412, receipt subject, remote 3d7d0e3 and PID 0."
 ---
 
 # AIRI live working state
@@ -22,6 +22,19 @@ reconciliation_receipt: "2026-08-24 03:22 KST stage receipt/commit intent: git a
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 03:23 KST **implementation commit receipt + push intent**: final cached gate
+  PASSed with exact 13 paths, index SHA
+  `e86c8788b3bbd261313c877780d95e63b8f84a3a9cc725276d03e4b07edf1902` and related
+  PID 0. Commit `fix: add E2-C1 adapter initialization` is
+  `6dd24129d3d374fb9add1080aca2838ada1267b0`, parent `3d7d0e3`, 13 files,
+  1,471 insertions/98 deletions, exit 0. Post-commit worktree is clean and local is ahead
+  `origin/main` by one. Exact next purpose is commit this receipt in WORKING/LOG only as
+  `docs: record E2-C1 adapter-init commit`, then push both commits to `origin/main`. Inputs and
+  frozen settings stay exact; output is receipt commit and remote main only; external run root is
+  absent, authoritative state is this file, expected AIRI PID is 0. Success requires docs cached
+  PASS, commit/push exit 0, refs exact clean/PID 0. Failure preserves commits and stops without
+  force/retry/GPU. Quota recovery and duplicate identity use mandatory five docs, `6dd2412`,
+  receipt subject, pre-push remote `3d7d0e3` and PID 0. No GPU/adoption mutation is in scope.
 - 2026-08-24 03:22 KST **stage receipt + exact commit intent**: `git add` exact 13 paths
   exited 0. Corrected cached identity is indexed rows 13, manifest SHA
   `f7528afea628ebb3f79283418122bed8cfd9808978069f87a69bf097257f67c4`, 1,453
