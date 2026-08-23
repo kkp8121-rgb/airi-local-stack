@@ -13,6 +13,10 @@
 
 ## 2026-08-23 T3 service and journal blocker
 
+## 2026-08-23 T3 stream scheduling validation
+
+- One clean authoritative T3 validation after service-Python and ownership fixes still failed closed at baseline turn 4 with `journal_pending` after the full 30-second bound. A terminal-frame await experiment had no effect and was removed. No production evidence was published; remaining blocker is live stream trace-to-journal scheduling/identity, not service readiness.
+
 - A bounded T3 diagnostic isolated two launcher false negatives: the training venv lacked `fastapi`/`httpx`, and ownership enumeration assumed the `Start-Process` parent PID. The launcher now uses the existing service venv and maps actual listener PIDs to exact commands. Services/TTS reached readiness, but baseline turn 3 remained `journal_pending` for the full 30-second durability bound despite zero journal worker errors and `last_outcome=appended`; T3 failed closed with no published evidence. Campaign remains blocked pending trace/journal identity correction.
 
 - T3 offline preflight remains PASS for 36 isolated runs. The first production attempt failed at the ownership gate after the proxy exited. A single retry with the pinned Python 3.12 environment failed closed at the local-service readiness gate (`127.0.0.1:11435/health` not ready within 60 seconds); no production evidence was published and no owned listeners remain. Do not repeat the same command without correcting the launcher/service root cause. Adoption remains unauthorized; campaign is blocked behind T3.

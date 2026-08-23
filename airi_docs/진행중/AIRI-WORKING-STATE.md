@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 15:40:00 +09:00"
-checkpoint_id: "20260823-154000-t3-journal-pending-blocker"
+updated_at_kst: "2026-08-23 16:55:00 +09:00"
+checkpoint_id: "20260823-165500-t3-live-journal-sync-failed"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "t3-journal-durability-blocked"
+active_phase: "t3-stream-journal-scheduling-blocked"
 git_head: "946a6d9a063b11c73e9d12519ce91a3841e12765"
 worktree_state: "live-state-only-dirty; staged-untracked-0"
 active_trainer_count: 1
-reconciliation_receipt: "2026-08-23 15:40 KST: T3 launcher fixes were exercised. Root cause 1 was missing FastAPI/httpx in the training venv; T3 now binds service/simulator execution to existing stt/.venv. Root cause 2 was a false ownership gate caused by Start-Process parent PID assumptions; ownership now resolves the actual listener PID and exact command identity. Services and TTS reached ready, but the first baseline evaluation repeatedly returned content-free journal_pending (575 retries over 30 seconds; journal telemetry showed pending_tasks=0, errors=0, last_outcome=appended), so T3 failed closed with no evidence published. Owned listeners are 0 after cleanup. Do not repeat the same matrix until the trace/journal identity or durable receipt root cause is corrected."
+reconciliation_receipt: "2026-08-23 16:55 KST: A single authoritative T3 validation after clean preflight still failed closed at baseline turn 4 with journal_pending (575 bounded retries, pending_tasks=0, errors=0, last_outcome=appended). The attempted terminal-frame await had no effect and was removed. Services/TTS reached ready; owned listeners are 0 after cleanup; no T3 evidence published. Remaining defect is the live stream trace-to-journal scheduling/identity path, not service readiness or receipt wait duration."
 ---
 
 # AIRI live working state
