@@ -14,7 +14,7 @@ gpu_authorized=false
 microsteps_completed=0
 optimizer_steps_completed=0
 adoption_authorized=false
-blocker=adapter_initialization_batch_publication_pending
+blocker=bounded_gpu_smoke_intent_on_review_pc
 ```
 
 이 문서는 E2-C1 학습 전에 한 번 고정한 데이터·학습·비오염 평가 계약이다. checkpoint에서
@@ -24,9 +24,10 @@ blocker=adapter_initialization_batch_publication_pending
 `3dba3ca43a161d69f677eec2a8d10c3ddd061fca`로 origin/main에 push됐고 직후
   HEAD/local·remote exact, worktree/stage clean, PID 0을 확인했다. 이후 trainer/builder/runner/
   verifier의 weights-only adapter init, fresh optimizer/scheduler/RNG/cursor/progress와 fault
-  회귀 최소 구현은 offline full gate를 PASS했다. 현재 gate는 이 배치의 검증된 commit/push와
-  clean/PID 0 receipt이며 그 전에는 bounded smoke를 시작하지 않는다. 동결은 T3 승자나 운영
-  채택을 뜻하지 않는다.
+  회귀 최소 구현은 offline full gate를 PASS했다. implementation `6dd2412`와 receipt
+  `3c4b1a9`는 origin/main에 push됐고 clean/PID 0을 확인했다. 다음 gate는 review PC의 fresh
+  reconciliation 뒤 별도 intent를 쓰는 bounded GPU smoke다. 동결은 T3 승자나 운영 채택을
+  뜻하지 않는다.
 
 ### Adapter-initialization 구현 부속 receipt
 
@@ -39,7 +40,8 @@ blocker=adapter_initialization_batch_publication_pending
 - pinned pycompile exit 0, focused suites 27 passed/2 skipped·50/2·67/1, combined
   144 passed/5 skipped, continuity/full current-checkpoint/diff-check PASS다.
 - actual E2 helper는 run id `v4-e2-seed42-1600-20260823-074326`과 base/model/config/artifact
-  SHA를 builder/trainer 양쪽에서 exact 확인했다. GPU 실행·외부 run root 생성은 0이다.
+  SHA를 builder/trainer 양쪽에서 exact 확인했다. implementation `6dd2412`와 receipt
+  `3c4b1a9`는 origin/main에 push됐다. GPU 실행·외부 run root 생성은 0이다.
 
 ## 1. 후보 정의와 금지선
 

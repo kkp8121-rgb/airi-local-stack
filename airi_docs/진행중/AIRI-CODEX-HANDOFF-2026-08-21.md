@@ -2,7 +2,7 @@
 
 갱신: 2026-08-24 03:19 KST (파일명은 현행 GPU SSoT 식별자로 유지)
 
-상태: **ACTIVE, E2-C1 ADAPTER-INIT OFFLINE PASS — PUBLICATION PENDING. K=3 controlled GPU와 authoritative E2
+상태: **ACTIVE, E2-C1 ADAPTER-INIT OFFLINE PASS — PUBLISHED. K=3 controlled GPU와 authoritative E2
 1,600/1,600, E1/E2 merge·BF16/Q4_K_M package는 완료·미채택이다. authoritative T3는
 baseline/E1/E2 각 12, 총 36 reports와 두 comparator까지 실행했으나 두 comparison이 모두
 `status=fail`, paired reports 0, reason `polite violation or invented handle`로 종료해 launcher
@@ -13,9 +13,10 @@ PASS했다. 앞서 확인한 `으로/로` 오류 5건과 validator 공백은 최
 milestone `2e61842`와 receipt `3dba3ca`는 origin/main에 push됐고 직후 local/remote exact·
   clean·PID 0이다. E2 weights-only init과 fresh optimizer/scheduler/RNG/cursor/progress,
   manifest/run-state/checkpoint provenance와 fault 회귀의 최소 구현은 pinned CPU/offline gate를
-  PASS했다. 현재 blocker는 이 adapter-init 배치의 검증된 commit/push와 clean/PID 0 receipt다.
-  그 전에는 `gpu_authorized=false`이고 bounded smoke도 시작하지 않는다. E2-C1 GPU는 0/0이며
-  승자·채택 모델도 아니다.**
+  PASS했고 implementation `6dd2412`와 receipt `3c4b1a9`는 origin/main에 push됐다. 현재
+  blocker/다음 gate는 검토 PC의 fresh mandatory reconciliation 뒤 별도 intent를 쓰는 bounded
+  GPU smoke다. 이 인계 배치에서는 `gpu_authorized=false`이며 smoke를 시작하지 않는다.
+  E2-C1 GPU는 0/0이고 승자·채택 모델도 아니다.**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
@@ -27,7 +28,7 @@ milestone `2e61842`와 receipt `3dba3ca`는 origin/main에 push됐고 직후 loc
 명시적으로 재승인됐다. 운영 채택과 기본 서비스 모델 변경은 별도 사용자 승인 전까지
 계속 금지한다.
 
-## -5. 2026-08-24 E2-C1 adapter-init offline PASS / publication pending
+## -5. 2026-08-24 E2-C1 adapter-init offline PASS / published
 
 - trainer는 E2 adapter model/config/artifact-manifest를 lowercase SHA와 source base SHA,
   LoRA config/target modules로 검증하고 `PeftModel.from_pretrained(..., is_trainable=True)`로
@@ -47,10 +48,11 @@ milestone `2e61842`와 receipt `3dba3ca`는 origin/main에 push됐고 직후 loc
 - final code SHA는 builder/runner/trainer/verifier `415934b4...d218`/`df522273...24ec`/
   `6b19ad5c...43f8`/`5bbe1071...335f`; tests는 `9e2e4a4f...4038`/
   `391d45cb...ee4`/`04a54b4f...8ee3`다.
-- 현재 publication 전 HEAD/remote는 `3d7d0e3`, related PID 0, GPU AIRI workload 0,
-  E2-C1 0/0이다. 이 배치를 Conventional Commit으로 origin/main에 push하고 HEAD=remote
-  clean/PID 0을 확인하기 전에는 bounded GPU smoke를 시작하지 않는다. 검토 PC는 push receipt
-  뒤 별도 intent에서만 fresh external smoke root를 만들 수 있다.
+- implementation `6dd24129d3d374fb9add1080aca2838ada1267b0`과 receipt
+  `3c4b1a9fed9be7f7e4adf6c9434b1e284bd8fc0d`는 `3d7d0e3..3c4b1a9 main -> main`으로
+  origin/main에 push됐고 HEAD/local·remote exact, clean, related PID 0, GPU AIRI workload 0,
+  E2-C1 0/0을 확인했다. 검토 PC는 mandatory reconciliation과 별도 bounded-smoke intent 뒤에만
+  fresh external smoke root를 만들 수 있다. 이 문서 finalization에서는 GPU를 시작하지 않는다.
 
 ## -4. 2026-08-24 E2-C1 frozen-contract first milestone
 

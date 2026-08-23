@@ -7,7 +7,7 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
-> **2026-08-24 E2-C1 adapter-init offline PASS / publication pending:** 사용자는 E2 adapter
+> **2026-08-24 E2-C1 adapter-init offline PASS / published:** 사용자는 E2 adapter
 > weight를 검증된 초기값으로 사용하고 optimizer/scheduler/RNG/cursor는 새로 시작하는
 > 교정 후보 `E2-C1`을 승인했다. correction 480 + 검증된 v4 replay 200 + mixture 680과
 > 새 retained blind 3종·4 seeds·baseline/E2/E2-C1 36-report 평가 계약을 GPU보다 먼저
@@ -19,9 +19,10 @@
 > `freeze_status=pass`, E2-C1 0/0, 관련 AIRI PID 0이다. trainer/builder/runner/verifier의 E2
 > weights-only init, fresh optimizer/scheduler/RNG/cursor/progress, v2/v3 provenance와 closed-
 > inventory fault 회귀는 pinned pycompile, focused 27/2·50/2·67/1, combined 144 passed/
-> 5 skipped, continuity/full current-checkpoint/diff-check와 actual E2 helper를 PASS했다. 현재
-> gate는 이 adapter-init 배치의 Conventional Commit/origin push와 clean/PID 0 receipt이며,
-> 그 전에는 `gpu_authorized=false`다. 계약은
+> 5 skipped, continuity/full current-checkpoint/diff-check와 actual E2 helper를 PASS했다.
+> implementation `6dd2412`와 receipt `3c4b1a9`는 origin/main에 push됐고 HEAD/local·remote
+> exact, clean, PID 0을 확인했다. 다음 gate는 review PC의 mandatory reconciliation 뒤 별도
+> intent를 쓰는 bounded GPU smoke이며 이 인계 배치에서는 `gpu_authorized=false`다. 계약은
 > `진행중/AIRI-E2-C1-FROZEN-CONTRACT-2026-08-24.md`를 따른다. 운영 채택과 기본 모델·태그
 > 변경 금지는 유지한다.
 
