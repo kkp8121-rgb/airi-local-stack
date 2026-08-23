@@ -1,13 +1,14 @@
 # AIRI Codex GPU 인수인계 — broadcast continuity v4
 
-갱신: 2026-08-23 20:56 KST (파일명은 현행 GPU SSoT 식별자로 유지)
+갱신: 2026-08-23 22:38 KST (파일명은 현행 GPU SSoT 식별자로 유지)
 
 상태: **ACTIVE, T3 FAILED CLOSED — K=3 controlled GPU와 authoritative E2
 1,600/1,600, E1/E2 merge·BF16/Q4_K_M package는 완료·미채택이다. authoritative T3는
 baseline/E1/E2 각 12, 총 36 reports와 두 comparator까지 실행했으나 두 comparison이 모두
 `status=fail`, paired reports 0, reason `polite violation or invented handle`로 종료해 launcher
 exit 1이고 `summary.json`은 없다. winner 0이므로 3×500 campaign은 금지한다. 실패 root를
-보존하고 같은 matrix나 hard gate를 반복·약화하지 않는다.**
+보존하고 같은 matrix나 hard gate를 반복·약화하지 않는다. 사용자는 E1/E2 원본 기록을
+검토 중이며, E2는 교정 학습의 상대 우세 출발점일 뿐 승자·채택 모델이 아니다.**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
@@ -18,6 +19,28 @@ exit 1이고 `summary.json`은 없다. winner 0이므로 3×500 campaign은 금�
 병합·패키징, 로컬 서비스, T3·장시간 캠페인, 검증된 milestone commit/push가
 명시적으로 재승인됐다. 운영 채택과 기본 서비스 모델 변경은 별도 사용자 승인 전까지
 계속 금지한다.
+
+## -3. 2026-08-23 E1/E2 사용자 검토와 교정 학습 경계
+
+- baseline/E1/E2는 서로 다른 기반 모델이 아니라 같은 Mi:dm 계열이다. baseline은 기존
+  broadcast v3, E1은 continuity v4 1 epoch, E2는 같은 v4 2 epoch 후보다.
+- 사용자가 직접 판단할 원본은 external T3 root의 `reports/e1`·`reports/e2` 각 12개,
+  총 24 schema `airi.broadcast-sim-report.v1` JSON이다. 각 파일의 `summary`는 run 집계,
+  `rows`는 턴별 metric/action/trace/receipt, `transcript`는 response-bearing 입력·응답이다.
+  원본 response, packet, runtime DB와 로그는 Git 금지이며 외부 root에만 보존한다.
+- 1,248 turns씩의 E1→E2 aggregate는 topic `572→586`, fact `180→193`, memory
+  `8→11`, invented-handle turns `46→37`, fallback `7→4`, callback `6→8`, complete arc
+  `1→5`로 E2가 상대 우세다. E1 donation은 `56/56`, E2는 `55/56`이다. transport와 polite
+  violation은 양쪽 0이다.
+- E2 dev loss history는 epoch 1 `2.893371758116589`, epoch 2
+  `2.735453106217887`이고 selected epoch은 2다. 이는 학습 신호가 남았다는 근거지만
+  same-data 3 epoch가 방송 hard gate를 통과한다는 근거는 아니다.
+- final blind만 보면 invented handle이 E1 26에서 E2 34로 악화했고 long memory probe는
+  양쪽 모두 0/12다. E2는 T3 winner나 운영 채택 모델이 아니며, 사용자 승인 없는 기본
+  서비스 모델 변경과 공식 campaign은 계속 금지한다.
+- 후속 학습을 원하면 단순 same-data epoch 연장이 아니라 identity/unknown-name,
+  장기 callback, donation/addressee, stale-context 전환을 보강한 교정 데이터와 새 비오염
+  blind, 후보 명칭·범위를 별도 intent로 고정한다. 이 설계 승인 전 GPU 학습은 시작하지 않는다.
 
 ## -2. 2026-08-23 authoritative T3 terminal FAIL receipt
 

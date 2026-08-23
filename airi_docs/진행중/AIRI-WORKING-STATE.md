@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 21:13:58 +09:00"
-checkpoint_id: "20260823-211358-t3-fail-push-receipt-commit-intent"
+updated_at_kst: "2026-08-23 22:46:10 +09:00"
+checkpoint_id: "20260823-224610-e1-e2-user-review-final-stage-commit-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "t3-failed-awaiting-user-direction"
-git_head: "914afb346e3bcb42b74c9721ca80cd38bc403b3b"
-worktree_state: "final-push-receipt-working-log-dirty; staged-untracked-0"
+active_phase: "e1-e2-user-review-doc-refresh"
+git_head: "3efe2ad46e620b2aabf6a6764cf148e773500e3b"
+worktree_state: "five-doc-staged; receipt-working-log-unstaged; untracked-0"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-23 21:13 KST final five-doc cached verification passed at staged 5, unstaged/untracked 0, security hits 0, blob bytes 660,995 and index manifest f1c5cf29...4bc9. Commit docs: close authoritative T3 failure receipt exited 0 as 914afb3 and push d3724b1..914afb3 main to main exited 0. HEAD/local origin/main/remote main are exact 914afb3 and worktree was clean; reports 36, both comparisons remain fail with exact SHA, summary absent, related AIRI processes/owned listeners 0. Final WORKING/roadmap receipt validation now passes at exact 2 paths, staged/untracked 0, security hits 0 and manifest 239f0e9f...a62f. Stage only these 2 docs, require cached 2/0/0 PASS, commit as docs: record T3 failure receipt push and push. Then verify HEAD=origin/main clean. Winner/campaign remain 0 and adoption forbidden."
+reconciliation_receipt: "2026-08-23 22:46 KST compact recovery reread the five required SSoTs to EOF and reconciled Goal/Git/PID/E2/T3. Goal API retains prior blocked while the user's current docs request is active; HEAD/local/remote origin/main are exact 3efe2ad. E2 state is complete 1,600/1,600 and 100/100, T3 inventory is 36 reports/two comparisons/summary absent, related AIRI PID excluding the probe itself is 0. Restaging WORKING/LOG exited 0. Cached boundary/diff/security passed at staged 5, boundary 0, unstaged/untracked 0, hit 0 and blob bytes 671,836. The first manifest formatting call used an unavailable Windows PowerShell .NET method and produced no manifest; a corrected read-only hash-only calculation produced index manifest c1461f2f...e107d. Restage only WORKING/LOG after this receipt and require final cached 5/0/0/hit-0 PASS, then commit docs: record E2 corrective review. Push only after commit receipt."
 ---
 
 # AIRI live working state
@@ -47,16 +47,62 @@ reconciliation_receipt: "2026-08-23 21:13 KST final five-doc cached verification
 
 | 항목 | 값 |
 |---|---|
-| 의도 | authoritative T3 terminal failure root와 origin/main receipt를 보존하고, 새 비오염 모델링/evaluation 방향 전에는 실행을 멈춘다. |
-| 허용 범위 | read-only 상태 보고와 사용자 방향 수신. 같은 matrix 재실행, hard-gate 약화, campaign, 운영 채택·기본 모델 변경 금지 |
-| 시작 전 증거 | reports 36, comparisons 2 FAIL, PASS summary 0, winner/campaign 0, 관련 PID/listener 0, terminal milestone/final receipt commits origin/main push 완료다. |
-| exact 변경 | repository code/model/service 변경 0. 마지막 push receipt용 WORKING-STATE와 roadmap log만 갱신한다. |
-| 출력 경로 | 실패 증거는 external root `airi-t3-authoritative-20260823-175152`에 보존한다. response-bearing reports/packets, DB와 로그는 Git 금지다. |
-| 완료 조건 | 이 goal의 전체 완료 조건은 아직 미충족이다. 새 오염되지 않은 평가와 개선 모델이 T3 PASS/winner를 낸 뒤 campaign/사용자 증거까지 완료돼야 한다. |
-| 중단·복구 | 같은 matrix를 반복하지 않는다. T3 통과 모델이 없으므로 campaign을 시작하지 않는다. 후속 모델링 iteration에는 오염되지 않은 새 평가 설계와 별도 intent가 필요하다. |
-| 현재 행동 | 같은 T3/campaign 명령을 실행하지 않고 사용자에게 권위 실패·blocker·최소 다음 경로를 보고한다. |
+| 의도 | E1/E2 사용자 검토 결론과 다음 교정 학습의 권한 경계를 현행 다섯 SSoT에 일관되게 기록한다. |
+| 허용 범위 | 문서 exact 5개 갱신·검증·Conventional Commit/push만 허용. code/model/service/GPU/T3/campaign 변경은 0이다. |
+| 시작 전 증거 | HEAD/local/remote origin/main `3efe2ad` exact, worktree clean, 관련 PID 0, E2 1,600/1,600, reports 36/comparisons 2 FAIL/summary 0이다. |
+| exact 변경 | WORKING-STATE, 현행 handoff, ROADMAP-STATUS, ROADMAP-LOG, NEXT에 E2 상대 우세·미승격·교정 iteration 승인 대기 경계를 반영한다. |
+| 출력 경로 | 원본 E1/E2 응답 24 reports는 external T3 root에만 유지한다. Git 문서는 집계·판정·비민감 SHA만 기록한다. |
+| 완료 조건 | exact 5-doc continuity/diff/security PASS, commit/push exit 0, HEAD=origin/main clean, 관련 PID 0이다. |
+| 중단·복구 | 검증 실패 시 stage/commit/push하지 않고 원인을 기록한다. 같은 T3 matrix, 단순 same-data 3 epoch, campaign, adoption은 실행하지 않는다. |
+| 현재 행동 | 문서 intent를 먼저 기록하고, 나머지 SSoT를 같은 판정으로 갱신한다. |
 
 ## 3. 마지막 내구성 체크포인트
+
+- `20260823-224610-e1-e2-user-review-final-stage-commit-intent`: compact recovery에서
+  지정 SSoT 5종을 순서대로 EOF까지 재독하고 Goal/Git/PID/E2/T3를 read-only 대조했다.
+  Goal API는 prior `blocked`를 유지하지만 현재 사용자 문서 요청은 active다. HEAD/local/
+  remote origin/main은 `3efe2ad` exact, E2 state는 complete 1,600/1,600·100/100,
+  T3는 reports 36/comparisons 2/summary absent, self 제외 관련 AIRI PID 0이다.
+  WORKING/LOG restage exit 0 뒤 cached 검증은 staged 5, boundary diff 0,
+  unstaged/untracked 0, diff-check 0줄, binary/oversize/credential·개인 경로 hit 0,
+  blob 671,836 bytes다. 첫 wrapper의 manifest formatting만 현재 Windows PowerShell
+  .NET에 없는 `Convert.ToHexString`으로 실패해 값이 비었고, state mutation 없이
+  호환 hash-only 계산으로 index manifest
+  `c1461f2f4dce6940a7791b8936cf00dd38cd7c6d90ea817dc982de2c409e107d`를 확보했다.
+  이 receipt로 바뀐 WORKING/LOG만 restage해 final cached 5/0/0과 hit 0을 확인한 뒤
+  exact `git commit -m "docs: record E2 corrective review"`를 실행한다. 실패하면 push하지
+  않고 stage를 보존한다.
+
+- `20260823-224130-e1-e2-user-review-staged-commit-intent`: receipt-adjusted final
+  five-doc continuity는 exit 0/literal PASS, boundary/diff/security도 actual 5/boundary 0/
+  staged·untracked 0, hit 0, 672,649 bytes, manifest `05934eff...fd4be`로 PASS했다.
+  exact five-path stage exit 0 뒤 cached 검증은 staged 5, boundary diff 0,
+  unstaged/untracked 0, cached diff-check 0줄, binary/oversize/credential·개인 경로 hit 0,
+  blob 670,482 bytes, index manifest
+  `a3f04521541d3ed4505cc02164833edb6b2f431fc04df8f30d971fab466dec4e`다. 이 receipt로
+  바뀐 WORKING/LOG만 restage해 같은 5/0/0과 cached PASS를 확인한 뒤 exact
+  `git commit -m "docs: record E2 corrective review"`를 실행한다. 실패하면 push하지 않고
+  stage를 보존한다.
+
+- `20260823-224015-e1-e2-user-review-docs-pass-stage-intent`: exact five SSoT refresh 뒤
+  focused continuity는 exit 0/literal PASS다. boundary/security wrapper도 exit 0이며 actual
+  5, boundary diff 0, staged/untracked 0, repo diff-check exit 0/expected line-ending warning
+  5줄, forbidden path/binary/5 MiB oversize/credential·개인 경로 hit 0이다. 총 671,384 bytes,
+  path+size+SHA manifest `af033ce767e5a7eb1f087ac9456a2a4bdded6e5687cbd15e289d6350f489700a`다.
+  이 receipt로 바뀐 WORKING/LOG를 포함해 final five-doc continuity/diff/security를 한 번
+  확인한 뒤 exact 5경로만 stage한다. staged 5, unstaged/untracked 0과 cached PASS 전에는
+  commit/push하지 않는다.
+
+- `20260823-223724-e1-e2-user-review-docs-intent`: 사용자가 E1/E2 원본 T3 기록과
+  추가 파인튜닝 가능성을 검토한 뒤 현행 문서 전부 갱신을 요청했다. actual preflight는
+  HEAD/local·remote origin/main `3efe2ad` exact, worktree clean, 관련 AIRI PID 0이다.
+  E2 report의 dev loss는 epoch 1 `2.893371758116589`에서 epoch 2
+  `2.735453106217887`로 낮아졌고 E1 대비 topic/fact/memory/invented-handle/continuity는
+  상대 개선했지만 final blind invented handle은 E1 26에서 E2 34로 악화했고 long memory는
+  양쪽 모두 0/12다. 따라서 E2는 교정 학습의 상대 우세 출발점일 뿐 T3 winner/adopted가
+  아니다. 같은 v4 데이터를 한 epoch 더 반복하는 E3는 승인·권고하지 않으며, 새 교정 데이터와
+  비오염 평가 설계를 사용자와 별도 intent로 고정해야 한다. exact five-doc만 갱신·검증·
+  commit/push하고 model/GPU/service/campaign은 변경하지 않는다.
 
 - `20260823-211203-t3-fail-final-push-receipt`: final five-doc cached 검증은 staged 5,
   unstaged/untracked 0, security hit 0, blob 660,995 bytes, index manifest

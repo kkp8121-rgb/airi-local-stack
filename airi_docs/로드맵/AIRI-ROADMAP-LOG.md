@@ -7,6 +7,46 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-23 E1/E2 user review and corrective-training boundary
+
+- 22:46 KST compact recovery에서 지정 SSoT 5종을 순서대로 EOF까지 재독하고
+  Goal/Git/PID/E2/T3를 대조했다. Goal API prior `blocked`와 현재 사용자 docs request
+  active 경계를 유지하며 HEAD/local/remote origin/main `3efe2ad` exact, E2 complete
+  1,600/1,600·100/100, T3 reports 36/comparisons 2/summary absent, self 제외 관련 AIRI
+  PID 0이다. WORKING/LOG restage 뒤 cached boundary/diff/security는 staged 5,
+  unstaged/untracked 0, hit 0, blob 671,836 bytes로 PASS했다. 첫 manifest formatting은
+  현재 Windows PowerShell .NET에 없는 `Convert.ToHexString` 때문에 값만 비었고,
+  state mutation 없이 호환 hash-only 계산한 index manifest는 `c1461f2f...e107d`다.
+  receipt 두 문서만 restage해 final cached 5/0/0/hit-0 뒤 commit한다.
+- 22:41 KST receipt-adjusted final five-doc continuity/diff/security는 actual 5,
+  staged/untracked 0, hit 0, 672,649 bytes, manifest `05934eff...fd4be`로 PASS했다.
+  exact five-path stage exit 0 뒤 cached 검증도 staged 5, boundary diff 0,
+  unstaged/untracked 0, cached diff-check 0줄, binary/oversize/credential·개인 경로 hit 0,
+  blob 670,482 bytes, index manifest `a3f04521...dec4e`로 PASS했다. WORKING/LOG receipt만
+  restage해 같은 cached 5/0/0을 확인한 뒤 `docs: record E2 corrective review`로 commit한다.
+- 22:40 KST exact five SSoT 갱신 뒤 focused continuity exit 0/literal PASS다. exact
+  boundary/security wrapper도 exit 0이며 actual 5, boundary diff 0, staged/untracked 0,
+  repo diff-check exit 0/expected line-ending warning 5줄, forbidden artifact/binary/oversize/
+  credential·개인 경로 hit 0, 총 671,384 bytes, manifest `af033ce7...9700a`다. receipt
+  기록으로 바뀐 WORKING/LOG를 포함해 final five-doc validation 뒤 exact 5경로만 stage한다.
+  cached 5/0/0과 security PASS 전에는 commit/push하지 않는다.
+- 22:37 KST 사용자가 E1/E2 원본 T3 기록을 직접 검토하고 추가 파인튜닝 가능성을
+  판단할 수 있도록 현행 다섯 SSoT 전체 갱신을 요청했다. preflight는 HEAD/local·remote
+  origin/main `3efe2ad` exact, worktree clean, 관련 AIRI PID 0, E2 1,600/1,600,
+  T3 reports 36/comparisons 2 FAIL/summary 0이다. baseline/E1/E2는 서로 다른 기반 모델이
+  아니라 같은 Mi:dm 계열의 기존 v3/continuity-v4 1 epoch/2 epoch 후보다.
+- E2는 E1 대비 topic `572→586`, fact `180→193`, memory `8→11`, invented handle
+  `46→37`, callback `6→8`, complete arc `1→5`로 상대 우세하고 dev loss도 epoch 1
+  `2.893371758116589`에서 epoch 2 `2.735453106217887`로 낮아졌다. 그러나 final blind의
+  invented handle은 E1 26→E2 34로 악화했고 long memory는 양쪽 0/12, E2 donation은
+  55/56으로 한 건 회귀했다. 따라서 E2는 후속 교정 학습의 검토상 우세한 출발점일 뿐
+  T3 PASS/winner나 운영 채택이 아니다.
+- 같은 v4 데이터를 단순히 한 epoch 더 반복하는 E3는 승인·권고하지 않는다. 새 교정
+  데이터와 공개되지 않은 새 blind 설계, 후보 명칭·범위를 별도 사용자 intent로 고정하기
+  전에는 GPU 학습/T3/campaign을 실행하지 않는다. response-bearing 24 reports와 runtime
+  산출물은 external T3 root에만 보존하고 Git에는 집계·판정·비민감 SHA만 기록한다.
+  이번 배치는 exact five-doc 갱신·검증·Conventional Commit/push만 수행한다.
+
 ## 2026-08-23 authoritative T3 36 post-compact reconciliation
 
 - 21:12 KST final five-doc cached 검증은 staged 5, unstaged/untracked 0, security hit 0,

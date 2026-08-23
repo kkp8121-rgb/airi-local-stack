@@ -7,6 +7,17 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
+> **2026-08-23 E1/E2 사용자 검토:** baseline/E1/E2는 모두 같은 Mi:dm 계열의 기존
+> broadcast v3/continuity-v4 1 epoch/2 epoch 후보다. 1,248턴씩에서 E2는 E1 대비 topic
+> 572→586, fact 180→193, memory 8→11, invented handle 46→37, callback 6→8,
+> complete arc 1→5로 상대 우세하고 dev loss도 epoch 1 `2.893371758116589`에서 epoch 2
+> `2.735453106217887`로 낮아졌다. 그러나 final blind invented handle은 E1 26→E2 34로
+> 악화했고 long memory는 양쪽 0/12, E2 donation은 55/56이다. 따라서 E2는 교정 학습의
+> 검토상 우세한 출발점일 뿐 T3 승자·운영 채택 모델이 아니다. same-data 3 epoch 반복은
+> 승인·권고하지 않으며 새 교정 데이터·비오염 blind·후보 범위를 별도 사용자 intent로
+> 고정하기 전에는 학습/T3/campaign을 실행하지 않는다. response-bearing 24 reports는
+> external T3 root에만 보존한다.
+
 > **2026-08-23 authoritative T3 terminal FAIL:** controlled GPU와 E2 1,600/1,600,
 > E1/E2 merge·BF16/Q4_K_M package는 완료·미채택이다. external root에서 baseline/E1/E2
 > 각 12, 총 36 reports와 두 comparator를 실행했으나 양쪽 comparison이 모두 schema v1,
@@ -406,8 +417,12 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
 - [x] exact baseline/E1/E2 tag+digest manifest 작성·SHA 결속 완료
 - [~] isolated 36-report T3와 두 comparator는 terminal 실행 완료이나 양쪽 hard-gate FAIL,
   PASS summary/winner 0
+- [x] E1/E2 각 12개 원본 report 위치와 1,248-turn aggregate, 실제 응답 대표 사례를
+  사용자 검토용으로 제출했다. E2는 상대 우세하나 T3 PASS/winner로 승격하지 않았다.
+- [ ] E2 기반 교정 iteration은 사용자 설계 승인 대기. same-data 3 epoch를 반복하지 않고
+  새 교정 데이터·새 비오염 blind·후보 명칭과 범위를 별도 intent로 고정해야 한다.
 - [ ] T3 승자 0이므로 3 seed × 500 turn full-stack live campaign 차단
-- [~] T3 terminal 실패 aggregate·receipt·hash 증거를 사용자에게 제출한다. 실제 승자 응답·
+- [~] T3 terminal 실패 aggregate·receipt·hash와 E1/E2 원본은 제출했다. 실제 승자 응답·
   지연·TTS/RAG campaign 묶음은 winner 0으로 생성 금지
 - [ ] 사용자 승인 뒤에만 운영 채택 판단; 그전까지 `adoption_authorized=false`
 

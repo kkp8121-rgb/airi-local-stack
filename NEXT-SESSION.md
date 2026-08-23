@@ -1,5 +1,17 @@
 # AIRI 다음 세션 안내
 
+> **2026-08-23 22:38 KST E1/E2 사용자 검토 경계:** baseline/E1/E2는 모두 같은
+> Mi:dm 계열의 기존 broadcast v3/continuity-v4 1 epoch/2 epoch 후보다. E2는 E1 대비
+> topic 572→586, fact 180→193, memory 8→11, invented handle 46→37, callback 6→8,
+> complete arc 1→5로 상대 우세하고 dev loss도 epoch 1 `2.893371758116589`에서 epoch 2
+> `2.735453106217887`로 낮아졌다. 그러나 final blind invented handle은 E1 26→E2 34,
+> long memory는 양쪽 0/12이고 E2 donation은 55/56이다. E2는 후속 교정 학습의 검토상
+> 우세한 출발점일 뿐 T3 winner/adopted가 아니다. 사용자는 external T3 root의 E1/E2
+> 각 12개 원본 report와 대표 실제 응답을 검토 중이다. response-bearing report/packet/
+> runtime은 Git에 넣지 않는다. same-data 3 epoch 반복은 승인·권고하지 않으며, 다음 실행
+> gate는 이 five-doc 배치 commit/push·clean 뒤 새 교정 데이터/비오염 blind/후보 범위를
+> 사용자가 별도 승인하는 것이다. 그전에는 GPU 학습, 같은 T3, campaign, 운영 채택을 금지한다.
+
 > **2026-08-23 20:56 KST 현재 gate: T3 FAILED CLOSED.** controlled GPU와
 > authoritative E2 1,600/1,600, E1/E2 merge·BF16/Q4_K_M package는 완료·미채택이다.
 > authoritative T3는 baseline/E1/E2 각 12, 총 36 reports와 두 comparator까지 실행했으나
