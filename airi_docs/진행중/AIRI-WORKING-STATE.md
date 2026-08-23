@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 14:32:00 +09:00"
-checkpoint_id: "20260823-143200-t3-retry-failed-closed"
+updated_at_kst: "2026-08-23 15:40:00 +09:00"
+checkpoint_id: "20260823-154000-t3-journal-pending-blocker"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "t3-matrix-launcher-blocked"
-git_head: "109c320"
+active_phase: "t3-journal-durability-blocked"
+git_head: "920e900a9155df6d6b1912a598dd21fef0746c3c"
 worktree_state: "live-state-only-dirty; staged-untracked-0"
 active_trainer_count: 1
-reconciliation_receipt: "2026-08-23 14:32 KST: E1/E2 BF16 and Q4_K_M packaging completed externally at D:\AIRI-Models\airi-broadcast-v4-packages-20260823-140500. T3 preflight PASS for 36 runs. Production retry with pinned Python 3.12 PATH also failed closed: local service did not become ready on http://127.0.0.1:11435/health within 60 seconds; no T3 evidence published and cleanup left owned listeners at 0. No further identical retry authorized without root-cause correction."
+reconciliation_receipt: "2026-08-23 15:40 KST: T3 launcher fixes were exercised. Root cause 1 was missing FastAPI/httpx in the training venv; T3 now binds service/simulator execution to existing stt/.venv. Root cause 2 was a false ownership gate caused by Start-Process parent PID assumptions; ownership now resolves the actual listener PID and exact command identity. Services and TTS reached ready, but the first baseline evaluation repeatedly returned content-free journal_pending (575 retries over 30 seconds; journal telemetry showed pending_tasks=0, errors=0, last_outcome=appended), so T3 failed closed with no evidence published. Owned listeners are 0 after cleanup. Do not repeat the same matrix until the trace/journal identity or durable receipt root cause is corrected."
 ---
 
 # AIRI live working state

@@ -74,7 +74,7 @@ function Stop-Owned([hashtable]$Owners) {
     foreach ($port in @($Owners.Keys)) {
         $ownerProcessId = [int]$Owners[$port]
         $identity = @(Get-CimInstance Win32_Process -Filter "ProcessId = $ownerProcessId" -ErrorAction SilentlyContinue)
-        if ($identity.Count -eq 1 -and [int]$identity[0].ParentProcessId -eq $PID -and
+        if ($identity.Count -eq 1 -and
             (Get-OwnedPortKey ([string]$identity[0].CommandLine)) -ceq [string]$port) {
             try {
                 $stoppedProcess = Stop-Process -Id $ownerProcessId -Force -PassThru -ErrorAction Stop
@@ -95,24 +95,17 @@ function Assert-OwnedListeners([hashtable]$Owners) {
     }
 }
 function Get-RecentOwned([datetime]$Since) {
-    # This identity filter is intentionally narrower than ports: never reclaim an unrelated listener.
+    # Resolve ownership from the actual listening socket first.  Start-Process
+    # may insert a launcher process, so command-line enumeration alone can
+    # produce multiple identities for one port.
     $found = @{}
-    $matchesByPort = @{}
-    foreach ($p in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
-        $_.CommandLine -and $_.CreationDate -and [int]$_.ParentProcessId -eq $PID -and
-        ([datetime]$_.CreationDate).ToUniversalTime() -ge $Since
-    })) {
-        $c = [string]$p.CommandLine
-        $portKey = Get-OwnedPortKey $c
-        if ($null -ne $portKey) {
-            if (-not $matchesByPort.ContainsKey($portKey)) { $matchesByPort[$portKey] = @() }
-            $matchesByPort[$portKey] = @($matchesByPort[$portKey]) + [int]$p.ProcessId
+    foreach ($listener in @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue)) {
+        $portKey = Get-OwnedPortKey ([string](Get-CimInstance Win32_Process -Filter "ProcessId = $($listener.OwningProcess)" -ErrorAction SilentlyContinue).CommandLine)
+        if ($null -eq $portKey -or $found.ContainsKey($portKey)) { continue }
+        $identity = Get-CimInstance Win32_Process -Filter "ProcessId = $($listener.OwningProcess)" -ErrorAction SilentlyContinue
+        if ($identity -and $identity.CreationDate -and ([datetime]$identity.CreationDate).ToUniversalTime() -ge $Since) {
+            $found[$portKey] = [int]$listener.OwningProcess
         }
-    }
-    foreach ($portKey in @($matchesByPort.Keys)) {
-        $identities = @($matchesByPort[$portKey] | Sort-Object -Unique)
-        if ($identities.Count -eq 1) { $found[$portKey] = [int]$identities[0] }
-        elseif ($identities.Count -gt 1) { Write-Warning "Multiple T3 process identities matched port $portKey; none were stopped." }
     }
     $found
 }
@@ -272,12 +265,27 @@ $previousReferenceAudio = [Environment]::GetEnvironmentVariable('GPT_SOVITS_REFE
 $previousNltkData = [Environment]::GetEnvironmentVariable('NLTK_DATA','Process')
 $previousPythonPath = [Environment]::GetEnvironmentVariable('PYTHONPATH','Process')
 $previousPythonIoEncoding = [Environment]::GetEnvironmentVariable('PYTHONIOENCODING','Process')
+$previousStackPython = [Environment]::GetEnvironmentVariable('AIRI_STACK_PYTHON','Process')
 $created = $false
 try {
     # Pin the only supported production TTS identity.  Besides guaranteeing the
     # embedding-cache wrapper on 9880, this makes listener ownership and cleanup
     # use the same exact command identity on every run.
     $env:AIRI_GPT_SOVITS_SV_CACHE = 'on'
+    # The training venv is intentionally used for deterministic simulation,
+    # but it does not carry the local service web dependencies.  Bind the
+    # stack launcher to an existing service venv so the proxy cannot silently
+    # die during the ownership/readiness gate.
+    $servicePythonCandidates = @(
+        (Join-Path $root 'stt\.venv\Scripts\python.exe'),
+        (Join-Path $root 'external\GPT-SoVITS\.venv\Scripts\python.exe')
+    )
+    $servicePython = @($servicePythonCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1)
+    if ($servicePython.Count -ne 1) { throw 'T3 service Python with local web dependencies is unavailable.' }
+    $env:AIRI_STACK_PYTHON = [string]$servicePython[0]
+    # The simulator also imports httpx; use the same verified interpreter so
+    # service and evaluation dependencies cannot drift within one matrix.
+    $python = [string]$servicePython[0]
     $env:GPT_SOVITS_STREAMING_MODE = '2'
     $env:GPT_SOVITS_MIN_CHUNK_LENGTH = '16'
     [IO.Directory]::CreateDirectory($out) | Out-Null; $created = $true
@@ -440,4 +448,5 @@ try {
     Restore-Env NLTK_DATA $previousNltkData
     Restore-Env PYTHONPATH $previousPythonPath
     Restore-Env PYTHONIOENCODING $previousPythonIoEncoding
+    Restore-Env AIRI_STACK_PYTHON $previousStackPython
 }

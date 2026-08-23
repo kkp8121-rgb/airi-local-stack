@@ -350,7 +350,10 @@ def run_live_capability_turn(
         "user_sha256": sha256_text(user_content),
         "answer_sha256": sha256_text(receipt_answer),
     }
-    deadline = time.monotonic() + 5.0
+    # Local SQLite/journal flush can lag the streamed answer under the full
+    # T3 stack. Keep the gate bounded, but allow the receipt to become durable
+    # before declaring a false runtime failure.
+    deadline = time.monotonic() + 30.0
     while True:
         try:
             status, _ = _broadcast_control(
@@ -358,6 +361,13 @@ def run_live_capability_turn(
                 live_broadcast["observer_token"], receipt, receipt=True,
             )
         except RuntimeError as exc:
+            # A receipt can cross the endpoint between the 202 pending seam
+            # and the durable journal write.  Treat only this explicit,
+            # content-free durability reason as retryable within the existing
+            # bounded deadline; all auth/schema/runtime failures remain fatal.
+            if "reason=journal_pending" in str(exc) and time.monotonic() < deadline:
+                time.sleep(0.05)
+                continue
             state: dict[str, object] = {}
             try:
                 response = transport.client.get(

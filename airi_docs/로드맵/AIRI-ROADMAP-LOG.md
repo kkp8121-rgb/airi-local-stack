@@ -11,6 +11,10 @@
 
 ## 2026-08-23 T3 production retry failed closed
 
+## 2026-08-23 T3 service and journal blocker
+
+- A bounded T3 diagnostic isolated two launcher false negatives: the training venv lacked `fastapi`/`httpx`, and ownership enumeration assumed the `Start-Process` parent PID. The launcher now uses the existing service venv and maps actual listener PIDs to exact commands. Services/TTS reached readiness, but baseline turn 3 remained `journal_pending` for the full 30-second durability bound despite zero journal worker errors and `last_outcome=appended`; T3 failed closed with no published evidence. Campaign remains blocked pending trace/journal identity correction.
+
 - T3 offline preflight remains PASS for 36 isolated runs. The first production attempt failed at the ownership gate after the proxy exited. A single retry with the pinned Python 3.12 environment failed closed at the local-service readiness gate (`127.0.0.1:11435/health` not ready within 60 seconds); no production evidence was published and no owned listeners remain. Do not repeat the same command without correcting the launcher/service root cause. Adoption remains unauthorized; campaign is blocked behind T3.
 
 - Authoritative E2 `v4-e2-seed42-1600-20260823-074326` reached `complete`/`trainer-complete` at 1,600/1,600 microsteps and 100/100 optimizer steps. Adapter/report are published and pinned; selected epoch 2 dev loss is `2.735453106217887`; adoption remains unauthorized and T3 is pending. Terminal PID reconciliation is 0. Next gates are merge/package, T3 36, and campaign evidence.
