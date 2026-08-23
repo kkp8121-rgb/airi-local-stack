@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 02:16:00 +09:00"
-checkpoint_id: "20260824-021600-frozen-milestone-commit-intent"
+updated_at_kst: "2026-08-24 02:17:00 +09:00"
+checkpoint_id: "20260824-021700-frozen-milestone-push-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
 active_phase: "e2-c1-design-data-evaluation-contract"
-git_head: "1de57a21cce329db480282ea89cb59c25e42710c"
-worktree_state: "frozen-milestone-commit-intent; HEAD-equals-local-origin-remote-main-at-1de57a2; cached-16-paths-one-rename; cached-boundary-security-pass; receipt-docs-restage-and-final-cached-validation-then-commit-push-pending"
+git_head: "2e61842ba72875bff4d473653b635541e6e0b82a"
+worktree_state: "frozen-milestone-commit-receipt; HEAD-2e61842-local-ahead-origin-main-one; milestone-commit-exit-0; receipt-docs-commit-and-exact-origin-main-push-pending"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-24 02:16 KST stage receipt and commit intent: exact git add exit 0; cached names 16 including one R069 rename, unstaged/untracked 0. Indexed rows 16/6,326,805 bytes, manifest f4ff5c13edd036697c09988cd7f8b0109c63ac65cf8714751ce25c5883935f7b; boundary diff, diff problems, binary, forbidden path, oversize, strong secret, personal path, stale current ref and related AIRI PID excluding probe all 0. Receipt docs are the only next mutation; restage them and require a fresh identical gate before Conventional Commit. E2-C1 0/0, GPU AIRI workload 0, adoption forbidden."
+reconciliation_receipt: "2026-08-24 02:17 KST milestone commit receipt and push intent: final cached names 16/rename 1, indexed 16 rows/6,328,851 bytes, manifest 71de5ad86bdb6b6d4a461de4b8b1ed917b1f8c21bd25b85f5b247f06477e7527 and all gates/PID 0 PASS. Commit 2e61842ba72875bff4d473653b635541e6e0b82a, parent 1de57a21cce329db480282ea89cb59c25e42710c, subject fix: freeze E2-C1 correction contract, 16 files/398 insertions/154 deletions, exit 0. Post-commit worktree clean, local ahead 1. Exact two-doc receipt commit then origin main push is authorized; E2-C1 0/0, GPU AIRI workload 0, adoption forbidden."
 ---
 
 # AIRI live working state
@@ -22,6 +22,23 @@ reconciliation_receipt: "2026-08-24 02:16 KST stage receipt and commit intent: e
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 02:17 KST **milestone commit receipt + receipt-docs/push intent**: receipt docs
+  restage 뒤 final cached gate는 names 16/rename 1, indexed 16 rows/6,328,851 bytes,
+  manifest `71de5ad86bdb6b6d4a461de4b8b1ed917b1f8c21bd25b85f5b247f06477e7527`이고 모든
+  boundary/diff/security/PID 항목 0으로 PASS했다. `fix: freeze E2-C1 correction contract`
+  commit `2e61842ba72875bff4d473653b635541e6e0b82a`, parent `1de57a21...10c`은 exit 0,
+  16 files/398 insertions/154 deletions이며 직후 worktree clean/local ahead 1이다. 다음
+  목적/허용 범위는 이 commit receipt를 담은 WORKING/ROADMAP-LOG exact 2 docs만 stage,
+  cached diff/security PASS, `docs: record E2-C1 freeze milestone` commit한 뒤 local main의
+  두 새 commit을 `origin main`에 push하는 것이다. 입력 dataset/base/E2-init/config/code와
+  동결 seed/batch/accum/step/LR/scheduler/checkpoint는 이전 intent와 exact, 학습/서비스/
+  외부 root는 건드리지 않는다. output은 receipt commit과 remote `refs/heads/main`,
+  authoritative state는 이 파일, 예상 AIRI PID는 0이다. 성공 조건은 receipt commit exit 0,
+  push exit 0, HEAD/local main/local origin/main/remote main exact, worktree/stage clean, PID 0이다.
+  실패·중단 시 force/retry하지 않고 local commits와 실제 remote를 보존·재대조해 기록한다.
+  quota/session 유실 뒤 mandatory 5문서→Goal→HEAD/local/remote/status/PID 순으로 복구한다.
+  중복 identity는 checkpoint `20260824-021700-frozen-milestone-push-intent`, milestone SHA,
+  receipt-doc subject와 pre-push remote `1de57a21...10c`다. durable run은 없어 pause 대상이 아니다.
 - 2026-08-24 02:16 KST **stage receipt + exact commit intent checkpoint**: exact 17-status-path
   `git add -A`는 exit 0이고 Git은 DRAFT→FROZEN을 `R069` 1건으로 접어 cached names 16,
   unstaged/untracked 0으로 표시했다. indexed rows 16/6,326,805 bytes, manifest

@@ -9,6 +9,13 @@
 
 ## 2026-08-24 E2-C1 frozen-contract first milestone
 
+- 02:17 KST receipt docs restage 뒤 final cached gate는 names 16/rename 1, indexed
+  16 rows/6,328,851 bytes/manifest `71de5ad8...7527`, boundary/diff/security/PID 0 PASS다.
+  exact milestone commit `2e61842ba72875bff4d473653b635541e6e0b82a`, parent `1de57a2`,
+  subject `fix: freeze E2-C1 correction contract`는 exit 0, 16 files/398 insertions/154 deletions이다.
+  post-commit worktree clean/local ahead 1이다. 이 receipt exact 2 docs만 별도 commit한 뒤 두
+  local commits를 origin/main에 push하고 local/remote exact·clean·PID 0을 확인한다.
+
 - 02:16 KST exact stage는 exit 0이고 cached names 16/R069 rename 1, unstaged·untracked 0,
   indexed 16 rows/6,326,805 bytes/manifest `f4ff5c13...f7b`이다. boundary, diff-check,
   binary, forbidden/oversize, strong-secret/personal-path, stale-ref와 related PID가 모두 0인
