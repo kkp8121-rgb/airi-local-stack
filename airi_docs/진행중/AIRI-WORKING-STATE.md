@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 13:16:00 +09:00"
-checkpoint_id: "20260823-131600-e2-checkpoint-32-receipt"
+updated_at_kst: "2026-08-23 14:32:00 +09:00"
+checkpoint_id: "20260823-143200-t3-retry-failed-closed"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "e2-terminal-provenance-verification"
-git_head: "92df0c5dc5afd0b6ab76199e89b0f8c29e1ac272"
+active_phase: "t3-matrix-launcher-blocked"
+git_head: "109c320"
 worktree_state: "live-state-only-dirty; staged-untracked-0"
 active_trainer_count: 1
-reconciliation_receipt: "2026-08-23 13:45 KST: E2 terminal receipt observed; authority state complete, 1600/1600 microsteps, 100/100 optimizer steps, terminal trainer-complete, revision 1635, adapter/report published, PID tree still to be reconciled at 0 before terminal PASS. Adapter manifest 70998cff, report 628d640f, selected epoch 2 dev loss 2.735453106217887, selected step 1600, dataset 96cc223c, model 394b6624, seed 42, adoption_authorized false, t3_status pending. Checkpoint 34 manifest 459e9f45, payload 6f358c04, event d3fa545c, index f911b504; checkpoint 33→34 interval 575.190254s. HEAD/origin main 92df0c5."
+reconciliation_receipt: "2026-08-23 14:32 KST: E1/E2 BF16 and Q4_K_M packaging completed externally at D:\AIRI-Models\airi-broadcast-v4-packages-20260823-140500. T3 preflight PASS for 36 runs. Production retry with pinned Python 3.12 PATH also failed closed: local service did not become ready on http://127.0.0.1:11435/health within 60 seconds; no T3 evidence published and cleanup left owned listeners at 0. No further identical retry authorized without root-cause correction."
 ---
 
 # AIRI live working state
