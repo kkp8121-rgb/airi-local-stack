@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 01:51:45 +09:00"
-checkpoint_id: "20260824-015145-e2-c1-checkpoint-commit-receipt-push-intent"
+updated_at_kst: "2026-08-24 01:53:16 +09:00"
+checkpoint_id: "20260824-015316-e2-c1-checkpoint-push-receipt-finalization-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
 active_phase: "e2-c1-design-data-evaluation-contract"
-git_head: "d859515fabc29fb03bb54c035308fab9ba089f68"
-worktree_state: "quota-warning-checkpoint-push; base-checkpoint-commit-created; local-ahead-origin-1; receipt-docs-modified-2; staged-0; untracked-0; grammar-freeze-fail-5-euro-ro-mismatches; replay-exact; non-milestone-pc-handoff-push-pending"
+git_head: "dd03893bbc58347522021f073ee0d7ae236cd073"
+worktree_state: "quota-warning-checkpoint-pushed; HEAD-equals-local-origin-remote-main-at-dd03893; push-receipt-docs-modified-2; staged-0; untracked-0; grammar-freeze-fail-5-euro-ro-mismatches; replay-exact; final-receipt-commit-push-pending"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-24 01:51 KST full corrected cached gate passed with staged/indexed rows 21, unstaged/untracked 0, cached diff-check 0, 6,346,267 index bytes, manifest SHA 6456e0e959f44b4fc8618b87662ab967565b181ed1a90c8b5ffaebaf100d1b25, forbidden/NUL/oversize/secret/personal hit 0 and related PID 0. Exact non-milestone commit exited 0: d859515fabc29fb03bb54c035308fab9ba089f68, parent 911179286ae32c7d5922358bcc5cb1741e58a5c9, 21 paths, 5,812 insertions/40 deletions. Post-commit worktree was clean, local main ahead origin/main by 1, PID 0. This commit receipt changes WORKING/ROADMAP-LOG only; validate/stage these two, commit `docs: record E2-C1 checkpoint commit`, then push both local commits once. Grammar freeze remains FAIL=5; GPU/adoption remain forbidden."
+reconciliation_receipt: "2026-08-24 01:53 KST receipt-doc commit dd03893bbc58347522021f073ee0d7ae236cd073, parent d859515fabc29fb03bb54c035308fab9ba089f68, exact WORKING/ROADMAP-LOG two docs exited 0. Exact git push origin main exited 0: 9111792..dd03893 main -> main. Post-push HEAD/local main/local origin/main/remote main are dd03893 exact, worktree clean, related AIRI PID 0. This actual push receipt now modifies only WORKING/ROADMAP-LOG; validate/stage/commit/push these final two docs once, then require HEAD=origin/main clean/PID 0. Current gate remains first-milestone grammar freeze FAIL=5; GPU use 0, E2-C1 0/0, last authority PASS E2 terminal/package plus T3 fail-closed receipt, blocker five 으로/로 rows, quota state safe with no durable run and no pause required."
 ---
 
 # AIRI live working state
@@ -136,6 +136,21 @@ reconciliation_receipt: "2026-08-24 01:51 KST full corrected cached gate passed 
 | 현재 행동 | correction data와 evaluator-owned blind를 서로 다른 담당으로 분리 구현하고 root가 body를 읽지 않은 채 commitment/SHA·validator receipt를 통합한다. trainer adapter-init은 first milestone push/clean 뒤 별도 intent에서만 수정한다. |
 
 ## 3. 마지막 내구성 체크포인트
+
+- `20260824-015316-e2-c1-checkpoint-push-receipt-finalization-intent`: commit receipt docs
+  `docs: record E2-C1 checkpoint commit`은 exit 0, commit
+  `dd03893bbc58347522021f073ee0d7ae236cd073`, parent
+  `d859515fabc29fb03bb54c035308fab9ba089f68`, exact WORKING/ROADMAP-LOG 2 files다.
+  exact `git push origin main`은 exit 0, `9111792..dd03893 main -> main`이다. push 뒤
+  HEAD/local main/local origin/main/remote main은 `dd03893` exact, worktree clean, related
+  AIRI PID 0이다.
+
+  이 actual push receipt용 WORKING/ROADMAP-LOG exact 2개만 continuity/boundary/diff/security로
+  검증하고 stage/cached 2/0/0 뒤 `docs: record E2-C1 checkpoint push`로 commit/push한다.
+  문서는 그 final commit SHA를 자가 참조하지 않는다. 마지막 read-only HEAD/local·remote
+  main exact, clean, PID 0을 확인하면 PC 이관 checkpoint push가 완료된다. 그 뒤 사용량이
+  허용될 때만 새 무-GPU `(으로,로)` 최소 수리 intent로 계속한다. first milestone freeze
+  FAIL=5, GPU use 0, E2-C1 0/0, adoption forbidden은 불변이다.
 
 - `20260824-015145-e2-c1-checkpoint-commit-receipt-push-intent`: corrected full cached
   verification은 staged/indexed rows 21, unstaged/untracked 0, cached diff-check exit 0,
