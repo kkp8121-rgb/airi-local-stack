@@ -9,6 +9,13 @@
 
 ## 2026-08-24 E2-C1 frozen-contract first milestone
 
+- 01:51 KST corrected full cached gate는 indexed rows 21/6,346,267 bytes, manifest
+  `6456e0e9...d1b25`, staged 21/unstaged·untracked 0, diff/security/PID 0 PASS다. exact
+  non-milestone commit `d859515fabc29fb03bb54c035308fab9ba089f68`은 parent `9111792`,
+  21 paths, 5,812 insertions/40 deletions으로 exit 0이다. commit 뒤 clean/local ahead 1/
+  related PID 0이다. 이 receipt 두 문서를 검증·stage·commit한 뒤 두 local commits를 한 번
+  push한다. grammar FAIL=5, freeze false, E2-C1 0/0, GPU/adoption 금지는 불변이다.
+
 - 01:48 KST exact 21-path stage exit 0 뒤 cached staged 21/unstaged·untracked 0,
   diff-check/PID 0 PASS다. 첫 index helper의 5,566,633-byte/`6455571c...98d2` 값은
   Git-quoted 한글 경로를 `ls-files`에서 누락한 **비권위 부분 manifest**다. corrected

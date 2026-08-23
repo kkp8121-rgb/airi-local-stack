@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 01:48:21 +09:00"
-checkpoint_id: "20260824-014821-e2-c1-checkpoint-stage-receipt-commit-intent"
+updated_at_kst: "2026-08-24 01:51:45 +09:00"
+checkpoint_id: "20260824-015145-e2-c1-checkpoint-commit-receipt-push-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
 active_phase: "e2-c1-design-data-evaluation-contract"
-git_head: "911179286ae32c7d5922358bcc5cb1741e58a5c9"
-worktree_state: "quota-warning-checkpoint-push; staged-21; unstaged-receipt-docs-2; untracked-0; exact-allowed-paths-21; HEAD-equals-local-origin-remote-main; grammar-freeze-fail-5-euro-ro-mismatches; replay-exact; non-milestone-pc-handoff-commit-pending"
+git_head: "d859515fabc29fb03bb54c035308fab9ba089f68"
+worktree_state: "quota-warning-checkpoint-push; base-checkpoint-commit-created; local-ahead-origin-1; receipt-docs-modified-2; staged-0; untracked-0; grammar-freeze-fail-5-euro-ro-mismatches; replay-exact; non-milestone-pc-handoff-push-pending"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-24 01:48 KST exact 21-path git add exit 0. Immediate staged 21/unstaged 0/untracked 0 and cached diff-check/PID 0 passed, but its index-manifest helper passed Git-quoted Unicode paths back to ls-files and omitted Korean docs; 5,566,633-byte SHA 6455571c...98d2 is non-authoritative. Corrected core.quotePath=false helper covered all 21 blobs and found only one security self-hit: this receipt's generic personal-home scanner literal, not an actual personal path or credential. The literal is removed in the same fail-closed correction. Restage the receipt docs and require full indexed rows 21, secret/personal/forbidden/NUL/oversize 0 before the non-milestone commit. Freeze remains FAIL=5 and GPU remains unauthorized/0/0."
+reconciliation_receipt: "2026-08-24 01:51 KST full corrected cached gate passed with staged/indexed rows 21, unstaged/untracked 0, cached diff-check 0, 6,346,267 index bytes, manifest SHA 6456e0e959f44b4fc8618b87662ab967565b181ed1a90c8b5ffaebaf100d1b25, forbidden/NUL/oversize/secret/personal hit 0 and related PID 0. Exact non-milestone commit exited 0: d859515fabc29fb03bb54c035308fab9ba089f68, parent 911179286ae32c7d5922358bcc5cb1741e58a5c9, 21 paths, 5,812 insertions/40 deletions. Post-commit worktree was clean, local main ahead origin/main by 1, PID 0. This commit receipt changes WORKING/ROADMAP-LOG only; validate/stage these two, commit `docs: record E2-C1 checkpoint commit`, then push both local commits once. Grammar freeze remains FAIL=5; GPU/adoption remain forbidden."
 ---
 
 # AIRI live working state
@@ -136,6 +136,26 @@ reconciliation_receipt: "2026-08-24 01:48 KST exact 21-path git add exit 0. Imme
 | 현재 행동 | correction data와 evaluator-owned blind를 서로 다른 담당으로 분리 구현하고 root가 body를 읽지 않은 채 commitment/SHA·validator receipt를 통합한다. trainer adapter-init은 first milestone push/clean 뒤 별도 intent에서만 수정한다. |
 
 ## 3. 마지막 내구성 체크포인트
+
+- `20260824-015145-e2-c1-checkpoint-commit-receipt-push-intent`: corrected full cached
+  verification은 staged/indexed rows 21, unstaged/untracked 0, cached diff-check exit 0,
+  index 6,346,267 bytes, manifest SHA
+  `6456e0e959f44b4fc8618b87662ab967565b181ed1a90c8b5ffaebaf100d1b25`, forbidden path/
+  extension, NUL, oversize, secret, personal path, related AIRI PID hit 0으로 PASS했다.
+
+  exact `git commit -m "chore: checkpoint E2-C1 contract work"`은 exit 0, commit
+  `d859515fabc29fb03bb54c035308fab9ba089f68`, parent
+  `911179286ae32c7d5922358bcc5cb1741e58a5c9`, exact 21 paths, 5,812 insertions/
+  40 deletions이다. commit 직후 worktree clean, local main은 origin/main보다 1 ahead,
+  related AIRI PID 0이다. 이는 known grammar FAIL=5를 보존한 검토 PC checkpoint이지
+  frozen milestone이 아니다.
+
+  이 receipt용 WORKING/ROADMAP-LOG exact 2개만 continuity/boundary/diff/security로 검증하고
+  stage/cached 2, unstaged/untracked 0을 확인한 뒤 `docs: record E2-C1 checkpoint commit`을
+  한 번 commit한다. 성공하면 exact `git push origin main`을 한 번 실행해 두 local commit을
+  push한다. 실패하면 local commits/docs를 보존하고 push 재시도·GPU·overwrite를 중단한다.
+  유실 복구 identity는 base commit `d859515`, parent `9111792`, grammar bad row five,
+  E2-C1 0/0/PID 0이다.
 
 - `20260824-014821-e2-c1-checkpoint-stage-receipt-commit-intent`: exact 21-path `git add`
   exit 0 뒤 immediate cached verification은 staged 21, unstaged/untracked 0, cached diff-check
