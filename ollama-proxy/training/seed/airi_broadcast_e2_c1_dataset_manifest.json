@@ -19,20 +19,20 @@
   "encoding": "UTF-8",
   "files": {
     "correction": {
-      "sha256": "dfe9eb15633a3f899f153b881ec318c42b4e8cda2be063b6ca67669742f7a97f",
-      "size": 680118
+      "sha256": "9fc5b7bc260ec510611eb3939642d3480aece869690f1a0a0552d2f58d496055",
+      "size": 680148
     },
     "correction_chat": {
-      "sha256": "b77dbe4f767bc4432e4ded6250c2bcc214fdb3dba0f6f7929a769c302049f4c9",
-      "size": 591187
+      "sha256": "faf9ec3703fb8f409088d5a934258a5087b0145ee93075ac35439fbab4ad674b",
+      "size": 591202
     },
     "mixture": {
-      "sha256": "6e23a06520eeffa8edfc8645c2390dabc14e4c6613e2e0ca1af640c21dbfc6a4",
-      "size": 2092783
+      "sha256": "fe532451c5b7f8cac9bee62f91242c09391cc7bff0b219477d91fb71f244e643",
+      "size": 2092813
     },
     "mixture_chat": {
-      "sha256": "e816e62d140d50e7c20988d2a7ce57d945e61d1409030b24cc589609de04712c",
-      "size": 1970237
+      "sha256": "c845adfc2c50f36db6f73e6bda56be5b6e7bbaef0b72f91a1ed7a595221c1980",
+      "size": 1970252
     },
     "replay": {
       "sha256": "c5814baa7a439ceac3ec7d10c4e5f8b63bd192edca562df18fd26ba6b9e884b8",
@@ -775,7 +775,7 @@
   },
   "training_input": {
     "path": "airi_broadcast_e2_c1_mixture_chat.jsonl",
-    "sha256": "e816e62d140d50e7c20988d2a7ce57d945e61d1409030b24cc589609de04712c",
-    "size": 1970237
+    "sha256": "c845adfc2c50f36db6f73e6bda56be5b6e7bbaef0b72f91a1ed7a595221c1980",
+    "size": 1970252
   }
 }

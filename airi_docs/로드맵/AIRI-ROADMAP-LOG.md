@@ -9,6 +9,65 @@
 
 ## 2026-08-24 E2-C1 frozen-contract first milestone
 
+- 02:16 KST exact stage는 exit 0이고 cached names 16/R069 rename 1, unstaged·untracked 0,
+  indexed 16 rows/6,326,805 bytes/manifest `f4ff5c13...f7b`이다. boundary, diff-check,
+  binary, forbidden/oversize, strong-secret/personal-path, stale-ref와 related PID가 모두 0인
+  cached PASS다. stage receipt와 exact `fix: freeze E2-C1 correction contract` commit intent를
+  WORKING에 기록했다. 이 두 receipt docs만 restage한 뒤 final cached gate를 다시 통과해야
+  commit하고, push는 별도 intent/receipt로 확인한다. GPU/E2-C1 0/0, adoption 금지는 유지한다.
+
+- 02:14 KST final pre-stage는 repository-config diff-check exit 0/problem 0, stale current ref 0,
+  status 17/tracked diff 16/untracked 1/staged 0, related AIRI PID excluding probe 0을 확인했다.
+  직전 `core.autocrlf=false` probe exit 2는 CRLF를 trailing whitespace로 오판한 비권위 검사
+  설정 오류이고 파일 변경은 없었다. exact stage intent를 WORKING에 입력 dataset/base/E2-init/
+  config/code SHA, 동결 seed/batch/accum/step/LR/scheduler/checkpoint, 성공·실패·quota 복구와
+  중복 identity까지 기록했다. 이제 current exact 17 status entries만 stage하고 cached
+  boundary/security를 통과해야 commit/push한다. GPU/E2-C1은 0/0, adoption 금지는 유지한다.
+
+- 02:07 KST compact 뒤 mandatory 5문서를 UTF-8로 EOF까지 재독하고 actual state를
+  대조했다. Goal active, HEAD/local·remote main `1de57a2` exact, tracked modified/deleted 12,
+  staged 0, untracked frozen contract 1, related AIRI PID 0, E2-C1 0/0이다. E2 terminal
+  state/checkpoint/adapter/report/source/chat/base와 로그 size/SHA, 기존 T3
+  36/36/89/72/2 실패 receipt·summary absent, blind exact 5-file sealed/validation receipt는
+  모두 기존 권위값과 exact하다. 로그·T3 report·blind fixture body는 읽지 않았다. 02:00
+  full freeze validation PASS는 유지되며 actual worktree 숫자만 rename 후 상태로 정정했다.
+  현재 blocker는 frozen SSoT 최신화·검증·milestone commit/push·clean뿐이고 GPU run이 없어
+  pause를 호출하지 않는다.
+
+- 02:00 KST final current bytes는 pinned pycompile, full unit 12, blind pytest 5,
+  generator byte check, repository/external verifier를 모두 PASS했다. independent audit는
+  correction/replay/mixture 480/200/680, exact splits/family, groups 120/bad 0, unique
+  prompt/target 480/480, collision 0, metadata 480, factual decoy hit 0, quoted-josa mismatch 0,
+  replay object mismatch 0, train 352:160이다. continuity/diff/security도 modified exact 11/
+  6,156,910 bytes, hit 0으로 PASS했다. 이제 draft를 frozen contract로 rename하고 모든 SSoT를
+  새 SHA/PASS에 맞춰 검증·commit/push한다. push/clean 전 GPU는 계속 0/금지다.
+
+- 01:58 KST exact pinned generator overwrite 1회는 exit 0/status PASS다. actual correction/
+  chat/mixture/chat/dataset SHA `9fc5b7bc...6055`/`faf9ec37...674b`/
+  `fe532451...e643`/`c845adfc...1980`/`fe1ca6c8...c9d0`, replay manifest
+  `23883d8d...bbd5` exact로 write-free expectation과 일치한다. related PID 0, modified exact 11,
+  staged/untracked 0이다. five malformed target은 새 bytes에서 수정됐으나 full tests/CLI/
+  semantic+grammar/split/replay/diff/security와 frozen SSoT 전에는 milestone PASS/GPU로
+  승격하지 않는다.
+
+- 01:57 KST `(으로,로)`/받침 ㄹ minimal code-only patch는 pinned pycompile,
+  focused generator+independent mutation 2 tests, write-free correction 480-row Hangul audit
+  mismatch 0을 PASS했다. code/test SHA는 `0d8ace22...1db4`/`ff79cf93...557d`/
+  `51cb87a5...5e8a`/`e6a86925...4ecd`; old generated six SHA는 exact 불변이다. write-free
+  expected correction/chat/mixture/chat/dataset/replay-manifest SHA
+  `9fc5b7bc...6055`/`faf9ec37...674b`/`fe532451...e643`/`c845adfc...1980`/
+  `fe1ca6c8...c9d0`/`23883d8d...bbd5`를 고정했다. exact pinned generator overwrite를
+  한 번만 실행하며 counts/splits/replay/training/blind는 불변이다. 이 write receipt 전에는
+  freeze/stage/commit/GPU로 이동하지 않는다.
+
+- 01:55 KST final push-receipt commit `1de57a21cce329db480282ea89cb59c25e42710c`과
+  push `dd03893..1de57a2 main -> main`은 exit 0이다. HEAD/local·remote exact, worktree clean,
+  related AIRI PID 0으로 검토 PC checkpoint를 닫았다. 사용자의 무-GPU 계속 진행 허가에 따라
+  `(으로,로)`/받침 ㄹ helper, direct dynamic template 2곳, independent verifier와 mutation
+  tests exact four code files만 최소 수리한다. 현재 generated SHA와 모든 학습/blind 동결값은
+  불변이고, code-only write-free PASS 전 dataset overwrite를 금지한다. freeze FAIL=5,
+  E2-C1 0/0, GPU/adoption 금지는 유지한다.
+
 - 01:53 KST receipt docs commit `dd03893bbc58347522021f073ee0d7ae236cd073`, parent
   `d859515`, exact two SSoT files는 exit 0이다. exact push도 exit 0,
   `9111792..dd03893 main -> main`; post-push HEAD/local·remote main exact, worktree clean,

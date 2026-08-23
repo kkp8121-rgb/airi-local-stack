@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 01:53:16 +09:00"
-checkpoint_id: "20260824-015316-e2-c1-checkpoint-push-receipt-finalization-intent"
+updated_at_kst: "2026-08-24 02:16:00 +09:00"
+checkpoint_id: "20260824-021600-frozen-milestone-commit-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
 active_phase: "e2-c1-design-data-evaluation-contract"
-git_head: "dd03893bbc58347522021f073ee0d7ae236cd073"
-worktree_state: "quota-warning-checkpoint-pushed; HEAD-equals-local-origin-remote-main-at-dd03893; push-receipt-docs-modified-2; staged-0; untracked-0; grammar-freeze-fail-5-euro-ro-mismatches; replay-exact; final-receipt-commit-push-pending"
+git_head: "1de57a21cce329db480282ea89cb59c25e42710c"
+worktree_state: "frozen-milestone-commit-intent; HEAD-equals-local-origin-remote-main-at-1de57a2; cached-16-paths-one-rename; cached-boundary-security-pass; receipt-docs-restage-and-final-cached-validation-then-commit-push-pending"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-24 01:53 KST receipt-doc commit dd03893bbc58347522021f073ee0d7ae236cd073, parent d859515fabc29fb03bb54c035308fab9ba089f68, exact WORKING/ROADMAP-LOG two docs exited 0. Exact git push origin main exited 0: 9111792..dd03893 main -> main. Post-push HEAD/local main/local origin/main/remote main are dd03893 exact, worktree clean, related AIRI PID 0. This actual push receipt now modifies only WORKING/ROADMAP-LOG; validate/stage/commit/push these final two docs once, then require HEAD=origin/main clean/PID 0. Current gate remains first-milestone grammar freeze FAIL=5; GPU use 0, E2-C1 0/0, last authority PASS E2 terminal/package plus T3 fail-closed receipt, blocker five 으로/로 rows, quota state safe with no durable run and no pause required."
+reconciliation_receipt: "2026-08-24 02:16 KST stage receipt and commit intent: exact git add exit 0; cached names 16 including one R069 rename, unstaged/untracked 0. Indexed rows 16/6,326,805 bytes, manifest f4ff5c13edd036697c09988cd7f8b0109c63ac65cf8714751ce25c5883935f7b; boundary diff, diff problems, binary, forbidden path, oversize, strong secret, personal path, stale current ref and related AIRI PID excluding probe all 0. Receipt docs are the only next mutation; restage them and require a fresh identical gate before Conventional Commit. E2-C1 0/0, GPU AIRI workload 0, adoption forbidden."
 ---
 
 # AIRI live working state
@@ -22,6 +22,59 @@ reconciliation_receipt: "2026-08-24 01:53 KST receipt-doc commit dd03893bbc58347
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 02:16 KST **stage receipt + exact commit intent checkpoint**: exact 17-status-path
+  `git add -A`는 exit 0이고 Git은 DRAFT→FROZEN을 `R069` 1건으로 접어 cached names 16,
+  unstaged/untracked 0으로 표시했다. indexed rows 16/6,326,805 bytes, manifest
+  `f4ff5c13edd036697c09988cd7f8b0109c63ac65cf8714751ce25c5883935f7b`; boundary diff,
+  diff-check problem, binary, forbidden path, oversize, strong secret, personal path, stale current
+  ref와 related AIRI PID excluding probe는 모두 0이다. 목적/범위는 이 receipt 두 SSoT를
+  restage하고 같은 cached gate를 다시 PASS한 뒤 exact staged milestone만
+  `fix: freeze E2-C1 correction contract`로 commit하는 것이다. 입력 dataset/base/E2-init/
+  config/code SHA와 seed 42, batch 1, accumulation 16, seq 2048, 512/32 steps, LR 1e-5,
+  constant scheduler, checkpoint 3/≤600초는 직전 stage intent와 exact하며 학습은 실행하지
+  않는다. output은 새 local commit과 Git index/HEAD이고 authoritative state는 이 파일,
+  예상 AIRI PID는 0이다. 성공 조건은 final cached boundary/security PASS, commit exit 0,
+  commit paths exact 16·unstaged/untracked 0이다. 실패·중단 시 push하지 않고 index/HEAD를
+  보존해 receipt를 기록한다. quota/session 유실 뒤 mandatory 5문서→Goal→HEAD/index/status/PID
+  를 재대조하며 중복 identity는 checkpoint `20260824-021600-frozen-milestone-commit-intent`,
+  parent `1de57a21...10c`, subject와 final index manifest다. commit 후 push는 별도 intent/receipt로
+  묶는다. durable run은 없어 pause 대상이 아니다.
+- 2026-08-24 02:14 KST **exact stage intent checkpoint**: 목적은 검증된 E2-C1 correction/
+  replay mixture, generator/verifier/tests, DRAFT 삭제→FROZEN 계약과 현행 SSoT만 Git index에
+  올려 cached 경계 검증 후 첫 milestone을 게시하는 것이다. 허용 범위는 현재 status exact
+  17 entries(16 tracked diff paths+1 untracked)뿐이며 GPU/서비스/외부 model root는 건드리지
+  않는다. 입력은 HEAD `1de57a21...10c`, correction/chat/mixture/chat/manifest SHA
+  `9fc5b7bc...6055`/`faf9ec37...674b`/`fe532451...e643`/`c845adfc...1980`/
+  `fe1ca6c8...c9d0`, replay manifest `23883d8d...bbd5`, base
+  `394b6624...f506`, E2 adapter/config `2a72292c...c5b`/`e01129ea...2b0`, code SHA
+  `0d8ace22...1db4`/`51cb87a5...5e8a`/`ff79cf93...557d`/`e6a86925...4ecd`, frozen
+  contract `f1c56e98...bd46`이다. 동결 학습값은 seed 42, batch 1, accumulation 16,
+  seq 2048, 512 microsteps/32 optimizer steps, LR 1e-5, constant LambdaLR, checkpoint every
+  3 optimizer steps와 실제 ≤600초이며 이번 Git 작업에서는 실행하지 않는다. output은 저장소
+  Git index이고 authoritative state는 이 파일, 예상 AIRI PID는 0이다. 성공 조건은 cached
+  names exact 17, unstaged/untracked 0, cached diff/security PASS이다. 실패·중단 시 commit/push를
+  하지 않고 index와 worktree를 보존하며 원인을 기록한다. quota/session 유실 뒤에는 mandatory
+  5문서→Goal→HEAD `1de57a2`→checkpoint ID→index/worktree/PID 순으로 재대조한다. 중복 실행
+  identity는 checkpoint `20260824-021400-frozen-milestone-stage-intent`, pre-stage HEAD와 exact
+  17 status paths다. durable run은 없으므로 pause 대상이 아니다.
+- 2026-08-24 02:07 KST compact 뒤 필수 5문서를 지정 순서·UTF-8로 EOF까지 다시 읽고
+  actual Goal/Git/PID/E2/T3/blind를 read-only 대조했다. Goal은 `active`; HEAD/local main/
+  local origin/main/remote main은 모두 `1de57a21cce329db480282ea89cb59c25e42710c` exact다.
+  actual worktree는 tracked modified/deleted 12, staged 0, untracked frozen contract 1이며,
+  이는 02:00 docs intent 뒤 DRAFT→FROZEN rename이 적용된 상태다. 관련 AIRI durable runner/
+  trainer/service/T3/campaign PID는 0이고 E2-C1은 0 microstep/0 optimizer step이다. GPU는
+  1,069/8,192 MiB를 사용 중이나 식별 가능한 AIRI workload는 0이므로 pause를 호출하지 않는다.
+  E2는 complete revision 1,635·1,600/1,600·100/100·pending 0이며 current/previous state,
+  anchor/index/checkpoint 35/34 payload/event/final evidence, input manifest, adapter/config/
+  artifact/report, v4 source/chat/base와 로그 size/SHA가 기존 권위값과 exact다. report epoch
+  1/2 dev loss `2.893371758116589`/`2.735453106217887`, selected epoch 2도 exact다. 로그 본문은
+  읽지 않았다. T3 inventory는 36/36/89/72/2, totals 7,296,178/787,171/801,050/
+  15,056,896/392 bytes, fixture/model manifest와 두 comparison SHA exact, summary absent다.
+  T3 report body는 읽지 않았다. blind root는 exact 5 files, validation PASS,
+  `response_viewed=false`, raw/canonical/sealed/receipt SHA exact이며 fixture body는 읽지 않았다.
+  마지막 권위 PASS는 current bytes의 full freeze validation이고, 현재 blocker는 frozen SSoT
+  최신화·검증·milestone commit/push·clean뿐이다. quota 종료 대비 durable run 0, pause 불필요,
+  갑작스러운 종료 시 `interrupted-awaiting-quota-reset`으로 복구한다.
 - 2026-08-24 01:41 KST compact 후 필수 5문서를 지정 순서대로 다시 읽고 actual state를
   대조했다. Goal API는 `active`; HEAD/local origin/main/remote main은 모두
   `911179286ae32c7d5922358bcc5cb1741e58a5c9`; actual worktree는 modified 3, staged 0,
@@ -133,9 +186,105 @@ reconciliation_receipt: "2026-08-24 01:53 KST receipt-doc commit dd03893bbc58347
 | 실패·중단 조건 | unexpected Git path/PID, blind body의 Git/training-path 노출, split/replay/collision/hash/schema/count/metric-policy 불일치, test/security 실패 시 즉시 중단한다. 부분 생성물은 완료로 승격하지 않고 같은 blind/body/seed를 결과 확인 뒤 수정·재실행하지 않는다. |
 | 세션 유실 복구 | 필수 5문서를 다시 EOF까지 읽고 Goal/Git/PID/E2/T3를 재대조한다. external root는 존재·inventory·SHA만 확인하고 fixture body는 읽지 않는다. root가 partial/ambiguous면 보존하고 원인 확정 전 재생성하지 않는다. 장기 GPU run은 0이므로 pause를 호출하지 않는다. |
 | 중복 판별 identity | checkpoint `20260824-000430-e2-c1-first-milestone-implementation-intent`, pre-intent HEAD `9111792`, external root exact `airi-e2-c1-blind-freeze-20260824-000430`, E2-C1 progress 0/0, expected durable PID 0과 repository generated-file manifest로 중복 여부를 판별한다. |
-| 현재 행동 | correction data와 evaluator-owned blind를 서로 다른 담당으로 분리 구현하고 root가 body를 읽지 않은 채 commitment/SHA·validator receipt를 통합한다. trainer adapter-init은 first milestone push/clean 뒤 별도 intent에서만 수정한다. |
+| 현재 행동 | current frozen code/data를 더 수정하지 않는다. frozen contract와 handoff/roadmap/NEXT/index를 같은 PASS 사실로 맞춰 continuity/boundary/diff/security를 검증하고 exact milestone commit/push·HEAD clean을 완료한다. trainer adapter-init은 first milestone push/clean 뒤 별도 intent에서만 감사·수정한다. |
 
 ## 3. 마지막 내구성 체크포인트
+
+- `20260824-020037-e2-c1-full-freeze-validation-receipt-docs-intent`: current final bytes는
+  pinned pycompile exit 0, generator+independent verifier full unit 12 OK, blind pytest 5 passed,
+  generator byte check, repository-only/external-blind verifier를 모두 PASS했다. independent
+  audit는 correction/replay/mixture 480/200/680, correction split 352/64/64, mixture
+  512/84/84, family split exact, whole groups 120/bad 0, unique prompt/target 480/480,
+  cross-split collision 0, metadata complete 480, factual decoy hit 0, quoted-josa mismatch 0,
+  replay object mismatch 0, train correction/replay 352/160이다. work-continuity와 repo diff-check도
+  exit 0, exact modified 11/6,156,910 bytes, staged/untracked 0, forbidden path/extension,
+  NUL, oversize, strong secret, personal path hit 0이다.
+
+  exact 다음 목적은 contract draft를 `AIRI-E2-C1-FROZEN-CONTRACT-2026-08-24.md`로 rename하고
+  status/SHA/validation/blocker를 PASS 상태로 갱신하며 handoff/ROADMAP status+log/NEXT/index와
+  WORKING을 같은 first-milestone 사실로 맞추는 것이다. 허용 boundary는 current code/test 4,
+  regenerated data/manifest 5, WORKING/ROADMAP-LOG와 contract rename, handoff/status/NEXT/index
+  exact 집합뿐이다. commitment/policy/workflow와 replay manifest는 byte 불변이다. base/E2/v4/
+  blind/training settings도 불변이다. output/run root와 state path는 없고 예상 AIRI PID 0이다.
+
+  성공 조건은 frozen contract에 new exact SHA와 full PASS가 결속되고, old DRAFT filename이
+  absent, all SSoT continuity, exact boundary/diff/security PASS, Conventional milestone commit/
+  push, HEAD=origin/main clean/PID 0이다. 문서 push/clean 전에는 `gpu_authorized=false`이며
+  GPU를 시작하지 않는다. 실패하면 current validated bytes/docs diff를 보존하고 stage/commit/
+  GPU로 이동하지 않는다. quota 유실 복구 identity는 this checkpoint, HEAD `1de57a2`,
+  final code/data SHA, external blind root, E2-C1 0/0/PID 0이다.
+
+- `20260824-015840-e2-c1-euro-ro-overwrite-receipt`: exact pinned generator
+  `--overwrite`는 한 번 실행돼 exit 0/JSON `status=PASS`로 종료했다. actual output은
+  correction 680,148 bytes SHA `9fc5b7bc260ec510611eb3939642d3480aece869690f1a0a0552d2f58d496055`,
+  chat 591,202/`faf9ec3703fb8f409088d5a934258a5087b0145ee93075ac35439fbab4ad674b`,
+  mixture 2,092,813/`fe532451c5b7f8cac9bee62f91242c09391cc7bff0b219477d91fb71f244e643`,
+  mixture chat 1,970,252/`c845adfc2c50f36db6f73e6bda56be5b6e7bbaef0b72f91a1ed7a595221c1980`,
+  dataset manifest 36,660/`fe1ca6c85654699b5c1db01af2a6e7598a3d97c00c5451bd752cef9f59f8c9d0`,
+  replay manifest 15,673/`23883d8d0b3d0befb2baef8fe585a5948fa2016586e2c335bd206f241a86bbd5`로
+  write-free expectation과 exact하다. post-run related AIRI PID 0, worktree modified exact 11,
+  staged/untracked 0이다.
+
+  이 receipt는 five target write 성공이지 frozen milestone PASS가 아니다. 다음 bounded
+  read-only gate는 pinned pycompile, full unit 12, blind pytest 5, generator `--check`,
+  repository/external verifier, exact `(으로,로)` audit 0과 기존 metadata/content/counts/splits/
+  groups/replay equality/collision, diff/security/continuity다. 모두 PASS 뒤에만 contract draft와
+  handoff/ROADMAP/NEXT/index를 `FROZEN` first milestone로 갱신·검증·commit/push한다. 실패하면
+  current bytes를 보존하고 overwrite를 반복하지 않는다. GPU/E2-C1은 계속 0/0이다.
+
+- `20260824-015743-e2-c1-euro-ro-overwrite-intent`: minimal code-only patch 뒤 generator/test는
+  51,739/8,786 bytes SHA `0d8ace22a7fa28618076a0be647bb96854db29629d07da6cd449259e8a241db4`/
+  `ff79cf93031b8948d0c132c6b2f02b4122a75c8cd115048db5051cb7d992557d`, independent
+  verifier/test는 19,161/10,816 bytes SHA
+  `51cb87a5c6dd42746da7c720944dcb379add80df1df8348297c2ee33f7385e8a`/
+  `e6a869258000cf56974ffd2bc0c8b047c718fd064c32432a084994011a1c4ecd`다. pinned
+  pycompile exit 0, focused generator/independent mutation 2 tests OK, write-free correction
+  480 rows의 `(으로,로)`/받침 ㄹ 감사 mismatch 0이다. 기존 generated six SHA는 직전
+  checkpoint와 exact해 dataset mutation은 아직 0이다.
+
+  exact state-changing command는 pinned Python
+  `synthesize_broadcast_e2_c1.py --overwrite` 한 번이다. 목적과 허용 변화는 long-callback/
+  complete-show-arc의 five malformed target 및 이에 따른 correction/chat, mixture/chat,
+  dataset manifest SHA뿐이다. write-free expected size/SHA는 correction 680,148/
+  `9fc5b7bc...6055`, chat 591,202/`faf9ec37...674b`, mixture 2,092,813/
+  `fe532451...e643`, mixture chat 1,970,252/`c845adfc...1980`, dataset manifest 36,660/
+  `fe1ca6c8...c9d0`; replay manifest 15,673/`23883d8d...bbd5` exact 불변이다.
+
+  입력 v4 source/chat, base, E2 adapter/config/artifact/report와 external blind/policy,
+  seed 42, batch 1, accumulation 16, seq 2048, max 512 microsteps=32 optimizer, LR 1e-5,
+  AdamW/constant LambdaLR/K=3은 불변이다. output root는 repository training seed이고
+  authoritative run root/state는 없음, 예상 runner/trainer PID 0이다. 성공 조건은 command
+  exit 0/status PASS, six size/SHA가 write-free 예상과 exact, replay exact, post-run PID 0이다.
+  실패하면 partial bytes와 code diff를 보존하고 같은 overwrite를 반복하지 않으며 원인 확정 전
+  tests/freeze/stage/commit/GPU로 이동하지 않는다. 사용량 유실 복구/중복 identity는 이
+  checkpoint, HEAD `1de57a2`, four code/test SHA, pre/post expected generated SHA, five row IDs,
+  E2-C1 0/0/PID 0이다. quota 경고가 지속되므로 새 장시간 명령은 시작하지 않고 durable run이
+  없어 pause하지 않는다.
+
+- `20260824-015506-e2-c1-euro-ro-minimal-code-fix-intent`: final push-receipt docs commit
+  `1de57a21cce329db480282ea89cb59c25e42710c`과 exact push
+  `dd03893..1de57a2 main -> main`은 exit 0이다. 이후 HEAD/local origin/main/remote main
+  exact, worktree clean, related AIRI PID 0이다. 검토 PC checkpoint는 GitHub에 durable하다.
+
+  사용자가 GPU 불필요 작업을 계속 허용했으므로 exact 목적은 generator/helper와 independent
+  verifier에 `(으로,로)` 및 받침 ㄹ 예외를 추가하고, long-callback/complete-show-arc의 direct
+  dynamic `로` 두 template를 helper로 바꾸며, generator/independent mutation tests로 이 공백을
+  닫는 것이다. 허용 파일은 `synthesize_broadcast_e2_c1.py`, 그 test,
+  `verify_e2_c1_frozen_contract.py`, 그 test와 receipt용 WORKING/ROADMAP-LOG exact 6개뿐이다.
+  현재 code/test SHA는 `9259fe6e...31542`/`3ab57e4c...871a`/
+  `25ec1b28...d7ef`/`8dd0c0a8...858b`; generated correction/chat/mixture/chat/dataset/
+  replay-manifest SHA는 `dfe9eb15...a97f`/`b77dbe4f...f4c9`/`6e23a065...c6a4`/
+  `e816e62d...712c`/`bfea431e...6957`/`23883d8d...bbd5`로 불변이다.
+
+  v4 source/chat, base, E2 adapter/config/artifact/report와 external blind root/commitment/policy,
+  seed 42, batch 1, accumulation 16, seq 2048, max 512 microsteps=32 optimizer, LR 1e-5,
+  AdamW/constant LambdaLR/K=3은 변경하지 않는다. output/run root와 authoritative state는 없고
+  예상 runner/trainer PID는 0이다. 성공 조건은 pinned pycompile, focused unit/mutation,
+  write-free in-memory render의 Hangul audit mismatch 0, 기존 generated bytes와 Git boundary
+  보존이다. 실패하면 diff를 보존하고 원인 확정 전 dataset overwrite/stage/commit/GPU를
+  금지한다. 성공해도 이 intent는 code-only receipt이며, 새 generated bytes는 별도 overwrite
+  intent 뒤 정확히 한 번만 생성한다. 유실 복구 identity는 HEAD `1de57a2`, checkpoint ID,
+  four pre-fix code/test SHA, five bad row IDs, generated pre-fix SHA, E2-C1 0/0/PID 0이다.
 
 - `20260824-015316-e2-c1-checkpoint-push-receipt-finalization-intent`: commit receipt docs
   `docs: record E2-C1 checkpoint commit`은 exit 0, commit
@@ -4448,18 +4597,17 @@ reconciliation_receipt: "2026-08-24 01:53 KST receipt-doc commit dd03893bbc58347
 
 ## 4. 다음 허용 행동
 
-1. generator의 donation/stale/factual/show-arc branch에 이미 추가된 조사 helper를 정확히
-   적용해 위 확대 표본 문법 결함만 고친다. counts/splits/replay/training/blind pins는 바꾸지
-   않는다.
-2. generator를 fail-closed로 한 번 재생성하고 pycompile, combined unit tests, generator
-   `--check`, repository/external blind validator, scoped diff-check와 train/dev/test 확대
-   한국어 표본·금지 패턴 감사를 모두 fresh PASS한다.
-3. exact 최종 dataset SHA와 계약을 frozen-contract 문서 및 장기 SSoT에 기록하고 first
-   milestone offline/security/staged gate를 통과한 검증 배치만 Conventional Commit으로
-   origin/main push한다. HEAD=origin/main clean·관련 PID 0 전에는 GPU로 이동하지 않는다.
-4. same public T3 matrix, blind 확인 뒤 계약 변경, E3/E2-C2, campaign, 운영 채택/기본 서비스
-   모델 변경은 금지한다. adapter initialization 구현과 bounded GPU smoke는 first milestone
-   push 뒤 별도 intent에서만 허용한다.
+1. frozen contract와 handoff/roadmap status+log/NEXT/current-docs-index를 current full
+   validation PASS와 exact dataset SHA에 맞춘다. code/data/commitment/policy/workflow는 더
+   수정하지 않는다.
+2. focused continuity, exact path boundary, repo diff-check와 forbidden artifact/binary/
+   oversize/secret/personal-path scan을 PASS한 뒤 기록된 경로만 stage하고 cached gate를
+   다시 검증한다.
+3. 검증 배치만 Conventional Commit으로 origin/main push하고 actual push receipt를 문서에
+   남긴 뒤 HEAD=origin/main clean·staged/untracked 0·관련 PID 0을 확인한다.
+4. publication clean 뒤 trainer가 E2 adapter weight-only initialization + fresh optimizer/
+   scheduler/RNG/cursor를 지원하는지 별도 intent에서 먼저 감사한다. 같은 public T3 matrix,
+   blind 확인 뒤 계약 변경, E3/E2-C2, campaign, 운영 채택/기본 서비스 모델 변경은 금지한다.
 
 ## 5. 갱신 트리거
 

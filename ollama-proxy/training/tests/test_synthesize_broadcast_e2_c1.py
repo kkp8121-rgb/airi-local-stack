@@ -59,6 +59,11 @@ class E2C1BuilderTests(unittest.TestCase):
         self.assertEqual(builder._quoted_josa('접기', '을', '를'), '“접기”를')
         self.assertEqual(builder._quoted_josa('접기', '과', '와'), '“접기”와')
         self.assertEqual(builder._quoted_josa('뭐가 좋아?', '이라면', '라면'), '“뭐가 좋아?”라면')
+        self.assertEqual(builder._quoted_josa('바다', '으로', '로'), '“바다”로')
+        self.assertEqual(builder._quoted_josa('길', '으로', '로'), '“길”로')
+        self.assertEqual(builder._quoted_josa('구름', '으로', '로'), '“구름”으로')
+        self.assertEqual(builder._quoted_josa_mismatches('“구름”로 가고 “길”으로 가자.'), [
+            ('구름', '로', '으로'), ('길', '으로', '로')])
         visible = '\n'.join(message['content'] for row in self.correction for message in row['messages'])
         self.assertEqual(builder._quoted_josa_mismatches(visible), [])
         for pattern in (

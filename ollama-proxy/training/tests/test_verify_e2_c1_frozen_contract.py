@@ -37,6 +37,13 @@ class FrozenContractTests(unittest.TestCase):
         with self.assertRaisesRegex(frozen.FrozenContractError,'semantic metadata'):frozen.semantics(factual)
         grammar=copy.deepcopy(source);grammar[0]['messages'][-2]['content']+=' “간식”는'
         with self.assertRaisesRegex(frozen.FrozenContractError,'quoted josa'):frozen.semantics(grammar)
+        self.assertEqual(frozen.josa('바다',('으로','로')),'로')
+        self.assertEqual(frozen.josa('길',('으로','로')),'로')
+        self.assertEqual(frozen.josa('구름',('으로','로')),'으로')
+        grammar=copy.deepcopy(source);grammar[0]['messages'][-2]['content']+=' “구름”로'
+        with self.assertRaisesRegex(frozen.FrozenContractError,'quoted josa'):frozen.semantics(grammar)
+        grammar=copy.deepcopy(source);grammar[0]['messages'][-2]['content']+=' “길”으로'
+        with self.assertRaisesRegex(frozen.FrozenContractError,'quoted josa'):frozen.semantics(grammar)
 
     def test_source_chat_pair_requires_exact_metadata_and_target(self):
         source=row();chat={k:v for k,v in source.items() if k!='target'}

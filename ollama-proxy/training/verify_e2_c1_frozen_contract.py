@@ -40,11 +40,14 @@ def pair(source,chat,target=True):
         if target and (not isinstance(a.get('target'),str) or assistant(a)!=a['target'] or assistant(b)!=a['target']):raise FrozenContractError('target')
         found[a['id']]=a
     return found
-JOSA_PAIRS={'은':('은','는'),'는':('은','는'),'이':('이','가'),'가':('이','가'),'을':('을','를'),'를':('을','를'),'과':('과','와'),'와':('과','와'),'이라면':('이라면','라면'),'라면':('이라면','라면')}
-JOSA_RE=re.compile(r'“([^”]+)”(이라면|라면|은|는|이|가|을|를|과|와)(?=\s|[.,!?])')
+JOSA_PAIRS={'은':('은','는'),'는':('은','는'),'이':('이','가'),'가':('이','가'),'을':('을','를'),'를':('을','를'),'과':('과','와'),'와':('과','와'),'이라면':('이라면','라면'),'라면':('이라면','라면'),'으로':('으로','로'),'로':('으로','로')}
+JOSA_RE=re.compile(r'“([^”]+)”(이라면|라면|으로|은|는|이|가|을|를|과|와|로)(?=\s|[.,!?])')
 def josa(value,pair):
     for char in reversed(value):
-        if '\uac00'<=char<='\ud7a3':return pair[0] if (ord(char)-0xAC00)%28 else pair[1]
+        if '\uac00'<=char<='\ud7a3':
+            jongseong=(ord(char)-0xAC00)%28
+            if pair==('으로','로'):return pair[1] if jongseong in (0,8) else pair[0]
+            return pair[0] if jongseong else pair[1]
     raise FrozenContractError('josa value')
 def semantics(source):
     identity={'identity_noninvention','unknown_identity'}; tokens={x.get('required_token') for x in source if x.get('semantic_family') in identity}

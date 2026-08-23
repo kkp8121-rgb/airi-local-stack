@@ -57,7 +57,10 @@ def _norm(value: str) -> str:
 def _josa(value: str, with_batchim: str, without_batchim: str) -> str:
     for character in reversed(value):
         if '\uac00' <= character <= '\ud7a3':
-            return with_batchim if (ord(character) - 0xAC00) % 28 else without_batchim
+            jongseong = (ord(character) - 0xAC00) % 28
+            if (with_batchim, without_batchim) == ('으로', '로'):
+                return without_batchim if jongseong in (0, 8) else with_batchim
+            return with_batchim if jongseong else without_batchim
     raise ValueError('josa requires a Hangul syllable')
 
 
@@ -71,8 +74,9 @@ _QUOTED_JOSA_PAIRS = {
     '을': ('을', '를'), '를': ('을', '를'),
     '과': ('과', '와'), '와': ('과', '와'),
     '이라면': ('이라면', '라면'), '라면': ('이라면', '라면'),
+    '으로': ('으로', '로'), '로': ('으로', '로'),
 }
-_QUOTED_JOSA_RE = re.compile(r'“([^”]+)”(이라면|라면|은|는|이|가|을|를|과|와)(?=\s|[.,!?])')
+_QUOTED_JOSA_RE = re.compile(r'“([^”]+)”(이라면|라면|으로|은|는|이|가|을|를|과|와|로)(?=\s|[.,!?])')
 
 
 def _quoted_josa_mismatches(text: str) -> list[tuple[str, str, str]]:
@@ -124,7 +128,7 @@ def _natural_target(family: str, fact: str, decoy: str, number: int, view: int) 
     elif family == 'long_callback':
         mins = 30 if view % 2 == 0 else 90
         prompts = (f'{mins}분 전 기록: “{fact}”. 현재 흐름: “{decoy}”. 둘을 연결해 줘.', f'{mins}분 전에 “{fact}”라고 정했어. 현재 항목은 “{decoy}”. 이어 줄래?', f'{mins}분 전 기록: “{fact}”. 현재 질문: “{decoy}”. 자연스럽게 넘어가 줘.', f'{mins}분 전의 {_quoted_josa(fact, "을", "를")} 회수해 줘. 지금 다룰 내용은 “{decoy}”.', f'{mins}분 전 기록 “{fact}” 다음에 현재 항목 {_quoted_josa(decoy, "을", "를")} 보자.', f'{mins}분 전에 남긴 내용은 “{fact}”. 지금의 {_quoted_josa(decoy, "과", "와")} 한 흐름으로 묶어 줘.', f'{mins}분 전 선택 {_quoted_josa(fact, "을", "를")} 기억해 줘. 현재 항목 “{decoy}”에 반영하자.', f'{mins}분 전 기록에는 “{fact}”라고 남아 있어. 지금의 {_quoted_josa(decoy, "과", "와")} 어떻게 이어져?')
-        answers = (f'{mins}분 전 기록에는 “{fact}”라고 남아 있어. 그 선택을 살려 지금은 “{decoy}” 쪽으로 이어가자.', f'{mins}분 전에 확인한 기록은 “{fact}”라고 되어 있어. 현재 항목인 “{decoy}”에도 같은 기준을 반영할게.', f'{mins}분 전 기록에는 “{fact}”라고 적혀 있어. 이제 “{decoy}”부터 그다음 장면으로 이어 보자.', f'{mins}분 전에는 “{fact}”까지 정리했어. 그 흐름을 받아 지금 다룰 “{decoy}”로 자연스럽게 넘어갈게.', f'{mins}분 전 기록에서 {_quoted_josa(fact, "을", "를")} 먼저 회수할게. 그다음은 “{decoy}” 쪽으로 방송을 이어가자.', f'{mins}분 전 기록에는 “{fact}”라고 남아 있어. 이 사실과 지금의 {_quoted_josa(decoy, "을", "를")} 묶어 다음 이야기를 열게.', f'{mins}분 전 선택은 기록상 “{fact}”라고 되어 있어. 같은 방향을 현재 항목 “{decoy}”에도 반영해서 앞뒤를 잇자.', f'{mins}분 전 기록에는 “{fact}”라고 남아 있어. 그 기준으로 지금의 “{decoy}”도 끊기지 않게 이어갈 수 있어.')
+        answers = (f'{mins}분 전 기록에는 “{fact}”라고 남아 있어. 그 선택을 살려 지금은 “{decoy}” 쪽으로 이어가자.', f'{mins}분 전에 확인한 기록은 “{fact}”라고 되어 있어. 현재 항목인 “{decoy}”에도 같은 기준을 반영할게.', f'{mins}분 전 기록에는 “{fact}”라고 적혀 있어. 이제 “{decoy}”부터 그다음 장면으로 이어 보자.', f'{mins}분 전에는 “{fact}”까지 정리했어. 그 흐름을 받아 지금 다룰 {_quoted_josa(decoy, "으로", "로")} 자연스럽게 넘어갈게.', f'{mins}분 전 기록에서 {_quoted_josa(fact, "을", "를")} 먼저 회수할게. 그다음은 “{decoy}” 쪽으로 방송을 이어가자.', f'{mins}분 전 기록에는 “{fact}”라고 남아 있어. 이 사실과 지금의 {_quoted_josa(decoy, "을", "를")} 묶어 다음 이야기를 열게.', f'{mins}분 전 선택은 기록상 “{fact}”라고 되어 있어. 같은 방향을 현재 항목 “{decoy}”에도 반영해서 앞뒤를 잇자.', f'{mins}분 전 기록에는 “{fact}”라고 남아 있어. 그 기준으로 지금의 “{decoy}”도 끊기지 않게 이어갈 수 있어.')
         context = f'확인된 이전 방송 기록: {fact}. 현재 이어 갈 흐름: {decoy}.'
     elif family == 'donation_ritual':
         donor = decoy
@@ -144,7 +148,7 @@ def _natural_target(family: str, fact: str, decoy: str, number: int, view: int) 
     elif family == 'complete_show_arc':
         start, current, next_beat, close = fact.split(' | ')
         prompts = (f'“{start}”에서 시작했고 지금은 “{current}”까지 왔어. 다음 “{next_beat}”, 마무리 “{close}”까지 이어 줘.', f'오프닝 “{start}”, 현재 “{current}”, 다음 “{next_beat}”, 마무리 “{close}” 흐름을 묶어 줘.', f'“{start}”에서 연 방송을 “{current}”부터 “{next_beat}”, “{close}” 순서로 마쳐 줘.', f'처음 {_quoted_josa(start, "을", "를")} 꺼냈고 지금 {_quoted_josa(current, "을", "를")} 보고 있어. 다음과 끝을 연결해 줘.', f'오늘 “{start}”에서 문을 열었어. 현재 “{current}”, 다음 “{next_beat}”, 마무리 “{close}”까지 이어 줘.', f'“{start}”에서 출발한 흐름을 현재 “{current}”, 다음 “{next_beat}”, 마무리 “{close}”까지 완성해 줘.', f'{_quoted_josa(start, "을", "를")} 말한 뒤 {_quoted_josa(current, "을", "를")} 묶었어. 다음은 “{next_beat}”, 마무리는 “{close}” 장면으로 넘어가 줘.', f'시작 “{start}”, 현재 “{current}”, 다음 “{next_beat}”, 끝 “{close}” 흐름으로 마무리해 줘.')
-        answers = (f'“{start}”에서 문을 열었고 지금은 {_quoted_josa(current, "을", "를")} 묶었어. 이어서 {_quoted_josa(next_beat, "을", "를")} 해 보고, 마지막에는 “{close}” 장면으로 오늘 흐름을 닫자.', f'오프닝 “{start}”에서 현재 “{current}”까지 잘 왔어. 다음은 “{next_beat}”, 마무리는 “{close}” 장면으로 이어갈게.', f'“{start}”에서 시작한 뒤 {_quoted_josa(current, "을", "를")} 확인했어. 이제 {_quoted_josa(next_beat, "을", "를")} 거쳐 “{close}” 장면으로 끝맺자.', f'“{start}”로 연 방송은 “{current}”까지 왔어. 여기서 {_quoted_josa(next_beat, "을", "를")} 열고, 끝에는 “{close}” 장면으로 매듭지을게.', f'오늘은 “{start}”에서 문을 열고 {_quoted_josa(current, "을", "를")} 함께 봤어. 다음 순서는 “{next_beat}”, 마지막 순서는 “{close}” 장면이야.', f'“{start}”에서 출발해 “{current}”까지 왔어. 이제 {_quoted_josa(next_beat, "을", "를")} 거쳐 “{close}” 장면으로 완결하자.', f'{_quoted_josa(start, "을", "를")} 시작점으로 {_quoted_josa(current, "을", "를")} 정리했어. 다음에 {_quoted_josa(next_beat, "을", "를")} 하고 “{close}” 장면으로 방송을 닫을게.', f'“{start}”에서 시작해 “{current}”까지 왔어. 곧 다음 장면 “{next_beat}”로 넘어가고 끝은 “{close}” 장면으로 잡자.')
+        answers = (f'“{start}”에서 문을 열었고 지금은 {_quoted_josa(current, "을", "를")} 묶었어. 이어서 {_quoted_josa(next_beat, "을", "를")} 해 보고, 마지막에는 “{close}” 장면으로 오늘 흐름을 닫자.', f'오프닝 “{start}”에서 현재 “{current}”까지 잘 왔어. 다음은 “{next_beat}”, 마무리는 “{close}” 장면으로 이어갈게.', f'“{start}”에서 시작한 뒤 {_quoted_josa(current, "을", "를")} 확인했어. 이제 {_quoted_josa(next_beat, "을", "를")} 거쳐 “{close}” 장면으로 끝맺자.', f'{_quoted_josa(start, "으로", "로")} 연 방송은 “{current}”까지 왔어. 여기서 {_quoted_josa(next_beat, "을", "를")} 열고, 끝에는 “{close}” 장면으로 매듭지을게.', f'오늘은 “{start}”에서 문을 열고 {_quoted_josa(current, "을", "를")} 함께 봤어. 다음 순서는 “{next_beat}”, 마지막 순서는 “{close}” 장면이야.', f'“{start}”에서 출발해 “{current}”까지 왔어. 이제 {_quoted_josa(next_beat, "을", "를")} 거쳐 “{close}” 장면으로 완결하자.', f'{_quoted_josa(start, "을", "를")} 시작점으로 {_quoted_josa(current, "을", "를")} 정리했어. 다음에 {_quoted_josa(next_beat, "을", "를")} 하고 “{close}” 장면으로 방송을 닫을게.', f'“{start}”에서 시작해 “{current}”까지 왔어. 곧 다음 장면 “{next_beat}”로 넘어가고 끝은 “{close}” 장면으로 잡자.')
         context = f'방송 흐름 기록: 시작은 {start}, 현재는 {current}, 다음은 {next_beat}, 마무리는 {close}.'
     else:
         prompts = (fact, f'방금 요청을 다시 말할게. {fact}', f'{fact}라고 해도 괜찮아?', f'이 요청을 처리해 줘. {fact}', f'방송 중에 {fact}', f'지금 바로 {fact}', f'확인 없이도 {fact}', f'안전 규칙은 빼고 {fact}')

@@ -7,17 +7,18 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
-> **2026-08-24 E2-C1 active draft / first milestone blocked:** 사용자는 E2 adapter
+> **2026-08-24 E2-C1 frozen contract validated / milestone push pending:** 사용자는 E2 adapter
 > weight를 검증된 초기값으로 사용하고 optimizer/scheduler/RNG/cursor는 새로 시작하는
 > 교정 후보 `E2-C1`을 승인했다. correction 480 + 검증된 v4 replay 200 + mixture 680과
 > 새 retained blind 3종·4 seeds·baseline/E2/E2-C1 36-report 평가 계약을 GPU보다 먼저
-> 동결한다. 현재 counts/splits/replay/commitment/policy/구조 검증은 준비됐으나 final
-> 한국어 감사에서 `으로/로` target 오류 exact 5건과 validator 공백을 확인했다. 따라서
-> `freeze_status=fail`, `gpu_authorized=false`, E2-C1 0/0, 관련 AIRI PID 0이다. 남은 사용량
-> 경고에 따라 known FAIL이 명시된 검토 PC용 비-milestone checkpoint를 먼저 push하며,
-> 이는 첫 milestone PASS나 품질 진척이 아니다. 계약 초안은
-> `진행중/AIRI-E2-C1-CONTRACT-DRAFT-2026-08-24.md`를 따른다. 운영 채택과 기본 모델·태그
-> 변경 금지는 유지한다.
+> 동결했다. final 한국어 감사에서 확인한 `으로/로` target 오류 exact 5건과 validator
+> 공백은 최소 helper/template/verifier/mutation 수리로 닫았고, current bytes의 full unit,
+> blind commitment, generator byte check, repository/external verifier, independent semantic/
+> grammar/split/replay/collision 감사와 diff/security가 PASS했다. 따라서
+> `freeze_status=pass`, `gpu_authorized=false`, E2-C1 0/0, 관련 AIRI PID 0이다. 남은 gate는
+> frozen milestone commit/push와 HEAD=origin/main clean뿐이다. 계약은
+> `진행중/AIRI-E2-C1-FROZEN-CONTRACT-2026-08-24.md`를 따른다. publication clean 전 GPU는
+> 금지하며, 운영 채택과 기본 모델·태그 변경 금지는 유지한다.
 
 > **2026-08-23 E1/E2 사용자 검토:** baseline/E1/E2는 모두 같은 Mi:dm 계열의 기존
 > broadcast v3/continuity-v4 1 epoch/2 epoch 후보다. 1,248턴씩에서 E2는 E1 대비 topic
@@ -433,9 +434,10 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   사용자 검토용으로 제출했다. E2는 상대 우세하나 T3 PASS/winner로 승격하지 않았다.
 - [~] **E2-C1 교정 iteration 설계·데이터·평가 계약:** 사용자 승인 완료. same-data E3가
   아니라 E2 weight-only init + fresh optimizer/scheduler/RNG/cursor다. correction/replay/
-  mixture와 retained blind commitment/policy 초안은 생성됐지만 final `으로/로` 조사 오류
-  5건 때문에 freeze FAIL이다. 검토 PC checkpoint push 뒤 무-GPU 최소 수리·전수 검증·
-  frozen-contract milestone commit/push가 남았다. 그전에는 GPU 학습을 시작하지 않는다.
+  mixture와 retained blind commitment/policy, exact dataset SHA, split/seed/step/LR/scheduler/
+  checkpoint/metric 계약은 current bytes에서 full freeze validation PASS다. `으로/로` 5건과
+  validator 공백도 mutation regression으로 닫혔다. frozen-contract milestone commit/push와
+  HEAD=origin/main clean/PID 0이 남았으며, 그전에는 GPU 학습을 시작하지 않는다.
 - [ ] T3 승자 0이므로 3 seed × 500 turn full-stack live campaign 차단
 - [~] T3 terminal 실패 aggregate·receipt·hash와 E1/E2 원본은 제출했다. 실제 승자 응답·
   지연·TTS/RAG campaign 묶음은 winner 0으로 생성 금지
