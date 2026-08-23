@@ -9,6 +9,17 @@
 
 ## 2026-08-23 E1/E2 user review and corrective-training boundary
 
+- 22:48 KST base five-doc commit `6efbf057` receipt용 WORKING/LOG는 focused continuity
+  exit 0/literal PASS, exact two-doc boundary/diff/security actual 2, staged/untracked 0,
+  repo diff-check exit 0/expected warning 2줄, forbidden/credential·개인 경로 hit 0,
+  586,669 bytes, manifest `2b24ad5d...a24c9`다. 두 문서만 stage해 cached 2/0/0/hit-0
+  뒤 `docs: record E2 review commit`으로 commit하고 그 receipt 전에는 push하지 않는다.
+- 22:47 KST final cached five-doc 검증은 staged 5, unstaged/untracked 0,
+  cached diff/security hit 0, blob 674,041 bytes, index manifest `4f97d69e...893d2`다.
+  `git commit -m "docs: record E2 corrective review"` exit 0, commit `6efbf05`, parent
+  `3efe2ad`, exact five docs, 153 insertions/17 deletions이다. commit 직후 worktree clean,
+  local main은 origin/main보다 1 ahead다. WORKING/LOG commit receipt를 검증·stage한 뒤
+  exact push를 실행하며 model/GPU/service/T3/campaign/adoption은 변경하지 않는다.
 - 22:46 KST compact recovery에서 지정 SSoT 5종을 순서대로 EOF까지 재독하고
   Goal/Git/PID/E2/T3를 대조했다. Goal API prior `blocked`와 현재 사용자 docs request
   active 경계를 유지하며 HEAD/local/remote origin/main `3efe2ad` exact, E2 complete

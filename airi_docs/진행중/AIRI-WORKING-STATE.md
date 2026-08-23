@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 22:46:10 +09:00"
-checkpoint_id: "20260823-224610-e1-e2-user-review-final-stage-commit-intent"
+updated_at_kst: "2026-08-23 22:48:33 +09:00"
+checkpoint_id: "20260823-224833-e1-e2-review-commit-receipt-docs-stage-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
 active_phase: "e1-e2-user-review-doc-refresh"
-git_head: "3efe2ad46e620b2aabf6a6764cf148e773500e3b"
-worktree_state: "five-doc-staged; receipt-working-log-unstaged; untracked-0"
+git_head: "6efbf057d36138676058275d5592b4f35584a027"
+worktree_state: "commit-receipt-working-log-unstaged; staged-0; untracked-0; local-main-ahead-1"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-23 22:46 KST compact recovery reread the five required SSoTs to EOF and reconciled Goal/Git/PID/E2/T3. Goal API retains prior blocked while the user's current docs request is active; HEAD/local/remote origin/main are exact 3efe2ad. E2 state is complete 1,600/1,600 and 100/100, T3 inventory is 36 reports/two comparisons/summary absent, related AIRI PID excluding the probe itself is 0. Restaging WORKING/LOG exited 0. Cached boundary/diff/security passed at staged 5, boundary 0, unstaged/untracked 0, hit 0 and blob bytes 671,836. The first manifest formatting call used an unavailable Windows PowerShell .NET method and produced no manifest; a corrected read-only hash-only calculation produced index manifest c1461f2f...e107d. Restage only WORKING/LOG after this receipt and require final cached 5/0/0/hit-0 PASS, then commit docs: record E2 corrective review. Push only after commit receipt."
+reconciliation_receipt: "2026-08-23 22:48 KST base five-doc commit 6efbf057 receipt docs passed focused continuity exit 0/literal PASS. Exact two-doc boundary/diff/security passed: actual 2, boundary 0, staged/untracked 0, repo diff-check exit 0 with two expected line-ending warnings, forbidden/credential/personal hits 0, bytes 586,669 and manifest 2b24ad5d...a24c9. Stage exactly WORKING and roadmap log, require cached 2/0/0/hit-0 PASS, then commit docs: record E2 review commit. Push both local commits only after that commit receipt. No model, GPU, service, T3, campaign, or adoption change is authorized."
 ---
 
 # AIRI live working state
@@ -57,6 +57,27 @@ reconciliation_receipt: "2026-08-23 22:46 KST compact recovery reread the five r
 | 현재 행동 | 문서 intent를 먼저 기록하고, 나머지 SSoT를 같은 판정으로 갱신한다. |
 
 ## 3. 마지막 내구성 체크포인트
+
+- `20260823-224833-e1-e2-review-commit-receipt-docs-stage-intent`: base five-doc commit
+  `6efbf057`의 receipt용 WORKING/roadmap log는 focused continuity exit 0/literal PASS다.
+  exact two-doc boundary/diff/security도 actual 2, boundary diff 0, staged/untracked 0,
+  repo diff-check exit 0/expected line-ending warning 2줄, forbidden/credential·개인 경로
+  hit 0, 586,669 bytes, manifest
+  `2b24ad5d5ba492075d9050042426595d8f08f353bafe006115eb5cdf5d8a24c9`로 PASS했다.
+  이 receipt를 포함한 두 문서만 stage해 cached 2/0/0과 hit 0을 확인한 뒤 exact
+  `git commit -m "docs: record E2 review commit"`을 실행한다. 그 commit receipt 전에는
+  push하지 않으며 model/GPU/service/T3/campaign/adoption은 변경하지 않는다.
+
+- `20260823-224727-e1-e2-user-review-commit-receipt-push-intent`: final cached 검증은
+  staged 5, boundary diff 0, unstaged/untracked 0, cached diff-check 0줄,
+  binary/oversize/credential·개인 경로 hit 0, blob 674,041 bytes, index manifest
+  `4f97d69efbb3ef4fb3f32161c9a6451f3cda41a1fe6b0e37080b7bd2c93893d2`다.
+  exact `git commit -m "docs: record E2 corrective review"` exit 0, commit
+  `6efbf057d36138676058275d5592b4f35584a027`, parent `3efe2ad`, exact five docs,
+  153 insertions/17 deletions이다. commit 직후 worktree clean, local main은 origin/main보다
+  1 ahead다. 이 receipt용 WORKING/roadmap log exact 2개를 continuity/boundary/diff/security로
+  검증하고 stage/cached PASS 뒤 exact `git push origin main`을 실행한다. 실패하면 local
+  commit과 receipt docs를 보존하며 model/GPU/service/T3/campaign/adoption은 변경하지 않는다.
 
 - `20260823-224610-e1-e2-user-review-final-stage-commit-intent`: compact recovery에서
   지정 SSoT 5종을 순서대로 EOF까지 재독하고 Goal/Git/PID/E2/T3를 read-only 대조했다.
