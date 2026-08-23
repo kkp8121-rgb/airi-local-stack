@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 21:10:39 +09:00"
-checkpoint_id: "20260823-211039-t3-fail-final-docs-pass-stage-intent"
+updated_at_kst: "2026-08-23 21:13:58 +09:00"
+checkpoint_id: "20260823-211358-t3-fail-push-receipt-commit-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "t3-36-failed-closed"
-git_head: "d3724b1ea3d0df7cff8e14fd511f4b8244b8838c"
-worktree_state: "t3-failure-pushed; final-receipt-five-ssot-dirty; staged-untracked-0"
+active_phase: "t3-failed-awaiting-user-direction"
+git_head: "914afb346e3bcb42b74c9721ca80cd38bc403b3b"
+worktree_state: "final-push-receipt-working-log-dirty; staged-untracked-0"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-23 21:10 KST final push-receipt five SSoT validation passed: focused continuity exit 0/literal PASS, repo diff-check exit 0 with expected five line-ending warnings, exact five paths, staged/untracked 0, forbidden path/binary/oversize/credential-sensitive literal/personal-path hits 0, total 662,542 bytes and manifest 2516a672...56aa. Stage only these five docs, require cached 5/0/0 and security PASS, commit as docs: close authoritative T3 failure receipt, push, then verify HEAD=origin/main clean and no related PID/listener."
+reconciliation_receipt: "2026-08-23 21:13 KST final five-doc cached verification passed at staged 5, unstaged/untracked 0, security hits 0, blob bytes 660,995 and index manifest f1c5cf29...4bc9. Commit docs: close authoritative T3 failure receipt exited 0 as 914afb3 and push d3724b1..914afb3 main to main exited 0. HEAD/local origin/main/remote main are exact 914afb3 and worktree was clean; reports 36, both comparisons remain fail with exact SHA, summary absent, related AIRI processes/owned listeners 0. Final WORKING/roadmap receipt validation now passes at exact 2 paths, staged/untracked 0, security hits 0 and manifest 239f0e9f...a62f. Stage only these 2 docs, require cached 2/0/0 PASS, commit as docs: record T3 failure receipt push and push. Then verify HEAD=origin/main clean. Winner/campaign remain 0 and adoption forbidden."
 ---
 
 # AIRI live working state
@@ -47,17 +47,29 @@ reconciliation_receipt: "2026-08-23 21:10 KST final push-receipt five SSoT valid
 
 | 항목 | 값 |
 |---|---|
-| 의도 | authoritative T3 terminal failure root를 보존하고 36 reports·두 comparator·inventory·PID 0을 content-safe하게 결속해 승자/campaign 금지를 문서화한다. |
-| 허용 범위 | external root의 metadata/aggregate/SHA read-only 검증과 milestone 문서 갱신. response 본문·로그 본문을 읽거나 matrix를 재실행하지 않으며 운영 채택·기본 모델 변경 금지 |
-| 시작 전 증거 | 동일 launcher session이 reports 36과 comparison 2를 게시한 뒤 exit 1했다. 두 comparator는 status fail/adoption false이고 PASS summary는 없다. |
-| exact 변경 | repository code/model/service 변경 0. WORKING-STATE, handoff, roadmap status/log, NEXT exact 5개에 terminal receipt와 no-winner/campaign-blocked 경계를 기록했다. |
+| 의도 | authoritative T3 terminal failure root와 origin/main receipt를 보존하고, 새 비오염 모델링/evaluation 방향 전에는 실행을 멈춘다. |
+| 허용 범위 | read-only 상태 보고와 사용자 방향 수신. 같은 matrix 재실행, hard-gate 약화, campaign, 운영 채택·기본 모델 변경 금지 |
+| 시작 전 증거 | reports 36, comparisons 2 FAIL, PASS summary 0, winner/campaign 0, 관련 PID/listener 0, terminal milestone/final receipt commits origin/main push 완료다. |
+| exact 변경 | repository code/model/service 변경 0. 마지막 push receipt용 WORKING-STATE와 roadmap log만 갱신한다. |
 | 출력 경로 | 실패 증거는 external root `airi-t3-authoritative-20260823-175152`에 보존한다. response-bearing reports/packets, DB와 로그는 Git 금지다. |
-| 완료 조건 | required SSoT가 실제 failure receipt와 no-winner/campaign-blocked 경계를 반영하고 focused/diff/security PASS 뒤 Conventional Commit/push, HEAD=origin/main·clean이다. |
+| 완료 조건 | 이 goal의 전체 완료 조건은 아직 미충족이다. 새 오염되지 않은 평가와 개선 모델이 T3 PASS/winner를 낸 뒤 campaign/사용자 증거까지 완료돼야 한다. |
 | 중단·복구 | 같은 matrix를 반복하지 않는다. T3 통과 모델이 없으므로 campaign을 시작하지 않는다. 후속 모델링 iteration에는 오염되지 않은 새 평가 설계와 별도 intent가 필요하다. |
-| 현재 행동 | exact five-doc focused continuity/diff/security를 검증한다. PASS 뒤 이 다섯 경로만 stage/commit/push하며 full matrix/campaign은 실행하지 않는다. |
+| 현재 행동 | 같은 T3/campaign 명령을 실행하지 않고 사용자에게 권위 실패·blocker·최소 다음 경로를 보고한다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260823-211203-t3-fail-final-push-receipt`: final five-doc cached 검증은 staged 5,
+  unstaged/untracked 0, security hit 0, blob 660,995 bytes, index manifest
+  `f1c5cf29d082a695ca2272f25cc956bbb4b52a12246c5a2e8c00fc5c96ef4bc9`였다.
+  exact `git commit -m "docs: close authoritative T3 failure receipt"` exit 0, commit
+  `914afb346e3bcb42b74c9721ca80cd38bc403b3b`; exact push exit 0,
+  `d3724b1..914afb3 main -> main`이다. 이후 HEAD/local·remote origin/main exact, worktree
+  clean, reports 36/comparisons 2 FAIL/summary absent, 관련 AIRI PID/owned listener 0이다.
+  GPU training/service workload 0, winner/campaign 0이다. 이 push receipt용 WORKING/roadmap
+  log exact 2개는 continuity/diff/security PASS, manifest `239f0e9f...a62f`다. 두 문서만
+  stage해 cached 2/0/0 PASS 뒤 `docs: record T3 failure receipt push`로 commit/push하고
+  HEAD=origin/main clean을 확인한다. 공개된 blind 재사용이나 gate 약화 없이 새 modeling/
+  evaluation 방향을 사용자에게 요청하며 goal은 complete가 아니다.
 - `20260823-211039-t3-fail-final-docs-pass-stage-intent`: final push-receipt five SSoT는
   focused continuity exit 0/literal PASS, repo diff-check exit 0/expected warning 5줄이다.
   actual exact 5, staged/untracked 0, forbidden artifact path/binary/oversize/credential·민감
@@ -3596,13 +3608,11 @@ reconciliation_receipt: "2026-08-23 21:10 KST final push-receipt five SSoT valid
 
 ## 4. 다음 허용 행동
 
-1. handoff, roadmap status/log, NEXT를 authoritative T3 terminal FAIL, winner 0,
-   campaign forbidden과 exact aggregate/inventory receipt에 맞춰 갱신한다.
-2. focused continuity, repo diff-check와 forbidden artifact/secret 검사를 수행한다.
-3. exact milestone 문서만 Conventional Commit/push하고 HEAD=origin/main·clean을 확인한다.
-4. 같은 T3 matrix를 반복하거나 hard gate를 약화하지 않는다. 새 모델링 iteration은 현재
-   blind가 공개된 점을 고려한 오염되지 않은 평가 설계와 별도 intent 없이는 시작하지 않는다.
-5. 운영 채택/기본 서비스 모델 변경은 계속 금지한다.
+1. 권위 T3 FAIL, winner 0, campaign 0과 origin/main receipt를 사용자에게 보고한다.
+2. 새 모델링 iteration을 원하면 현재 blind를 재사용하지 않는 평가 설계·데이터 범위·후보
+   명칭을 별도 intent로 고정한 뒤 시작한다.
+3. 같은 T3 matrix를 반복하거나 hard gate를 약화하지 않는다.
+4. 운영 채택/기본 서비스 모델 변경은 계속 금지한다.
 
 ## 5. 갱신 트리거
 
