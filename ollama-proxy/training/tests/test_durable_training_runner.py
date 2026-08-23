@@ -1656,3 +1656,143 @@ def test_safe_pause_then_explicit_resume_reaches_atomic_terminal_receipt() -> No
         failed = json.loads((root / "run" / "run-state.json").read_text())
         assert failed["status"] == "failed"
         assert failed["terminal"]["reason"] == "completed-artifact-integrity-mismatch"
+
+
+def test_v3_initial_adapter_is_closed_pinned_held_and_excludes_resume() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        trainer = root / "trainer.py"
+        trainer.write_text(FAKE_TRAINER, encoding="utf-8", newline="\n")
+        arguments = _arguments(root, trainer)
+        manifest_path = root / "input-manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        legacy_manifest = json.loads(json.dumps(manifest))
+        adapter = root / "initial-adapter"
+        adapter.mkdir()
+        model = adapter / "adapter_model.safetensors"
+        config = adapter / "adapter_config.json"
+        model.write_bytes(b"adapter-model")
+        config.write_bytes(b"{}\n")
+        files = [{"path": path.name, "bytes": path.stat().st_size,
+                  "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+                 for path in (config, model)]
+        artifact = {"schema_version": "airi.behavior-adapter-artifact.v1",
+                    "run_id": "source-run", "pins": {
+                        "model_weight_sha256": manifest["model_weight_sha256"]},
+                    "files": files}
+        artifact_path = adapter / "artifact-manifest.json"
+        artifact_path.write_bytes(runner.canonical_bytes(artifact))
+        manifest["schema_version"] = "airi.behavior-input-manifest.v3"
+        manifest["training_config"]["init_mode"] = "adapter-weights-only"
+        manifest["training_config_sha256"] = hashlib.sha256(
+            runner.canonical_bytes(manifest["training_config"])).hexdigest()
+        manifest["initial_adapter"] = {
+            "run_id": "source-run", "model_sha256": files[1]["sha256"],
+            "config_sha256": files[0]["sha256"],
+            "artifact_manifest_sha256": hashlib.sha256(artifact_path.read_bytes()).hexdigest(),
+            "files": files,
+        }
+        manifest_path.write_bytes(runner.canonical_bytes(manifest))
+        trailer = ["--init-adapter-dir", str(adapter), "--init-adapter-model-sha256",
+                   files[1]["sha256"], "--init-adapter-config-sha256", files[0]["sha256"],
+                   "--init-adapter-artifact-manifest-sha256",
+                   manifest["initial_adapter"]["artifact_manifest_sha256"]]
+        trainer_args = arguments[arguments.index("--") + 1:] + trailer
+        identity = runner.validate_input_manifest_content(
+            manifest_path, hashlib.sha256(manifest_path.read_bytes()).hexdigest(), trainer_args,
+            manifest["trainer_source_sha256"], manifest["dataset_sha256"],
+            manifest["model_weight_sha256"], 5, manifest["checkpoint_helper_source_sha256"])
+        assert identity["initial_adapter"]["directory"] == str(adapter.resolve())
+
+        extra = adapter / "unexpected.bin"
+        extra.write_bytes(b"unexpected")
+        with pytest.raises(runner.DurableRunnerError, match="closed exact"):
+            runner.validate_input_manifest_content(
+                manifest_path, hashlib.sha256(manifest_path.read_bytes()).hexdigest(), trainer_args,
+                manifest["trainer_source_sha256"], manifest["dataset_sha256"],
+                manifest["model_weight_sha256"], 5,
+                manifest["checkpoint_helper_source_sha256"])
+        extra.unlink()
+        empty = adapter / "unexpected-empty-directory"
+        empty.mkdir()
+        with pytest.raises(runner.DurableRunnerError, match="closed exact"):
+            runner.validate_input_manifest_content(
+                manifest_path, hashlib.sha256(manifest_path.read_bytes()).hexdigest(), trainer_args,
+                manifest["trainer_source_sha256"], manifest["dataset_sha256"],
+                manifest["model_weight_sha256"], 5,
+                manifest["checkpoint_helper_source_sha256"])
+        empty.rmdir()
+
+        missing_v3_mode = json.loads(json.dumps(manifest))
+        del missing_v3_mode["training_config"]["init_mode"]
+        missing_v3_mode["training_config_sha256"] = hashlib.sha256(
+            runner.canonical_bytes(missing_v3_mode["training_config"])).hexdigest()
+        manifest_path.write_bytes(runner.canonical_bytes(missing_v3_mode))
+        with pytest.raises(runner.DurableRunnerError, match="configuration schema mismatch"):
+            runner.validate_input_manifest_content(
+                manifest_path, hashlib.sha256(manifest_path.read_bytes()).hexdigest(), trainer_args,
+                manifest["trainer_source_sha256"], manifest["dataset_sha256"],
+                manifest["model_weight_sha256"], 5,
+                manifest["checkpoint_helper_source_sha256"])
+        invalid_v2 = json.loads(json.dumps(legacy_manifest))
+        invalid_v2["training_config"]["init_mode"] = "fresh-lora"
+        invalid_v2["training_config_sha256"] = hashlib.sha256(
+            runner.canonical_bytes(invalid_v2["training_config"])).hexdigest()
+        manifest_path.write_bytes(runner.canonical_bytes(invalid_v2))
+        with pytest.raises(runner.DurableRunnerError, match="configuration schema mismatch"):
+            runner.validate_input_manifest_content(
+                manifest_path, hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+                arguments[arguments.index("--") + 1:], invalid_v2["trainer_source_sha256"],
+                invalid_v2["dataset_sha256"], invalid_v2["model_weight_sha256"], 5,
+                invalid_v2["checkpoint_helper_source_sha256"])
+        manifest_path.write_bytes(runner.canonical_bytes(manifest))
+
+        command = _with_runner_flag(arguments, "--pause-at-first-optimizer-boundary")
+        command[command.index("--input-manifest-sha256") + 1] = hashlib.sha256(
+            manifest_path.read_bytes()).hexdigest()
+        command.extend(trailer)
+        launched = subprocess.run([sys.executable, str(HERE / "durable_training_runner.py"), *command],
+                                 cwd=root, capture_output=True, text=True, check=False)
+        assert launched.returncode == 75, launched.stderr
+        state = json.loads((root / "run" / "run-state.json").read_text(encoding="utf-8"))
+        assert state["inputs"]["init_mode"] == "adapter-weights-only"
+        assert state["inputs"]["init_adapter_model_sha256"] == files[1]["sha256"]
+        resumed_command = list(arguments)
+        resumed_command[resumed_command.index("--input-manifest-sha256") + 1] = hashlib.sha256(
+            manifest_path.read_bytes()).hexdigest()
+        resumed_command = _with_runner_flag(resumed_command, "--resume-interrupted")
+        resumed_command.extend(trailer)
+        resumed = subprocess.run(
+            [sys.executable, str(HERE / "durable_training_runner.py"), *resumed_command],
+            cwd=root, capture_output=True, text=True, check=False)
+        assert resumed.returncode == 0, resumed.stderr
+        completed = json.loads((root / "run" / "run-state.json").read_text(encoding="utf-8"))
+        assert completed["inputs"] == state["inputs"]
+        assert completed["command"]["base_canonical_sha256"] == state["command"]["base_canonical_sha256"]
+        assert completed["command"]["canonical_sha256"] != completed["command"]["base_canonical_sha256"]
+        stripped = list(trailer)
+        for flag in ("--init-adapter-dir", "--init-adapter-model-sha256",
+                     "--init-adapter-config-sha256", "--init-adapter-artifact-manifest-sha256"):
+            runner._remove_argument(stripped, flag)
+        assert stripped == []
+        held = runner._hold_training_inputs(root / "dataset.jsonl", manifest["dataset_sha256"],
+                                            root / "model", manifest["model_inventory"],
+                                            identity["initial_adapter"])
+        try:
+            replacement = adapter / "replacement"
+            replacement.write_bytes(b"tampered")
+            with pytest.raises(PermissionError):
+                os.replace(replacement, model)
+            assert model.read_bytes() == b"adapter-model"
+        finally:
+            for handle in held:
+                handle.close()
+        with pytest.raises(runner.DurableRunnerError, match="supplied together"):
+            runner._init_adapter_arguments(trainer_args[:-2])
+        manifest["initial_adapter"]["model_sha256"] = "0" * 64
+        manifest_path.write_bytes(runner.canonical_bytes(manifest))
+        with pytest.raises(runner.DurableRunnerError, match="pin mismatch"):
+            runner.validate_input_manifest_content(
+                manifest_path, hashlib.sha256(manifest_path.read_bytes()).hexdigest(), trainer_args,
+                manifest["trainer_source_sha256"], manifest["dataset_sha256"],
+                manifest["model_weight_sha256"], 5, manifest["checkpoint_helper_source_sha256"])

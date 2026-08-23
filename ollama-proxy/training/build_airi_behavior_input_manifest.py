@@ -45,10 +45,12 @@ def _training_config(args: argparse.Namespace) -> dict[str, Any]:
         "max_seq_len": args.max_seq_len,
         "checkpoint_every_optimizer_steps": args.checkpoint_every_optimizer_steps,
         "deterministic_validation": bool(args.deterministic_validation),
+        "init_mode": ("adapter-weights-only" if args.init_adapter_dir else "fresh-lora"),
     }
 
 
-def _trainer_arguments(config: dict[str, Any]) -> list[str]:
+def _trainer_arguments(config: dict[str, Any], initial_adapter: dict[str, Any] | None = None,
+                       initial_adapter_dir: Path | None = None) -> list[str]:
     values = [
         "--mode", str(config["mode"]),
         "--seed", str(config["seed"]),
@@ -63,7 +65,84 @@ def _trainer_arguments(config: dict[str, Any]) -> list[str]:
     ]
     if config["deterministic_validation"]:
         values.append("--deterministic-validation")
+    if config["init_mode"] == "adapter-weights-only":
+        if initial_adapter is None or initial_adapter_dir is None:
+            raise ManifestBuildError("adapter initialization arguments require explicit provenance")
+        values.extend(("--init-adapter-dir", str(initial_adapter_dir),
+                       "--init-adapter-model-sha256", initial_adapter["model_sha256"],
+                       "--init-adapter-config-sha256", initial_adapter["config_sha256"],
+                       "--init-adapter-artifact-manifest-sha256",
+                       initial_adapter["artifact_manifest_sha256"]))
     return values
+
+
+def _initial_adapter(args: argparse.Namespace) -> dict[str, Any] | None:
+    values = (args.init_adapter_dir, args.init_adapter_model_sha256,
+              args.init_adapter_config_sha256, args.init_adapter_artifact_manifest_sha256)
+    if not any(value is not None for value in values):
+        return None
+    if any(value is None for value in values):
+        raise ManifestBuildError("init adapter flags must be supplied together")
+    directory = durable.validate_local_path(args.init_adapter_dir, "init adapter directory")
+    if not directory.is_dir():
+        raise ManifestBuildError("init adapter directory is missing")
+    pins = {
+        "model_sha256": args.init_adapter_model_sha256,
+        "config_sha256": args.init_adapter_config_sha256,
+        "artifact_manifest_sha256": args.init_adapter_artifact_manifest_sha256,
+    }
+    for label, digest in pins.items():
+        if not durable.HEX64.fullmatch(digest):
+            raise ManifestBuildError(f"init adapter {label} is invalid")
+    try:
+        artifact_bytes = durable._read_regular_file_snapshot(
+            directory / "artifact-manifest.json", "init adapter artifact manifest")
+        if durable.sha256_bytes(artifact_bytes) != pins["artifact_manifest_sha256"]:
+            raise ManifestBuildError("init adapter artifact manifest SHA-256 does not match its bytes")
+        artifact = json.loads(artifact_bytes.decode("utf-8"))
+    except (durable.DurableRunnerError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ManifestBuildError("init adapter artifact manifest is invalid") from exc
+    if artifact_bytes != durable.canonical_bytes(artifact):
+        raise ManifestBuildError("init adapter artifact manifest is not canonical")
+    if (set(artifact) != {"schema_version", "run_id", "pins", "files"}
+            or artifact.get("schema_version") != "airi.behavior-adapter-artifact.v1"
+            or not isinstance(artifact.get("run_id"), str) or not artifact["run_id"]
+            or not isinstance(artifact.get("pins"), dict)
+            or not durable.HEX64.fullmatch(str(artifact["pins"].get("model_weight_sha256", "")))):
+        raise ManifestBuildError("init adapter artifact schema is invalid")
+    if artifact["pins"]["model_weight_sha256"] != args.model_sha256:
+        raise ManifestBuildError("init adapter base model pin does not match training model")
+    files = artifact.get("files")
+    if not isinstance(files, list) or not files:
+        raise ManifestBuildError("init adapter artifact inventory is invalid")
+    seen: set[str] = set()
+    declared: list[dict[str, Any]] = []
+    for row in files:
+        if (not isinstance(row, dict) or set(row) != {"path", "bytes", "sha256"}
+                or not isinstance(row["path"], str) or not row["path"] or row["path"] in seen
+                or Path(row["path"]).is_absolute() or ".." in Path(row["path"]).parts
+                or not isinstance(row["bytes"], int) or row["bytes"] < 0
+                or not durable.HEX64.fullmatch(str(row["sha256"]))):
+            raise ManifestBuildError("init adapter artifact inventory row is invalid")
+        seen.add(row["path"])
+        payload = durable._read_regular_file_snapshot(directory / row["path"], "init adapter file")
+        if len(payload) != row["bytes"] or durable.sha256_bytes(payload) != row["sha256"]:
+            raise ManifestBuildError("init adapter artifact inventory does not match disk")
+        declared.append(dict(row))
+    try:
+        durable._validate_closed_model_inventory(directory, [
+            *declared,
+            {"path": "artifact-manifest.json", "bytes": len(artifact_bytes),
+             "sha256": durable.sha256_bytes(artifact_bytes)},
+        ])
+    except durable.DurableRunnerError as exc:
+        raise ManifestBuildError("init adapter artifact inventory is not closed") from exc
+    for filename, pin in (("adapter_model.safetensors", "model_sha256"),
+                          ("adapter_config.json", "config_sha256")):
+        row = next((item for item in declared if item["path"] == filename), None)
+        if row is None or row["sha256"] != pins[pin]:
+            raise ManifestBuildError(f"init adapter {filename} pin does not match inventory")
+    return {"run_id": artifact["run_id"], **pins, "files": declared}
 
 
 def _closed_model_inventory(model_root: Path) -> list[dict[str, Any]]:
@@ -127,6 +206,7 @@ def build_manifest(args: argparse.Namespace) -> tuple[dict[str, Any], bytes]:
     except durable.DurableRunnerError as exc:
         raise ManifestBuildError("trainer is not a regular file") from exc
     config = _training_config(args)
+    initial_adapter = _initial_adapter(args)
     helper = trainer.parent / "behavior_training_checkpoint.py"
     try:
         helper_sha256 = durable.sha256_bytes(
@@ -139,7 +219,7 @@ def build_manifest(args: argparse.Namespace) -> tuple[dict[str, Any], bytes]:
         raise ManifestBuildError("model inventory lacks config.json")
     config_sha256 = durable.sha256_bytes(durable.canonical_bytes(config))
     manifest = {
-        "schema_version": "airi.behavior-input-manifest.v2",
+        "schema_version": "airi.behavior-input-manifest.v3",
         "dataset_sha256": dataset_sha256,
         "model_weight_sha256": model_sha256,
         "trainer_source_sha256": trainer_sha256,
@@ -147,6 +227,7 @@ def build_manifest(args: argparse.Namespace) -> tuple[dict[str, Any], bytes]:
         "model_inventory": inventory,
         "training_config": config,
         "training_config_sha256": config_sha256,
+        "initial_adapter": initial_adapter,
     }
     return manifest, durable.canonical_bytes(manifest)
 
@@ -190,6 +271,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-seq-len", type=int, required=True)
     parser.add_argument("--checkpoint-every-optimizer-steps", type=int, required=True)
     parser.add_argument("--deterministic-validation", action="store_true")
+    parser.add_argument("--init-adapter-dir", type=Path)
+    parser.add_argument("--init-adapter-model-sha256")
+    parser.add_argument("--init-adapter-config-sha256")
+    parser.add_argument("--init-adapter-artifact-manifest-sha256")
     return parser
 
 
@@ -198,7 +283,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     manifest, payload = build_manifest(args)
     digest = _publish_nonreplacing(args.output, payload)
     durable.validate_input_manifest_content(
-        args.output, digest, _trainer_arguments(manifest["training_config"]),
+        args.output, digest, _trainer_arguments(
+            manifest["training_config"], manifest["initial_adapter"], args.init_adapter_dir),
         manifest["trainer_source_sha256"], manifest["dataset_sha256"],
         manifest["model_weight_sha256"],
         manifest["training_config"]["checkpoint_every_optimizer_steps"],

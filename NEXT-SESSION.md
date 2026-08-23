@@ -1,6 +1,6 @@
 # AIRI 다음 세션 안내
 
-> **2026-08-24 02:19 KST 검토 PC 최우선 진입점 — E2-C1 FROZEN MILESTONE PUBLISHED / ADAPTER-INIT AUDIT NEXT:**
+> **2026-08-24 03:19 KST 검토 PC 최우선 진입점 — E2-C1 ADAPTER-INIT OFFLINE PASS / PUBLICATION PENDING:**
 > latest Goal은 E2 adapter weight를 초기값으로 쓰고 optimizer/scheduler/RNG/cursor는
 > 새로 시작하는 `E2-C1` 교정 후보다. correction 480, v4 replay 200, mixture 680과
 > 새 retained blind 3종/4 seeds/3 arms의 계약은 동결됐다. final 감사에서 확인한 exact
@@ -11,20 +11,22 @@
 > receipt commit `3dba3ca43a161d69f677eec2a8d10c3ddd061fca`는 origin/main에 push됐고,
 > push 직후 HEAD/local main/local origin/main/remote main exact·worktree/stage clean·PID 0이다.
 > 현재 `freeze_status=pass`, `gpu_authorized=false`, E2-C1 0 microstep/0 optimizer step이다.
-> blocker/다음 gate는 trainer의 E2 adapter-initialization seam을 GPU 없이 read-only 감사해
-> 지원 여부와 최소 변경 범위를 확정하는 것이다.
+> E2 weights-only init과 fresh optimizer/scheduler/RNG/cursor/progress, v2/v3 provenance와
+> closed inventory의 최소 구현은 pinned pycompile, focused 27/2·50/2·67/1, combined
+> 144 passed/5 skipped, continuity/full current-checkpoint/diff-check와 actual E2 helper를
+> PASS했다. blocker/다음 gate는 이 exact 배치의 commit/push와 clean/PID 0 receipt다.
 >
 > 새 PC에서는 다른 실행보다 먼저 `AGENTS.md` → `AIRI-WORKING-STATE.md` → 현행 handoff →
 > `AIRI-ROADMAP-STATUS.md` → 이 파일을 전체 읽고 Goal/Git/PID/E2/T3/blind를 read-only로
 > 대조한다. PID 0이면 `pause-airi-safely.ps1`을 실행하지 않는다. 현재 checkpoint의
-> exact 설계·SHA·blind gate는
+> exact 설계·SHA·blind gate와 adapter-init receipt는
 > `airi_docs/진행중/AIRI-E2-C1-FROZEN-CONTRACT-2026-08-24.md`에 있다. 다음 무-GPU 동작은
-> trainer adapter-initialization seam과 provenance/fresh optimizer·scheduler·RNG·cursor/run-state/
-> checkpoint/safe-pause 계약의 read-only 감사다. counts/splits/replay,
+> adapter-init 배치의 actual commit/push 여부를 먼저 확인하는 것이다. counts/splits/replay,
 > v4/base/E2, seed 42·batch 1·accumulation 16·seq 2048·512 microsteps·LR 1e-5·constant/K=3,
 > blind fixture/seed/threshold는 변경하지 않는다. milestone publication이 끝났어도 GPU를
-> 자동 시작하지 않으며, audit 결과와 필요한 최소 구현·fault 회귀가 검증·commit/push되고
-> HEAD=origin/main clean/PID 0인 뒤에만 bounded smoke intent를 별도로 기록한다.
+> 자동 시작하지 않으며, 이 구현·fault 회귀가 commit/push되고 HEAD=origin/main clean/PID 0인
+> 뒤에만 bounded smoke intent를 별도로 기록한다. review PC는 publication이 아직 pending이면
+> 먼저 boundary/security/cached diff를 재검증해 push하고, 이미 pushed면 SHA/clean만 대조한다.
 
 > **2026-08-23 22:38 KST E1/E2 사용자 검토 경계:** baseline/E1/E2는 모두 같은
 > Mi:dm 계열의 기존 broadcast v3/continuity-v4 1 epoch/2 epoch 후보다. E2는 E1 대비

@@ -1,6 +1,6 @@
 # AIRI E2-C1 교정 학습 동결 계약
 
-갱신: 2026-08-24 02:19 KST
+갱신: 2026-08-24 03:19 KST
 
 상태: **FROZEN / VALIDATED / MILESTONE PUBLISHED**
 
@@ -14,7 +14,7 @@ gpu_authorized=false
 microsteps_completed=0
 optimizer_steps_completed=0
 adoption_authorized=false
-blocker=adapter_initialization_seam_read_only_audit
+blocker=adapter_initialization_batch_publication_pending
 ```
 
 이 문서는 E2-C1 학습 전에 한 번 고정한 데이터·학습·비오염 평가 계약이다. checkpoint에서
@@ -22,10 +22,24 @@ blocker=adapter_initialization_seam_read_only_audit
 독립 verifier와 mutation regression으로 최소 수리했고 current bytes의 full gate가 PASS했다.
 이 frozen-contract 배치와 receipt는 commit `2e61842ba72875bff4d473653b635541e6e0b82a`/
 `3dba3ca43a161d69f677eec2a8d10c3ddd061fca`로 origin/main에 push됐고 직후
-HEAD/local·remote exact, worktree/stage clean, PID 0을 확인했다. 다음 gate는 trainer의
-adapter-initialization seam을 GPU 없이 read-only 감사하는 것이며, 감사와 필요한 최소 구현·
-fault 회귀의 검증·commit/push 전에는 bounded smoke를 시작하지 않는다. 동결은 T3 승자나
-운영 채택을 뜻하지 않는다.
+  HEAD/local·remote exact, worktree/stage clean, PID 0을 확인했다. 이후 trainer/builder/runner/
+  verifier의 weights-only adapter init, fresh optimizer/scheduler/RNG/cursor/progress와 fault
+  회귀 최소 구현은 offline full gate를 PASS했다. 현재 gate는 이 배치의 검증된 commit/push와
+  clean/PID 0 receipt이며 그 전에는 bounded smoke를 시작하지 않는다. 동결은 T3 승자나 운영
+  채택을 뜻하지 않는다.
+
+### Adapter-initialization 구현 부속 receipt
+
+- schema v3는 `init_mode=adapter-weights-only`와 E2 run/model/config/artifact/inventory를
+  결속하고 v2는 legacy config key set만 허용한다.
+- trainer는 held SHA를 PEFT load 직전에 다시 확인하고 checkpoint resume와 init을 상호배제한다.
+  optimizer/scheduler/RNG/cursor/progress는 새로 시작한다.
+- builder/runner/verifier는 extra file·undeclared/empty directory·link/reparse·special entry를
+  포함한 closed inventory 위반을 fail-closed한다.
+- pinned pycompile exit 0, focused suites 27 passed/2 skipped·50/2·67/1, combined
+  144 passed/5 skipped, continuity/full current-checkpoint/diff-check PASS다.
+- actual E2 helper는 run id `v4-e2-seed42-1600-20260823-074326`과 base/model/config/artifact
+  SHA를 builder/trainer 양쪽에서 exact 확인했다. GPU 실행·외부 run root 생성은 0이다.
 
 ## 1. 후보 정의와 금지선
 

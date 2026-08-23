@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 02:23:00 +09:00"
-checkpoint_id: "20260824-022300-frozen-milestone-finalization-commit-intent"
+updated_at_kst: "2026-08-24 03:22:18 +09:00"
+checkpoint_id: "20260824-032218-e2-c1-adapter-init-stage-receipt-commit-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "e2-c1-design-data-evaluation-contract"
-git_head: "3dba3ca43a161d69f677eec2a8d10c3ddd061fca"
-worktree_state: "frozen-milestone-finalization-staged-pass; HEAD-local-main-local-origin-main-remote-main-exact-3dba3ca; cached-seven-current-docs; finalization-commit-push-pending"
+active_phase: "e2-c1-adapter-init-offline-validation"
+git_head: "3d7d0e342dca32a432b46de4ff77f7a7a5aa83a7"
+worktree_state: "HEAD-local-main-local-origin-main-remote-main-exact-3d7d0e3; exact-nine-allowed-paths-modified-unstaged; 1331-insertions-74-deletions-before-doc-publication-batch; adapter-init-minimal-implementation-offline-pass; publication-pending"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-24 02:23 KST finalization stage receipt and commit intent: exact seven current docs only; continuity exit 0/PASS, worktree boundary exact 7, diff/security/stale pending/PID 0. Stage exit 0; cached names/rows 7, 873,441 bytes, manifest 4fa03bc39e29b914f30a378ecab0769cd04302ac6c530354d6b005d2bb08552d; unstaged/untracked, boundary diff, diff problems, binary, strong secret, personal path, stale pending and related AIRI PID excluding probe all 0. Restage this receipt and require fresh cached PASS before docs finalization commit/push. E2-C1 0/0, GPU 0, adoption forbidden."
+reconciliation_receipt: "2026-08-24 03:22 KST stage receipt/commit intent: git add exact 13 paths exit 0. Corrected cached identity is indexed rows 13, manifest SHA f7528afea628ebb3f79283418122bed8cfd9808978069f87a69bf097257f67c4, 1,453 insertions/98 deletions, unstaged/untracked 0, cached diff/security PASS. The first aggregate SHA helper used an unavailable static .NET HashData API and returned null as a non-authoritative subreceipt; stage bytes were unaffected, and the compatible SHA256.Create probe produced the authoritative value. Exact next state change is restage this receipt in WORKING/LOG, revalidate cached 13 paths/security/PID 0, then commit once as `fix: add E2-C1 adapter initialization`. All input pins, frozen training settings, output scope, success/failure/quota recovery and duplicate identity remain the 03:21 intent; no GPU or adoption mutation."
 ---
 
 # AIRI live working state
@@ -22,6 +22,167 @@ reconciliation_receipt: "2026-08-24 02:23 KST finalization stage receipt and com
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 03:22 KST **stage receipt + exact commit intent**: `git add` exact 13 paths
+  exited 0. Corrected cached identity is indexed rows 13, manifest SHA
+  `f7528afea628ebb3f79283418122bed8cfd9808978069f87a69bf097257f67c4`, 1,453
+  insertions/98 deletions, unstaged/untracked 0, cached diff/security PASS. The first aggregate
+  SHA helper used an unavailable static .NET `HashData` API and returned null as a non-authoritative
+  subreceipt; stage bytes were unaffected, and the compatible `SHA256.Create` probe produced the
+  authoritative value above. Exact next state change is restage this receipt in WORKING/LOG,
+  revalidate cached 13 paths/security/PID 0, then commit once as
+  `fix: add E2-C1 adapter initialization`. All input pins, frozen training settings, output scope,
+  success/failure/quota recovery and duplicate identity remain the 03:21 intent. No GPU smoke or
+  adoption mutation is in scope.
+- 2026-08-24 03:21 KST **adapter-init publication stage intent**: expanded exact 13-path
+  boundary is 1,429 insertions/98 deletions with staged/untracked/unexpected/forbidden/binary/
+  oversize/secret/personal-path 0; continuity and diff-check PASS. Exact purpose is stage only
+  these verified code/tests/current SSoT, validate cached boundary/security, commit
+  `fix: add E2-C1 adapter initialization`, then record receipts and push `origin/main`. Inputs are
+  HEAD `3d7d0e3`, frozen dataset `c845adfc...1980`, base `394b6624...f506`, E2 model/config/
+  artifact `2a72292c...5c5b`/`e01129ea...2b0`/`70998cff...7195` and the final seven code/test
+  SHA in the handoff. Frozen seed 42, batch 1, accumulation 16, seq 2048, 512/32 steps,
+  LR 1e-5, constant scheduler and checkpoint 3/≤600 seconds are unchanged and not executed.
+  Output is Git index/commits/remote main only; external run root is absent, authoritative state is
+  this file, expected AIRI PID is 0. Success requires cached PASS, commit/push exit 0, HEAD/local/
+  remote exact clean and PID 0. On failure stop without force/retry/GPU, preserve index/commit,
+  and recover after quota via mandatory five docs→Goal→HEAD/index/remote/PID→checkpoint ID.
+  Duplicate identity is this checkpoint, parent `3d7d0e3`, exact 13 paths, subject and final code
+  SHA. No GPU smoke or adoption mutation is in scope.
+- 2026-08-24 03:19 KST **adapter-init offline PASS + publication intent**: the minimal
+  trainer/builder/runner/verifier implementation binds the E2 adapter as weights-only
+  initialization while optimizer/scheduler/RNG/cursor/progress start fresh; init and checkpoint
+  resume are mutually exclusive. It also owns v2/v3 schema keys, re-verifies held SHA immediately
+  before the PEFT load, and enforces a closed adapter inventory including extra files/directories,
+  links/reparse points and special entries. Pinned pycompile is exit 0; focused suites are
+  27 passed/2 skipped, 50/2 and 67/1; combined is 144 passed/5 skipped. Work-continuity and the
+  full offline current-checkpoint contract PASS; diff-check is exit 0. The actual E2 builder/trainer
+  helper probe PASSed with run id `v4-e2-seed42-1600-20260823-074326` and exact base/model/config/
+  artifact pins. Pre-doc worktree is exact 9 paths, staged/untracked 0, 1,331 insertions/
+  74 deletions. Related AIRI PID is 0; GPU is 1,077/8,192 MiB, 18%, 42 C with AIRI workload 0;
+  E2-C1 is 0/0. Exact next purpose is update current handoff/status/NEXT/frozen contract, verify
+  expanded boundary/security, Conventional Commit and push. No GPU smoke, service/model/tag or
+  adoption mutation is authorized in this publication batch. Durable run 0 means pause is not
+  applicable; sudden quota loss recovers as `interrupted-awaiting-quota-reset`.
+- 2026-08-24 03:10 KST **post-compact full authority reconciliation receipt**: after the
+  03:08 Git correction, external E2/T3/blind authority was freshly reconciled read-only.
+  Pre-receipt worktree is the exact 9 allowed modified paths with staged/untracked 0 and
+  1,165 insertions/63 deletions. E2 is `complete` revision 1,635, terminal exit 0/
+  `trainer-complete`, 1,600/1,600 microsteps·100/100 optimizer steps·pending 0. Current/
+  previous state, anchor/index, checkpoint 35/34 manifest/payload/event, final/producer/progress,
+  adapter/config/artifact/report and log size/SHA are exact. Dev losses remain epoch 1
+  `2.893371758116589`, epoch 2 `2.735453106217887`, selected epoch 2; adoption is false and
+  T3 pending. T3 inventory remains reports/packets/evidence/runtime/comparisons 36/36/89/72/2
+  with exact totals and fixture/model/two comparator SHA; summary is absent. Blind root remains
+  exact five files, validation PASS, expected reports 36 and `response_viewed=false`. Log, T3
+  report and blind fixture bodies were not read. Related AIRI PID is 0, GPU has no identifiable
+  AIRI workload, and E2-C1 remains 0/0. Gate returns to root review, minimal code fixes, pinned
+  CPU/offline regression and actual E2 helper validation. Durable run 0 means pause is not
+  applicable; sudden quota loss recovers as `interrupted-awaiting-quota-reset`.
+- 2026-08-24 03:08 KST **post-compact Git reconciliation correction**: mandatory five
+  documents were loaded in the required order and the current live gate was reread in UTF-8.
+  Goal API is `active`; HEAD/local main/local origin/main/remote main are exact
+  `3d7d0e342dca32a432b46de4ff77f7a7a5aa83a7`. Actual worktree remains the exact 9
+  allowed modified paths with staged/untracked 0, but the 03:04 receipt-doc edits make the
+  pre-correction diff 1,144 insertions/63 deletions rather than the recorded 1,116/63.
+  Related AIRI durable runner/trainer/service/T3/campaign PID is 0. GPU is 1,073/8,192 MiB,
+  16%, 42 C with identifiable AIRI workload 0; E2-C1 remains 0/0. Per fail-closed policy,
+  external E2/T3/blind authority and code work remain stopped until this correction is recorded
+  and those receipts are freshly reconciled. Durable run 0 means pause is not applicable;
+  sudden quota loss recovers as `interrupted-awaiting-quota-reset`.
+- 2026-08-24 03:04 KST **post-compact full authority reconciliation receipt**: after the
+  03:01 Git correction, external E2/T3/blind authority was read-only reconciled. Pre-receipt
+  worktree remained the exact 9 allowed paths with staged/untracked 0 and 1,116 insertions/
+  63 deletions. Related AIRI PID is 0; GPU is 1,073/8,192 MiB, 16%, 42 C with identifiable
+  AIRI workload 0; E2-C1 is 0/0. E2 is `complete` revision 1,635, terminal exit 0/
+  `trainer-complete`, 1,600/1,600 microsteps·100/100 optimizer steps·pending 0. Current/
+  previous state, anchor/index, checkpoint 35/34 manifest/payload/event, final/producer/progress,
+  adapter/config/artifact/report and log size/SHA are exact. The report remains selected dev epoch
+  2/loss `2.735453106217887`, training authorized, adoption false, T3 pending. T3 inventory remains
+  reports/packets/evidence/runtime/comparisons 36/36/89/72/2 with totals 7,296,178/787,171/
+  801,050/15,056,896/392 bytes, fixture/model and both comparator SHA exact, summary absent.
+  Blind root remains exact five files, validation PASS, expected reports 36 and
+  `response_viewed=false`. Log, T3 report and blind fixture bodies were not read. Current gate is
+  root review plus pinned CPU/offline validation and actual E2 helper validation of the adapter-
+  init batch; no GPU/stage/commit/push before PASS. Durable run 0 means pause is not applicable;
+  sudden quota loss recovers as `interrupted-awaiting-quota-reset`.
+- 2026-08-24 03:01 KST **post-compact Git reconciliation correction**: mandatory five
+  documents were reread in the required order to EOF and Goal API is `active`. HEAD/local main/
+  local origin/main/remote main are exact `3d7d0e342dca32a432b46de4ff77f7a7a5aa83a7`.
+  Actual worktree remains the exact 9 allowed paths with staged/untracked 0, but the 02:54
+  receipt-doc edits make the current diff 1,091 insertions/63 deletions rather than the recorded
+  1,065/63; repository diff-check exit is 0. Related AIRI process count is 0. GPU is
+  1,073/8,192 MiB, 16%, 42 C with identifiable AIRI workload 0; E2-C1 remains 0/0. The first
+  combined Git wrapper was read-only but non-authoritative because `ErrorActionPreference=Stop`
+  promoted expected LF-to-CRLF native warnings before receipt assembly; a corrected warning-
+  suppressed wrapper exited 0 and produced the values above. Per the fail-closed contract, code
+  work remains stopped until external E2/T3/blind receipts are read-only reconciled after this
+  document correction. Current adapter-init bytes are not root PASS or a milestone. Durable run
+  0 means pause is not applicable; sudden quota loss recovers as
+  `interrupted-awaiting-quota-reset`.
+- 2026-08-24 02:54 KST **post-compact authority reconciliation correction**: mandatory five
+  documents were reread in the required order to EOF. Goal API is `active`; HEAD/local main/local
+  origin/main/remote main are exact `3d7d0e342dca32a432b46de4ff77f7a7a5aa83a7`. Actual
+  worktree is the same exact 9 allowed modified paths with staged/untracked 0, now 1,065
+  insertions/63 deletions after the latest reconciliation-doc edits; repository diff-check exit 0.
+  Related AIRI runner/trainer/service/T3/campaign PID is 0. GPU is 1,073/8,192 MiB, 15%, 42°C
+  with identifiable AIRI workload 0; E2-C1 remains 0 microstep/0 optimizer step. E2 authority is
+  complete revision 1,635, 1,600/1,600·100/100·pending 0; state/anchor/index, checkpoint 35/34,
+  final/producer/progress, adapter/config/artifact/report and log size/SHA are exact. T3 inventory
+  remains 36/36/89/72/2 with both comparison SHA exact and summary absent. Blind root remains exact
+  five files, validation PASS and `response_viewed=false`. Log, T3 report and blind fixture bodies
+  were not read. The earlier 1,023/52 count is therefore superseded, not an unexpected code path.
+  Current gate remains root review plus pinned CPU/offline validation of this adapter-init batch;
+  no GPU smoke, stage, commit or push is authorized until it passes. Durable run 0 means pause is
+  not applicable; sudden quota loss recovers as `interrupted-awaiting-quota-reset`.
+- 2026-08-24 02:43 KST **post-compact adapter-init implementation reconciliation**:
+  필수 다섯 문서를 지정 순서·UTF-8로 EOF까지 재독했고 Goal API는 `active`다. HEAD/local
+  main/local origin/main/remote main은 exact `3d7d0e342dca32a432b46de4ff77f7a7a5aa83a7`이다.
+  actual worktree는 직전 intent가 허용한 exact 9 paths만 modified, staged/untracked 0이다:
+  WORKING/ROADMAP-LOG, input-manifest builder, durable runner+test, trainer+test, equivalence
+  verifier+test다. diff는 1,023 insertions/52 deletions이며 아직 root 통합 검증 전이다.
+  관련 AIRI runner/trainer/service/T3/campaign PID는 0이다. GPU는 1,073/8,192 MiB를 사용
+  중이나 식별 가능한 AIRI workload는 0이고 E2-C1은 0 microstep/0 optimizer step이다.
+  E2 authority는 complete revision 1,635, 1,600/1,600·100/100·pending 0이고 current/
+  previous state, anchor, checkpoint index 35/34 manifest/payload/event, final evidence,
+  input manifest와 adapter/config/artifact/report size/SHA가 기존 권위값과 exact하다. 로그는
+  1,874/500 bytes SHA exact이며 본문을 읽지 않았다. T3 inventory는 reports/packets/evidence/
+  runtime/comparisons 36/36/89/72/2, totals 7,296,178/787,171/801,050/15,056,896/392
+  bytes, fixture/model manifest와 두 comparison SHA exact, summary absent다. T3 report body는
+  읽지 않았다. blind root는 exact 5 files, validation PASS, expected reports 36,
+  `response_viewed=false`이며 fixture body는 읽지 않았다. 현재 gate는 이 exact adapter-init
+  최소 구현의 root code review, pinned CPU/offline pycompile+regression과 actual E2 structured
+  provenance helper 검증이다. PASS 전 smoke/GPU/stage/commit/push는 금지한다. durable run이
+  없어 quota/power pause 대상이 아니며 갑작스러운 종료는 `interrupted-awaiting-quota-reset`로
+  복구한다.
+- 2026-08-24 02:28 KST **adapter-init read-only audit receipt + minimal implementation intent**:
+  finalization commit `3d7d0e342dca32a432b46de4ff77f7a7a5aa83a7`, parent `3dba3ca...1fca`,
+  7 files/119 insertions/59 deletions과 push `3dba3ca..3d7d0e3 main -> main`은 exit 0이다.
+  직후 HEAD/local main/local origin/main/remote main exact, clean, related AIRI PID 0,
+  E2-C1 0/0이다. read-only 감사에서 trainer는 `get_peft_model` fresh base LoRA와 동일 run
+  `--resume-from-checkpoint` full-state 복원만 지원하고, E2 weights-only init flag/loader/pin/
+  provenance가 없음을 확인했다. runner와 input manifest v2는 dataset/base/trainer/config만
+  bind하며 equivalence verifier도 같은 v2 key set만 허용한다. checkpoint resume는 optimizer/
+  scheduler/RNG/step/epoch/cursor/history를 복원하므로 E2-C1 초기화로 사용할 수 없다.
+  목적은 일반 리팩터링 없이 `--init-adapter-dir`과 model/config/artifact-manifest exact SHA,
+  `init_mode=adapter-weights-only`, E2 artifact/run provenance, fresh optimizer/scheduler/RNG/
+  cursor/progress evidence, init-vs-resume 상호배제와 pin/path/content fault 회귀를 추가하는 것이다.
+  허용 범위는 trainer+test, input-manifest builder, durable runner+test, equivalence verifier+test와
+  WORKING/ROADMAP-LOG exact 9 files뿐이다. 입력은 HEAD `3d7d0e3`, dataset
+  `c845adfc...1980`, base `394b6624...f506`, E2 adapter/config/artifact-manifest
+  `2a72292c...c5b`/`e01129ea...2b0`/`70998c...7195`, E2 artifact run id
+  `v4-e2-seed42-1600-20260823-074326`, code SHA `4fe27935...eeeb`/`ad326e97...3fbc`/
+  `181ead6b...3387`/`2a15333c...a98b`와 tests `fd64c39c...377d`/
+  `c3adbe2d...5e86`/`c57e3f8d...6a7e`다. 동결값 seed 42, batch 1, accumulation 16,
+  seq 2048, 512/32 steps, LR 1e-5, constant scheduler, checkpoint 3/≤600초는 불변이고 실행하지
+  않는다. output은 repository code/tests/docs뿐이며 external output/run root는 없음,
+  authoritative state는 이 파일, 예상 AIRI runner/trainer PID는 0이다. 성공 조건은 CPU/offline
+  tests가 adapter tensor equality at initialization, optimizer state empty, progress/cursor zero,
+  manifest/run-state/checkpoint/report provenance exact, init/resume mutual exclusion, tamper/missing/
+  SHA mismatch fail-closed와 기존 v2 resume compatibility를 PASS하는 것이다. 실패·중단 시 GPU/
+  launch/smoke/commit/push를 하지 않고 bytes와 test receipt를 보존한다. quota/session 유실 뒤
+  mandatory 5문서→Goal→HEAD/status/PID→checkpoint ID→exact allowed paths/tests 순으로 복구한다.
+  중복 identity는 checkpoint `20260824-022800-e2-c1-adapter-init-minimal-implementation-intent`,
+  pre-intent HEAD/code SHA와 E2 three SHA다. durable run은 없어 pause 대상이 아니다.
 - 2026-08-24 02:23 KST **finalization stage receipt + commit intent**: current exact 7 docs는
   continuity exit 0/literal PASS, worktree boundary exact, diff/security/stale pending/PID 0이다.
   stage exit 0 뒤 cached names/rows 7, 873,441 bytes, manifest
@@ -4644,17 +4805,18 @@ reconciliation_receipt: "2026-08-24 02:23 KST finalization stage receipt and com
 
 ## 4. 다음 허용 행동
 
-1. frozen contract와 handoff/roadmap status+log/NEXT/current-docs-index를 current full
-   validation PASS와 exact dataset SHA에 맞춘다. code/data/commitment/policy/workflow는 더
-   수정하지 않는다.
-2. focused continuity, exact path boundary, repo diff-check와 forbidden artifact/binary/
-   oversize/secret/personal-path scan을 PASS한 뒤 기록된 경로만 stage하고 cached gate를
-   다시 검증한다.
-3. 검증 배치만 Conventional Commit으로 origin/main push하고 actual push receipt를 문서에
-   남긴 뒤 HEAD=origin/main clean·staged/untracked 0·관련 PID 0을 확인한다.
-4. publication clean 뒤 trainer가 E2 adapter weight-only initialization + fresh optimizer/
-   scheduler/RNG/cursor를 지원하는지 별도 intent에서 먼저 감사한다. 같은 public T3 matrix,
-   blind 확인 뒤 계약 변경, E3/E2-C2, campaign, 운영 채택/기본 서비스 모델 변경은 금지한다.
+1. current exact 9-path adapter-init diff를 root가 검토하고 pinned Python 3.12 pycompile과
+   trainer/runner/equivalence focused regression을 실행한다. GPU/CUDA training은 실행하지 않는다.
+2. actual E2 adapter artifact를 read-only validator/helper에 넣어 model/config/artifact-manifest/
+   base/run provenance와 expanded target modules를 exact하게 수용하고 tamper fault를 거부하는지
+   확인한다. adapter tensor/model load와 외부 output publication은 아직 실행하지 않는다.
+3. 모든 affected regression, v2 compatibility, continuity, exact path boundary, repo diff-check와
+   forbidden artifact/binary/oversize/secret/personal-path scan이 PASS한 경우에만 implementation
+   receipt와 다음 milestone 문서 intent를 기록한다.
+4. 검증된 adapter-init 배치만 Conventional Commit으로 origin/main push하고 actual push receipt,
+   HEAD=origin/main clean·staged/untracked 0·관련 PID 0을 확인한다. bounded GPU smoke는 별도
+   intent와 receipt commit/push 전에는 시작하지 않는다. 같은 public T3 matrix, blind 확인 뒤
+   계약 변경, E3/E2-C2, campaign, 운영 채택/기본 서비스 모델 변경은 금지한다.
 
 ## 5. 갱신 트리거
 

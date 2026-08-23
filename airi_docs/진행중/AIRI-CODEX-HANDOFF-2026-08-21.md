@@ -1,8 +1,8 @@
 # AIRI Codex GPU 인수인계 — broadcast continuity v4
 
-갱신: 2026-08-24 02:19 KST (파일명은 현행 GPU SSoT 식별자로 유지)
+갱신: 2026-08-24 03:19 KST (파일명은 현행 GPU SSoT 식별자로 유지)
 
-상태: **ACTIVE, E2-C1 FIRST MILESTONE PUBLISHED — ADAPTER-INIT AUDIT NEXT. K=3 controlled GPU와 authoritative E2
+상태: **ACTIVE, E2-C1 ADAPTER-INIT OFFLINE PASS — PUBLICATION PENDING. K=3 controlled GPU와 authoritative E2
 1,600/1,600, E1/E2 merge·BF16/Q4_K_M package는 완료·미채택이다. authoritative T3는
 baseline/E1/E2 각 12, 총 36 reports와 두 comparator까지 실행했으나 두 comparison이 모두
 `status=fail`, paired reports 0, reason `polite violation or invented handle`로 종료해 launcher
@@ -11,8 +11,11 @@ exit 1이고 `summary.json`은 없다. winner 0이므로 3×500 campaign은 금�
 교정 후보 E2-C1의 데이터·비오염 평가 계약은 current bytes에서 full freeze validation을
 PASS했다. 앞서 확인한 `으로/로` 오류 5건과 validator 공백은 최소 수리·회귀로 닫혔다.
 milestone `2e61842`와 receipt `3dba3ca`는 origin/main에 push됐고 직후 local/remote exact·
-clean·PID 0이다. 현재 blocker/다음 gate는 trainer adapter-init seam의 read-only 감사이며
-그 감사 전에는 `gpu_authorized=false`다. E2-C1 GPU는 0/0이고 승자·채택 모델도 아니다.**
+  clean·PID 0이다. E2 weights-only init과 fresh optimizer/scheduler/RNG/cursor/progress,
+  manifest/run-state/checkpoint provenance와 fault 회귀의 최소 구현은 pinned CPU/offline gate를
+  PASS했다. 현재 blocker는 이 adapter-init 배치의 검증된 commit/push와 clean/PID 0 receipt다.
+  그 전에는 `gpu_authorized=false`이고 bounded smoke도 시작하지 않는다. E2-C1 GPU는 0/0이며
+  승자·채택 모델도 아니다.**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
@@ -23,6 +26,31 @@ clean·PID 0이다. 현재 blocker/다음 gate는 trainer adapter-init seam의 r
 병합·패키징, 로컬 서비스, T3·장시간 캠페인, 검증된 milestone commit/push가
 명시적으로 재승인됐다. 운영 채택과 기본 서비스 모델 변경은 별도 사용자 승인 전까지
 계속 금지한다.
+
+## -5. 2026-08-24 E2-C1 adapter-init offline PASS / publication pending
+
+- trainer는 E2 adapter model/config/artifact-manifest를 lowercase SHA와 source base SHA,
+  LoRA config/target modules로 검증하고 `PeftModel.from_pretrained(..., is_trainable=True)`로
+  weight만 초기화한다. PEFT load 직전 held descriptor를 다시 stat/hash하며 checkpoint resume와
+  init을 상호배제한다. optimizer/scheduler/RNG/cursor/progress는 새 run에서 0부터 시작한다.
+- input-manifest builder·durable runner·equivalence verifier는 schema v3 `init_mode`와 E2 run/
+  model/config/artifact/inventory provenance를 결속한다. v2는 기존 key set만 허용한다. adapter
+  inventory는 extra file·empty/undeclared directory·link/reparse·special entry를 fail-closed한다.
+  durable resume에서는 E2 init flag를 재주입하지 않고 같은 process tree의 checkpoint full-state
+  resume만 수행해 초기화와 resume 의미를 섞지 않는다.
+- pinned Python 3.12 pycompile은 exit 0, trainer/runner/verifier focused suite는 각각
+  27 passed/2 skipped, 50/2, 67/1이고 combined는 144 passed/5 skipped다. work-continuity,
+  full `test-current-checkpoint.ps1`, repository diff-check도 PASS했다.
+- actual E2 read-only helper probe는 run id `v4-e2-seed42-1600-20260823-074326`, base
+  `394b6624...f506`, adapter/config/artifact `2a72292c...5c5b`/`e01129ea...2b0`/
+  `70998cff...7195`와 3-file artifact inventory를 builder/trainer 양쪽에서 exact 확인했다.
+- final code SHA는 builder/runner/trainer/verifier `415934b4...d218`/`df522273...24ec`/
+  `6b19ad5c...43f8`/`5bbe1071...335f`; tests는 `9e2e4a4f...4038`/
+  `391d45cb...ee4`/`04a54b4f...8ee3`다.
+- 현재 publication 전 HEAD/remote는 `3d7d0e3`, related PID 0, GPU AIRI workload 0,
+  E2-C1 0/0이다. 이 배치를 Conventional Commit으로 origin/main에 push하고 HEAD=remote
+  clean/PID 0을 확인하기 전에는 bounded GPU smoke를 시작하지 않는다. 검토 PC는 push receipt
+  뒤 별도 intent에서만 fresh external smoke root를 만들 수 있다.
 
 ## -4. 2026-08-24 E2-C1 frozen-contract first milestone
 

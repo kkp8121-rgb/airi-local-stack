@@ -287,10 +287,17 @@ def _input_manifest_binding(state: Mapping[str, Any], expected_sha256: str,
                             expected_training_config_sha256: str) -> dict[str, str]:
     """Re-verify the completed run's durable manifest identity and bytes."""
     inputs = state.get("inputs")
-    required = {"dataset_sha256", "model_weight_sha256", "trainer_source_sha256",
-                "input_manifest_path", "input_manifest_sha256",
-                "input_manifest_training_config_sha256", "checkpoint_helper_source_sha256"}
-    if not isinstance(inputs, dict) or set(inputs) != required:
+    required_v2_inputs = {
+        "dataset_sha256", "model_weight_sha256", "trainer_source_sha256",
+        "input_manifest_path", "input_manifest_sha256",
+        "input_manifest_training_config_sha256", "checkpoint_helper_source_sha256",
+    }
+    required_v3_inputs = required_v2_inputs | {
+        "init_mode", "init_adapter_dir", "init_adapter_model_sha256",
+        "init_adapter_config_sha256", "init_adapter_artifact_manifest_sha256",
+    }
+    if not isinstance(inputs, dict) or frozenset(inputs) not in {
+            frozenset(required_v2_inputs), frozenset(required_v3_inputs)}:
         raise EquivalenceError("completed run input manifest identity is malformed")
     recorded_path = inputs.get("input_manifest_path")
     recorded_sha256 = inputs.get("input_manifest_sha256")
@@ -322,21 +329,35 @@ def _input_manifest_binding(state: Mapping[str, Any], expected_sha256: str,
             raise EquivalenceError("completed run input manifest is not canonical JSON")
     except (TypeError, ValueError) as exc:
         raise EquivalenceError("completed run input manifest contains non-canonical values") from exc
-    required_manifest = {"schema_version", "dataset_sha256", "model_weight_sha256",
-                         "trainer_source_sha256", "training_config", "training_config_sha256",
-                         "checkpoint_helper_source_sha256", "model_inventory"}
-    if (set(manifest) != required_manifest
-            or manifest.get("schema_version") != "airi.behavior-input-manifest.v2"):
+    required_v2_manifest = {
+        "schema_version", "dataset_sha256", "model_weight_sha256",
+        "trainer_source_sha256", "training_config", "training_config_sha256",
+        "checkpoint_helper_source_sha256", "model_inventory",
+    }
+    required_v3_manifest = required_v2_manifest | {"initial_adapter"}
+    schema = manifest.get("schema_version")
+    if ((schema == "airi.behavior-input-manifest.v2"
+         and (set(manifest) != required_v2_manifest or set(inputs) != required_v2_inputs))
+            or (schema == "airi.behavior-input-manifest.v3"
+                and (set(manifest) != required_v3_manifest or set(inputs) != required_v3_inputs))
+            or schema not in {"airi.behavior-input-manifest.v2",
+                              "airi.behavior-input-manifest.v3"}):
         raise EquivalenceError("completed run input manifest schema mismatch")
     config = manifest.get("training_config")
-    config_keys = {"mode", "seed", "lora_r", "lora_alpha", "lora_dropout",
-                   "learning_rate", "max_steps", "batch_size",
-                   "gradient_accumulation", "max_seq_len",
-                   "checkpoint_every_optimizer_steps", "deterministic_validation"}
+    config_keys = {
+        "mode", "seed", "lora_r", "lora_alpha", "lora_dropout",
+        "learning_rate", "max_steps", "batch_size", "gradient_accumulation",
+        "max_seq_len", "checkpoint_every_optimizer_steps", "deterministic_validation",
+    }
+    if schema == "airi.behavior-input-manifest.v3":
+        config_keys.add("init_mode")
     if not isinstance(config, dict) or set(config) != config_keys:
         raise EquivalenceError("completed run input manifest training configuration schema mismatch")
     if config.get("mode") not in {"cuda-qlora", "cpu-smoke"}:
         raise EquivalenceError("completed run input manifest training mode is invalid")
+    if (schema == "airi.behavior-input-manifest.v3"
+            and config.get("init_mode") not in {"fresh-lora", "adapter-weights-only"}):
+        raise EquivalenceError("completed run input manifest initialization mode is invalid")
     for key in ("seed", "lora_r", "lora_alpha", "max_steps", "batch_size",
                 "gradient_accumulation", "max_seq_len",
                 "checkpoint_every_optimizer_steps"):
@@ -375,11 +396,102 @@ def _input_manifest_binding(state: Mapping[str, Any], expected_sha256: str,
                 or not isinstance(row.get("sha256"), str) or not _HEX64.fullmatch(row["sha256"])):
             raise EquivalenceError("completed run input manifest model inventory row is invalid")
         seen.add(row["path"])
+    result = {"path": canonical_path, "sha256": actual_sha256,
+              "training_config_sha256": recorded_training_config_sha256}
+    if schema == "airi.behavior-input-manifest.v3":
+        init_mode = config["init_mode"]
+        if inputs.get("init_mode") != init_mode:
+            raise EquivalenceError("completed run initial adapter mode differs")
+        adapter_keys = (
+            "init_adapter_model_sha256", "init_adapter_config_sha256",
+            "init_adapter_artifact_manifest_sha256",
+        )
+        if init_mode == "fresh-lora":
+            if (manifest.get("initial_adapter") is not None
+                    or inputs.get("init_adapter_dir") != ""
+                    or any(inputs.get(key) != "" for key in adapter_keys)):
+                raise EquivalenceError("fresh LoRA run retains unexpected initial adapter provenance")
+        else:
+            initial = manifest.get("initial_adapter")
+            required_initial = {
+                "run_id", "model_sha256", "config_sha256",
+                "artifact_manifest_sha256", "files",
+            }
+            if (not isinstance(initial, dict) or set(initial) != required_initial
+                    or not isinstance(initial.get("run_id"), str) or not initial["run_id"]
+                    or not all(isinstance(initial.get(key), str)
+                               and _HEX64.fullmatch(initial[key])
+                               for key in ("model_sha256", "config_sha256",
+                                           "artifact_manifest_sha256"))):
+                raise EquivalenceError("completed run initial adapter manifest is invalid")
+            input_to_manifest = {
+                "init_adapter_model_sha256": "model_sha256",
+                "init_adapter_config_sha256": "config_sha256",
+                "init_adapter_artifact_manifest_sha256": "artifact_manifest_sha256",
+            }
+            if any(inputs.get(input_key) != initial[manifest_key]
+                   for input_key, manifest_key in input_to_manifest.items()):
+                raise EquivalenceError("completed run initial adapter pin differs")
+            recorded_adapter_dir = inputs.get("init_adapter_dir")
+            if not isinstance(recorded_adapter_dir, str) or not recorded_adapter_dir:
+                raise EquivalenceError("completed run initial adapter directory is missing")
+            adapter_dir = _local_dir(Path(recorded_adapter_dir), "initial adapter directory")
+            if str(adapter_dir) != recorded_adapter_dir:
+                raise EquivalenceError("completed run initial adapter directory is not canonical")
+            files = initial.get("files")
+            if not isinstance(files, list) or not files:
+                raise EquivalenceError("completed run initial adapter inventory is invalid")
+            listed: set[str] = set()
+            rows: dict[str, dict[str, Any]] = {}
+            for row in files:
+                if (not isinstance(row, dict) or set(row) != {"path", "bytes", "sha256"}
+                        or not isinstance(row.get("path"), str) or not row["path"]
+                        or Path(row["path"]).is_absolute() or ".." in Path(row["path"]).parts
+                        or row["path"] in listed or not isinstance(row.get("bytes"), int)
+                        or isinstance(row["bytes"], bool) or row["bytes"] < 0
+                        or not isinstance(row.get("sha256"), str)
+                        or not _HEX64.fullmatch(row["sha256"])):
+                    raise EquivalenceError("completed run initial adapter inventory row is invalid")
+                listed.add(row["path"])
+                rows[row["path"]] = row
+                path, data = _read_regular_file_snapshot(
+                    adapter_dir / row["path"], "initial adapter input")
+                if _EVIDENCE_CUT is not None:
+                    _EVIDENCE_CUT[path] = data
+                if len(data) != row["bytes"] or _sha256_bytes(data) != row["sha256"]:
+                    raise EquivalenceError("completed run initial adapter input integrity mismatch")
+            if (rows.get("adapter_model.safetensors", {}).get("sha256")
+                    != initial["model_sha256"]
+                    or rows.get("adapter_config.json", {}).get("sha256")
+                    != initial["config_sha256"]):
+                raise EquivalenceError("completed run initial adapter inventory pin differs")
+            artifact_path, artifact_raw = _read_regular_file_snapshot(
+                adapter_dir / "artifact-manifest.json", "initial adapter artifact manifest")
+            if _EVIDENCE_CUT is not None:
+                _EVIDENCE_CUT[artifact_path] = artifact_raw
+            if _sha256_bytes(artifact_raw) != initial["artifact_manifest_sha256"]:
+                raise EquivalenceError("completed run initial adapter artifact manifest differs")
+            try:
+                artifact = json.loads(artifact_raw.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise EquivalenceError("initial adapter artifact manifest is invalid JSON") from exc
+            if (not isinstance(artifact, dict)
+                    or set(artifact) != {"schema_version", "run_id", "pins", "files"}
+                    or artifact.get("schema_version") != "airi.behavior-adapter-artifact.v1"
+                    or artifact.get("run_id") != initial["run_id"]
+                    or artifact.get("files") != files
+                    or not isinstance(artifact.get("pins"), dict)
+                    or artifact["pins"].get("model_weight_sha256")
+                    != inputs.get("model_weight_sha256")):
+                raise EquivalenceError("initial adapter artifact provenance differs")
+            _closed_inventory_paths(
+                adapter_dir, listed | {"artifact-manifest.json"},
+                "initial adapter inventory")
+        result["init_mode"] = init_mode
     if (recorded_training_config_sha256 != config_sha256
             or config_sha256 != expected_training_config_sha256):
         raise EquivalenceError("completed run input manifest training config differs from the controlled target")
-    return {"path": canonical_path, "sha256": actual_sha256,
-            "training_config_sha256": recorded_training_config_sha256}
+    return result
 
 
 def _artifact_dir(state: Mapping[str, Any], explicit: Path | None, label: str) -> Path:
@@ -389,6 +501,47 @@ def _artifact_dir(state: Mapping[str, Any], explicit: Path | None, label: str) -
     if not isinstance(receipt, dict) or not isinstance(receipt.get("path"), str):
         raise EquivalenceError(f"{label} must be supplied when run-state has no adapter receipt")
     return _local_dir(Path(receipt["path"]), label)
+
+
+def _closed_inventory_paths(directory: Path, expected_files: set[str], label: str) -> None:
+    """Reject undeclared files, directories, links, reparse points, and special entries."""
+
+    expected_directories = {
+        parent.as_posix()
+        for relative in expected_files
+        for parent in Path(relative).parents
+        if parent != Path(".")
+    }
+    actual_files: set[str] = set()
+    actual_directories: set[str] = set()
+    pending = [directory]
+    while pending:
+        current = pending.pop()
+        try:
+            with os.scandir(current) as scan:
+                entries = list(scan)
+        except OSError as exc:
+            raise EquivalenceError(f"{label} cannot be inspected") from exc
+        for entry in entries:
+            candidate = Path(entry.path)
+            try:
+                metadata = entry.stat(follow_symlinks=False)
+            except OSError as exc:
+                raise EquivalenceError(f"{label} entry cannot be inspected") from exc
+            attributes = getattr(metadata, "st_file_attributes", 0)
+            if (entry.is_symlink()
+                    or attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
+                raise EquivalenceError(f"{label} contains a linked entry")
+            relative = candidate.relative_to(directory).as_posix()
+            if stat.S_ISDIR(metadata.st_mode):
+                actual_directories.add(relative)
+                pending.append(candidate)
+            elif stat.S_ISREG(metadata.st_mode):
+                actual_files.add(relative)
+            else:
+                raise EquivalenceError(f"{label} contains a special entry")
+    if actual_files != expected_files or actual_directories != expected_directories:
+        raise EquivalenceError(f"{label} file inventory mismatch")
 
 
 def _verify_artifact_snapshot(directory: Path, pins: Mapping[str, Any],
@@ -419,15 +572,8 @@ def _verify_artifact_snapshot(directory: Path, pins: Mapping[str, Any],
         if len(data) != entry["bytes"] or _sha256_bytes(data) != entry["sha256"]:
             raise EquivalenceError("adapter artifact file integrity mismatch")
         file_bytes[entry["path"]] = data
-    entries = list(directory.rglob("*"))
-    if any(path.is_symlink()
-           or getattr(os.lstat(path), "st_file_attributes", 0) & 0x400
-           for path in entries):
-        raise EquivalenceError("adapter artifact inventory contains a linked entry")
-    actual = {path.relative_to(directory).as_posix() for path in entries
-              if path.is_file() and path.name != "artifact-manifest.json"}
-    if actual != listed:
-        raise EquivalenceError("adapter artifact file inventory mismatch")
+    _closed_inventory_paths(
+        directory, listed | {"artifact-manifest.json"}, "adapter artifact inventory")
     return {"manifest": manifest, "manifest_sha256": _sha256_bytes(_canonical(manifest)),
             "files": file_bytes}
 
@@ -873,6 +1019,86 @@ def _closed_producer_evidence(state: Mapping[str, Any], run_dir: Path,
             "report_sha256": producer["report_sha256"]}
 
 
+def _initialization_provenance(pins: Mapping[str, Any]) -> dict[str, Any] | None:
+    config = pins.get("config")
+    init_mode = config.get("init_mode") if isinstance(config, dict) else None
+    initialization = pins.get("initialization")
+    if init_mode is None:
+        if initialization is not None:
+            raise EquivalenceError("legacy checkpoint has unexpected initialization provenance")
+        return None
+    if init_mode == "fresh-lora":
+        if initialization != {"init_mode": "fresh-lora"}:
+            raise EquivalenceError("fresh LoRA checkpoint initialization provenance is invalid")
+        return dict(initialization)
+    required = {
+        "init_mode", "directory_identity", "run_id", "model_sha256",
+        "config_sha256", "artifact_manifest_sha256", "inventory",
+    }
+    if (init_mode != "adapter-weights-only" or not isinstance(initialization, dict)
+            or set(initialization) != required
+            or initialization.get("init_mode") != init_mode
+            or not isinstance(initialization.get("directory_identity"), str)
+            or not initialization["directory_identity"]
+            or Path(initialization["directory_identity"]).name
+            != initialization["directory_identity"]
+            or not isinstance(initialization.get("run_id"), str)
+            or not initialization["run_id"]
+            or not all(isinstance(initialization.get(key), str)
+                       and _HEX64.fullmatch(initialization[key])
+                       for key in ("model_sha256", "config_sha256",
+                                   "artifact_manifest_sha256"))):
+        raise EquivalenceError("adapter checkpoint initialization provenance is invalid")
+    inventory = initialization.get("inventory")
+    if not isinstance(inventory, list) or not inventory:
+        raise EquivalenceError("adapter checkpoint initialization inventory is invalid")
+    seen: set[str] = set()
+    for row in inventory:
+        if (not isinstance(row, dict) or set(row) != {"path", "bytes", "sha256"}
+                or not isinstance(row.get("path"), str) or not row["path"]
+                or Path(row["path"]).is_absolute() or ".." in Path(row["path"]).parts
+                or row["path"] in seen or not isinstance(row.get("bytes"), int)
+                or isinstance(row["bytes"], bool) or row["bytes"] < 0
+                or not isinstance(row.get("sha256"), str)
+                or not _HEX64.fullmatch(row["sha256"])):
+            raise EquivalenceError("adapter checkpoint initialization inventory row is invalid")
+        seen.add(row["path"])
+    if (next((row["sha256"] for row in inventory
+              if row["path"] == "adapter_model.safetensors"), None)
+            != initialization["model_sha256"]
+            or next((row["sha256"] for row in inventory
+                     if row["path"] == "adapter_config.json"), None)
+            != initialization["config_sha256"]):
+        raise EquivalenceError("adapter checkpoint initialization inventory pin differs")
+    return dict(initialization)
+
+
+def _bind_run_state_initialization(state: Mapping[str, Any],
+                                   initialization: Mapping[str, Any] | None) -> None:
+    inputs = state.get("inputs")
+    if initialization is None:
+        return
+    if not isinstance(inputs, dict) or inputs.get("init_mode") != initialization["init_mode"]:
+        raise EquivalenceError("run-state and checkpoint initialization mode differ")
+    adapter_keys = {
+        "init_adapter_model_sha256": "model_sha256",
+        "init_adapter_config_sha256": "config_sha256",
+        "init_adapter_artifact_manifest_sha256": "artifact_manifest_sha256",
+    }
+    if initialization["init_mode"] == "fresh-lora":
+        if (inputs.get("init_adapter_dir") != ""
+                or any(inputs.get(key) != "" for key in adapter_keys)):
+            raise EquivalenceError("fresh run-state contains adapter initialization pins")
+        return
+    if any(inputs.get(input_key) != initialization[pin_key]
+           for input_key, pin_key in adapter_keys.items()):
+        raise EquivalenceError("run-state and checkpoint initial adapter pin differ")
+    directory = inputs.get("init_adapter_dir")
+    if (not isinstance(directory, str) or not directory
+            or Path(directory).name != initialization["directory_identity"]):
+        raise EquivalenceError("run-state and checkpoint initial adapter identity differ")
+
+
 def _report_fields(state: Mapping[str, Any], artifact_manifest_sha256: str,
                    pins: Mapping[str, Any]) -> dict[str, Any]:
     outputs = state.get("outputs")
@@ -884,6 +1110,9 @@ def _report_fields(state: Mapping[str, Any], artifact_manifest_sha256: str,
                 "deterministic_validation", "determinism", "adapter_artifact_manifest_sha256",
                 "dataset_sha256", "model_weight_sha256", "seed", "training_authorization",
                 "adoption_authorized", "t3_status"}
+    initialization = _initialization_provenance(pins)
+    if initialization is not None:
+        required.add("initialization")
     if not required.issubset(report) or report["mode"] != "cuda-qlora" or report["training_authorization"] is not True or report["adoption_authorized"] is not False or report["t3_status"] != "pending":
         raise EquivalenceError("training report semantic fields are invalid")
     if (report["adapter_artifact_manifest_sha256"] != artifact_manifest_sha256
@@ -894,6 +1123,8 @@ def _report_fields(state: Mapping[str, Any], artifact_manifest_sha256: str,
             or report["deterministic_validation"] is not True
             or report["determinism"] != pins.get("determinism")):
         raise EquivalenceError("training report identity fields are invalid")
+    if initialization is not None and report.get("initialization") != initialization:
+        raise EquivalenceError("training report initialization provenance differs")
     # The artifact-manifest hash intentionally differs because each durable
     # artifact contains its own run_id; it is validated above but is not a
     # behavioral comparison field.
@@ -1077,6 +1308,9 @@ def verify_equivalence(baseline_run_dir: Path, resumed_run_dir: Path, receipt_pa
                                 "double_quant": True,
                                 "compute_dtype": "bfloat16"}):
         raise EquivalenceError("controlled CUDA determinism or checkpoint interval pins are invalid")
+    initialization = _initialization_provenance(pins)
+    _bind_run_state_initialization(baseline, initialization)
+    _bind_run_state_initialization(resumed, initialization)
     if _sha256_bytes(_canonical(config)) != expected_training_config_sha256:
         raise EquivalenceError("full checkpoint training config differs from the controlled target")
     for key in ("dataset_sha256", "model_weight_sha256", "trainer_source_sha256"):

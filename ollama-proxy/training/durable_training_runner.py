@@ -550,7 +550,8 @@ def _open_held_regular_input(path: Path, label: str) -> _HeldRegularInput:
 
 
 def _hold_training_inputs(dataset: Path, dataset_sha256: str, model_dir: Path,
-                          inventory: list[dict[str, Any]] | None) -> list[_HeldRegularInput]:
+                          inventory: list[dict[str, Any]] | None,
+                          initial_adapter: Mapping[str, Any] | None = None) -> list[_HeldRegularInput]:
     """Acquire all v2 loader inputs atomically enough to leave no launch gap."""
     held: list[_HeldRegularInput] = []
     try:
@@ -565,6 +566,13 @@ def _hold_training_inputs(dataset: Path, dataset_sha256: str, model_dir: Path,
                 held.append(handle)
                 if len(handle.payload) != row["bytes"] or handle.sha256 != row["sha256"]:
                     raise DurableRunnerError("model inventory changed after manifest publication")
+        if initial_adapter is not None:
+            adapter_dir = Path(initial_adapter["directory"])
+            for row in [*initial_adapter["files"], initial_adapter["artifact_manifest"]]:
+                handle = _open_held_regular_input(adapter_dir / row["path"], "pinned init adapter file")
+                held.append(handle)
+                if len(handle.payload) != row["bytes"] or handle.sha256 != row["sha256"]:
+                    raise DurableRunnerError("init adapter changed after manifest publication")
         return held
     except BaseException:
         for handle in reversed(held):
@@ -615,19 +623,39 @@ def _manifest_training_config(arguments: Sequence[str], checkpoint_interval: int
             config[name] = converter(value or "")
         except ValueError as exc:
             raise DurableRunnerError(f"training configuration value is invalid: {flag}") from exc
+    init = _init_adapter_arguments(arguments)
+    config["init_mode"] = "adapter-weights-only" if init is not None else "fresh-lora"
     return _validate_manifest_training_config(config)
+
+
+def _init_adapter_arguments(arguments: Sequence[str]) -> dict[str, str] | None:
+    flags = ("--init-adapter-dir", "--init-adapter-model-sha256",
+             "--init-adapter-config-sha256", "--init-adapter-artifact-manifest-sha256")
+    values = {flag: _argument_value(arguments, flag) for flag in flags}
+    if not any(value is not None for value in values.values()):
+        return None
+    if any(value is None for value in values.values()):
+        raise DurableRunnerError("init adapter trainer flags must be supplied together")
+    for flag in flags[1:]:
+        if not HEX64.fullmatch(values[flag] or ""):
+            raise DurableRunnerError(f"init adapter SHA-256 is invalid: {flag}")
+    return {"directory": values[flags[0]] or "", "model_sha256": values[flags[1]] or "",
+            "config_sha256": values[flags[2]] or "",
+            "artifact_manifest_sha256": values[flags[3]] or ""}
 
 
 def _validate_manifest_training_config(value: Any) -> dict[str, Any]:
     """Validate the full, typed config that an input manifest commits to."""
 
-    required = {
+    required_v2 = {
         "mode", "seed", "lora_r", "lora_alpha", "lora_dropout",
         "learning_rate", "max_steps", "batch_size", "gradient_accumulation",
         "max_seq_len", "checkpoint_every_optimizer_steps",
         "deterministic_validation",
     }
-    if not isinstance(value, dict) or set(value) != required:
+    required = required_v2 | {"init_mode"}
+    if (not isinstance(value, dict)
+            or (set(value) != required_v2 and set(value) != required)):
         raise DurableRunnerError("input manifest training configuration schema mismatch")
     if value["mode"] not in {"cuda-qlora", "cpu-smoke"}:
         raise DurableRunnerError("input manifest training mode is invalid")
@@ -644,17 +672,93 @@ def _validate_manifest_training_config(value: Any) -> dict[str, Any]:
         raise DurableRunnerError("input manifest dropout/learning-rate contract failure")
     if not isinstance(value["deterministic_validation"], bool):
         raise DurableRunnerError("input manifest deterministic validation is invalid")
-    return dict(value)
+    normalized = dict(value)
+    normalized.setdefault("init_mode", "fresh-lora")
+    if normalized["init_mode"] not in {"fresh-lora", "adapter-weights-only"}:
+        raise DurableRunnerError("input manifest init mode is invalid")
+    return normalized
+
+
+def _validate_initial_adapter(manifest_value: Any, trainer_args: Sequence[str]) -> dict[str, Any] | None:
+    requested = _init_adapter_arguments(trainer_args)
+    if manifest_value is None:
+        if requested is not None:
+            raise DurableRunnerError("input manifest initial adapter mismatch")
+        return None
+    required = {"run_id", "model_sha256", "config_sha256", "artifact_manifest_sha256", "files"}
+    if not isinstance(manifest_value, dict) or set(manifest_value) != required or requested is None:
+        raise DurableRunnerError("input manifest initial adapter schema mismatch")
+    if not isinstance(manifest_value["run_id"], str) or not manifest_value["run_id"]:
+        raise DurableRunnerError("input manifest initial adapter run_id is invalid")
+    for key in ("model_sha256", "config_sha256", "artifact_manifest_sha256"):
+        if (not HEX64.fullmatch(str(manifest_value[key]))
+                or manifest_value[key] != requested[key]):
+            raise DurableRunnerError("input manifest initial adapter pin mismatch")
+    directory = validate_local_path(Path(requested["directory"]), "init adapter directory")
+    if not directory.is_dir():
+        raise DurableRunnerError("init adapter directory is missing")
+    artifact_path = directory / "artifact-manifest.json"
+    raw = _read_regular_file_snapshot(artifact_path, "init adapter artifact manifest")
+    if sha256_bytes(raw) != manifest_value["artifact_manifest_sha256"]:
+        raise DurableRunnerError("init adapter artifact manifest SHA-256 mismatch")
+    try:
+        artifact = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise DurableRunnerError("init adapter artifact manifest is invalid") from exc
+    if raw != canonical_bytes(artifact):
+        raise DurableRunnerError("init adapter artifact manifest is not canonical")
+    if (set(artifact) != {"schema_version", "run_id", "pins", "files"}
+            or artifact.get("schema_version") != "airi.behavior-adapter-artifact.v1"
+            or artifact.get("run_id") != manifest_value["run_id"]
+            or not isinstance(artifact.get("pins"), dict)
+            or not HEX64.fullmatch(str(artifact["pins"].get("model_weight_sha256", "")))
+            or artifact["pins"]["model_weight_sha256"] != _argument_value(trainer_args, "--model-sha256", required=True)):
+        raise DurableRunnerError("init adapter artifact schema/pin mismatch")
+    files = manifest_value["files"]
+    if not isinstance(files, list) or not files or artifact.get("files") != files:
+        raise DurableRunnerError("init adapter declared inventory mismatch")
+    seen: set[str] = set()
+    for row in files:
+        if (not isinstance(row, dict) or set(row) != {"path", "bytes", "sha256"}
+                or not isinstance(row["path"], str) or not row["path"] or row["path"] in seen
+                or Path(row["path"]).is_absolute() or ".." in Path(row["path"]).parts
+                or not isinstance(row["bytes"], int) or row["bytes"] < 0
+                or not HEX64.fullmatch(str(row["sha256"]))):
+            raise DurableRunnerError("init adapter inventory row is invalid")
+        seen.add(row["path"])
+        payload = _read_regular_file_snapshot(directory / row["path"], "init adapter file")
+        if len(payload) != row["bytes"] or sha256_bytes(payload) != row["sha256"]:
+            raise DurableRunnerError("init adapter inventory does not match disk")
+    _validate_closed_model_inventory(directory, [
+        *files,
+        {"path": "artifact-manifest.json", "bytes": len(raw),
+         "sha256": sha256_bytes(raw)},
+    ])
+    for path, key in (("adapter_model.safetensors", "model_sha256"),
+                      ("adapter_config.json", "config_sha256")):
+        row = next((item for item in files if item["path"] == path), None)
+        if row is None or row["sha256"] != manifest_value[key]:
+            raise DurableRunnerError("init adapter required file pin mismatch")
+    return {"directory": str(directory), "files": files,
+            "artifact_manifest": {"path": "artifact-manifest.json", "bytes": len(raw),
+                                  "sha256": sha256_bytes(raw)}}
 
 
 def _validate_closed_model_inventory(model_dir: Path, inventory: list[dict[str, Any]]) -> None:
-    """Require a v2 manifest to enumerate every file a local loader may see."""
+    """Require a manifest to enumerate every entry a local loader may see."""
     root = validate_local_path(model_dir, "model directory")
     if not root.is_dir():
         raise DurableRunnerError("model directory is missing")
     declared = {row["path"]: {"bytes": row["bytes"], "sha256": row["sha256"]}
                 for row in inventory}
+    declared_directories = {
+        parent.as_posix()
+        for relative in declared
+        for parent in Path(relative).parents
+        if parent != Path(".")
+    }
     actual: dict[str, dict[str, Any]] = {}
+    actual_directories: set[str] = set()
     pending = [root]
     while pending:
         directory = pending.pop()
@@ -674,6 +778,7 @@ def _validate_closed_model_inventory(model_dir: Path, inventory: list[dict[str, 
                     or attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
                 raise DurableRunnerError("model inventory cannot contain links or reparse points")
             if stat.S_ISDIR(metadata.st_mode):
+                actual_directories.add(candidate.relative_to(root).as_posix())
                 pending.append(candidate)
                 continue
             if not stat.S_ISREG(metadata.st_mode):
@@ -681,7 +786,7 @@ def _validate_closed_model_inventory(model_dir: Path, inventory: list[dict[str, 
             relative = candidate.relative_to(root).as_posix()
             data = _read_regular_file_snapshot(candidate, "model inventory entry")
             actual[relative] = {"bytes": len(data), "sha256": sha256_bytes(data)}
-    if actual != declared:
+    if actual != declared or actual_directories != declared_directories:
         raise DurableRunnerError("input manifest model inventory is not a closed exact file set")
 
 
@@ -711,15 +816,30 @@ def validate_input_manifest_content(path: Path, expected_sha256: str,
     required_v2 = {"schema_version", "dataset_sha256", "model_weight_sha256",
                    "trainer_source_sha256", "training_config", "training_config_sha256",
                    "checkpoint_helper_source_sha256", "model_inventory"}
-    if (manifest.get("schema_version") != "airi.behavior-input-manifest.v2"
-            or set(manifest) != required_v2):
+    required_v3 = required_v2 | {"initial_adapter"}
+    schema = manifest.get("schema_version")
+    if ((schema == "airi.behavior-input-manifest.v2" and set(manifest) != required_v2)
+            or (schema == "airi.behavior-input-manifest.v3" and set(manifest) != required_v3)
+            or schema not in {"airi.behavior-input-manifest.v2", "airi.behavior-input-manifest.v3"}):
         raise DurableRunnerError("input manifest schema mismatch")
     config = _manifest_training_config(trainer_args, checkpoint_interval)
-    manifest_config = _validate_manifest_training_config(manifest["training_config"])
+    raw_manifest_config = manifest["training_config"]
+    required_config_v2 = {
+        "mode", "seed", "lora_r", "lora_alpha", "lora_dropout",
+        "learning_rate", "max_steps", "batch_size", "gradient_accumulation",
+        "max_seq_len", "checkpoint_every_optimizer_steps",
+        "deterministic_validation",
+    }
+    required_config = (required_config_v2 | {"init_mode"}
+                       if schema == "airi.behavior-input-manifest.v3"
+                       else required_config_v2)
+    if not isinstance(raw_manifest_config, dict) or set(raw_manifest_config) != required_config:
+        raise DurableRunnerError("input manifest training configuration schema mismatch")
+    manifest_config = _validate_manifest_training_config(raw_manifest_config)
     if (manifest_config != config
             or not isinstance(manifest["training_config_sha256"], str)
             or not HEX64.fullmatch(manifest["training_config_sha256"])
-            or manifest["training_config_sha256"] != sha256_bytes(canonical_bytes(manifest_config))):
+            or manifest["training_config_sha256"] != sha256_bytes(canonical_bytes(raw_manifest_config))):
         raise DurableRunnerError("input manifest training configuration mismatch")
     expected = {"dataset_sha256": dataset_sha256, "model_weight_sha256": model_sha256,
                 "trainer_source_sha256": trainer_sha256}
@@ -744,9 +864,18 @@ def validate_input_manifest_content(path: Path, expected_sha256: str,
     model_dir_value = _argument_value(trainer_args, "--model-dir")
     if model_dir_value is not None:
         _validate_closed_model_inventory(Path(model_dir_value), inventory)
+    initial_adapter = None
+    if schema == "airi.behavior-input-manifest.v3":
+        initial_adapter = _validate_initial_adapter(manifest["initial_adapter"], trainer_args)
+        if ((manifest_config["init_mode"] == "fresh-lora" and initial_adapter is not None)
+                or (manifest_config["init_mode"] == "adapter-weights-only" and initial_adapter is None)):
+            raise DurableRunnerError("input manifest initial adapter mode mismatch")
+    elif _init_adapter_arguments(trainer_args) is not None:
+        raise DurableRunnerError("v2 input manifest cannot initialize an adapter")
     return {"path": str(resolved), "sha256": actual_sha256,
             "training_config_sha256": manifest["training_config_sha256"],
-            "model_inventory": inventory}
+            "model_inventory": inventory, "initial_adapter": initial_adapter,
+            "schema_version": schema, "init_mode": manifest_config["init_mode"]}
 
 
 def _relative_inside(root: Path, path: Path) -> str:
@@ -778,6 +907,14 @@ def _ensure_argument(arguments: list[str], flag: str, value: str) -> None:
         arguments.extend((flag, value))
     elif existing != value:
         raise DurableRunnerError(f"trainer argument conflicts with runner: {flag}")
+
+
+def _remove_argument(arguments: list[str], flag: str) -> None:
+    value = _argument_value(arguments, flag)
+    if value is None:
+        return
+    index = arguments.index(flag)
+    del arguments[index:index + 2]
 
 
 def _validate_trainer_arguments(arguments: Sequence[str]) -> None:
@@ -1772,6 +1909,9 @@ def run_supervisor(args: argparse.Namespace) -> int:
     if trainer_args and trainer_args[0] == "--":
         trainer_args.pop(0)
     _validate_trainer_arguments(trainer_args)
+    if (_init_adapter_arguments(trainer_args) is not None
+            and _argument_value(trainer_args, "--resume-from-checkpoint") is not None):
+        raise DurableRunnerError("init adapter cannot be combined with checkpoint resume")
     _ensure_argument(trainer_args, "--run-dir", str(run_dir))
     _ensure_argument(trainer_args, "--run-id", args.run_id)
     _ensure_argument(trainer_args, "--checkpoint-every-optimizer-steps",
@@ -1811,8 +1951,22 @@ def run_supervisor(args: argparse.Namespace) -> int:
               "input_manifest_sha256": manifest_identity["sha256"],
               "input_manifest_training_config_sha256": manifest_identity["training_config_sha256"],
               "trainer_source_sha256": trainer_source_sha256}
+    if manifest_identity["schema_version"] == "airi.behavior-input-manifest.v3":
+        initial = manifest_identity["initial_adapter"]
+        inputs.update({
+            "init_mode": manifest_identity["init_mode"],
+            "init_adapter_dir": initial["directory"] if initial else "",
+            "init_adapter_model_sha256": (next((row["sha256"] for row in initial["files"]
+                                                 if row["path"] == "adapter_model.safetensors"), "")
+                                          if initial else ""),
+            "init_adapter_config_sha256": (next((row["sha256"] for row in initial["files"]
+                                                  if row["path"] == "adapter_config.json"), "")
+                                           if initial else ""),
+            "init_adapter_artifact_manifest_sha256": (initial["artifact_manifest"]["sha256"]
+                                                        if initial else ""),
+        })
     for key, value in inputs.items():
-        if key == "input_manifest_path":
+        if key in {"input_manifest_path", "init_mode", "init_adapter_dir"}:
             continue
         if value and not HEX64.fullmatch(value):
             raise DurableRunnerError("input SHA-256 is invalid")
@@ -1912,6 +2066,13 @@ def run_supervisor(args: argparse.Namespace) -> int:
         elif ack_exists:
             raise DurableRunnerError("resume has an orphan pause ack")
         _ensure_argument(trainer_args, "--resume-from-checkpoint", checkpoint["absolute_path"])
+        # The supervisor re-binds initial-adapter provenance on every durable
+        # resume, but trainer checkpoint restoration must never reinitialize
+        # weights from that adapter.
+        for flag in ("--init-adapter-dir", "--init-adapter-model-sha256",
+                     "--init-adapter-config-sha256",
+                     "--init-adapter-artifact-manifest-sha256"):
+            _remove_argument(trainer_args, flag)
 
     logs_dir = run_dir / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
@@ -1938,7 +2099,7 @@ def run_supervisor(args: argparse.Namespace) -> int:
             # the same held descriptors, leaving no path re-open window.
             held_inputs = _hold_training_inputs(
                 dataset_path, dataset_sha or "", model_path,
-                manifest_identity["model_inventory"])
+                manifest_identity["model_inventory"], manifest_identity["initial_adapter"])
             trainer_process = subprocess.Popen(
                 command, cwd=str(working_directory), stdout=stdout_stream,
                 stderr=stderr_stream, stdin=subprocess.DEVNULL,
@@ -2088,12 +2249,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     preflight_helper = preflight_trainer.parent / "behavior_training_checkpoint.py"
     if not preflight_helper.is_file():
         raise DurableRunnerError("checkpoint helper path is missing")
-    validate_input_manifest_content(
+    preflight_manifest = validate_input_manifest_content(
         args.input_manifest_path, args.input_manifest_sha256,
         preflight_trainer_args, sha256_file(preflight_trainer),
         _argument_value(preflight_trainer_args, "--dataset-sha256", required=True) or "",
         _argument_value(preflight_trainer_args, "--model-sha256") or "",
         args.checkpoint_every_optimizer_steps, sha256_file(preflight_helper))
+    if (preflight_manifest["initial_adapter"] is not None
+            and _argument_value(preflight_trainer_args, "--resume-from-checkpoint") is not None):
+        raise DurableRunnerError("init adapter cannot be combined with checkpoint resume")
     if args.pause_at_first_optimizer_boundary:
         try:
             run_dir.mkdir(parents=True, exist_ok=False)

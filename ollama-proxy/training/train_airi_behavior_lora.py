@@ -46,7 +46,7 @@ if str(Path(__file__).parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).parent))
 from behavior_training_checkpoint import (
     CheckpointError, atomic_json, load_generation, publish_artifact_directory,
-    publish_checkpoint, publish_fresh_json,
+    publish_checkpoint, publish_fresh_json, verify_artifact_directory,
 )
 
 CPU_SMOKE_MAX_SAMPLES = 16
@@ -280,7 +280,9 @@ def _source_pins(args: argparse.Namespace, model_dir: Path, tokenizer: Any) -> d
         "versions": versions,
         "cuda_identity": cuda_identity,
         "quantization": quantization,
-        "config": {key: getattr(args, key) for key in ("mode", "seed", "lora_r", "lora_alpha", "lora_dropout", "learning_rate", "max_steps", "batch_size", "gradient_accumulation", "max_seq_len", "checkpoint_every_optimizer_steps", "deterministic_validation")},
+        "config": {key: (getattr(args, key, "fresh-lora") if key == "init_mode"
+                         else getattr(args, key))
+                   for key in ("mode", "seed", "lora_r", "lora_alpha", "lora_dropout", "learning_rate", "max_steps", "batch_size", "gradient_accumulation", "max_seq_len", "checkpoint_every_optimizer_steps", "deterministic_validation", "init_mode")},
         "determinism": {
             "validation_enabled": bool(args.deterministic_validation),
             "algorithms_enabled": bool(torch.are_deterministic_algorithms_enabled()),
@@ -293,6 +295,77 @@ def _source_pins(args: argparse.Namespace, model_dir: Path, tokenizer: Any) -> d
         "tokenizer_class": tokenizer.__class__.__name__,
         "order_strategy": "seeded-scenario-group-then-row-shuffle.v1",
     }
+
+
+def _adapter_initialization(args: argparse.Namespace, base_model_sha256: str) -> dict[str, Any]:
+    """Validate a prior adapter as immutable input, without resuming its run.
+
+    This deliberately returns only provenance and a local path.  Optimizer,
+    scheduler, RNG, cursor, and progress are never inputs to this seam.
+    """
+    values = (args.init_adapter_dir, args.init_adapter_model_sha256,
+              args.init_adapter_config_sha256,
+              args.init_adapter_artifact_manifest_sha256)
+    if not any(values):
+        return {"init_mode": "fresh-lora"}
+    if not all(values):
+        raise BehaviorTrainingError("adapter initialization flags must be supplied all-or-none")
+    if args.resume_from_checkpoint:
+        raise BehaviorTrainingError("adapter initialization is mutually exclusive with --resume-from-checkpoint")
+    for value in values[1:]:
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+            raise BehaviorTrainingError("adapter initialization SHA-256 pins must be lowercase hex")
+    directory = reject_network_path(Path(args.init_adapter_dir), "init adapter dir")
+    try:
+        metadata = os.lstat(directory)
+    except OSError as exc:
+        raise BehaviorTrainingError("init adapter directory is unavailable") from exc
+    if (not stat.S_ISDIR(metadata.st_mode)
+            or getattr(metadata, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
+        raise BehaviorTrainingError("init adapter directory must be a local non-reparse directory")
+    files = _closed_model_loader_files(directory)
+    manifest_path = directory / "artifact-manifest.json"
+    model_path = directory / "adapter_model.safetensors"
+    config_path = directory / "adapter_config.json"
+    if not {manifest_path, model_path, config_path}.issubset(files):
+        raise BehaviorTrainingError("init adapter requires manifest, model, and config regular files")
+    try:
+        verified = verify_artifact_directory(directory)
+    except CheckpointError as exc:
+        raise BehaviorTrainingError(f"invalid init adapter artifact: {exc}") from exc
+    manifest = verified["manifest"]
+    if verified["manifest_sha256"] != args.init_adapter_artifact_manifest_sha256:
+        raise BehaviorTrainingError("init adapter artifact manifest SHA-256 mismatch")
+    if _file_sha256(model_path) != args.init_adapter_model_sha256:
+        raise BehaviorTrainingError("init adapter model SHA-256 mismatch")
+    if _file_sha256(config_path) != args.init_adapter_config_sha256:
+        raise BehaviorTrainingError("init adapter config SHA-256 mismatch")
+    source_base_sha = manifest["pins"].get("model_weight_sha256")
+    if source_base_sha != base_model_sha256:
+        raise BehaviorTrainingError("init adapter base model weight SHA-256 mismatch")
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise BehaviorTrainingError("init adapter config is invalid") from exc
+    expected = {"peft_type": "LORA", "task_type": "CAUSAL_LM",
+                "r": args.lora_r, "lora_alpha": args.lora_alpha,
+                "lora_dropout": args.lora_dropout}
+    if any(config.get(key) != value for key, value in expected.items()):
+        raise BehaviorTrainingError("init adapter LoRA configuration is incompatible")
+    targets = config.get("target_modules")
+    all_linear_projections = {
+        "up_proj", "o_proj", "v_proj", "down_proj", "k_proj", "q_proj", "gate_proj",
+    }
+    if targets != "all-linear" and (not isinstance(targets, list)
+                                     or set(targets) != all_linear_projections
+                                     or len(targets) != len(all_linear_projections)):
+        raise BehaviorTrainingError("init adapter target modules are incompatible")
+    return {"init_mode": "adapter-weights-only", "path": directory,
+            "directory_identity": directory.name,
+            "run_id": manifest["run_id"], "model_sha256": args.init_adapter_model_sha256,
+            "config_sha256": args.init_adapter_config_sha256,
+            "artifact_manifest_sha256": args.init_adapter_artifact_manifest_sha256,
+            "inventory": manifest["files"], "files": files}
 
 
 def _progress(run_dir: Path | None, value: dict[str, Any]) -> None:
@@ -659,7 +732,7 @@ def encode_example(tokenizer: Any, messages: list[dict[str, str]], max_seq_len: 
 def run_training(args: argparse.Namespace) -> dict[str, Any]:
     _prepare_deterministic_validation(args.deterministic_validation)
     import torch  # noqa: PLC0415 — heavy import stays inside the entrypoint
-    from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+    from peft import LoraConfig, PeftModel, get_peft_model, prepare_model_for_kbit_training
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     _configure_deterministic_validation(torch, args.deterministic_validation)
@@ -694,6 +767,11 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
                 "run directory and final artifacts must share one fixed volume")
     if args.resume_from_checkpoint and run_dir is None:
         raise BehaviorTrainingError("--resume-from-checkpoint requires --run-dir")
+    if args.resume_from_checkpoint and any((args.init_adapter_dir,
+                                            args.init_adapter_model_sha256,
+                                            args.init_adapter_config_sha256,
+                                            args.init_adapter_artifact_manifest_sha256)):
+        raise BehaviorTrainingError("adapter initialization is mutually exclusive with --resume-from-checkpoint")
 
     if args.mode == "cpu-smoke":
         rows = rows[:CPU_SMOKE_MAX_SAMPLES]
@@ -716,6 +794,12 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
         max_steps = args.max_steps
         device = "cuda"
 
+    base_weights = sorted(model_dir.glob("*.safetensors"))
+    base_model_sha256 = (_file_sha256(base_weights[0]) if len(base_weights) == 1
+                         else "cpu-smoke-weight-unavailable")
+    initialization = _adapter_initialization(args, base_model_sha256)
+    args.init_mode = initialization["init_mode"]
+
     if output.exists():
         raise BehaviorTrainingError("output path already exists; use a fresh adapter directory")
     if report_path is not None and report_path.exists():
@@ -729,6 +813,8 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
         torch.cuda.manual_seed_all(args.seed)
 
     loader_files = _closed_model_loader_files(model_dir)
+    if initialization["init_mode"] == "adapter-weights-only":
+        loader_files += initialization["files"]
     if not loader_files:
         raise BehaviorTrainingError("model loader inventory is empty")
     with _HeldInputFiles(loader_files) as held_inputs:
@@ -736,6 +822,15 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
             weights = sorted(model_dir.glob("*.safetensors"))
             if len(weights) != 1 or held_inputs.sha256_for(weights[0]) != args.model_sha256:
                 raise BehaviorTrainingError("held model weight does not match its SHA-256 pin")
+        if initialization["init_mode"] == "adapter-weights-only":
+            expected_adapter_pins = {
+                initialization["path"] / "adapter_model.safetensors": initialization["model_sha256"],
+                initialization["path"] / "adapter_config.json": initialization["config_sha256"],
+                initialization["path"] / "artifact-manifest.json": initialization["artifact_manifest_sha256"],
+            }
+            if any(held_inputs.sha256_for(path) != expected
+                   for path, expected in expected_adapter_pins.items()):
+                raise BehaviorTrainingError("held init adapter input does not match its SHA-256 pin")
         tokenizer = AutoTokenizer.from_pretrained(str(model_dir), local_files_only=True)
         if tokenizer.pad_token_id is None:
             tokenizer.pad_token = tokenizer.eos_token
@@ -745,21 +840,30 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
             model_kwargs["quantization_config"] = quantization
             model_kwargs["device_map"] = {"": 0}
         model = AutoModelForCausalLM.from_pretrained(str(model_dir), **model_kwargs)
+        if quantization is None:
+            model = model.to(device)
+            verified_model_sha256 = base_model_sha256
+        else:
+            # QLoRA needs frozen k-bit parameters and input gradients; checkpointing
+            # is what keeps a 2.3B, 48-layer model within the supported 8 GiB card.
+            model = prepare_model_for_kbit_training(
+                model, use_gradient_checkpointing=True)
+            model.config.use_cache = False
+        if initialization["init_mode"] == "adapter-weights-only":
+            held_inputs.verify()
+            if any(held_inputs.sha256_for(path) != expected
+                   for path, expected in expected_adapter_pins.items()):
+                raise BehaviorTrainingError(
+                    "held init adapter input does not match its SHA-256 pin")
+            model = PeftModel.from_pretrained(
+                model, str(initialization["path"]), is_trainable=True)
+        else:
+            model = get_peft_model(model, LoraConfig(
+                r=args.lora_r, lora_alpha=args.lora_alpha, lora_dropout=args.lora_dropout,
+                task_type="CAUSAL_LM", target_modules="all-linear"))
         held_inputs.verify()
-    if quantization is None:
-        model = model.to(device)
-        cpu_weights = sorted(model_dir.glob("*.safetensors"))
-        verified_model_sha256 = (_file_sha256(cpu_weights[0]) if len(cpu_weights) == 1
-                                 else "cpu-smoke-weight-unavailable")
-    else:
-        # QLoRA needs frozen k-bit parameters and input gradients; checkpointing
-        # is what keeps a 2.3B, 48-layer model within the supported 8 GiB card.
-        model = prepare_model_for_kbit_training(
-            model, use_gradient_checkpointing=True)
-        model.config.use_cache = False
-    model = get_peft_model(model, LoraConfig(
-        r=args.lora_r, lora_alpha=args.lora_alpha, lora_dropout=args.lora_dropout,
-        task_type="CAUSAL_LM", target_modules="all-linear"))
+    pins["initialization"] = {key: value for key, value in initialization.items()
+                               if key not in {"path", "files"}}
 
     encoded = [encode_example(tokenizer, row["messages"], args.max_seq_len) for row in rows]
     dev_rows = [row for row in all_rows if row["split"] == "dev"]
@@ -822,6 +926,25 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
     checkpoint_generation = 0
     training_elapsed_ns = 0
     active_segment_started_ns = time.perf_counter_ns()
+    if run_dir is not None and initialization["init_mode"] == "adapter-weights-only":
+        fresh_receipt = {
+            "schema_version": "airi.behavior-adapter-initialization-receipt.v1",
+            "run_id": args.run_id,
+            "initialization": pins["initialization"],
+            "fresh_state": {"microsteps_completed": 0, "optimizer_steps": 0,
+                            "epoch": 0, "next_batch_index": 0,
+                            "pending_microbatches": 0,
+                            "optimizer_state_entries": len(optimizer.state)},
+            "inherited_state": {"optimizer": False, "scheduler": False,
+                                "rng": False, "cursor": False},
+        }
+        if fresh_receipt["fresh_state"]["optimizer_state_entries"] != 0:
+            raise BehaviorTrainingError("adapter initialization did not produce a fresh optimizer")
+        publish_fresh_json(run_dir / "fresh-state-receipt.json", fresh_receipt)
+        _progress(run_dir, {"run_id": args.run_id, "status": "initialized",
+                            "epoch": 0, "next_batch_index": 0,
+                            "microsteps": 0, "optimizer_steps": 0,
+                            "pending_microbatches": 0, "training_elapsed_ns": 0})
     if args.resume_from_checkpoint:
         try:
             requested = args.resume_from_checkpoint.resolve()
@@ -1015,6 +1138,7 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
         "loss_first3_mean": round(first, 4), "loss_last3_mean": round(last, 4),
         "adapter_dir": str(output),
         "adapter_artifact_manifest_sha256": artifact["manifest_sha256"],
+        "initialization": pins["initialization"],
         "dataset_sha256": args.dataset_sha256,
         "model_weight_sha256": verified_model_sha256,
         "trainable_parameters": trainable,
@@ -1082,6 +1206,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--checkpoint-every-optimizer-steps", type=int, default=5)
     parser.add_argument("--resume-from-checkpoint", type=Path,
                         help="exact immutable generation directory under run-dir/checkpoints")
+    parser.add_argument("--init-adapter-dir",
+                        help="local immutable adapter artifact to load as trainable weights only")
+    parser.add_argument("--init-adapter-model-sha256", default="",
+                        help="exact adapter_model.safetensors SHA-256")
+    parser.add_argument("--init-adapter-config-sha256", default="",
+                        help="exact adapter_config.json SHA-256")
+    parser.add_argument("--init-adapter-artifact-manifest-sha256", default="",
+                        help="exact artifact-manifest.json SHA-256")
+    parser.set_defaults(init_mode="fresh-lora")
     parser.add_argument("--deterministic-validation", action="store_true",
                         help="fail closed on nondeterministic CUDA operations for equivalence proof")
     for key, value in DEFAULTS.items():

@@ -9,6 +9,107 @@
 
 ## 2026-08-24 E2-C1 frozen-contract first milestone
 
+- 03:22 KST exact 13 paths `git add` exit 0 뒤 corrected cached identity는 indexed rows 13,
+  manifest SHA `f7528afe...67c4`, 1,453 insertions/98 deletions, unstaged/untracked 0,
+  cached diff/security PASS다. 첫 aggregate SHA helper는 unavailable static .NET `HashData`로
+  null을 반환한 비권위 subreceipt이며 stage bytes mutation은 없었다. compatible
+  `SHA256.Create` probe 값만 권위로 사용한다. 이 receipt 두 docs를 restage하고 cached 13/
+  security/PID 0을 재검증한 뒤 `fix: add E2-C1 adapter initialization` commit을 한 번 수행한다.
+
+- 03:21 KST expanded exact 13-path publication boundary는 1,429 insertions/98 deletions이고
+  staged/untracked/unexpected/forbidden/binary/oversize/secret/personal-path 0, continuity와
+  diff-check PASS다. frozen data/base/E2/config와 seed/batch/accum/seq/step/LR/scheduler/K는
+  불변이며 실행하지 않는다. exact 13 paths만 stage해 cached gate를 재검증하고
+  `fix: add E2-C1 adapter initialization` commit 뒤 receipt commit/push를 수행한다. 실패하면
+  index/local commit을 보존하고 force/retry/GPU를 금지한다. quota 복구 identity는 WORKING의
+  `20260824-032104-e2-c1-adapter-init-publication-stage-intent`, parent `3d7d0e3`, exact paths와
+  final code SHA다.
+
+- 03:19 KST E2 weights-only adapter-init 최소 구현의 root 통합 offline gate가 PASS했다.
+  trainer는 PEFT load 직전 held SHA를 재검증하고 init/checkpoint-resume를 상호배제하며 fresh
+  optimizer/scheduler/RNG/cursor/progress receipt를 남긴다. builder/runner/verifier는 v2/v3
+  schema key ownership, base/E2 run/model/config/artifact pin과 closed inventory를 fail-closed로
+  검증한다. pinned pycompile exit 0, focused 27/2·50/2·67/1, combined 144 passed/5 skipped,
+  continuity/full current-checkpoint/diff-check PASS다. actual E2 helper도 run id
+  `v4-e2-seed42-1600-20260823-074326`과 exact pins로 PASS했다. pre-doc worktree exact 9,
+  staged/untracked 0, 1,331 insertions/74 deletions, related PID 0, GPU AIRI workload 0,
+  E2-C1 0/0이다. 다음 목적은 current SSoT 확대 갱신·boundary/security·commit/push이며 이
+  publication batch에서 GPU smoke나 운영 채택 변경은 하지 않는다.
+
+- 03:10 KST 03:08 Git correction 뒤 external E2/T3/blind authority를 fresh read-only로
+  대조했다. receipt 직전 worktree는 exact 9 allowed modified paths, staged/untracked 0,
+  1,165 insertions/63 deletions이다. E2는 complete revision 1,635, exit 0/trainer-complete,
+  1,600/1,600·100/100·pending 0이고 state/anchor/index, checkpoint 35/34,
+  final/producer/progress, adapter/config/artifact/report와 log size/SHA가 exact하다. dev loss는
+  epoch 1 `2.893371758116589`, epoch 2 `2.735453106217887`, selected epoch 2이며 adoption
+  false/T3 pending이다. T3 inventory는 36/36/89/72/2, totals와 fixture/model/comparator SHA
+  exact, summary absent다. blind는 exact 5 files, validation PASS, expected 36,
+  `response_viewed=false`다. 로그·T3 report·blind fixture body는 읽지 않았다. related AIRI
+  PID 0, E2-C1 0/0이며 gate는 adapter-init root review/minimal fixes, pinned CPU regression과
+  actual E2 helper validation으로 복귀한다. durable run 0이라 pause는 불필요하다.
+
+- 03:08 KST compact 뒤 mandatory 5문서를 지정 순서로 전체 로드하고 current live gate를
+  UTF-8로 재독했다. Goal active, HEAD/local main/local origin/main/remote main `3d7d0e3`
+  exact, exact 9 allowed modified paths와 staged/untracked 0은 유지된다. 다만 03:04 receipt-doc
+  edits 뒤 actual pre-correction diff가 1,144 insertions/63 deletions인데 WORKING은
+  1,116/63으로 남아 있어 외부 receipt·code work를 멈추고 관측 사실로 먼저 정정했다.
+  related AIRI PID 0, GPU 1,073/8,192 MiB·16%·42 C이나 AIRI workload 0, E2-C1 0/0이다.
+  external E2/T3/blind를 fresh read-only 대조하기 전에는 code/test/GPU/stage/commit/push를
+  계속 금지한다. durable run이 없어 pause는 불필요하며 quota 급종료 시
+  `interrupted-awaiting-quota-reset`으로 복구한다.
+
+- 03:04 KST 03:01 Git correction 뒤 external E2/T3/blind authority를 read-only로 전부
+  대조했다. receipt 직전 worktree는 exact 9 allowed paths, staged/untracked 0,
+  1,116 insertions/63 deletions이다. related AIRI PID 0, GPU 1,073/8,192 MiB·16%·42 C이나
+  AIRI workload 0, E2-C1 0/0이다. E2는 complete revision 1,635, terminal exit 0,
+  1,600/1,600·100/100·pending 0이고 current/previous state, anchor/index, checkpoint 35/34
+  manifest/payload/event, final/producer/progress, adapter/config/artifact/report와 log size/SHA가
+  exact하다. T3 inventory 36/36/89/72/2와 totals·fixture/model·comparison SHA exact,
+  summary absent다. blind는 exact 5 files, validation PASS, expected 36,
+  `response_viewed=false`다. 로그·T3 report·blind fixture body는 읽지 않았다. 현재 gate는
+  adapter-init batch의 root review, pinned CPU/offline regression과 actual E2 helper validation이며
+  PASS 전 GPU/stage/commit/push는 금지한다. durable run 0이라 pause는 불필요하다.
+
+- 03:01 KST compact 뒤 mandatory 5문서를 지정 순서로 EOF까지 재독하고 Goal/Git/PID/GPU의
+  첫 read-only 대조를 수행했다. Goal active, HEAD/local main/local origin/main/remote main
+  `3d7d0e3` exact, exact 9 allowed modified paths와 staged/untracked 0은 유지된다. 02:54
+  receipt-doc edits 뒤 actual diff가 1,091 insertions/63 deletions인데 WORKING은 1,065/63으로
+  남아 있어 다른 검증을 멈추고 관측 사실로 먼저 정정했다. repo diff-check exit 0, related
+  AIRI PID 0, GPU 1,073/8,192 MiB·16%·42 C이나 AIRI workload 0, E2-C1 0/0이다. 첫 combined
+  Git wrapper는 expected LF→CRLF native warning이 `ErrorActionPreference=Stop`에 승격돼 receipt
+  조립 전 중단한 read-only 비권위 실행이고, warning-suppressed corrected wrapper의 exit 0
+  receipt만 사용한다. external E2/T3/blind 재대조 전에는 code/test/GPU/stage/commit/push를
+  계속 금지한다. durable run이 없어 pause는 불필요하다.
+
+- 02:54 KST compact 뒤 mandatory 5문서를 지정 순서로 EOF까지 재독하고 Goal/Git/PID/E2/
+  T3/blind를 actual bytes와 다시 대조했다. Goal active, HEAD/local main/local origin/main/
+  remote main `3d7d0e3` exact, exact 9 allowed modified paths와 staged/untracked 0은 그대로다.
+  latest reconciliation-doc edits를 포함한 actual diff는 1,065 insertions/63 deletions이고
+  repo diff-check exit 0이다. 따라서 02:43의 1,023/52는 code drift가 아니라 직전 문서
+  변경 전 통계로 supersede한다. related AIRI PID 0, GPU 1,073/8,192 MiB이나 AIRI workload 0,
+  E2-C1 0/0이다. E2 complete 1,600/100과 checkpoint 35/34·adapter/report SHA, T3
+  36/36/89/72/2·comparison SHA·summary absent, blind exact 5/PASS/response_viewed=false는
+  권위값과 exact하다. 로그·T3 report·blind fixture body는 읽지 않았다. 현재 구현은 여전히
+  root review/pinned CPU regression 전이므로 PASS가 아니며 GPU/stage/commit/push는 금지한다.
+
+- 02:43 KST compact 뒤 mandatory 5문서를 지정 순서로 EOF까지 재독했다. Goal active,
+  HEAD/local main/local origin/main/remote main `3d7d0e3` exact, actual worktree는 직전
+  adapter-init intent의 exact 9 allowed paths만 modified, staged/untracked 0이다. related AIRI
+  PID 0, GPU 1,073/8,192 MiB이나 AIRI workload 0, E2-C1 0/0이다. E2 complete 1,600/100과
+  checkpoint 35/34·adapter/report SHA, T3 36/36/89/72/2·comparison SHA·summary absent,
+  blind exact 5/PASS/response_viewed=false가 기존 권위값과 exact하다. 로그·T3 report·blind
+  fixture body는 읽지 않았다. 현재 구현 diff는 1,023 insertions/52 deletions이며 root
+  pycompile/code review/regression 전이므로 PASS가 아니다. durable run이 없어 pause는
+  불필요하고, 다음 gate는 pinned CPU/offline integration과 actual E2 provenance helper 검증이다.
+
+- 02:28 KST finalization commit `3d7d0e342dca32a432b46de4ff77f7a7a5aa83a7`과 push
+  `3dba3ca..3d7d0e3 main -> main`은 exit 0이고 local/remote exact·clean·PID 0이다. 다음
+  무-GPU adapter-init seam 감사 결과 current trainer/runner/manifest/verifier에는 E2
+  weights-only initialization/pin/provenance가 없고 checkpoint resume는 optimizer/scheduler/
+  RNG/cursor/progress까지 복원해 계약 위반이다. exact 9-file 최소 구현 intent를 WORKING에
+  입력/E2/code SHA, 동결 학습값, fresh-state·fault·v2 compatibility 성공 조건과 quota 복구
+  identity까지 기록했다. GPU/E2-C1은 0/0이고 smoke/launch/adoption은 계속 금지다.
+
 - 02:23 KST publication finalization exact 7 docs는 continuity PASS, worktree boundary/diff/
   security/stale pending/PID 0이다. stage exit 0, cached names/rows 7, 873,441 bytes,
   manifest `4fa03bc3...552d`; unstaged/untracked·boundary·diff·binary·secret·personal·stale·PID가

@@ -287,6 +287,73 @@ def test_report_fields_keep_cached_report_after_path_replacement() -> None:
         assert report_path.read_bytes() == b'{"replacement":true}\n'
 
 
+def test_v3_report_and_checkpoint_bind_exact_weights_only_initialization() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        report_path = Path(temporary) / "report.json"
+        manifest_sha = "a" * 64
+        initialization = {
+            "init_mode": "adapter-weights-only", "directory_identity": "e2-adapter",
+            "run_id": "e2-source", "model_sha256": "6" * 64,
+            "config_sha256": "7" * 64, "artifact_manifest_sha256": "8" * 64,
+            "inventory": [
+                {"path": "adapter_config.json", "bytes": 1, "sha256": "7" * 64},
+                {"path": "adapter_model.safetensors", "bytes": 1, "sha256": "6" * 64},
+            ],
+        }
+        pins = {**_pins(), "config": {**_pins()["config"],
+                                       "init_mode": "adapter-weights-only"},
+                "initialization": initialization}
+        report = {
+            "mode": "cuda-qlora", "steps": 1, "optimizer_steps": 1,
+            "checkpoint_every_optimizer_steps": 5, "deterministic_validation": True,
+            "determinism": pins["determinism"], "initialization": initialization,
+            "adapter_artifact_manifest_sha256": manifest_sha,
+            "dataset_sha256": pins["dataset_sha256"],
+            "model_weight_sha256": pins["model_weight_sha256"], "seed": 42,
+            "training_authorization": True, "adoption_authorized": False,
+            "t3_status": "pending",
+        }
+        report_path.write_bytes(verifier._canonical(report))
+        state = {"outputs": {"report": {"path": str(report_path)}},
+                 "inputs": {"init_mode": "adapter-weights-only",
+                            "init_adapter_dir": str(Path(temporary) / "e2-adapter"),
+                            "init_adapter_model_sha256": "6" * 64,
+                            "init_adapter_config_sha256": "7" * 64,
+                            "init_adapter_artifact_manifest_sha256": "8" * 64}}
+        assert verifier._report_fields(state, manifest_sha, pins)["initialization"] == initialization
+        verifier._bind_run_state_initialization(state, initialization)
+
+        report.pop("initialization")
+        report_path.write_bytes(verifier._canonical(report))
+        with pytest.raises(verifier.EquivalenceError, match="semantic fields"):
+            verifier._report_fields(state, manifest_sha, pins)
+        state["inputs"]["init_adapter_model_sha256"] = "0" * 64
+        with pytest.raises(verifier.EquivalenceError, match="pin differ"):
+            verifier._bind_run_state_initialization(state, initialization)
+
+
+def test_initialization_provenance_rejects_inventory_and_mode_faults() -> None:
+    fresh = {**_pins(), "config": {**_pins()["config"], "init_mode": "fresh-lora"},
+             "initialization": {"init_mode": "fresh-lora"}}
+    assert verifier._initialization_provenance(fresh) == {"init_mode": "fresh-lora"}
+    broken = {**fresh, "initialization": {"init_mode": "adapter-weights-only"}}
+    with pytest.raises(verifier.EquivalenceError, match="fresh LoRA"):
+        verifier._initialization_provenance(broken)
+
+    invalid_adapter = {
+        **_pins(), "config": {**_pins()["config"], "init_mode": "adapter-weights-only"},
+        "initialization": {
+            "init_mode": "adapter-weights-only", "directory_identity": "nested/path",
+            "run_id": "e2", "model_sha256": "6" * 64, "config_sha256": "7" * 64,
+            "artifact_manifest_sha256": "8" * 64,
+            "inventory": [{"path": "adapter_model.safetensors", "bytes": 1,
+                           "sha256": "6" * 64}],
+        },
+    }
+    with pytest.raises(verifier.EquivalenceError, match="provenance is invalid"):
+        verifier._initialization_provenance(invalid_adapter)
+
+
 def test_completed_output_receipts_refuse_adapter_and_report_substitution() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
@@ -415,6 +482,137 @@ def test_input_manifest_binding_requires_a_canonical_actual_file_and_current_has
         manifest.unlink()
         with pytest.raises(verifier.EquivalenceError, match="missing"):
             verifier._input_manifest_binding(state, digest, expected_config)
+
+
+def test_v3_fresh_lora_manifest_binding_preserves_legacy_empty_init_provenance() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        manifest = Path(temporary) / "manifest.json"
+        payload = _manifest_payload()
+        payload["schema_version"] = "airi.behavior-input-manifest.v3"
+        payload["training_config"] = {**payload["training_config"],
+                                      "init_mode": "fresh-lora"}
+        payload["training_config_sha256"] = verifier._sha256_bytes(
+            verifier._canonical(payload["training_config"]))
+        payload["initial_adapter"] = None
+        manifest.write_bytes(verifier._canonical(payload))
+        digest = verifier._sha256_file(manifest)
+        state = _state("fresh")
+        state["inputs"] = {
+            **state["inputs"], "input_manifest_path": str(manifest.resolve()),
+            "input_manifest_sha256": digest,
+            "input_manifest_training_config_sha256": payload["training_config_sha256"],
+            "init_mode": "fresh-lora", "init_adapter_dir": "",
+            "init_adapter_model_sha256": "", "init_adapter_config_sha256": "",
+            "init_adapter_artifact_manifest_sha256": "",
+        }
+        assert verifier._input_manifest_binding(
+            state, digest, payload["training_config_sha256"])["init_mode"] == "fresh-lora"
+
+
+def test_v3_weights_only_manifest_reverifies_adapter_inventory_and_provenance() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        adapter = root / "source-adapter"
+        adapter.mkdir()
+        model = adapter / "adapter_model.safetensors"
+        config = adapter / "adapter_config.json"
+        readme = adapter / "README.md"
+        model.write_bytes(b"adapter weights")
+        config.write_bytes(b'{"peft_type":"LORA"}\n')
+        readme.write_bytes(b"local test artifact\n")
+        files = [{"path": path.name, "bytes": path.stat().st_size,
+                  "sha256": verifier._sha256_file(path)}
+                 for path in (config, model, readme)]
+        artifact = {
+            "schema_version": "airi.behavior-adapter-artifact.v1",
+            "run_id": "e2-source-run", "pins": {"model_weight_sha256": "2" * 64},
+            "files": files,
+        }
+        artifact_path = adapter / "artifact-manifest.json"
+        artifact_path.write_bytes(verifier._canonical(artifact))
+        artifact_sha = verifier._sha256_file(artifact_path)
+        model_sha = verifier._sha256_file(model)
+        config_sha = verifier._sha256_file(config)
+        payload = _manifest_payload()
+        payload["schema_version"] = "airi.behavior-input-manifest.v3"
+        payload["training_config"] = {**payload["training_config"],
+                                      "init_mode": "adapter-weights-only"}
+        payload["training_config_sha256"] = verifier._sha256_bytes(
+            verifier._canonical(payload["training_config"]))
+        payload["initial_adapter"] = {
+            "run_id": "e2-source-run", "model_sha256": model_sha,
+            "config_sha256": config_sha, "artifact_manifest_sha256": artifact_sha,
+            "files": files,
+        }
+        manifest = root / "manifest.json"
+        manifest.write_bytes(verifier._canonical(payload))
+        digest = verifier._sha256_file(manifest)
+        state = _state("weights-only")
+        state["inputs"] = {
+            **state["inputs"], "input_manifest_path": str(manifest.resolve()),
+            "input_manifest_sha256": digest,
+            "input_manifest_training_config_sha256": payload["training_config_sha256"],
+            "init_mode": "adapter-weights-only",
+            "init_adapter_dir": str(adapter.resolve()),
+            "init_adapter_model_sha256": model_sha,
+            "init_adapter_config_sha256": config_sha,
+            "init_adapter_artifact_manifest_sha256": artifact_sha,
+        }
+        result = verifier._input_manifest_binding(
+            state, digest, payload["training_config_sha256"])
+        assert result["init_mode"] == "adapter-weights-only"
+
+        extra = adapter / "unexpected.bin"
+        extra.write_bytes(b"unexpected")
+        with pytest.raises(verifier.EquivalenceError,
+                           match="initial adapter inventory file inventory mismatch"):
+            verifier._input_manifest_binding(
+                state, digest, payload["training_config_sha256"])
+        extra.unlink()
+        empty = adapter / "unexpected-empty-directory"
+        empty.mkdir()
+        with pytest.raises(verifier.EquivalenceError,
+                           match="initial adapter inventory file inventory mismatch"):
+            verifier._input_manifest_binding(
+                state, digest, payload["training_config_sha256"])
+        empty.rmdir()
+
+        model.write_bytes(b"tampered weights")
+        with pytest.raises(verifier.EquivalenceError, match="integrity mismatch"):
+            verifier._input_manifest_binding(
+                state, digest, payload["training_config_sha256"])
+
+
+def test_v3_weights_only_manifest_rejects_run_state_init_pin_mismatch() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        manifest = Path(temporary) / "manifest.json"
+        payload = _manifest_payload()
+        payload["schema_version"] = "airi.behavior-input-manifest.v3"
+        payload["training_config"] = {**payload["training_config"],
+                                      "init_mode": "adapter-weights-only"}
+        payload["training_config_sha256"] = verifier._sha256_bytes(
+            verifier._canonical(payload["training_config"]))
+        payload["initial_adapter"] = {
+            "run_id": "e2-source", "model_sha256": "6" * 64,
+            "config_sha256": "7" * 64, "artifact_manifest_sha256": "8" * 64,
+            "files": [{"path": "adapter_model.safetensors", "bytes": 1,
+                       "sha256": "6" * 64}],
+        }
+        manifest.write_bytes(verifier._canonical(payload))
+        digest = verifier._sha256_file(manifest)
+        state = _state("pin-mismatch")
+        state["inputs"] = {
+            **state["inputs"], "input_manifest_path": str(manifest.resolve()),
+            "input_manifest_sha256": digest,
+            "input_manifest_training_config_sha256": payload["training_config_sha256"],
+            "init_mode": "adapter-weights-only", "init_adapter_dir": str(Path(temporary).resolve()),
+            "init_adapter_model_sha256": "0" * 64,
+            "init_adapter_config_sha256": "7" * 64,
+            "init_adapter_artifact_manifest_sha256": "8" * 64,
+        }
+        with pytest.raises(verifier.EquivalenceError, match="initial adapter pin differs"):
+            verifier._input_manifest_binding(
+                state, digest, payload["training_config_sha256"])
 
 
 def test_manifest_binding_uses_one_snapshot_across_hash_parse_cutpoint() -> None:

@@ -62,6 +62,65 @@ def pinned_payload(rows: list[dict]) -> tuple[bytes, str]:
 
 
 class ContractTests(unittest.TestCase):
+    def test_adapter_initialization_requires_complete_exact_artifact_and_fresh_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            adapter = root / "prior-adapter"
+            adapter.mkdir()
+            model = adapter / "adapter_model.safetensors"
+            config = adapter / "adapter_config.json"
+            model.write_bytes(b"test adapter weights")
+            config.write_text(json.dumps({"peft_type": "LORA", "task_type": "CAUSAL_LM",
+                                          "r": 16, "lora_alpha": 32,
+                                          "lora_dropout": 0.05,
+                                          # PEFT serializes all-linear as this expanded,
+                                          # order-independent E2 projection set.
+                                          "target_modules": ["up_proj", "o_proj", "v_proj",
+                                                             "down_proj", "k_proj", "q_proj",
+                                                             "gate_proj"]}), encoding="utf-8")
+            inventory = [{"path": path.name, "bytes": path.stat().st_size,
+                          "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+                         for path in (config, model)]
+            manifest = {"schema_version": "airi.behavior-adapter-artifact.v1",
+                        "run_id": "prior-run", "pins": {"model_weight_sha256": "b" * 64},
+                        "files": inventory}
+            manifest_path = adapter / "artifact-manifest.json"
+            manifest_path.write_bytes(trainer._canonical_json_bytes(manifest))
+            args = SimpleNamespace(
+                init_adapter_dir=str(adapter),
+                init_adapter_model_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),
+                init_adapter_config_sha256=hashlib.sha256(config.read_bytes()).hexdigest(),
+                init_adapter_artifact_manifest_sha256=hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+                resume_from_checkpoint=None, lora_r=16, lora_alpha=32, lora_dropout=0.05,
+            )
+            result = trainer._adapter_initialization(args, "b" * 64)
+            self.assertEqual(result["init_mode"], "adapter-weights-only")
+            self.assertEqual(result["run_id"], "prior-run")
+            self.assertEqual(result["directory_identity"], "prior-adapter")
+            self.assertEqual(result["inventory"], inventory)
+
+            args.init_adapter_config_sha256 = "0" * 64
+            with self.assertRaisesRegex(trainer.BehaviorTrainingError, "config SHA"):
+                trainer._adapter_initialization(args, "b" * 64)
+            args.init_adapter_config_sha256 = hashlib.sha256(config.read_bytes()).hexdigest()
+            model.write_bytes(b"tampered")
+            with self.assertRaisesRegex(trainer.BehaviorTrainingError, "artifact"):
+                trainer._adapter_initialization(args, "b" * 64)
+
+    def test_adapter_initialization_all_or_none_and_resume_are_rejected(self) -> None:
+        args = SimpleNamespace(init_adapter_dir="x", init_adapter_model_sha256="",
+                               init_adapter_config_sha256="", init_adapter_artifact_manifest_sha256="",
+                               resume_from_checkpoint=None, lora_r=16, lora_alpha=32,
+                               lora_dropout=0.05)
+        with self.assertRaisesRegex(trainer.BehaviorTrainingError, "all-or-none"):
+            trainer._adapter_initialization(args, "a" * 64)
+        args.init_adapter_model_sha256 = "a" * 64
+        args.init_adapter_config_sha256 = "a" * 64
+        args.init_adapter_artifact_manifest_sha256 = "a" * 64
+        args.resume_from_checkpoint = Path("checkpoint")
+        with self.assertRaisesRegex(trainer.BehaviorTrainingError, "mutually exclusive"):
+            trainer._adapter_initialization(args, "a" * 64)
+
     @unittest.skipUnless(os.name == "nt", "native sharing semantics are Windows-only")
     def test_held_windows_loader_handle_blocks_replace_delete_and_final_reparse(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -472,6 +531,54 @@ class CpuSmokeTests(unittest.TestCase):
 
         with self.assertRaises(trainer.BehaviorTrainingError):
             trainer.run_training(args)
+
+    def test_cpu_weights_only_initialization_loads_exact_tensors_with_fresh_progress(self) -> None:
+        import torch
+        from peft import PeftModel
+        from safetensors.torch import load_file
+
+        source_args = trainer.build_parser().parse_args([
+            "--dataset", str(self.dataset), "--dataset-sha256", self.sha,
+            "--model-dir", str(self.model_dir), "--output", str(self.tmp / "init-source"),
+            "--mode", "cpu-smoke", "--max-steps", "8", "--batch-size", "2",
+            "--gradient-accumulation", "2",
+        ])
+        source = trainer.run_training(source_args)
+        source_dir = Path(source["adapter_dir"])
+        model_sha = hashlib.sha256((source_dir / "adapter_model.safetensors").read_bytes()).hexdigest()
+        config_sha = hashlib.sha256((source_dir / "adapter_config.json").read_bytes()).hexdigest()
+        manifest_sha = hashlib.sha256((source_dir / "artifact-manifest.json").read_bytes()).hexdigest()
+        target_args = trainer.build_parser().parse_args([
+            "--dataset", str(self.dataset), "--dataset-sha256", self.sha,
+            "--model-dir", str(self.model_dir), "--output", str(self.tmp / "init-target"),
+            "--mode", "cpu-smoke", "--max-steps", "8", "--batch-size", "2",
+            "--gradient-accumulation", "2", "--run-id", "weights-only-init",
+            "--run-dir", str(self.tmp / "weights-only-run"),
+            "--init-adapter-dir", str(source_dir), "--init-adapter-model-sha256", model_sha,
+            "--init-adapter-config-sha256", config_sha,
+            "--init-adapter-artifact-manifest-sha256", manifest_sha,
+        ])
+        captured = {}
+        original = PeftModel.from_pretrained.__func__
+
+        def capture(cls, model, *args, **kwargs):
+            loaded = original(cls, model, *args, **kwargs)
+            captured.update({key.replace(".default.", "."): value.detach().cpu().clone()
+                             for key, value in loaded.state_dict().items() if "lora_" in key})
+            return loaded
+
+        with mock.patch.object(PeftModel, "from_pretrained", classmethod(capture)):
+            result = trainer.run_training(target_args)
+        expected = load_file(str(source_dir / "adapter_model.safetensors"))
+        self.assertEqual(set(expected), set(captured))
+        for key, value in expected.items():
+            self.assertTrue(torch.equal(value, captured[key]), key)
+        receipt = json.loads((target_args.run_dir / "fresh-state-receipt.json").read_text())
+        self.assertEqual(receipt["fresh_state"], {
+            "microsteps_completed": 0, "optimizer_steps": 0, "epoch": 0,
+            "next_batch_index": 0, "pending_microbatches": 0,
+            "optimizer_state_entries": 0})
+        self.assertEqual(result["initialization"]["init_mode"], "adapter-weights-only")
 
     def test_cpu_uninterrupted_and_safe_pause_resume_are_exact(self) -> None:
         import torch
