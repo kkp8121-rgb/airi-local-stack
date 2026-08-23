@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 23:37:43 +09:00"
-checkpoint_id: "20260823-233743-serena-final-receipt-cached-pass-commit-intent"
+updated_at_kst: "2026-08-23 23:40:25 +09:00"
+checkpoint_id: "20260823-234025-serena-retirement-finalization-pass-commit-push-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
 active_phase: "e2-c1-design-data-evaluation-contract"
-git_head: "3a80e5094859225d272c35d7c40a7dcf2a9a4bf4"
-worktree_state: "serena-policy-pushed; receipts-exact-2-staged-with-receipt-adjustment; untracked-0; HEAD-equals-local-origin-remote-main"
+git_head: "a7135b8c64424ed3dd4e6f3df0e19ba352567bbb"
+worktree_state: "serena-receipt-commit-pushed; finalization-exact-2-unstaged; staged-0; untracked-0; HEAD-equals-local-origin-remote-main"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-23 23:37 KST Serena final receipt exact two-doc stage/cached validation PASS: staged 2, unstaged/untracked 0; cached diff-check/boundary/binary/oversize/credential/personal-path hit 0; related AIRI PID 0; index manifest SHA 56f082e2cd1e6f3fd68de1da250388b26282643709fc3eac9dfd1732a030279c. Restage this receipt adjustment, recheck exact 2/0/0 and cached gates, then commit docs: record Serena retirement receipt once. Record commit receipt before push. E2-C1 remains 0/0; GPU/service/T3/campaign/adoption changes 0."
+reconciliation_receipt: "2026-08-23 23:40 KST Serena finalization docs validation PASS: focused continuity exit 0/literal PASS; actual WORKING/ROADMAP-LOG exact two, boundary/staged/untracked 0; repo diff-check exit 0 with expected LF-to-CRLF warnings only; credential/personal path hit 0; 615072 bytes, manifest SHA 56e9466b8c84134c6fe7f96a402e2fb26a8bdb2cbd9fa555bbb8dd62672ef6a2; related AIRI PID 0. Stage exact two, cached PASS, commit docs: close Serena retirement milestone and push once. Final read-only HEAD=origin/main clean/PID0 closes the user request without self-referential SHA. E2-C1 remains 0/0; GPU/service/T3/campaign/adoption changes 0."
 ---
 
 # AIRI live working state
@@ -90,6 +90,35 @@ reconciliation_receipt: "2026-08-23 23:37 KST Serena final receipt exact two-doc
 | 현재 행동 | 이 intent를 두 문서에 기록하고 exact diff/Goal/Git/PID를 read-only receipt로 확인한다. |
 
 ## 3. 마지막 내구성 체크포인트
+
+- `20260823-234025-serena-retirement-finalization-pass-commit-push-intent`: finalization
+  WORKING/ROADMAP-LOG는 focused continuity exit 0/literal PASS, actual modified exact 2,
+  boundary/staged/untracked 0, repo diff-check exit 0/expected line-ending warning만,
+  credential·개인 경로 hit 0, 관련 AIRI PID 0으로 PASS했다. 총 615,072 bytes,
+  path/size/SHA manifest는
+  `56e9466b8c84134c6fe7f96a402e2fb26a8bdb2cbd9fa555bbb8dd62672ef6a2`다. exact two
+  docs만 stage해 cached 2/0/0과 diff/security를 확인한 뒤
+  `docs: close Serena retirement milestone` commit과 `git push origin main`을 각각 한 번
+  실행한다. final read-only HEAD/local·remote main exact, worktree clean, PID 0으로 닫으며
+  그 final commit SHA는 문서가 자가 참조하지 않는다.
+
+- `20260823-233929-serena-retirement-finalization-intent`: exact receipt-doc push는 exit 0,
+  `3a80e50..a7135b8 main -> main`이다. 이후 HEAD/local origin/main/remote main은 모두
+  `a7135b8c64424ed3dd4e6f3df0e19ba352567bbb`, 관련 AIRI PID 0이고 actual worktree는
+  이 finalization용 WORKING/ROADMAP-LOG exact 2만 unstaged, staged/untracked 0이다.
+  두 문서를 focused continuity/boundary/diff/security로 검증하고 exact stage/cached PASS
+  뒤 `docs: close Serena retirement milestone`로 commit/push한다. 문서가 자기 final commit
+  SHA를 자가 참조하지 않으며, push 뒤 read-only HEAD=origin/main clean·PID 0을 확인한다.
+  하나라도 실패하면 local 상태를 보존하고 E2-C1/GPU로 이동하지 않는다.
+
+- `20260823-233846-serena-receipt-commit-push-intent`: receipt adjustment restage 뒤 final
+  cached exact 2/unstaged·untracked 0, diff/security/PID 0 PASS와 index manifest
+  `f72d3dc1e5b173a8d8e75e27ab7badfaaa08a4a74a57fb52b6ecf37ba048f22a`를 확인했다.
+  exact `git commit -m "docs: record Serena retirement receipt"`은 exit 0, commit
+  `a7135b8c64424ed3dd4e6f3df0e19ba352567bbb`, parent `3a80e50`, WORKING/ROADMAP-LOG
+  exact 2, 265 insertions/19 deletions이다. local main은 origin/main보다 1 ahead이고 이
+  push intent 두 문서만 unstaged, staged/untracked 0이다. exact `git push origin main`을
+  한 번 실행한다. 실패하면 local commit/docs를 보존하고 GPU를 시작하지 않는다.
 
 - `20260823-233743-serena-final-receipt-cached-pass-commit-intent`: exact two-doc stage
   exit 0 뒤 cached 검증은 staged 2, unstaged/untracked 0, boundary/cached diff-check,
