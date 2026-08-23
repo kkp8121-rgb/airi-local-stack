@@ -1,20 +1,18 @@
 # AIRI 다음 세션 안내
 
-> **2026-08-23 17:49 KST 현재 gate:** controlled GPU와 authoritative E2 1,600/1,600,
-> E1/E2 merge·BF16/Q4_K_M package는 완료·미채택이다. T3 production `journal_pending`은
-> OpenAI SSE 오류 대체 문장이 terminal success로 전달되면서 exact trace journal을
-> 예약하지 않은 false-success로 확정했다. 두 직접 경로만 최소 수정했고 py_compile,
-> targeted 2/2, 영향 113/113, proxy 370/370, simulator 63/63, work-continuity와
-> current-checkpoint가 PASS했다. baseline/승인 fixture/seed 11 실제 1-turn smoke도
-> `transport_failures=0`, `live_receipt_bound=true`, report SHA
-> `6193fb80c0c9072af92ea8fb222a54da172b6ab05e3e364149f4326772126886`로 PASS했다.
-> 관련 listener는 종료 후 0이고 GPU 학습은 없으며 baseline Ollama 추론 모델만 로드돼 있다.
-> 다음 exact gate는 이 수정·문서 commit/push와 HEAD=origin/main·clean 확인, 그다음 새 외부
-> root의 authoritative T3 36이다. T3 `summary.json`, 승자, 3×500 campaign은 아직 없다.
-> 운영 채택과 기본 서비스 모델 변경은 계속 금지한다.
-> 수정/test/필수 SSoT는 commit `80160a14179a0685a0b15b6bdbc724cd68c2e5b1`로
-> `9724833..80160a1 main -> main` push됐고, 직후 HEAD/local/remote exact·worktree
-> clean이었다. 이 push receipt 문서 commit 뒤 다시 clean을 확인하고 T3 36을 시작한다.
+> **2026-08-23 20:56 KST 현재 gate: T3 FAILED CLOSED.** controlled GPU와
+> authoritative E2 1,600/1,600, E1/E2 merge·BF16/Q4_K_M package는 완료·미채택이다.
+> authoritative T3는 baseline/E1/E2 각 12, 총 36 reports와 두 comparator까지 실행했으나
+> 두 comparison 모두 `status=fail`, adoption false, paired reports 0, reason
+> `polite violation or invented handle`로 종료했고 launcher exit 1, `summary.json` absent다.
+> 전 arm transport failure는 0이나 invented handle baseline/E1/E2 30/46/37,
+> memory 5/36·8/36·11/36, fact 173/752·180/752·193/752, donation
+> 56/56·56/56·55/56이다. comparison 두 파일은 각 196 bytes SHA `5f2b4213...3afa`;
+> report/packet/evidence/runtime/comparison inventory SHA는 `e5241341...16b4`/
+> `00b90c95...859a`/`7cb97aea...3dee`/`0417f814...4e8a`/`5a4793b9...d75`다.
+> launcher/관련 PID/owned listener는 0이다. winner 0이므로 3×500 campaign과 운영 채택을
+> 금지하며, 실패 root를 보존하고 같은 공개 blind matrix나 hard gate를 반복·약화하지 않는다.
+> 다음 gate는 이 terminal receipt의 SSoT 검증·commit/push와 HEAD=origin/main·clean 확인이다.
 
 > **2026-08-23 controlled GPU P0-B PASS receipt:** 최신 Goal status는 `active`,
 > `goal_status=active`다. 첫 K=5 baseline은 480/30 계산 뒤 actual interval max

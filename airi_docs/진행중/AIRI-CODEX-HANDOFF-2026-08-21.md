@@ -1,13 +1,13 @@
 # AIRI Codex GPU 인수인계 — broadcast continuity v4
 
-갱신: 2026-08-23 17:49 KST (파일명은 현행 GPU SSoT 식별자로 유지)
+갱신: 2026-08-23 20:56 KST (파일명은 현행 GPU SSoT 식별자로 유지)
 
-상태: **ACTIVE — K=3 CONTROLLED GPU PASS, authoritative E2 1,600/1,600 PASS,
-E1/E2 merge·BF16/Q4_K_M package 완료·미채택. T3 production은 아직 권위 `summary.json` 0,
-live campaign 0이다. `journal_pending` blocker의 exact 원인을 OpenAI SSE 오류 대체 문장
-false-success로 확인해 최소 수정했고, baseline/승인 fixture/seed 11 실서비스 1-turn smoke에서
-`transport_failures=0`, `live_receipt_bound=true`를 확인했다. 최종 저장소 gate는 PASS했으며,
-수정 commit/push와 clean 확인 뒤 새 외부 root에서 authoritative T3 36회를 시작한다.**
+상태: **ACTIVE, T3 FAILED CLOSED — K=3 controlled GPU와 authoritative E2
+1,600/1,600, E1/E2 merge·BF16/Q4_K_M package는 완료·미채택이다. authoritative T3는
+baseline/E1/E2 각 12, 총 36 reports와 두 comparator까지 실행했으나 두 comparison이 모두
+`status=fail`, paired reports 0, reason `polite violation or invented handle`로 종료해 launcher
+exit 1이고 `summary.json`은 없다. winner 0이므로 3×500 campaign은 금지한다. 실패 root를
+보존하고 같은 matrix나 hard gate를 반복·약화하지 않는다.**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
@@ -18,6 +18,30 @@ false-success로 확인해 최소 수정했고, baseline/승인 fixture/seed 11 
 병합·패키징, 로컬 서비스, T3·장시간 캠페인, 검증된 milestone commit/push가
 명시적으로 재승인됐다. 운영 채택과 기본 서비스 모델 변경은 별도 사용자 승인 전까지
 계속 금지한다.
+
+## -2. 2026-08-23 authoritative T3 terminal FAIL receipt
+
+- external root `airi-t3-authoritative-20260823-175152`에서 baseline/E1/E2 각 12,
+  총 36 reports와 36 packets가 게시됐다. 모든 arm의 aggregate transport failure는 0이고
+  run별 local service/durable receipt 무결성은 보존됐다.
+- 마지막 `e2-3-20260822.json`은 419,613 bytes SHA
+  `2c8d74bd17a52905abc7732c8e74b58c1a9dc1a21b59c3d6d7298805663c140c`다.
+  실제 집계는 topic 99/216, fact 31/111, donation 4/4이나 memory 0/3,
+  continuity callback 4/12, complete arc 3/12, invented handle 11이다.
+- arm별 aggregate invented handle은 baseline/E1/E2 `30/46/37`, memory는
+  `5/36`·`8/36`·`11/36`, fact는 `173/752`·`180/752`·`193/752`, donation은
+  `56/56`·`56/56`·`55/56`이다. baseline에는 polite violation 1건도 있다.
+- `baseline-vs-e1.json`과 `baseline-vs-e2.json`은 각각 196 bytes, 같은 SHA
+  `5f2b42135a2d2a6cdae23d4e512b3754807bbbdcdc3938b9d0d1940867d83afa`, schema
+  `airi.broadcast-sim-t3-comparison.v1`, `status=fail`, adoption false, paired reports 0,
+  reason `polite violation or invented handle`이다. launcher는 이를 PASS로 승격하지 않고
+  exit 1했으며 `summary.json`을 게시하지 않았다.
+- report/packet/evidence/runtime/comparison inventory는 36/36/89/72/2 files이고 manifest
+  SHA는 `e5241341...16b4`/`00b90c95...859a`/`7cb97aea...3dee`/
+  `0417f814...4e8a`/`5a4793b9...d75`다. launcher/관련 process/owned listener는 종료 뒤 0이다.
+- T3 winner와 campaign output은 0이다. hard gate 우회나 같은 공개 blind matrix 반복은
+  증거가 아니므로 금지한다. 후속 학습 iteration에는 오염되지 않은 새 평가 설계와 별도
+  intent가 필요하다. 운영 채택과 기본 서비스 모델 변경 금지는 유지한다.
 
 ## -1. 2026-08-23 T3 journal false-success 수정 receipt
 
@@ -338,7 +362,12 @@ HF safe-merge → BF16 GGUF → Q4_K_M 순서로 패키징한다. 패키저가 1
 build suffix를 붙이므로 최종 태그는 각 `package-evidence.json`에서 읽는다.
 패키징은 모델 태그를 만드는 상태 변경이지만 운영 채택은 아니다.
 
-## 5. T3 — 병합 후 필수, 아직 실행하지 않음
+## 5. T3 — 36 reports 완료, comparator FAIL
+
+2026-08-23 authoritative 실행은 exact model manifest SHA `42e94892...3bde`와 승인 fixture
+manifest를 사용해 36/36 reports를 게시했다. 두 comparator가 위 §-2의 품질 hard gate에서
+실패해 PASS summary와 승자는 없다. 아래 계약과 명령은 실행 당시 고정 입력의 기록이며 같은
+matrix 재실행 명령이 아니다.
 
 baseline v3:
 
@@ -403,10 +432,10 @@ fail-closed로 고정한다.
   -ModelManifest D:\AIRI-Models\airi-broadcast-v4-20260821\t3-model-manifest.json
 ```
 
-현재 launcher는 실제 E2 adapter/tag가 없으므로 production matrix를 시작하지 않았고,
-이 상태에서는 model preflight에서 output/service 생성 전에 반드시 중단한다. T3에는
-RAG corpus가 필요 없으므로 fresh knowledge DB는 빈 상태를 attest하며 populated campaign
-fixture를 섞지 않는다.
+실행에 사용한 exact tag/digest는 external model manifest에 baseline
+`e683802b...5291`, E1 `721812de...79c8`, E2 `4afe7f4e...243`으로 결속됐다. T3에는 RAG
+corpus를 섞지 않았고 각 fresh knowledge DB가 빈 상태임을 attest했다. terminal failure root는
+삭제하지 않으며 동일 command를 다시 실행하지 않는다.
 
 통과 기준은 기존 calibration 계약과 새 blind fixture를 모두 만족해야 하며,
 특히 v3의 memory 12/24→8/24, donation callout 40/40→38/40 회귀를 되돌려야 한다.
@@ -539,22 +568,23 @@ identity spoof, corrupt-current/valid-previous 회귀와 전체 offline checkpoi
    base model, E1 SHA exact, fresh root와 E2 adapter/report 부재를 확인하고 K3 실험을
    실행했다. E2-LAUNCH 직전에는 현재 verifier/docs commit push와 HEAD=origin/main·clean을
    확인한 뒤 같은 입력·PID·E2 부재 preflight를 fresh timestamped root 기준으로 반복한다.
-5. [ ] **E2-LAUNCH:** 기존 0-byte 로그를 삭제하지 않고 P0 receipt에서 검증·고정한
+5. [x] **E2-LAUNCH:** 기존 0-byte 로그를 삭제하지 않고 P0 receipt에서 검증·고정한
    authoritative durable runner 명령으로만 새 timestamped stdout/stderr 경로와
    run-state를 생성해 step 0부터 시작한다. direct trainer/임의 hidden process 실행은
    무효다. PID와 exact command identity, CUDA 메모리 사용을 기록한다.
-6. [ ] E2 1,600 microsteps를 완주한다. 완료 증거는 adapter model/config/report,
+6. [x] E2 1,600 microsteps를 완주했다. 완료 증거는 adapter model/config/report,
    dataset/base pin, optimizer step, epoch 1/2 dev loss, selected epoch, SHA와 artifact
    manifest다. 로그나 GPU 사용 시간만으로 완료 처리하지 않는다.
-7. [ ] E1/E2 provenance를 독립 재감사하고 E1 dev `2.8938066467`과 E2 epoch 1/2를
+7. [x] E1/E2 provenance를 독립 재감사하고 E1 dev `2.8938066467`과 E2 epoch 1/2를
    비교한다. 두 후보 모두 계속 `adoption_authorized=false`다.
-8. [ ] E1/E2 각각 HF safe-merge → BF16 GGUF → Q4_K_M을 수행한다. 후보별
+8. [x] E1/E2 각각 HF safe-merge → BF16 GGUF → Q4_K_M을 수행했다. 후보별
    manifest/SHA와 `package-evidence.json`의 최종 tag/digest를 보존한다.
-9. [ ] 서로 다른 exact baseline/E1/E2 tag+64-hex digest로 T3 model manifest를
+9. [x] 서로 다른 exact baseline/E1/E2 tag+64-hex digest로 T3 model manifest를
    만들고 승인 fixture raw/canonical retained SHA를 재검증한다.
-10. [ ] isolated T3 36 reports와 baseline↔E1/E2 두 comparator를 완주한다. report,
-   health, contract, stream plan, SQLite/sidecar hash inventory 누락이 있으면 승자 없음이다.
-11. [ ] T3 통과 승자 1개만 3 seed × 500 turn live campaign을 실행한다. semantic/decoy,
+10. [~] isolated T3 36 reports와 baseline↔E1/E2 두 comparator는 terminal까지 실행했으나
+   두 comparator가 hard-gate FAIL했고 PASS summary가 없어 **승자 없음**이다. report,
+   health, contract, stream plan, SQLite/sidecar inventory는 실패 root에 보존한다.
+11. [ ] T3 통과 승자 1개가 없어 3 seed × 500 turn live campaign은 **차단**한다. semantic/decoy,
    RAG receipt, durable journal, answer→spoken→TTS SHA, 인과 순서, close·latency·stability
    증거와 retained hashes를 모두 요구한다.
 12. [ ] 실제 응답 비교 묶음, 실패 사례, 점수와 증거를 사용자에게 제출한다.

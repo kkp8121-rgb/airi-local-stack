@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 17:50:50 +09:00"
-checkpoint_id: "20260823-175050-t3-journal-fix-pushed"
+updated_at_kst: "2026-08-23 21:06:36 +09:00"
+checkpoint_id: "20260823-210636-t3-fail-staged-commit-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "t3-36-prelaunch"
-git_head: "80160a14179a0685a0b15b6bdbc724cd68c2e5b1"
-worktree_state: "five-doc-push-receipt-dirty; staged-untracked-0"
+active_phase: "t3-36-failed-closed"
+git_head: "90a436ee4f1eaea46a139e1f6d30da3d28cfaebc"
+worktree_state: "terminal-failure-five-ssot-staged; unstaged-untracked-0-before-receipt"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-23 17:50 KST receipt: exact seven-path cached review had forbidden-name 0, secret-pattern 0 and diff-check PASS. Conventional commit 80160a14179a0685a0b15b6bdbc724cd68c2e5b1 (fix: preserve durable T3 fallback receipts) was pushed 9724833..80160a1 to origin/main; HEAD/local/remote are exact and worktree was clean immediately after push. This five-doc receipt is the only new dirty batch. Next: validate and push the docs receipt, re-confirm HEAD=origin/main/clean/listener 0, then create one fresh external authoritative T3 root."
+reconciliation_receipt: "2026-08-23 21:06 KST exact five-doc git add exit 0. Initial cached receipt is staged 5, unstaged/untracked 0, boundary and cached diff-check PASS, forbidden path/over-5MiB/credential-sensitive literal/personal-path hits 0, staged blob bytes 656,287 and index manifest 3da54976...0927. Restage this WORKING receipt only, require the same 5/0/0 and cached PASS, then commit with subject docs: record authoritative T3 failure. On commit failure preserve stage and do not push."
 ---
 
 # AIRI live working state
@@ -23,15 +23,18 @@ reconciliation_receipt: "2026-08-23 17:50 KST receipt: exact seven-path cached r
 ## 1. 권한과 현재 사실
 
 - 2026-08-23 01:12 KST 최신 사용자 `/goal` 명령으로 goal을 명시적으로 재개했다.
-  Goal 도구의 실제 status는 `active`이며 complete/cancel이 아니다. 저장소 구현·검증,
-  통제 GPU, authoritative E2, 병합·패키징, T3·campaign, 검증된 milestone commit/push가
-  승인됐다. 운영 모델 채택과 기본 서비스 모델 변경은 계속 별도 사용자 승인 대상이다.
+  Goal 도구는 prior `blocked` status를 유지하지만 최신 사용자가 같은 unfinished goal을
+  명시적으로 재개했으므로 effective execution은 active이며 complete/cancel이 아니다.
+  저장소 구현·검증, 통제 GPU, authoritative E2, 병합·패키징, T3·campaign, 검증된 milestone
+  commit/push가 승인됐다. 운영 모델 채택과 기본 서비스 모델 변경은 계속 별도 사용자 승인 대상이다.
 - 운영 모델 채택과 기본 모델 변경 금지는 pause와 무관하게 계속 유지한다.
 - 2026-08-22 18:40 KST compact 복구 재확인: Python trainer/durable runner
   프로세스 0. GPU process 목록에는 OS/app 프로세스가 있지만 식별 가능한 AIRI
   trainer/runner workload는 0이다.
-- v4 파인튜닝은 E1 adapter/report까지만 완료·검증됐고 아직 미채택이다.
-- E2 adapter/report, merge/package, v4 T3, live campaign 산출물은 0이다.
+- v4 E1/E2 adapter/report와 provenance, E1/E2 safe merge·BF16/Q4_K_M package는
+  완료·검증됐고 미채택이다. E2 selected epoch 2 dev loss는 `2.735453106217887`이다.
+- authoritative v4 T3는 36 reports와 두 failed comparator를 외부 root에 보존했다.
+  PASS summary와 winner, live campaign 산출물은 0이다.
 - 2026-08-23 07:28 KST HEAD/local·remote origin/main은
   `0454ca8d9df9239cf7d6c063e5ed751235fb2ed1`로 일치한다. K3 controlled GPU
   equivalence receipt SHA `d913992e...e84b9`는 PASS이고 baseline/safe arm은 complete
@@ -44,17 +47,177 @@ reconciliation_receipt: "2026-08-23 17:50 KST receipt: exact seven-path cached r
 
 | 항목 | 값 |
 |---|---|
-| 의도 | verified manifest를 입력으로 authoritative durable launcher에서 E2 seed 42·1,600 microsteps를 step 0부터 정확히 한 번 시작한다. |
-| 허용 범위 | launcher가 fresh `...074326\run`, timestamped run logs/checkpoints/state와 fixed E2 adapter/report target만 소유. direct trainer, ResumeInterrupted, pause, 서비스 금지 |
-| 시작 전 증거 | manifest 1,638 bytes SHA `bdc2b47b...a7bd`, config `48ba20dd...1853`, run/output/report absent, PID 0, GPU 480 MiB. launcher는 이 경계에서 정확히 한 번 호출됐다. |
-| exact 변경 | run id `v4-e2-seed42-1600-20260823-074326`, K=3, heartbeat 10s, deterministic trainer args 33개, effective command SHA `cc6df6ac...49a53`. |
-| 출력 경로 | run `...074326\run`; new stdout/stderr `run\logs\trainer.*.log`; adapter/report는 기존 고정 E2 absent target. 기존 0-byte logs는 보존 |
-| 완료 조건 | verified live receipt는 PASS했다. 장기 완료는 terminal 1,600/100, adapter/config/report와 final evidence/provenance, 관련 PID 0의 별도 receipt다. |
-| 중단·복구 | 같은 launch/resume/pause를 호출하지 않는다. current state/anchor와 exact PID tree를 15분 이내 heartbeat로 monitor하고 terminal failure면 root를 보존·진단한다. |
-| 현재 행동 | authoritative E2 한 run을 중복·중단 없이 monitor한다. 09:41 KST 768/48, GPU 7,986 MiB·100%이며 checkpoint 16 chain이 exact 게시됐다. |
+| 의도 | authoritative T3 terminal failure root를 보존하고 36 reports·두 comparator·inventory·PID 0을 content-safe하게 결속해 승자/campaign 금지를 문서화한다. |
+| 허용 범위 | external root의 metadata/aggregate/SHA read-only 검증과 milestone 문서 갱신. response 본문·로그 본문을 읽거나 matrix를 재실행하지 않으며 운영 채택·기본 모델 변경 금지 |
+| 시작 전 증거 | 동일 launcher session이 reports 36과 comparison 2를 게시한 뒤 exit 1했다. 두 comparator는 status fail/adoption false이고 PASS summary는 없다. |
+| exact 변경 | repository code/model/service 변경 0. WORKING-STATE, handoff, roadmap status/log, NEXT exact 5개에 terminal receipt와 no-winner/campaign-blocked 경계를 기록했다. |
+| 출력 경로 | 실패 증거는 external root `airi-t3-authoritative-20260823-175152`에 보존한다. response-bearing reports/packets, DB와 로그는 Git 금지다. |
+| 완료 조건 | required SSoT가 실제 failure receipt와 no-winner/campaign-blocked 경계를 반영하고 focused/diff/security PASS 뒤 Conventional Commit/push, HEAD=origin/main·clean이다. |
+| 중단·복구 | 같은 matrix를 반복하지 않는다. T3 통과 모델이 없으므로 campaign을 시작하지 않는다. 후속 모델링 iteration에는 오염되지 않은 새 평가 설계와 별도 intent가 필요하다. |
+| 현재 행동 | exact five-doc focused continuity/diff/security를 검증한다. PASS 뒤 이 다섯 경로만 stage/commit/push하며 full matrix/campaign은 실행하지 않는다. |
 
 ## 3. 마지막 내구성 체크포인트
 
+- `20260823-210636-t3-fail-staged-commit-intent`: exact five-doc `git add` exit 0 뒤
+  staged 5, unstaged/untracked 0, boundary/cached diff-check PASS, forbidden artifact path/
+  5 MiB 초과/credential·민감 literal/개인 경로 hit 0이다. staged blob 총 656,287 bytes,
+  index path/mode/blob/size manifest는
+  `3da54976b45e031003a9201efe066a12b5b0fbe390bdfadb7ec13f7686f00927`다.
+  이 receipt로 바뀐 WORKING만 재stage해 같은 5/0/0과 cached 검증을 확인한 뒤 exact
+  `git commit -m "docs: record authoritative T3 failure"`를 실행한다. 실패하면 push하지
+  않고 stage를 보존한다.
+- `20260823-210530-t3-fail-security-pass-stage-intent`: corrected five-doc wrapper는
+  exit 0이다. Git probe 4종 exit 0, actual exact 5, boundary/staged/untracked 0,
+  forbidden artifact path/binary/5 MiB 초과/credential·민감 literal/개인 경로 hit 모두 0,
+  총 657,941 bytes, path+size+SHA manifest
+  `082a997b68d45b92b60061be0d342497eaef5e4cbf3284f67a9f67f5d7e76904`다.
+  이 receipt로 바뀐 WORKING을 포함한 exact 5경로만 stage하고 staged 5, unstaged/untracked
+  0, cached diff/security PASS를 확인한다. 실패하면 commit/push하지 않는다.
+- `20260823-210439-t3-fail-security-wrapper-corrected-intent`: repo 기본 diff-check는
+  exit 0이고 expected LF→CRLF warning 5줄뿐이다. 첫 five-doc security wrapper는
+  `ErrorActionPreference=Stop`이 동일 Git native stderr를 terminating error로 승격해
+  receipt 조립 전 exit 1했다. file/stage/Git mutation은 0이고 security PASS가 아니다.
+  `$ErrorActionPreference='Continue'`에서 native stderr/exit를 명시 캡처하는 수정 wrapper를
+  같은 exact five-doc 경계에 한 번 실행한다. 완결 hit-0 receipt 전에는 stage하지 않는다.
+- `20260823-210335-t3-fail-continuity-pass-diff-intent`: exact
+  `powershell -NoProfile -ExecutionPolicy Bypass -File .\test-airi-work-continuity.ps1`은
+  exit 0/literal PASS다. post-run actual modified exact 5, staged/untracked 0, 관련 T3 PID
+  0이다. repo 기본 diff-check와 exact five-doc boundary, forbidden artifact/binary/oversize/
+  credential·민감 literal·개인 경로 scan 및 path+size+SHA manifest를 read-only로 수행한다.
+  PASS 전에는 stage/commit/push하지 않는다.
+- `20260823-210248-t3-fail-docs-validation-intent`: authoritative terminal receipt를
+  WORKING/handoff/roadmap status/log/NEXT exact 5개에 반영했다. HEAD=origin/main
+  `90a436e`, actual modified exact 5, staged/untracked 0, 관련 PID/listener 0이다. focused
+  continuity 한 번, repo diff-check와 five-doc forbidden artifact/secret scan을 실행한다.
+  PASS하면 exact 5개만 stage해 cached boundary/security를 확인하고 Conventional Commit/push,
+  HEAD=origin/main clean으로 milestone을 durable하게 만든다. matrix/campaign/adoption 변경은
+  금지한다.
+- `20260823-205658-t3-36-terminal-fail`: 마지막 E2 blind fixture seed 20260822 report가
+  419,613 bytes SHA `2c8d74bd17a52905abc7732c8e74b58c1a9dc1a21b59c3d6d7298805663c140c`로
+  게시돼 baseline/E1/E2 각 12, 총 36/36이다. 216 turns/transport failure 0, topic
+  99/216, fact 31/111, donation 4/4이나 memory 0/3, callback 4/12, complete arc 3/12,
+  invented handle 11을 실제 품질 실패로 보존한다. 이어 두 comparator는 각각 196 bytes
+  SHA `5f2b42135a2d2a6cdae23d4e512b3754807bbbdcdc3938b9d0d1940867d83afa`, schema
+  `airi.broadcast-sim-t3-comparison.v1`, `status=fail`, adoption false, paired reports 0,
+  reason `polite violation or invented handle`로 종료했고 launcher exit 1이다. arm별 transport
+  failure는 모두 0이나 invented handle baseline/E1/E2 30/46/37, memory 5/36·8/36·11/36,
+  fact 173/752·180/752·193/752, donation 56/56·56/56·55/56이다. report/packet/evidence/
+  runtime/comparison inventory는 36/36/89/72/2 files, manifest SHA `e5241341...16b4`/
+  `00b90c95...859a`/`7cb97aea...3dee`/`0417f814...4e8a`/`5a4793b9...d75`다.
+  `summary.json`은 absent, launcher/related process/owned listener 0이다. 승자 0이므로
+  campaign을 금지하며 root를 보존하고 같은 matrix를 반복하지 않는다.
+- `20260823-204733-t3-36-heartbeat-35`: E2 blind fixture seed 66 report가 415,847 bytes
+  SHA `2653090494f31f08890c058894c62c7f8db8d2c9196d9be16d392b523c89e7a4`로 게시돼
+  baseline 12/E1 12/E2 11, 총 35/36이다. 216 turns/transport failure 0이나 topic
+  86/216, fact usage 33/126, donation 3/4, memory 0/3, continuity callback 2/12,
+  complete arc 1/12, invented handle 13, drift 1, addressee 13/28을 실제 품질 실패로
+  보존한다. 같은 launcher PID 11348이 runtime 36의 마지막 E2 blind seed 20260822로
+  전환했고 localhost service children 4개가 live다. simulator runner는 snapshot 시점
+  미게시, comparator 0, summary absent다. GPU는 7,034/8,192 MiB·38%·56°C로 추론 only,
+  trainer 0, training E2 terminal 1,600/1,600, 운영 채택 false다.
+- `20260823-204205-post-compact-t3-34`: compact 직후 지정 SSoT 5종을 순서대로
+  EOF까지 재독하고 Goal/Git/PID/T3 external receipt/GPU를 read-only로 대조했다. Goal
+  도구는 prior `blocked`를 유지하지만 최신 사용자가 같은 unfinished goal을 명시적으로
+  재개해 effective execution은 active다. HEAD/local·remote origin/main은 `90a436e` exact,
+  actual worktree는 WORKING-STATE와 roadmap log 두 파일 dirty, staged/untracked 0이다.
+  동일 launcher PID 11348 아래 E2 blind seed 66 runner PIDs 19392/31532와 localhost
+  service descendants가 live다. report는 baseline 12/E1 12/E2 10, 총 34/36으로 직전
+  receipt와 같고 latest `e2-3-55.json`은 420,264 bytes SHA `762beaea...473f`다.
+  runtime 35, comparator 0, summary absent다. GPU는 7,403/8,192 MiB·64%·69°C로 추론
+  중이며 trainer 0, training E2 terminal 1,600/1,600, 운영 채택 false다. 같은 launcher만
+  terminal까지 회수한다.
+- `20260823-203813-t3-36-heartbeat-34`: E2 blind fixture seed 55 report가 420,264 bytes
+  SHA `762beaea2d3b8d506f303e4e6d2458dc73e5714212d15c76ee56a52d2e5b473f`로 게시돼
+  baseline 12/E1 12/E2 10, 총 34/36이다. 216 turns/transport failure 0, topic
+  98/216, fact usage 36/131, donation 4/4이나 memory 0/3, callback 2/12, complete arc
+  1/12, invented handle 4, addressee 11/28을 실제 품질 실패로 보존한다. runtime 35가
+  다음 blind run으로 시작됐다. comparator/summary absent, GPU 추론 only, trainer 0,
+  training E2 terminal 1,600/1,600, 운영 채택 false다.
+- `20260823-203010-t3-36-heartbeat-33`: E2 blind fixture seed 44 report가 418,293 bytes
+  SHA `4a69e232b1ffe0f45e5e86ac4e84bf3115b38390e082792df64c6769de7d099d`로 게시돼
+  baseline 12/E1 12/E2 9, 총 33/36이다. 216 turns/transport failure 0, fact usage
+  41/135, donation 4/4이나 memory 0/3, continuity callback 0/12, complete arc 0/12,
+  invented handle 6, addressee 11/28을 실제 품질 실패로 보존한다. runtime 34가 다음
+  blind run으로 시작됐다. comparator/summary absent, GPU 추론 only, trainer 0, training
+  E2 terminal 1,600/1,600, 운영 채택 false다.
+- `20260823-202207-t3-36-heartbeat-32`: E2 fixture 2 seed 20260818 report가 94,843 bytes
+  SHA `43d02192a98d0faa75e1407416d9baee864978de47f3379e610e594b5bc8553e`로 게시돼
+  baseline 12/E1 12/E2 8, 총 32/36이고 E2 fixture 2가 닫혔다. 48 turns/transport
+  failure 0, topic 26/48, memory 2/3, fact usage 8/34, donation/addressee 5/5이나
+  fallback 1/48을 실제 결과로 보존한다. runtime 33이 첫 E2 blind 216-turn run으로
+  시작됐다. comparator/summary absent, GPU 추론 only, trainer 0, training E2 terminal
+  1,600/1,600, 운영 채택 false다.
+- `20260823-201828-t3-36-heartbeat-31`: E2 fixture 2 seed 33 report가 93,550 bytes SHA
+  `1c092bced07145f860526800491b7e2281a240241038ddb99508bc832172bf66`로 게시돼
+  baseline 12/E1 12/E2 7, 총 31/36이다. 48 turns/transport failure 0, topic 30/48,
+  memory 1/3, fact usage 6/30, donation/addressee 5/5이며 invented handle 1이다. runtime
+  32가 같은 launcher에서 시작됐다. comparator/summary absent, GPU 추론 only, trainer 0,
+  training E2 terminal 1,600/1,600, 운영 채택 false다.
+- `20260823-201447-t3-36-heartbeat-30`: E2 fixture 2 seed 22 report가 95,640 bytes SHA
+  `8dc288a100497884a91e62e5b4f80f6bbc215f8926eca5672c6782f407179fd9`로 게시돼
+  baseline 12/E1 12/E2 6, 총 30/36이다. 48 turns/transport failure 0, topic 31/48,
+  memory 2/3, fact usage 11/39, donation/addressee 5/5, invented handle 0이다. runtime
+  31이 같은 launcher에서 시작됐다. comparator/summary absent, GPU 추론 only, trainer 0,
+  training E2 terminal 1,600/1,600, 운영 채택 false다.
+- `20260823-201208-t3-36-heartbeat-29`: E2 fixture 2 seed 11 report가 94,010 bytes SHA
+  `ae585995c4bdc9ffb5e2813f4201ec584955b176e4e7cb08cfdc9828a6bfdf3e`로 게시돼
+  baseline 12/E1 12/E2 5, 총 29/36이다. 48 turns/transport failure 0, topic 31/48,
+  memory 2/3, donation/addressee 5/5, fact usage 6/27이나 fallback 2/48을 실제 결과로
+  보존한다. runtime 30이 같은 launcher에서 시작됐다. comparator/summary absent, GPU
+  추론 only, trainer 0, training E2 terminal 1,600/1,600, 운영 채택 false다.
+- `20260823-200827-t3-36-heartbeat-28`: E2 fixture 1 seed 20260818 report가 94,875 bytes
+  SHA `db204f9307462bef1838caccf1bf336fde453963c15881faec31ce12fa6d9ea4`로 게시돼
+  baseline 12/E1 12/E2 4, 총 28/36이고 E2 fixture 1이 닫혔다. 48 turns/transport
+  failure 0, donation/addressee 5/5, topic 27/48, memory 0/3, fact usage 4/29,
+  invented handle 0이다. runtime 29가 fixture 2로 시작됐다. comparator/summary absent,
+  GPU 추론 only, trainer 0, training E2 terminal 1,600/1,600, 운영 채택 false다.
+- `20260823-200446-t3-36-heartbeat-27`: E2 fixture 1 seed 33 report가 95,811 bytes SHA
+  `d58331dac80ad6e48bacf396cd6fdb566b7f618cc67b3b21741894df189d86ff`로 게시돼
+  baseline 12/E1 12/E2 3, 총 27/36이다. 48 turns/transport failure 0, donation/addressee
+  5/5, memory 2/3, topic 25/48, fact usage 6/29이며 invented handle 1을 실제 결과로
+  보존한다. runtime 28이 같은 launcher에서 시작됐다. comparator/summary absent, GPU
+  추론 only, trainer 0, training E2 terminal 1,600/1,600, 운영 채택 false다.
+- `20260823-200107-t3-36-heartbeat-26`: E2 fixture 1 seed 22 report가 95,869 bytes SHA
+  `dd730de73846dbcee3ec5d18f8e7e9760de4d661eaedbb2033041626693d3ba7`로 게시돼
+  baseline 12/E1 12/E2 2, 총 26/36이다. 48 turns/transport failure 0, donation/addressee
+  5/5, memory 1/3, fact usage 8/33이며 invented handle 1을 실제 결과로 보존한다.
+  runtime 27이 같은 launcher에서 시작됐다. comparator/summary absent, GPU 추론 only,
+  trainer 0, training E2 terminal 1,600/1,600, 운영 채택 false다.
+- `20260823-195723-t3-36-heartbeat-25`: E2 fixture 1 seed 11 report가 95,099 bytes SHA
+  `1eedc2490b8b9fe6c39c60bb59f3fe8680a9c02131ab9248fcd06bf6ab345012`로 게시돼
+  baseline 12/E1 12/E2 1, 총 25/36이다. 48 turns/transport failure 0, memory 1/3,
+  donation/addressee 5/5이나 fallback 1/48과 fact usage 3/28을 실제 결과로 보존한다.
+  runtime 26이 같은 launcher에서 시작됐다. comparator/summary absent, GPU 추론 only,
+  trainer 0, training E2 terminal 1,600/1,600, 운영 채택 false다.
+- `20260823-195436-t3-36-heartbeat-24`: E1 fixture 3 seed 20260822 report가 419,898 bytes
+  SHA `dd5e58d955c96da679f04a3eac4c5a3776ee21b08fe475020f5c305144b1fc74`로 게시돼
+  baseline 12/E1 12/E2 0, 총 24/36이고 E1 arm이 닫혔다. 216 turns/transport failure 0이나
+  memory probe 0/3, continuity callback 1/12, invented handle 6, drift 1, complete arc 0/12를
+  실제 결함으로 보존한다. runtime 25가 첫 E2 run으로 시작됐고 새 localhost listener 4개가
+  live다. comparator 0, summary absent, GPU 추론 only, trainer 0, training E2 terminal
+  1,600/1,600, 운영 채택 false다.
+- `20260823-194605-t3-36-heartbeat-23`: E1 fixture 3 seed 66 report가 415,291 bytes SHA
+  `6e0e7bc6e0c8e87e0792fd8b494413b48bb6f47de3c33cce5d451e229d6f178d`로 게시돼
+  baseline 12/E1 11/E2 0, 총 23/36이다. 216 turns/transport failure 0이나 topic anchor
+  79/216, memory probe 0/3, invented handle 9, drift 1, complete arc 0/12를 실제 결함으로
+  보존한다. runtime 24의 localhost listener 4개가 새 PID로 시작됐고 launcher PID 11348은
+  동일하다. summary absent, GPU 추론 only, trainer 0, E2 terminal 1,600/1,600이다.
+- `20260823-193718-t3-36-heartbeat-22`: E1 fixture 3 seed 55 report가 420,770 bytes SHA
+  `b16da35e114ae0c2be7009ca3bf6552e7f57a633b2d70856f1bb8683c2904b0f`로 게시돼
+  baseline 12/E1 10/E2 0, 총 22/36이다. 216 turns/transport failure 0이나 memory probe
+  0/3, continuity callback 2/12, invented handle 1, forbidden continuity 3을 실제 결함으로
+  보존한다. runtime 23의 localhost listener 4개가 새 PID로 시작됐고 launcher PID 11348은
+  동일하다. summary absent, GPU 추론 only, trainer 0, E2 terminal 1,600/1,600이다.
+- `20260823-193322-t3-36-heartbeat-21`: compact 뒤 지정 SSoT 5종을 순서대로 EOF까지
+  재독했다. HEAD/local origin/main은 `90a436ee4f1eaea46a139e1f6d30da3d28cfaebc`, actual
+  worktree는 이 live state 단독 diff, staged/untracked 0이다. 동일 authoritative launcher
+  PID 11348과 E1 fixture 3 seed 55 runner PIDs 30240/8056이 live이고 localhost listener
+  11435/8880/9880/8892는 현재 runtime 22의 exact service command다. recursive report는
+  baseline 12/E1 9/E2 0, 총 21/36이며 latest `e1-3-44.json`은 419,373 bytes SHA
+  `6631c7063425d5f264bfca553e8c59fdcb63d9d10c8e6c531dd1427257f9557b`다. summary는
+  absent, GPU는 6,664/8,192 MiB·23%·60°C로 추론 중이고 trainer는 0, E2는 terminal
+  1,600/1,600이다. Goal tool의 prior `blocked`는 replacement를 unfinished로 거부하지만
+  최신 사용자가 동일 goal을 명시적으로 재개했다. 중복 launch 없이 기존 session만 회수한다.
 - `20260823-094123-e2-checkpoint-16-receipt`: authority state는 `running` revision 663,
   768/1,600 microsteps·48/100 optimizer steps이고 state/anchor current가 exact다. checkpoint 16
   manifest/payload/event/index SHA는 `00d9d109...340512`/`40ec5f98...b59d2b`/
@@ -3409,11 +3572,13 @@ reconciliation_receipt: "2026-08-23 17:50 KST receipt: exact seven-path cached r
 
 ## 4. 다음 허용 행동
 
-1. 현재 authoritative E2 run의 run-state/anchor, exact runner+trainer identity와 GPU를
-   15분 상한 heartbeat로 terminal까지 monitor한다.
-2. checkpoint publication 때 manifest/payload/event/index SHA와 interval을 결속해 기록한다.
-3. terminal 1,600/100과 adapter/config/report/final evidence/PID 0 뒤 provenance를 검증한다.
-5. direct trainer 실행과 운영 채택/기본 서비스 모델 변경은 계속 금지한다.
+1. handoff, roadmap status/log, NEXT를 authoritative T3 terminal FAIL, winner 0,
+   campaign forbidden과 exact aggregate/inventory receipt에 맞춰 갱신한다.
+2. focused continuity, repo diff-check와 forbidden artifact/secret 검사를 수행한다.
+3. exact milestone 문서만 Conventional Commit/push하고 HEAD=origin/main·clean을 확인한다.
+4. 같은 T3 matrix를 반복하거나 hard gate를 약화하지 않는다. 새 모델링 iteration은 현재
+   blind가 공개된 점을 고려한 오염되지 않은 평가 설계와 별도 intent 없이는 시작하지 않는다.
+5. 운영 채택/기본 서비스 모델 변경은 계속 금지한다.
 
 ## 5. 갱신 트리거
 

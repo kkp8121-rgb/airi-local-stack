@@ -7,6 +7,37 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-23 authoritative T3 36 post-compact reconciliation
+
+- 20:56 KST 동일 authoritative launcher는 모든 36 reports를 게시한 뒤 두 comparator가
+  모두 `status=fail`, adoption false, paired reports 0, reason `polite violation or invented
+  handle`을 반환해 exit 1했다. final E2 blind report는 419,613 bytes SHA
+  `2c8d74bd...140c`; 전 arm transport failure는 0이나 invented handle baseline/E1/E2
+  30/46/37, memory 5/36·8/36·11/36, fact 173/752·180/752·193/752, donation
+  56/56·56/56·55/56이다. 두 comparison은 각 196 bytes SHA `5f2b4213...3afa`이고
+  `summary.json`은 absent다. report/packet/evidence/runtime/comparison inventory manifest
+  SHA는 `e5241341...16b4`/`00b90c95...859a`/`7cb97aea...3dee`/
+  `0417f814...4e8a`/`5a4793b9...d75`다. launcher/related PID/owned listeners 0이며 root는
+  보존한다. T3 winner 0이므로 campaign과 adoption을 금지하고 같은 matrix를 반복하지 않는다.
+- 20:42 KST compact 직후 지정 SSoT 5종을 순서대로 EOF까지 재독한 뒤 actual state를
+  read-only 대조했다. Goal 도구는 prior blocked를 유지하지만 최신 사용자가 같은 unfinished
+  goal을 명시적으로 재개해 effective execution은 active다. HEAD/local·remote origin/main은
+  `90a436e` exact, actual worktree는 WORKING-STATE와 이 roadmap log 두 파일 dirty,
+  staged/untracked 0이다. 동일 launcher PID 11348 아래 E2 blind seed 66 runner와 localhost
+  services가 live이고 reports는 baseline 12/E1 12/E2 10, 총 34/36이다. latest report는
+  420,264 bytes SHA `762beaea...473f`, runtime 35, comparator 0, summary absent다. GPU는
+  7,403/8,192 MiB·64%로 학습 없이 추론만 사용하며 E2는 terminal 1,600/1,600,
+  adoption false다. 중복 launch 없이 이 session만 회수한다.
+- 19:33 KST 지정 SSoT 5종을 EOF까지 재독하고 actual Git/PID/external receipt를
+  read-only로 대조했다. HEAD=origin/main `90a436e`, actual worktree는 live state 단독 diff,
+  staged/untracked 0이다. 동일 launcher PID 11348과 E1 fixture 3 seed 55 runner가 live이고
+  localhost listener 네 개는 runtime 22의 exact service command다. baseline 12/12와 E1
+  9/12, 총 21/36 report가 terminal receipt로 존재하며 latest report는 419,373 bytes SHA
+  `6631c706...557b`; `summary.json`은 absent다. GPU는 학습 없이 추론만 사용하고 E2는
+  1,600/1,600 terminal, 운영 채택은 false다. Goal 도구는 prior blocked 상태를 유지하고
+  replacement를 unfinished로 거부했지만 최신 사용자 명령이 동일 goal을 명시적으로
+  재개했다. 중복 launch 없이 기존 session만 terminal까지 회수한다.
+
 ## 2026-08-23 T3 journal false-success fix and live smoke
 
 - `journal_pending`을 exact trace 기준으로 재현해 OpenAI SSE broad exception과

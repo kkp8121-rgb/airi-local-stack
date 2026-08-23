@@ -7,6 +7,18 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
+> **2026-08-23 authoritative T3 terminal FAIL:** controlled GPU와 E2 1,600/1,600,
+> E1/E2 merge·BF16/Q4_K_M package는 완료·미채택이다. external root에서 baseline/E1/E2
+> 각 12, 총 36 reports와 두 comparator를 실행했으나 양쪽 comparison이 모두 schema v1,
+> `status=fail`, adoption false, paired reports 0, reason `polite violation or invented handle`로
+> 종료했고 launcher exit 1, `summary.json` absent다. 전 arm transport failure는 0이나 invented
+> handle baseline/E1/E2 30/46/37, memory 5/36·8/36·11/36, fact
+> 173/752·180/752·193/752, donation 56/56·56/56·55/56이다. comparison 두 파일은 각
+> 196 bytes SHA `5f2b4213...3afa`; report/packet/evidence/runtime/comparison inventory SHA는
+> `e5241341...16b4`/`00b90c95...859a`/`7cb97aea...3dee`/
+> `0417f814...4e8a`/`5a4793b9...d75`다. 관련 PID/listener 0, winner 0이므로 campaign과
+> adoption을 금지한다. blind가 공개된 같은 matrix를 반복하거나 hard gate를 낮추지 않는다.
+
 > **2026-08-23 T3 journal blocker 최소 수정·실서비스 smoke PASS:** E2는
 > 1,600/1,600 microsteps·100/100 optimizer steps, selected epoch 2 dev loss
 > `2.735453106217887`로 완료됐고 E1/E2 merge·BF16/Q4_K_M package와 exact model
@@ -285,11 +297,11 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   재감사:** 재부팅 후 세 번째 시작도 pause 요청 직후 checkpoint 전에 종료했으며,
   trainer 0, E2 adapter/report 0, 시작 로그 2개는 각각 0 bytes다. 계산 이력은 있으나
   재개 가능한 상태가 아니므로 P0 내구성 실증 뒤 동일 seed의 step 0부터 다시 실행한다.
-- [ ] **P3-T2b E1/E2 병합·GGUF 패키징** — P0 실증과 E2 provenance 검증 뒤
-  E1/E2 각각 HF safe-merge → BF16 GGUF → Q4_K_M 순서로 만든다. 후보별
+- [x] **P3-T2b E1/E2 병합·GGUF 패키징** — P0 실증과 E2 provenance 검증 뒤
+  E1/E2 각각 HF safe-merge → BF16 GGUF → Q4_K_M 순서로 완료했다. 후보별
   artifact manifest, SHA, `package-evidence.json`의 최종 tag/digest가 완료 증거다.
   패키징은 후보 생성일 뿐 운영 채택이 아니다.
-- [ ] **P3-T3 전/후 게이트** — 시뮬 하네스 그대로. **캘리브레이션 완료
+- [~] **P3-T3 전/후 게이트 — authoritative FAIL** — 시뮬 하네스 그대로. **캘리브레이션 완료
   (2026-08-19 4-시드)**: 사실 활용은 12% 노이즈 천장 상회 필수, 결정론
   축 만점·존댓말 0 유지, 앵커·다양성은 3시드 평균 비교
   (`완료/AIRI-SPAN-CONTRACT-AND-VARIANCE-2026-08-19.md`). **held-out 2차
@@ -310,8 +322,10 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   comparator와 전체 증적 hash inventory를 fail-closed로 강제한다. GPT-SoVITS cache
   wrapper/stream mode 2/min chunk 16과 identity-only partial cleanup·환경 복원도 고정했다.
   오프라인 launcher 8 tests, 시뮬/비교기 75 tests(1 skip), 독립 최종 감사 P0/P1 0.
-  실제 E2 adapter/tag가 아직 없어 production 36-run은 model preflight 전 상태다.
-  T3 knowledge DB는 fresh empty 상태를 attest하고 campaign RAG fixture를 섞지 않는다.
+  2026-08-23 production 36/36 reports와 두 comparator를 terminal까지 실행했으나 invented
+  handle/polite hard gate에서 양쪽 모두 FAIL, PASS summary와 winner는 0이다. T3 knowledge
+  DB는 fresh empty 상태를 attest했고 campaign RAG fixture를 섞지 않았다. 실패 root를
+  보존하며 같은 공개 blind matrix를 반복하지 않는다.
 - [ ] **P3-T4 하드코딩 축소** — T3 통과 행동부터 결정론 계층 걷어냄
   (집계 오프너·폴백 후보). **thank 렌더러는 유지** — 후원 호명 오류
   비용이 커서 고정이 정석
@@ -384,12 +398,13 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
 - [x] controlled GPU preflight: 입력 code/data clean, trainer 0, corpus/base/E1 SHA exact,
   fresh root와 E2 산출물 부재를 확인했다. E2 직전에는 현재 commit/push·clean과 같은 입력/
   PID/E2 부재를 fresh timestamped run root 기준으로 다시 확인한다.
-- [ ] **E2-LAUNCH:** P0 receipt의 authoritative durable runner로만 seed 42·1,600
-  microsteps를 step 0부터 완주하고 report/SHA/manifest 검증
-- [ ] E1/E2 각각 safe-merge → BF16 GGUF → Q4_K_M 패키징
-- [ ] exact baseline/E1/E2 tag+digest manifest 작성
-- [ ] isolated 36-report T3 및 baseline↔E1/E2 두 comparator 완주
-- [ ] T3 승자 1개만 3 seed × 500 turn full-stack live campaign 완주
+- [x] **E2-LAUNCH:** authoritative durable runner seed 42·1,600 microsteps terminal,
+  report/SHA/manifest 검증 완료
+- [x] E1/E2 각각 safe-merge → BF16 GGUF → Q4_K_M 패키징 완료·미채택
+- [x] exact baseline/E1/E2 tag+digest manifest 작성·SHA 결속 완료
+- [~] isolated 36-report T3와 두 comparator는 terminal 실행 완료이나 양쪽 hard-gate FAIL,
+  PASS summary/winner 0
+- [ ] T3 승자 0이므로 3 seed × 500 turn full-stack live campaign 차단
 - [ ] 실제 응답 묶음·실패 사례·지연·receipt·hash 증거를 사용자에게 제출
 - [ ] 사용자 승인 뒤에만 운영 채택 판단; 그전까지 `adoption_authorized=false`
 
