@@ -7,6 +7,94 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-23 E2-C1 goal start and actual-state reconciliation
+
+- 23:37 KST final receipt exact two-doc stage/cached 검증은 staged 2, unstaged/untracked 0,
+  boundary/diff/security hit 0, 관련 AIRI PID 0으로 PASS했고 index manifest는
+  `56f082e2...0279c`다. 이 receipt adjustment만 restage해 final cached 2/0/0을 확인한 뒤
+  `docs: record Serena retirement receipt` commit을 한 번 실행한다.
+- 23:36 KST final receipt WORKING/LOG는 focused continuity와 exact two-doc boundary/diff/
+  security에서 actual 2, staged/untracked 0, hit 0, 610,683 bytes, manifest
+  `3cf47445...58106`, 관련 AIRI PID 0으로 PASS했다. final boundary 확인 뒤 exact 2개만
+  stage/cached 검증해 `docs: record Serena retirement receipt` commit/push를 수행한다.
+- 23:35 KST exact Serena policy push는 exit 0, `b99440c..3a80e50 main -> main`이다.
+  이후 HEAD/local origin/main/remote main은 `3a80e509` exact, 관련 AIRI PID 0이고
+  WORKING/LOG exact 2만 unstaged다. 이 final receipt 두 문서를 검증·commit/push해 clean을
+  만든 뒤 E2-C1 frozen-contract milestone으로 복귀한다. GPU/service/T3/campaign/adoption
+  변경은 0이다.
+- 23:34 KST exact `docs: retire Serena workflow` commit은 exit 0,
+  `3a80e5094859225d272c35d7c40a7dcf2a9a4bf4`, parent `b99440c`, exact policy docs 4,
+  21 insertions/73 deletions이다. local main은 origin/main보다 1 ahead, WORKING/LOG exact
+  2만 unstaged, staged/untracked 0이다. exact push를 한 번 실행하고 성공 receipt 전에는
+  E2-C1 구현/GPU로 이동하지 않는다.
+- 23:34 KST corrected UTF-8 cached validation은 staged exact 4, unstaged receipt docs exact 2,
+  untracked 0, cached diff/boundary/security hit 0, active Serena directive 0, per-file retired/
+  no-use literal 5/5, 관련 AIRI PID 0으로 PASS했다. index manifest SHA는
+  `4b7cc665...7ddba`다. exact `docs: retire Serena workflow` commit을 한 번 실행하고
+  성공 receipt 전에는 push/GPU를 실행하지 않는다.
+- 23:32 KST Serena policy exact git add는 exit 0이며 staged policy docs 4, unstaged receipt
+  docs 2, untracked 0이다. 첫 cached wrapper는 boundary/diff/security hit 0을 모두 확인했지만
+  captured `git show`의 UTF-8 판독과 required-policy count 4 가정 때문에 observed 3에서
+  overall false/exit 2였다. stage/file 추가 mutation은 없고 PASS가 아니다. index blob raw
+  bytes를 UTF-8로 명시 decode해 파일별 필수 literal과 같은 cached boundary/security를
+  한 번 재검증하며 PASS 전 commit/push/GPU는 금지한다.
+- 23:31 KST compact 복구에서 필수 5문서를 순서대로 EOF까지 재독하고 Goal/Git/PID/E2/T3를
+  다시 대조했다. Goal active, HEAD/local·remote origin/main `b99440c` exact, actual modified
+  six/staged·untracked 0, 관련 AIRI PID 0이며 E2 complete 1,600/1,600과 T3
+  36/36/89/72/2 canonical SHA도 기존 receipt와 exact하다. 두 read-only helper는 빈 guessed
+  path와 PowerShell `H` alias 때문에 각각 output 전 실패했으나 mutation 0이고 원인을 고친
+  probes만 권위로 사용했다. focused continuity는 exit 0/literal PASS다. exact policy docs
+  4개만 stage하고 WORKING/LOG 두 receipt 문서는 unstaged로 유지한 cached boundary/diff/
+  security PASS 뒤 `docs: retire Serena workflow` commit/push를 실행한다. E2-C1 0/0,
+  GPU/service/T3/campaign/adoption 변경 0이다.
+- 23:24 KST Serena retirement exact six-doc validation은 boundary diff 0, staged/untracked 0,
+  repo diff-check exit 0/expected warning 6줄, active install/register/index/use directive hit 0,
+  required retired/no-use hit 4, 관련 AIRI PID 0으로 PASS했다. broad scan의 rollback 제거 문장
+  false positive는 mutation 없이 semantic pattern으로 좁혀 0을 확인했다. focused continuity
+  PASS 뒤 policy docs exact 4개만 stage/cached 검증해 `docs: retire Serena workflow` commit과
+  exact push를 한 번씩 실행한다. WORKING/LOG는 receipt용 unstaged로 유지하며 실패 시
+  push/GPU를 중단한다.
+- 23:21 KST 사용자가 Serena를 사용하지 않기로 확정했다. 이 Goal의 Serena 호출은 0이며
+  세 read-only explorer에도 built-in `rg`/좁은 read만 사용하도록 통지했다. AGENTS의 강제
+  정책을 제거하고 NEXT/current docs index를 재도입 계획 없음으로 맞추며, token-order 문서는
+  실행 금지 역사 기록으로 폐기한다. historical roadmap 실측 기록과 TTS speaker 이름은
+  보존한다. 이 docs-only intent는 exact six-doc boundary와 active directive 0, diff/security,
+  related PID 0을 요구하고 E2-C1/GPU/service/T3/campaign/adoption은 바꾸지 않는다.
+- 23:18 KST corrected read-only wrapper는 Goal API active, HEAD/local origin/main/remote
+  main `b99440c` exact, actual dirty exact 2, boundary diff 0, staged/untracked 0,
+  repo diff-check exit 0/expected LF→CRLF warning 2줄, 관련 AIRI PID 0으로 PASS했다. 첫
+  wrapper 실패는 expected native warning의 terminating 승격이었고 mutation 0에서 원인 수정
+  후 한 번만 재실행했다. reconciliation receipt가 확보됐으므로 다음 단계는 bounded read-only
+  trainer/data/evaluation seam 감사다. E2-C1 0/0, GPU/service/T3/campaign/adoption 변경 0이다.
+- 23:13 KST 최신 사용자 `/goal`로 E2 adapter를 새 optimizer/scheduler의 검증된 초기값으로
+  사용하는 교정 후보 `E2-C1` Goal을 시작했다. 첫 milestone은 GPU가 아니라 새 교정/replay
+  데이터와 retained blind, mixture/split/dataset SHA, seed/max steps/LR/scheduler/checkpoint,
+  hard gate와 더하기 지표의 단일 동결·검증·origin/main push다. same-data E3, 기존 공개 T3
+  fixture/원본 24 reports의 후보 선택 재사용, 결과 확인 뒤 계약 변경, 운영 채택은 금지한다.
+- 필수 다섯 SSoT를 지정 순서대로 EOF까지 재독하고 actual Goal/Git/PID/E2/T3를 read-only로
+  대조했다. Goal API active, HEAD/local origin/main/remote main은
+  `b99440cfe6ae01ffedb12dabdfff3f83f4d84f6a` exact, pre-intent worktree/stage/untracked 0,
+  관련 AIRI runner/trainer/service PID 0이다. 이 SHA는 최종 `docs: close E2 review
+  milestone`이며 WORKING/LOG의 `3464820` state가 실제보다 한 commit 뒤처진 것을 정정한다.
+- E2 authority는 complete revision 1,635, 1,600/1,600 microsteps·100/100 optimizer steps·
+  pending 0이다. source/chat/base SHA는 `43f9c1ed...a2ed`/`96cc223c...eb44`/
+  `394b6624...f506`, E2 adapter model/config/report는 `2a72292c...5c5b`/
+  `e01129ea...82b0`/`628d640f...aa4c`로 actual exact다. current/previous checkpoint index와
+  latest/previous event도 authority receipt에 exact 결속된다.
+- authoritative T3 external root는 reports/packets/evidence/runtime/comparisons
+  36/36/89/72/2이고 canonical manifest SHA `e5241341...16b4`/
+  `00b90c95...859a`/`7cb97aea...3dee`/`0417f814...4e8a`/
+  `5a4793b9...d75`가 기존 receipt와 exact하며 summary absent다. E2-C1은 0/0이고 GPU는
+  비-AIRI 앱이 5,039/8,192 MiB를 쓰지만 AIRI compute PID는 0이다. quota 종료 대비 장기
+  process가 없어 pause는 실행하지 않으며, 다음 세션은 이 checkpoint identity로 중복 실행을
+  판별한다. 이 exact two-doc intent diff를 검증·receipt화하기 전에는 구현·테스트·GPU를
+  시작하지 않는다.
+- 첫 exact two-doc receipt wrapper는 expected LF→CRLF Git warning을 outer
+  `ErrorActionPreference=Stop`이 terminating native error로 승격해 receipt 조립 전에 exit
+  1했다. file/stage/Git mutation은 0이고 PASS가 아니다. 원인을 고정했으므로 native stderr를
+  비종료 캡처하고 각 native exit code를 명시 판정하는 corrected read-only wrapper를 한 번
+  실행한다.
+
 ## 2026-08-23 E1/E2 user review and corrective-training boundary
 
 - 22:50 KST push-intent 두 문서는 focused continuity와 exact two-doc diff/security에서

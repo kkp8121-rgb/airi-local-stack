@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 22:50:45 +09:00"
-checkpoint_id: "20260823-225045-e1-e2-review-push-receipt-finalization-intent"
+updated_at_kst: "2026-08-23 23:37:43 +09:00"
+checkpoint_id: "20260823-233743-serena-final-receipt-cached-pass-commit-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "e1-e2-user-review-doc-refresh"
-git_head: "34648200ee4e1678ca0e39e08b6f2f453f18c0fc"
-worktree_state: "push-receipt-working-log-unstaged; staged-0; untracked-0; HEAD-equals-origin-main"
+active_phase: "e2-c1-design-data-evaluation-contract"
+git_head: "3a80e5094859225d272c35d7c40a7dcf2a9a4bf4"
+worktree_state: "serena-policy-pushed; receipts-exact-2-staged-with-receipt-adjustment; untracked-0; HEAD-equals-local-origin-remote-main"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-23 22:50 KST push-intent docs passed focused continuity and exact two-doc diff/security: actual 2, boundary 0, staged/untracked 0, diff-check exit 0 with expected warnings, hit 0, bytes 589,511, manifest 0b547cf6...26360. Exact git push origin main exited 0: 3efe2ad..3464820 main -> main. After push, HEAD/local origin/main/remote main are exact 34648200ee4e1678ca0e39e08b6f2f453f18c0fc and related AIRI PID excluding the probe is 0; only this WORKING/roadmap-log actual push receipt is dirty. Validate and commit/push these exact two docs as docs: close E2 review milestone, then require final HEAD=origin/main, clean worktree and PID 0. Model/GPU/service/T3/campaign/adoption remain unchanged."
+reconciliation_receipt: "2026-08-23 23:37 KST Serena final receipt exact two-doc stage/cached validation PASS: staged 2, unstaged/untracked 0; cached diff-check/boundary/binary/oversize/credential/personal-path hit 0; related AIRI PID 0; index manifest SHA 56f082e2cd1e6f3fd68de1da250388b26282643709fc3eac9dfd1732a030279c. Restage this receipt adjustment, recheck exact 2/0/0 and cached gates, then commit docs: record Serena retirement receipt once. Record commit receipt before push. E2-C1 remains 0/0; GPU/service/T3/campaign/adoption changes 0."
 ---
 
 # AIRI live working state
@@ -22,6 +22,37 @@ reconciliation_receipt: "2026-08-23 22:50 KST push-intent docs passed focused co
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-23 23:13 KST 최신 사용자 `/goal`은 E2 adapter를 새 optimizer/scheduler의
+  검증된 초기값으로 쓰는 교정 후보 `E2-C1`을 승인했다. 같은 v4를 한 epoch 더 반복하는
+  E3, 공개된 기존 T3 fixture/원본 24 reports의 선택 근거 재사용, blind 확인 뒤 target·
+  threshold·seed·step 변경은 금지한다. 첫 milestone은 GPU 실행이 아니라 교정/replay
+  데이터와 retained blind, 평가 기준, mixture/split/seed/max-step/LR/scheduler/checkpoint
+  계약의 단일 동결·검증·origin/main push다. 운영 채택과 기본 서비스 모델·태그 변경은
+  계속 별도 사용자 승인 전까지 금지한다.
+- 실제 Goal API는 `active`다. pre-intent HEAD/local origin/main/remote main은
+  `b99440cfe6ae01ffedb12dabdfff3f83f4d84f6a` exact이고 worktree/stage/untracked 0이다.
+  이 SHA는 누락됐던 최종 `docs: close E2 review milestone` receipt이며 기존 live state의
+  `3464820`은 과거 pre-finalization 값이다.
+- 관련 AIRI durable runner/trainer/local service PID는 0이다. GPU는 5,039/8,192 MiB를
+  사용 중이나 식별 가능한 AIRI workload는 0이므로 GPU 학습 사용은 **아니며** pause
+  명령을 실행하지 않는다. E2-C1 progress는 0 microstep/0 optimizer step이다.
+- E2 authority state는 `complete` revision 1,635, exit 0/`trainer-complete`, epoch 2,
+  1,600/1,600 microsteps·100/100 optimizer steps·pending 0이다. input manifest SHA
+  `bdc2b47b...a7bd`, current/previous index SHA `fd8dd8c4...f210`/
+  `f911b504...1753`, latest/previous event SHA `e869ba30...a14d`/
+  `d3fa545c...b6f4`가 exact하다. adapter model/config/report SHA는
+  `2a72292c...5c5b`/`e01129ea...82b0`/`628d640f...aa4c`다.
+- source/chat/base actual SHA는 `43f9c1ed...a2ed`/`96cc223c...eb44`/
+  `394b6624...f506`으로 고정값과 exact하다. T3 external inventory는 reports/packets/
+  evidence/runtime/comparisons 36/36/89/72/2이고 canonical manifest SHA도 기존
+  `e5241341...16b4`/`00b90c95...859a`/`7cb97aea...3dee`/
+  `0417f814...4e8a`/`5a4793b9...d75`와 exact하며 `summary.json`은 absent다.
+- 현재 gate는 **E2-C1 설계·데이터·비오염 평가 계약 동결**이다. 마지막 권위 PASS는
+  E2 terminal provenance/package와 그 뒤 authoritative T3의 fail-closed terminal receipt다.
+  blocker는 E2-C1 mixture/split/dataset SHA, new retained blind canonical SHA,
+  max steps/LR/scheduler/checkpoint와 더하기 지표·hard gate가 아직 동결·검증·push되지 않은
+  것이다. quota 대비 상태는 장기 process 0/안전 pause 불필요이며, 갑작스러운 종료 뒤에는
+  이 checkpoint와 실제 Git/PID/E2/T3를 다시 대조하고 중복 GPU launch를 금지한다.
 - 2026-08-23 01:12 KST 최신 사용자 `/goal` 명령으로 goal을 명시적으로 재개했다.
   Goal 도구는 prior `blocked` status를 유지하지만 최신 사용자가 같은 unfinished goal을
   명시적으로 재개했으므로 effective execution은 active이며 complete/cancel이 아니다.
@@ -47,16 +78,140 @@ reconciliation_receipt: "2026-08-23 22:50 KST push-intent docs passed focused co
 
 | 항목 | 값 |
 |---|---|
-| 의도 | E1/E2 사용자 검토 결론과 다음 교정 학습의 권한 경계를 현행 다섯 SSoT에 일관되게 기록한다. |
-| 허용 범위 | 문서 exact 5개 갱신·검증·Conventional Commit/push만 허용. code/model/service/GPU/T3/campaign 변경은 0이다. |
-| 시작 전 증거 | HEAD/local/remote origin/main `3efe2ad` exact, worktree clean, 관련 PID 0, E2 1,600/1,600, reports 36/comparisons 2 FAIL/summary 0이다. |
-| exact 변경 | WORKING-STATE, 현행 handoff, ROADMAP-STATUS, ROADMAP-LOG, NEXT에 E2 상대 우세·미승격·교정 iteration 승인 대기 경계를 반영한다. |
-| 출력 경로 | 원본 E1/E2 응답 24 reports는 external T3 root에만 유지한다. Git 문서는 집계·판정·비민감 SHA만 기록한다. |
-| 완료 조건 | exact 5-doc continuity/diff/security PASS, commit/push exit 0, HEAD=origin/main clean, 관련 PID 0이다. |
-| 중단·복구 | 검증 실패 시 stage/commit/push하지 않고 원인을 기록한다. 같은 T3 matrix, 단순 same-data 3 epoch, campaign, adoption은 실행하지 않는다. |
-| 현재 행동 | 문서 intent를 먼저 기록하고, 나머지 SSoT를 같은 판정으로 갱신한다. |
+| 의도 | 새 Goal 시작 시 stale `3464820` live 기록을 actual `b99440c` clean receipt와 E2-C1 계약 gate로 먼저 정정한다. 이후 기존 trainer/data/T3 seam을 read-only 감사해 첫 milestone 설계안을 만든다. |
+| 허용 범위 | 이 intent 명령은 WORKING-STATE와 ROADMAP-LOG 두 문서의 관측 정정만 허용한다. 다음 설계 단계도 repository inspection만 허용하며 GPU/model/service/T3/campaign/adoption 변경은 0이다. |
+| 입력 pins | code tree/HEAD `b99440c`; v4 source/chat SHA `43f9c1ed...a2ed`/`96cc223c...eb44`; base SHA `394b6624...f506`; E2 adapter model/config/report SHA `2a72292c...5c5b`/`e01129ea...82b0`/`628d640f...aa4c`. |
+| 학습 설정 | E2-C1 seed 42, batch 1, accumulation 16, seq 2048는 사용자 고정이다. mixture, max steps, LR, scheduler와 실제 checkpoint K는 아직 **미동결**이며 동결·push 전 GPU 금지다. E2-C1 progress 0/0이다. |
+| output/run root | 현재 repository 문서 두 파일만 변경한다. E2-C1 외부 output/run root와 authoritative state path는 아직 선택하지 않으며 생성하지 않는다. 예상 AIRI PID는 0이다. |
+| 성공 조건 | 실제 Goal/Git/PID/E2/T3 receipt와 두 문서가 일치하고 exact two-doc diff만 존재한다. 다음 단계는 read-only 구조 감사이며 구현·테스트·GPU가 아니다. |
+| 실패·중단 조건 | unexpected Git path/PID/artifact SHA 불일치, state parse/hash 실패 시 즉시 중단하고 추가 실행 없이 관측 사실만 보존한다. |
+| 세션 유실 복구 | 필수 5문서를 다시 EOF까지 읽고 Goal API, `b99440c` ancestry/local·remote main, exact PID identity, E2 state/index/events/artifacts, T3 inventories를 재대조한다. 장기 run은 0이므로 pause를 호출하지 않는다. |
+| 중복 판별 identity | checkpoint `20260823-231340-e2-c1-goal-start-reconciliation-intent`, expected pre-intent HEAD `b99440c`, exact dirty paths WORKING-STATE/ROADMAP-LOG 두 개, E2-C1 external run root absent·PID 0으로 판별한다. |
+| 현재 행동 | 이 intent를 두 문서에 기록하고 exact diff/Goal/Git/PID를 read-only receipt로 확인한다. |
 
 ## 3. 마지막 내구성 체크포인트
+
+- `20260823-233743-serena-final-receipt-cached-pass-commit-intent`: exact two-doc stage
+  exit 0 뒤 cached 검증은 staged 2, unstaged/untracked 0, boundary/cached diff-check,
+  binary/oversize/credential·개인 경로 hit 0, 관련 AIRI PID 0으로 PASS했다. index
+  path/mode/blob/size manifest는
+  `56f082e2cd1e6f3fd68de1da250388b26282643709fc3eac9dfd1732a030279c`다. 이 receipt로
+  바뀐 WORKING/ROADMAP-LOG만 restage하고 exact 2/0/0과 cached gates를 재확인한 뒤
+  `git commit -m "docs: record Serena retirement receipt"`을 한 번 실행한다. 실패하면
+  stage를 보존하고 push/GPU를 실행하지 않는다.
+
+- `20260823-233633-serena-final-receipt-docs-pass-stage-intent`: policy push receipt를
+  반영한 WORKING/ROADMAP-LOG는 focused continuity exit 0/literal PASS, actual modified
+  exact 2, boundary/staged/untracked 0, repo diff-check exit 0/expected LF→CRLF warning만,
+  forbidden path/credential·개인 경로 hit 0, 관련 AIRI PID 0으로 PASS했다. 두 문서 총
+  610,683 bytes, path/size/SHA manifest는
+  `3cf47445b0b763f40c150c6237c33c1bcf70f89f3e6bbf3d24096e270c858106`다. 이 receipt로
+  bytes가 바뀌었으므로 exact two-doc boundary/diff/security를 final 확인한 뒤 두 문서만
+  stage한다. cached exact 2, unstaged/untracked 0, diff/security PASS 뒤에만
+  `docs: record Serena retirement receipt` commit/push를 실행한다.
+
+- `20260823-233530-serena-policy-push-receipt-final-docs-intent`: exact
+  `git push origin main`은 exit 0, `b99440c..3a80e50 main -> main`이다. push 뒤 HEAD/local
+  origin/main/remote main은 모두 `3a80e5094859225d272c35d7c40a7dcf2a9a4bf4`, 관련 AIRI
+  PID 0이고 actual worktree는 이 receipt용 WORKING/ROADMAP-LOG exact 2만 unstaged,
+  staged/untracked 0이다. 두 문서를 focused continuity/boundary/diff/security로 검증하고
+  exact stage/cached PASS 뒤 `docs: record Serena retirement receipt`로 commit/push한다.
+  final HEAD=origin/main clean과 PID 0 전에는 E2-C1 구현/GPU로 이동하지 않는다. long
+  process 0이므로 quota pause는 실행하지 않는다.
+
+- `20260823-233440-serena-policy-commit-receipt-push-intent`: exact
+  `git commit -m "docs: retire Serena workflow"`은 exit 0, commit
+  `3a80e5094859225d272c35d7c40a7dcf2a9a4bf4`, parent `b99440c`, exact AGENTS/NEXT/
+  current docs index/retired token-order 네 문서, 21 insertions/73 deletions이다. commit
+  직후 local main은 origin/main보다 1 ahead, WORKING/ROADMAP-LOG exact 2만 unstaged,
+  staged/untracked 0이다. exact `git push origin main`을 한 번 실행한다. 실패하면 local
+  commit과 receipt docs를 보존하고 GPU를 시작하지 않는다. 성공하면 HEAD/local origin/
+  remote main exact와 관련 AIRI PID 0을 read-only 확인한 뒤 push receipt를 기록한다.
+
+- `20260823-233407-serena-cached-pass-commit-intent`: corrected wrapper는 four index blobs를
+  raw UTF-8로 명시 decode했다. staged exact 4, unstaged WORKING/ROADMAP-LOG exact 2,
+  untracked 0, cached diff-check/boundary/binary/oversize/forbidden path/credential·개인 경로
+  hit 0, active Serena directive 0, AGENTS/NEXT/index/retired 문서의 per-file 필수 literal
+  5개 모두 true, 관련 AIRI PID 0으로 PASS했다. staged path/mode/blob/size manifest SHA는
+  `4b7cc6658ff8f6eb4a367a2859e31bf5d9b5c5a01ed3d6e098196b2ef5e7ddba`다. exact
+  `git commit -m "docs: retire Serena workflow"`을 한 번 실행한다. 성공하면 unstaged
+  receipt docs를 보존하고 commit SHA/parent/path/HEAD-origin 관계를 기록한 뒤에만 push한다.
+  실패하면 stage를 보존하고 push/GPU를 실행하지 않는다.
+
+- `20260823-233255-serena-cached-validation-corrected-intent`: exact policy-doc `git add`
+  exit 0 뒤 staged는 AGENTS/NEXT/current docs index/token-order exact 4, unstaged는 WORKING/
+  ROADMAP-LOG exact 2, untracked 0이다. 첫 cached wrapper는 stage/unstaged boundary,
+  cached diff-check, binary/oversize/forbidden path/credential·개인 경로, active directive를
+  모두 0으로 확인했지만 captured `git show` text의 UTF-8 판독과 `required hit >=4` 개수
+  가정이 신뢰할 수 없어 required hit 3에서 overall false/exit 2였다. stage/file 추가
+  mutation은 0이고 PASS가 아니다. 각 index blob SHA를 얻어 raw bytes를 UTF-8로 명시
+  decode하고 AGENTS/NEXT/index/retired 문서별 필수 literal을 따로 확인하는 corrected
+  read-only wrapper를 같은 cached 경계에서 한 번 실행한다. PASS 전에는 commit/push/GPU를
+  실행하지 않는다.
+
+- `20260823-233119-serena-policy-continuity-pass-stage-intent`: compact 뒤 필수 다섯
+  문서를 지정 순서대로 EOF까지 재독하고 actual Goal/Git/PID/E2/T3를 다시 대조했다.
+  Goal API active, HEAD/local origin/main/remote main `b99440c` exact, actual modified
+  exact 6, staged/untracked 0, 관련 AIRI PID 0이다. E2 state/anchor/index/events/adapter/
+  report와 T3 36/36/89/72/2 canonical inventory SHA는 기존 receipt와 exact하고 summary는
+  absent다. 첫 external receipt helper는 guessed 빈 경로를 `Test-Path`에 넘겨, 이후
+  T3 manifest candidate helper는 함수명 `H`가 PowerShell `Get-History` alias와 충돌해 각각
+  output 전 exit 1했다. 둘 다 read-only/file·Git·process mutation 0이며 실제 경로와
+  `HashText`로 고친 probes만 권위로 쓴다. exact focused continuity는 exit 0/literal
+  `AIRI work-continuity contract: PASS`다. 다음 상태 변경은 AGENTS/NEXT/current docs index/
+  retired token-order exact 4개만 stage하는 것이다. WORKING/ROADMAP-LOG는 unstaged로
+  유지하고 cached exact 4, unstaged exact 2, untracked 0, cached diff/security hit 0을
+  확인한 뒤에만 `docs: retire Serena workflow` commit/push를 실행한다. E2-C1은 0/0,
+  AIRI GPU/process 0, quota 종료 대비 pause 불필요다.
+
+- `20260823-232417-serena-policy-docs-pass-commit-push-intent`: exact six-doc boundary는
+  actual 6/boundary diff 0/staged·untracked 0, repo diff-check exit 0/expected line-ending
+  warning 6줄, active Serena install/register/index/use directive hit 0, required retired/no-use
+  policy hit 4, 관련 AIRI PID 0으로 PASS했다. 첫 broad scan의 유일 hit는 historical rollback의
+  `[mcp_servers.serena]` 제거 문장이어서 mutation 없이 active-directive pattern으로 좁혀 0을
+  확인했다. exact `powershell -NoProfile -ExecutionPolicy Bypass -File
+  .\test-airi-work-continuity.ps1`을 한 번 실행한다. PASS하면 AGENTS/NEXT/current docs index/
+  token-order exact 4개만 stage하고 WORKING/ROADMAP-LOG는 unstaged로 유지한다. cached exact
+  4, staged diff/security PASS 뒤 `git commit -m "docs: retire Serena workflow"`, 이어
+  `git push origin main`을 각각 한 번 실행한다. 입력 code HEAD `b99440c`, 학습 seed/batch/
+  steps/checkpoint/output root/state path는 docs-only 명령에 N/A, expected AIRI PID 0이다.
+  실패하면 stage/local commit을 보존하고 push/GPU를 중단한다. 세션 유실은 Goal/Git/PID와
+  exact staged/unstaged paths로 복구하고 같은 commit/push를 중복 실행하지 않는다.
+
+- `20260823-232120-serena-policy-retirement-intent`: 최신 사용자가 Serena를 사용하지 않기로
+  확정하고 관련 지시 문서를 정리하라고 했다. 이 Goal의 Serena 실제 호출은 0이며 세 read-only
+  explorer도 `rg`/좁은 read만 쓰도록 통지했다. exact 허용 변경은 AGENTS, NEXT, current docs
+  index, Serena token-order 기록과 receipt용 WORKING/ROADMAP-LOG 여섯 문서다. AGENTS의
+  강제 사용 정책을 built-in 검색·편집 정책으로 교체하고 token-order 문서는 실행 금지 역사
+  기록으로 폐기하며 NEXT/index도 재도입 계획 없음으로 맞춘다. historical roadmap log의 과거
+  실측 기록과 TTS speaker 이름 `Serena`는 변경하지 않는다. 입력 code tree는 `b99440c`,
+  E2-C1 학습 설정/output root/state path는 이 docs-only 명령에 N/A, expected AIRI PID는 0이다.
+  성공 조건은 active Serena 지시 0, exact six-doc boundary, diff/security PASS, PID 0이다.
+  실패 시 stage/commit/GPU 없이 diff를 보존하고 다음 세션은 checkpoint ID+exact dirty paths로
+  중복 여부를 판별한다. quota 대비 장기 process 0이라 pause는 실행하지 않는다.
+
+- `20260823-231841-e2-c1-goal-start-reconciliation-receipt`: corrected read-only wrapper는
+  Goal API active, HEAD/local origin/main/remote main `b99440c` exact, actual dirty paths
+  WORKING-STATE/ROADMAP-LOG exact 2, boundary diff 0, staged/untracked 0, repo diff-check exit 0/
+  expected LF→CRLF warning 2줄, 관련 AIRI PID 0으로 PASS했다. stale state 정정 receipt가
+  확보됐으며 E2-C1은 0/0, GPU 학습·service·T3·campaign·adoption 변경은 0이다. 다음은
+  구현이나 GPU가 아니라 trainer adapter-init seam, 데이터/replay validation seam, 새 retained
+  blind/T3 metric seam의 bounded read-only 감사다.
+
+- `20260823-231340-e2-c1-goal-start-reconciliation-intent`: 최신 사용자 `/goal`로
+  E2-C1 설계·데이터·평가 계약 Goal을 시작했다. 필수 다섯 SSoT를 지정 순서대로 EOF까지
+  읽고 actual Goal active, HEAD/local origin/main/remote main `b99440c` exact, clean,
+  관련 AIRI PID 0을 확인했다. E2 state 1,600/1,600·100/100·pending 0과 adapter/report,
+  source/chat/base SHA가 exact하고 T3 36/36/89/72/2 inventory SHA도 기존 receipt와 exact,
+  summary absent다. 기존 frontmatter의 `3464820`/review-finalization은 실제보다 뒤처졌으므로
+  이 두 문서만 관측 사실로 먼저 정정한다. E2-C1 0/0, GPU 학습 0, service/T3/campaign/
+  adoption 변경 0이다. exact two-doc diff와 Goal/Git/PID receipt 전에는 구조 감사를 시작하지
+  않는다.
+  첫 exact two-doc receipt wrapper는 repo의 expected LF→CRLF warning을 outer
+  `ErrorActionPreference=Stop`이 terminating native error로 승격해 Git/Goal/PID receipt
+  조립 전에 exit 1했다. file/stage/Git mutation은 0이고 PASS가 아니다. native stderr를
+  비종료 캡처하고 각 Git exit code를 명시 판정하는 corrected read-only wrapper를 한 번
+  실행한다.
 
 - `20260823-225045-e1-e2-review-push-receipt-finalization-intent`: push-intent 두 문서는
   focused continuity와 exact boundary/diff/security에서 actual 2, boundary diff 0,
@@ -3699,11 +3854,14 @@ reconciliation_receipt: "2026-08-23 22:50 KST push-intent docs passed focused co
 
 ## 4. 다음 허용 행동
 
-1. 권위 T3 FAIL, winner 0, campaign 0과 origin/main receipt를 사용자에게 보고한다.
-2. 새 모델링 iteration을 원하면 현재 blind를 재사용하지 않는 평가 설계·데이터 범위·후보
-   명칭을 별도 intent로 고정한 뒤 시작한다.
-3. 같은 T3 matrix를 반복하거나 hard gate를 약화하지 않는다.
-4. 운영 채택/기본 서비스 모델 변경은 계속 금지한다.
+1. 이 reconciliation exact two-doc diff와 Goal/Git/PID를 read-only 검증하고 receipt를
+   WORKING-STATE/ROADMAP-LOG에 기록한다.
+2. 기존 trainer/data/T3 seam을 read-only로 분리 감사해 E2 adapter initialization 최소
+   변경 필요 여부, 교정/replay 데이터 계약, retained blind와 새 지표 설계안을 만든다.
+3. GPU 전에 mixture/split/dataset SHA/seed/max steps/LR/scheduler/checkpoint, blind canonical
+   SHA와 threshold를 한 번 동결하고 offline 회귀·security·commit/push·HEAD clean을 완료한다.
+4. 같은 공개 T3 matrix, 결과 확인 뒤 계약 변경, E3/E2-C2, campaign, 운영 채택/기본 서비스
+   모델 변경은 금지한다.
 
 ## 5. 갱신 트리거
 
