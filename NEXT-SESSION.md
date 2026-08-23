@@ -1,5 +1,18 @@
 # AIRI 다음 세션 안내
 
+> **2026-08-23 17:49 KST 현재 gate:** controlled GPU와 authoritative E2 1,600/1,600,
+> E1/E2 merge·BF16/Q4_K_M package는 완료·미채택이다. T3 production `journal_pending`은
+> OpenAI SSE 오류 대체 문장이 terminal success로 전달되면서 exact trace journal을
+> 예약하지 않은 false-success로 확정했다. 두 직접 경로만 최소 수정했고 py_compile,
+> targeted 2/2, 영향 113/113, proxy 370/370, simulator 63/63, work-continuity와
+> current-checkpoint가 PASS했다. baseline/승인 fixture/seed 11 실제 1-turn smoke도
+> `transport_failures=0`, `live_receipt_bound=true`, report SHA
+> `6193fb80c0c9072af92ea8fb222a54da172b6ab05e3e364149f4326772126886`로 PASS했다.
+> 관련 listener는 종료 후 0이고 GPU 학습은 없으며 baseline Ollama 추론 모델만 로드돼 있다.
+> 다음 exact gate는 이 수정·문서 commit/push와 HEAD=origin/main·clean 확인, 그다음 새 외부
+> root의 authoritative T3 36이다. T3 `summary.json`, 승자, 3×500 campaign은 아직 없다.
+> 운영 채택과 기본 서비스 모델 변경은 계속 금지한다.
+
 > **2026-08-23 controlled GPU P0-B PASS receipt:** 최신 Goal status는 `active`,
 > `goal_status=active`다. 첫 K=5 baseline은 480/30 계산 뒤 actual interval max
 > `705.902827`초와 final-evidence 결속 실패로 FAIL해 보존했고 같은 K=5를 반복하지 않았다.

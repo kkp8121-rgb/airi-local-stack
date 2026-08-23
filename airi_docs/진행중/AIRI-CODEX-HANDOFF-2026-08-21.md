@@ -1,13 +1,13 @@
 # AIRI Codex GPU 인수인계 — broadcast continuity v4
 
-갱신: 2026-08-23 07:38 KST (파일명은 현행 GPU SSoT 식별자로 유지)
+갱신: 2026-08-23 17:49 KST (파일명은 현행 GPU SSoT 식별자로 유지)
 
-상태: **ACTIVE — K=3 CONTROLLED GPU PASS. E1 완료·미채택, E2 microstep/저장 산출물 0,
-merge/package 0, v4 T3 0, live campaign 0. baseline과 실제 `SAFE_TO_POWER_OFF` pause/resume는
-480/30 terminal이며 paired receipt가 672 tensors exact·최대 구간 551.5176357초로 PASS했다.
-Windows verifier receipt-order 최소 수정과 milestone docs는 origin/main에 push됐다. actual
-push receipt five-doc을 final commit/push하고 clean을 확인한 뒤에만 authoritative E2를
-step 0부터 시작한다.**
+상태: **ACTIVE — K=3 CONTROLLED GPU PASS, authoritative E2 1,600/1,600 PASS,
+E1/E2 merge·BF16/Q4_K_M package 완료·미채택. T3 production은 아직 권위 `summary.json` 0,
+live campaign 0이다. `journal_pending` blocker의 exact 원인을 OpenAI SSE 오류 대체 문장
+false-success로 확인해 최소 수정했고, baseline/승인 fixture/seed 11 실서비스 1-turn smoke에서
+`transport_failures=0`, `live_receipt_bound=true`를 확인했다. 최종 저장소 gate는 PASS했으며,
+수정 commit/push와 clean 확인 뒤 새 외부 root에서 authoritative T3 36회를 시작한다.**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
@@ -18,6 +18,27 @@ step 0부터 시작한다.**
 병합·패키징, 로컬 서비스, T3·장시간 캠페인, 검증된 milestone commit/push가
 명시적으로 재승인됐다. 운영 채택과 기본 서비스 모델 변경은 별도 사용자 승인 전까지
 계속 금지한다.
+
+## -1. 2026-08-23 T3 journal false-success 수정 receipt
+
+- E2 `v4-e2-seed42-1600-20260823-074326`은 1,600/1,600 microsteps·100/100 optimizer
+  steps, selected epoch 2 dev loss `2.735453106217887`로 완료됐다. E1 dev
+  `2.8938066467`보다 낮고 adapter/config/report/provenance SHA가 검증됐다.
+- E1/E2 safe merge와 BF16·Q4_K_M GGUF, exact tag/digest model manifest는 외부 모델
+  root에 완료됐다. 어느 후보도 운영 채택하거나 기본 서비스 모델로 바꾸지 않았다.
+- T3의 400 `journal_pending`은 같은 trace의 늦은 append가 아니었다. OpenAI SSE broad
+  exception과 directed-repeat local failure가 public fallback과 `[DONE]`을 보낸 뒤에도
+  journal을 예약하지 않는 false-success였다. aggregate `/health.last_outcome=appended`는
+  이전 trace 값이었다. 전달된 exact fallback을 terminal 전에 durable journal로 예약하도록
+  두 경로만 최소 수정했다.
+- py_compile, targeted 2/2, 영향 suite 113/113, proxy 전체 370/370, broadcast simulator
+  63/63, work-continuity와 `test-current-checkpoint.ps1`이 PASS했다.
+- 외부 smoke root `airi-t3-journal-smoke-20260823-174232`의 report는 4,510 bytes,
+  SHA `6193fb80c0c9072af92ea8fb222a54da172b6ab05e3e364149f4326772126886`이고 packet은
+  783 bytes, SHA `e89f9e0043d77e041f3517668f7a084b2ab4c6159f1a6f0a0686f018e5777fcc`다.
+  response-bearing report/packet과 runtime DB는 Git 금지 외부 산출물로 유지한다.
+- smoke 종료 뒤 관련 service/listener는 0이다. GPU 학습은 없고 Ollama baseline 추론
+  모델만 로드돼 있다. authoritative T3 36과 승자 campaign은 아직 PASS가 아니다.
 
 ## 0. 2026-08-23 P0 로컬 배치 최종 검증 receipt
 

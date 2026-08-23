@@ -1978,6 +1978,40 @@ class ShortTermDialogueStateTests(unittest.TestCase):
         self.assertEqual(called, [True])
         self.assertIn("평소처럼 다시 답할게.", response.text)
 
+    def test_directed_repeat_local_failure_durably_journals_public_fallback(self) -> None:
+        async def director(
+            payload: dict[str, object], repeat_count: int, query: str
+        ) -> tuple[str, str, float]:
+            return "normal", "", 10.0
+
+        async def local_failure(*args: object, **kwargs: object) -> str:
+            raise RuntimeError("upstream failed")
+
+        messages = [
+            {"role": "user", "content": "\uc624\ub298 \ub0a0\uc528 \uc5b4\ub54c?"},
+            {"role": "assistant", "content": "\ub9d1\uc544."},
+            {"role": "user", "content": "\uc624\ub298 \ub0a0\uc528 \uc5b4\ub54c?"},
+        ]
+        journal = mock.Mock()
+        with mock.patch.object(
+            ollama_proxy, "run_dialogue_director", director
+        ), mock.patch.object(
+            ollama_proxy, "fetch_local_dialogue", local_failure
+        ), mock.patch.object(
+            ollama_proxy, "schedule_completed_turn", new=journal
+        ), mock.patch.object(
+            ollama_proxy, "client", _StubClient(RuntimeError("unused"))
+        ):
+            response = post_stream_messages(messages)
+
+        self.assertEqual(response.headers["X-AIRI-Repeat-Candidate"], "true")
+        self.assertIn(ollama_proxy.LOCAL_ERROR_DIALOGUE, response.text)
+        self.assertEqual(journal.call_count, 1)
+        self.assertEqual(journal.call_args.kwargs["assistant_text"], ollama_proxy.LOCAL_ERROR_DIALOGUE)
+        self.assertEqual(journal.call_args.kwargs["action"], "local_error")
+        self.assertNotIn("durable", journal.call_args.kwargs)
+        self.assertFalse(journal.call_args.kwargs["evaluate_state"])
+
     def test_pending_or_failed_previous_turn_is_not_suppressed(self) -> None:
         attempted: list[str] = []
         directed: list[int] = []
@@ -4225,17 +4259,27 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertEqual(ollama_proxy.configured_upstream_first_raw_timeout(value), 8.0)
 
-    def test_incomplete_local_sse_is_closed_without_completion_scheduling(self) -> None:
+    def test_incomplete_local_sse_journals_the_delivered_fallback_before_terminal(self) -> None:
         partial = b'{"message":{"role":"assistant","content":"partial"},"done":false}\n'
         chat = _SplitSseClient([partial])
-        memory = _FakeMemoryRuntime()
+        calls = mock.Mock()
+        journal = mock.Mock()
+        finish = mock.Mock(wraps=ollama_proxy.openai_sse_finish)
+        calls.attach_mock(journal, "journal")
+        calls.attach_mock(finish, "finish")
         with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
-            ollama_proxy, "memory_runtime", memory
-        ):
+            ollama_proxy, "schedule_completed_turn", new=journal
+        ), mock.patch.object(ollama_proxy, "openai_sse_finish", new=finish):
             response = post_stream("question")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(memory.completed, [])
+        self.assertEqual(openai_sse_dialogue(response.text), ollama_proxy.LOCAL_ERROR_DIALOGUE)
+        self.assertEqual(journal.call_count, 1)
+        self.assertEqual(journal.call_args.kwargs["assistant_text"], ollama_proxy.LOCAL_ERROR_DIALOGUE)
+        self.assertEqual(journal.call_args.kwargs["action"], "local_error")
+        self.assertFalse(journal.call_args.kwargs["evaluate_state"])
+        order = [call[0] for call in calls.mock_calls]
+        self.assertLess(order.index("journal"), order.index("finish"))
         self.assertTrue(chat.response.closed)
 
     def test_raw_progress_watchdog_closes_partial_stream_and_journals_one_fallback(self) -> None:

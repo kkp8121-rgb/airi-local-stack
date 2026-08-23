@@ -7,6 +7,19 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
+> **2026-08-23 T3 journal blocker 최소 수정·실서비스 smoke PASS:** E2는
+> 1,600/1,600 microsteps·100/100 optimizer steps, selected epoch 2 dev loss
+> `2.735453106217887`로 완료됐고 E1/E2 merge·BF16/Q4_K_M package와 exact model
+> manifest도 완료·미채택이다. T3 `journal_pending`의 원인은 OpenAI SSE 오류 경로가
+> public fallback과 terminal을 정상 전달하면서 같은 trace journal을 예약하지 않은
+> false-success였다. exact public fallback을 terminal 전에 durable 예약하도록 최소 수정했고
+> targeted 2, 영향 113, proxy 370, simulator 63, continuity/current-checkpoint gate가 모두
+> PASS했다. baseline/첫 승인 fixture/seed 11 실제 1-turn smoke는
+> `transport_failures=0`, `live_receipt_bound=true`; report SHA는
+> `6193fb80...26886`이다. authoritative T3 36 `summary.json`과 campaign은 아직 0이며,
+> 수정 commit/push·clean 뒤 새 외부 root에서 T3 36을 실행한다. GPU 학습은 없고 baseline
+> Ollama 추론 모델만 로드돼 있다. `adoption_authorized=false`를 유지한다.
+
 > **2026-08-23 controlled GPU P0-B PASS receipt:** Goal status는 `active`다. 첫 K=5
 > baseline은 480/30 계산 뒤 actual checkpoint interval max `705.902827`초와 final-evidence
 > 결속 실패로 FAIL해 보존했고 같은 K=5를 반복하지 않았다. final-evidence SHA 의미 혼동을

@@ -7,6 +7,17 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-23 T3 journal false-success fix and live smoke
+
+- `journal_pending`을 exact trace 기준으로 재현해 OpenAI SSE broad exception과
+  directed-repeat local failure가 public fallback + terminal을 전달하면서 journal을
+  예약하지 않는 false-success임을 확인했다. 두 경로에서 exact public fallback을 terminal
+  전에 durable 예약하도록 최소 수정했다. targeted 2/2, 영향 113/113, proxy 370/370,
+  simulator 63/63, continuity/current-checkpoint가 PASS했다. baseline/승인 fixture/seed 11
+  실서비스 1-turn smoke도 transport failure 0·durable receipt true로 PASS했고 report/packet
+  SHA를 결속했다. 관련 listener는 cleanup 뒤 0이다. authoritative T3 36과 campaign은 아직
+  미실행이며 adoption은 계속 false다.
+
 ## 2026-08-23 E2 terminal receipt
 
 ## 2026-08-23 T3 production retry failed closed
@@ -14,6 +25,10 @@
 ## 2026-08-23 T3 service and journal blocker
 
 ## 2026-08-23 T3 stream scheduling validation
+
+## 2026-08-23 T3 journal blocker resumed
+
+- The user explicitly resumed problem-solving after the Goal was marked blocked. Actual Git is clean at `9724833`, relevant PID/listener count is 0, and no authoritative T3 summary exists. The next gate is a content-safe single-turn reproduction that separates missing journal scheduling from trace identity mismatch; the 36-run matrix will not be repeated until that distinction is proven.
 
 - One clean authoritative T3 validation after service-Python and ownership fixes still failed closed at baseline turn 4 with `journal_pending` after the full 30-second bound. A terminal-frame await experiment had no effect and was removed. No production evidence was published; remaining blocker is live stream trace-to-journal scheduling/identity, not service readiness.
 

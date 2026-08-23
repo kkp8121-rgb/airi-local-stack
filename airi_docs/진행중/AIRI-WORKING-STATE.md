@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 16:55:00 +09:00"
-checkpoint_id: "20260823-165500-t3-live-journal-sync-failed"
+updated_at_kst: "2026-08-23 17:49:03 +09:00"
+checkpoint_id: "20260823-174903-t3-journal-fix-gates-pass"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "t3-stream-journal-scheduling-blocked"
-git_head: "946a6d9a063b11c73e9d12519ce91a3841e12765"
-worktree_state: "live-state-only-dirty; staged-untracked-0"
-active_trainer_count: 1
-reconciliation_receipt: "2026-08-23 16:55 KST: A single authoritative T3 validation after clean preflight still failed closed at baseline turn 4 with journal_pending (575 bounded retries, pending_tasks=0, errors=0, last_outcome=appended). The attempted terminal-frame await had no effect and was removed. Services/TTS reached ready; owned listeners are 0 after cleanup; no T3 evidence published. Remaining defect is the live stream trace-to-journal scheduling/identity path, not service readiness or receipt wait duration."
+active_phase: "t3-journal-fix-commit-push"
+git_head: "9724833faebd4a111b93288dc4d441174b60c845"
+worktree_state: "t3-journal-fix-and-five-doc-receipt-dirty; staged-untracked-0"
+active_trainer_count: 0
+reconciliation_receipt: "2026-08-23 17:49 KST receipt: journal false-success fix is verified by py_compile, targeted 2/2, impacted 113/113, full proxy 370/370, simulator 63/63, work-continuity PASS after correcting only the live-state goal enum fixture, and final test-current-checkpoint PASS. Isolated live smoke receipt/hashes and listener-0 cleanup remain exact. Modified scope is two product/test files plus required five SSoT docs; staged/untracked 0 before review. Next state change: diff/security review, Conventional Commit and origin/main push; authoritative T3 36 remains forbidden until HEAD=origin/main and clean."
 ---
 
 # AIRI live working state

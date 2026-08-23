@@ -8440,6 +8440,31 @@ async def stream_local_with_ack(
             if isinstance(exc, httpx.TimeoutException)
             else LOCAL_ERROR_DIALOGUE
         )
+        if not context.proactive_turn:
+            # The fallback is a completed public answer.  Bind the exact
+            # delivered text to this trace before [DONE], just like every
+            # successful local stream path; otherwise a live-broadcast client
+            # can accept the terminal frame while its receipt remains forever
+            # at the ledger's unscheduled ``pending`` default.
+            schedule_completed_turn(
+                context.original_messages,
+                session_id=context.memory_session_id,
+                user_text=context.last_user_text,
+                assistant_text=spoken,
+                trace_id=context.trace_id,
+                action=(
+                    "local_chat_timeout"
+                    if isinstance(exc, httpx.TimeoutException)
+                    else "local_error"
+                ),
+                emotion="neutral",
+                emotion_reason=(
+                    "upstream_timeout"
+                    if isinstance(exc, httpx.TimeoutException)
+                    else "local_failure"
+                ),
+                evaluate_state=False,
+            )
         emit_substantive_content(context.trace_id, context.request_started)
         yield openai_sse_delta(
             context.completion_id,
@@ -9242,7 +9267,6 @@ async def proxy(path: str, request: Request):
                         action=("local_error" if local_failed else "local_chat"),
                         emotion=emotion,
                         emotion_reason=("local_failure" if local_failed else "local_response"),
-                        durable=not local_failed,
                         evaluate_state=not local_failed,
                     )
                     emit_substantive_content(trace_id, request_started)
