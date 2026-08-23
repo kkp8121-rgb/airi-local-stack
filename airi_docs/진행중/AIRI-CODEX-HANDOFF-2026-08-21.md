@@ -1,8 +1,8 @@
 # AIRI Codex GPU 인수인계 — broadcast continuity v4
 
-갱신: 2026-08-24 02:07 KST (파일명은 현행 GPU SSoT 식별자로 유지)
+갱신: 2026-08-24 02:19 KST (파일명은 현행 GPU SSoT 식별자로 유지)
 
-상태: **ACTIVE, E2-C1 FIRST MILESTONE VALIDATED — PUSH PENDING. K=3 controlled GPU와 authoritative E2
+상태: **ACTIVE, E2-C1 FIRST MILESTONE PUBLISHED — ADAPTER-INIT AUDIT NEXT. K=3 controlled GPU와 authoritative E2
 1,600/1,600, E1/E2 merge·BF16/Q4_K_M package는 완료·미채택이다. authoritative T3는
 baseline/E1/E2 각 12, 총 36 reports와 두 comparator까지 실행했으나 두 comparison이 모두
 `status=fail`, paired reports 0, reason `polite violation or invented handle`로 종료해 launcher
@@ -10,8 +10,9 @@ exit 1이고 `summary.json`은 없다. winner 0이므로 3×500 campaign은 금�
 보존하고 같은 matrix나 hard gate를 반복·약화하지 않는다. E2를 초기 weight로 쓰는 새
 교정 후보 E2-C1의 데이터·비오염 평가 계약은 current bytes에서 full freeze validation을
 PASS했다. 앞서 확인한 `으로/로` 오류 5건과 validator 공백은 최소 수리·회귀로 닫혔다.
-현재 blocker는 frozen milestone 문서의 commit/push와 HEAD=origin/main clean뿐이며,
-그 전에는 `gpu_authorized=false`다. E2-C1 GPU는 0/0이고 승자·채택 모델도 아니다.**
+milestone `2e61842`와 receipt `3dba3ca`는 origin/main에 push됐고 직후 local/remote exact·
+clean·PID 0이다. 현재 blocker/다음 gate는 trainer adapter-init seam의 read-only 감사이며
+그 감사 전에는 `gpu_authorized=false`다. E2-C1 GPU는 0/0이고 승자·채택 모델도 아니다.**
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
@@ -31,12 +32,12 @@ PASS했다. 앞서 확인한 `으로/로` 오류 5건과 validator 공백은 최
   3종, split/seed/max-step/LR/scheduler/checkpoint/metric 계약의 동결·검증·origin/main
   push다. 현재 E2-C1 progress는 0 microstep/0 optimizer step이고 durable runner/trainer 0,
   GPU 학습 0이다.
-- 2026-08-24 02:07 KST compact 후 mandatory 5문서와 actual Goal/Git/PID/E2/T3/blind를
-  재대조했다. HEAD/local origin/main/remote main은 `1de57a21cce329db480282ea89cb59c25e42710c`
-  exact, worktree는 tracked modified/deleted 12, staged 0, untracked frozen contract 1,
-  related AIRI PID 0이다. E2 terminal state/checkpoint/adapter/report와 T3 36/36/89/72/2
-  failure root, external blind exact 5-file sealed receipt는 기존 크기·SHA와 exact하고
-  로그·T3 report·blind fixture body는 읽지 않았다.
+- 2026-08-24 02:18 KST milestone `2e61842ba72875bff4d473653b635541e6e0b82a`와 receipt
+  `3dba3ca43a161d69f677eec2a8d10c3ddd061fca`를 `1de57a2..3dba3ca main -> main`으로
+  push했다. 직후 HEAD/local main/local origin/main/remote main exact, worktree/stage clean,
+  related AIRI PID 0, E2-C1 0/0이다. E2 terminal state/checkpoint/adapter/report와 T3
+  36/36/89/72/2 failure root, external blind exact 5-file sealed receipt는 기존 크기·SHA와
+  exact하고 로그·T3 report·blind fixture body는 읽지 않았다.
 - final sample/조사 감사에서 확인했던 exact five malformed targets는 다음이었다:
   `e2c1-long_callback-001-v3`, `e2c1-complete_show_arc-002-v2`, `-003-v1`, `-010-v2`,
   `-011-v1`. generator/helper와 independent verifier에 `(으로,로)` 및 받침 ㄹ의 `로`
@@ -47,12 +48,12 @@ PASS했다. 앞서 확인한 `으로/로` 오류 5건과 validator 공백은 최
   collision 감사, continuity/diff/security를 모두 PASS했다. correction/replay/mixture는
   480/200/680, train correction:replay는 352:160이고 blind는 `response_viewed=false`다.
 - 세부 frozen 계약과 exact dataset SHA는
-  `AIRI-E2-C1-FROZEN-CONTRACT-2026-08-24.md`를 따른다. 현재 `freeze_status=pass`지만
-  publication gate가 남아 `gpu_authorized=false`다. first-milestone commit/push 뒤
-  HEAD=origin/main clean, staged/untracked 0, PID 0을 확인해야만 다음 gate로 이동한다.
+  `AIRI-E2-C1-FROZEN-CONTRACT-2026-08-24.md`를 따른다. 현재 `freeze_status=pass`이고
+  publication gate도 PASS했다. 다음 adapter-init seam read-only 감사와 필요한 경우 최소
+  구현·fault 회귀가 검증·push되기 전에는 `gpu_authorized=false`다.
 - 검토 PC의 첫 동작은 mandatory 5문서→Goal/Git/PID/E2/T3/blind read-only 대조다.
-  PID 0이면 pause를 호출하지 않는다. 다음 동작은 frozen SSoT의 continuity/boundary/diff/
-  security 검증과 exact milestone commit/push다. counts/splits/replay, v4/base/E2,
+  PID 0이면 pause를 호출하지 않는다. 다음 동작은 trainer adapter-init/provenance/fresh-state/
+  run-state/checkpoint/safe-pause seam의 read-only 감사다. counts/splits/replay, v4/base/E2,
   seed 42·batch 1·accumulation 16·seq 2048·512 microsteps·LR 1e-5·constant/K=3,
   blind fixture/seed/threshold는 바꾸지 않는다. clean publication 뒤에도 GPU를 자동 시작하지
   않고 trainer adapter-initialization seam을 별도 intent에서 먼저 감사한다.

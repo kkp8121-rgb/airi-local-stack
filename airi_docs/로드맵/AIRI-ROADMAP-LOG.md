@@ -9,6 +9,19 @@
 
 ## 2026-08-24 E2-C1 frozen-contract first milestone
 
+- 02:23 KST publication finalization exact 7 docs는 continuity PASS, worktree boundary/diff/
+  security/stale pending/PID 0이다. stage exit 0, cached names/rows 7, 873,441 bytes,
+  manifest `4fa03bc3...552d`; unstaged/untracked·boundary·diff·binary·secret·personal·stale·PID가
+  모두 0이다. 이 receipt 두 docs를 restage해 fresh cached PASS 뒤
+  `docs: publish E2-C1 freeze receipt` commit/push로 닫는다. GPU/E2-C1 0/0, adoption 금지다.
+
+- 02:19 KST receipt-doc commit `3dba3ca43a161d69f677eec2a8d10c3ddd061fca`, parent
+  `2e61842`, 2 files/29 insertions/5 deletions은 exit 0이다. push도 exit 0,
+  `1de57a2..3dba3ca main -> main`; HEAD/local main/local origin/main/remote main exact,
+  worktree/stage clean, related AIRI PID 0, E2-C1 0/0이다. current 7 docs의 publication-pending
+  문구를 실제 published receipt와 다음 무-GPU adapter-init seam read-only audit gate로 정정하는
+  finalization intent를 기록했다. code/data/GPU/service/model/adoption 변경은 0이다.
+
 - 02:17 KST receipt docs restage 뒤 final cached gate는 names 16/rename 1, indexed
   16 rows/6,328,851 bytes/manifest `71de5ad8...7527`, boundary/diff/security/PID 0 PASS다.
   exact milestone commit `2e61842ba72875bff4d473653b635541e6e0b82a`, parent `1de57a2`,

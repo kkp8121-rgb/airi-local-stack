@@ -1,8 +1,8 @@
 # AIRI E2-C1 교정 학습 동결 계약
 
-갱신: 2026-08-24 02:00 KST
+갱신: 2026-08-24 02:19 KST
 
-상태: **FROZEN / VALIDATED / MILESTONE PUSH PENDING**
+상태: **FROZEN / VALIDATED / MILESTONE PUBLISHED**
 
 기계 판독 상태:
 
@@ -14,14 +14,18 @@ gpu_authorized=false
 microsteps_completed=0
 optimizer_steps_completed=0
 adoption_authorized=false
-blocker=frozen_milestone_commit_push_clean
+blocker=adapter_initialization_seam_read_only_audit
 ```
 
 이 문서는 E2-C1 학습 전에 한 번 고정한 데이터·학습·비오염 평가 계약이다. checkpoint에서
 확인한 한국어 조사 오류 5건과 validator 공백은 `(으로,로)`/받침 ㄹ helper, template,
 독립 verifier와 mutation regression으로 최소 수리했고 current bytes의 full gate가 PASS했다.
-단, 이 frozen-contract 배치가 origin/main에 push되고 HEAD=origin/main clean/PID 0이 되기
-전에는 GPU를 허가하지 않는다. 동결은 T3 승자나 운영 채택을 뜻하지 않는다.
+이 frozen-contract 배치와 receipt는 commit `2e61842ba72875bff4d473653b635541e6e0b82a`/
+`3dba3ca43a161d69f677eec2a8d10c3ddd061fca`로 origin/main에 push됐고 직후
+HEAD/local·remote exact, worktree/stage clean, PID 0을 확인했다. 다음 gate는 trainer의
+adapter-initialization seam을 GPU 없이 read-only 감사하는 것이며, 감사와 필요한 최소 구현·
+fault 회귀의 검증·commit/push 전에는 bounded smoke를 시작하지 않는다. 동결은 T3 승자나
+운영 채택을 뜻하지 않는다.
 
 ## 1. 후보 정의와 금지선
 
@@ -202,21 +206,24 @@ required 형태만 있다.
 - [x] generator byte-stable `--check`, independent repository/external verifier PASS
 - [x] blind body Git/training-path 노출 0, commitment/sealed/receipt exact
 - [x] targeted tests, CI registration, diff/security/binary/oversize boundary PASS
-- [ ] frozen milestone commit/push 뒤 HEAD=origin/main clean, staged/untracked 0, 관련 PID 0
+- [x] frozen milestone commit/push 뒤 HEAD=origin/main clean, staged/untracked 0, 관련 PID 0
 
-마지막 항목은 repository publication gate다. 그 전에는 `gpu_authorized=false`를 유지한다.
+repository publication gate는 PASS했다. 다음 adapter-init seam 감사 전에는
+`gpu_authorized=false`를 유지한다.
 
 ## 8. 이후 fail-closed 순서
 
-1. 검증된 frozen-contract milestone commit/push
-2. adapter-init bounded GPU smoke 1회와 receipt commit/push
-3. fresh external root에서 durable E2-C1 본 학습 step 0
-4. adapter/config/report·epoch dev loss·selected epoch·E2 대비 회귀/개선 검증
-5. safe merge → BF16 GGUF → Q4_K_M 및 exact tag/digest manifest
-6. baseline/E2/E2-C1 × blind 3종 × seed 4 = 36 reports
-7. hard/additive gate로 unique winner 판정
-8. winner가 있을 때만 3 seed × 500 turn full-stack campaign
-9. 실제 response·failure·invented handle·memory·repetition·context break·donation·transition·
+1. 검증된 frozen-contract milestone commit/push — **완료**
+2. trainer adapter-init/provenance/fresh-state seam read-only 감사
+3. 지원 공백이 있을 때만 최소 구현·fault 회귀·commit/push
+4. adapter-init bounded GPU smoke 1회와 receipt commit/push
+5. fresh external root에서 durable E2-C1 본 학습 step 0
+6. adapter/config/report·epoch dev loss·selected epoch·E2 대비 회귀/개선 검증
+7. safe merge → BF16 GGUF → Q4_K_M 및 exact tag/digest manifest
+8. baseline/E2/E2-C1 × blind 3종 × seed 4 = 36 reports
+9. hard/additive gate로 unique winner 판정
+10. winner가 있을 때만 3 seed × 500 turn full-stack campaign
+11. 실제 response·failure·invented handle·memory·repetition·context break·donation·transition·
    TTS/RAG/latency/trace/hash 사용자 판단 묶음 제출
 
 T3 winner가 없으면 campaign과 운영 채택을 금지하고 실패 receipt만 commit/push한다.
@@ -234,9 +241,11 @@ T3 winner가 없으면 campaign과 운영 채택을 금지하고 실패 receipt�
 E2 state/checkpoints, T3 inventory와 blind sealed receipt를 read-only로 대조한다. PID 0이면
 pause를 실행하지 않는다. 이 checkpoint의 중복 판별 identity는 pre-intent HEAD
 `911179286ae32c7d5922358bcc5cb1741e58a5c9`, checkpoint ID
-`20260824-020037-e2-c1-full-freeze-validation-receipt-docs-intent`, HEAD `1de57a2`, 위
-frozen code/data SHA, external blind root와 E2-C1 0/0/PID 0이다. 첫 동작은 frozen milestone
-commit/push가 실제로 끝났는지 확인하는 것이다. clean/PID 0 전에는 GPU로 이동하지 않는다.
+`20260824-021900-frozen-milestone-push-receipt-finalization-intent`, published HEAD
+`3dba3ca43a161d69f677eec2a8d10c3ddd061fca`, 위 frozen code/data SHA, external blind root와
+E2-C1 0/0/PID 0이다. 첫 동작은 actual local/remote publication receipt를 재확인한 뒤 trainer
+adapter-initialization seam을 read-only 감사하는 것이다. 별도 smoke intent 전에는 GPU로
+이동하지 않는다.
 
 ## 10. 2026-08-24 02:00 KST full freeze validation receipt
 
@@ -260,5 +269,6 @@ checkpoint 단계의 첫 병렬 Python 검증 6개는 PowerShell call operator `
 interpreter 실행 전 parser exit 1, 첫 Hangul wrapper는 expected string interpolation parse
 error로 exit 1이었다. 둘 다 mutation 0/비권위였고 corrected PASS가 대체한다.
 
-결론: current data/evaluation contract의 freeze gate는 PASS했다. remaining blocker는 이
-frozen contract와 SSoT의 commit/push/HEAD clean뿐이며 그 전에는 GPU를 시작하지 않는다.
+결론: current data/evaluation contract의 freeze와 repository publication gate는 PASS했다.
+remaining blocker/다음 gate는 trainer adapter-initialization seam의 read-only 감사와,
+필요한 경우 최소 구현·fault 회귀의 검증·commit/push다. 별도 intent 전에는 GPU를 시작하지 않는다.

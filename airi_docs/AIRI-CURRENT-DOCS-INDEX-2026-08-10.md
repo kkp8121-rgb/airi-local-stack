@@ -1,7 +1,8 @@
 # AIRI Documentation Index
 
 최종 현행화 2026-08-24 (Codex GPU — E2-C1 correction/replay/retained blind 계약의
-full freeze validation PASS, frozen milestone publication 대기, GPU 0/0·운영 채택 금지).
+full freeze validation과 origin/main publication PASS, 다음 adapter-init seam read-only 감사,
+GPU 0/0·운영 채택 금지).
 직전 현행화 2026-08-22 (Codex GPU — 사용자 `/goal`로 `active`, live working-state
 지속성 프로토콜, P0-A offline checkpoint/durable-runner/safe-pause 구현·독립 P0/P1 0·
 `6f0c1358` origin/main push, P0-B timing/exact-equivalence evidence gate와 external
@@ -43,8 +44,9 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
   학습·평가의 동결 계약.** correction 480 + v4 replay 200 + mixture 680, exact dataset
   SHA, split/seed/step/LR/scheduler/checkpoint와 baseline/E2/E2-C1 36-report metric gate가
   current bytes에서 full validation PASS다. 조사 오류 5건과 validator 공백은 mutation
-  regression으로 닫혔다. 현재 `freeze_status=pass`, `gpu_authorized=false`이며 frozen
-  milestone commit/push와 HEAD=origin/main clean 뒤에만 다음 gate로 이동한다.
+  regression으로 닫혔다. milestone `2e61842`와 receipt `3dba3ca`는 origin/main에 push돼
+  local/remote exact·clean·PID 0을 확인했다. 현재 `freeze_status=pass`,
+  `gpu_authorized=false`이며 다음 gate는 adapter-init seam read-only 감사다.
 - `AIRI-CODEX-HANDOFF-2026-08-21.md` — **현행 코덱스(GPU) 인계 단일 SSoT.**
   2026-08-22 사용자 `/goal`로 goal은 `active`다. P0-A checkpoint/resume/durable
   runner/safe-pause offline 구현·독립 P0/P1 0은 완료되어 `6f0c1358`로
