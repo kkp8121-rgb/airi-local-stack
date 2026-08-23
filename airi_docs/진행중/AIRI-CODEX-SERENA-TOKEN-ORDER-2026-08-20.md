@@ -1,12 +1,9 @@
-# 코덱스(GPU dev PC) 작업 명령 — Serena MCP 도입으로 Codex 토큰 절감 (2026-08-20, 클로드 PC 발신)
+# 폐기된 실험 기록 — Serena MCP 토큰 A/B (2026-08-20)
 
-> 목적: 코덱스 PC의 Codex CLI에 Serena MCP(시맨틱 코드 검색·편집,
-> github.com/oraios/serena, 28.3k★)를 붙여 **파일 통짜 read·grep 반복
-> 체인을 심볼 단위 조회로 대체**해 토큰 소비를 줄인다. 본 문서는
-> 자기완결형이며, 절차 §1~§5를 순서대로 실행하고 §7에 결과를 추기한다.
-> Phase 1(serena) 적용 후에는 §8 Phase 2(caveman 프록시)를 진행한다.
-> 이 작업은 **코덱스 PC의 에이전트 환경 변경**이다 — AIRI 레포 코드·운영
-> 설정은 건드리지 않는다 (§6 경계).
+> **RETIRED — 실행 금지.** 2026-08-23 사용자 결정으로 Serena는 사용하거나
+> 재도입하지 않는다. 아래 배경·수치·결과표는 과거 A/B와 롤백의 감사 기록이며,
+> 설치·등록·인덱싱·사용 정책 지시로 해석하지 않는다. 현행 정책은 루트
+> `AGENTS.md`의 built-in/`rg` 코드 탐색 정책이다. Caveman trial도 자동 진행하지 않는다.
 
 ## 0. 배경·근거 (클로드 PC 조사, 2026-08-20)
 
@@ -24,63 +21,11 @@
 - airi-local-stack은 Python 위주 대형 레포(테스트 1,200+)라 적용 적합.
   PowerShell 스크립트·ps1 패치는 Serena 비대상(built-in 유지).
 
-## 1. 설치 (1회)
+## 1~4. 폐기된 설치·등록·인덱싱·사용 절차
 
-```powershell
-# uv가 없으면 (유일한 선행 조건):
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-# 새 셸에서:
-uv tool install -p 3.13 serena-agent
-serena --version   # 성공 확인 (PATH에 없으면 새 터미널 또는 uv tool update-shell)
-```
-
-주의: MCP 마켓플레이스 경유 설치 금지(공식 README가 outdated 명령이라고
-명시). 위 명령이 유일한 공식 경로다.
-
-## 2. Codex 등록 (공식 스니펫 그대로)
-
-`~/.codex/config.toml`에 추가:
-
-```toml
-[mcp_servers.serena]
-startup_timeout_sec = 15
-command = "serena"
-args = ["start-mcp-server", "--project-from-cwd", "--context=codex"]
-```
-
-Codex 세션에서 `/mcp` 실행 → serena 연결 확인. `--project-from-cwd`라
-**Codex를 반드시 airi-local-stack 루트에서 기동**해야 프로젝트가 잡힌다.
-
-## 3. 프로젝트 준비 (1회)
-
-1. **인덱싱**: 레포 루트에서 `serena project index` — 언어 서버 심볼을
-   선캐시해 첫 호출 지연을 없앤다. 이후는 자동 갱신.
-2. **온보딩 토큰 선소비 주의**: 최초 세션에서 Serena가 온보딩(파일
-   다수 read + 메모리 생성)을 자동 수행한다 — **저부담 세션 하나를
-   온보딩 전용으로 소모**하고 본 작업은 다음 세션부터.
-3. **레포 오염 금지**: Serena가 레포에 `.serena/`(project.yml·메모리)를
-   생성한다. **커밋 금지·레포 .gitignore 수정도 금지** — 전역 제외로
-   처리한다 (클로드 PC의 `.gstack/` 오염 사고와 같은 유형 예방):
-   ```powershell
-   git config --global core.excludesFile "$HOME/.gitignore_global"
-   Add-Content "$HOME/.gitignore_global" ".serena/"
-   git status --short   # .serena/ 미표시 확인
-   ```
-
-## 4. 사용 정책 — AGENTS.md에 아래 절을 그대로 추가
-
-레포 루트 `AGENTS.md` 말미에 추가(코덱스 에이전트가 매 세션 준수하도록
-배선하는 것이 목적):
-
-```markdown
-## Serena 사용 정책 (2026-08-20)
-
-- Serena로 할 것: 심볼 검색·참조 조회·타입 계층·cross-file rename/move·
-  메서드 본문 단위 read/edit. 파일 전체 read 전에 반드시 심볼 조회 먼저.
-- built-in으로 할 것: 1~2줄 수정, 자유 텍스트/문자열 검색, 설정·JSON·
-  픽스처·ps1·md 파일, 쉘·git·테스트 실행.
-- 판단 기준 한 줄: "IDE라면 go-to-definition을 쓸 작업인가?" — 그렇다면 Serena.
-```
+2026-08-20 실험 당시 절차는 §7 결과표의 역사적 증거로만 남긴다. 설치, Codex MCP
+등록, 프로젝트 인덱싱, `AGENTS.md` 사용 정책 추가를 실행하지 않는다. 심볼·참조·
+cross-file 작업도 repository built-in 도구와 `rg`를 사용한다.
 
 ## 5. 검증·실측 의무 (완료 주장은 증거 동반 — 하우스 룰)
 

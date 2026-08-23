@@ -89,7 +89,9 @@
 `ollama-proxy/training/seed/airi_broadcast_response_pilot_pending.jsonl`이다.
 
 토큰 실측 기록: `airi_docs/진행중/AIRI-CODEX-SERENA-TOKEN-ORDER-2026-08-20.md`.
-Serena MCP는 로컬 A/B 순손실로 등록 롤백됐고 Caveman trial은 미실행이다.
+Serena MCP는 로컬 A/B 순손실로 등록 롤백됐으며 2026-08-23 사용자 결정으로
+사용·재도입하지 않는다. 관련 token-order 문서는 실행 지시가 아닌 역사 기록이다.
+Caveman trial은 미실행이다.
 
 최근 배치 이력은 `airi_docs/로드맵/AIRI-ROADMAP-LOG.md`(최신이 위).
 **매 배치 커밋마다 LOG에 기록**하고, STATUS는 상태 변화 시에만 고친다.

@@ -67,8 +67,9 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
   아카이브 이동 예정이며 현재 상태 검증에 쓰지 말 것.
 - `AIRI-CODEX-SERENA-TOKEN-ORDER-2026-08-20.md` — 코덱스 PC 토큰 절감 실측 기록.
   Serena ON/OFF 완료 표본에서 ON이 평균 `+136.6%` 순손실이고 MCP 미노출 실패가
-  2회 발생해 등록을 롤백했다. 실행 파일·인덱스·선택적 심볼 정책은 보존하지만
-  Serena MCP는 상시 등록하지 않는다. Caveman trial 결과는 비어 있고 설치하지 않았다.
+  2회 발생해 등록을 롤백했다. 2026-08-23 사용자 결정으로 Serena는 사용·재도입하지
+  않으며 이 문서는 실행 지시가 아닌 역사 기록이다. Caveman trial 결과는 비어 있고
+  설치하지 않았다.
   AIRI 코드·운영 설정은 이 실험에서 무접촉이다.
 - `AIRI-BROADCAST-SIM-REVIEW-2026-08-18.md` — 100인 시청자 방송 시뮬레이션
   원문 검토 packet(기억 3-arm + named 변형). 수치 요약·판단은
