@@ -9,6 +9,15 @@
 
 ## 2026-08-24 E2-C1 frozen-contract first milestone
 
+- 03:26 KST exact six current docs continuity/boundary/diff/security/PID 0 PASS 뒤
+  `docs: publish E2-C1 adapter-init receipt` commit `508161678199f059525ea1b38acb577ba80d64f0`,
+  6 files, 55 insertions/29 deletions과 push `3c4b1a9..5081616 main -> main`은 exit 0이다.
+  HEAD/local main/local origin/main/remote main exact `5081616`, clean, PID 0, GPU AIRI workload 0,
+  E2-C1 0/0이다. 마지막 권위 PASS는 published adapter-init offline implementation+actual E2
+  helper이며 다음 gate는 review PC mandatory reconciliation 뒤 새 intent의 bounded GPU smoke다.
+  이 actual receipt 두 docs만 `docs: record E2-C1 adapter-init push`로 commit/push하고 final refs/
+  clean/PID 0을 확인한다.
+
 - 03:24 KST receipt commit `3c4b1a9fed9be7f7e4adf6c9434b1e284bd8fc0d`, parent
   `6dd2412`, exact WORKING/LOG 2 files와 push `3d7d0e3..3c4b1a9 main -> main`은 exit 0이다.
   HEAD/local main/local origin/main/remote main exact `3c4b1a9`, clean, PID 0, E2-C1 0/0이다.
