@@ -9,6 +9,19 @@
 
 ## 2026-08-23 E1/E2 user review and corrective-training boundary
 
+- 22:50 KST push-intent 두 문서는 focused continuity와 exact two-doc diff/security에서
+  actual 2, staged/untracked 0, hit 0, 589,511 bytes, manifest `0b547cf6...26360`으로
+  PASS했다. exact `git push origin main` exit 0, `3efe2ad..3464820 main -> main`이다.
+  이후 HEAD/local origin/main/remote main은 `34648200` exact, 관련 AIRI PID 0이며
+  actual push receipt용 WORKING/LOG 두 파일만 dirty다. 두 문서를 final 검증·commit/push한
+  뒤 HEAD=origin/main clean을 확인하며 모델·GPU·서비스·T3·campaign·adoption은 바꾸지 않는다.
+- 22:49 KST base-commit receipt docs cached 검증은 staged 2, unstaged/untracked 0,
+  diff/security hit 0, blob 586,219 bytes, index manifest `56d831bb...c262`다. exact
+  `git commit -m "docs: record E2 review commit"` exit 0, commit `34648200`, parent
+  `6efbf057`, two docs, 37 insertions/5 deletions이다. post-commit worktree clean,
+  local main은 origin/main보다 2 ahead다. 이 push intent 두 문서를 검증한 뒤 exact
+  `git push origin main`을 한 번 실행하고, actual push receipt를 final docs commit으로
+  남기기 전에는 milestone을 완료 처리하지 않는다.
 - 22:48 KST base five-doc commit `6efbf057` receipt용 WORKING/LOG는 focused continuity
   exit 0/literal PASS, exact two-doc boundary/diff/security actual 2, staged/untracked 0,
   repo diff-check exit 0/expected warning 2줄, forbidden/credential·개인 경로 hit 0,

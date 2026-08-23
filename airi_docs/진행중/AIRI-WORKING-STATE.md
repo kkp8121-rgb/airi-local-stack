@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-23 22:48:33 +09:00"
-checkpoint_id: "20260823-224833-e1-e2-review-commit-receipt-docs-stage-intent"
+updated_at_kst: "2026-08-23 22:50:45 +09:00"
+checkpoint_id: "20260823-225045-e1-e2-review-push-receipt-finalization-intent"
 goal_status: "active"
 authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
 active_phase: "e1-e2-user-review-doc-refresh"
-git_head: "6efbf057d36138676058275d5592b4f35584a027"
-worktree_state: "commit-receipt-working-log-unstaged; staged-0; untracked-0; local-main-ahead-1"
+git_head: "34648200ee4e1678ca0e39e08b6f2f453f18c0fc"
+worktree_state: "push-receipt-working-log-unstaged; staged-0; untracked-0; HEAD-equals-origin-main"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-23 22:48 KST base five-doc commit 6efbf057 receipt docs passed focused continuity exit 0/literal PASS. Exact two-doc boundary/diff/security passed: actual 2, boundary 0, staged/untracked 0, repo diff-check exit 0 with two expected line-ending warnings, forbidden/credential/personal hits 0, bytes 586,669 and manifest 2b24ad5d...a24c9. Stage exactly WORKING and roadmap log, require cached 2/0/0/hit-0 PASS, then commit docs: record E2 review commit. Push both local commits only after that commit receipt. No model, GPU, service, T3, campaign, or adoption change is authorized."
+reconciliation_receipt: "2026-08-23 22:50 KST push-intent docs passed focused continuity and exact two-doc diff/security: actual 2, boundary 0, staged/untracked 0, diff-check exit 0 with expected warnings, hit 0, bytes 589,511, manifest 0b547cf6...26360. Exact git push origin main exited 0: 3efe2ad..3464820 main -> main. After push, HEAD/local origin/main/remote main are exact 34648200ee4e1678ca0e39e08b6f2f453f18c0fc and related AIRI PID excluding the probe is 0; only this WORKING/roadmap-log actual push receipt is dirty. Validate and commit/push these exact two docs as docs: close E2 review milestone, then require final HEAD=origin/main, clean worktree and PID 0. Model/GPU/service/T3/campaign/adoption remain unchanged."
 ---
 
 # AIRI live working state
@@ -57,6 +57,30 @@ reconciliation_receipt: "2026-08-23 22:48 KST base five-doc commit 6efbf057 rece
 | 현재 행동 | 문서 intent를 먼저 기록하고, 나머지 SSoT를 같은 판정으로 갱신한다. |
 
 ## 3. 마지막 내구성 체크포인트
+
+- `20260823-225045-e1-e2-review-push-receipt-finalization-intent`: push-intent 두 문서는
+  focused continuity와 exact boundary/diff/security에서 actual 2, boundary diff 0,
+  staged/untracked 0, repo diff-check exit 0/expected warning, credential·개인 경로 hit 0,
+  589,511 bytes, manifest `0b547cf6a09b96dc3baae5dac71218a2076fa2edb8f7a5145c659748b5f26360`으로
+  PASS했다. exact `git push origin main` exit 0,
+  `3efe2ad..3464820 main -> main`이다. 이후 HEAD/local origin/main/remote main은 모두
+  `34648200ee4e1678ca0e39e08b6f2f453f18c0fc`, self 제외 관련 AIRI PID 0이고 actual
+  worktree는 이 push receipt용 WORKING/roadmap log 두 파일만 dirty다. 이 두 문서를
+  focused/boundary/diff/security, exact stage/cached 검증 뒤
+  `docs: close E2 review milestone`로 commit/push한다. 성공 뒤 HEAD=origin/main clean과
+  PID 0을 확인하며 model/GPU/service/T3/campaign/adoption은 계속 변경하지 않는다.
+
+- `20260823-224930-e1-e2-review-receipt-commit-push-intent`: base-commit receipt docs의
+  stage/cached 검증은 staged 2, boundary diff 0, unstaged/untracked 0,
+  cached diff-check 0줄, binary/oversize/credential·개인 경로 hit 0, blob 586,219 bytes,
+  index manifest `56d831bb965ca06709b4dd437688f41b4f1146c6c3b2811aafa403e797e5c262`다.
+  exact `git commit -m "docs: record E2 review commit"` exit 0, commit
+  `34648200ee4e1678ca0e39e08b6f2f453f18c0fc`, parent `6efbf057`, two docs,
+  37 insertions/5 deletions이다. commit 직후 worktree clean, local main은 origin/main
+  `3efe2ad`보다 2 ahead다. 이 push intent 두 문서를 focused/boundary/diff/security로
+  검증한 뒤 exact `git push origin main`을 한 번 실행한다. 실패하면 local commit/docs를
+  보존한다. 성공해도 actual push receipt를 commit/push하고 HEAD=origin/main clean을
+  확인하기 전에는 문서 milestone을 완료로 승격하지 않는다.
 
 - `20260823-224833-e1-e2-review-commit-receipt-docs-stage-intent`: base five-doc commit
   `6efbf057`의 receipt용 WORKING/roadmap log는 focused continuity exit 0/literal PASS다.
