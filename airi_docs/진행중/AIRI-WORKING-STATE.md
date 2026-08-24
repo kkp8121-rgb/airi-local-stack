@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 16:46:00 +09:00"
-checkpoint_id: "20260824-164600-docs-refresh-and-next-session-goal-handoff"
+updated_at_kst: "2026-08-24 17:20:00 +09:00"
+checkpoint_id: "20260824-172000-e2c2-recipe-design-frozen-receipt"
 goal_status: "active"
-authorization: "user-goal-2026-08-24: repository-gpu-unlimited-training-packaging-36-report-campaign-on-winner-e2-c2-on-no-winner-local-services-t3-readonly-diagnosis-t05-sample-synthesis-commit-push-authorized; forbidden: post-blind-target-fixture-threshold-seed-change, blind-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-on, speaker-126-operational-promotion; operational-adoption-forbidden-until-separate-user-approval; diagnosis+guard phase (this batch) complete — recommend a fresh explicit /goal before E2-C2 GPU work even though this authorization already names e2-c2-on-no-winner"
-active_phase: "e2-c2-design-pending-new-goal"
-git_head: "04f9f0df15a6ac2cf391279208f149e1016210e8"
-worktree_state: "HEAD-local-remote-exact-04f9f0d; clean; matrix-fully-idle-PID-0; work-continuity-contract-PASS; test-current-checkpoint-PASS; awaiting next explicit /goal for E2-C2"
+authorization: "user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
+active_phase: "e2-c2-recipe-design"
+git_head: "2fe39f52e40e0a6bd2bdb1e98aeb90e4b8d55294"
+worktree_state: "HEAD-local-remote-exact-2fe39f5; clean; AIRI-PID-0 (only Ollama 11434 serve + unrelated MCP procs); trainer 0"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
@@ -22,6 +22,39 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 17:20 KST **E2-C2 레시피 설계 동결 receipt (phase 1 완료)**: read-only 조사
+  (scout 3: trainer 파라미터화 / dataset 도구 / blind·matrix 도구) + E2-C1 verdict JSON
+  실측으로 설계를 확정, `airi_docs/진행중/AIRI-E2-C2-FROZEN-CONTRACT-2026-08-24.md` 신규
+  작성. 핵심: (a) **선량 교정** — E1/E2 본 학습이 LR 2e-5·1,600 microsteps/100 opt steps
+  였던 데 비해 E2-C1은 LR 1e-5·512/32(train 512행 1 epoch)로 과소학습이었고, 그럼에도
+  교정 방향은 전 축 유효(donation composite 0.167→0.458 등 additive 4/5 개선)했다는
+  verdict 실측이 근거. E2-C2 = **1536 microsteps/96 opt steps(3 epochs) + LR 2e-5 + epoch별
+  dev-loss best-epoch 선택**(trainer 내장 확인), 나머지 계약(seed 42, LoRA 8/16/0.05,
+  batch 1/accum 16/seq 2048, AdamW/constant, K=3 checkpoint, adapter-weights-only init from
+  E2, durable runner only)은 E2-C1과 동일. (b) **correction:replay 비율은 재검토 후 동결
+  유지**(11:5, dataset byte-exact 승계) — 망각 징후 0·방향 유효 실측에 따라 변수를 선량/LR로
+  한정해 언더트레이닝 가설의 깨끗한 검정으로 설계, E3 금지선과의 구분을 계약 §3에 명문화.
+  (c) **blind v3**: 동일 role 3종·seeds [73,89,97,20260824]·threshold 무완화 승계, 전부 신규
+  한국어 본문, 교정 proper noun(_HANDLES 18/_UNKNOWN 16/_DONORS 17 등 모듈 상수) 충돌 0,
+  v1+v2 root/hash reseal 가드, guard=on attestation 필드 신설. (d) 도구 조사 결과 trainer/
+  merge/package는 후보명 하드코딩 0(SHA 핀만)이라 코드 변경 불요, 변경 필요 지점은 launcher
+  `e2c2` profile + `compare_e2c2_blind.py` + commitment/policy/test + guard env 주입뿐.
+  이 checkpoint 직후 ROADMAP-LOG 기록, diff-check/test-current-checkpoint 검증 후 docs
+  commit/push(goal 표준 요구사항의 허가 범위). GPU 0, 실행 프로세스 변화 0.
+- 2026-08-24 17:01 KST **E2-C2 user `/goal` 접수 + 설계 phase intent (Fable 감독)**: 16:46
+  checkpoint가 요청한 새 `/goal`이 그대로 접수됐다 — E2-C2 교정 학습 재설계 + 신규 blind
+  3종 봉인 + smoke→durable→merge→package + 새 blind 36-report matrix(이번엔 프록시
+  `AIRI_HANDLE_GROUNDING_GUARD=on`) + winner 시 3×500 campaign / no_winner 시 진단 보고
+  후 대기(자동 E2-C3 금지). GPU 무제한. 금지: blind v1/v2 재사용, hard gate 완화, same-data
+  epoch-only E3, 운영 모델/태그 변경, 외부 provider/extraction/greybox 기본 ON, T-05 126
+  승격. adoption은 campaign 결과와 무관하게 별도 사용자 승인. preflight 대조 완료: HEAD/
+  local/remote exact `2fe39f5`, clean, AIRI PID 0(Ollama serve 11434만 listen), trainer 0 —
+  16:46 frontmatter의 `04f9f0d`는 그 checkpoint 직후 docs receipt 커밋 2개(`59d1836` 이후
+  `04f9f0d`→`2fe39f5`)가 쌓인 정상 진행이다. 이 checkpoint는 **phase 1 intent**: frozen
+  contract §11 언더트레이닝 가설(512 microsteps = train 512행 1 epoch, optimizer 32 steps,
+  LR 1e-5 상수)을 반영한 E2-C2 레시피(학습량/LR/correction:replay 비율) 설계 조사를
+  read-only로 시작한다. GPU·데이터 재생성·blind 저작은 이 설계가 live state에 기록된 뒤
+  각각 별도 intent로 착수한다.
 - 2026-08-24 16:46 KST **문서 전면 갱신 + 다음 세션 /goal 핸드오프 준비**: `59d1836`
   (핸들 grounding 가드+채점기 신호 push) 이후 진단+가드 phase가 완료되어, 사용자 요청대로
   관련 문서 5종을 이 배치로 갱신한다 — `NEXT-SESSION.md`(새 최우선 진입점 블록),

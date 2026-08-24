@@ -7,6 +7,21 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-24 E2-C2 goal 접수 + 레시피 설계 동결
+
+- 17:20 KST (클로드 PC, Fable 감독) 사용자 `/goal`(E2-C2 재설계 + 신규 blind + guard=on
+  36-report matrix + winner 시 3×500 campaign, GPU 무제한) 접수. read-only 조사(scout 3:
+  trainer/dataset/blind·matrix 도구) + E2-C1 verdict JSON 실측으로 설계를 확정하고
+  `진행중/AIRI-E2-C2-FROZEN-CONTRACT-2026-08-24.md`를 신규 작성했다. 레시피: 1536
+  microsteps/96 optimizer steps(3 epochs) + LR 2e-5(E1/E2 실증 LR 복원) + epoch별 dev-loss
+  best-epoch 선택, 나머지 계약은 E2-C1과 동일(adapter-weights-only from E2, seed 42,
+  LoRA 8/16/0.05, 1/16/2048, K=3, durable runner only). correction:replay 11:5와 frozen
+  dataset은 재검토 후 byte-exact 동결 유지 — 망각 징후 0·교정 방향 전 축 유효 실측에 따라
+  변수를 선량/LR로 한정(언더트레이닝 가설의 깨끗한 검정, E3 금지선 구분 명문화). blind v3는
+  동일 role 3종·seeds·threshold 무완화 승계, 전부 신규 한국어 본문, 교정 proper noun 충돌 0,
+  v1+v2 reseal 가드, guard=on attestation 필드 신설 예정. 문서 전용 배치, GPU/모델/서비스
+  변경 0. 다음 배치: blind v3 저작·봉인 + launcher e2c2 profile + comparator 구현.
+
 ## 2026-08-24 문서 전면 갱신 + 다음 세션 E2-C2 /goal 핸드오프
 
 - 16:46 KST (클로드 PC, Fable 감독) `59d1836`(핸들 grounding 가드+채점기 신호 push) 뒤
