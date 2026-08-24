@@ -66,6 +66,37 @@ SUPERSEDED_HASHES = frozenset({
 })
 
 
+# Later evaluation generations reuse this sealer with their own schema
+# strings, arm sets, and an extended superseded inventory; 'e2c2' remains the
+# default so every existing call and receipt stays byte-identical.
+GENERATIONS: dict[str, dict[str, Any]] = {
+    'e2c2': {
+        'sealed_schema': SEALED_SCHEMA_VERSION,
+        'receipt_schema': RECEIPT_SCHEMA_VERSION,
+        'root_prefix': 'airi-e2-c2-blind-freeze-',
+        'arms': ARMS,
+        'extra_superseded_root_ids': (),
+        'extra_superseded_hashes': frozenset(),
+    },
+    'd1': {
+        'sealed_schema': 'airi.d1-blind-sealed-manifest.v1',
+        'receipt_schema': 'airi.d1-blind-validation-receipt.v1',
+        'root_prefix': 'airi-d1-blind-freeze-',
+        'arms': ('baseline', 'e2', 'e2-c1', 'e2-c2'),
+        # blind v3 was consumed by the E2-C2 36-report matrix (2026-08-25).
+        'extra_superseded_root_ids': ('airi-e2-c2-blind-freeze-20260824-v3',),
+        'extra_superseded_hashes': frozenset({
+            '99945ebb2cbffd1b831e73ec10e29271eb9b3c1daac3bb3a5d959ce1e2a65b61',
+            '7dc54f119f1b87443677047aa853544c17bf1724318246871d1a0d32e496c86f',
+            'ed50352d2bce3570d938aca4c752ce98b16f426cb484dbf61bbe50c95e300acd',
+            '4df78907c6b8606acb9501b4a9538813b0777c110740a902e07701da73a89b1c',
+            '5175b4e005eedf973b41e27021d90b4ceb68324bcba1be77e225f9eccc2e17e9',
+            '374f470837506f07133dd9634efc88904dc065175dcd182097d2c5fcdbb60956',
+        }),
+    },
+}
+
+
 class BlindSealError(ValueError):
     """Fail-closed error: the staging fixtures cannot be sealed as-is."""
 
@@ -169,13 +200,17 @@ def check_public_collisions(fixture: dict[str, Any], raw: bytes, filename: str,
 
 
 def check_superseded(fixture: dict[str, Any], raw: bytes, filename: str,
-                     superseded_roots: Sequence[Path]) -> None:
+                     superseded_roots: Sequence[Path],
+                     generation: dict[str, Any] | None = None) -> None:
+    generation = generation or GENERATIONS['e2c2']
+    forbidden_hashes = SUPERSEDED_HASHES | generation['extra_superseded_hashes']
+    forbidden_root_ids = tuple(SUPERSEDED_ROOT_IDS) + tuple(generation['extra_superseded_root_ids'])
     raw_hash = sha256_hex(raw)
     canonical_hash = sha256_hex(canonical_bytes(fixture))
-    if raw_hash in SUPERSEDED_HASHES or canonical_hash in SUPERSEDED_HASHES:
-        raise BlindSealError(f'{filename}: hash matches a superseded (v1/v2) blind fixture')
+    if raw_hash in forbidden_hashes or canonical_hash in forbidden_hashes:
+        raise BlindSealError(f'{filename}: hash matches a superseded blind fixture')
     text = json.dumps(fixture, ensure_ascii=False)
-    for root_id in SUPERSEDED_ROOT_IDS:
+    for root_id in forbidden_root_ids:
         if root_id in text:
             raise BlindSealError(f'{filename}: names a superseded blind root: {root_id}')
     handles = fixture_handles(fixture)
@@ -202,8 +237,10 @@ def validate_staging(staging_dir: Path, superseded_roots: Sequence[Path],
                      public_dir: Path | None = None,
                      correction_nouns: Iterable[str] | None = None,
                      correction_text: str | None = None,
-                     sim: Any | None = None) -> list[dict[str, Any]]:
+                     sim: Any | None = None,
+                     generation: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     """Validate all three staged fixtures and return their commitment pins."""
+    generation = generation or GENERATIONS['e2c2']
     sim = sim if sim is not None else load_broadcast_sim()
     public_dir = public_dir if public_dir is not None else HERE
     if correction_nouns is None:
@@ -232,7 +269,7 @@ def validate_staging(staging_dir: Path, superseded_roots: Sequence[Path],
         check_stream_language(sim, fixture, filename, SEEDS)
         check_proper_noun_collisions(fixture, filename, correction_nouns, correction_text)
         check_public_collisions(fixture, raw, filename, public_dir)
-        check_superseded(fixture, raw, filename, superseded_roots)
+        check_superseded(fixture, raw, filename, superseded_roots, generation)
         for handle in fixture_handles(fixture):
             if handle in all_handles and all_handles[handle] != filename:
                 raise BlindSealError(f'handle {handle} appears in both {all_handles[handle]} '
@@ -249,15 +286,19 @@ def validate_staging(staging_dir: Path, superseded_roots: Sequence[Path],
 
 
 def seal(staging_dir: Path, output_root: Path, root_id: str,
-         superseded_roots: Sequence[Path]) -> dict[str, Any]:
-    if not re.fullmatch(r'airi-e2-c2-blind-freeze-[0-9]{8}(-[0-9a-z]+)?', root_id):
-        raise BlindSealError(f'root_id does not follow the e2-c2 freeze naming: {root_id}')
+         superseded_roots: Sequence[Path],
+         generation: dict[str, Any] | None = None) -> dict[str, Any]:
+    generation = generation or GENERATIONS['e2c2']
+    root_pattern = re.escape(generation['root_prefix']) + r'[0-9]{8}(-[0-9a-z]+)?'
+    if not re.fullmatch(root_pattern, root_id):
+        raise BlindSealError(f'root_id does not follow the freeze naming: {root_id}')
     if output_root.exists():
         raise BlindSealError(f'output root already exists (sealing is no-overwrite): {output_root}')
-    pins = validate_staging(staging_dir, superseded_roots)
+    pins = validate_staging(staging_dir, superseded_roots, generation=generation)
 
+    arms = generation['arms']
     sealed_manifest = {
-        'schema_version': SEALED_SCHEMA_VERSION,
+        'schema_version': generation['sealed_schema'],
         'root_id': root_id,
         'canonicalization': CANONICALIZATION,
         'fixtures': pins,
@@ -265,7 +306,7 @@ def seal(staging_dir: Path, output_root: Path, root_id: str,
     }
     sealed_bytes = canonical_bytes(sealed_manifest)
     receipt = {
-        'schema_version': RECEIPT_SCHEMA_VERSION,
+        'schema_version': generation['receipt_schema'],
         'root_id': root_id,
         'sealed_manifest_raw_sha256': sha256_hex(sealed_bytes),
         'validation': {
@@ -274,8 +315,8 @@ def seal(staging_dir: Path, output_root: Path, root_id: str,
             'canonicalization': CANONICALIZATION,
             'fixture_count': len(EXPECTED_FIXTURES),
             'seed_count': len(SEEDS),
-            'arm_count': len(ARMS),
-            'expected_report_count': len(EXPECTED_FIXTURES) * len(SEEDS) * len(ARMS),
+            'arm_count': len(arms),
+            'expected_report_count': len(EXPECTED_FIXTURES) * len(SEEDS) * len(arms),
             'public_raw_or_canonical_hash_collision': False,
             'correction_proper_noun_collision': False,
             'superseded_hash_collision': False,
@@ -319,15 +360,19 @@ def main(argv: list[str] | None = None) -> int:
                         help='Consumed blind root to check for content reuse (repeatable)')
     parser.add_argument('--check', action='store_true',
                         help='Validate the staging fixtures without sealing')
+    parser.add_argument('--generation', choices=sorted(GENERATIONS), default='e2c2',
+                        help='Evaluation generation whose schemas/arms/superseded set to seal for')
     args = parser.parse_args(argv)
+    generation = GENERATIONS[args.generation]
     try:
         if args.check:
-            pins = validate_staging(args.staging_dir, args.superseded_root)
+            pins = validate_staging(args.staging_dir, args.superseded_root, generation=generation)
             print(json.dumps({'status': 'pass', 'fixtures': pins}, ensure_ascii=False, indent=2))
             return 0
         if not args.output_root or not args.root_id:
             parser.error('--output-root and --root-id are required unless --check is used')
-        result = seal(args.staging_dir, args.output_root, args.root_id, args.superseded_root)
+        result = seal(args.staging_dir, args.output_root, args.root_id, args.superseded_root,
+                      generation=generation)
         print(json.dumps({'status': 'sealed', **result}, ensure_ascii=False, indent=2))
         return 0
     except BlindSealError as exc:
