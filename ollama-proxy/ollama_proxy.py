@@ -88,6 +88,7 @@ from output_moderation import OutputModerationRuntime, load_moderation_policy
 from epistemic_confidence import build_runtime as build_epistemic_confidence_runtime
 from broadcast_contract import apply_broadcast_contract, broadcast_contract_enabled
 from memory_claim_guard import guard_memory_claim
+import handle_grounding_guard
 from live_broadcast_runtime import LiveBroadcastRuntime, BroadcastControlError
 
 
@@ -6331,7 +6332,12 @@ def apply_output_moderation(content: str) -> tuple[str, dict[str, object] | None
 _UNPREPARED_SSE_DIALOGUE = object()
 
 
-def prepare_openai_sse_dialogue(content: str) -> tuple[str, dict[str, object] | None]:
+def prepare_openai_sse_dialogue(
+    content: str,
+    *,
+    grounding_context: str | None = None,
+    memory_grounding_pool: str | None = None,
+) -> tuple[str, dict[str, object] | None]:
     """Return the exact dialogue text and signal intended for the public wire.
 
     A completed-turn journal must use this result, rather than the draft that
@@ -6339,10 +6345,29 @@ def prepare_openai_sse_dialogue(content: str) -> tuple[str, dict[str, object] | 
     terminal SSE frame prepare once and pass the returned signal back to
     ``openai_sse_delta``; this avoids a second inspection and, importantly,
     avoids rotating a blocked replacement a second time.
+
+    ``grounding_context``/``memory_grounding_pool`` are only meaningful for a
+    real (non-templated) dialogue candidate; templated fallback text has
+    nothing to ground and callers omit them. With the guard's env flag off
+    (the default) this block is a single boolean check and the result is
+    unchanged from before the guard existed.
     """
+    moderation: dict[str, object] | None = None
     if content and output_moderation_enabled():
-        return apply_output_moderation(content)
-    return content, None
+        content, moderation = apply_output_moderation(content)
+    if (
+        content
+        and grounding_context is not None
+        and handle_grounding_guard.HANDLE_GROUNDING_GUARD_ENABLED
+    ):
+        content, handle_signal = handle_grounding_guard.apply_handle_grounding_guard(
+            content,
+            full_context=grounding_context,
+            memory_pool=memory_grounding_pool or "",
+        )
+        if handle_signal is not None:
+            moderation = {**(moderation or {}), "handle_grounding": handle_signal}
+    return content, moderation
 
 
 def openai_sse_delta(
@@ -7016,6 +7041,7 @@ async def health() -> dict[str, object]:
         # silently reuse a proxy with the broadcast safety contract disabled.
         "broadcast_contract": broadcast_contract_enabled(),
         "memory_claim_guard": MEMORY_CLAIM_GUARD_ENABLED,
+        "handle_grounding_guard": handle_grounding_guard.HANDLE_GROUNDING_GUARD_ENABLED,
         "chat_model": chat_model_telemetry.health(),
         "system_prompt_overridden": False,
         "active_character_card_merge": True,
@@ -7510,6 +7536,14 @@ async def stream_local_with_ack(
                 question=context.memory_question,
                 trace_id=context.trace_id,
             )
+        # Computed once and reused at every real-dialogue emission point
+        # below: with the guard's env flag off this is a single boolean
+        # check, and both pools stay None.
+        _grounding_context, _memory_grounding_pool = handle_grounding_guard.build_grounding_pools(
+            last_user_text=context.last_user_text,
+            briefing_evidence=context.briefing_evidence,
+            memory_result=_memory_result,
+        )
         absence_required = not context.proactive_turn and memory_absence_fallback_required(
             context.memory_question, _memory_result, context.original_messages
         )
@@ -7825,7 +7859,11 @@ async def stream_local_with_ack(
                         ) == early_candidate
                     )
                     if early_candidate_is_safe:
-                        public_dialogue_emitted, moderation = prepare_openai_sse_dialogue(early_candidate)
+                        public_dialogue_emitted, moderation = prepare_openai_sse_dialogue(
+                            early_candidate,
+                            grounding_context=_grounding_context,
+                            memory_grounding_pool=_memory_grounding_pool,
+                        )
                         emitted_substantive = True
                         emit_substantive_content(context.trace_id, context.request_started)
                         yield openai_sse_delta(
@@ -8269,7 +8307,11 @@ async def stream_local_with_ack(
             )
             grounding_silence_fallback_used = True
         if dialogue and not public_dialogue_emitted:
-            dialogue, moderation = prepare_openai_sse_dialogue(dialogue)
+            dialogue, moderation = prepare_openai_sse_dialogue(
+                dialogue,
+                grounding_context=_grounding_context,
+                memory_grounding_pool=_memory_grounding_pool,
+            )
             emitted_substantive = True
             emit_substantive_content(context.trace_id, context.request_started)
             yield openai_sse_delta(

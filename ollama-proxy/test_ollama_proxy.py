@@ -7409,6 +7409,36 @@ class ImmediateAckMetadataTests(unittest.TestCase):
             response = post_stream("내 별명 기억나?")
         self.assertIn("응, 기억해!", openai_sse_content(response.text))
 
+    def test_handle_grounding_guard_off_by_default_leaves_a_vocative_callout_untouched(self) -> None:
+        self.assertFalse(ollama_proxy.handle_grounding_guard.HANDLE_GROUNDING_GUARD_ENABLED)
+        with mock.patch.object(ollama_proxy, "needs_grounding_retry", lambda *a, **k: False), \
+                mock.patch.object(ollama_proxy, "memory_absence_fallback_required", lambda *a, **k: False), \
+                mock.patch.object(ollama_proxy, "client", _CapturingChatClient("초코님, 반가워!")):
+            response = post_stream("안녕")
+        self.assertIn("초코님, 반가워!", openai_sse_content(response.text))
+
+    def test_handle_grounding_guard_strips_an_ungrounded_vocative_when_enabled(self) -> None:
+        # E2-C1 진단(2026-08-24): 재호명 handle이 이번 턴 실제 근거(유저
+        # 발화/브리핑/memory 회수) 어디에도 없으면 -님 호칭만 안전하게 치환한다.
+        with mock.patch.object(
+                ollama_proxy.handle_grounding_guard, "HANDLE_GROUNDING_GUARD_ENABLED", True), \
+                mock.patch.object(ollama_proxy, "needs_grounding_retry", lambda *a, **k: False), \
+                mock.patch.object(ollama_proxy, "memory_absence_fallback_required", lambda *a, **k: False), \
+                mock.patch.object(ollama_proxy, "client", _CapturingChatClient("초코님, 반가워!")):
+            response = post_stream("안녕")
+        content = openai_sse_content(response.text)
+        self.assertNotIn("초코님", content)
+        self.assertIn("여러분", content)
+
+    def test_handle_grounding_guard_keeps_a_target_grounded_in_the_user_turn(self) -> None:
+        with mock.patch.object(
+                ollama_proxy.handle_grounding_guard, "HANDLE_GROUNDING_GUARD_ENABLED", True), \
+                mock.patch.object(ollama_proxy, "needs_grounding_retry", lambda *a, **k: False), \
+                mock.patch.object(ollama_proxy, "memory_absence_fallback_required", lambda *a, **k: False), \
+                mock.patch.object(ollama_proxy, "client", _CapturingChatClient("민지님, 잘 지냈어?")):
+            response = post_stream("나 민지인데 방금 들어왔어")
+        self.assertIn("민지님, 잘 지냈어?", openai_sse_content(response.text))
+
     def test_immediate_ack_mode_parses_conservatively(self) -> None:
         for raw, expected in ((None, "audible"), ("", "audible"), ("MARKER", "marker"),
                               (" off ", "off"), ("audible", "audible"), ("banana", "audible")):

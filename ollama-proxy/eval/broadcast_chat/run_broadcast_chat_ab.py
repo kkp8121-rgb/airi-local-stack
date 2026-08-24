@@ -680,6 +680,12 @@ class HttpTransport:
                 except json.JSONDecodeError:
                     meta["parse_errors"] = meta.get("parse_errors", 0) + 1
                     continue
+                airi_moderation = event.get("airi_moderation")
+                if isinstance(airi_moderation, dict) and "handle_grounding" in airi_moderation:
+                    # 여러 청크가 와도 실제 대화가 실리는 청크는 턴당 하나뿐이므로
+                    # (early-safe-sentence 아니면 main dialogue 중 하나만 emit) 마지막
+                    # 값을 신뢰해도 된다.
+                    meta["handle_grounding"] = airi_moderation["handle_grounding"]
                 for choice in event.get("choices") or []:
                     piece = (choice.get("delta") or {}).get("content")
                     if not piece:
@@ -747,6 +753,7 @@ def call_once(
                 "ttft_ms": None if ttft is None else round(ttft, 1),
                 "complete_ms": round(elapsed, 1),
                 "transport_meta": meta,
+                "handle_grounding": meta.get("handle_grounding"),
             }
         )
         if meta.get("status_code", 200) != 200:

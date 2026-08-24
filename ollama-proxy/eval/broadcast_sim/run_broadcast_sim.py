@@ -559,10 +559,22 @@ def run_arm(
             deterministic_act = "memory_guard"
 
         fact_tokens = None
+        token_pool: set[str] = set()
         if briefing == "on":
-            token_pool: set[str] = set()
             for item in sim.select_viewer_lines(fixture, stream, pick):
                 token_pool |= sim._tokens(item["text"])
+        # 프록시가 AIRI_HANDLE_GROUNDING_GUARD=on 으로 떠 있을 때만 채워지는
+        # 신호다. 디렉터의 손수 조립 브리핑은 이미 briefing_fact_tokens로
+        # 반영되지만, 라이브 memory 검색이 실제로 회수한 시청자 handle은
+        # 디렉터도 모른다 — E2-C1 진단에서 확인된 invented_handle 회귀의
+        # 실제 원인. 게이트 정의(무엇이 위반인가)는 그대로 두고, 판정 입력
+        # 범위만 이 턴에 실제로 존재했던 근거로 넓힌다.
+        memory_grounding_pool = (record.get("handle_grounding") or {}).get("memory_pool") or ""
+        if memory_grounding_pool:
+            token_pool |= {
+                handle for handle in roster if handle and handle in memory_grounding_pool
+            }
+        if token_pool:
             fact_tokens = sorted(token_pool)
         register = ab.score_response(body)
         row = sim.score_turn(pick, body, beat=beat, fallback_pool=FALLBACK_POOL,

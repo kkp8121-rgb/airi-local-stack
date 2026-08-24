@@ -465,6 +465,69 @@ class HttpTransportTests(unittest.TestCase):
         self.assertEqual("", turn["response"])
 
 
+class HandleGroundingSignalTests(unittest.TestCase):
+    """SSE 델타의 airi_moderation.handle_grounding 이 call_once record까지 살아 있는지 확인한다."""
+
+    def _streaming_transport(self, handler):
+        real_client = httpx.Client
+
+        def fake_client(**kwargs):
+            return real_client(transport=httpx.MockTransport(handler), **kwargs)
+
+        with patch.object(httpx, "Client", fake_client):
+            return ab.HttpTransport("http://mock.invalid/v1", "test-token", stream_mode="on")
+
+    def test_handle_grounding_signal_reaches_the_record(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            body = (
+                'data: {"choices":[{"delta":{"role":"assistant"}}]}\n\n'
+                'data: {"choices":[{"delta":{"content":"배접천부터 꺼내야 해"}}],'
+                '"airi_moderation":{"handle_grounding":{"vocative_checked":[],'
+                '"vocative_grounded":[],"vocative_stripped":[],'
+                '"memory_pool":"배접천이 회수된 기억 블록"}}}\n\n'
+                'data: [DONE]\n\n'
+            )
+            return httpx.Response(200, content=body.encode("utf-8"))
+
+        transport = self._streaming_transport(handler)
+        try:
+            record = ab.call_once(
+                transport, model="midm-airi:2.0-mini",
+                messages=[{"role": "user", "content": "안녕"}],
+                max_tokens=64, timeout=5.0,
+            )
+        finally:
+            transport.close()
+
+        self.assertTrue(record["ok"])
+        self.assertEqual(record["response"], "배접천부터 꺼내야 해")
+        self.assertEqual(
+            record["handle_grounding"]["memory_pool"], "배접천이 회수된 기억 블록",
+        )
+
+    def test_absent_signal_leaves_handle_grounding_none(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            body = (
+                'data: {"choices":[{"delta":{"role":"assistant"}}]}\n\n'
+                'data: {"choices":[{"delta":{"content":"오늘 방송 재밌었지?"}}]}\n\n'
+                'data: [DONE]\n\n'
+            )
+            return httpx.Response(200, content=body.encode("utf-8"))
+
+        transport = self._streaming_transport(handler)
+        try:
+            record = ab.call_once(
+                transport, model="midm-airi:2.0-mini",
+                messages=[{"role": "user", "content": "안녕"}],
+                max_tokens=64, timeout=5.0,
+            )
+        finally:
+            transport.close()
+
+        self.assertTrue(record["ok"])
+        self.assertIsNone(record["handle_grounding"])
+
+
 class DryRunMainTests(unittest.TestCase):
     def _run_main(self, directory: str, contract: str, scenarios: str | None = "autumn_leaves") -> dict:
         output = Path(directory) / f"dry-{contract}.json"
