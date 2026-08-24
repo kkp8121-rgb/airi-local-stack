@@ -7,19 +7,19 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
-## 2026-08-24 E2-C1 36-report blind matrix 완료 — no_winner
+## 2026-08-24 문서 전면 갱신 + 다음 세션 E2-C2 /goal 핸드오프
 
-- 15:14 KST (클로드 PC, Fable 감독) 한국어 blind v2로 baseline/e2/e2-c1 × 3 fixture × 4 seed
-  = 36 reports를 완주했다(첫 시도 2회는 no-overwrite 가드·blind v1 언어 결함으로 정상
-  fail-closed, 각 root 보존). comparator verdict: `status=pass`(정상 채점), **`winner=null`**.
-  score는 e2-c1 0.244 > e2 0.225 > baseline 0.218로 최고점이나, `invented_handle` 위반이
-  28→40→**53**으로 학습할수록 악화해 hard/legacy/perfect-rate 게이트 13개가 전부 실패했다
-  (additive 5축 중 4축은 E2 대비 방향 개선이나 전부 절대 최소선 미달). `adoption_authorized=
-  false`·3×500 campaign 금지 유지. 사용자가 수락한 다음 순서: ① e2-c1 위반 53건 원문 진단
-  (blind 채점 완료라 열람 가능, 날조/재호명/렌더러 되먹임 분류) ② roster 밖 한국어 인명을
-  거르는 결정론 런타임 가드 설계·구현 ③ 남는 축은 학습량(512/32는 mixture 1 epoch 미만)·LR
-  재검토한 **E2-C2**를 새 blind로 재도전(same-data E3 아님). 상세는 frozen contract §11·
-  handoff §-6·STATUS 배너·§3·§5. 문서 갱신만이며 GPU/모델/서비스 변경 0.
+- 16:46 KST (클로드 PC, Fable 감독) `59d1836`(핸들 grounding 가드+채점기 신호 push) 뒤
+  사용자 요청으로 관련 문서 5종을 갱신: `NEXT-SESSION.md` 새 최우선 진입점,
+  `AIRI-ROADMAP-STATUS.md` banner+§5(진단·가드 항목 `[x]`, 89%/13%/87% 분할로 설명 정정),
+  `AIRI-CODEX-HANDOFF-2026-08-21.md` 신규 `## -7.`, `AIRI-E2-C1-FROZEN-CONTRACT-2026-08-24.md`
+  신규 `## 12.`(§1-10 학습 계약 불변 명시), `AIRI-CURRENT-DOCS-INDEX-2026-08-10.md` 최종
+  현행화 블록. 겸사로 이 LOG 파일 자체의 순서 결함도 고쳤다 — 직전 배치가 "handle
+  grounding 가드" 항목을 15:14 no_winner 항목보다 아래(blind v1 재봉인 항목 앞)에 잘못
+  삽입해 "최신이 위" 규칙을 어겼던 것을 발견, 제자리(맨 위)로 옮겼다. `git diff --check`
+  0, `test-current-checkpoint.ps1`/work-continuity 재확인 PASS. 문서 전용 배치이며 GPU/
+  모델/서비스 변경 0. 이 배치 뒤 사용자에게 E2-C2 설계용 `/goal` 문안을 제시한다 — 수락
+  전까지 `goal_status=paused-awaiting-next-goal`.
 
 ## 2026-08-24 handle grounding 가드 + 채점기 신호 구현 (E2-C1 진단 1+2)
 
@@ -37,6 +37,20 @@
   블라인드 commitment 6 전부 pass, `test-current-checkpoint.ps1` PASS, diff-check 0. CI shard에
   `test_handle_grounding_guard.py` 등록. commit `a0020dd`(fix)+docs로 push. 다음: E2-C2 설계
   (v1/v2 재사용 금지, 신규 blind 필요).
+
+## 2026-08-24 E2-C1 36-report blind matrix 완료 — no_winner
+
+- 15:14 KST (클로드 PC, Fable 감독) 한국어 blind v2로 baseline/e2/e2-c1 × 3 fixture × 4 seed
+  = 36 reports를 완주했다(첫 시도 2회는 no-overwrite 가드·blind v1 언어 결함으로 정상
+  fail-closed, 각 root 보존). comparator verdict: `status=pass`(정상 채점), **`winner=null`**.
+  score는 e2-c1 0.244 > e2 0.225 > baseline 0.218로 최고점이나, `invented_handle` 위반이
+  28→40→**53**으로 학습할수록 악화해 hard/legacy/perfect-rate 게이트 13개가 전부 실패했다
+  (additive 5축 중 4축은 E2 대비 방향 개선이나 전부 절대 최소선 미달). `adoption_authorized=
+  false`·3×500 campaign 금지 유지. 사용자가 수락한 다음 순서: ① e2-c1 위반 53건 원문 진단
+  (blind 채점 완료라 열람 가능, 날조/재호명/렌더러 되먹임 분류) ② roster 밖 한국어 인명을
+  거르는 결정론 런타임 가드 설계·구현 ③ 남는 축은 학습량(512/32는 mixture 1 epoch 미만)·LR
+  재검토한 **E2-C2**를 새 blind로 재도전(same-data E3 아님). 상세는 frozen contract §11·
+  handoff §-6·STATUS 배너·§3·§5. 문서 갱신만이며 GPU/모델/서비스 변경 0.
 
 ## 2026-08-24 blind v1 실행-불능 결함과 한국어 v2 재봉인
 

@@ -1,6 +1,11 @@
 # AIRI Documentation Index
 
-최종 현행화 2026-08-24 (Codex GPU — E2-C1 correction/replay/retained blind 계약의
+최종 현행화 2026-08-24 16:33 KST (클로드 PC — E2-C1 36-report blind matrix no_winner 진단
+완료 + 핸들 grounding 가드/채점기 신호 SHIPPED. invented_handle 53건 중 89%가 실제
+memory 회수 오분류였고 그중 13%만 vocative 형태 — 가드는 그 13%만, 채점기 신호가 나머지
+87%를 처리. 게이트 정의 불변, 입력 범위만 확장. commit `a0020dd`+docs 3개로
+`59d1836`까지 push. E2-C1 학습 계약 자체는 불변, 다음은 새 blind로 E2-C2 설계).
+직전 현행화 2026-08-24 (Codex GPU — E2-C1 correction/replay/retained blind 계약의
 full freeze validation과 origin/main publication PASS, 다음 adapter-init seam read-only 감사,
 GPU 0/0·운영 채택 금지).
 직전 현행화 2026-08-22 (Codex GPU — 사용자 `/goal`로 `active`, live working-state
@@ -41,27 +46,26 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
   60분 heartbeat와 단계 전후 intent/receipt를 기록하고, milestone만 handoff와
   roadmap에 승격한다. 자동 compact 직전 신호에 의존하지 않는다.
 - `AIRI-E2-C1-FROZEN-CONTRACT-2026-08-24.md` — **E2-C1 설계·데이터·retained blind·
-  학습·평가의 동결 계약.** correction 480 + v4 replay 200 + mixture 680, exact dataset
-  SHA, split/seed/step/LR/scheduler/checkpoint와 baseline/E2/E2-C1 36-report metric gate가
-  current bytes에서 full validation PASS다. 조사 오류 5건과 validator 공백은 mutation
-  regression으로 닫혔다. milestone `2e61842`와 receipt `3dba3ca`는 origin/main에 push돼
-  local/remote exact·clean·PID 0을 확인했다. 현재 `freeze_status=pass`,
-  `gpu_authorized=false`이며 다음 gate는 adapter-init seam read-only 감사다.
+  학습·평가의 동결 계약(§1-10, 불변) + 결과·진단·수정 receipt(§11-12, 계속 추가).**
+  §1-10: correction 480 + v4 replay 200 + mixture 680, exact dataset SHA, split/seed/
+  step/LR/scheduler/checkpoint, baseline/E2/E2-C1 36-report metric gate — full freeze
+  validation PASS, GPU로 그대로 실행 완료. §11: 36-report blind v2 matrix 결과
+  `winner=null`(invented_handle 28→40→53 악화로 hard/legacy/perfect-rate 13개 게이트
+  실패). §12: invented_handle 53건 진단(89%가 실제 memory 회수, 그중 13%만 vocative) +
+  핸들 grounding 가드/채점기 신호 구현·SHIPPED(commit `a0020dd`+docs →
+  `59d1836`). 다음 gate는 이 진단 근거로 재설계한 E2-C2를 새 retained blind로
+  실행하는 것(v1/v2 재사용 금지).
 - `AIRI-CODEX-HANDOFF-2026-08-21.md` — **현행 코덱스(GPU) 인계 단일 SSoT.**
-  2026-08-22 사용자 `/goal`로 goal은 `active`다. P0-A checkpoint/resume/durable
-  runner/safe-pause offline 구현·독립 P0/P1 0은 완료되어 `6f0c1358`로
-  origin/main push됐고, P0-B timing/exact-equivalence evidence gate와 external
-  expected-run 결속도 `e970cf7`·`8cd69b5`로 origin/main push됐다. E2 전 controlled GPU 동등성·실제 속도 10분 checkpoint
-  실증은 여전히 필수다. RunDir 생략 safe-pause는 exact command/state/source/process
-  identity가 맞는 active run 정확히 1개만 자동 선택하도록 offline 검증됐다.
-  운영 채택·기본 모델 변경은 계속 금지한다.
-  runtime-shaped broadcast continuity v4 1,000행의 source/chat SHA, seq2048
-  token 실측, E1 adapter/report/hash, checkpoint 없이 세 차례 중단된 E2의 step 0 재실행 명령,
-  safe-merge/GGUF 도구 핀, baseline/E1/E2 × calibration/heldout/blind 36-report
-  T3와 승자 3×500 live campaign 순서를 고정한다. 검증 완료된 isolated T3 launcher의
-  manifest/health/DB/capability/report/비교/evidence 계약과 실행 명령도 포함한다.
-  E1은 T3 pending·채택 금지이며
-  서비스 모델은 변경하지 않았다.
+  최신(§-7, 2026-08-24 16:33): E2-C1 36-report blind matrix `winner=null`(§-6)의
+  invented_handle 53건 진단 완료(89%가 실제 memory 회수 오분류, 그중 13%만 vocative
+  형태) + 핸들 grounding 가드(`AIRI_HANDLE_GROUNDING_GUARD`, 기본 off)·채점기 신호
+  구현·SHIPPED. 게이트 정의는 불변, 판정 입력 범위만 확장. commit `a0020dd`(fix)
+  +docs 3개로 `59d1836`까지 origin/main push, HEAD/local/remote exact. E2-C1의
+  §1-10 학습 계약은 이 배치로 바뀌지 않았다 — GPU 재학습 없음. 다음 gate는 이 진단으로
+  재설계한 **E2-C2**를 새 retained blind로 실행하는 것(v1/v2 재사용 금지). 운영 채택·
+  기본 모델 변경 금지는 계속 유지, 서비스 모델은 바뀌지 않았다.
+  이전 이력(2026-08-22 P0-A/P0-B, E2 launch, isolated T3 36-run, 승자 3×500 fail-closed
+  체크리스트 등)은 파일 본문 §0-6에 보존.
 - `AIRI-CODEX-HANDOFF-2026-08-20.md` — 이전 greybox·추출·사용자 총평 인계.
   방송 GPU 진행 상태는 08-21판이 대체한다.
   2026-08-21 사용자 총평 반영본. 기존 행동 181·affect 행동 120은 짧고 기계적인

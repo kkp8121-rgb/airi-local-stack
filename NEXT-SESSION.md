@@ -1,5 +1,36 @@
 # AIRI 다음 세션 안내
 
+> **2026-08-24 16:33 KST 최우선 진입점 — E2-C1 NO_WINNER 진단 완료, 가드+채점기 수정
+> SHIPPED, 다음은 E2-C2 설계:** E2-C1 36-report blind matrix는 `winner=null`로
+> 끝났다(score는 최고지만 `invented_handle` 위반 28→40→53으로 학습할수록 악화, hard/
+> legacy/perfect-rate 13개 게이트 전부 실패). 사용자 승인 goal로 원인을 진단한 결과,
+> 53건 중 47건(89%)은 실제 memory 회수가 정확했는데 채점기가 그 근거를 볼 수 없어
+> 오분류한 경우였다 — 모델이 이름을 지어낸 게 아니었다. 이어서 forensic 재검토로 더
+> 정밀하게 나눠 보니, 문법적으로 사람을 부르는 형태(-님 vocative)는 53건 중 7건(13%)뿐
+> 이고 나머지 46건(87%)은 회수된 이름을 그냥 일반 명사처럼 쓴 경우였다 — 이 비중이
+> 가드와 채점기 수정의 실제 담당 범위를 결정했다.
+>
+> 사용자의 "1과 2함께" 지시로 신규 `ollama-proxy/handle_grounding_guard.py`(기본 off,
+> `AIRI_HANDLE_GROUNDING_GUARD`)를 구현했다: 이번 턴 실제 근거 풀(유저 발화+브리핑+
+> memory 회수+journal)을 한 번 계산해 (1) -님 vocative 호칭만 좁게 스트립·치환하고
+> (2) 그 계산의 memory/journal 부분을 기존 in-band `airi_moderation` SSE 신호로 항상
+> 노출한다. `run_broadcast_chat_ab.py`가 캡처하고 `run_broadcast_sim.py`가 roster
+> 부분일치로 `fact_tokens`에 합친다 — `invented_handle` 게이트 정의(무엇이 위반인가)는
+> 그대로, 판정에 쓰는 근거 범위만 넓혔다. 프록시 flag가 off면 완전 no-op(시뮬레이터
+> union도 자동 무동작), 실제 버그 1건(flag-off 경로에서도 속성 조기 접근으로
+> AttributeError → 370개 중 62 FAIL/6 ERROR)과 이중 flag monkeypatch 위험 1건을 구현
+> 중 발견·수리했다. 검증: 신규 모듈 16 + 프록시 373(ON/OFF/grounded 통합 3 포함) +
+> 시뮬레이터/코드체인 88+85 + blind commitment 6 전부 pass, `test-current-checkpoint.ps1`
+> PASS, work-continuity PASS, diff-check 0. fix `a0020dd` + docs 3개 commit으로
+> `59d1836`까지 push, HEAD/local/remote exact 확인.
+>
+> **다음 세션 진입점 순서는 그대로 4개다** (아래 참조). GPU 학습은 아직 없다 —
+> 이 배치는 순수 코드/채점기 수정이었다. E2-C1의 학습 계약(`AIRI-E2-C1-FROZEN-
+> CONTRACT-2026-08-24.md` §1-10: correction 480/replay 200/mixture 680, 512/32,
+> LR 1e-5 등)은 변경되지 않았다 — E2-C2는 그 계약을 재검토해서 만드는 **새** 후보이고,
+> **새 blind가 필요하다(v1/v2 모두 이미 소비돼 재사용 금지)**. 상세는 handoff `-7`,
+> frozen contract `12`, ROADMAP-LOG 2026-08-24 최신 두 배치.
+>
 > **2026-08-24 03:24 KST 검토 PC 최우선 진입점 — E2-C1 ADAPTER-INIT OFFLINE PASS / PUBLISHED:**
 > latest Goal은 E2 adapter weight를 초기값으로 쓰고 optimizer/scheduler/RNG/cursor는
 > 새로 시작하는 `E2-C1` 교정 후보다. correction 480, v4 replay 200, mixture 680과

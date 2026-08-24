@@ -363,3 +363,33 @@ error로 exit 1이었다. 둘 다 mutation 0/비권위였고 corrected PASS가 �
 결론: current data/evaluation contract의 freeze와 repository publication gate는 PASS했다.
 remaining blocker/다음 gate는 trainer adapter-initialization seam의 read-only 감사와,
 필요한 경우 최소 구현·fault 회귀의 검증·commit/push다. 별도 intent 전에는 GPU를 시작하지 않는다.
+
+## 12. 2026-08-24 16:33 KST 핸들 grounding 가드 + 채점기 신호 — §11 순서 ①②의 결과
+
+§11이 적은 다음 순서 중 ①(원문 진단)·②(결정론 런타임 가드)를 완료했다. 이 절은 §1-10의
+동결 학습 계약(correction 480 + v4 replay 200 + mixture 680, exact dataset SHA, split/
+seed/step/LR/scheduler/checkpoint)을 **바꾸지 않는다** — E2-C1은 여전히 여기 적힌 그대로
+학습됐고, 아래는 그 학습이 끝난 뒤 채점·서빙 경로에 더한 별도 코드 변경이다.
+
+①의 결과: invented_handle 53건은 순수 날조 0, 재호명(실제 memory 회수) 47건(89%), 렌더러
+되먹임 0이었다. 구현 착수 전 그 47건을 문법적으로 다시 훑으니 vocative 접미사(-님) 직후에
+handle이 오는 경우는 7/53(13%)뿐이고 나머지 46/53(87%)은 회수된 이름을 일반 명사로 쓴
+경우였다 — §9가 적은 "roster/context에 없는 한국어 인명을 탐지해 제거"라는 표현은 프로덕션에
+roster가 없어(표시 이름이 프롬프트 재료에서 의도적으로 빠짐) 문자 그대로는 불가능함이
+드러났다. ②는 그래서 사용자 승인("1과 2함께")으로 두 갈래로 나눠 구현했다: (1)
+`ollama-proxy/handle_grounding_guard.py`(기본 `AIRI_HANDLE_GROUNDING_GUARD=off`)가 이번
+턴 실제 근거 풀(유저 발화+브리핑+memory 회수+journal)을 계산해 -님 vocative만 좁게
+가드(13% 커버), (2) 그 계산의 memory/journal 부분을 기존 in-band `airi_moderation` SSE
+신호로 항상 노출해 `run_broadcast_sim.py`가 roster 부분일치로 `fact_tokens`에 합침(실제
+no_winner 원인이던 87% 커버) — `invented_handle` 게이트 정의는 불변, 판정 입력 범위만
+확장했다. 구현 중 실제 버그 1건(flag-off 경로 AttributeError, 370개 중 62 FAIL/6 ERROR로
+재현)과 이중 flag monkeypatch 위험 1건을 발견·수리하고 회귀 테스트로 고정했다.
+
+검증: 신규 모듈 16 + `test_ollama_proxy.py` 373(신규 ON/OFF/grounded 통합 3 포함) +
+시뮬레이터/코드체인 88+85 + blind commitment 6 전부 pass, `test-current-checkpoint.ps1`
+PASS, work-continuity PASS, diff-check 0. commit `a0020dd`(fix) + docs 3개로
+`59d1836`까지 origin/main push, HEAD/local/remote exact 확인.
+
+③(가드 반영 후 남는 축의 E2-C2)은 아직 시작하지 않았다. 다음 gate는 이 진단 근거로
+학습량/LR/correction:replay 비율을 재검토한 새 후보 설계이며, 반드시 새 retained blind가
+필요하다 — v1(영어 결함)·v2(이번에 소비) 모두 재사용 금지.

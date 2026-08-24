@@ -7,6 +7,21 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
+> **2026-08-24 16:33 KST 진단 완료 + 핸들 grounding 가드/채점기 신호 SHIPPED:**
+> no_winner 원인은 e2-c1 자체가 아니라 채점기 사각지대였다 — invented_handle 53건 중
+> 47건(89%)이 실제 memory 회수였고, 그중 vocative(-님) 형태는 7건(13%)뿐, 46건(87%)은
+> 일반 명사 사용이었다(forensic 재검토로 확정, 프로덕션은 roster가 없어 문법 신호
+> 외에 handle을 식별 못 함). 사용자 "1과 2함께" 승인으로 신규
+> `handle_grounding_guard.py`(기본 off)가 이번 턴 실제 근거 풀을 한 번 계산해 -님
+> vocative만 좁게 가드하고, 그 계산의 memory/journal 부분을 기존 in-band SSE 신호로
+> 항상 노출 — 시뮬레이터가 roster 부분일치로 `fact_tokens`에 합쳐 게이트 정의는
+> 그대로 두고 판정 입력 범위만 넓힌다. 구현 중 실제 버그 1건 + 이중 flag 위험 1건을
+> 잡아 회귀 테스트로 고정. 신규 16 + 프록시 373 + 시뮬레이터/코드체인 88+85 + blind
+> commitment 6 전부 pass, `test-current-checkpoint.ps1`/work-continuity PASS. commit
+> `a0020dd`(fix)+docs 3개로 `59d1836`까지 push. E2-C1 학습 계약(§frozen 1-10)은
+> 불변 — 다음은 이 근거로 학습량/LR을 재검토한 **E2-C2**를 새 blind로 설계하는 것.
+> 상세는 frozen contract §12·handoff §-7.
+>
 > **2026-08-24 15:14 KST E2-C1 36-report blind matrix 결과 — no_winner:** 한국어로 재봉인한
 > blind v2로 baseline/e2/e2-c1 36 reports를 완주했다. score는 e2-c1 0.244(최고)지만
 > `invented_handle` 위반이 28→40→**53**으로 학습할수록 악화해 13개 hard/legacy/perfect-rate
@@ -470,10 +485,16 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   실행 불능이던 결함 수리 후) 36/36 완주. score e2-c1 0.244(최고)·e2 0.225·baseline 0.218,
   additive 4/5 축 방향 개선하나 전부 절대 최소선 미달. `invented_handle` 위반 28/40/53으로
   후보가 최악 — hard/legacy/perfect-rate 13개 게이트 전부 실패. `adoption_authorized=false`
-- [ ] invented_handle 53건 원문 진단(날조/재호명/렌더러 되먹임 분류) — blind 채점 완료라
-  열람 가능
-- [ ] roster 밖 한국어 인명을 걸러내는 결정론 런타임 가드 설계·구현
-- [ ] 가드 적용 후 남는 축은 학습량/LR 재검토한 E2-C2를 새 retained blind로 재도전
+- [x] invented_handle 53건 원문 진단 완료: 순수 날조 0, 재호명(실제 memory 회수) 47건
+  (89%), 그중 -님 vocative 7건(13%)·일반 명사 사용 46건(87%), 렌더러 되먹임 0
+- [x] **핸들 grounding 가드 + 채점기 신호 구현·SHIPPED (2026-08-24 16:33,
+  commit `a0020dd`+docs → `59d1836`):** roster가 없는 프로덕션에서는 문법
+  신호(-님 vocative)만 좁게 가드하고, 실제 no_winner 원인이던 87%(일반 명사 사용)는
+  채점기 쪽에 memory/journal 근거를 노출해 `fact_tokens`로 합치는 방식으로 처리 —
+  게이트 정의는 불변, 판정 입력 범위만 확장. 프록시 flag 기본 off, 신규 16 + 프록시
+  373 + 시뮬레이터 88+85 전부 pass
+- [ ] 가드+채점기 신호 반영 후, 학습량/LR/correction:replay 비율을 재검토한 E2-C2를
+  새 retained blind(v1/v2 재사용 금지)로 재도전
 - [ ] T3(v4)·E2-C1(blind v2) 모두 승자 0이므로 3 seed × 500 turn full-stack live campaign
   계속 차단
 - [~] T3 terminal 실패 aggregate·receipt·hash와 E1/E2 원본은 제출했다. 실제 승자 응답·

@@ -1,8 +1,11 @@
 # AIRI Codex GPU 인수인계 — broadcast continuity v4
 
-갱신: 2026-08-24 03:19 KST (파일명은 현행 GPU SSoT 식별자로 유지)
+갱신: 2026-08-24 16:33 KST (파일명은 현행 GPU SSoT 식별자로 유지)
 
-상태: **E2-C1 TRAINED/PACKAGED, BLIND MATRIX NO_WINNER (2026-08-24 15:14) — 아래 -6 참조.
+상태: **E2-C1 NO_WINNER 진단 완료, 핸들 GROUNDING 가드+채점기 신호 SHIPPED
+(2026-08-24 16:33) — 아래 -7 참조. E2-C1 학습 계약 자체는 불변, GPU 재학습(E2-C2)은
+아직 미실행.
+이전 스냅샷: E2-C1 TRAINED/PACKAGED, BLIND MATRIX NO_WINNER (2026-08-24 15:14) — 아래 -6 참조.
 이전 스냅샷: ACTIVE, E2-C1 ADAPTER-INIT OFFLINE PASS — PUBLISHED. K=3 controlled GPU와 authoritative E2
 1,600/1,600, E1/E2 merge·BF16/Q4_K_M package는 완료·미채택이다. authoritative T3는
 baseline/E1/E2 각 12, 총 36 reports와 두 comparator까지 실행했으나 두 comparison이 모두
@@ -34,6 +37,61 @@ hard gate 완화, 운영 서비스 모델/태그 변경·외부 provider/extract
 운영 승격이며, 운영 채택은 campaign 결과 묶음을 본 사용자의 별도 승인이다.
 (이전 08-23 `/goal`: 저장소 구현·검증, GPU 학습, 병합·패키징, 로컬 서비스, T3·캠페인,
 milestone commit/push 승인 — 이 문단으로 대체.)
+
+## -7. 2026-08-24 16:33 KST 핸들 grounding 가드 + 채점기 신호 구현 — SHIPPED
+
+-6의 다음 순서 ①②를 사용자 승인 goal("1과 2함께")로 완료했다.
+
+**① invented_handle 53건 원문 진단**: 순수 날조 0건, 재호명(실제 memory 회수) 47건
+(89%), 렌더러 되먹임 0건 — 모델이 이름을 지어낸 게 아니라 라이브 memory 검색이
+정확히 회수한 과거 시청자를 언급했는데 채점기 `fact_tokens_used`가 director의 손수
+브리핑만 알고 memory retrieval 존재를 몰라 발명으로 오채점했다. 구현 착수 전 이
+47건을 문법적으로 다시 훑어 -7 설계를 정밀화했다: vocative 접미사(-님) 직후에
+handle이 오는 경우는 7/53(13%)뿐이고, 나머지 46/53(87%)은 "배접천부터 꺼내야 해"처럼
+일반 명사로 쓰였다 — 이 비중이 가드와 채점기 수정 각각의 실제 담당 범위를 정했다.
+
+**② 결정론 가드 설계 반영**: 프로덕션은 roster(등록된 시청자 handle 목록)가 없다 —
+표시 이름을 프롬프트 재료에서 의도적으로 뺀 설계(chat-ingress 프라이버시 경계)라,
+문법 신호 없이는 어떤 한국어 단어가 "handle"인지 식별할 방법이 없다. 그래서 -6이
+적었던 "roster 밖 한국어 인명을 걸러내는 가드"는 문자 그대로는 프로덕션에서 불가능
+했고, 실제로는 두 갈래로 나눠 구현했다:
+
+1. **런타임 가드** (`ollama-proxy/handle_grounding_guard.py`, 기본
+   `AIRI_HANDLE_GROUNDING_GUARD=off`): 이번 턴 실제 근거 풀(유저 발화+브리핑+memory
+   회수+journal)을 한 번 계산해 -님 vocative 호칭만 좁게 검사 — 근거에 없으면 안전한
+   호칭으로 치환한다. 13%만 커버하는 좁은 범위이지만, 프로덕션에서 안전하게 만들 수
+   있는 최대치다.
+2. **채점기 신호** (`run_broadcast_chat_ab.py`/`run_broadcast_sim.py`): 같은 근거 풀
+   계산의 memory/journal 부분(브리핑 계층에는 없던, 채점기가 원래 못 보던 부분만)을
+   기존 in-band `airi_moderation` SSE 신호로 항상 노출한다. 시뮬레이터가 roster
+   handle의 부분일치를 찾아 `fact_tokens`에 합친다 — 실제 no_winner의 87% 원인을
+   여기서 처리한다. `invented_handle` 게이트의 정의(무엇이 위반인가)는 바꾸지
+   않았고, 그 판정이 보는 근거 범위만 정확하게 넓혔다.
+
+프록시 flag가 off면 완전 no-op이고(시뮬레이터 쪽 union도 자동 무동작), 두 신호
+모두 하나의 grounding 계산에서 나온다(사용자 "1과 2함께" 지시).
+
+**구현 중 발견·수리한 실제 결함 2건**: (a) `build_grounding_pools`가 flag-off
+경로에서도 호출부가 `_memory_result.block` 속성을 먼저 꺼내 넘기다가 RetrievalResult가
+아닌 테스트 자리표시자에서 AttributeError로 `stream_local_with_ack` 전체가 깨짐
+(수리 전 `test_ollama_proxy.py` 370개 중 62 FAIL/6 ERROR로 재현) — memory_result
+원본을 그대로 넘기고 flag 확인 뒤에만 getattr로 읽도록 고쳤다. (b) `from ... import
+HANDLE_GROUNDING_GUARD_ENABLED`가 `ollama_proxy`와 `handle_grounding_guard`에 독립
+사본을 만들어 monkeypatch 불일치 위험이 있었다 — `import handle_grounding_guard`
+qualified 접근으로 단일 소스화했다. 둘 다 회귀 테스트로 고정.
+
+**검증**: 신규 모듈 단위 16 tests, `test_ollama_proxy.py` 373(ON/OFF/grounded 통합 3건
+포함, 이전 370 전부 유지) 전부 pass, `run_broadcast_sim`/`compare_e2c1_blind`/
+`compare_broadcast_t3` 88 pass+1 skip, `run_broadcast_rehearsal` 85 pass(SSE 신호 캡처
+회귀 2건 포함), `test_e2_c1_blind_commitment` 6 pass, `test-current-checkpoint.ps1`
+PASS, work-continuity PASS, `git diff --check` 0. commit `a0020dd`(fix) + docs
+3개로 `59d1836`까지 origin/main push, HEAD/local/remote exact 확인.
+
+**E2-C1 학습 계약은 이 배치로 바뀌지 않았다** — `AIRI-E2-C1-FROZEN-CONTRACT-2026-08-24.md`
+§1-10(correction 480/replay 200/mixture 680, 512/32 microsteps, LR 1e-5 등)은 그대로
+frozen이다. 다음 gate는 이 진단 근거로 학습량/LR/correction:replay 비율을 재검토한
+**E2-C2** 설계이고, 반드시 **새** retained blind가 필요하다(v1/v2 둘 다 이미
+소비돼 재사용 금지). GPU/서비스는 idle, 관련 PID 0.
 
 ## -6. 2026-08-24 E2-C1 36-report blind matrix 결과 — no_winner, 다음 순서 확정
 

@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 16:33:00 +09:00"
-checkpoint_id: "20260824-163300-handle-grounding-guard-pushed"
+updated_at_kst: "2026-08-24 16:46:00 +09:00"
+checkpoint_id: "20260824-164600-docs-refresh-and-next-session-goal-handoff"
 goal_status: "active"
-authorization: "user-goal-2026-08-24: repository-gpu-unlimited-training-packaging-36-report-campaign-on-winner-e2-c2-on-no-winner-local-services-t3-readonly-diagnosis-t05-sample-synthesis-commit-push-authorized; forbidden: post-blind-target-fixture-threshold-seed-change, blind-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-on, speaker-126-operational-promotion; operational-adoption-forbidden-until-separate-user-approval"
-active_phase: "e2-c2-design-pending"
-git_head: "1ba11cd889a78b9ac4f594df76c8ebc092a17e1a"
-worktree_state: "HEAD-local-remote-exact-1ba11cd; clean; matrix-fully-idle-PID-0; work-continuity-contract-PASS; test-current-checkpoint-PASS"
+authorization: "user-goal-2026-08-24: repository-gpu-unlimited-training-packaging-36-report-campaign-on-winner-e2-c2-on-no-winner-local-services-t3-readonly-diagnosis-t05-sample-synthesis-commit-push-authorized; forbidden: post-blind-target-fixture-threshold-seed-change, blind-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-on, speaker-126-operational-promotion; operational-adoption-forbidden-until-separate-user-approval; diagnosis+guard phase (this batch) complete — recommend a fresh explicit /goal before E2-C2 GPU work even though this authorization already names e2-c2-on-no-winner"
+active_phase: "e2-c2-design-pending-new-goal"
+git_head: "59d18368c623e064948694f26ea1d6a8d6bef4a4"
+worktree_state: "HEAD-local-remote-exact-59d1836-before-this-docs-batch; docs-refresh-batch-in-flight; matrix-fully-idle-PID-0; work-continuity-contract-PASS; test-current-checkpoint-PASS"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
@@ -22,6 +22,22 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 16:46 KST **문서 전면 갱신 + 다음 세션 /goal 핸드오프 준비**: `59d1836`
+  (핸들 grounding 가드+채점기 신호 push) 이후 진단+가드 phase가 완료되어, 사용자 요청대로
+  관련 문서 5종을 이 배치로 갱신한다 — `NEXT-SESSION.md`(새 최우선 진입점 블록),
+  `AIRI-ROADMAP-STATUS.md`(banner + §5 체크리스트: 진단·가드 항목 `[x]`, 설명을 실제
+  구현(89%/13%/87% 분할)에 맞게 정정), `AIRI-CODEX-HANDOFF-2026-08-21.md`(상태줄 +
+  신규 `## -7.` 섹션), `AIRI-E2-C1-FROZEN-CONTRACT-2026-08-24.md`(신규 `## 12.` — §1-10
+  학습 계약은 불변임을 명시), `AIRI-CURRENT-DOCS-INDEX-2026-08-10.md`(최종 현행화 블록 +
+  관련 두 항목 재기술). `git diff --check` 0, `test-current-checkpoint.ps1` PASS,
+  work-continuity PASS(이 batch push 전 재확인 예정). 이 receipt 직후 문서 commit+push하고,
+  사용자에게 E2-C2 설계용 `/goal` 명령 문안을 별도로 제시한다. `goal_status`는
+  work-continuity 계약이 `active|paused|complete|blocked` 리터럴만 허용하고 `nextSession/
+  handoff/roadmap` 세 문서 모두에 박힌 `goal_status=active` 리터럴과 정확히 일치해야 해서
+  `active`로 유지한다 — 이미 이 goal 권한 문자열에 `e2-c2-on-no-winner`가 있어 기술적으로는
+  새 `/goal` 없이도 진행 가능하지만, 큰 GPU phase 전 명시적 재확인 관행에 따라 사용자에게
+  새 goal 문안을 권한다. 사용자가 그 goal을 승인하기 전까지 GPU 재학습·새 blind 봉인을
+  시작하지 않는다.
 - 2026-08-24 16:26 KST **핸들 grounding 가드 + 채점기 신호 구현 receipt (감독 직접 구현, opus 위임 3회 529 overload 후 포기)**: `a0020dd`(fix)로 커밋. 구현 전 forensic 재검토로 이전 결론(15:55 receipt)을 갱신한다 — 53건 재호명 텍스트를 문법적으로 다시 훑으니 vocative 접미사(-님/-아/-야) 직후에 handle이 오는 경우는 7/53(13%)뿐이고, 나머지 46/53(87%)은 "배접천부터 꺼내야 해"처럼 일반 명사로 쓰였다 — 두 갈래 조치의 실제 담당 비중이 애초 가정과 다르다: (1) 런타임 가드는 vocative 87%를 못 잡는 좁은 범위(프로덕션은 roster가 없어 문법 신호 외에 handle을 식별할 방법이 없음 — display name이 프롬프트 재료에서 의도적으로 빠져 있음)이고, (2) 채점기 신호가 실제로 no_winner 원인이던 87%를 담당한다. 설계를 이 증거에 맞춰 통합: 신규 `ollama-proxy/handle_grounding_guard.py`(`AIRI_HANDLE_GROUNDING_GUARD` 기본 off)가 이번 턴 실제 근거 풀(유저 발화+브리핑+memory 회수+journal)을 한 번 계산해 ①-님 vocative만 좁게 스트립·치환하고 ②그 계산의 memory/journal 부분(브리핑 계층에는 없던, 그레이더가 원래 못 보던 부분만)을 항상 기존 in-band `airi_moderation` SSE 신호에 실어 보낸다. `ollama_proxy.py`는 `prepare_openai_sse_dialogue`에 kwarg 2개를 더하고 `stream_local_with_ack`의 실제 모델-생성 두 지점(early-safe-sentence·main dialogue)에서만 사용 — 템플릿/폴백 문구는 안 건드림. `run_broadcast_chat_ab.py`의 SSE 델타 파서가 `airi_moderation.handle_grounding`을 `record`로 끌어올리고, `run_broadcast_sim.py`가 그 memory_pool에서 roster handle 부분일치를 찾아 `fact_tokens`에 합친다 — 게이트 정의(무엇이 위반인가)는 그대로, 판정 입력 범위만 넓힘, 프록시 플래그가 off면 완전 no-op(시뮬레이터 쪽 union도 자동 무동작). 실제 버그 1건 발견·수정: `build_grounding_pools`가 flag-off 경로에서도 호출부가 `_memory_result.block`을 미리 꺼내 넘기다가 RetrievalResult 아닌 자리표시자에서 AttributeError로 `stream_local_with_ack` 전체를 깨뜨림(370개 중 62 FAIL/6 ERROR) — memory_result 원본을 그대로 넘기고 flag 확인 뒤에만 getattr로 읽도록 고침, 재현 회귀 테스트 추가. 이중 플래그 위험도 하나 고침: `from ... import HANDLE_GROUNDING_GUARD_ENABLED`가 두 모듈에 독립 사본을 만들어 monkeypatch 불일치를 낳을 수 있어 `import handle_grounding_guard` qualified 접근으로 단일 소스화. 검증: 신규 모듈 단위 16 tests, `test_ollama_proxy.py` 370(+3 신규 ON/OFF/grounded 통합 테스트)=373 전부 pass(WindowsApps python 3.14, httpx/fastapi 보유 — 리포 실사용 venv 2종엔 둘 다 없어 부적합했음), `run_broadcast_sim`/`compare_e2c1_blind`/`compare_broadcast_t3` 88 pass+1 skip, `run_broadcast_rehearsal` 85 pass(신규 SSE 시그널 캡처 회귀 2건 포함), `test_e2_c1_blind_commitment` 6 pass(훈련 venv pytest, 무관 확인), `test-current-checkpoint.ps1` PASS, `git diff --check` 0. CI shard에 `test_handle_grounding_guard.py` 등록. 다음: 이 receipt를 docs 커밋으로 push, push 후 HEAD==origin/main 확인, work-continuity 계약 재확인 후 E2-C2 설계로 진행(신규 blind 필요, v1/v2 재사용 금지 유지).
 - 2026-08-24 16:10 KST **사용자 결정: (1)+(2) 함께 진행 + 구현 intent**: 사용자가 런타임 가드와
   채점기 보정을 동시에 승인했다(goal의 "1과 2함께"). 감독이 직접 코드 조사: `memory_runtime.
