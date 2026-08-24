@@ -155,6 +155,7 @@ jobs:
               ollama-proxy/eval/broadcast_chat/test_run_broadcast_rehearsal.py
               ollama-proxy/eval/broadcast_sim/test_broadcast_sim.py
               ollama-proxy/eval/broadcast_sim/test_compare_broadcast_t3.py
+              ollama-proxy/eval/broadcast_sim/test_compare_e2c1_blind.py
               ollama-proxy/eval/broadcast_sim/test_e2_c1_blind_commitment.py
               ollama-proxy/eval/broadcast_sim/test_long_broadcast_continuity.py
               ollama-proxy/eval/broadcast_sim/test_third_long_broadcast_heldout.py

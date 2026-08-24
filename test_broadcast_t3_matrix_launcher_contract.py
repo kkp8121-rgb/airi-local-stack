@@ -9,7 +9,9 @@ ROOT = Path(__file__).resolve().parent
 SCRIPT = ROOT / 'run-airi-broadcast-t3-matrix.ps1'
 
 
-class T3LauncherContract(unittest.TestCase):
+class LauncherHarness:
+    """Shared offline fixtures for both matrix profiles."""
+
     def manifest(self, shuffled=False, duplicate=False):
         arms = [
             {'name': 'baseline', 'tag': 'base:one', 'digest': 'a' * 64},
@@ -66,6 +68,21 @@ class T3LauncherContract(unittest.TestCase):
             'picks': [{'turn_index': 7}],
         }
 
+    def blind_manifest(self, legacy_arms=False):
+        if legacy_arms:
+            return self.manifest()
+        arms = [
+            {'name': 'baseline', 'tag': 'base:one', 'digest': 'a' * 64},
+            {'name': 'e2', 'tag': 'e2:one', 'digest': 'b' * 64},
+            {'name': 'e2-c1', 'tag': 'e2c1:one', 'digest': 'c' * 64},
+        ]
+        return {'schema_version': 'airi.broadcast-sim-t3-model-manifest.v2', 'arms': arms}
+
+    def blind_tags(self):
+        return {'models': [{'name': 'base:one', 'digest': 'a' * 64},
+                           {'name': 'e2:one', 'digest': 'b' * 64},
+                           {'name': 'e2c1:one', 'digest': 'c' * 64}]}
+
     def invoke(self, directory, manifest, tags, *extra):
         model, tag_file, out = directory/'models.json', directory/'tags.json', directory/'out'
         model.write_text(json.dumps(manifest), encoding='utf-8')
@@ -75,6 +92,8 @@ class T3LauncherContract(unittest.TestCase):
                    '-OllamaTagsFile', str(tag_file), *extra]
         return subprocess.run(command, cwd=ROOT, text=True, capture_output=True), out
 
+
+class T3LauncherContract(LauncherHarness, unittest.TestCase):
     def test_invalid_arms_fail_before_output(self):
         with tempfile.TemporaryDirectory() as temp:
             result, out = self.invoke(Path(temp), {'schema_version': 'airi.broadcast-sim-t3-model-manifest.v2', 'arms': self.manifest()['arms'][:2]}, self.tags(), '-PreflightOnly')
@@ -132,7 +151,7 @@ class T3LauncherContract(unittest.TestCase):
                          "$env:GPT_SOVITS_STREAMING_MODE = '2'",
                          "$env:GPT_SOVITS_MIN_CHUNK_LENGTH = '16'",
                          'Assert-TtsHealth', 'Test-ExactBoolean',
-                         '[int]$_.ParentProcessId -eq $PID',
+                         'Get-OwnedPortKey', "ProcessId = $ownerProcessId",
                          'Stop-Process -Id $ownerProcessId -Force -PassThru',
                          'WaitForExit(10000)',
                          "foreach ($key in $plannedKeys)",
@@ -231,6 +250,79 @@ class T3LauncherContract(unittest.TestCase):
                 '-ReportPlanFixtureFile', str(plan),
             )
             self.assertNotEqual(result.returncode, 0)
+
+
+class E2C1BlindProfileContract(LauncherHarness, unittest.TestCase):
+    """The e2c1 profile is fail-closed offline: its blind bodies live outside the repo."""
+
+    def test_e2c1_requires_blind_root(self):
+        with tempfile.TemporaryDirectory() as temp:
+            result, out = self.invoke(Path(temp), self.blind_manifest(), self.blind_tags(),
+                                      '-PreflightOnly', '-MatrixProfile', 'e2c1')
+            self.assertNotEqual(result.returncode, 0); self.assertFalse(out.exists())
+
+    def test_blind_root_is_rejected_by_the_t3_profile(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp); blind = path/'blind'; blind.mkdir()
+            result, out = self.invoke(path, self.manifest(), self.tags(), '-PreflightOnly',
+                                      '-BlindRoot', str(blind))
+            self.assertNotEqual(result.returncode, 0); self.assertFalse(out.exists())
+
+    def test_e2c1_rejects_the_t3_arm_set(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp); blind = path/'blind'; blind.mkdir()
+            result, out = self.invoke(path, self.blind_manifest(legacy_arms=True), self.tags(),
+                                      '-PreflightOnly', '-MatrixProfile', 'e2c1',
+                                      '-BlindRoot', str(blind))
+            self.assertNotEqual(result.returncode, 0); self.assertFalse(out.exists())
+
+    def test_e2c1_fails_closed_on_an_unbound_blind_root(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp); blind = path/'blind'; blind.mkdir()
+            (blind/'identity_unknown_and_donation_ritual.json').write_text('{}', encoding='utf-8')
+            result, out = self.invoke(path, self.blind_manifest(), self.blind_tags(),
+                                      '-PreflightOnly', '-MatrixProfile', 'e2c1',
+                                      '-BlindRoot', str(blind))
+            self.assertNotEqual(result.returncode, 0); self.assertFalse(out.exists())
+
+    def test_launcher_parses_and_binds_the_frozen_e2c1_inputs(self):
+        ast = subprocess.run(
+            ['powershell', '-NoProfile', '-Command',
+             "$e=$null;$t=$null;"
+             "[void][Management.Automation.Language.Parser]::ParseFile("
+             "(Resolve-Path './run-airi-broadcast-t3-matrix.ps1'),[ref]$t,[ref]$e);"
+             "if ($e) { $e | ForEach-Object { $_.Message }; exit 1 }"],
+            cwd=ROOT, text=True, capture_output=True)
+        self.assertEqual(ast.returncode, 0, ast.stdout + ast.stderr)
+        source = SCRIPT.read_text(encoding='utf-8')
+        for required in ("[ValidateSet('t3','e2c1')] [string]$MatrixProfile = 't3'",
+                         '[string]$BlindRoot',
+                         "The e2c1 profile requires -BlindRoot.",
+                         "@('baseline','e2','e2-c1')",
+                         'airi_e2_c1_blind_commitment.json',
+                         'airi_e2_c1_metric_policy.json',
+                         "airi-e2-c1-blind-freeze-20260824-000430",
+                         'b664d162840fa326312638a9b3e504e704e9db2be33208e23ac66bedc31def58',
+                         'compare_e2c1_blind.py', '--reports-dir', '--commitment',
+                         '--environment-attestation', '--expected-model-manifest-sha256',
+                         "airi.e2-c1-environment-attestation.v1",
+                         "airi.e2-c1-blind-comparison.v1",
+                         'blind_commitment_sha256=$commitmentSha256'):
+            self.assertIn(required, source)
+
+    def test_matrix_profile_is_a_two_value_validate_set(self):
+        query = subprocess.run(
+            ['powershell', '-NoProfile', '-Command',
+             "$e=$null;$t=$null;"
+             "$ast=[Management.Automation.Language.Parser]::ParseFile("
+             "(Resolve-Path './run-airi-broadcast-t3-matrix.ps1'),[ref]$t,[ref]$e);"
+             "$p=$ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -ceq "
+             "'MatrixProfile' };"
+             "($p.Attributes | Where-Object { $_.TypeName.FullName -eq 'ValidateSet' }"
+             ").PositionalArguments.Value -join ','"],
+            cwd=ROOT, text=True, capture_output=True)
+        self.assertEqual(query.returncode, 0, query.stderr)
+        self.assertEqual(query.stdout.strip(), 't3,e2c1')
 
 
 if __name__ == '__main__':

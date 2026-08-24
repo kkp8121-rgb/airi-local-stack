@@ -7,6 +7,10 @@ param(
     [Parameter(Mandatory)] [string]$OutputDir,
     [Parameter(Mandatory)] [string]$ModelManifest,
     [string]$FixtureManifest = (Join-Path $PSScriptRoot 'ollama-proxy\eval\broadcast_sim\t3_fixture_manifest_v2.json'),
+    # 't3' is the pinned baseline/e1/e2 matrix.  'e2c1' runs the frozen E2-C1
+    # blind evaluation: baseline/e2/e2-c1 over the sealed external blind root.
+    [ValidateSet('t3','e2c1')] [string]$MatrixProfile = 't3',
+    [string]$BlindRoot = '',
     # Offline contract-test seam; production always performs the localhost lookup.
     [string]$OllamaTagsFile = '',
     [switch]$PreflightOnly,
@@ -184,6 +188,8 @@ function Assert-Report([string]$Path, [object]$Arm, [object]$Fixture, [int]$Seed
 
 # Everything below this line is preflight-only until the manifest and all fixtures validate.
 if (Test-Path -LiteralPath $out) { throw 'OutputDir must not exist: evidence is no-overwrite.' }
+if ($MatrixProfile -ceq 'e2c1' -and -not $BlindRoot) { throw 'The e2c1 profile requires -BlindRoot.' }
+if ($MatrixProfile -cne 'e2c1' -and $BlindRoot) { throw '-BlindRoot is only valid for the e2c1 profile.' }
 if (($OllamaTagsFile -or $HealthFixtureFile -or $ReportFixtureFile -or $ReportPlanFixtureFile) -and -not $PreflightOnly) { throw 'Offline fixture seams are PreflightOnly and forbidden for production runs.' }
 $strictUtf8 = [Text.UTF8Encoding]::new($false, $true)
 $modelManifestBytes = [IO.File]::ReadAllBytes((Get-Item -LiteralPath $ModelManifest -ErrorAction Stop).FullName)
@@ -193,7 +199,10 @@ $armProperties = @($armsDoc.PSObject.Properties.Name | Sort-Object)
 if ($armsDoc.schema_version -cne 'airi.broadcast-sim-t3-model-manifest.v2' -or $armProperties.Count -ne 2 -or $armProperties[0] -cne 'arms' -or $armProperties[1] -cne 'schema_version') { throw 'Model manifest schema or key set is invalid.' }
 $arms = @($armsDoc.arms)
 $armNames = @($arms.name | Sort-Object)
-if ($arms.Count -ne 3 -or @($arms.name | Sort-Object -Unique).Count -ne 3 -or $armNames.Count -ne 3 -or $armNames[0] -cne 'baseline' -or $armNames[1] -cne 'e1' -or $armNames[2] -cne 'e2') { throw 'Model manifest must contain exactly baseline, e1, e2.' }
+$expectedArmNames = if ($MatrixProfile -ceq 'e2c1') { @('baseline','e2','e2-c1') } else { @('baseline','e1','e2') }
+$armNamesMatch = $arms.Count -eq 3 -and @($arms.name | Sort-Object -Unique).Count -eq 3 -and $armNames.Count -eq 3
+if ($armNamesMatch) { for ($i=0; $i -lt 3; $i++) { if ($armNames[$i] -cne $expectedArmNames[$i]) { $armNamesMatch = $false; break } } }
+if (-not $armNamesMatch) { throw "Model manifest must contain exactly $($expectedArmNames -join ', ')." }
 foreach ($arm in $arms) {
     $keys = @($arm.PSObject.Properties.Name | Sort-Object)
     if ($keys.Count -ne 3 -or $keys[0] -cne 'digest' -or $keys[1] -cne 'name' -or $keys[2] -cne 'tag' -or
@@ -203,25 +212,57 @@ foreach ($arm in $arms) {
 }
 if (@($arms.tag | Sort-Object -Unique).Count -ne 3 -or @($arms.digest | Sort-Object -Unique).Count -ne 3) { throw 'T3 model tags and digests must each be distinct.' }
 $arms = @(
-    @($arms | Where-Object { $_.name -ceq 'baseline' }) +
-    @($arms | Where-Object { $_.name -ceq 'e1' }) +
-    @($arms | Where-Object { $_.name -ceq 'e2' })
+    @($arms | Where-Object { $_.name -ceq $expectedArmNames[0] }) +
+    @($arms | Where-Object { $_.name -ceq $expectedArmNames[1] }) +
+    @($arms | Where-Object { $_.name -ceq $expectedArmNames[2] })
 )
-$fixtureManifestBytes = [IO.File]::ReadAllBytes((Get-Item -LiteralPath $FixtureManifest -ErrorAction Stop).FullName)
-$fixtureManifestSha256 = Get-BytesSha256 $fixtureManifestBytes
-$fixturesDoc = $strictUtf8.GetString($fixtureManifestBytes) | ConvertFrom-Json
-$fixtures = @($fixturesDoc.fixtures | Sort-Object creation_order)
-if ($fixtures.Count -ne 3 -or [int]$fixtures[0].creation_order -ne 1 -or [int]$fixtures[1].creation_order -ne 2 -or [int]$fixtures[2].creation_order -ne 3) { throw 'Fixture manifest must contain first/second/third in exact creation order.' }
-$expectedManifestHash='d150bf0d928da565ab1d29885b2eb494e52f806b04d384ed9bbf124609953bd8'; if ($fixtureManifestSha256 -cne $expectedManifestHash) { throw 'Fixture manifest raw SHA-256 differs from the approved T3 manifest.' }
-$expectedCanon = @('0d558c0ce3e019569673ed96f4f171e3464e1e044028e7de6b7ede9d5b8085d6','c2ae8a2db00f8f0ed8bd4ee4d909bde965bcbf18dd359b8dbaf340f4c65a57b1','ddb43f03f88dacff70ebd8a6221274e51348e01e9fe542153139c0330bd52b61')
-$expectedRaw = @('d6cdd694e76ac4017ca1cdebb60ba09c337efa6a1813ce9c00c91b03d4ffcc9c','22692a9d24f25cbb6877c297ffc23c93e7d0a74028ddff5072b899e648583760','4e0f018729857b8f4648496298abf2f358a1ad19098f2927d6ec1356809a9897')
-$seedSets = @(@(11,22,33,20260818),@(11,22,33,20260818),@(44,55,66,20260822))
-for ($i=0; $i -lt 3; $i++) { $f=$fixtures[$i]; $file=Join-Path (Split-Path $FixtureManifest) $f.filename; if ($f.canonical_sha256 -cne $expectedCanon[$i] -or $f.raw_sha256 -cne $expectedRaw[$i] -or -not (Test-Path -LiteralPath $file) -or (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expectedRaw[$i]) { throw 'Fixture manifest hash binding is invalid.' } }
+if ($MatrixProfile -ceq 'e2c1') {
+    # The blind bodies stay outside the repository; only their size and hashes
+    # are read here, and only against the frozen in-repo commitment.
+    $commitmentPath = Join-Path $root 'ollama-proxy\eval\broadcast_sim\fixtures\commitments\airi_e2_c1_blind_commitment.json'
+    $commitmentBytes = [IO.File]::ReadAllBytes((Get-Item -LiteralPath $commitmentPath -ErrorAction Stop).FullName)
+    $commitmentSha256 = Get-BytesSha256 $commitmentBytes
+    $commitment = $strictUtf8.GetString($commitmentBytes) | ConvertFrom-Json
+    if ($commitment.schema_version -cne 'airi.e2-c1-blind-commitment.v1' -or
+        $commitment.root_id -cne 'airi-e2-c1-blind-freeze-20260824-000430' -or
+        [int]$commitment.expected_matrix_reports -ne 36) { throw 'E2-C1 blind commitment schema or root is invalid.' }
+    $blindRootPath = [IO.Path]::GetFullPath((Get-Item -LiteralPath $BlindRoot -ErrorAction Stop).FullName)
+    $fixtures = @($commitment.fixtures)
+    if ($fixtures.Count -ne 3 -or @($fixtures.logical_role | Sort-Object -Unique).Count -ne 3) { throw 'E2-C1 commitment must pin exactly three distinct blind fixtures.' }
+    $fixtureKeys = @($fixtures.logical_role)
+    $expectedCanon = @($fixtures.canonical_sha256)
+    $expectedRaw = @($fixtures.raw_sha256)
+    $commitmentSeeds = @($commitment.seeds)
+    if ($commitmentSeeds.Count -ne 4) { throw 'E2-C1 commitment must pin exactly four seeds.' }
+    $seedSets = @($commitmentSeeds, $commitmentSeeds, $commitmentSeeds)
+    for ($i=0; $i -lt 3; $i++) {
+        $f = $fixtures[$i]; $file = Join-Path $blindRootPath $f.filename
+        $item = Get-Item -LiteralPath $file -ErrorAction Stop
+        if ($item.PSIsContainer -or [long]$item.Length -ne [long]$f.size_bytes -or
+            (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expectedRaw[$i] -or
+            (Get-CanonicalJsonSha256 $file) -cne $expectedCanon[$i]) { throw 'Blind fixture size or hash binding is invalid.' }
+    }
+    $sealedManifestPath = Join-Path $blindRootPath 'sealed_manifest.json'
+    $expectedSealedSha256 = 'b664d162840fa326312638a9b3e504e704e9db2be33208e23ac66bedc31def58'
+    if ((Get-FileHash -LiteralPath $sealedManifestPath -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expectedSealedSha256) { throw 'Sealed blind manifest raw SHA-256 is invalid.' }
+} else {
+    $fixtureManifestBytes = [IO.File]::ReadAllBytes((Get-Item -LiteralPath $FixtureManifest -ErrorAction Stop).FullName)
+    $fixtureManifestSha256 = Get-BytesSha256 $fixtureManifestBytes
+    $fixturesDoc = $strictUtf8.GetString($fixtureManifestBytes) | ConvertFrom-Json
+    $fixtures = @($fixturesDoc.fixtures | Sort-Object creation_order)
+    if ($fixtures.Count -ne 3 -or [int]$fixtures[0].creation_order -ne 1 -or [int]$fixtures[1].creation_order -ne 2 -or [int]$fixtures[2].creation_order -ne 3) { throw 'Fixture manifest must contain first/second/third in exact creation order.' }
+    $expectedManifestHash='d150bf0d928da565ab1d29885b2eb494e52f806b04d384ed9bbf124609953bd8'; if ($fixtureManifestSha256 -cne $expectedManifestHash) { throw 'Fixture manifest raw SHA-256 differs from the approved T3 manifest.' }
+    $expectedCanon = @('0d558c0ce3e019569673ed96f4f171e3464e1e044028e7de6b7ede9d5b8085d6','c2ae8a2db00f8f0ed8bd4ee4d909bde965bcbf18dd359b8dbaf340f4c65a57b1','ddb43f03f88dacff70ebd8a6221274e51348e01e9fe542153139c0330bd52b61')
+    $expectedRaw = @('d6cdd694e76ac4017ca1cdebb60ba09c337efa6a1813ce9c00c91b03d4ffcc9c','22692a9d24f25cbb6877c297ffc23c93e7d0a74028ddff5072b899e648583760','4e0f018729857b8f4648496298abf2f358a1ad19098f2927d6ec1356809a9897')
+    $fixtureKeys = @('1','2','3')
+    $seedSets = @(@(11,22,33,20260818),@(11,22,33,20260818),@(44,55,66,20260822))
+    for ($i=0; $i -lt 3; $i++) { $f=$fixtures[$i]; $file=Join-Path (Split-Path $FixtureManifest) $f.filename; if ($f.canonical_sha256 -cne $expectedCanon[$i] -or $f.raw_sha256 -cne $expectedRaw[$i] -or -not (Test-Path -LiteralPath $file) -or (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expectedRaw[$i]) { throw 'Fixture manifest hash binding is invalid.' } }
+}
 $plannedKeys = @()
 foreach ($arm in $arms) {
-    foreach ($fixture in $fixtures) {
-        foreach ($seed in $seedSets[[int]$fixture.creation_order - 1]) {
-            $plannedKeys += "$($arm.name)-$($fixture.creation_order)-$seed"
+    for ($i=0; $i -lt 3; $i++) {
+        foreach ($seed in $seedSets[$i]) {
+            $plannedKeys += "$($arm.name)-$($fixtureKeys[$i])-$seed"
         }
     }
 }
@@ -251,7 +292,8 @@ if ($PreflightOnly) {
         if ($ReportFixtureIndex -lt 1 -or $ReportFixtureIndex -gt 3) { throw 'Report fixture index must be 1..3.' }
         Assert-Report $ReportFixtureFile @($arms | Where-Object { $_.name -ceq $FixtureArmName })[0] $fixtures[$ReportFixtureIndex - 1] $ReportFixtureSeed $ReportPlanFixtureFile
     }
-    [pscustomobject]@{ runs = 36; run_keys = $plannedKeys; arms = @($arms.name); seed_sets = $seedSets; comparisons = @('baseline-vs-e1','baseline-vs-e2'); common = @{ memory_arm='seeded'; max_tokens=220; timeout_seconds=180; num_ctx=$NumCtx; live_context='on' } } | ConvertTo-Json -Depth 8 -Compress
+    $plannedComparisons = if ($MatrixProfile -ceq 'e2c1') { @('e2c1-blind') } else { @('baseline-vs-e1','baseline-vs-e2') }
+    [pscustomobject]@{ runs = 36; run_keys = $plannedKeys; arms = @($arms.name); seed_sets = $seedSets; comparisons = $plannedComparisons; common = @{ memory_arm='seeded'; max_tokens=220; timeout_seconds=180; num_ctx=$NumCtx; live_context='on' } } | ConvertTo-Json -Depth 8 -Compress
     exit 0
 }
 
@@ -290,24 +332,39 @@ try {
     $env:GPT_SOVITS_MIN_CHUNK_LENGTH = '16'
     [IO.Directory]::CreateDirectory($out) | Out-Null; $created = $true
     foreach ($d in @('evidence','evidence\plans','reports','packets','comparisons','runtime')) { [IO.Directory]::CreateDirectory((Join-Path $out $d)) | Out-Null }
-    foreach ($armDirectory in @('baseline','e1','e2')) {
+    foreach ($armDirectory in $expectedArmNames) {
         [IO.Directory]::CreateDirectory((Join-Path $out ('reports\\' + $armDirectory))) | Out-Null
         [IO.Directory]::CreateDirectory((Join-Path $out ('packets\\' + $armDirectory))) | Out-Null
     }
     $evidenceModelManifest = Join-Path $out 'evidence\model-manifest.json'
-    $evidenceFixtureManifest = Join-Path $out 'evidence\fixture-manifest.json'
     Copy-NoOverwrite $ModelManifest $evidenceModelManifest
-    Copy-NoOverwrite $FixtureManifest $evidenceFixtureManifest
-    foreach ($f in $fixtures) {
-        # Keep fixtures beside their unchanged approved manifest so the evidence
-        # package is directly replayable and source drift cannot affect a later run.
-        Copy-NoOverwrite (Join-Path (Split-Path $FixtureManifest) $f.filename) (Join-Path $out ('evidence\' + $f.filename))
+    if ($MatrixProfile -ceq 'e2c1') {
+        # The sealed blind bodies are copied only into this external OutputDir;
+        # nothing under the repository ever holds them.
+        $evidenceCommitment = Join-Path $out 'evidence\blind-commitment.json'
+        $evidencePolicy = Join-Path $out 'evidence\blind-metric-policy.json'
+        Copy-NoOverwrite $commitmentPath $evidenceCommitment
+        Copy-NoOverwrite (Join-Path $root 'ollama-proxy\eval\broadcast_sim\fixtures\commitments\airi_e2_c1_metric_policy.json') $evidencePolicy
+        Copy-NoOverwrite $sealedManifestPath (Join-Path $out 'evidence\sealed_manifest.json')
+        foreach ($f in $fixtures) { Copy-NoOverwrite (Join-Path $blindRootPath $f.filename) (Join-Path $out ('evidence\' + $f.filename)) }
+        if ((Get-FileHash -LiteralPath $evidenceCommitment -Algorithm SHA256).Hash.ToLowerInvariant() -cne $commitmentSha256 -or
+            (Get-FileHash -LiteralPath (Join-Path $out 'evidence\sealed_manifest.json') -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expectedSealedSha256) {
+            throw 'Retained blind commitment or sealed manifest differs from the preflight bytes.'
+        }
+    } else {
+        $evidenceFixtureManifest = Join-Path $out 'evidence\fixture-manifest.json'
+        Copy-NoOverwrite $FixtureManifest $evidenceFixtureManifest
+        foreach ($f in $fixtures) {
+            # Keep fixtures beside their unchanged approved manifest so the evidence
+            # package is directly replayable and source drift cannot affect a later run.
+            Copy-NoOverwrite (Join-Path (Split-Path $FixtureManifest) $f.filename) (Join-Path $out ('evidence\' + $f.filename))
+        }
+        if ((Get-FileHash -LiteralPath $evidenceFixtureManifest -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expectedManifestHash) {
+            throw 'Retained manifest differs from the preflight bytes.'
+        }
     }
     $retainedModelManifestHash = (Get-FileHash -LiteralPath $evidenceModelManifest -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($retainedModelManifestHash -cne $modelManifestSha256 -or
-        (Get-FileHash -LiteralPath $evidenceFixtureManifest -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expectedManifestHash) {
-        throw 'Retained manifest differs from the preflight bytes.'
-    }
+    if ($retainedModelManifestHash -cne $modelManifestSha256) { throw 'Retained manifest differs from the preflight bytes.' }
     for ($i=0; $i -lt 3; $i++) {
         $retainedFixture = Join-Path $out ('evidence\' + $fixtures[$i].filename)
         $rawBefore = (Get-FileHash -LiteralPath $retainedFixture -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -319,9 +376,10 @@ try {
     }
     $plansByKey = @{}
     $planEvidence = @()
-    foreach ($fixture in $fixtures) {
-        foreach ($seed in $seedSets[[int]$fixture.creation_order - 1]) {
-            $planKey = "$($fixture.creation_order)-$seed"
+    for ($i=0; $i -lt 3; $i++) {
+        $fixture = $fixtures[$i]
+        foreach ($seed in $seedSets[$i]) {
+            $planKey = "$($fixtureKeys[$i])-$seed"
             $planPath = Join-Path $out ('evidence\plans\' + $planKey + '.json')
             $null = & $python (Join-Path $root 'ollama-proxy\eval\broadcast_sim\run_broadcast_sim.py') --fixture (Join-Path $out ('evidence\' + $fixture.filename)) --seed $seed --stream-only --report $planPath
             if ($LASTEXITCODE -ne 0) { throw 'T3 deterministic stream plan generation failed.' }
@@ -343,8 +401,8 @@ try {
     $contractEvidence = @()
     $comparisonEvidence = @()
     foreach ($arm in $arms) {
-        foreach ($fixture in $fixtures) { foreach ($seed in $seedSets[[int]$fixture.creation_order - 1]) {
-            $key = "$($arm.name)-$($fixture.creation_order)-$seed"; $run = Join-Path $out ('runtime\' + $key)
+        for ($i=0; $i -lt 3; $i++) { $fixture = $fixtures[$i]; foreach ($seed in $seedSets[$i]) {
+            $key = "$($arm.name)-$($fixtureKeys[$i])-$seed"; $run = Join-Path $out ('runtime\' + $key)
             [IO.Directory]::CreateDirectory($run) | Out-Null
             $master=New-Capability; $observer=New-Capability; if ($master -ceq $observer) { throw 'Capability collision.' }
             $owners=@{}; $started=[DateTime]::UtcNow
@@ -360,7 +418,7 @@ try {
                 $report=Join-Path $out ('reports\' + $arm.name + '\' + $key + '.json'); $packet=Join-Path $out ('packets\' + $arm.name + '\' + $key + '.md')
                 & $python (Join-Path $root 'ollama-proxy\eval\broadcast_sim\run_broadcast_sim.py') --base-url http://127.0.0.1:11435/v1 --model $arm.tag --memory-arm seeded --contract on --protocol operational --author-format runtime --fixture (Join-Path $out ('evidence\' + $fixture.filename)) --seed $seed --history-turns 8 --max-tokens 220 --timeout 180 --briefing on --briefing-evidence on --acts on --live-broadcast-context on --report $report --packet $packet
                 if ($LASTEXITCODE -ne 0) { throw 'T3 runner failed.' }
-                Assert-Report $report $arm $fixture $seed $plansByKey["$($fixture.creation_order)-$seed"]
+                Assert-Report $report $arm $fixture $seed $plansByKey["$($fixtureKeys[$i])-$seed"]
                 $healthAfter=Invoke-RestMethod 'http://127.0.0.1:11435/health' -TimeoutSec 5; Assert-Health $healthAfter $arm
                 $ttsHealthAfter=Invoke-RestMethod 'http://127.0.0.1:8880/health' -TimeoutSec 5; Assert-TtsHealth $ttsHealthAfter
                 $healthPath = Join-Path $out ('evidence\health-' + $key + '.json')
@@ -396,9 +454,42 @@ try {
         $contractEvidence.Count -ne 36 -or $planEvidence.Count -ne 12) {
         throw 'T3 matrix evidence is not exactly 36 complete runs.'
     }
+    $comparisonFailures = @()
+    if ($MatrixProfile -ceq 'e2c1') {
+        # privacy, localhost_exposure and external_provider_without_opt_in have no
+        # field in the runner's report schema.  Attest exactly what this launcher
+        # verified so the comparator can gate them instead of assuming them.
+        $attestationPath = Join-Path $out 'evidence\environment-attestation.json'
+        Write-JsonNoOverwrite $attestationPath @{
+            schema_version='airi.e2-c1-environment-attestation.v1'
+            root_id=[string]$commitment.root_id
+            run_count=36
+            zero_violations=@{privacy=0;localhost_exposure=0;external_provider_without_opt_in=0}
+            verified_by='run-airi-broadcast-t3-matrix.ps1'
+            evidence=@{chat_provider_local_only=$true;chat_provider_external_approved=$false;external_chat_allowed=$false;external_search_allowed=$false;external_memory_extraction_allowed=$false;loopback_only_endpoints=$true;memory_extraction_listener_absent=$true;stt_listener_absent=$true;per_run_isolated_databases=$true}
+        }
+        $comparison = Join-Path $out 'comparisons\e2c1-blind.json'
+        & $python (Join-Path $root 'ollama-proxy\eval\broadcast_sim\compare_e2c1_blind.py') --reports-dir (Join-Path $out 'reports') --policy $evidencePolicy --commitment $evidenceCommitment --output $comparison --environment-attestation $attestationPath --expected-model-manifest-sha256 $retainedModelManifestHash
+        $comparisonExit = $LASTEXITCODE
+        if (Test-Path -LiteralPath $comparison) {
+            $comparisonEvidence += @{candidate='e2-c1';sha256=(Get-FileHash -LiteralPath $comparison -Algorithm SHA256).Hash.ToLowerInvariant()}
+            try {
+                $verdict = Get-Content -Raw -LiteralPath $comparison -Encoding utf8 | ConvertFrom-Json
+                # A published `no_winner` verdict is a terminal success of the
+                # matrix, not a launcher failure: the human decides what follows.
+                if ($comparisonExit -eq 0 -and $verdict.schema_version -ceq 'airi.e2-c1-blind-comparison.v1' -and
+                    $verdict.status -ceq 'pass' -and (Test-ExactInteger $verdict.report_count 36) -and
+                    (Test-ExactBoolean $verdict.adoption_authorized $false) -and
+                    ($null -eq $verdict.winner -or ($verdict.winner -is [string] -and $verdict.winner))) {
+                    $comparisonStatuses['e2-c1'] = if ($null -eq $verdict.winner) { 'pass-no-winner' } else { 'pass-' + [string]$verdict.winner }
+                } else { $comparisonFailures += 'e2-c1' }
+            } catch { $comparisonFailures += 'e2-c1' }
+        } else { $comparisonFailures += 'e2-c1' }
+        if ($comparisonFailures.Count -ne 0) { throw 'The E2-C1 blind comparator did not publish a valid verdict.' }
+        if ($comparisonEvidence.Count -ne 1 -or $comparisonStatuses.Count -ne 1) { throw 'E2-C1 blind evidence is not exactly one published verdict.' }
+    } else {
     # Run both comparisons after all 36 reports exist.  A failed E1 comparison
     # must not prevent the independent E2 comparison from producing evidence.
-    $comparisonFailures = @()
     foreach ($candidateName in @('e1','e2')) {
         $comparison=Join-Path $out ('comparisons\baseline-vs-' + $candidateName + '.json')
         & $python (Join-Path $root 'ollama-proxy\eval\broadcast_sim\compare_broadcast_t3.py') --base-reports (Join-Path $out 'reports\baseline') --candidate-reports (Join-Path $out ('reports\' + $candidateName)) --fixture-manifest $evidenceFixtureManifest --output $comparison
@@ -421,6 +512,7 @@ try {
         $comparisonStatuses.Count -ne 2 -or $planEvidence.Count -ne 12) {
         throw 'T3 matrix evidence is not exactly 36 runs plus two comparisons.'
     }
+    }
     foreach ($key in $plannedKeys) {
         foreach ($dbName in @('memory.sqlite3','knowledge.sqlite3')) {
             $dbPath = Join-Path $out ('runtime\' + $key + '\' + $dbName)
@@ -436,6 +528,10 @@ try {
                 @{path=$_.FullName.Substring($outputPrefix.Length).Replace('\','/');size=[long]$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
             }
     )
+    if ($MatrixProfile -ceq 'e2c1') {
+        Write-JsonNoOverwrite (Join-Path $out 'summary.json') @{ schema_version='airi.t3-matrix-launcher.v2'; matrix_profile='e2c1'; status='pass'; adoption_authorized=$false; run_count=36; model_manifest_sha256=$retainedModelManifestHash; blind_commitment_sha256=$commitmentSha256; sealed_manifest_sha256=$expectedSealedSha256; blind_root_id=[string]$commitment.root_id; common_settings=@{memory_arm='seeded';max_tokens=220;timeout_seconds=180;num_ctx=$NumCtx;num_gpu=999;live_context='on';tts_reference_embedding_cache=$true;tts_streaming_mode=2;tts_min_chunk_length=16}; models=@($arms | ForEach-Object { @{name=$_.name;tag=$_.tag;digest=$_.digest} }); fixtures=@(0..2 | ForEach-Object { @{logical_role=$fixtureKeys[$_];canonical_sha256=$expectedCanon[$_];raw_sha256=$expectedRaw[$_];seeds=$seedSets[$_]} }); plan_evidence=$planEvidence; health_evidence=$healthEvidence; report_evidence=$reportEvidence; packet_evidence=$packetEvidence; run_contract_evidence=$contractEvidence; comparison_evidence=$comparisonEvidence; runtime_evidence=$runtimeEvidence; comparisons=$comparisonStatuses }
+        return
+    }
     Write-JsonNoOverwrite (Join-Path $out 'summary.json') @{ schema_version='airi.t3-matrix-launcher.v2'; status='pass'; adoption_authorized=$false; run_count=36; model_manifest_sha256=$retainedModelManifestHash; fixture_manifest_sha256=$expectedManifestHash; common_settings=@{memory_arm='seeded';max_tokens=220;timeout_seconds=180;num_ctx=$NumCtx;num_gpu=999;live_context='on';tts_reference_embedding_cache=$true;tts_streaming_mode=2;tts_min_chunk_length=16}; models=@($arms | ForEach-Object { @{name=$_.name;tag=$_.tag;digest=$_.digest} }); fixtures=@($fixtures | ForEach-Object { @{creation_order=$_.creation_order;canonical_sha256=$_.canonical_sha256;seeds=$seedSets[[int]$_.creation_order-1]} }); plan_evidence=$planEvidence; health_evidence=$healthEvidence; report_evidence=$reportEvidence; packet_evidence=$packetEvidence; run_contract_evidence=$contractEvidence; comparison_evidence=$comparisonEvidence; runtime_evidence=$runtimeEvidence; comparisons=$comparisonStatuses }
 } finally {
     Restore-Env AIRI_IMMEDIATE_ACK $previousAck
