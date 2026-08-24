@@ -7,6 +7,14 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-24 E2-C2 durable 본 학습 완료 (1536/96, 3 epochs)
+
+- 21:00 KST (클로드 PC, Fable 감독) root `airi-e2-c2-main-20260824-181203`에서 terminal
+  exit 0/trainer-complete, 1536/96·pending 0, 실측 ~48분. dev loss 3 epoch 단조 하강
+  2.0723→1.8219→**1.6105**(선택 epoch 3; E2-C1 단일 epoch 2.2351 대비 -0.62, 언더트레이닝
+  가설 정합·과적합 신호 없음). adapter model `f3d23950...2efa`. 사용자 지시로 merge/
+  패키징/matrix는 시작하지 않고 GPU idle 대기('게임 끝' 신호 후 재개). trainer PID 0.
+
 ## 2026-08-24 E2-C2 bounded GPU smoke PASS
 
 - 19:10 KST (클로드 PC, Fable 감독) fresh root `airi-e2-c2-smoke-20260824-175116`에서 builder

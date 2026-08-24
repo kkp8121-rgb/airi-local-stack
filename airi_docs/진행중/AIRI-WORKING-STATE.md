@@ -1,10 +1,11 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 19:10:00 +09:00"
-checkpoint_id: "20260824-191000-e2c2-smoke-pass-receipt"
+updated_at_kst: "2026-08-24 21:00:00 +09:00"
+checkpoint_id: "20260824-210000-e2c2-main-training-complete-paused-awaiting-user"
+active_trainer_note: "e2c2 본 학습 terminal complete(1536/96, exit 0). 사용자 지시로 merge/패키징/matrix 진행하지 않고 대기. 재개 신호 = 사용자 '게임 끝' 통지. trainer/runner PID 0, AIRI GPU 워크로드 0"
 goal_status: "active"
 authorization: "user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "e2c2-gpu-smoke"
+active_phase: "e2c2-trained-paused-awaiting-user-game-end"
 git_head: "9a2195b4ec4c9dba9bf449967ce840a8849667d9"
 worktree_state: "HEAD-local-remote-exact-9a2195b(harness batch); dirty: live-state heartbeat + verify_e2_c2 deterministic_validation key (commit with smoke receipt); AIRI-PID-0; trainer 0; GPU idle 479MiB"
 active_trainer_count: 0
@@ -22,6 +23,37 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 21:00 KST **E2-C2 본 학습 terminal receipt + 사용자 지시 대기**: run
+  `e2c2-main-seed42-1536-20260824`(root `airi-e2-c2-main-20260824-181203`)이 terminal exit
+  0/`trainer-complete`, **1536/1536 microsteps·96/96 optimizer steps·pending 0**, rev 614,
+  실측 약 48분, peak CUDA 5,909,909,504 B(E2-C1과 동일 수준). **dev loss가 3 epoch 내내
+  단조 하강**: epoch 1 `2.072321476649235` → epoch 2 `1.8219252664151293` → epoch 3
+  `1.61045854235197`(선택 epoch 3, step 1536). E2-C1의 단일 epoch dev `2.2351` 대비 -0.62 —
+  §11 언더트레이닝 가설과 정합(3 epoch에도 과적합 신호 없음, train loss last3 1.2093).
+  init adapter-weights-only(run_id v4-e2-...074326), fresh-state receipt 존재. adapter:
+  model `f3d23950deb268270e450605c0431b455cac6d573c5781dce883b08c513e2efa`(56,318,520 B),
+  config `1df90712...ccdfa`, artifact-manifest `29763925...a9c9cb`(2,955 B), report
+  `c2678675...c35585`(2,352 B). trainer/runner PID 0, AIRI GPU 워크로드 0(잔여 VRAM
+  사용은 사용자 측 프로세스). **사용자 지시(20:27)에 따라 merge/패키징/matrix는 시작하지
+  않는다** — 이 receipt를 docs commit/push하고 `게임 끝` 신호까지 대기. 재개 시 순서:
+  safe merge → BF16/Q4_K_M 패키징 → 평가 태그 → 36-report matrix(guard=on).
+- 2026-08-24 20:27 KST **사용자 지시 — 학습 완료 후 일시 정지**: 진행 중인 본 학습
+  (1152/1536, epoch 2)은 그대로 완주시키되, terminal complete 후 **merge/패키징/matrix로
+  넘어가지 않는다**. GPU idle·PID 0을 확인하고 학습 receipt를 기록·보고한 뒤
+  `paused-awaiting-user-game-end`로 대기한다. 재개 신호는 사용자의 "게임 끝" 통지다.
+  goal 자체는 active 유지(범위 축소 아님, 시퀀싱 지시).
+- 2026-08-24 19:15 KST **E2-C2 durable 본 학습 intent**: smoke PASS 배치 `ef85271` push,
+  HEAD/local/remote exact, GPU idle(355MiB)·trainer PID 0. fresh external root
+  `D:\AIRI-Models\airi-e2-c2-main-20260824-<hhmmss>`에서 계약 §4 동결값 그대로 step 0부터
+  정확히 한 번 실행한다: builder v3 manifest(mode cuda-qlora, seed 42, LoRA 8/16/0.05,
+  **LR 2e-5, max 1536 microsteps = 96 optimizer steps(3 epochs)**, batch 1/accum 16/seq
+  2048, **K=3**, deterministic validation, adapter-weights-only init E2 3핀, mixture chat
+  `c845adfc...1980`, base merged-hf `394b6624...f506`) → authoritative durable launcher
+  RunId `e2c2-main-seed42-1536-20260824`(RunDir main-run, heartbeat 10초, K=3). epoch별
+  dev loss 평가 + best-epoch 자동 선택은 trainer 내장. 예상 소요 ~45-60분(E2-C1 512가
+  15분 실측). 완료 조건: terminal complete 1536/96·pending 0, adapter/report/fresh-state
+  receipt, epoch 1-3 dev loss history + selected epoch, 관련 PID 0. 실패 시 root 보존·
+  재시작 금지. GPU 실행 중 heartbeat 상한 15분.
 - 2026-08-24 19:10 KST **E2-C2 bounded GPU smoke PASS receipt**: root
   `D:\AIRI-Models\airi-e2-c2-smoke-20260824-175116`. builder v3 manifest exit 0(manifest SHA
   `ee5cc0dd196d469fd2870a99cc71bb3ee7198ba25c3983676b43b666603db873`, training_config SHA
