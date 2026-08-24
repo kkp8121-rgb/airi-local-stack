@@ -1,0 +1,2 @@
+- [Deliver reports via SendMessage](feedback-deliver-report-via-sendmessage.md) — text output never reaches the supervisor; the send is part of the deliverable.
+- [Report blocked runs, don't retry](feedback-report-blocked-runs-do-not-retry.md) — a refusal caused by a live training run is a finding, not something to work around.
