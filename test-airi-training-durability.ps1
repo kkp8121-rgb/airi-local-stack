@@ -55,7 +55,9 @@ foreach ($token in @(
     'An unanchored or terminal previous run-state cannot authorize power-off',
     'checkpoint canonical pins SHA differs', 'Read-AuthoritativeFileSnapshot',
     'airi.behavior-checkpoint-index.v2', 'airi.behavior-final-evidence-root.v1',
-    'checkpoint_helper_source_sha256', 'run-state checkpoint helper source SHA is invalid')) {
+    'checkpoint_helper_source_sha256', 'run-state checkpoint helper source SHA is invalid',
+    'init_adapter_artifact_manifest_sha256', 'run-state init adapter pin is invalid',
+    'run-state init adapter directory is invalid', 'run-state init mode is invalid')) {
     if (-not $pause.Contains($token)) {
         throw "Safe-pause contract token is missing: $token"
     }
@@ -151,6 +153,84 @@ if (Test-ContainsSafePowerOffMarker 'Safe-pause deadline expired before SAFE_TO_
 }
 if (-not (Test-ContainsSafePowerOffMarker ("prefix`r`nSAFE_TO_POWER_OFF`nsuffix"))) {
     throw 'Subprocess SAFE_TO_POWER_OFF marker parser rejected an exact multiline marker line'
+}
+
+# Extracts the real run-state inputs validation (v2 seven-pin set or v3
+# adapter-init set) out of pause-airi-safely.ps1 so the contract exercises the
+# shipped statements instead of a copy of them.
+function New-ContractInputsValidator {
+    $inputsTokens = $null
+    $inputsErrors = $null
+    $pauseAst = [Management.Automation.Language.Parser]::ParseInput(
+        $pause, [ref]$inputsTokens, [ref]$inputsErrors)
+    if ($inputsErrors.Count -ne 0) {
+        throw 'Safe-pause source did not parse for run-state inputs extraction'
+    }
+    $assertDefinition = @($pauseAst.FindAll({
+        $args[0] -is [Management.Automation.Language.FunctionDefinitionAst] -and
+        $args[0].Name -eq 'Assert-ExactJsonProperties' }, $true))
+    $checkpointDefinition = @($pauseAst.FindAll({
+        $args[0] -is [Management.Automation.Language.FunctionDefinitionAst] -and
+        $args[0].Name -eq 'Assert-VerifiedCheckpoint' }, $true))
+    if ($assertDefinition.Count -ne 1 -or $checkpointDefinition.Count -ne 1) {
+        throw 'Safe-pause source no longer defines a single inputs validation owner'
+    }
+    $anchor = @($checkpointDefinition[0].FindAll({
+        $args[0] -is [Management.Automation.Language.AssignmentStatementAst] -and
+        $args[0].Left.Extent.Text -eq '$inputsV2' }, $true))
+    $gate = @($checkpointDefinition[0].FindAll({
+        $args[0] -is [Management.Automation.Language.IfStatementAst] -and
+        $args[0].Clauses[0].Item1.Extent.Text -like "*inputNames -contains 'init_mode'*" }, $true))
+    if ($anchor.Count -ne 1 -or $gate.Count -ne 1) {
+        throw 'Safe-pause source no longer exposes one run-state inputs validation block'
+    }
+    $blockStart = $anchor[0].Extent.StartOffset
+    $blockEnd = $gate[0].Extent.EndOffset
+    if ($blockEnd -le $blockStart) {
+        throw 'Safe-pause run-state inputs validation block has an invalid extent'
+    }
+    $validation = $pause.Substring($blockStart, $blockEnd - $blockStart)
+    foreach ($token in @('$inputsV3', 'init_adapter_artifact_manifest_sha256',
+        'run-state init adapter pin is invalid', "-Label 'run-state inputs'")) {
+        if (-not $validation.Contains($token)) {
+            throw "Extracted run-state inputs validation is missing: $token"
+        }
+    }
+    return [ScriptBlock]::Create(@"
+param(`$State)
+
+`$TestOnlyFinalGateDelayMilliseconds = 0
+$($assertDefinition[0].Extent.Text)
+$validation
+"@)
+}
+
+function Get-ContractInputsFailure {
+    param(
+        [Parameter(Mandatory = $true)][ScriptBlock]$Validator,
+        [Parameter(Mandatory = $true)]$Inputs
+    )
+
+    $candidate = [pscustomobject]@{
+        inputs = ($Inputs | ConvertTo-Json -Compress | ConvertFrom-Json)
+    }
+    try {
+        & $Validator -State $candidate
+        return ''
+    }
+    catch {
+        return [string]$_.Exception.Message
+    }
+}
+
+function Copy-ContractInputs {
+    param([Parameter(Mandatory = $true)]$Inputs)
+
+    $copy = [ordered]@{}
+    foreach ($key in $Inputs.Keys) {
+        $copy[[string]$key] = $Inputs[$key]
+    }
+    return $copy
 }
 
 function New-ContractInputManifest {
@@ -494,6 +574,37 @@ try {
     }
     if ([string]$state.inputs.checkpoint_helper_source_sha256 -notmatch '^[0-9a-f]{64}$') {
         throw 'Manual paused-safe fixture omitted a valid checkpoint helper source pin'
+    }
+
+    # Schema-v3 (adapter-weights-only initialization) run-state inputs must clear the
+    # same gateway as the v2 seven-pin set, while mixtures and non-hex adapter pins
+    # stay refused.
+    $inputsValidator = New-ContractInputsValidator
+    $v2Failure = Get-ContractInputsFailure -Validator $inputsValidator -Inputs $state.inputs
+    if ($v2Failure -ne '') {
+        throw "Safe-pause refused a valid v2 run-state inputs object: $v2Failure"
+    }
+    $v3Inputs = Copy-ContractInputs $state.inputs
+    $v3Inputs['init_mode'] = 'adapter-weights-only'
+    $v3Inputs['init_adapter_dir'] = 'D:\synthetic\adapter'
+    $v3Inputs['init_adapter_model_sha256'] = '4' * 64
+    $v3Inputs['init_adapter_config_sha256'] = '5' * 64
+    $v3Inputs['init_adapter_artifact_manifest_sha256'] = '6' * 64
+    $v3Failure = Get-ContractInputsFailure -Validator $inputsValidator -Inputs $v3Inputs
+    if ($v3Failure -ne '') {
+        throw "Safe-pause refused a valid schema-v3 adapter-init run-state inputs object: $v3Failure"
+    }
+    $unpinnedInputs = Copy-ContractInputs $v3Inputs
+    $unpinnedInputs['init_adapter_model_sha256'] = 'not-a-sha256'
+    $unpinnedFailure = Get-ContractInputsFailure -Validator $inputsValidator -Inputs $unpinnedInputs
+    if ($unpinnedFailure -notmatch 'run-state init adapter pin is invalid: init_adapter_model_sha256') {
+        throw "Safe-pause accepted a non-hex adapter init pin: $unpinnedFailure"
+    }
+    $mixedInputs = Copy-ContractInputs $state.inputs
+    $mixedInputs['init_mode'] = 'adapter-weights-only'
+    $mixedFailure = Get-ContractInputsFailure -Validator $inputsValidator -Inputs $mixedInputs
+    if ($mixedFailure -notmatch 'run-state inputs property set is invalid') {
+        throw "Safe-pause accepted a mixed v2/v3 run-state inputs object: $mixedFailure"
     }
     $terminalTrainer = Start-ContractSleeper -Seconds 2
     Start-Sleep -Milliseconds 200

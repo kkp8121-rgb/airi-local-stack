@@ -1909,9 +1909,8 @@ def run_supervisor(args: argparse.Namespace) -> int:
     if trainer_args and trainer_args[0] == "--":
         trainer_args.pop(0)
     _validate_trainer_arguments(trainer_args)
-    if (_init_adapter_arguments(trainer_args) is not None
-            and _argument_value(trainer_args, "--resume-from-checkpoint") is not None):
-        raise DurableRunnerError("init adapter cannot be combined with checkpoint resume")
+    # Init adapter provenance and --resume-from-checkpoint coexist: the pins
+    # a checkpoint commits to include init_mode, so a resume must re-supply it.
     _ensure_argument(trainer_args, "--run-dir", str(run_dir))
     _ensure_argument(trainer_args, "--run-id", args.run_id)
     _ensure_argument(trainer_args, "--checkpoint-every-optimizer-steps",
@@ -2067,12 +2066,9 @@ def run_supervisor(args: argparse.Namespace) -> int:
             raise DurableRunnerError("resume has an orphan pause ack")
         _ensure_argument(trainer_args, "--resume-from-checkpoint", checkpoint["absolute_path"])
         # The supervisor re-binds initial-adapter provenance on every durable
-        # resume, but trainer checkpoint restoration must never reinitialize
-        # weights from that adapter.
-        for flag in ("--init-adapter-dir", "--init-adapter-model-sha256",
-                     "--init-adapter-config-sha256",
-                     "--init-adapter-artifact-manifest-sha256"):
-            _remove_argument(trainer_args, flag)
+        # resume and keeps the flags on the resumed command: the trainer uses
+        # them only for identity and checkpoint pins, never to reinitialize
+        # weights over restored checkpoint state.
 
     logs_dir = run_dir / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
@@ -2249,15 +2245,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     preflight_helper = preflight_trainer.parent / "behavior_training_checkpoint.py"
     if not preflight_helper.is_file():
         raise DurableRunnerError("checkpoint helper path is missing")
-    preflight_manifest = validate_input_manifest_content(
+    # Preflight refusal only: the manifest must validate before the run lock,
+    # including adapter-init runs, which now keep their init flags on a resumed
+    # command so the checkpoint's exact pins still match (see run_supervisor).
+    validate_input_manifest_content(
         args.input_manifest_path, args.input_manifest_sha256,
         preflight_trainer_args, sha256_file(preflight_trainer),
         _argument_value(preflight_trainer_args, "--dataset-sha256", required=True) or "",
         _argument_value(preflight_trainer_args, "--model-sha256") or "",
         args.checkpoint_every_optimizer_steps, sha256_file(preflight_helper))
-    if (preflight_manifest["initial_adapter"] is not None
-            and _argument_value(preflight_trainer_args, "--resume-from-checkpoint") is not None):
-        raise DurableRunnerError("init adapter cannot be combined with checkpoint resume")
     if args.pause_at_first_optimizer_boundary:
         try:
             run_dir.mkdir(parents=True, exist_ok=False)

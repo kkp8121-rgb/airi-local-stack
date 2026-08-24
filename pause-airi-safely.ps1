@@ -758,10 +758,37 @@ function Assert-VerifiedCheckpoint {
         [string]$manifest.payload.sha256 -notmatch '^[0-9a-f]{64}$') {
         throw 'checkpoint manifest identity is invalid'
     }
-    Assert-ExactJsonProperties -Value $State.inputs -Names @(
+    # v2 inputs are the seven launch pins; v3 (adapter-weights-only initialization)
+    # adds the init mode and the four E2 adapter provenance pins. Either exact set
+    # is acceptable, never a mixture and never extra keys.
+    $inputsV2 = @(
         'dataset_sha256', 'model_weight_sha256', 'input_manifest_path',
         'input_manifest_sha256', 'input_manifest_training_config_sha256',
-        'trainer_source_sha256', 'checkpoint_helper_source_sha256') -Label 'run-state inputs'
+        'trainer_source_sha256', 'checkpoint_helper_source_sha256')
+    $inputsV3 = $inputsV2 + @(
+        'init_mode', 'init_adapter_dir', 'init_adapter_model_sha256',
+        'init_adapter_config_sha256', 'init_adapter_artifact_manifest_sha256')
+    $inputNames = @($State.inputs.PSObject.Properties.Name)
+    if ($inputNames -contains 'init_mode') {
+        Assert-ExactJsonProperties -Value $State.inputs -Names $inputsV3 -Label 'run-state inputs'
+        if ([string]$State.inputs.init_mode -notin @('fresh-lora', 'adapter-weights-only')) {
+            throw 'run-state init mode is invalid'
+        }
+        if ([string]$State.inputs.init_mode -eq 'adapter-weights-only') {
+            if ([string]::IsNullOrWhiteSpace([string]$State.inputs.init_adapter_dir)) {
+                throw 'run-state init adapter directory is invalid'
+            }
+            foreach ($key in @('init_adapter_model_sha256', 'init_adapter_config_sha256',
+                    'init_adapter_artifact_manifest_sha256')) {
+                if ([string]$State.inputs.$key -notmatch '^[0-9a-f]{64}$') {
+                    throw "run-state init adapter pin is invalid: $key"
+                }
+            }
+        }
+    }
+    else {
+        Assert-ExactJsonProperties -Value $State.inputs -Names $inputsV2 -Label 'run-state inputs'
+    }
     if ([string]$State.inputs.checkpoint_helper_source_sha256 -notmatch '^[0-9a-f]{64}$') {
         throw 'run-state checkpoint helper source SHA is invalid'
     }

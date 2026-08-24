@@ -282,9 +282,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     manifest, payload = build_manifest(args)
     digest = _publish_nonreplacing(args.output, payload)
+    # The runner's initial-adapter check binds the artifact's base pin to the
+    # launch command's --model-sha256, so the builder's self-check must carry
+    # the same pin or every adapter-weights-only manifest is refused after publication.
     durable.validate_input_manifest_content(
-        args.output, digest, _trainer_arguments(
-            manifest["training_config"], manifest["initial_adapter"], args.init_adapter_dir),
+        args.output, digest, [
+            *_trainer_arguments(
+                manifest["training_config"], manifest["initial_adapter"], args.init_adapter_dir),
+            "--model-sha256", manifest["model_weight_sha256"],
+        ],
         manifest["trainer_source_sha256"], manifest["dataset_sha256"],
         manifest["model_weight_sha256"],
         manifest["training_config"]["checkpoint_every_optimizer_steps"],

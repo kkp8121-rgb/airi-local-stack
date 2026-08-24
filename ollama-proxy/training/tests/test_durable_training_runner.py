@@ -68,6 +68,7 @@ parser.add_argument("--output", type=Path, required=True)
 parser.add_argument("--report", type=Path, required=True)
 parser.add_argument("--resume-from-checkpoint", type=Path)
 args, _ = parser.parse_known_args()
+print(json.dumps({"argv": sys.argv[1:]}, sort_keys=True), flush=True)
 now = datetime.now(timezone.utc).isoformat()
 time.sleep(1.5)
 
@@ -1658,7 +1659,7 @@ def test_safe_pause_then_explicit_resume_reaches_atomic_terminal_receipt() -> No
         assert failed["terminal"]["reason"] == "completed-artifact-integrity-mismatch"
 
 
-def test_v3_initial_adapter_is_closed_pinned_held_and_excludes_resume() -> None:
+def test_v3_initial_adapter_is_closed_pinned_held_and_kept_on_resume() -> None:
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
         trainer = root / "trainer.py"
@@ -1770,11 +1771,21 @@ def test_v3_initial_adapter_is_closed_pinned_held_and_excludes_resume() -> None:
         assert completed["inputs"] == state["inputs"]
         assert completed["command"]["base_canonical_sha256"] == state["command"]["base_canonical_sha256"]
         assert completed["command"]["canonical_sha256"] != completed["command"]["base_canonical_sha256"]
-        stripped = list(trailer)
-        for flag in ("--init-adapter-dir", "--init-adapter-model-sha256",
-                     "--init-adapter-config-sha256", "--init-adapter-artifact-manifest-sha256"):
-            runner._remove_argument(stripped, flag)
-        assert stripped == []
+        # Regression: the resumed trainer command must keep initial-adapter
+        # provenance, or its pins say fresh-lora and the checkpoint pin gate
+        # makes every adapter-init run unresumable.
+        launches = [json.loads(line)["argv"] for line
+                    in (root / "run" / "logs" / "trainer.stdout.log")
+                    .read_text(encoding="utf-8").splitlines() if line.strip()]
+        assert len(launches) == 2, launches
+        resumed_argv = launches[1]
+        assert "--resume-from-checkpoint" in resumed_argv
+        for index in range(0, len(trailer), 2):
+            flag, value = trailer[index], trailer[index + 1]
+            assert flag in resumed_argv, flag
+            assert resumed_argv[resumed_argv.index(flag) + 1] == value, flag
+        assert (resumed_argv[resumed_argv.index("--resume-from-checkpoint") + 1]
+                == str((root / "run" / "checkpoints" / "checkpoint-00000001").resolve()))
         held = runner._hold_training_inputs(root / "dataset.jsonl", manifest["dataset_sha256"],
                                             root / "model", manifest["model_inventory"],
                                             identity["initial_adapter"])
@@ -1796,3 +1807,66 @@ def test_v3_initial_adapter_is_closed_pinned_held_and_excludes_resume() -> None:
                 manifest_path, hashlib.sha256(manifest_path.read_bytes()).hexdigest(), trainer_args,
                 manifest["trainer_source_sha256"], manifest["dataset_sha256"],
                 manifest["model_weight_sha256"], 5, manifest["checkpoint_helper_source_sha256"])
+
+
+def test_builder_main_publishes_and_self_validates_adapter_init_manifest() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        dataset = root / "dataset.jsonl"
+        model_dir = root / "model"
+        model_dir.mkdir()
+        model_weight = model_dir / "model.safetensors"
+        trainer = root / "trainer.py"
+        manifest_path = root / "input-manifest.json"
+        dataset.write_bytes(b"{}\n")
+        model_weight.write_bytes(b"model")
+        (model_dir / "config.json").write_bytes(b"{}\n")
+        trainer.write_bytes(b"# trainer\n")
+        (root / "behavior_training_checkpoint.py").write_bytes(b"# helper\n")
+        model_sha256 = hashlib.sha256(model_weight.read_bytes()).hexdigest()
+
+        adapter = root / "initial-adapter"
+        adapter.mkdir()
+        config = adapter / "adapter_config.json"
+        model = adapter / "adapter_model.safetensors"
+        config.write_bytes(b"{}\n")
+        model.write_bytes(b"adapter-model")
+        files = [{"path": path.name, "bytes": path.stat().st_size,
+                  "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+                 for path in (config, model)]
+        artifact = {"schema_version": "airi.behavior-adapter-artifact.v1",
+                    "run_id": "source-run", "pins": {"model_weight_sha256": model_sha256},
+                    "files": files}
+        artifact_path = adapter / "artifact-manifest.json"
+        artifact_path.write_bytes(runner.canonical_bytes(artifact))
+
+        command = [
+            sys.executable, str(BUILDER), "--output", str(manifest_path),
+            "--dataset", str(dataset), "--dataset-sha256",
+            hashlib.sha256(dataset.read_bytes()).hexdigest(),
+            "--model-weight", str(model_weight), "--model-sha256", model_sha256,
+            "--trainer", str(trainer), "--mode", "cuda-qlora",
+            "--seed", "42", "--lora-r", "8", "--lora-alpha", "16",
+            "--lora-dropout", "0.05", "--learning-rate", "2e-5",
+            "--max-steps", "480", "--batch-size", "1",
+            "--gradient-accumulation", "16", "--max-seq-len", "2048",
+            "--checkpoint-every-optimizer-steps", "5",
+            "--deterministic-validation",
+            "--init-adapter-dir", str(adapter),
+            "--init-adapter-model-sha256", files[1]["sha256"],
+            "--init-adapter-config-sha256", files[0]["sha256"],
+            "--init-adapter-artifact-manifest-sha256",
+            hashlib.sha256(artifact_path.read_bytes()).hexdigest(),
+        ]
+        built = subprocess.run(command, cwd=root, capture_output=True, text=True, check=False)
+        # Regression: the self-check omitted --model-sha256, so the builder
+        # published a v3 manifest and then refused it with exit code 2.
+        assert built.returncode == 0, built.stderr
+        receipt = json.loads(built.stdout)
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert manifest_path.read_bytes() == runner.canonical_bytes(payload)
+        assert receipt["sha256"] == hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+        assert payload["schema_version"] == "airi.behavior-input-manifest.v3"
+        assert payload["training_config"]["init_mode"] == "adapter-weights-only"
+        assert payload["initial_adapter"]["run_id"] == artifact["run_id"]
+        assert payload["initial_adapter"]["files"] == files

@@ -660,6 +660,13 @@ if ($null -ne $existing) {
             'dataset_sha256', 'model_weight_sha256', 'trainer_source_sha256',
             'input_manifest_path', 'input_manifest_sha256',
             'input_manifest_training_config_sha256', 'checkpoint_helper_source_sha256')
+        # A v3 (adapter-weights-only) run-state carries the init mode and four
+        # adapter provenance pins; treat that exact superset as the live shape.
+        if (@($existing.inputs.PSObject.Properties.Name) -contains 'init_mode') {
+            $requiredInputProperties += @(
+                'init_mode', 'init_adapter_dir', 'init_adapter_model_sha256',
+                'init_adapter_config_sha256', 'init_adapter_artifact_manifest_sha256')
+        }
         $requiredCommandProperties = @(
             'canonical_sha256', 'base_canonical_sha256',
             'runner_source_sha256', 'trainer_source_sha256')

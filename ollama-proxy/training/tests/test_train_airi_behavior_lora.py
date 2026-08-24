@@ -61,6 +61,37 @@ def pinned_payload(rows: list[dict]) -> tuple[bytes, str]:
     return payload, hashlib.sha256(payload).hexdigest()
 
 
+def _pins_initialization(initialization: dict) -> dict:
+    """The exact projection train_airi_behavior_lora writes into pins."""
+    return {key: value for key, value in initialization.items()
+            if key not in {"path", "files"}}
+
+
+def _write_init_adapter(directory: Path, base_model_sha256: str) -> dict:
+    """A closed, SHA-pinned prior adapter usable as weight initialization."""
+    directory.mkdir(parents=True)
+    model = directory / "adapter_model.safetensors"
+    config = directory / "adapter_config.json"
+    model.write_bytes(b"test adapter weights")
+    config.write_text(json.dumps({"peft_type": "LORA", "task_type": "CAUSAL_LM",
+                                  "r": 16, "lora_alpha": 32, "lora_dropout": 0.05,
+                                  "target_modules": ["up_proj", "o_proj", "v_proj",
+                                                     "down_proj", "k_proj", "q_proj",
+                                                     "gate_proj"]}), encoding="utf-8")
+    inventory = [{"path": path.name, "bytes": path.stat().st_size,
+                  "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+                 for path in (config, model)]
+    manifest_path = directory / "artifact-manifest.json"
+    manifest_path.write_bytes(trainer._canonical_json_bytes({
+        "schema_version": "airi.behavior-adapter-artifact.v1", "run_id": "prior-run",
+        "pins": {"model_weight_sha256": base_model_sha256}, "files": inventory}))
+    return {"directory": directory, "inventory": inventory,
+            "model_sha256": hashlib.sha256(model.read_bytes()).hexdigest(),
+            "config_sha256": hashlib.sha256(config.read_bytes()).hexdigest(),
+            "artifact_manifest_sha256": hashlib.sha256(
+                manifest_path.read_bytes()).hexdigest()}
+
+
 class ContractTests(unittest.TestCase):
     def test_adapter_initialization_requires_complete_exact_artifact_and_fresh_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -107,19 +138,35 @@ class ContractTests(unittest.TestCase):
             with self.assertRaisesRegex(trainer.BehaviorTrainingError, "artifact"):
                 trainer._adapter_initialization(args, "b" * 64)
 
-    def test_adapter_initialization_all_or_none_and_resume_are_rejected(self) -> None:
+    def test_adapter_initialization_is_all_or_none_and_survives_resume(self) -> None:
         args = SimpleNamespace(init_adapter_dir="x", init_adapter_model_sha256="",
                                init_adapter_config_sha256="", init_adapter_artifact_manifest_sha256="",
                                resume_from_checkpoint=None, lora_r=16, lora_alpha=32,
                                lora_dropout=0.05)
         with self.assertRaisesRegex(trainer.BehaviorTrainingError, "all-or-none"):
             trainer._adapter_initialization(args, "a" * 64)
-        args.init_adapter_model_sha256 = "a" * 64
-        args.init_adapter_config_sha256 = "a" * 64
-        args.init_adapter_artifact_manifest_sha256 = "a" * 64
         args.resume_from_checkpoint = Path("checkpoint")
-        with self.assertRaisesRegex(trainer.BehaviorTrainingError, "mutually exclusive"):
+        with self.assertRaisesRegex(trainer.BehaviorTrainingError, "all-or-none"):
             trainer._adapter_initialization(args, "a" * 64)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            adapter = _write_init_adapter(Path(temporary) / "prior-adapter", "b" * 64)
+            args = SimpleNamespace(
+                init_adapter_dir=str(adapter["directory"]),
+                init_adapter_model_sha256=adapter["model_sha256"],
+                init_adapter_config_sha256=adapter["config_sha256"],
+                init_adapter_artifact_manifest_sha256=adapter["artifact_manifest_sha256"],
+                resume_from_checkpoint=None, lora_r=16, lora_alpha=32,
+                lora_dropout=0.05)
+            fresh = trainer._adapter_initialization(args, "b" * 64)
+            args.resume_from_checkpoint = Path("checkpoints") / "checkpoint-00000001"
+            resumed = trainer._adapter_initialization(args, "b" * 64)
+            self.assertEqual(resumed["init_mode"], "adapter-weights-only")
+            # Pins are what a checkpoint commits to: a resumed run must rebuild
+            # byte-identical initialization provenance, not fall back to fresh.
+            self.assertEqual(fresh, resumed)
+            self.assertEqual(
+                _pins_initialization(fresh), _pins_initialization(resumed))
 
     @unittest.skipUnless(os.name == "nt", "native sharing semantics are Windows-only")
     def test_held_windows_loader_handle_blocks_replace_delete_and_final_reparse(self) -> None:
@@ -579,6 +626,78 @@ class CpuSmokeTests(unittest.TestCase):
             "next_batch_index": 0, "pending_microbatches": 0,
             "optimizer_state_entries": 0})
         self.assertEqual(result["initialization"]["init_mode"], "adapter-weights-only")
+
+    def test_cpu_adapter_init_run_resumes_from_its_own_checkpoint(self) -> None:
+        """Regression: an adapter-init run must survive a durable resume.
+
+        The resumed process re-supplies the init flags, so its pins keep
+        init_mode=adapter-weights-only and the checkpoint pin gate matches.
+        """
+        source_args = trainer.build_parser().parse_args([
+            "--dataset", str(self.dataset), "--dataset-sha256", self.sha,
+            "--model-dir", str(self.model_dir),
+            "--output", str(self.tmp / "resume-init-source"),
+            "--mode", "cpu-smoke", "--max-steps", "8", "--batch-size", "2",
+            "--gradient-accumulation", "2",
+        ])
+        source_dir = Path(trainer.run_training(source_args)["adapter_dir"])
+        init_flags = [
+            "--init-adapter-dir", str(source_dir),
+            "--init-adapter-model-sha256",
+            hashlib.sha256((source_dir / "adapter_model.safetensors").read_bytes()).hexdigest(),
+            "--init-adapter-config-sha256",
+            hashlib.sha256((source_dir / "adapter_config.json").read_bytes()).hexdigest(),
+            "--init-adapter-artifact-manifest-sha256",
+            hashlib.sha256((source_dir / "artifact-manifest.json").read_bytes()).hexdigest(),
+        ]
+        run_dir = self.tmp / "resume-init-run"
+
+        def arguments(resume: Path | None = None):
+            values = [
+                "--dataset", str(self.dataset), "--dataset-sha256", self.sha,
+                "--model-dir", str(self.model_dir),
+                "--output", str(self.tmp / "resume-init-target"),
+                "--report", str(self.tmp / "resume-init-report.json"),
+                "--mode", "cpu-smoke", "--max-steps", "8", "--batch-size", "2",
+                "--gradient-accumulation", "2", "--run-id", "resume-init-run",
+                "--run-dir", str(run_dir),
+                "--checkpoint-every-optimizer-steps", "1", *init_flags,
+            ]
+            if resume is not None:
+                values.extend(("--resume-from-checkpoint", str(resume)))
+            return trainer.build_parser().parse_args(values)
+
+        paused_args = arguments()
+        control = run_dir / "control"
+        control.mkdir(parents=True)
+        trainer.atomic_json(control / "pause.request.json", {
+            "schema_version": "airi.behavior-pause-request.v1",
+            "run_id": "resume-init-run", "request_id": "pause-init-001",
+        })
+        with self.assertRaises(trainer.PauseRequested) as paused:
+            trainer.run_training(paused_args)
+        self.assertEqual(paused.exception.code, 75)
+        receipt_path = run_dir / "fresh-state-receipt.json"
+        receipt_bytes = receipt_path.read_bytes()
+        index = json.loads(
+            (run_dir / "checkpoints" / "checkpoint-index.json").read_text())
+        generation = index["latest"]["relative_path"]
+        checkpoint = run_dir / "checkpoints" / generation
+        pins = json.loads((checkpoint / "manifest.json").read_text())["pins"]
+        self.assertEqual(pins["config"]["init_mode"], "adapter-weights-only")
+        self.assertEqual(pins["initialization"]["init_mode"], "adapter-weights-only")
+
+        resumed = trainer.run_training(arguments(checkpoint))
+        self.assertEqual(resumed["initialization"], pins["initialization"])
+        report = json.loads((self.tmp / "resume-init-report.json").read_text())
+        self.assertEqual(report["initialization"]["init_mode"], "adapter-weights-only")
+        accepted = json.loads((control / "resume.accepted.json").read_text())
+        self.assertEqual(accepted["checkpoint_relative_path"], generation)
+        # The fresh-state receipt belongs to the fresh run only; a resume must
+        # neither republish it nor re-assert an empty optimizer.
+        self.assertEqual(receipt_path.read_bytes(), receipt_bytes)
+        progress = json.loads((run_dir / "progress.json").read_text())
+        self.assertEqual(progress["status"], "completed")
 
     def test_cpu_uninterrupted_and_safe_pause_resume_are_exact(self) -> None:
         import torch

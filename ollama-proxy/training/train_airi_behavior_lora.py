@@ -302,6 +302,10 @@ def _adapter_initialization(args: argparse.Namespace, base_model_sha256: str) ->
 
     This deliberately returns only provenance and a local path.  Optimizer,
     scheduler, RNG, cursor, and progress are never inputs to this seam.
+
+    A durable resume re-supplies the same init flags so identity and pins stay
+    byte-identical to the fresh run; the adapter is re-verified from disk here
+    and its weights are still overwritten by the checkpoint restore.
     """
     values = (args.init_adapter_dir, args.init_adapter_model_sha256,
               args.init_adapter_config_sha256,
@@ -310,8 +314,6 @@ def _adapter_initialization(args: argparse.Namespace, base_model_sha256: str) ->
         return {"init_mode": "fresh-lora"}
     if not all(values):
         raise BehaviorTrainingError("adapter initialization flags must be supplied all-or-none")
-    if args.resume_from_checkpoint:
-        raise BehaviorTrainingError("adapter initialization is mutually exclusive with --resume-from-checkpoint")
     for value in values[1:]:
         if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
             raise BehaviorTrainingError("adapter initialization SHA-256 pins must be lowercase hex")
@@ -767,11 +769,8 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
                 "run directory and final artifacts must share one fixed volume")
     if args.resume_from_checkpoint and run_dir is None:
         raise BehaviorTrainingError("--resume-from-checkpoint requires --run-dir")
-    if args.resume_from_checkpoint and any((args.init_adapter_dir,
-                                            args.init_adapter_model_sha256,
-                                            args.init_adapter_config_sha256,
-                                            args.init_adapter_artifact_manifest_sha256)):
-        raise BehaviorTrainingError("adapter initialization is mutually exclusive with --resume-from-checkpoint")
+    # A resumed run keeps its initialization provenance: the same flags must
+    # reproduce the same identity/pins, or the checkpoint pin gate rejects it.
 
     if args.mode == "cpu-smoke":
         rows = rows[:CPU_SMOKE_MAX_SAMPLES]
@@ -855,6 +854,8 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
                    for path, expected in expected_adapter_pins.items()):
                 raise BehaviorTrainingError(
                     "held init adapter input does not match its SHA-256 pin")
+            # On a resume this only re-creates the adapter modules; the
+            # checkpoint's restore_trainable_state below overwrites the weights.
             model = PeftModel.from_pretrained(
                 model, str(initialization["path"]), is_trainable=True)
         else:
@@ -926,7 +927,10 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
     checkpoint_generation = 0
     training_elapsed_ns = 0
     active_segment_started_ns = time.perf_counter_ns()
-    if run_dir is not None and initialization["init_mode"] == "adapter-weights-only":
+    if (run_dir is not None and not args.resume_from_checkpoint
+            and initialization["init_mode"] == "adapter-weights-only"):
+        # Fresh-run only: the receipt is immutable and a resumed process
+        # legitimately restores optimizer/scheduler/cursor state below.
         fresh_receipt = {
             "schema_version": "airi.behavior-adapter-initialization-receipt.v1",
             "run_id": args.run_id,
