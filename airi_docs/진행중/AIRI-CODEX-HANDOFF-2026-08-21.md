@@ -2,7 +2,8 @@
 
 갱신: 2026-08-24 03:19 KST (파일명은 현행 GPU SSoT 식별자로 유지)
 
-상태: **ACTIVE, E2-C1 ADAPTER-INIT OFFLINE PASS — PUBLISHED. K=3 controlled GPU와 authoritative E2
+상태: **E2-C1 TRAINED/PACKAGED, BLIND MATRIX NO_WINNER (2026-08-24 15:14) — 아래 -6 참조.
+이전 스냅샷: ACTIVE, E2-C1 ADAPTER-INIT OFFLINE PASS — PUBLISHED. K=3 controlled GPU와 authoritative E2
 1,600/1,600, E1/E2 merge·BF16/Q4_K_M package는 완료·미채택이다. authoritative T3는
 baseline/E1/E2 각 12, 총 36 reports와 두 comparator까지 실행했으나 두 comparison이 모두
 `status=fail`, paired reports 0, reason `polite violation or invented handle`로 종료해 launcher
@@ -33,6 +34,25 @@ hard gate 완화, 운영 서비스 모델/태그 변경·외부 provider/extract
 운영 승격이며, 운영 채택은 campaign 결과 묶음을 본 사용자의 별도 승인이다.
 (이전 08-23 `/goal`: 저장소 구현·검증, GPU 학습, 병합·패키징, 로컬 서비스, T3·캠페인,
 milestone commit/push 승인 — 이 문단으로 대체.)
+
+## -6. 2026-08-24 E2-C1 36-report blind matrix 결과 — no_winner, 다음 순서 확정
+
+사용자 GPU 무제한 `/goal`(09:47 KST) 하에 smoke → 본 학습(512/32, K=3) → merge → BF16/
+Q4_K_M 패키징 → 한국어 blind v2 재봉인(v1 영어 문구 결함 수리) → baseline/e2/e2-c1 ×
+3 fixture × 4 seed 36 reports를 완주했다. verdict: `status=pass`(채점 정상 실행을 뜻함),
+**`winner=null`**. score는 e2-c1 0.244 > e2 0.225 > baseline 0.218로 최고점이지만, hard/
+legacy/perfect-rate 게이트 13개가 전부 실패했다 — 특히 `invented_handle` 위반이 baseline
+28 → e2 40 → **e2-c1 53**으로 학습할수록 악화해 다른 4/5 additive 축의 개선 방향과 무관하게
+winner 자격을 잃었다. `adoption_authorized=false`, 3×500 campaign 금지 유지.
+
+사용자가 수락한 원인·다음 순서(상세는
+`AIRI-E2-C1-FROZEN-CONTRACT-2026-08-24.md` §11): 512/32 microsteps는 mixture 680행
+(accum 16) 기준 1 epoch 미만이었고 LR도 E1/E2의 1/5(1e-5)라 교정 신호가 과소학습됐을
+가능성과, `invented_handle`이 0회를 요구하는 hard gate라 확률적 생성만으로는 구조적으로
+닫기 어려울 가능성 두 가지를 함께 본다. 순서: ① 이번 matrix의 e2-c1 위반 53건 원문 진단
+(blind는 이미 채점 완료라 열람 가능) ② roster에 없는 한국어 인명을 걸러내는 결정론
+런타임 가드 설계·구현 ③ 가드 적용 후 남는 축은 학습량/LR 재검토한 **E2-C2**로 새 blind
+봉인해 재도전. GPU/서비스는 현재 idle이고 관련 PID 0이다.
 
 ## -5a. 2026-08-24 bounded smoke 실측 — adapter-init seam 공백 3건 수리
 

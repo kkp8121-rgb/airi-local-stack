@@ -7,6 +7,14 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
+> **2026-08-24 15:14 KST E2-C1 36-report blind matrix 결과 — no_winner:** 한국어로 재봉인한
+> blind v2로 baseline/e2/e2-c1 36 reports를 완주했다. score는 e2-c1 0.244(최고)지만
+> `invented_handle` 위반이 28→40→**53**으로 학습할수록 악화해 13개 hard/legacy/perfect-rate
+> 게이트가 전부 실패, `winner=null`이다. `adoption_authorized=false`·campaign 금지 유지.
+> 사용자 승인 순서: e2-c1 invented_handle 원문 진단 → roster 밖 한국어 인명을 거르는
+> 결정론 런타임 가드 설계 → 남는 축은 학습량 재검토한 E2-C2를 새 blind로 재도전(같은
+> data로 epoch만 늘리는 E3는 아님). 상세는 frozen contract §11·handoff §-6.
+>
 > **2026-08-24 09:47 KST 사용자 `/goal` — GPU 제한 없음:** E2-C1 bounded smoke → durable 본 학습
 > step 0 → merge/package → baseline/E2/E2-C1 36 reports → gate 판정이 연속 허가됐다. winner면
 > 3×500 campaign을 즉시, no_winner면 실패 축 분석·새 blind 봉인·E2-C2까지 재확인 없이 진행한다.
@@ -365,7 +373,10 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   2026-08-23 production 36/36 reports와 두 comparator를 terminal까지 실행했으나 invented
   handle/polite hard gate에서 양쪽 모두 FAIL, PASS summary와 winner는 0이다. T3 knowledge
   DB는 fresh empty 상태를 attest했고 campaign RAG fixture를 섞지 않았다. 실패 root를
-  보존하며 같은 공개 blind matrix를 반복하지 않는다.
+  보존하며 같은 공개 blind matrix를 반복하지 않는다. **2026-08-24 E2-C1 후속:** 새 한국어
+  blind v2(3 fixture×4 seed)로 baseline/e2/e2-c1 36-report를 별도 실행 — e2-c1 score
+  최고(0.244)나 `invented_handle` 위반 53건(학습할수록 악화)으로 13개 게이트 전부 FAIL,
+  winner 0. 다음은 원문 진단+결정론 가드+재검토된 E2-C2다.
 - [ ] **P3-T4 하드코딩 축소** — T3 통과 행동부터 결정론 계층 걷어냄
   (집계 오프너·폴백 후보). **thank 렌더러는 유지** — 후원 호명 오류
   비용이 커서 고정이 정석
@@ -452,7 +463,19 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   checkpoint/metric 계약은 current bytes에서 full freeze validation PASS다. `으로/로` 5건과
   validator 공백도 mutation regression으로 닫혔다. frozen-contract milestone commit/push와
   HEAD=origin/main clean/PID 0이 남았으며, 그전에는 GPU 학습을 시작하지 않는다.
-- [ ] T3 승자 0이므로 3 seed × 500 turn full-stack live campaign 차단
+- [x] **E2-C1 GPU 실행 완료:** smoke PASS(K=1 80/5 두 arm+resume) → 본 학습 512/32 terminal
+  exit 0(mixture dev loss 2.235104) → safe merge(target l2 0.0865, non-target 무변경) →
+  BF16/Q4_K_M 패키징(tag `midm-airi:e2c1-broadcast-v4-20260824-08df7ecf...`) — 전부 미채택
+- [x] **E2-C1 blind v2 36-report matrix — no_winner:** 한국어 재봉인 blind(v1은 영어 문구라
+  실행 불능이던 결함 수리 후) 36/36 완주. score e2-c1 0.244(최고)·e2 0.225·baseline 0.218,
+  additive 4/5 축 방향 개선하나 전부 절대 최소선 미달. `invented_handle` 위반 28/40/53으로
+  후보가 최악 — hard/legacy/perfect-rate 13개 게이트 전부 실패. `adoption_authorized=false`
+- [ ] invented_handle 53건 원문 진단(날조/재호명/렌더러 되먹임 분류) — blind 채점 완료라
+  열람 가능
+- [ ] roster 밖 한국어 인명을 걸러내는 결정론 런타임 가드 설계·구현
+- [ ] 가드 적용 후 남는 축은 학습량/LR 재검토한 E2-C2를 새 retained blind로 재도전
+- [ ] T3(v4)·E2-C1(blind v2) 모두 승자 0이므로 3 seed × 500 turn full-stack live campaign
+  계속 차단
 - [~] T3 terminal 실패 aggregate·receipt·hash와 E1/E2 원본은 제출했다. 실제 승자 응답·
   지연·TTS/RAG campaign 묶음은 winner 0으로 생성 금지
 - [ ] 사용자 승인 뒤에만 운영 채택 판단; 그전까지 `adoption_authorized=false`

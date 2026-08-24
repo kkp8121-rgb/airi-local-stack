@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 13:02:00 +09:00"
-checkpoint_id: "20260824-130200-blind-v2-pushed-matrix-relaunch-intent"
+updated_at_kst: "2026-08-24 15:14:00 +09:00"
+checkpoint_id: "20260824-134000-matrix-no-winner-docs-receipt-diagnosis-goal"
 goal_status: "active"
 authorization: "user-goal-2026-08-24: repository-gpu-unlimited-training-packaging-36-report-campaign-on-winner-e2-c2-on-no-winner-local-services-t3-readonly-diagnosis-t05-sample-synthesis-commit-push-authorized; forbidden: post-blind-target-fixture-threshold-seed-change, blind-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-on, speaker-126-operational-promotion; operational-adoption-forbidden-until-separate-user-approval"
-active_phase: "e2-c1-blind-36-report-matrix"
-git_head: "5b4d757_after_8f8f176_c96b929_push"
-worktree_state: "HEAD-local-remote-exact-5b4d757; clean-except-live-state-heartbeat; smoke2-fresh-root-launch"
+active_phase: "e2-c1-invented-handle-diagnosis-and-guard-design"
+git_head: "764df3fdf33f0962aff84860480a354a7e2c8a26"
+worktree_state: "HEAD-local-remote-exact-764df3f-before-this-docs-batch; docs-batch-plus-agent-memory-uncommitted; matrix-fully-idle-PID-0"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-24 09:55 KST E2-C1 bounded GPU smoke intent (Claude PC, Fable supervisor). Docs batch commit 9875895 pushed (6726baa..9875895), HEAD=local=remote exact, clean, related AIRI PID 0, GPU idle 953 MiB, D: free 38 GB. Pins re-verified on disk: mixture chat c845adfc...1980 (1,970,252 B), base model.safetensors 394b6624...f506, E2 adapter dir D:\AIRI-Models\airi-broadcast-v4-20260821\adapter-r8-seq2048-e2-lr2e5 with adapter_model 2a72292c...5c5b (56,318,520 B), adapter_config e01129ea...82b0 (863 B), artifact-manifest 70998cff...7195 (2,141 B, run_id v4-e2-seed42-1600-20260823-074326). Smoke = two arms in fresh root D:\AIRI-Models\airi-e2-c1-smoke-<ts>: builder v3 manifest (init_mode adapter-weights-only, seed 42, r/alpha/dropout 8/16/0.05, LR 1e-5, batch 1, accum 16, seq 2048, max 80 microsteps = 5 optimizer steps, K=1, deterministic validation) -> authoritative durable launcher baseline arm run id e2c1-smoke-baseline-80 -> safe arm e2c1-smoke-safe-80 with -PauseAtFirstOptimizerBoundary -> pause-airi-safely.ps1 SAFE_TO_POWER_OFF -> -ResumeInterrupted -> verify_airi_behavior_gpu_equivalence.py expecting 80/5/K=1, safe pause 16/1, manifest+config SHA -> receipts/gpu-equivalence.json pass=true. Also expected: fresh-state-receipt.json in each run dir with optimizer_state_entries 0 and progress 0/0 at init. Smoke is not quality progress; frozen 512/32/K=3 contract values are untouched. Failure preserves root, no relaunch of the same arm, no E2-C1 main training until root cause. Heartbeat 15 min while GPU runs."
+reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
 
 # AIRI live working state
@@ -22,6 +22,22 @@ reconciliation_receipt: "2026-08-24 09:55 KST E2-C1 bounded GPU smoke intent (Cl
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 15:14 KST **E2-C1 blind v2 matrix 최종 receipt + 진단 phase 문서 배치**: 36/36
+  reports, comparator `status=pass`/**`winner=null`**. score e2-c1 0.244(최고)·e2 0.225·
+  baseline 0.218, additive 4/5축 방향 개선하나 전부 절대 최소선 미달, `invented_handle`
+  위반 28/40/**53**(학습할수록 악화)로 hard/legacy/perfect-rate 13개 게이트 전부 실패.
+  `adoption_authorized=false`, 3×500 campaign 금지 유지. 사용자 수락 순서: ① e2-c1 위반
+  53건 원문 진단(blind 채점 완료라 열람 가능) ② roster 밖 한국어 인명을 거르는 결정론
+  런타임 가드 설계·구현 ③ 남는 축은 학습량/LR 재검토한 E2-C2를 새 blind로 재도전.
+  frozen contract §11·handoff §-6·ROADMAP-STATUS 배너/§3/§5·LOG에 기록했다. GPU/서비스
+  전부 idle, 관련 PID 0, Ollama 11434만 listen. 이 배치는 문서 commit/push만이며 모델·
+  서비스·GPU 변경 0이다. 다음 동작은 사용자의 새 `/goal`(진단+가드 phase) 접수 뒤 착수.
+- 2026-08-24 13:22 KST **matrix heartbeat**: 15/36 (baseline 12/12 완료, e2 3), launcher alive, throw 0.
+- 2026-08-24 12:55 KST **matrix heartbeat**: 8/36 reports(baseline arm 8), launcher alive, throw 0.
+- 2026-08-24 12:40 KST(2차) **matrix v2 진행 heartbeat**: 직전 재기동에서 stale `run` dir가
+  no-overwrite 가드에 걸려 1회 throw(정상 fail-closed) → `run-failed-blindv1-language`로 보존 후
+  재기동(launcher PID 9432). baseline identity 4 seeds 완료(약 3.5분/report, GPU 93%), 예상 총
+  ~2시간. 이후 15분 단위 heartbeat 유지, 36/36 후 comparator verdict.
 - 2026-08-24 13:02 KST **blind v2 push receipt + matrix 재실행 intent**: `444faf2`(fix: reseal
   Korean E2-C1 blind v2)·`af2cd68`(docs, 12:40 결함 receipt)이 push됐고 이 배치에서 contract
   개정문·LOG 항목·이 receipt를 추가 docs commit으로 push한다. 검증 상태: combined 44 passed/

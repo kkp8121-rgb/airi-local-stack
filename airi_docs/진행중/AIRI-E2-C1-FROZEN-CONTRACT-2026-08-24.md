@@ -2,7 +2,7 @@
 
 갱신: 2026-08-24 03:19 KST
 
-상태: **FROZEN / VALIDATED / MILESTONE PUBLISHED**
+상태: **TRAINED / PACKAGED / BLIND MATRIX NO_WINNER — DIAGNOSIS + DETERMINISTIC GUARD NEXT**
 
 기계 판독 상태:
 
@@ -10,11 +10,12 @@
 candidate=E2-C1
 goal_status=active
 freeze_status=pass
-gpu_authorized=false
-microsteps_completed=0
-optimizer_steps_completed=0
+gpu_authorized=true
+microsteps_completed=512
+optimizer_steps_completed=32
+matrix_status=no_winner
 adoption_authorized=false
-blocker=bounded_gpu_smoke_intent_on_review_pc
+blocker=invented_handle_diagnosis_and_deterministic_guard_design
 ```
 
 이 문서는 E2-C1 학습 전에 한 번 고정한 데이터·학습·비오염 평가 계약이다. checkpoint에서
@@ -296,6 +297,46 @@ pause를 실행하지 않는다. 이 checkpoint의 중복 판별 identity는 pre
 E2-C1 0/0/PID 0이다. 첫 동작은 actual local/remote publication receipt를 재확인한 뒤 trainer
 adapter-initialization seam을 read-only 감사하는 것이다. 별도 smoke intent 전에는 GPU로
 이동하지 않는다.
+
+## 11. 2026-08-24 15:14 KST E2-C1 36-report blind matrix 결과 (no_winner)
+
+사용자 GPU 무제한 goal(09:47 KST) 하에 smoke PASS → durable 본 학습(512/32, K=3, adapter-
+weights-only init) terminal exit 0 → safe merge → BF16/Q4_K_M 패키징 → 한국어 blind v2
+재봉인(v1이 영어 문구라 실행 불능이었던 결함 수리) → baseline/e2/e2-c1 × 3 fixture × 4 seed
+= 36 reports를 전부 완주했다. `compare_e2c1_blind.py` verdict:
+
+```text
+root_id=airi-e2-c1-blind-freeze-20260824-v2
+report_count=36  status=pass  winner=null  adoption_authorized=false
+scores: baseline=0.217883  e2=0.224945  e2-c1=0.244070  (margin 0.019125)
+improved_additive_axes_vs_e2=4/5 (topic_anchor만 delta -0.006 소폭 하락)
+invented_handle violations: baseline=28  e2=40  e2-c1=53  (학습할수록 악화)
+```
+
+additive 5축 중 4축(complete_show_arc/fact_grounded_usage/long_callback/memory)은 E2 대비
+방향은 개선했으나 전부 절대 최소선에 크게 못 미쳤다(예: complete_show_arc 0.1625/0.75,
+memory 0.075/0.5). hard·legacy·perfect-rate 게이트 13개가 모두 실패했고, 특히
+`zero_violations.invented_handle`이 후보에서 오히려 최악(53건)이라 다른 축 개선과 무관하게
+winner가 될 수 없었다. `unknown_identity_safe`(25%/100%), donation
+name/addressee/thanks/message composite(46%/100%), `stale_transition_clean`(37.5%/100%)도
+전부 미달이다. 산출물은 `D:\AIRI-Models\airi-e2c1-blind-matrix-20260824\run\`
+(comparisons/e2c1-blind.json, policy_sha256/commitment_sha256/environment_attestation_sha256
+결속)에 보존, 외부 미커밋. 첫 실행 시도 2회는 fail-closed 정상 실패로 각각 별도 run dir에
+보존됐다(no-overwrite 가드, blind v1 언어 결함).
+
+**결론:** E2-C1은 no_winner다. `adoption_authorized=false` 유지, 3×500 campaign 금지.
+사용자가 수락한 다음 순서(same-data E3 아님):
+
+1. 이 matrix의 e2-c1 invented_handle 53건 원문을 읽고 분류(순수 날조 / 대화 훨씬 앞
+   맥락의 실제 이름 재호명 / 렌더러 되먹임) — blind는 이미 채점 완료라 열람이 결과를
+   오염시키지 않는다.
+2. roster/context에 없는 한국어 인명을 탐지해 제거·재생성하는 **결정론 런타임 가드**
+   설계 — 로드맵 v3 원칙(모델에게 시키지 말고 코드가 만든다)에 따라 hard gate(0회 위반)를
+   구조적으로 보장.
+3. 가드 적용 후에도 남는 축(complete_show_arc·long_callback·memory)은 **E2-C2**로 재도전.
+   512/32 microsteps는 mixture 680행(accum 16) 기준 1 epoch 미만이었다는 점을 설계에
+   반영해 학습량/LR/correction:replay 비율을 재검토하고, 새 retained blind를 봉인한다
+   (v2는 이미 소비됨 — 재사용 금지).
 
 ## 10. 2026-08-24 02:00 KST full freeze validation receipt
 

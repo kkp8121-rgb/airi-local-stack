@@ -7,6 +7,20 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-24 E2-C1 36-report blind matrix 완료 — no_winner
+
+- 15:14 KST (클로드 PC, Fable 감독) 한국어 blind v2로 baseline/e2/e2-c1 × 3 fixture × 4 seed
+  = 36 reports를 완주했다(첫 시도 2회는 no-overwrite 가드·blind v1 언어 결함으로 정상
+  fail-closed, 각 root 보존). comparator verdict: `status=pass`(정상 채점), **`winner=null`**.
+  score는 e2-c1 0.244 > e2 0.225 > baseline 0.218로 최고점이나, `invented_handle` 위반이
+  28→40→**53**으로 학습할수록 악화해 hard/legacy/perfect-rate 게이트 13개가 전부 실패했다
+  (additive 5축 중 4축은 E2 대비 방향 개선이나 전부 절대 최소선 미달). `adoption_authorized=
+  false`·3×500 campaign 금지 유지. 사용자가 수락한 다음 순서: ① e2-c1 위반 53건 원문 진단
+  (blind 채점 완료라 열람 가능, 날조/재호명/렌더러 되먹임 분류) ② roster 밖 한국어 인명을
+  거르는 결정론 런타임 가드 설계·구현 ③ 남는 축은 학습량(512/32는 mixture 1 epoch 미만)·LR
+  재검토한 **E2-C2**를 새 blind로 재도전(same-data E3 아님). 상세는 frozen contract §11·
+  handoff §-6·STATUS 배너·§3·§5. 문서 갱신만이며 GPU/모델/서비스 변경 0.
+
 ## 2026-08-24 blind v1 실행-불능 결함과 한국어 v2 재봉인
 
 - 12:58 KST (클로드 PC, Fable 감독 + opus 워커 blind-v2) matrix 1차 실행이 sim traceback으로
