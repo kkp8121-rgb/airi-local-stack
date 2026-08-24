@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 15:14:00 +09:00"
-checkpoint_id: "20260824-134000-matrix-no-winner-docs-receipt-diagnosis-goal"
+updated_at_kst: "2026-08-24 16:26:00 +09:00"
+checkpoint_id: "20260824-162600-handle-grounding-guard-plus-grader-fix-receipt"
 goal_status: "active"
 authorization: "user-goal-2026-08-24: repository-gpu-unlimited-training-packaging-36-report-campaign-on-winner-e2-c2-on-no-winner-local-services-t3-readonly-diagnosis-t05-sample-synthesis-commit-push-authorized; forbidden: post-blind-target-fixture-threshold-seed-change, blind-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-on, speaker-126-operational-promotion; operational-adoption-forbidden-until-separate-user-approval"
-active_phase: "e2-c1-invented-handle-diagnosis-and-guard-design"
-git_head: "764df3fdf33f0962aff84860480a354a7e2c8a26"
-worktree_state: "HEAD-local-remote-exact-764df3f-before-this-docs-batch; docs-batch-plus-agent-memory-uncommitted; matrix-fully-idle-PID-0"
+active_phase: "handle-grounding-guard-and-grader-fix-implementation"
+git_head: "a0020dd17ff9bcdbbd902d419cf88e0588f1d12e"
+worktree_state: "HEAD-local-a0020dd-not-yet-pushed-pending-this-docs-batch; matrix-fully-idle-PID-0"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
@@ -22,6 +22,74 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 16:26 KST **핸들 grounding 가드 + 채점기 신호 구현 receipt (감독 직접 구현, opus 위임 3회 529 overload 후 포기)**: `a0020dd`(fix)로 커밋. 구현 전 forensic 재검토로 이전 결론(15:55 receipt)을 갱신한다 — 53건 재호명 텍스트를 문법적으로 다시 훑으니 vocative 접미사(-님/-아/-야) 직후에 handle이 오는 경우는 7/53(13%)뿐이고, 나머지 46/53(87%)은 "배접천부터 꺼내야 해"처럼 일반 명사로 쓰였다 — 두 갈래 조치의 실제 담당 비중이 애초 가정과 다르다: (1) 런타임 가드는 vocative 87%를 못 잡는 좁은 범위(프로덕션은 roster가 없어 문법 신호 외에 handle을 식별할 방법이 없음 — display name이 프롬프트 재료에서 의도적으로 빠져 있음)이고, (2) 채점기 신호가 실제로 no_winner 원인이던 87%를 담당한다. 설계를 이 증거에 맞춰 통합: 신규 `ollama-proxy/handle_grounding_guard.py`(`AIRI_HANDLE_GROUNDING_GUARD` 기본 off)가 이번 턴 실제 근거 풀(유저 발화+브리핑+memory 회수+journal)을 한 번 계산해 ①-님 vocative만 좁게 스트립·치환하고 ②그 계산의 memory/journal 부분(브리핑 계층에는 없던, 그레이더가 원래 못 보던 부분만)을 항상 기존 in-band `airi_moderation` SSE 신호에 실어 보낸다. `ollama_proxy.py`는 `prepare_openai_sse_dialogue`에 kwarg 2개를 더하고 `stream_local_with_ack`의 실제 모델-생성 두 지점(early-safe-sentence·main dialogue)에서만 사용 — 템플릿/폴백 문구는 안 건드림. `run_broadcast_chat_ab.py`의 SSE 델타 파서가 `airi_moderation.handle_grounding`을 `record`로 끌어올리고, `run_broadcast_sim.py`가 그 memory_pool에서 roster handle 부분일치를 찾아 `fact_tokens`에 합친다 — 게이트 정의(무엇이 위반인가)는 그대로, 판정 입력 범위만 넓힘, 프록시 플래그가 off면 완전 no-op(시뮬레이터 쪽 union도 자동 무동작). 실제 버그 1건 발견·수정: `build_grounding_pools`가 flag-off 경로에서도 호출부가 `_memory_result.block`을 미리 꺼내 넘기다가 RetrievalResult 아닌 자리표시자에서 AttributeError로 `stream_local_with_ack` 전체를 깨뜨림(370개 중 62 FAIL/6 ERROR) — memory_result 원본을 그대로 넘기고 flag 확인 뒤에만 getattr로 읽도록 고침, 재현 회귀 테스트 추가. 이중 플래그 위험도 하나 고침: `from ... import HANDLE_GROUNDING_GUARD_ENABLED`가 두 모듈에 독립 사본을 만들어 monkeypatch 불일치를 낳을 수 있어 `import handle_grounding_guard` qualified 접근으로 단일 소스화. 검증: 신규 모듈 단위 16 tests, `test_ollama_proxy.py` 370(+3 신규 ON/OFF/grounded 통합 테스트)=373 전부 pass(WindowsApps python 3.14, httpx/fastapi 보유 — 리포 실사용 venv 2종엔 둘 다 없어 부적합했음), `run_broadcast_sim`/`compare_e2c1_blind`/`compare_broadcast_t3` 88 pass+1 skip, `run_broadcast_rehearsal` 85 pass(신규 SSE 시그널 캡처 회귀 2건 포함), `test_e2_c1_blind_commitment` 6 pass(훈련 venv pytest, 무관 확인), `test-current-checkpoint.ps1` PASS, `git diff --check` 0. CI shard에 `test_handle_grounding_guard.py` 등록. 다음: 이 receipt를 docs 커밋으로 push, push 후 HEAD==origin/main 확인, work-continuity 계약 재확인 후 E2-C2 설계로 진행(신규 blind 필요, v1/v2 재사용 금지 유지).
+- 2026-08-24 16:10 KST **사용자 결정: (1)+(2) 함께 진행 + 구현 intent**: 사용자가 런타임 가드와
+  채점기 보정을 동시에 승인했다(goal의 "1과 2함께"). 감독이 직접 코드 조사: `memory_runtime.
+  prepare_payload_context()`가 반환하는 `RetrievalResult`(`airi_memory.py:270`, `block`/
+  `journal_messages`/`journal_count` 필드)가 이번 턴에 실제로 검색·주입된 내용 전부를 담고
+  있음을 확인했다. `LocalStreamRequestContext`(ollama_proxy.py:7391)는 아직 이 result를
+  들고 있지 않아 새로 꿰어야 한다. 기존 `apply_output_moderation`(ollama_proxy.py:6302,
+  문장 단위 순수 함수, `output_moderation_runtime.inspect`) 패턴을 그대로 따라 새 가드를
+  붙인다. 설계: 응답에서 한국어 호격 패턴(-님/-아/-야가 붙은 선행 토큰)을 후보 handle로 추출
+  → 이번 턴에 실제로 조립된 전체 프롬프트 텍스트(원 메시지+briefing+retrieval block+journal
+  messages)에 그 문자열이 있는지 검사 → 없으면 안전한 지시어로 대체. 이 판정 결과(grounded
+  token 집합)를 loopback 전용 신규 헤더(`X-AIRI-Briefing-Evidence` 패턴과 동일한 exact-match·
+  content-limited 원칙)로도 노출해, 채점기(`run_broadcast_sim.py`/`broadcast_sim.py`)가 같은
+  판정을 `briefing_fact_tokens`에 합쳐 `fact_tokens_used`로 인정하게 한다. **가드와 채점기
+  신호가 동일 로직에서 나오므로 게이트 정의 자체(무엇이 위반인가)는 바꾸지 않고, 그 판정의
+  입력 범위(director briefing만 알던 것→실제 프롬프트 전체)만 정확하게 만드는 것**이다.
+  기본 `AIRI_HANDLE_GROUNDING_GUARD=off`(env truthy 파싱, 기존 `AIRI_MEMORY_CLAIM_GUARD`
+  패턴과 동일), OFF 시 요청/응답 바이트 무변화 회귀 필수. 구현은 신규 모듈
+  `ollama-proxy/handle_grounding_guard.py`로 격리해 `ollama_proxy.py` diff 최소화.
+  implementer(opus)에게 조사 검증+구현+테스트를 위임한다. frozen policy/comparator/threshold/
+  seed/fixture 파일은 건드리지 않는다.
+- 2026-08-24 15:55 KST **재호명 근본 원인 확정 — 라이브 memory 검색이 실제로 회수, 채점기가
+  모름(read-only DB 조사, 코드 변경 0)**: e2-c1 factual_grounding-73 run의 보존된
+  `memory.sqlite3`를 열람. `memory` 테이블(18행)은 AIRI/사용자 base persona 사실뿐 — 시청자별
+  seed 정보 없음(memory-arm seeded가 개별 시청자 fact를 심지 않음 확인, 첫 가설 기각).
+  `conversation_message` 테이블(214행, 전체 turn 로그)에서 상위 반복 handle '배접천'이 14회
+  등장 확인 — `memory_runtime.py:530 retrieve()`가 실제 FTS 기반 RAG로 이 로그를 검색해
+  프롬프트에 주입할 수 있는 진짜 함수임을 코드로 확인. 결론: 모델이 지어낸 게 아니라 **라이브
+  memory 검색 시스템이 정상 작동해 먼 과거(30~91턴 전) 시청자를 정확히 회수**했는데, 채점기
+  `broadcast_sim.py`의 `fact_tokens_used`는 director의 손수 조립 briefing(현재 발화자 본인
+  발언 + 직전 2개 pick)만 알고 live memory retrieval의 존재를 전혀 모른다 — 그래서 정확한
+  행동이 위반으로 채점된다.
+
+  두 갈래 조치로 나뉜다: **(1) 런타임 가드(행동측, 즉시 승인 범위 내)** — 이번 턴에 실제로
+  조립된 프롬프트(director briefing + live memory retrieval 결과 전부)에 없는 handle만 응답에서
+  제거·대체. 채점기 정의를 안 건드리므로 hard gate 완화가 아니고, 정당한 memory 사용이든
+  아니든 채점기 기준을 항상 만족시키는 안전한 하한선. **(2) 채점기 보정(측정측, 별도 승인
+  필요)** — `fact_tokens_used`가 live memory retrieval 결과도 grounding으로 인정하도록 확장.
+  기술적으로는 버그 수정에 가깝지만 결과를 본 뒤 무엇이 '위반'인지의 정의를 바꾸는 것이라
+  `hard gate 완화` 금지 조항과 닿아 있어 사용자 확인 없이 진행하지 않는다.
+
+  (1)로 즉시 진행하고, (2)는 사용자 확인 대기.
+- 2026-08-24 15:35 KST **invented_handle 53건 진단 receipt — 100% 재호명, 0% 순수 날조/렌더러**:
+  scout가 12개 e2-c1 report의 `transcript[]`로 전수 추적. 결과: 순수_날조 0, **재호명 53(100%)**,
+  렌더러_되먹임 0. fixture별 factual_grounding 25·long_continuity 24·identity_unknown 4(정작
+  날조 저항을 노린 fixture가 최소). 재호명 거리 중앙값 30턴, 최대 91턴(history_turns=8 훨씬
+  밖) — 원시 대화창이 아니라 briefing/memory 경로로 회수된 것으로 추정. top handle 2종이
+  각 9회 반복(우연한 재사용 아님, 실제 memory 회수). 총합 53 sanity check 일치. 결론: 모델이
+  거짓 이름을 지어낸 게 아니라 **실제 과거 시청자를 정확히 기억해 불렀는데, 그 부름이 이번 턴의
+  fact_tokens_used로 grounding되지 않아 metric이 invented로 채점**한 것 — long_callback/
+  memory 교정과 invented_handle gate가 같은 행동을 반대로 채점하는 긴장 관계다. 가드 설계는
+  두 갈래: (A) 이번 턴 텍스트/author/fact_tokens에 없는 handle을 무조건 제거·대체(작지만
+  callback 행동 자체를 죽임) vs (B) 장기 callback이 briefing에서 fact_tokens_used로 grounding
+  되도록 파이프라인을 보강해 같은 행동이 invented 대신 memory로 인정받게 함(범위가 더 크고
+  memory/long_callback 축도 같이 개선 가능하나 briefing 계층 변경 필요). 사용자에게 설계
+  방향 확인 요청 중.
+- 2026-08-24 15:22 KST **user `/goal` 접수 + invented_handle 진단 intent**: 사용자가 앞서 제시한
+  goal 문안을 그대로 승인(진단→가드→E2-C2, blind v1/v2 재사용·hard gate 완화·same-data E3·
+  campaign은 금지, GPU 무제한, adoption은 별도 승인). preflight: HEAD/local/remote exact
+  `57d0e53`, clean, 관련 AIRI PID 0. e2-c1 blind v2 report는
+  `D:\AIRI-Modelsiri-e2c1-blind-matrix-20260824uneports\e2-c1\`에 12개(3 fixture×4 seed)
+  존재 확인. report schema는 `rows[].invented_handles`(위반 handle 목록)와 `transcript[]`
+  (stage=turn마다 author/chat/airi/deterministic_act, turn_index 순)를 모두 담아 이름의
+  최초 등장 위치를 이 report 하나만으로 추적 가능함을 확인했다. scout(haiku)에게 12개
+  report의 invented_handles 53건 전부를 ①순수 날조(이전 어디에도 미등장) ②재호명(실제
+  시청자 author/chat에 이전 등장) ③렌더러 되먹임(deterministic_act가 먼저 소개)으로 분류
+  위임한다. blind는 이미 채점 완료라 열람이 오염이 아니다. 원문은 문서/커밋에 옮기지 않고
+  분류 통계만 기록한다. 완료 조건: 53건 전수 분류 + 비율표 + 대표 사례(익명화) 보고.
 - 2026-08-24 15:14 KST **E2-C1 blind v2 matrix 최종 receipt + 진단 phase 문서 배치**: 36/36
   reports, comparator `status=pass`/**`winner=null`**. score e2-c1 0.244(최고)·e2 0.225·
   baseline 0.218, additive 4/5축 방향 개선하나 전부 절대 최소선 미달, `invented_handle`

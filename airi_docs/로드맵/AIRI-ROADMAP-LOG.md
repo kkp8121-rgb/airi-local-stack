@@ -21,6 +21,23 @@
   재검토한 **E2-C2**를 새 blind로 재도전(same-data E3 아님). 상세는 frozen contract §11·
   handoff §-6·STATUS 배너·§3·§5. 문서 갱신만이며 GPU/모델/서비스 변경 0.
 
+## 2026-08-24 handle grounding 가드 + 채점기 신호 구현 (E2-C1 진단 1+2)
+
+- 16:26 KST (클로드 PC, Fable 감독 직접 구현 — opus 위임 3회 529 overload로 포기) 사용자가
+  "1과 2함께"로 승인한 통합 설계를 구현: 신규 `handle_grounding_guard.py`(기본 off)가 이번
+  턴 실제 근거 풀을 한 번 계산해 -님 vocative만 좁게 가드하고, 그 계산의 memory/journal 부분을
+  기존 in-band `airi_moderation` SSE 신호로 항상 노출 — `run_broadcast_chat_ab.py`가 캡처,
+  `run_broadcast_sim.py`가 roster 부분일치로 `fact_tokens`에 합침(게이트 정의 불변, 입력 범위만
+  확장). 구현 착수 전 재검증한 forensic 결과가 15:55 receipt를 갱신: 53건 중 vocative는 7건
+  (13%)뿐이고 46건(87%)은 회수된 이름을 일반 명사로 쓴 사례 — 런타임 가드가 커버하는 몫과
+  실제 no_winner 원인(채점기 신호가 담당)의 비중이 애초 가정과 다름을 설계에 반영했다. 구현 중
+  실제 버그 1건(`_memory_result` 속성 조기 접근으로 flag-off 경로가 AttributeError, 370개 중
+  62 FAIL/6 ERROR) + 이중 플래그 monkeypatch 위험 1건을 고치고 회귀 테스트로 고정. 검증:
+  신규 모듈 16 + 프록시 373(신규 ON/OFF/grounded 통합 3 포함) + 시뮬레이터/코드체인 88+85 +
+  블라인드 commitment 6 전부 pass, `test-current-checkpoint.ps1` PASS, diff-check 0. CI shard에
+  `test_handle_grounding_guard.py` 등록. commit `a0020dd`(fix)+docs로 push. 다음: E2-C2 설계
+  (v1/v2 재사용 금지, 신규 blind 필요).
+
 ## 2026-08-24 blind v1 실행-불능 결함과 한국어 v2 재봉인
 
 - 12:58 KST (클로드 PC, Fable 감독 + opus 워커 blind-v2) matrix 1차 실행이 sim traceback으로
