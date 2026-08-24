@@ -1,11 +1,11 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 21:00:00 +09:00"
-checkpoint_id: "20260824-210000-e2c2-main-training-complete-paused-awaiting-user"
+updated_at_kst: "2026-08-24 23:55:00 +09:00"
+checkpoint_id: "20260824-235500-e2c2-merged-packaged-matrix-intent"
 active_trainer_note: "e2c2 본 학습 terminal complete(1536/96, exit 0). 사용자 지시로 merge/패키징/matrix 진행하지 않고 대기. 재개 신호 = 사용자 '게임 끝' 통지. trainer/runner PID 0, AIRI GPU 워크로드 0"
 goal_status: "active"
 authorization: "user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "e2c2-trained-paused-awaiting-user-game-end"
+active_phase: "e2c2-blind-matrix"
 git_head: "9a2195b4ec4c9dba9bf449967ce840a8849667d9"
 worktree_state: "HEAD-local-remote-exact-9a2195b(harness batch); dirty: live-state heartbeat + verify_e2_c2 deterministic_validation key (commit with smoke receipt); AIRI-PID-0; trainer 0; GPU idle 479MiB"
 active_trainer_count: 0
@@ -23,6 +23,37 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 23:55 KST **merge/package receipt + 36-report matrix intent**: ① safe merge
+  exit 0 — merged `model.safetensors`
+  `c2b907e5419854a46154fdfcd44123d5fa8211a926d954483cce68a96961dedb`(4,611,084,960 B),
+  non-target tensor exactly_unchanged true, target l2 delta 0.1124(E2-C1 0.0865보다 큰 이동
+  — 6× 유효 선량 정합), evidence `D:\AIRI-Models\airi-e2-c2-merged-20260824\merged-hf`.
+  ② 패키징 exit 0 — E2-C1과 동일 4 도구 핀 exact(converter python/script, quantizer bundle,
+  ollama), BF16→Q4_K_M q4 gguf `7802bee3...b6905`(1,426,272,608 B), **평가 전용 태그**
+  `midm-airi:e2c2-broadcast-v4-20260824-5eda8184e7118093773b4eafe513ec96`(digest
+  `66364b4a1eeb33459b957d5024d864a45264897d121c2db0cc1f528b7bd48252`), evidence
+  `D:\AIRI-Models\airi-e2-c2-packages-20260824\e2c2`. 운영 태그 불변·adoption 아님. ③
+  Ollama 태그 3-arm digest 검증 OK, model manifest
+  `D:\AIRI-Models\airi-e2c2-blind-matrix-20260824\e2c2-model-manifest.json` 작성, launcher
+  `-MatrixProfile e2c2 -PreflightOnly` exit 0(36 unique run keys, blind v3 binding 유효).
+  **matrix intent**: 이 receipt commit/push 후 detached로
+  `run-airi-broadcast-t3-matrix.ps1 -MatrixProfile e2c2 -OutputDir
+  D:\AIRI-Models\airi-e2c2-blind-matrix-20260824\run -ModelManifest <위 manifest>
+  -BlindRoot D:\AIRI-Models\airi-e2-c2-blind-freeze-20260824-v3` 1회 실행 — 프록시는 run별
+  `AIRI_HANDLE_GROUNDING_GUARD=on`(launcher가 강제, /health로 attest). 36 runs 예상
+  2~3시간, 14분 heartbeat, 첫 3 report에서 perfect-rate 분모 확인, 종료 시
+  `compare_e2c2_blind.py` verdict(자동 실행)로 winner 판정. 실패 시 root 보존·동일 명령
+  반복 금지. winner면 3×500 campaign 연속, no_winner면 진단 보고 후 대기(goal 지시).
+- 2026-08-24 23:35 KST **사용자 재개 신호 + merge/package intent**: 사용자 "작업 재개" 접수
+  (21:00 정지 지시의 해제). preflight: HEAD/local/remote exact `ea55ffb`, live-state
+  heartbeat만 dirty, AIRI trainer/서비스 PID 0. E2-C1과 동일 도구·핀 순서로 진행: ①
+  `merge_airi_behavior_lora.py` — base merged-hf(`394b6624...f506`, top-level canonical
+  manifest `bac2b815...8209` 디스크 재계산 exact) + e2c2-adapter(model `f3d23950...2efa`,
+  top-level canonical manifest `fd3972501bc2339d5e5b6c1ed55f45a3250a9af3ae3d21bda270085992324a12`)
+  → `D:\AIRI-Models\airi-e2-c2-merged-20260824\merged-hf`, temporary-dir=output parent
+  (E2-C1 fail-closed 교훈 반영). ② `package_airi_gguf.py` — E2-C1과 같은 4 도구 핀으로
+  BF16→Q4_K_M→평가 전용 태그(운영 태그 불변). ③ 새 blind matrix intent는 패키징 receipt 후
+  별도 기록. 각 단계 exit 0 + evidence로 receipt.
 - 2026-08-24 21:00 KST **E2-C2 본 학습 terminal receipt + 사용자 지시 대기**: run
   `e2c2-main-seed42-1536-20260824`(root `airi-e2-c2-main-20260824-181203`)이 terminal exit
   0/`trainer-complete`, **1536/1536 microsteps·96/96 optimizer steps·pending 0**, rev 614,

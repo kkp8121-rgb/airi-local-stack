@@ -7,6 +7,15 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-24 E2-C2 merge/package + matrix 착수
+
+- 23:55 KST (클로드 PC, Fable 감독) 사용자 "작업 재개" 후 safe merge exit 0(merged
+  `c2b907e5...dedb`, non-target 무변경, target l2 0.1124) → 패키징 exit 0(Q4_K_M
+  `7802bee3...6905`, 평가 태그 `midm-airi:e2c2-broadcast-v4-20260824-5eda8184...`, digest
+  `66364b4a...8252`, 도구 4핀 exact). Ollama 3-arm digest 검증·model manifest 작성·e2c2
+  preflight exit 0(36 keys). detached matrix 실행 intent 기록 — 프록시 guard=on 강제,
+  comparator까지 launcher가 자동 실행. 운영 태그 불변, adoption 아님.
+
 ## 2026-08-24 E2-C2 durable 본 학습 완료 (1536/96, 3 epochs)
 
 - 21:00 KST (클로드 PC, Fable 감독) root `airi-e2-c2-main-20260824-181203`에서 terminal
