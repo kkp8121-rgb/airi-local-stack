@@ -7,6 +7,19 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-24 E2-C1 bounded smoke PASS
+
+- 10:50 KST (클로드 PC) 수리 코드(`8f8f176`)로 fresh root `airi-e2-c1-smoke2-20260824-104800`
+  에서 smoke 재실행 완료·PASS. baseline arm complete 80/5 exit 0(fresh-state receipt: 상속
+  optimizer/scheduler/rng/cursor 전부 false, optimizer entries 0), safe arm은 pause prearm →
+  gateway `SAFE_TO_POWER_OFF` 1회 → paused-safe 16/1 → `-ResumeInterrupted` 재개(이번에는
+  resume-accepted 기록과 함께 완주) → complete 80/5 exit 0. 두 arm 모두 report
+  `init_mode=adapter-weights-only`, dev loss `2.51504065335813` 동일. equivalence verifier
+  exit 0, `receipts/gpu-equivalence.json` pass=true, 672 tensors exact(max abs/rel 0.0),
+  normal intervals 4/최대 54.8초(≤600). manifest `af2fe999...65dc`, config `7f9d929e...6b30`,
+  frozen pin 전부 exact. frozen contract §8-4(bounded smoke 1회) 충족 — 다음은 fresh external
+  root에서 durable E2-C1 본 학습 step 0(512 microsteps/32 opt steps, K=3)이다. 운영 채택 아님.
+
 ## 2026-08-24 E2-C1 smoke 1차 + T-05 A/B 샘플
 
 - 10:35 KST (클로드 PC, Fable 감독+팀) goal `active`. E2-C1 bounded smoke 진행 중 adapter-init

@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 10:44:00 +09:00"
-checkpoint_id: "20260824-104400-smoke-seam-fixes-verified-commit-intent"
+updated_at_kst: "2026-08-24 10:51:00 +09:00"
+checkpoint_id: "20260824-105100-smoke2-pass-receipt-main-training-intent"
 goal_status: "active"
 authorization: "user-goal-2026-08-24: repository-gpu-unlimited-training-packaging-36-report-campaign-on-winner-e2-c2-on-no-winner-local-services-t3-readonly-diagnosis-t05-sample-synthesis-commit-push-authorized; forbidden: post-blind-target-fixture-threshold-seed-change, blind-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-on, speaker-126-operational-promotion; operational-adoption-forbidden-until-separate-user-approval"
-active_phase: "e2-c1-bounded-gpu-smoke"
-git_head: "9875895f6ef30db47846dc0e9f38959257a44548"
-worktree_state: "HEAD-local-main-local-origin-main-remote-main-exact-9875895; smoke-seam-fix-batch-8-code-test-files-plus-doc-batch-uncommitted; commit-in-two-batches-intent"
+active_phase: "e2-c1-main-training-launch"
+git_head: "5b4d757_after_8f8f176_c96b929_push"
+worktree_state: "HEAD-local-remote-exact-5b4d757; clean-except-live-state-heartbeat; smoke2-fresh-root-launch"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 09:55 KST E2-C1 bounded GPU smoke intent (Claude PC, Fable supervisor). Docs batch commit 9875895 pushed (6726baa..9875895), HEAD=local=remote exact, clean, related AIRI PID 0, GPU idle 953 MiB, D: free 38 GB. Pins re-verified on disk: mixture chat c845adfc...1980 (1,970,252 B), base model.safetensors 394b6624...f506, E2 adapter dir D:\AIRI-Models\airi-broadcast-v4-20260821\adapter-r8-seq2048-e2-lr2e5 with adapter_model 2a72292c...5c5b (56,318,520 B), adapter_config e01129ea...82b0 (863 B), artifact-manifest 70998cff...7195 (2,141 B, run_id v4-e2-seed42-1600-20260823-074326). Smoke = two arms in fresh root D:\AIRI-Models\airi-e2-c1-smoke-<ts>: builder v3 manifest (init_mode adapter-weights-only, seed 42, r/alpha/dropout 8/16/0.05, LR 1e-5, batch 1, accum 16, seq 2048, max 80 microsteps = 5 optimizer steps, K=1, deterministic validation) -> authoritative durable launcher baseline arm run id e2c1-smoke-baseline-80 -> safe arm e2c1-smoke-safe-80 with -PauseAtFirstOptimizerBoundary -> pause-airi-safely.ps1 SAFE_TO_POWER_OFF -> -ResumeInterrupted -> verify_airi_behavior_gpu_equivalence.py expecting 80/5/K=1, safe pause 16/1, manifest+config SHA -> receipts/gpu-equivalence.json pass=true. Also expected: fresh-state-receipt.json in each run dir with optimizer_state_entries 0 and progress 0/0 at init. Smoke is not quality progress; frozen 512/32/K=3 contract values are untouched. Failure preserves root, no relaunch of the same arm, no E2-C1 main training until root cause. Heartbeat 15 min while GPU runs."
 ---
@@ -22,6 +22,27 @@ reconciliation_receipt: "2026-08-24 09:55 KST E2-C1 bounded GPU smoke intent (Cl
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 10:51 KST **smoke2 PASS receipt + 본 학습 intent**: fresh root
+  `airi-e2-c1-smoke2-20260824-104800`에서 baseline/safe 두 arm 모두 complete 80/5 exit 0,
+  gateway `SAFE_TO_POWER_OFF` 1회, resume-accepted 기록, 두 report init_mode
+  adapter-weights-only·dev `2.51504065335813` 동일, equivalence verifier exit 0/pass=true/672
+  tensors exact(0.0)/intervals 4·max 54.8초, manifest `af2fe999...65dc`. frozen contract §8-4
+  bounded smoke 충족. 이 receipt를 `docs: record E2-C1 bounded smoke PASS`로 commit/push하고
+  clean/PID 0 확인 뒤, 본 학습을 fresh external root `D:\AIRI-Modelsiri-e2-c1-main-<ts>`에서
+  frozen 값 그대로(step 0, seed 42, batch 1, accum 16, seq 2048, **512 microsteps/32 optimizer
+  steps, checkpoint K=3**, LR 1e-5, adapter-weights-only init, mixture chat `c845adfc...1980`)
+  authoritative durable runner로 정확히 한 번 시작한다. 예상 소요 ~50-90분, GPU 학습 중 heartbeat
+  상한 15분(모니터를 14분 단위로 나눠 재기록). 완료 조건: terminal complete 512/32, adapter/
+  report/fresh-state receipt, epoch dev loss, 관련 PID 0. 실패 시 root 보존·재시작 금지.
+- 2026-08-24 10:48 KST **smoke2 intent**: seam 수리 배치 `8f8f176`(fix)·`c96b929`(docs)·`5b4d757`
+  (chore)가 push돼 HEAD=origin/main exact·clean이다. trainer/runner source SHA가 바뀌었으므로
+  bounded smoke를 fresh root `D:\AIRI-Modelsiri-e2-c1-smoke2-20260824-104800`에서 동일 계약
+  (80 microsteps/5 opt steps, K=1, adapter-weights-only init, frozen pin 전부 동일)으로 두 arm
+  재실행한다: builder v3 manifest → baseline `e2c1-smoke2-baseline-80` → safe
+  `e2c1-smoke2-safe-80`(-PauseAtFirstOptimizerBoundary → gateway SAFE_TO_POWER_OFF →
+  -ResumeInterrupted 완주) → equivalence verifier(expected 80/5/K=1, safe 16/1, manifest/config
+  SHA) → `receipts/gpu-equivalence.json` pass=true + 각 fresh-state receipt. PASS receipt
+  commit/push 뒤 본 학습 intent로 이동. 실패 시 root 보존·재시작 금지.
 - 2026-08-24 10:44 KST **seam 수리 3건 검증 완료 + 2-commit intent**: implementer `resume-init-fix`
   보고(파일 4, 상호배제 제거, resume가 init flag 유지, fresh-state receipt는 fresh 전용, cpu-smoke
   end-to-end 회귀 + pre-fix fail-first 재현 `1 failed` 확인)를 감독이 diff로 검토했고 독립 재검증:
