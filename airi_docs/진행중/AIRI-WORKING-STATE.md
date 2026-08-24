@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 18:25:00 +09:00"
-checkpoint_id: "20260824-182500-e2c2-harness-implemented-receipt"
+updated_at_kst: "2026-08-24 19:10:00 +09:00"
+checkpoint_id: "20260824-191000-e2c2-smoke-pass-receipt"
 goal_status: "active"
 authorization: "user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "e2-c2-recipe-design"
-git_head: "2fe39f52e40e0a6bd2bdb1e98aeb90e4b8d55294"
-worktree_state: "HEAD-local-remote-exact-2fe39f5; clean; AIRI-PID-0 (only Ollama 11434 serve + unrelated MCP procs); trainer 0"
+active_phase: "e2c2-gpu-smoke"
+git_head: "9a2195b4ec4c9dba9bf449967ce840a8849667d9"
+worktree_state: "HEAD-local-remote-exact-9a2195b(harness batch); dirty: live-state heartbeat + verify_e2_c2 deterministic_validation key (commit with smoke receipt); AIRI-PID-0; trainer 0; GPU idle 479MiB"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
@@ -22,6 +22,43 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 19:10 KST **E2-C2 bounded GPU smoke PASS receipt**: root
+  `D:\AIRI-Models\airi-e2-c2-smoke-20260824-175116`. builder v3 manifest exit 0(manifest SHA
+  `ee5cc0dd196d469fd2870a99cc71bb3ee7198ba25c3983676b43b666603db873`, training_config SHA
+  `d2ab0ddc29ab271f39bcf9eac74dae7e48133486557ce03573e0af712f37da0d`). baseline arm
+  `e2c2-smoke-baseline-80` terminal exit 0/trainer-complete 80/80·5/5·pending 0, dev loss
+  `2.444845537582428`(epoch 1; E2-C1 smoke 1e-5의 2.51504 대비 낮음 — LR 2e-5 반영 방향 정합),
+  init adapter-weights-only, fresh-state receipt 존재. safe arm 1차는 self-pause(paused-safe
+  16/1) **후** gateway를 호출해 anti-spoof 설계 거부('Already-paused terminal cannot
+  authorize...') — E2-C1 10:22 선례와 동일한 정상 fail-closed이며
+  `safe-pause-resume-run-gateway-late-invocation`으로 보존, 같은 run 재시작 안 함. fresh
+  RunDir 재시작(runner 15744, pause-requested) 후 trainer live 구간에 gateway 호출 → exit 0,
+  `SAFE_TO_POWER_OFF` 1회, paused-safe 16/1, checkpoint-00000001(manifest
+  `ed141bb9...ebaab`). `-ResumeInterrupted` 재개 → terminal exit 0 complete 80/5, dev loss
+  baseline과 **비트 동일**(2.444845537582428). equivalence verifier exit 0,
+  `receipts/gpu-equivalence.json` `pass=true`, normal intervals 4/max 54.8초(≤600 gate).
+  GPU 355MiB idle, trainer/runner PID 0. 계약 §4 bounded smoke 충족(1회, 배관 검증 완료).
+  이 receipt + verifier `deterministic_validation` 강화 한 줄을 commit/push 후 본 학습
+  intent로 이동.
+- 2026-08-24 18:45 KST **E2-C2 bounded GPU smoke intent (계약 §4, 1회 한정)**: harness 배치
+  `9a2195b` push 완료(HEAD/local/remote exact). 입력 pin 5종 디스크 재검증 ALL-EXACT
+  (mixture chat `c845adfc...1980`, base merged-hf `394b6624...f506`, E2 adapter dir
+  `D:\AIRI-Models\airi-broadcast-v4-20260821\adapter-r8-seq2048-e2-lr2e5`의 model/config/
+  artifact 3핀). GPU idle(479MiB, trainer PID 0). `verify_e2_c2_frozen_contract.py`의
+  RUNNER_TRAINING_CONFIG에 `deterministic_validation: True` 추가(동결 강화, 23 tests pass —
+  smoke receipt 배치에 함께 커밋). exact 계획(E2-C1 smoke2 패턴, LR/steps만 E2-C2 값):
+  fresh root `D:\AIRI-Models\airi-e2-c2-smoke-20260824-<hhmmss>`에 훈련 venv
+  (`venv-midm-broadcast-qlora-py312`)로 ① builder v3 manifest(mode cuda-qlora, seed 42,
+  8/16/0.05, **LR 2e-5**, batch 1/accum 16/seq 2048, **max 80 microsteps=5 opt steps, K=1**,
+  deterministic validation, adapter-weights-only init 3핀) ② authoritative
+  `run-airi-behavior-training-durable.ps1`로 baseline arm `e2c2-smoke-baseline-80`
+  (RunDir baseline-run, K=1, heartbeat 10초) ③ safe arm `e2c2-smoke-safe-80`을
+  `-PauseAtFirstOptimizerBoundary`로 시작 → `pause-airi-safely.ps1` SAFE_TO_POWER_OFF →
+  `-ResumeInterrupted` 완주 ④ `verify_airi_behavior_gpu_equivalence.py`(expected 80/5/K=1,
+  safe pause 16/1, manifest/config SHA) → `receipts/gpu-equivalence.json` pass=true.
+  smoke는 배관 검증이며 품질 진척 아님. 완료 조건: 두 arm complete 80/5·fresh-state
+  receipt(optimizer entries 0)·equivalence pass·관련 PID 0. 실패 시 root 보존·같은 arm
+  재시작 금지·원인 확정 전 본 학습 금지. GPU 실행 중 heartbeat 상한 15분.
 - 2026-08-24 18:25 KST **e2c2 평가 하네스 구현 receipt (offline 전체 PASS)**: 신규 리포 파일
   8종 + 수정 3종. 신규: `compare_e2c2_blind.py`(implementer 위임 — e2c1 사본 최소 수정,
   candidate e2-c2/schema `airi.e2-c2-blind-comparison.v1`/attestation에

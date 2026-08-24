@@ -91,6 +91,7 @@ RUNNER_TRAINING_CONFIG = {
     'gradient_accumulation': 16,
     'max_seq_len': 2048,
     'checkpoint_every_optimizer_steps': 3,
+    'deterministic_validation': True,
     'init_mode': 'adapter-weights-only',
 }
 

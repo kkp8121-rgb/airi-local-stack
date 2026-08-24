@@ -7,6 +7,15 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-24 E2-C2 bounded GPU smoke PASS
+
+- 19:10 KST (클로드 PC, Fable 감독) fresh root `airi-e2-c2-smoke-20260824-175116`에서 builder
+  v3(LR 2e-5, 80/5, K=1, adapter-weights-only) → baseline arm complete 80/5 exit 0(dev
+  2.444845537582428) → safe arm gateway `SAFE_TO_POWER_OFF`(late-invocation 1회는 anti-spoof
+  정상 거부로 보존) → resume 완주(dev baseline과 비트 동일) → equivalence verifier
+  `pass=true`(intervals 4/max 54.8s). verifier freeze에 `deterministic_validation` 키 추가.
+  GPU idle 복귀, PID 0. 다음 배치: durable 본 학습 1536/96 step 0.
+
 ## 2026-08-24 E2-C2 blind v3 봉인 + 평가 하네스 구현
 
 - 18:25 KST (클로드 PC, Fable 감독) blind v3 3종을 감독이 직접 저작(직조 공방/간이역
