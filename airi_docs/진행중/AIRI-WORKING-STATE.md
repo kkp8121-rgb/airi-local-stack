@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 09:47:17 +09:00"
-checkpoint_id: "20260824-094717-goal-gpu-unlimited-docs-commit-intent"
+updated_at_kst: "2026-08-24 10:44:00 +09:00"
+checkpoint_id: "20260824-104400-smoke-seam-fixes-verified-commit-intent"
 goal_status: "active"
 authorization: "user-goal-2026-08-24: repository-gpu-unlimited-training-packaging-36-report-campaign-on-winner-e2-c2-on-no-winner-local-services-t3-readonly-diagnosis-t05-sample-synthesis-commit-push-authorized; forbidden: post-blind-target-fixture-threshold-seed-change, blind-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-on, speaker-126-operational-promotion; operational-adoption-forbidden-until-separate-user-approval"
-active_phase: "e2-c1-gpu-execution-goal-active-docs-batch-commit"
-git_head: "6726baa5253e970f17c65f8bb0447c6bbe86e5e0"
-worktree_state: "HEAD-local-main-local-origin-main-remote-main-exact-6726baa; decision-form-reply-doc-batch-plus-goal-activation-docs-modified-uncommitted; untracked-.claude-agents-and-CLAUDE.md-to-be-committed-in-same-batch"
+active_phase: "e2-c1-bounded-gpu-smoke"
+git_head: "9875895f6ef30db47846dc0e9f38959257a44548"
+worktree_state: "HEAD-local-main-local-origin-main-remote-main-exact-9875895; smoke-seam-fix-batch-8-code-test-files-plus-doc-batch-uncommitted; commit-in-two-batches-intent"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-24 09:47 KST user /goal activation (Claude PC, Fable supervisor): GPU unlimited; E2-C1 smoke -> durable training step 0 -> merge/package -> 36 reports -> gate; campaign auto on winner, E2-C2 loop auto on no_winner; T3 invented-handle read-only diagnosis; T-05 speaker-126 A/B synthesis; docs batch commit/push authorized. Forbidden: post-blind contract changes, blind reuse, hard-gate relaxation, operational model/tag change, external provider/extraction/greybox ON, 126 promotion; adoption needs separate approval. Pre-commit state: HEAD=local=remote 6726baa, related AIRI PID 0, GPU idle, E2-C1 0/0. Intent: commit decision-form docs + goal activation docs + .claude/agents + CLAUDE.md as docs: record decision-form reply, push, verify HEAD=origin/main clean. Next: smoke intent."
+reconciliation_receipt: "2026-08-24 09:55 KST E2-C1 bounded GPU smoke intent (Claude PC, Fable supervisor). Docs batch commit 9875895 pushed (6726baa..9875895), HEAD=local=remote exact, clean, related AIRI PID 0, GPU idle 953 MiB, D: free 38 GB. Pins re-verified on disk: mixture chat c845adfc...1980 (1,970,252 B), base model.safetensors 394b6624...f506, E2 adapter dir D:\AIRI-Models\airi-broadcast-v4-20260821\adapter-r8-seq2048-e2-lr2e5 with adapter_model 2a72292c...5c5b (56,318,520 B), adapter_config e01129ea...82b0 (863 B), artifact-manifest 70998cff...7195 (2,141 B, run_id v4-e2-seed42-1600-20260823-074326). Smoke = two arms in fresh root D:\AIRI-Models\airi-e2-c1-smoke-<ts>: builder v3 manifest (init_mode adapter-weights-only, seed 42, r/alpha/dropout 8/16/0.05, LR 1e-5, batch 1, accum 16, seq 2048, max 80 microsteps = 5 optimizer steps, K=1, deterministic validation) -> authoritative durable launcher baseline arm run id e2c1-smoke-baseline-80 -> safe arm e2c1-smoke-safe-80 with -PauseAtFirstOptimizerBoundary -> pause-airi-safely.ps1 SAFE_TO_POWER_OFF -> -ResumeInterrupted -> verify_airi_behavior_gpu_equivalence.py expecting 80/5/K=1, safe pause 16/1, manifest+config SHA -> receipts/gpu-equivalence.json pass=true. Also expected: fresh-state-receipt.json in each run dir with optimizer_state_entries 0 and progress 0/0 at init. Smoke is not quality progress; frozen 512/32/K=3 contract values are untouched. Failure preserves root, no relaunch of the same arm, no E2-C1 main training until root cause. Heartbeat 15 min while GPU runs."
 ---
 
 # AIRI live working state
@@ -22,6 +22,126 @@ reconciliation_receipt: "2026-08-24 09:47 KST user /goal activation (Claude PC, 
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 10:44 KST **seam 수리 3건 검증 완료 + 2-commit intent**: implementer `resume-init-fix`
+  보고(파일 4, 상호배제 제거, resume가 init flag 유지, fresh-state receipt는 fresh 전용, cpu-smoke
+  end-to-end 회귀 + pre-fix fail-first 재현 `1 failed` 확인)를 감독이 diff로 검토했고 독립 재검증:
+  pinned combined 4-suite `158 passed, 5 skipped in 36.39s`, durability contract 자식 프로세스
+  exit 0 + literal PASS, diff-check 0. 문서 정정: frozen contract 부속 receipt와 handoff에 smoke
+  개정 note(-5a) 추가 — frozen 학습 값·dataset·blind pin은 불변. commit 계획: ①
+  `fix: make adapter-init durable runs resumable`(builder/trainer/runner/pause/launcher/durability
+  + 테스트 2) ② `docs: record E2-C1 smoke receipts and T-05 samples`(WORKING/LOG/handoff/contract/
+  완료 T-05) → push → HEAD=origin/main clean 확인 → fresh smoke root에서 두 arm+gateway+verifier
+  재실행 intent.
+- 2026-08-24 10:36 KST **T-05 receipt**: backend 기동(HTTP ready 6초) → 4문장 × 2 참조 = 8쌍
+  raw+listen WAV·provenance.json 합성 exit 0 → backend 종료(`api_v2` PID 0, 9880 미청취; 첫
+  정리 시도에서 프로세스 2개가 남아 즉시 강제 종료로 정정). 산출물
+  `tts-samples/t05-conversational-20260824/`(WAV gitignored), 길이 9.0~22초, listen RMS
+  0.08~0.12. 문서 `완료/AIRI-T05-CONVERSATIONAL-AB-2026-08-24.md` 작성, LOG 기록. 사용자 청취
+  대기(126 승격 검토/현행 유지/재합성). 다음 gate는 implementer `resume-init-fix` 결과 검토 →
+  durability contract exit-0 재실행 → fix commit/push → fresh root에서 smoke 두 arm 재실행이다.
+- 2026-08-24 10:31 KST **T-05 합성 intent + resume-fix 위임**: adapter-init resume pins 수정은
+  implementer `resume-init-fix`(opus)에 exact spec(runner가 resume 시 init flag 유지, trainer는
+  resume+init 허용·disk 재검증·identity/pins 구성·weight는 checkpoint 복원, fresh-state receipt는
+  resume에서 미발행, 상호배제 테스트 2건 갱신, cpu-smoke resume-with-init 회귀)으로 위임했다. GPU
+  idle(python runner/trainer PID 0, 9880 미청취)이므로 T-05를 지금 수행한다. exact 동작: external
+  GPT-SoVITS venv로 `api_v2.py -a 127.0.0.1 -p 9880 -c gpt-sovits/tts-infer-v2proplus.yaml` backend만
+  기동(8880 proxy·Ollama 미기동) → scratchpad `t05/synth_t05_ab.py --created-at 2026-08-24T10:31:00+09:00`
+  로 4문장 × {ja-current(현행 참조, prompt ja), ko-126(reference-126, SHA 2e1552fc... 재검증)} 비스트리밍
+  `/tts` 합성 → raw+loudnorm(I=-20:LRA=7:TP=-1.5, mono 32k) listen WAV 8개 + provenance.json을
+  `tts-samples/t05-conversational-20260824/`(gitignored WAV)에 생성 → backend 종료·PID 0. 성공 조건은
+  script exit 0, WAV 8개 RIFF 검증, provenance SHA 기록. 실패 시 backend 종료 후 보고, 재시도 1회 이내.
+  운영 음성/서비스 설정 변경 0. 126번 운영 승격 아님.
+- 2026-08-24 10:28 KST **smoke safe arm resume FAILED — adapter-init resume pins mismatch (세 번째 seam
+  공백, smoke가 잡아야 할 결함)**: `-ResumeInterrupted` 재개(runner 29832·trainer 10892)는 `resuming`→
+  `pause-requested` 뒤 rev 16 `failed`, terminal exit 1/`trainer-nonzero-exit`, 16/1 그대로. stderr:
+  `cannot resume checkpoint: checkpoint exact pins mismatch`(`behavior_training_checkpoint.py:310`
+  via `train_airi_behavior_lora.py:954`). 원인: checkpoint-00000001 manifest pins는
+  `config.init_mode=adapter-weights-only`+`initialization` block을 담는데, durable runner는 resume
+  시 `--init-adapter-*` 4 flag를 제거하고(`durable_training_runner.py:2072-2074`, trainer가 init과
+  `--resume-from-checkpoint` 동시 사용을 거부하므로) trainer는 `init_mode=fresh-lora`·initialization
+  없음으로 expected pins를 만들어 exact 비교에 실패한다. 즉 adapter-init run은 어떤 pause/정전 뒤에도
+  재개 불가 — E2-C1 본 학습 전에 반드시 닫아야 할 P0. GPU/checkpoint/ack/gateway 자체는 정상이었고
+  failure root(`safe-pause-resume-run`, checkpoint 1·ack·terminal receipt)는 보존한다. 같은 run을
+  재시작하지 않는다. 수정 방향(최소): resume 시 runner가 init flag를 유지하고 trainer는 resume+init
+  조합에서 init adapter를 disk에서 재검증해 identity/pins만 구성하되 weight는 checkpoint
+  full-state로 복원, fresh-state receipt는 resume에서 재발행하지 않음; 기존 상호배제 테스트 2건
+  갱신 + cpu-smoke resume-with-init 회귀 추가. implementer(opus)에 위임하고 감독이 검토한다.
+  수정·회귀·독립 재검증 PASS 뒤 smoke를 fresh root에서 baseline+safe 두 arm 모두 다시 실행한다
+  (trainer/runner source SHA가 바뀌므로 기존 baseline과 짝을 이룰 수 없음). 그동안 GPU idle이므로
+  T-05 A/B 합성을 먼저 수행한다. durability contract는 implementer 보고상 PASS 문구 관측(v3 inputs
+  4 case 추가, 58-60/158-235/578-608), 프로세스 exit 0 receipt는 arm 종료 후 감독 재실행으로 확보.
+- 2026-08-24 10:22 KST **safe arm 재시작·gateway PASS·resume intent + 서브에이전트 receipt**:
+  수정된 gateway를 첫 paused-safe run에 재실행하자 v3 inputs 검사는 통과했으나 설계상 `Already-paused
+  terminal cannot authorize power-off without runner and trainer identities observed live`로 거부했다
+  (anti-spoof, 정상). 그 run은 pause.ack `safe_to_power_off=true`·checkpoint 1·exit 75 증거를 가진 채
+  `safe-pause-resume-run-gateway-refused-v3gap`으로 보존했다. fresh RunDir `safe-pause-resume-run`에
+  같은 manifest/args로 safe arm을 1회 재시작(runner 27876·trainer 17224, `pause-requested`) →
+  patched gateway가 exit 0, standalone `SAFE_TO_POWER_OFF` 1회 출력, state `paused-safe` rev 10
+  16/1·pending 0, PID 0, GPU 284 MiB. 첫 resume 시도 2회는 implementer의 durability contract
+  synthetic runner(ambient python 2→4)와 상호배제 guard로 정당하게 대기했고, 0 확인 뒤
+  `-ResumeInterrupted`로 정확히 한 번 재개한다. 서브에이전트 receipt: (1) implementer
+  `builder-regression` — `test_durable_training_runner.py` 1799-1861에
+  `test_builder_main_publishes_and_self_validates_adapter_init_manifest` 추가, subprocess
+  `main` 경로, pinned pytest `51 passed, 2 skipped in 32.43s`, diff-check 0(감독 독립 재실행 51/2
+  동일). (2) worker `t05-prep` — scratchpad `t05/synth_t05_ab.py`+README, 문장 4개(donation-ritual/
+  selected-playful-tease/donation-anonymous/greeting-opening), `/tts` POST 비스트리밍, ja-current
+  vs ko-126 참조(SHA 2e1552fc... 대조 exact), py_compile 0, 서비스/GPU 미접촉. (3) scout
+  `t3-diagnosis` — 120 flagged = 날조 27(arm당 9 동일) / 자기 날조 되풀이 23 / 실제 시청자 재호명
+  67(중앙값 73턴 전; history window 안 52+22, 밖 15+4) / 렌더러 되먹임 3; 규칙은
+  `broadcast_sim.py:622-627`(called handle이 현재 입력·author·grounded fact token에 없으면 invented).
+  scratchpad JSON 2종 보존, response 원문 미인용.
+- 2026-08-24 10:12 KST **smoke baseline complete + safe arm paused-safe + pause gateway v3 gap 수리**:
+  baseline arm `e2c1-smoke-baseline-80`은 `complete` rev 43, terminal exit 0/`trainer-complete`,
+  80/80 microsteps·5/5 optimizer steps·pending 0, checkpoint 5개(6 events), adapter/report 존재,
+  `fresh-state-receipt.json`이 init_mode adapter-weights-only·E2 run_id·3 pin exact·inherited
+  optimizer/scheduler/rng/cursor 전부 false·optimizer_state_entries 0을 증명한다. report의
+  initialization block 동일, selected epoch 1 dev loss `2.51504065335813`(mixture dev, E2 v4 dev와
+  비교 불가), peak CUDA 5,848,189,440 B, adoption false. 종료 후 python runner/trainer PID 0,
+  GPU 314 MiB. safe arm `e2c1-smoke-safe-80`을 `-PauseAtFirstOptimizerBoundary`로 1회 시작해
+  runner 3548·`pause-requested`를 받았고 trainer는 자체적으로 `paused-safe` rev 11, 16/1·pending 0,
+  control에 pause.request/ack가 있다. 그러나 `pause-airi-safely.ps1` gateway는 v3 run-state의
+  12-key `inputs`(v2 7 + init_mode + init_adapter_dir + 3 pin)를 v2 7-key exact 목록으로 검사해
+  `run-state inputs property set is invalid`로 거부했다(adapter-init seam의 두 번째 지원 공백;
+  GPU/run 자체는 정상). 최소 수정: pause 스크립트가 v2 또는 v3 exact set을 받고 v3면 init_mode
+  값·adapter dir·3 pin hex64를 검증, launcher already-running exact 목록도 v3 superset 허용.
+  두 스크립트 AST parse error 0. implementer(opus)가 durability contract에 v3 회귀를 추가 중.
+  `test-airi-training-durability.ps1`은 baseline 실행 중 ambient runner 때문에 정당하게 refuse
+  했고 커밋 전 재실행한다. 다음 동작: 수정된 gateway를 paused-safe run에 1회 재실행해
+  `SAFE_TO_POWER_OFF`를 확인 → `-ResumeInterrupted` 재개 → verifier. T3 진단(scout) 1차 결과:
+  flagged 120 = 날조 27 / 자기 날조 되풀이 23 / 실제 시청자 재호명 67(중앙값 73턴 전) /
+  렌더러 되먹임 3; 날조는 arm당 9로 동일해 학습 무영향 축이다.
+- 2026-08-24 10:03 KST **builder refusal receipt + 최소 수정 + baseline launch intent**: 첫 smoke root
+  `airi-e2-c1-smoke-20260824-095500`에서 `build_airi_behavior_input_manifest.py`가 v3 manifest
+  (2,364 B)를 publish한 뒤 self-check에서 exit 2 `missing trainer argument: --model-sha256`로
+  거부했다. 원인: runner `_validate_initial_adapter`는 artifact base pin을 launch args의
+  `--model-sha256`과 결속하는데 builder `main()`의 self-check는 `_trainer_arguments()`만 넘겨 그
+  flag가 없었다(v3 경로가 실제 `main()`으로 실행된 첫 사례; GPU 미접촉). 최소 수정: builder
+  self-check 인자에 `--model-sha256 <manifest model_weight_sha256>`만 추가(+주석). refused
+  root는 `...-095500-builder-refused`로 보존했다. py_compile exit 0. fresh root
+  `D:\AIRI-Modelsiri-e2-c1-smoke-20260824-100200`에서 같은 인자로 builder exit 0, manifest
+  2,364 B SHA `d2ddf38b0637a784ad4c51ef0311500f42ff7ac3a4e2cdd923c0ec1aa9c53e3c`, config SHA
+  `7f9d929e3331385efc64a11877a7788441057d6bdd3034ab9aef108183bf6b30`. 회귀 테스트는
+  implementer(opus) 서브에이전트가 `test_durable_training_runner.py`에 추가 중이며 그 결과와 함께
+  builder fix를 별도 commit한다. 지금 authoritative launcher로 baseline arm
+  `e2c1-smoke-baseline-80`(RunDir `baseline-run`, K=1, heartbeat 10초, TrainerArguments = 위
+  frozen 값 + init 3 SHA + dataset/model/output/report)을 정확히 한 번 시작한다. 완료 조건은
+  run-state `complete` 80/5·pending 0, adapter/report/fresh-state-receipt 존재, 관련 PID 0이다.
+- 2026-08-24 09:55 KST **E2-C1 bounded GPU smoke intent**: 문서 batch commit `9875895`가
+  `6726baa..9875895 main -> main`으로 push됐고 HEAD/local/remote exact·clean·PID 0·GPU idle이다.
+  입력 pin을 디스크에서 재검증했다 — mixture chat `c845adfc...1980`, base `394b6624...f506`,
+  E2 adapter dir `D:\AIRI-Models\airi-broadcast-v4-20260821\adapter-r8-seq2048-e2-lr2e5`의
+  model/config/artifact `2a72292c...5c5b`/`e01129ea...82b0`/`70998cff...7195` exact.
+  smoke 정의: fresh root `D:\AIRI-Models\airi-e2-c1-smoke-<ts>`에 builder v3 manifest
+  (init_mode adapter-weights-only, seed 42, 8/16/0.05, LR 1e-5, batch 1, accum 16, seq 2048,
+  **max 80 microsteps = 5 optimizer steps, K=1**, deterministic validation) → authoritative
+  durable launcher baseline arm `e2c1-smoke-baseline-80` → safe arm `e2c1-smoke-safe-80`을
+  `-PauseAtFirstOptimizerBoundary`로 시작 → `pause-airi-safely.ps1`로 `SAFE_TO_POWER_OFF` →
+  `-ResumeInterrupted` → `verify_airi_behavior_gpu_equivalence.py`(expected 80/5/K=1, safe
+  pause 16/1, manifest/config SHA) → `receipts/gpu-equivalence.json` pass=true. 각 run dir의
+  `fresh-state-receipt.json`이 optimizer entries 0·progress 0/0을 증명해야 한다. K=1은 smoke
+  전용이며(verifier 최소 4구간) frozen 본 학습 512/32/K=3은 불변이다. smoke는 품질 진척이
+  아니다. 예상 소요 arm당 약 14분(E2 실측 10.4초/microstep). 실패·중단 시 root 보존, 같은 arm
+  재시작 금지, 원인 확정 전 본 학습 금지. GPU 실행 중 heartbeat 상한 15분.
 - 2026-08-24 09:47 KST **user `/goal` 활성화 + 문서 batch commit intent (클로드 PC, Fable 감독)**: 사용자가
   GPU 제한 없음을 명시하고 다음을 허가했다 — E2-C1 bounded smoke 1회 → durable runner 본 학습
   step 0(frozen 값 불변) → adapter/report 검증 → safe merge → BF16/Q4_K_M → baseline/E2/E2-C1 ×

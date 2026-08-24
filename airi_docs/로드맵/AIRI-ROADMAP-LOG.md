@@ -7,6 +7,23 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-24 E2-C1 smoke 1차 + T-05 A/B 샘플
+
+- 10:35 KST (클로드 PC, Fable 감독+팀) goal `active`. E2-C1 bounded smoke 진행 중 adapter-init
+  seam 지원 공백 3건을 실측으로 발견·수리했다: ① builder `main()` self-check가 v3에서
+  `--model-sha256` 누락으로 publish 후 거부(1-line fix + 회귀 test 1799-1861, pinned pytest
+  51/2) ② `pause-airi-safely.ps1`/launcher의 v2 7-key exact inputs 목록이 v3 12-key run-state
+  거부(v2|v3 exact set 허용 + durability contract에 4-case 회귀, PASS 문구 관측) ③ durable
+  resume가 init flag를 제거해 checkpoint pins(`init_mode=adapter-weights-only`)와 불일치 —
+  adapter-init run은 재개 불가(P0, implementer 수리 중). smoke 실측: baseline arm 80/5
+  terminal exit 0·fresh-state receipt(상속 optimizer/scheduler/rng/cursor 전부 false)·dev
+  2.5150, safe arm은 checkpoint 1에서 `SAFE_TO_POWER_OFF` 1회 방출(paused-safe 16/1) 뒤
+  resume에서 위 ③으로 failed — failure root 보존, 수리·회귀 뒤 fresh root에서 두 arm 재실행
+  예정. 병행: scout가 T3 invented-handle 120건 분류(날조 27=arm당 9 동일 / 자기 날조 되풀이
+  23 / 실제 시청자 재호명 67·중앙값 73턴 전 / 렌더러 되먹임 3). T-05는 파일럿 4문장 ×
+  {ja-current, ko-126} 8쌍 합성·loudnorm·provenance 완료(백엔드 기동→종료 PID 0), 문서
+  `완료/AIRI-T05-CONVERSATIONAL-AB-2026-08-24.md`. 운영 채택·모델/서비스 변경 0.
+
 ## 2026-08-24 결정 폼 회신 반영
 
 - 2026-08-24 09:47 KST (클로드 PC, Fable 감독) 사용자 `/goal`로 **GPU 제한 없음** 및 E2-C1 smoke→본 학습→

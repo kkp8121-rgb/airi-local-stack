@@ -34,12 +34,39 @@ hard gate 완화, 운영 서비스 모델/태그 변경·외부 provider/extract
 (이전 08-23 `/goal`: 저장소 구현·검증, GPU 학습, 병합·패키징, 로컬 서비스, T3·캠페인,
 milestone commit/push 승인 — 이 문단으로 대체.)
 
+## -5a. 2026-08-24 bounded smoke 실측 — adapter-init seam 공백 3건 수리
+
+첫 bounded GPU smoke(fresh root `airi-e2-c1-smoke-20260824-100200`, 80 microsteps/5 opt steps,
+K=1, 두 arm)가 offline 검증이 놓친 실행 공백 3건을 드러냈고 전부 최소 수리·회귀로 닫았다.
+
+1. builder `main()` self-check가 v3 manifest publish 뒤 `missing trainer argument: --model-sha256`
+   exit 2 — 검증 인자에 base pin 추가(1줄) + subprocess 회귀
+   (`test_builder_main_publishes_and_self_validates_adapter_init_manifest`). refused root는
+   `...-095500-builder-refused`로 보존.
+2. `pause-airi-safely.ps1`·launcher already-running 검사의 v2 7-key exact `inputs` 목록이 v3
+   12-key run-state를 거부 — v2|v3 exact set 허용 + init pin/hex 검증, durability contract에
+   AST 추출 기반 4-case 회귀. 수리 뒤 실측 gateway가 `SAFE_TO_POWER_OFF`를 1회 방출했다.
+3. durable resume가 init flag 4종을 제거해 trainer expected pins가 `init_mode=fresh-lora`가 되고
+   checkpoint pins(`adapter-weights-only`+initialization)와 exact 불일치 — adapter-init run 전면
+   재개 불능(P0). 현행 계약: resume는 init flag를 유지, trainer는 resume+init 조합에서 disk
+   재검증으로 identity/pins만 구성하고 weight는 checkpoint 복원이 덮어씀, fresh-state receipt는
+   fresh run 전용. 상호배제 문구 2종은 코드에서 제거됐다. cpu-smoke end-to-end 회귀
+   (`test_cpu_adapter_init_run_resumes_from_its_own_checkpoint`)와 pre-fix fail-first 재현으로 고정.
+
+smoke 실측 receipt: baseline arm terminal exit 0(80/5, fresh-state receipt에 상속
+optimizer/scheduler/rng/cursor 전부 false, dev 2.5150, peak CUDA 5.85 GB), safe arm paused-safe
+16/1 + `SAFE_TO_POWER_OFF`, resume은 공백 3으로 failed — failure root 보존. 수리 후 pinned
+combined `158 passed, 5 skipped`, durability contract process exit 0 literal PASS. **수리로
+trainer/runner source SHA가 바뀌어 smoke 두 arm은 fresh root에서 재실행해야 하며**, 그 PASS가
+본 학습 gate다. frozen 학습 값·dataset·blind는 불변.
+
 ## -5. 2026-08-24 E2-C1 adapter-init offline PASS / published
 
 - trainer는 E2 adapter model/config/artifact-manifest를 lowercase SHA와 source base SHA,
   LoRA config/target modules로 검증하고 `PeftModel.from_pretrained(..., is_trainable=True)`로
   weight만 초기화한다. PEFT load 직전 held descriptor를 다시 stat/hash하며 checkpoint resume와
-  init을 상호배제한다. optimizer/scheduler/RNG/cursor/progress는 새 run에서 0부터 시작한다.
+  init을 상호배제한다(→ **2026-08-24 smoke 개정으로 대체**, 아래 -5a). optimizer/scheduler/RNG/
+  cursor/progress는 새 run에서 0부터 시작한다.
 - input-manifest builder·durable runner·equivalence verifier는 schema v3 `init_mode`와 E2 run/
   model/config/artifact/inventory provenance를 결속한다. v2는 기존 key set만 허용한다. adapter
   inventory는 extra file·empty/undeclared directory·link/reparse·special entry를 fail-closed한다.

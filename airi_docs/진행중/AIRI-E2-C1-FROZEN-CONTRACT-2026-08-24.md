@@ -33,8 +33,13 @@ blocker=bounded_gpu_smoke_intent_on_review_pc
 
 - schema v3는 `init_mode=adapter-weights-only`와 E2 run/model/config/artifact/inventory를
   결속하고 v2는 legacy config key set만 허용한다.
-- trainer는 held SHA를 PEFT load 직전에 다시 확인하고 checkpoint resume와 init을 상호배제한다.
-  optimizer/scheduler/RNG/cursor/progress는 새로 시작한다.
+- trainer는 held SHA를 PEFT load 직전에 다시 확인한다. optimizer/scheduler/RNG/cursor/progress는
+  새로 시작한다. **2026-08-24 bounded smoke 개정:** 초기 구현의 "resume와 init 상호배제"는 실측에서
+  checkpoint pins(`config.init_mode`/`initialization`)와 모순돼 adapter-init run을 재개 불능으로
+  만들었다(smoke safe arm resume `checkpoint exact pins mismatch`). 현행 계약은 durable resume가
+  같은 init flag 4종을 유지하고 trainer가 disk에서 provenance를 재검증해 identity/pins만 구성하며,
+  weight는 checkpoint full-state 복원이 덮어쓴다(재초기화 0). fresh-state receipt는 fresh run
+  1회만 발행한다. cpu-smoke end-to-end 회귀와 fail-first 재현으로 고정했다.
 - builder/runner/verifier는 extra file·undeclared/empty directory·link/reparse·special entry를
   포함한 closed inventory 위반을 fail-closed한다.
 - pinned pycompile exit 0, focused suites 27 passed/2 skipped·50/2·67/1, combined
