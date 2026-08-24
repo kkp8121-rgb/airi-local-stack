@@ -167,7 +167,44 @@ hash·핸들·archetype 템플릿 재사용 0(검사가 v2 템플릿 동일 문�
    보존·진단 보고 후 사용자 지시 대기(자동 E2-C3 금지). adoption은 어느 경우에도
    별도 사용자 승인 전 금지.
 
-## 7. 고정 입력 provenance (학습 측)
+## 7. 2026-08-25 02:30 KST 36-report blind matrix 결과 (no_winner)
+
+smoke PASS → durable 본 학습(1536/96, dev loss 2.0723→1.8219→**1.6105** 3 epoch 단조
+하강, best-epoch 3) → safe merge(target l2 0.1124) → Q4_K_M 패키징(평가 태그
+`midm-airi:e2c2-broadcast-v4-20260824-5eda8184...`) → blind v3에서 baseline/e2/e2-c2 ×
+3 fixture × 4 seed = 36 reports 완주(launcher exit 0, transport 0, 전 run `/health`
+guard=on attest). `compare_e2c2_blind.py` verdict(7,705 B SHA
+`68f4107ddee5d5c49cbacb41e64cae1266bb45934f5caa8295c7b7f1cb2e8ce5`):
+
+```text
+root_id=airi-e2-c2-blind-freeze-20260824-v3
+report_count=36  status=pass  winner=null  adoption_authorized=false
+scores: baseline=0.167511  e2=0.201901  e2-c2=0.187536  (top=e2, margin 0.014365)
+improved_additive_axes_vs_e2=2/5 (topic_anchor +0.036, long_callback +0.019)
+악화 축: memory_probe -0.050, viewer_fact_usage -0.055, show_arc ±0
+invented_handle violations: baseline=14  e2=27  e2-c2=33  (여전히 학습 단조 악화)
+```
+
+**결론: E2-C2도 no_winner이며, 후보 score가 E2보다 낮다(사상 처음 역전).** 13개
+게이트 전부 실패. §6 순서대로 campaign 없이 정지한다. 진단(§8 참조 문서: live state
+02:40 receipt):
+
+1. **dev loss와 blind 성능의 절연** — 언더트레이닝 가설은 dev(-0.62) 기준으로는
+   실증됐으나 blind 신규 도메인 전이는 오히려 후퇴했다. 교정 480행의 좁은 주제 공간
+   (공예/편지 계열)에 6× 선량이 표면 형식 과적합을 만든 것과 정합: 가장 형식화된
+   donation composite만 크게 개선(0.458→0.583)되고 fact/memory 축은 하락했다.
+2. **invented_handle 단조 악화는 가드 신호 ON에서도 지속**(14/27/33; v2 대비 절대
+   수는 전 arm 감소). 채점기 사각지대 교정으로는 부족하고, 행동 학습 자체가
+   비근거 handle 발화 경향을 늘린다.
+3. **절대 최소선의 구조적 미달** — blind v3에서 전 arm의 절대 수준이 v2보다 더
+   낮아져(전 arm score 0.17-0.20), additive 최소선(0.4-0.75)과 perfect 1.0 게이트는
+   어떤 arm도 2-4배 미달이다. 선량/데이터 미세조정으로 닫힐 격차가 아니다.
+
+failure root는 `D:\AIRI-Models\airi-e2c2-blind-matrix-20260824\`(run/ 전체 + verdict +
+attestation + launcher.log)에 보존한다. blind v3는 이 matrix로 소비됐다(재사용 금지).
+자동 E2-C3는 goal 금지 조항에 따라 시작하지 않는다 — 다음 방향은 사용자 결정 사항이다.
+
+## 8. 고정 입력 provenance (학습 측)
 
 E2-C1 계약 §2·§3.3의 pin을 그대로 승계한다: base `model.safetensors`
 `394b6624...8f506`, E2 adapter model `2a72292c...895c5b`, E2 adapter config

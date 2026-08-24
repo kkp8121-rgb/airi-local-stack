@@ -7,6 +7,17 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-25 E2-C2 blind v3 36-report matrix — no_winner 종결
+
+- 02:40 KST (클로드 PC, Fable 감독) 36/36 완주(launcher exit 0, guard=on 전 run attest,
+  transport 0). verdict `winner=null`: scores baseline 0.1675 / e2 0.2019 / **e2-c2
+  0.1875** — 후보가 E2보다 낮은 첫 역전. improved additive 2/5, invented_handle
+  14/27/33(가드 신호 ON에도 학습 단조 악화, 단 v2 대비 절대 수는 전 arm 감소), 13개
+  게이트 전부 실패. 진단: dev -0.62 개선 vs blind 후퇴 절연(좁은 교정 도메인 6× 선량
+  과적합), invented_handle은 행동 학습 부작용, 전 arm이 절대 최소선 2-4× 미달.
+  goal 지시대로 campaign 없이 정지·root 보존(`airi-e2c2-blind-matrix-20260824`)·blind
+  v3 소비 처리. 상세 contract §7. 다음 방향은 사용자 결정 대기.
+
 ## 2026-08-24 E2-C2 merge/package + matrix 착수
 
 - 23:55 KST (클로드 PC, Fable 감독) 사용자 "작업 재개" 후 safe merge exit 0(merged

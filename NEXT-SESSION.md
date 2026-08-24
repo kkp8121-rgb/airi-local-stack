@@ -1,6 +1,24 @@
 # AIRI 다음 세션 안내
 
-> **2026-08-24 16:33 KST 최우선 진입점 — E2-C1 NO_WINNER 진단 완료, 가드+채점기 수정
+> **2026-08-25 02:40 KST 최우선 진입점 — E2-C2 NO_WINNER 종결, 다음 방향은 사용자
+> 결정:** 언더트레이닝 교정 후보 E2-C2(E2 adapter init, 1536 microsteps/96 opt steps
+> = 3 epochs, LR 2e-5, frozen dataset 그대로)는 학습 자체는 이상적으로 끝났다 — dev
+> loss 2.0723→1.8219→1.6105 3 epoch 단조 하강(E2-C1 2.2351 대비 -0.62), smoke/merge/
+> Q4_K_M 패키징 전부 exit 0. 그러나 새 blind v3(직조 공방/간이역 신호소/가마터, 가드
+> 신호 ON 측정, 전 run /health attest)에서 **winner=null, 후보 score 0.1875 < E2
+> 0.2019(첫 역전)**, improved additive 2/5, invented_handle 14/27/33(가드 신호 ON에도
+> 학습 단조 악화), 13개 게이트 전부 실패. 진단 3축: ① dev 개선↔blind 후퇴 절연 =
+> 교정 480행의 좁은 도메인에 6× 선량이 표면 과적합(형식화된 donation composite만
+> 0.458→0.583 개선) ② invented_handle 경향은 행동 학습의 구조적 부작용(채점기 보정은
+> 절대 수를 낮췄지만 기울기를 못 바꿈) ③ 전 arm이 절대 최소선의 2-4배 미달 — E2-C1/
+> E2-C2 두 후보로 "선량·LR 재조정으로는 안 닫힌다"가 실증됨. campaign·adoption 금지
+> 유지, 실패 root `D:\AIRI-Models\airi-e2c2-blind-matrix-20260824\` 보존, blind
+> v1/v2/v3 전부 소비(재사용 금지). **자동 E2-C3는 goal 금지 조항으로 시작하지 않았다.**
+> 다음 후보 방향(예: 교정 데이터 도메인 다변화, 결정론 계층 확대, 게이트 체계 재설계
+> 논의)은 사용자 결정 후 새 `/goal`로 시작한다. 상세: E2-C2 contract §7, handoff §-8,
+> ROADMAP-LOG 2026-08-25.
+
+> **(이력) 2026-08-24 16:33 KST — E2-C1 NO_WINNER 진단 완료, 가드+채점기 수정
 > SHIPPED, 다음은 E2-C2 설계:** E2-C1 36-report blind matrix는 `winner=null`로
 > 끝났다(score는 최고지만 `invented_handle` 위반 28→40→53으로 학습할수록 악화, hard/
 > legacy/perfect-rate 13개 게이트 전부 실패). 사용자 승인 goal로 원인을 진단한 결과,

@@ -7,6 +7,15 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
+> **2026-08-25 02:40 KST E2-C2 no_winner 종결:** 언더트레이닝 교정 후보 E2-C2(1536/96,
+> LR 2e-5, 3 epochs — dev loss 2.24→1.61)를 새 blind v3(가드 신호 ON 측정)에서 36-report로
+> 평가한 결과 **winner=null이며 후보 score(0.1875)가 E2(0.2019)보다 낮았다**(첫 역전).
+> invented_handle은 가드 신호 ON에도 14/27/33으로 학습 단조 악화. 진단: dev 개선과 blind
+> 후퇴의 절연(좁은 교정 도메인에 6× 선량 → 표면 과적합), 전 arm이 절대 최소선 2-4× 미달 —
+> 선량/LR 조정으로 닫힐 격차가 아니라는 것이 두 후보(E2-C1/E2-C2)로 실증됐다. campaign/
+> adoption 금지 유지, 실패 root 보존, blind v1/v2/v3 전부 소비됨. **다음 방향은 사용자
+> 결정 사항**(자동 E2-C3 금지). 상세: `진행중/AIRI-E2-C2-FROZEN-CONTRACT-2026-08-24.md` §7.
+
 > **2026-08-24 16:33 KST 진단 완료 + 핸들 grounding 가드/채점기 신호 SHIPPED:**
 > no_winner 원인은 e2-c1 자체가 아니라 채점기 사각지대였다 — invented_handle 53건 중
 > 47건(89%)이 실제 memory 회수였고, 그중 vocative(-님) 형태는 7건(13%)뿐, 46건(87%)은

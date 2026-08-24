@@ -1,11 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 23:55:00 +09:00"
-checkpoint_id: "20260824-235500-e2c2-merged-packaged-matrix-intent"
+updated_at_kst: "2026-08-25 02:40:00 +09:00"
+checkpoint_id: "20260825-024000-e2c2-matrix-final-receipt-no-winner"
+matrix_note: "TERMINAL: 36/36, launcher exit 0, verdict winner=null (e2-c2 0.1875 < e2 0.2019). campaign 금지 유지, 사용자 결정 대기"
 active_trainer_note: "e2c2 본 학습 terminal complete(1536/96, exit 0). 사용자 지시로 merge/패키징/matrix 진행하지 않고 대기. 재개 신호 = 사용자 '게임 끝' 통지. trainer/runner PID 0, AIRI GPU 워크로드 0"
 goal_status: "active"
 authorization: "user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "e2c2-blind-matrix"
+active_phase: "e2c2-no-winner-awaiting-user-direction"
 git_head: "9a2195b4ec4c9dba9bf449967ce840a8849667d9"
 worktree_state: "HEAD-local-remote-exact-9a2195b(harness batch); dirty: live-state heartbeat + verify_e2_c2 deterministic_validation key (commit with smoke receipt); AIRI-PID-0; trainer 0; GPU idle 479MiB"
 active_trainer_count: 0
@@ -23,6 +24,24 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-25 02:40 KST **E2-C2 36-report matrix 최종 receipt — no_winner, goal 종결 보고**:
+  detached launcher(PID 27140) exit 0, 36/36 reports, transport 0, 전 run `/health`
+  `handle_grounding_guard=true` before/after attest, attestation
+  `airi.e2-c2-environment-attestation.v1`(guard='on', privacy/localhost/external 0),
+  summary `pass`/`pass-no-winner`, 서비스 listener 0. verdict `e2c2-blind.json`(7,705 B
+  SHA `68f4107ddee5d5c49cbacb41e64cae1266bb45934f5caa8295c7b7f1cb2e8ce5`):
+  **winner=null**, scores baseline 0.167511 / e2 0.201901 / **e2-c2 0.187536** — 후보가
+  reference E2보다 낮은 첫 사례. improved additive 2/5(topic +0.036, callback +0.019),
+  악화 memory -0.050·fact -0.055, invented_handle 14/27/**33**(가드 신호 ON에도 학습
+  단조 악화; v2 대비 절대 수는 전 arm 감소 — 채점기 보정 유효했으나 경향 미해결),
+  13개 게이트 전부 실패. perfect_rates e2-c2: donation composite 0.583(개선),
+  stale 0.175, unknown_safe 0.167(악화), decoy 0.0875. 진단 3줄: ① dev -0.62 개선과
+  blind 후퇴의 절연 = 교정 480행 좁은 도메인에 6× 선량이 표면 과적합(형식화된 donation
+  축만 개선) ② invented_handle 경향은 행동 학습 자체의 부작용 ③ 전 arm 절대 수준이
+  절대 최소선의 2-4배 미달로 선량 조정으로 닫힐 격차 아님. **goal 지시 이행: campaign
+  없이 정지, 실패 root `D:\AIRI-Models\airi-e2c2-blind-matrix-20260824\` 보존, blind v3
+  소비 처리(재사용 금지), 자동 E2-C3 없음. adoption_authorized=false 유지.** 이 receipt와
+  contract §7·LOG·STATUS/NEXT-SESSION/handoff 갱신을 commit/push 후 사용자 결정 대기.
 - 2026-08-24 23:55 KST **merge/package receipt + 36-report matrix intent**: ① safe merge
   exit 0 — merged `model.safetensors`
   `c2b907e5419854a46154fdfcd44123d5fa8211a926d954483cce68a96961dedb`(4,611,084,960 B),

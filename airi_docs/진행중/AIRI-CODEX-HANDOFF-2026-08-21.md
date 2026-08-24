@@ -38,6 +38,32 @@ hard gate 완화, 운영 서비스 모델/태그 변경·외부 provider/extract
 (이전 08-23 `/goal`: 저장소 구현·검증, GPU 학습, 병합·패키징, 로컬 서비스, T3·캠페인,
 milestone commit/push 승인 — 이 문단으로 대체.)
 
+## -8. 2026-08-25 02:40 KST E2-C2 no_winner 종결 — 다음 방향은 사용자 결정
+
+사용자 `/goal`(2026-08-24 17:00, GPU 무제한) 전 구간을 완주했다: 레시피 설계(1536/96,
+LR 2e-5, frozen dataset 유지 — `AIRI-E2-C2-FROZEN-CONTRACT-2026-08-24.md`) → blind v3
+신규 저작·봉인(`airi-e2-c2-blind-freeze-20260824-v3`, seal 도구 신설) → e2c2 하네스
+(comparator/commitment/policy/launcher profile, guard=on 강제+attest) → bounded smoke
+PASS → durable 본 학습 exit 0(**dev loss 2.0723→1.8219→1.6105 단조 하강**) → safe
+merge(l2 0.1124) → Q4_K_M 패키징(평가 태그 `...e2c2-broadcast-v4-20260824-5eda8184...`)
+→ 36/36 matrix(가드 신호 ON) → verdict **winner=null**.
+
+핵심 수치: scores baseline 0.167511 / e2 0.201901 / **e2-c2 0.187536(E2보다 낮음 —
+첫 역전)**, improved additive 2/5, invented_handle 14/27/33, 13 게이트 전부 실패.
+verdict SHA `68f4107d...2e8ce5`, root `D:\AIRI-Models\airi-e2c2-blind-matrix-20260824\`.
+
+진단(contract §7): ① dev 개선과 blind 후퇴의 절연 — 교정 480행의 좁은 도메인에 6×
+선량이 표면 과적합을 만들었다(형식화된 donation composite만 0.458→0.583 개선, fact/
+memory 하락). ② invented_handle 학습-단조 악화는 가드 신호 ON에서도 지속 — 행동 학습
+자체의 부작용이며 채점기 보정은 절대 수만 낮췄다(v2 28/40/53 → v3 14/27/33). ③ 전
+arm이 절대 최소선 2-4× 미달 — E2-C1(1 epoch/1e-5)과 E2-C2(3 epochs/2e-5) 두 점으로
+"선량·LR 축 재조정으로는 게이트가 닫히지 않는다"가 실증됐다.
+
+goal 지시 이행: campaign 미실행, 자동 E2-C3 없음, adoption_authorized=false, blind
+v1/v2/v3 전부 소비(재사용 금지), 실패 root 보존. 다음 후보 방향(교정 데이터 도메인
+다변화 / 결정론 계층 확대(로드맵 v3 원칙) / 게이트 체계 자체의 재검토 논의)은 사용자
+결정 후 새 `/goal`로 시작한다.
+
 ## -7. 2026-08-24 16:33 KST 핸들 grounding 가드 + 채점기 신호 구현 — SHIPPED
 
 -6의 다음 순서 ①②를 사용자 승인 goal("1과 2함께")로 완료했다.
