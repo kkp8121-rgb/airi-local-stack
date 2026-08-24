@@ -7,6 +7,16 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-25 D1 goal 접수 + 결정론 발화 계층 설계 동결
+
+- 05:20 KST (클로드 PC, Fable 감독) 사용자 `/goal` D1(무학습, 결정론 계층으로 게이트
+  4종 보장 + blind v4 + 4-arm 48-report) 접수. scout 3 조사로 설계 동결
+  (`진행중/AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md`): 신호 풀의 history
+  누락(위반 표본 100% 실제 재호명, 상당수 8턴 창 내) 발견, 단일 모듈 5부(P1 pool
+  history 확장 / P2 과거-전용 토큰 가드 / P3 결정 회수 렌더러 / P4 거부-옵션 억제기 /
+  P5 후원 echo-감사), 4-arm comparator 확장 규칙(threshold 동일, delta는 학습 후보만)
+  결과-전 동결. 문서 배치, GPU 0.
+
 ## 2026-08-25 E2-C2 blind v3 36-report matrix — no_winner 종결
 
 - 02:40 KST (클로드 PC, Fable 감독) 36/36 완주(launcher exit 0, guard=on 전 run attest,

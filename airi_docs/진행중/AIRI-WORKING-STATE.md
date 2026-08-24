@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 02:40:00 +09:00"
-checkpoint_id: "20260825-024000-e2c2-matrix-final-receipt-no-winner"
-matrix_note: "TERMINAL: 36/36, launcher exit 0, verdict winner=null (e2-c2 0.1875 < e2 0.2019). campaign 금지 유지, 사용자 결정 대기"
+updated_at_kst: "2026-08-25 05:20:00 +09:00"
+checkpoint_id: "20260825-052000-d1-design-frozen-receipt"
+matrix_note: "E2-C2 no_winner 종결(receipt 7e9f8e3). 신규 goal D1 접수"
 active_trainer_note: "e2c2 본 학습 terminal complete(1536/96, exit 0). 사용자 지시로 merge/패키징/matrix 진행하지 않고 대기. 재개 신호 = 사용자 '게임 끝' 통지. trainer/runner PID 0, AIRI GPU 워크로드 0"
 goal_status: "active"
-authorization: "user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "e2c2-no-winner-awaiting-user-direction"
+authorization: "user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
+active_phase: "d1-deterministic-layer-design"
 git_head: "9a2195b4ec4c9dba9bf449967ce840a8849667d9"
 worktree_state: "HEAD-local-remote-exact-9a2195b(harness batch); dirty: live-state heartbeat + verify_e2_c2 deterministic_validation key (commit with smoke receipt); AIRI-PID-0; trainer 0; GPU idle 479MiB"
 active_trainer_count: 0
@@ -24,6 +24,35 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-25 05:20 KST **D1 설계 동결 receipt (scout 3 조사 완료)**: 신규
+  `airi_docs/진행중/AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md` 작성. 조사 핵심:
+  (a) **신호 풀의 history 누락 발견** — e2-c2 위반 33건 표본 16건 전수가 실제 과거
+  시청자 재호명(날조 0)이고 상당수가 history 창(8턴) 내 = 프롬프트 실재 근거인데
+  `build_grounding_pools`가 user/briefing/memory/journal만 담아 위반 처리(E2-C1 §12와
+  동형 사각지대 3차). (b) 결정론 act 3종은 sim 러너에만 존재, donation composite 실패는
+  모델 이어쓰기(추가 호명·메시지 무반응·근사-오답)가 원인. (c) fixture required/
+  forbidden은 "긍정 분기 echo + 거부 분기(말고-branch) 미반복 + 입력 밖 사실 미도입"
+  으로 환원 가능 — check 비열람 결정론 구성 가능. 설계: 단일 모듈
+  `deterministic_utterance_layer.py`(플래그 기본 off, off 무변화) 5부 — P1 pool에
+  history 추가(신호 확장, sim union 무변경 호환), P2 세션 과거-전용 토큰 가드(프롬프트
+  밖 과거 토큰 지시어 치환), P3 결정 회수 렌더러(회수 질문 → 풀에서 "S는 A 말고 B"/
+  "내 X는 Y" 추출 대체, 미발견 시 memory_guard 폴백), P4 거부-옵션 억제기(말고-branch
+  덴이리스트 문장 제거), P5 후원 계속 echo-감사 보강. 평가: 4-arm(baseline/e2/e2-c1/
+  e2-c2) × blind v4 × 4 seeds = 48 reports, `compare_d1_blind.py`(threshold 동일, delta
+  요건은 학습 후보 arm에만 — 확장 규칙 결과-전 동결), 계층+가드 ON attest. 이 배치
+  commit/push 후 구현 배치 착수. GPU 학습 0.
+- 2026-08-25 04:55 KST **D1 user `/goal` 접수 + 설계 phase intent (Fable 감독)**: E2-C2
+  no_winner 종결 보고에 대해 사용자가 결정론 계층 방향의 새 goal을 승인했다 — GPU 학습
+  없이 hard-zero·perfect-rate 게이트 4종(invented_handle 전체 커버리지, donation
+  composite, stale_transition_clean, decoy_fact_use)을 런타임 결정론 계층으로 보장 →
+  offline 회귀·push → blind v4 봉인 → 계층 ON 4-arm(baseline/e2/e2-c1/e2-c2) 48-report
+  matrix → 게이트 닫히면 top-score arm 3×500 campaign / 안 닫히면 진단 후 대기. 금지:
+  GPU 재학습, blind v1/v2/v3 재사용, hard gate 완화, 운영 태그 변경, 외부 provider 기본
+  ON, T-05 승격. adoption 별도 승인. preflight: HEAD/local/remote exact `7e9f8e3`,
+  live-state heartbeat만 dirty, AIRI PID 0, GPU 934MiB(학습 워크로드 0). **phase 1
+  intent**: 결정론 계층 설계를 위한 read-only 조사(기존 deterministic act/렌더러/브리핑
+  경로, sim 채점 필드 파생, 프록시가 turn별로 받는 이벤트 메타데이터 범위) 후 설계를
+  live state에 동결하고 구현 배치로 진행한다.
 - 2026-08-25 02:40 KST **E2-C2 36-report matrix 최종 receipt — no_winner, goal 종결 보고**:
   detached launcher(PID 27140) exit 0, 36/36 reports, transport 0, 전 run `/health`
   `handle_grounding_guard=true` before/after attest, attestation
