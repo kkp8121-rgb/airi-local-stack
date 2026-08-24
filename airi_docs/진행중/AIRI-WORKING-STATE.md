@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 10:51:00 +09:00"
-checkpoint_id: "20260824-105100-smoke2-pass-receipt-main-training-intent"
+updated_at_kst: "2026-08-24 12:02:00 +09:00"
+checkpoint_id: "20260824-120200-matrix-impl-verified-commit-and-run-intent"
 goal_status: "active"
 authorization: "user-goal-2026-08-24: repository-gpu-unlimited-training-packaging-36-report-campaign-on-winner-e2-c2-on-no-winner-local-services-t3-readonly-diagnosis-t05-sample-synthesis-commit-push-authorized; forbidden: post-blind-target-fixture-threshold-seed-change, blind-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-on, speaker-126-operational-promotion; operational-adoption-forbidden-until-separate-user-approval"
-active_phase: "e2-c1-main-training-launch"
+active_phase: "e2-c1-blind-36-report-matrix"
 git_head: "5b4d757_after_8f8f176_c96b929_push"
 worktree_state: "HEAD-local-remote-exact-5b4d757; clean-except-live-state-heartbeat; smoke2-fresh-root-launch"
 active_trainer_count: 0
@@ -22,6 +22,49 @@ reconciliation_receipt: "2026-08-24 09:55 KST E2-C1 bounded GPU smoke intent (Cl
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 12:02 KST **matrix 구현 검증 receipt + commit/실행 intent**: implementer
+  `e2c1-matrix` 산출(launcher e2c1 profile +168/-37, comparator 596줄+13 tests, contract 6
+  cases, CI 등록)을 감독이 검토·독립 재실행으로 확인했다 — comparator/legacy/commitment
+  `29 passed, 1 skipped`, launcher contract **14 passed**(stale `ParentProcessId` token을 현행
+  `Get-OwnedPortKey`/CIM 조회 핀으로 교체 후), AST parse 0, diff-check 0. env 3축 attestation과
+  role-scoped perfect_rates 해석을 frozen contract에 pre-result로 기록했다. commit 계획: ①
+  `fix: add e2c1 blind matrix profile and policy comparator` ② docs 배치. push 후 실행 intent:
+  `run-airi-broadcast-t3-matrix.ps1 -MatrixProfile e2c1 -OutputDir
+  D:\AIRI-Models\airi-e2c1-blind-matrix-20260824\run -ModelManifest ...\e2c1-model-manifest.json
+  (SHA 3a3d5200...) -BlindRoot D:\AIRI-Models\airi-e2-c1-blind-freeze-20260824-000430` — 36 runs
+  (약 2~3시간, 15분 heartbeat), 첫 3 report 후 perfect-rate 분모 nonzero 조기 확인, 종료 후
+  comparator verdict로 winner 판정. 실패/no_winner 시 root 보존·blind 재사용 금지. GPU 학습
+  아님(Ollama 추론), 운영 채택 없음.
+- 2026-08-24 11:30 KST **E2-C1 merge/package receipt + blind matrix 구현 intent**: safe merge는 첫
+  시도 2회가 fail-closed(도구의 canonical top-level manifest 방식과 temporary-dir=output parent
+  규칙 — 입력 오류이지 결함 아님) 후 exit 0. merged model.safetensors
+  `1494e8cc9dd184b997dd155b787fa39ab6410f453eaa819966a08e7adbadee49`(4,611,084,960 B), non-target
+  tensor exactly_unchanged true, target l2 0.0865. 패키징 exit 0: BF16→Q4_K_M, tag
+  `midm-airi:e2c1-broadcast-v4-20260824-08df7ecfc4c32bdfb7cdbeaef932583e`, digest
+  `fccbfde9f6d40dd7d728c7da386fcbb20154f9987f09d9d9305226632a94a9e1`, q4 gguf sha
+  `bd8af468...a352`, 도구 4핀 exact(converter/quantizer/ollama). package-evidence는
+  `D:\AIRI-Modelsiri-e2-c1-packages-20260824\e2c1\`. 어느 것도 운영 채택 아님. 다음 §8-8:
+  기존 T3 launcher는 arm명(baseline/e1/e2)·old fixture SHA·old comparator가 하드코딩돼 있어
+  **e2c1 profile 확장 + frozen policy comparator(`compare_e2c1_blind.py`) 신규**를 implementer
+  `e2c1-matrix`(opus)에 spec으로 위임했다(commitment/policy JSON·sealed manifest
+  `b664d162...` 결속, seeds [73,89,97,20260824], 파생 불가 metric은 fail-closed 보고). 검증 후
+  감독이 commit/push하고 matrix 실행 intent를 별도 기록한다. blind body는 여전히 미열람.
+- 2026-08-24 11:15 KST **E2-C1 본 학습 terminal receipt + merge/package intent**: run
+  `e2c1-main-seed42-512-20260824`(root `airi-e2-c1-main-20260824-105300`)이 terminal exit 0/
+  `trainer-complete`, **512/512 microsteps·32/32 optimizer steps·pending 0**, rev 129, checkpoint
+  11개(K=3), 실측 약 15분(mixture 시퀀스가 v4보다 짧아 빠름), peak CUDA 5,909,909,504 B. report:
+  selected epoch 1, **mixture dev loss `2.235104203440376`**(v4 dev와 데이터가 달라 E2 2.7355와
+  직접 비교 불가), init_mode adapter-weights-only(run_id v4-e2-...074326), adoption false.
+  fresh-state receipt: optimizer entries 0·상속 4축 전부 false. adapter SHA: model
+  `e8f81da2bdc6b8642cb7415923b1c2cc7a02b97d39919bb86f83ace3d685a0ce`(56,318,520 B), config
+  `80e44e46da377288af94007f125882f0addf27170345d1cb1c13efcbf4745fb5`, artifact-manifest
+  `3e8a8d1dc4c91a83290b7342b6b80286ba18ea34459a3c3320d1edc1ab62dfe1`(2,953 B), report
+  `d59cb947d036e8e2...`(2,253 B). 관련 PID 0. **다음 intent(§8-7)**: E1/E2와 동일 도구·핀으로
+  ① `merge_airi_behavior_lora.py` — base merged-hf(`394b6624...f506`, base artifact manifest
+  `bac2b815...8209`) + e2c1-adapter safe merge → `D:\AIRI-Modelsiri-e2-c1-merged-20260824\merged-hf`
+  ② `package_airi_gguf.py` — converter python `488d1f16...`, script `21b70f59...`, quantizer bundle
+  `354c70ff...`, ollama `a6434101...` 핀으로 BF16→Q4_K_M→tag/digest manifest. 각 exit 0과
+  merge/package evidence로 receipt. 실패 시 보존·중단. 패키징은 후보 생성일 뿐 채택 아님.
 - 2026-08-24 10:51 KST **smoke2 PASS receipt + 본 학습 intent**: fresh root
   `airi-e2-c1-smoke2-20260824-104800`에서 baseline/safe 두 arm 모두 complete 80/5 exit 0,
   gateway `SAFE_TO_POWER_OFF` 1회, resume-accepted 기록, 두 report init_mode

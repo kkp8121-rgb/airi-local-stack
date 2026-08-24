@@ -196,6 +196,25 @@ collision false, old fixture/report selection reuse false, thresholds frozen으�
   중 4축 이상 개선이 모두 필요하다.
 - tie, missing/duplicate report, hard gate 실패는 `no_winner`다.
 
+**2026-08-24 결과 확인 전(pre-result) 고정 해석** — matrix 구현 시점에 기록하며 결과를 본 뒤
+바꾸지 않는다:
+
+- hard gate 중 `privacy`/`localhost_exposure`/`external_provider_without_opt_in`은 report
+  schema로 파생 불가하므로, launcher가 실행 전후 검증한 사실을
+  `airi.e2-c1-environment-attestation.v1`(root_id·run_count=36 결속)로 기록하고 comparator가
+  이를 필수 입력으로 gate한다. attestation 없이는 verdict를 쓰지 않는다(exit 2).
+- perfect_rates의 role-scoped 파생(각 fixture role의 report row만 사용, 분모 0이면 fail-closed):
+  `unknown_identity_safe` = identity role의 probe row에서 `probe_hit ∧ ¬invented_handles`;
+  donation composite = donation row의 `callout_correct` ∧ `addressee_forbidden_hits=[]` ∧
+  `addressee_required_met` ∧ non-empty `shared_tokens`; `stale_transition_clean` = continuity
+  role의 `arc_event_type=topic_transition` row에서 `arc_required_met ∧ ¬arc_forbidden_hits`;
+  `decoy_fact_use` = factual role의 checked row에서 forbidden-pattern hit 존재율(0이어야 함).
+- report 이름 규칙 `reports/<arm>/<arm>-<logical_role>-<seed>.json`, verdict schema
+  `airi.e2-c1-blind-comparison.v1`(adoption_authorized=false 고정), `transport_failures>0`은
+  invalid report가 아니라 hard-gate 위반으로 처리(구 comparator와 의도적 상이).
+- 실행 도구: `run-airi-broadcast-t3-matrix.ps1 -MatrixProfile e2c1 -BlindRoot <sealed root>` +
+  `compare_e2c1_blind.py`. t3 profile 동작은 불변.
+
 ## 6. 조사 blocker 해결 receipt
 
 checkpoint generator와 독립 verifier는 `(으로,로)`와 받침 ㄹ 예외를 지원하지 않아 다음

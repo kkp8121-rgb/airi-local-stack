@@ -7,6 +7,23 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-24 E2-C1 본 학습·패키징·blind matrix 구현
+
+- 12:00 KST (클로드 PC, Fable 감독+opus 워커) E2-C1 본 학습 `e2c1-main-seed42-512-20260824`
+  terminal exit 0(512/32, K=3 checkpoint 11, mixture dev `2.235104203440376`, peak CUDA 5.91 GB,
+  adapter `e8f81da2...a0ce`), safe merge exit 0(merged `1494e8cc...ee49`, non-target 무변경),
+  패키징 exit 0(tag `midm-airi:e2c1-broadcast-v4-20260824-08df7ecf...`, digest `fccbfde9...a9e1`,
+  도구 4핀 exact) — 모두 미채택. ollama에 baseline/e2/e2-c1 3태그 확인. blind matrix 실행을 위해
+  launcher에 `-MatrixProfile e2c1`(+`-BlindRoot`, commitment/sealed manifest SHA 결속, seeds
+  [73,89,97,20260824], 외부 evidence 사본)과 frozen policy comparator `compare_e2c1_blind.py`
+  (13 tests)·launcher contract e2c1 6 cases를 구현했다(worker: opus implementer, 감독 검토·독립
+  재실행 29 passed/1 skipped + 14 passed). env 3축 hard gate는 launcher attestation
+  (`airi.e2-c1-environment-attestation.v1`)으로, perfect_rates는 role-scoped row 파생으로 고정
+  (frozen contract에 pre-result 해석 기록). HEAD에서 이미 red였던 stale token
+  `[int]$_.ParentProcessId -eq $PID`(launcher에 부재)는 현행 identity 메커니즘
+  (`Get-OwnedPortKey`/CIM ProcessId 조회) 핀으로 교체 — 계약 약화 아님, 현행 코드 결속 갱신.
+  CI evaluations shard에 `test_compare_e2c1_blind.py` 등록. blind body 미열람 유지.
+
 ## 2026-08-24 E2-C1 bounded smoke PASS
 
 - 10:50 KST (클로드 PC) 수리 코드(`8f8f176`)로 fresh root `airi-e2-c1-smoke2-20260824-104800`
