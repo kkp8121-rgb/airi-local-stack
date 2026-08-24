@@ -7,6 +7,30 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-24 결정 폼 회신 반영
+
+- 2026-08-24 09:47 KST (클로드 PC, Fable 감독) 사용자 `/goal`로 **GPU 제한 없음** 및 E2-C1 smoke→본 학습→
+  merge/package→36-report→gate, winner 시 campaign 자동, no_winner 시 E2-C2 루프 자동, T3
+  invented-handle read-only 진단, T-05 126번 A/B 합성, 서브에이전트(scout haiku/worker sonnet)
+  사용, 문서 batch commit/push가 허가됐다. 금지는 근거 무효(blind 확인 뒤 계약 변경·blind
+  재사용·hard gate 완화)와 운영 경계(운영 모델/태그·외부 provider/extraction/greybox·126번
+  승격)로 축소했고 adoption만 별도 승인이다. 이 배치 자체는 문서·에이전트 정의·CLAUDE.md의
+  commit/push이며 GPU/모델/서비스 변경 0이다. wshobson `agent-teams` 플러그인(user scope)과
+  프로젝트 `.claude/agents/` implementer(opus)/worker(sonnet)/scout(haiku)를 도입했다.
+  다음 동작은 E2-C1 bounded GPU smoke intent다.
+
+- 09:11 KST (클로드 PC, 문서만) 사용자가 `진행예정/AIRI-DECISION-FORM-2026-08-19.html`의
+  정식 회신 텍스트를 제출했다: `ack=marker · targets=승인 · thank=배선진행 ·
+  wave=원안승인 · memguard=도입 · b4c=reaction/narration/readout/silence/absence/
+  namecall/tagq/opening/closing 전부 승인 · pool=ON · contract=ON · fandom=유보 ·
+  t05=샘플요청 · deepl=보류`. 0~7·10은 08-19 일괄 승인 기록과 동일해 상태값 변화가
+  없고, STATUS §6의 8(T-05 유보→**샘플 요청**)과 9(DeepL 종결→**보류(위험 인지)**)만
+  갱신했다. 색인의 폼 상태를 "회신 완료"로, NEXT-SESSION 음성 항목에 T-05 샘플 요청을
+  반영했다. 코드·런처 기본값·모델·서비스·GPU·운영 채택 변경은 0이다. 후속 작업은
+  126번 참조(`tts-samples/t05-zeroth-ko-2026-08-12/`, provenance 보존)를 감정 대화체
+  문장으로 재합성해 현행 일본어 참조와 A/B 청취 샘플을 만드는 것이며, GPT-SoVITS
+  서비스 시작이 필요하므로 WORKING-STATE에 별도 intent를 쓴 뒤 수행한다.
+
 ## 2026-08-24 E2-C1 frozen-contract first milestone
 
 - 03:26 KST exact six current docs continuity/boundary/diff/security/PID 0 PASS 뒤

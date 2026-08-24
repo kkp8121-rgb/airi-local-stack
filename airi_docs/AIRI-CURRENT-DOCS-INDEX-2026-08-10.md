@@ -132,7 +132,9 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
   일반 호칭 “시청자들” 사용, T-05 126번 예비 후보 보존·현행 음성 유지다.
   근거는
   `참조/AIRI-BROADCAST-RESEARCH-2026-08-12.md`.
-- `AIRI-DECISION-FORM-2026-08-19.html` — **통합 결정 폼(회신 대기).**
+- `AIRI-DECISION-FORM-2026-08-19.html` — **통합 결정 폼(2026-08-24 회신 완료).**
+  회신 전문과 반영 결과는 `로드맵/AIRI-ROADMAP-STATUS.md` §6. t05=샘플요청·
+  deepl=보류만 08-19 기록과 다르다.
   v3 결정 큐 전체 19문항: ACK 기본 모드·지표 목표치·P2 3건(thank 배선·
   여론 집계 문구·기억나 가드)·B4c 파라미터 9행·운영 ON·기타. 기존 B4c
   폼(08-18)을 대체(아카이브 이동).

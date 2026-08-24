@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 03:26:17 +09:00"
-checkpoint_id: "20260824-032617-e2-c1-adapter-init-finalization-receipt"
+updated_at_kst: "2026-08-24 09:47:17 +09:00"
+checkpoint_id: "20260824-094717-goal-gpu-unlimited-docs-commit-intent"
 goal_status: "active"
-authorization: "repository-gpu-training-packaging-local-services-evaluation-commit-push-authorized; operational-adoption-forbidden"
-active_phase: "e2-c1-adapter-init-offline-validation"
-git_head: "508161678199f059525ea1b38acb577ba80d64f0"
-worktree_state: "HEAD-local-main-local-origin-main-remote-main-exact-5081616; clean-before-this-receipt; adapter-init-implementation-receipt-and-current-doc-finalization-pushed; final-two-doc-receipt-commit-push-pending"
+authorization: "user-goal-2026-08-24: repository-gpu-unlimited-training-packaging-36-report-campaign-on-winner-e2-c2-on-no-winner-local-services-t3-readonly-diagnosis-t05-sample-synthesis-commit-push-authorized; forbidden: post-blind-target-fixture-threshold-seed-change, blind-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-on, speaker-126-operational-promotion; operational-adoption-forbidden-until-separate-user-approval"
+active_phase: "e2-c1-gpu-execution-goal-active-docs-batch-commit"
+git_head: "6726baa5253e970f17c65f8bb0447c6bbe86e5e0"
+worktree_state: "HEAD-local-main-local-origin-main-remote-main-exact-6726baa; decision-form-reply-doc-batch-plus-goal-activation-docs-modified-uncommitted; untracked-.claude-agents-and-CLAUDE.md-to-be-committed-in-same-batch"
 active_trainer_count: 0
-reconciliation_receipt: "2026-08-24 03:26 KST adapter-init finalization receipt: exact six current docs passed continuity/boundary/diff/security/PID 0. Commit `docs: publish E2-C1 adapter-init receipt` is 508161678199f059525ea1b38acb577ba80d64f0, six files, 55 insertions/29 deletions; push `3c4b1a9..5081616 main -> main` exit 0. HEAD/local main/local origin/main/remote main are exact 5081616, clean, related AIRI PID 0; GPU 1,077/8,192 MiB, 16%, 42 C with AIRI workload 0; E2-C1 0/0. Last authority PASS is adapter-init offline implementation and actual E2 helper, now published. Current gate is review-PC mandatory reconciliation then one bounded GPU smoke under a new intent; this session will not start it. Exact final state change is commit this receipt in WORKING/LOG only as `docs: record E2-C1 adapter-init push` and push; inputs/frozen settings stay exact, external run root absent, expected PID 0. Success requires two-doc cached PASS, commit/push exit 0 and final refs exact clean/PID 0. Failure preserves prior pushed commits without force/retry/GPU. Quota recovery and duplicate identity use mandatory five docs, 5081616, exact two paths, final subject and PID 0."
+reconciliation_receipt: "2026-08-24 09:47 KST user /goal activation (Claude PC, Fable supervisor): GPU unlimited; E2-C1 smoke -> durable training step 0 -> merge/package -> 36 reports -> gate; campaign auto on winner, E2-C2 loop auto on no_winner; T3 invented-handle read-only diagnosis; T-05 speaker-126 A/B synthesis; docs batch commit/push authorized. Forbidden: post-blind contract changes, blind reuse, hard-gate relaxation, operational model/tag change, external provider/extraction/greybox ON, 126 promotion; adoption needs separate approval. Pre-commit state: HEAD=local=remote 6726baa, related AIRI PID 0, GPU idle, E2-C1 0/0. Intent: commit decision-form docs + goal activation docs + .claude/agents + CLAUDE.md as docs: record decision-form reply, push, verify HEAD=origin/main clean. Next: smoke intent."
 ---
 
 # AIRI live working state
@@ -22,6 +22,33 @@ reconciliation_receipt: "2026-08-24 03:26 KST adapter-init finalization receipt:
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 09:47 KST **user `/goal` 활성화 + 문서 batch commit intent (클로드 PC, Fable 감독)**: 사용자가
+  GPU 제한 없음을 명시하고 다음을 허가했다 — E2-C1 bounded smoke 1회 → durable runner 본 학습
+  step 0(frozen 값 불변) → adapter/report 검증 → safe merge → BF16/Q4_K_M → baseline/E2/E2-C1 ×
+  blind 3종 × seed 4 = 36 reports → gate 판정; winner면 3×500 campaign 즉시, no_winner면 실패 축
+  분석 → 새 blind 봉인 → E2-C2 설계·학습·36-report 연속; external T3 root 36 reports read-only
+  invented-handle 분류; T-05 GPT-SoVITS 9880 기동/종료와 126번 vs 현행 참조 4문장 A/B 합성;
+  서브에이전트 scout(haiku)/worker(sonnet)는 읽기·합성·집계만, GPU 실행·서비스·SSoT·commit은
+  감독만. 금지는 blind 확인 뒤 target/fixture/threshold/seed 변경·blind 재사용·hard gate 완화,
+  운영 모델/태그 변경·외부 provider/extraction/greybox ON·126번 운영 승격이며 adoption은 별도
+  승인이다. 세션 경계·compact 뒤에도 intent/receipt만 쓰고 GPU 작업을 계속한다. commit 직전
+  관측: HEAD/local/remote exact `6726baa`, related AIRI PID 0, GPU idle, E2-C1 0/0. 이 intent의
+  exact 동작은 결정 회신 5개 docs + goal 활성화 docs(WORKING/LOG/STATUS/handoff) + `.claude/agents/`
+  3종 + `CLAUDE.md`를 `docs: record decision-form reply`로 commit하고 push한 뒤 HEAD=origin/main
+  clean·PID 0을 확인하는 것이다. 성공 뒤 다음 한 동작은 E2-C1 bounded GPU smoke intent다.
+- 2026-08-24 09:14 KST **decision-form reply doc receipt (클로드 PC)**: 필수 5문서를 EOF까지
+  읽고 read-only 대조했다. HEAD/local main/local origin/main/remote main은 exact `6726baa`
+  (직전 pending 2-doc receipt commit이 push된 상태), related AIRI PID 0(Ollama 11434 서비스만
+  listen), GPU 953/8,192 MiB idle·AIRI workload 0, external E2/T3/blind root 존재(body 미독),
+  E2-C1 0/0이다. 사용자가 `AIRI-DECISION-FORM-2026-08-19` 정식 회신을 제출했다: ack=marker ·
+  targets/wave/memguard/b4c 9행/pool/contract 승인 · thank=배선진행 · fandom=유보 ·
+  **t05=샘플요청** · **deepl=보류(위험 인지)**. STATUS §6 8/9행, 색인 폼 상태, NEXT-SESSION
+  음성 항목, LOG 1건만 바꿨고 코드·모델·서비스·GPU·운영 채택 변경은 0, diff-check exit 0
+  (expected LF/CRLF warning only)이다. worktree에는 `/init`이 만든 untracked `CLAUDE.md`도
+  있다. 이 배치의 commit/push는 이 세션에서 아직 허가되지 않아 로컬 전용이다. 다음 비GPU-학습
+  동작은 T-05 126번 대화체 A/B 청취 샘플 합성이며 GPT-SoVITS 9880 기동이 필요하므로 별도
+  intent checkpoint 뒤에만 시작한다. E2-C1 bounded GPU smoke의 `gpu_authorized`는 review-PC
+  smoke intent 전까지 false다.
 - 2026-08-24 03:26 KST **adapter-init finalization receipt**: exact six current docs passed
   continuity/boundary/diff/security/PID 0. Commit `docs: publish E2-C1 adapter-init receipt` is
   `508161678199f059525ea1b38acb577ba80d64f0`, six files, 55 insertions/29 deletions;

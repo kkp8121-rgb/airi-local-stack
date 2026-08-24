@@ -7,6 +7,14 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
+> **2026-08-24 09:47 KST 사용자 `/goal` — GPU 제한 없음:** E2-C1 bounded smoke → durable 본 학습
+> step 0 → merge/package → baseline/E2/E2-C1 36 reports → gate 판정이 연속 허가됐다. winner면
+> 3×500 campaign을 즉시, no_winner면 실패 축 분석·새 blind 봉인·E2-C2까지 재확인 없이 진행한다.
+> T3 invented-handle read-only 진단과 T-05 126번 A/B 샘플은 병행한다. 금지는 blind 확인 뒤
+> 계약 변경·blind 재사용·hard gate 완화, 운영 모델/태그 변경·외부 provider/extraction/greybox
+> ON·126번 승격뿐이며 adoption은 별도 승인이다. 감독은 Claude Fable 세션, 워커는
+> `.claude/agents/` implementer(opus)/worker(sonnet)/scout(haiku)다.
+>
 > **2026-08-24 E2-C1 adapter-init offline PASS / published:** 사용자는 E2 adapter
 > weight를 검증된 초기값으로 사용하고 optimizer/scheduler/RNG/cursor는 새로 시작하는
 > 교정 후보 `E2-C1`을 승인했다. correction 480 + 검증된 v4 replay 200 + mixture 680과
@@ -496,9 +504,15 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
 | 5 | 침묵 폴백 풀 운영 ON | **완료** — 런처 기본 ON(`3ead135`) |
 | 6 | 계약 v3+게이트 운영 ON | **완료** — 런처 기본 ON(`3ead135`) |
 | 7 | 팬덤명 | 유보 지속 |
-| 8 | T-05 목소리 샘플 | 유보 지속 |
-| 9 | DeepL 키 (talkain) | **종결** — 사용자 지시로 추적 종료(2026-08-19) |
+| 8 | T-05 목소리 샘플 | **샘플 요청** — 2026-08-24 결정 폼 회신 `t05=샘플요청`. 126번을 감정이 드러나는 대화체 문장으로 재합성해 현행 일본어 참조와 A/B 청취 샘플을 준비한다(포지). 운영 승격 아님·현행 음성 유지 |
+| 9 | DeepL 키 (talkain) | **보류** — 2026-08-24 회신 `deepl=보류(위험 인지)`. 08-19 "종결" 표기를 대체하며 회전 시점은 사용자 몫 |
 | 10 | §1 목표치 확정 | **승인** — 제안값 확정, 실측 후 조정 가능 |
+
+2026-08-24 사용자가 `AIRI-DECISION-FORM-2026-08-19.html` 정식 회신 텍스트를 제출했다:
+`ack=marker · targets=승인 · thank=배선진행 · wave=원안승인 · memguard=도입 ·
+b4c 9행 전부 승인 · pool=ON · contract=ON · fandom=유보 · t05=샘플요청 · deepl=보류`.
+0~7·10은 08-19 일괄 승인 기록과 동일하고 8·9만 위 표대로 갱신했다. 회신은 문서
+결정이며 코드·런처 기본값·운영 채택은 바뀌지 않았다.
 
 확정된 과거 결정(1~7, 2026-08-12·14·18)의 전문은 v2 스냅샷 §사용자 결정
 참조 — 요지: 관계 축=AI 단독형+사장님 메타 서사, 로컬 LLM=Mi:dm,

@@ -23,10 +23,16 @@ milestone `2e61842`와 receipt `3dba3ca`는 origin/main에 push됐고 직후 loc
 기계 판독 계약: `goal_status=active`;
 `execution_order=P0_A>P0_B>E2_LAUNCH>E2_PROVENANCE>PACKAGE>T3_36>CAMPAIGN_3X500>USER_DECISION`
 
-현재 권한: 2026-08-23 최신 사용자 `/goal`로 저장소 구현·검증, GPU 학습,
-병합·패키징, 로컬 서비스, T3·장시간 캠페인, 검증된 milestone commit/push가
-명시적으로 재승인됐다. 운영 채택과 기본 서비스 모델 변경은 별도 사용자 승인 전까지
-계속 금지한다.
+현재 권한: **2026-08-24 09:47 KST 사용자 `/goal`(클로드 PC, Fable 감독)로 GPU 제한 없음**이
+명시됐다. E2-C1 bounded smoke → durable 본 학습 step 0 → merge/package → 36 reports → gate
+판정, winner 시 3×500 campaign 즉시, no_winner 시 새 blind 봉인·E2-C2 루프 연속 진행, T3
+invented-handle read-only 진단, T-05 126번 A/B 합성, 문서 commit/push가 허가됐다. 세션
+경계·compact 뒤에도 intent/receipt만 쓰고 GPU 작업을 계속한다(`gpu_authorized=false` 자체
+gate는 이 goal로 해제). 금지는 blind 확인 뒤 target/fixture/threshold/seed 변경·blind 재사용·
+hard gate 완화, 운영 서비스 모델/태그 변경·외부 provider/extraction/greybox ON·126번 음성
+운영 승격이며, 운영 채택은 campaign 결과 묶음을 본 사용자의 별도 승인이다.
+(이전 08-23 `/goal`: 저장소 구현·검증, GPU 학습, 병합·패키징, 로컬 서비스, T3·캠페인,
+milestone commit/push 승인 — 이 문단으로 대체.)
 
 ## -5. 2026-08-24 E2-C1 adapter-init offline PASS / published
 
