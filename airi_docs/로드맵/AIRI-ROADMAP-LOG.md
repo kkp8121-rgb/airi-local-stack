@@ -7,6 +7,20 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-24 blind v1 실행-불능 결함과 한국어 v2 재봉인
+
+- 12:58 KST (클로드 PC, Fable 감독 + opus 워커 blind-v2) matrix 1차 실행이 sim traceback으로
+  중단(부분 root 2개 보존). 진단: 공개 fixture 라이브 단일 런 exit 0(스택 정상), blind는
+  `unsupported_language` — 봉인 blind 3종의 생성 문구가 전부 영어(한글 0자)인 실행-불능 저작
+  결함(봉인 검증이 실행/언어 미포함). goal 사전 허가에 따라 한국어 v2 재저작·재봉인: 같은
+  role 3종·seeds [73,89,97,20260824]·arms·threshold 불변, 교정 데이터 proper token 239개와
+  충돌 0(예방 개명 1건), stream-only 12조합 exit 0·한글 비율 1.0·perfect-rate 분모 전부
+  nonzero, sealed manifest `ce81bbb5...c9d4`, receipt `language_validation` 필수화, v1 재봉인
+  금지 테스트. 핀 갱신: commitment/verifier/commitment test(워커) + launcher·launcher
+  contract·frozen test(감독). 재검증 combined `44 passed, 1 skipped`+frozen 6+verifier
+  pass+AST 0+diff 0. 노출 기록: 진단 중 v1 생성 스펙·stream 입력 열람, blind 모델 응답 0.
+  commit `444faf2`(fix)·docs로 push. 다음: matrix 재실행(BlindRoot=v2).
+
 ## 2026-08-24 E2-C1 본 학습·패키징·blind matrix 구현
 
 - 12:00 KST (클로드 PC, Fable 감독+opus 워커) E2-C1 본 학습 `e2c1-main-seed42-512-20260824`

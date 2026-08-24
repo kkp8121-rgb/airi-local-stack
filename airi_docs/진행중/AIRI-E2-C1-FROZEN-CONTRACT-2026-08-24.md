@@ -161,8 +161,18 @@ smoke는 품질 진척이 아니다. smoke PASS receipt의 commit/push와 HEAD=o
 
 ## 5. retained blind와 평가 계약
 
-external evaluator root는
-`D:\AIRI-Models\airi-e2-c1-blind-freeze-20260824-000430`이다. repository에는 body를
+external evaluator root는 **v2** `D:\AIRI-Models\airi-e2-c1-blind-freeze-20260824-v2`다.
+(**2026-08-24 12:55 결과-전 개정:** 최초 root `...-000430`은 matrix 첫 실행에서 archetype/probe
+문구가 전부 영어(한글 0자)임이 드러나 운영 입력 스크리닝이 `unsupported_language`로 전 턴을
+차단, 세 fixture 모두 실행 불가였다. 어떤 arm의 응답도 생성되기 전이므로 fixture body만
+한국어로 재저작해 재봉인했다 — role 3종·seeds·arms·threshold·metric policy·학습 계약은 전부
+불변. v1 root는 결함 증거로 보존한다. 재발 방지로 sealed receipt에 `language_validation`
+(stream-only 한글 검증, model_calls 0)이 필수가 됐고 v1 root_id/hash 재봉인은 테스트로
+금지했다. v2 pin: identity 7,531 B raw `22100048...fb3d`, continuity 12,913 B raw
+`98c66f21...a7f7`, factual 11,035 B raw `c90e976b...f81d`; sealed manifest 1,125 B raw
+`ce81bbb59edd473210b0c5b6637a5728827fef3e56e077786f213b52f989c9d4`, validation receipt 803 B
+raw `f7815727...f629`. repository verifier는 v2 root에 대해 status pass다. 아래 v1 표는
+역사 기록이다.) repository에는 body를
 넣지 않고 commitment·policy만 둔다. root는 body를 읽지 않았고
 `response_viewed=false`다.
 

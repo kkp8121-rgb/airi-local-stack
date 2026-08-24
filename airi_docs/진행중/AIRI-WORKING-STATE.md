@@ -1,7 +1,7 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 12:40:00 +09:00"
-checkpoint_id: "20260824-124000-blind-root-defect-receipt-v2-reseal-intent"
+updated_at_kst: "2026-08-24 13:02:00 +09:00"
+checkpoint_id: "20260824-130200-blind-v2-pushed-matrix-relaunch-intent"
 goal_status: "active"
 authorization: "user-goal-2026-08-24: repository-gpu-unlimited-training-packaging-36-report-campaign-on-winner-e2-c2-on-no-winner-local-services-t3-readonly-diagnosis-t05-sample-synthesis-commit-push-authorized; forbidden: post-blind-target-fixture-threshold-seed-change, blind-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-on, speaker-126-operational-promotion; operational-adoption-forbidden-until-separate-user-approval"
 active_phase: "e2-c1-blind-36-report-matrix"
@@ -22,6 +22,14 @@ reconciliation_receipt: "2026-08-24 09:55 KST E2-C1 bounded GPU smoke intent (Cl
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 13:02 KST **blind v2 push receipt + matrix 재실행 intent**: `444faf2`(fix: reseal
+  Korean E2-C1 blind v2)·`af2cd68`(docs, 12:40 결함 receipt)이 push됐고 이 배치에서 contract
+  개정문·LOG 항목·이 receipt를 추가 docs commit으로 push한다. 검증 상태: combined 44 passed/
+  1 skipped, frozen test 6 passed, verifier(v2 root) pass, launcher AST 0, diff 0. 이후 exact
+  동작: detached wrapper(BlindRoot=v2 root, OutputDir `...blind-matrix-20260824\run`)로 matrix
+  1회 재실행 — 36 runs, 14분 heartbeat, 첫 3 report에서 perfect-rate 분모 확인, 종료 시
+  comparator verdict(`airi.e2-c1-blind-comparison.v1`)로 winner 판정. 실패 시 root 보존·동일
+  명령 반복 금지·원인 확정 후 재기록.
 - 2026-08-24 12:40 KST **blind root 실행-불능 결함 receipt + v2 재봉인 intent**: matrix 첫 실행이
   launcher line 419에서 sim traceback으로 중단됐다(부분 root 2개 `run-aborted-toolcap`/
   `run-failed-noerrlog` 보존, 서비스 정리 후 PID/listener 0). 진단: 공개 fixture 단일 라이브 런은
