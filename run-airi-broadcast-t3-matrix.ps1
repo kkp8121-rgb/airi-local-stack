@@ -224,7 +224,7 @@ if ($MatrixProfile -ceq 'e2c1') {
     $commitmentSha256 = Get-BytesSha256 $commitmentBytes
     $commitment = $strictUtf8.GetString($commitmentBytes) | ConvertFrom-Json
     if ($commitment.schema_version -cne 'airi.e2-c1-blind-commitment.v1' -or
-        $commitment.root_id -cne 'airi-e2-c1-blind-freeze-20260824-000430' -or
+        $commitment.root_id -cne 'airi-e2-c1-blind-freeze-20260824-v2' -or
         [int]$commitment.expected_matrix_reports -ne 36) { throw 'E2-C1 blind commitment schema or root is invalid.' }
     $blindRootPath = [IO.Path]::GetFullPath((Get-Item -LiteralPath $BlindRoot -ErrorAction Stop).FullName)
     $fixtures = @($commitment.fixtures)
@@ -243,7 +243,7 @@ if ($MatrixProfile -ceq 'e2c1') {
             (Get-CanonicalJsonSha256 $file) -cne $expectedCanon[$i]) { throw 'Blind fixture size or hash binding is invalid.' }
     }
     $sealedManifestPath = Join-Path $blindRootPath 'sealed_manifest.json'
-    $expectedSealedSha256 = 'b664d162840fa326312638a9b3e504e704e9db2be33208e23ac66bedc31def58'
+    $expectedSealedSha256 = 'ce81bbb59edd473210b0c5b6637a5728827fef3e56e077786f213b52f989c9d4'
     if ((Get-FileHash -LiteralPath $sealedManifestPath -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expectedSealedSha256) { throw 'Sealed blind manifest raw SHA-256 is invalid.' }
 } else {
     $fixtureManifestBytes = [IO.File]::ReadAllBytes((Get-Item -LiteralPath $FixtureManifest -ErrorAction Stop).FullName)

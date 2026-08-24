@@ -19,6 +19,19 @@ EXPECTED_ROLES = {
 }
 EXPECTED_SEEDS = [73, 89, 97, 20260824]
 EXPECTED_ARMS = ['baseline', 'e2', 'e2-c1']
+# v1 blind root (airi-e2-c1-blind-freeze-20260824-000430).  Its three bodies were
+# English, so Korean-first input screening rejected every generated viewer chat and
+# no arm could produce a report.  Pinned here so a silent revert to the unrunnable
+# root is caught rather than re-sealed.
+SUPERSEDED_ROOT_ID = 'airi-e2-c1-blind-freeze-20260824-000430'
+SUPERSEDED_HASHES = {
+    'fdf0a26a976542e9a47d9b1f0b5d24d31d571bf4b48b7930806f04be12f26162',
+    '62accd68e1b40d7c57f6b3b85a61dc9bc24696dc121c80b5fb152e8bf0ca912d',
+    '71010d62b9b609370521912d434777d7759cd862dbd2c9e82447adc0ea9b2fee',
+    '3a33a467f3997a780b3ce17393af5c85d0d58577f9005615507888fec2cbeab5',
+    '13b433cf26da8ab4f938dd9886d664b681971663c8f70ba1bebde17707868e40',
+    'd021b6b3f2026c12b961472eca98af1322b800843567e745bba706db38401e30',
+}
 PUBLIC_HASHES = {
     'd6cdd694e76ac4017ca1cdebb60ba09c337efa6a1813ce9c00c91b03d4ffcc9c',
     '0d558c0ce3e019569673ed96f4f171e3464e1e044028e7de6b7ede9d5b8085d6',
@@ -93,7 +106,7 @@ def test_canonicalizer_and_temp_synthetic_fixture_are_accepted():
 
 def test_commitment_is_only_a_sealed_inventory_and_freezes_the_36_report_matrix():
     commitment = _read(COMMITMENT_PATH)
-    assert commitment['root_id'] == 'airi-e2-c1-blind-freeze-20260824-000430'
+    assert commitment['root_id'] == 'airi-e2-c1-blind-freeze-20260824-v2'
     assert commitment['seeds'] == EXPECTED_SEEDS
     assert commitment['arms'] == EXPECTED_ARMS
     assert commitment['expected_matrix_reports'] == 36
@@ -105,6 +118,15 @@ def test_commitment_is_only_a_sealed_inventory_and_freezes_the_36_report_matrix(
         'old_public_fixture_reused': False, 'old_report_selection_rationale_reused': False,
         'response_viewed': False, 'thresholds_frozen': True,
     }
+
+
+def test_unrunnable_v1_blind_root_is_not_re_sealed():
+    commitment = _read(COMMITMENT_PATH)
+    assert commitment['root_id'] != SUPERSEDED_ROOT_ID
+    assert SUPERSEDED_ROOT_ID not in COMMITMENT_PATH.read_text(encoding='utf-8')
+    assert all(item['raw_sha256'] not in SUPERSEDED_HASHES
+               and item['canonical_sha256'] not in SUPERSEDED_HASHES
+               for item in commitment['fixtures'])
 
 
 def test_metric_policy_is_complete_fail_closed_and_preserves_existing_comparator_axes():

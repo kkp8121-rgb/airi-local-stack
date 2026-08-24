@@ -1,6 +1,6 @@
 {
   "schema_version": "airi.e2-c1-blind-commitment.v1",
-  "root_id": "airi-e2-c1-blind-freeze-20260824-000430",
+  "root_id": "airi-e2-c1-blind-freeze-20260824-v2",
   "fixture_schema_version": "airi.broadcast-sim-fixture.v1",
   "canonicalization": {
     "algorithm": "utf-8 JSON: sort_keys=true, separators=(',', ':'), ensure_ascii=false",
@@ -13,23 +13,23 @@
     {
       "filename": "identity_unknown_and_donation_ritual.json",
       "logical_role": "identity_unknown_and_donation_ritual",
-      "size_bytes": 2378,
-      "raw_sha256": "fdf0a26a976542e9a47d9b1f0b5d24d31d571bf4b48b7930806f04be12f26162",
-      "canonical_sha256": "62accd68e1b40d7c57f6b3b85a61dc9bc24696dc121c80b5fb152e8bf0ca912d"
+      "size_bytes": 7531,
+      "raw_sha256": "221000487646ad1e6b8b93e2d7dbad9bbbffd33b41516d1b168d3bc33483fb3d",
+      "canonical_sha256": "17ab77e9f1c9aed37926d68d8827542a9ab7e37226674e22e482b0cab78fd504"
     },
     {
       "filename": "long_continuity_and_stale_transition.json",
       "logical_role": "long_continuity_and_stale_transition",
-      "size_bytes": 2803,
-      "raw_sha256": "71010d62b9b609370521912d434777d7759cd862dbd2c9e82447adc0ea9b2fee",
-      "canonical_sha256": "3a33a467f3997a780b3ce17393af5c85d0d58577f9005615507888fec2cbeab5"
+      "size_bytes": 12913,
+      "raw_sha256": "98c66f212317872dff11bc353cb7dd12017bf78a75925e7c4657e3a74b2fa7f7",
+      "canonical_sha256": "16174f8729ee9a33ca0b323f6e919795d66918e8be8bfd1adecdbceabb1dae1d"
     },
     {
       "filename": "factual_grounding_and_complete_show_arc.json",
       "logical_role": "factual_grounding_and_complete_show_arc",
-      "size_bytes": 2953,
-      "raw_sha256": "13b433cf26da8ab4f938dd9886d664b681971663c8f70ba1bebde17707868e40",
-      "canonical_sha256": "d021b6b3f2026c12b961472eca98af1322b800843567e745bba706db38401e30"
+      "size_bytes": 11035,
+      "raw_sha256": "c90e976b145c0c2401af2d30fbe7bdbab7aebb5620370c166ef3098d54f81b1d",
+      "canonical_sha256": "a19886918a23090834ed1105374890c44192e1b2716451a8f2db1d3a2ab9c1db"
     }
   ],
   "pre_result_attestation": {
