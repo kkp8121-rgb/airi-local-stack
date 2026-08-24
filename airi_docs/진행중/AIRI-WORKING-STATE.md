@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 16:26:00 +09:00"
-checkpoint_id: "20260824-162600-handle-grounding-guard-plus-grader-fix-receipt"
+updated_at_kst: "2026-08-24 16:33:00 +09:00"
+checkpoint_id: "20260824-163300-handle-grounding-guard-pushed"
 goal_status: "active"
 authorization: "user-goal-2026-08-24: repository-gpu-unlimited-training-packaging-36-report-campaign-on-winner-e2-c2-on-no-winner-local-services-t3-readonly-diagnosis-t05-sample-synthesis-commit-push-authorized; forbidden: post-blind-target-fixture-threshold-seed-change, blind-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-on, speaker-126-operational-promotion; operational-adoption-forbidden-until-separate-user-approval"
-active_phase: "handle-grounding-guard-and-grader-fix-implementation"
-git_head: "a0020dd17ff9bcdbbd902d419cf88e0588f1d12e"
-worktree_state: "HEAD-local-a0020dd-not-yet-pushed-pending-this-docs-batch; matrix-fully-idle-PID-0"
+active_phase: "e2-c2-design-pending"
+git_head: "1ba11cd889a78b9ac4f594df76c8ebc092a17e1a"
+worktree_state: "HEAD-local-remote-exact-1ba11cd; clean; matrix-fully-idle-PID-0; work-continuity-contract-PASS; test-current-checkpoint-PASS"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
