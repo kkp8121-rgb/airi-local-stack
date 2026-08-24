@@ -1,7 +1,7 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 05:20:00 +09:00"
-checkpoint_id: "20260825-052000-d1-design-frozen-receipt"
+updated_at_kst: "2026-08-25 06:05:00 +09:00"
+checkpoint_id: "20260825-060500-d1-layer-implemented-receipt"
 matrix_note: "E2-C2 no_winner 종결(receipt 7e9f8e3). 신규 goal D1 접수"
 active_trainer_note: "e2c2 본 학습 terminal complete(1536/96, exit 0). 사용자 지시로 merge/패키징/matrix 진행하지 않고 대기. 재개 신호 = 사용자 '게임 끝' 통지. trainer/runner PID 0, AIRI GPU 워크로드 0"
 goal_status: "active"
@@ -24,6 +24,24 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-25 06:05 KST **D1 계층 구현 receipt (배치 2)**: 신규
+  `ollama-proxy/deterministic_utterance_layer.py`(P2 세션 과거-전용 토큰 가드 + 조사
+  교정, P3 결정/사실 회수 렌더러("S는 A 말고 B"/"내 X는 Y" 추출, 미발견 시 안전 폴백),
+  P4 거부-옵션 억제기(활용형 어간 변형 포함, 전량 드롭 시 폴백, 라이브 제안 ack), P5
+  후원 echo-감사, `build_layer_inputs`(system 문구는 P2 grounding에만 포함하고 P3/P4
+  증거 풀에서는 제외 — 계약 산문의 "…지 말고" 오염 방지), 세션 캐시 스냅샷-후-관찰
+  순서 보장) + `test_deterministic_utterance_layer.py` 25 tests. P1:
+  `handle_grounding_guard.build_grounding_pools`에 `history_texts` 추가(신호 memory_pool
+  에 history 합류 — 게이트 정의 불변, flag off 무변화; guard 테스트 16→18). 프록시 배선:
+  import, pools 지점에서 dialogue history 수집(양 플래그 off 시 스킵) + layer 입력 1회
+  계산, `prepare_openai_sse_dialogue` 3번째 gate(moderation→guard→layer), early-safe/main
+  두 방출 지점 전달, `/health`에 `deterministic_utterance_layer` 노출. 통합 테스트 4종
+  추가(OFF 기본 무변화 / history 근거 회수 응답 / 거부-branch 미방송(first-sentence
+  cutoff 시 폴백이 정답임을 주석으로 고정) / 후원 echo). 검증: 신규 25 + guard 18 +
+  proxy 377(373+4) 전부 pass(WindowsApps 3.14), broadcast_sim 137+1s·rehearsal 85
+  (P1 신호 변화에 회귀 0), `test-current-checkpoint.ps1` PASS, CI shard 등록. 발견 1건:
+  early-safe first-sentence cutoff에서 P4가 첫 문장을 드롭하면 뒤 문장 대신 폴백이
+  방송됨 — fail-safe로 문서화. 다음 배치: blind v4 + 4-arm matrix 하네스.
 - 2026-08-25 05:20 KST **D1 설계 동결 receipt (scout 3 조사 완료)**: 신규
   `airi_docs/진행중/AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md` 작성. 조사 핵심:
   (a) **신호 풀의 history 누락 발견** — e2-c2 위반 33건 표본 16건 전수가 실제 과거

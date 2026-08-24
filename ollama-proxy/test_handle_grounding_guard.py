@@ -140,6 +140,33 @@ class BuildGroundingPoolsTests(unittest.TestCase):
         self.assertEqual(memory_pool, "")
 
 
+class HistoryPoolTests(unittest.TestCase):
+    def test_history_texts_join_both_pools_when_enabled(self) -> None:
+        # D1 (2026-08-25): E2-C2 위반 표본은 전부 실제 과거 시청자 재호명이었고
+        # 상당수가 모델 프롬프트의 history 창 안에 있었다 — 그레이더가 원래 못
+        # 보던 그 근거를 memory_pool 신호에도 싣는다. 게이트 정의는 불변이다.
+        import handle_grounding_guard as module
+        from unittest import mock
+        with mock.patch.object(module, "HANDLE_GROUNDING_GUARD_ENABLED", True):
+            full_context, memory_pool = module.build_grounding_pools(
+                last_user_text="지금 발화",
+                briefing_evidence=None,
+                history_texts=["아까 배접천이 한 말", "AIRI의 이전 답"],
+            )
+        self.assertIn("배접천", full_context)
+        self.assertIn("배접천", memory_pool)
+        self.assertIn("이전 답", memory_pool)
+
+    def test_history_texts_are_ignored_while_the_flag_is_off(self) -> None:
+        self.assertEqual(
+            build_grounding_pools(
+                last_user_text="x", briefing_evidence=None,
+                history_texts=["아까 배접천이 한 말"],
+            ),
+            (None, None),
+        )
+
+
 class ApplyHandleGroundingGuardTests(unittest.TestCase):
     def test_empty_content_short_circuits(self) -> None:
         self.assertEqual(

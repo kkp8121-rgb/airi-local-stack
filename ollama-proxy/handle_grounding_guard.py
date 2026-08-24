@@ -68,6 +68,7 @@ def build_grounding_context(
     briefing_evidence: str | None = None,
     memory_block: str | None = None,
     journal_messages: Iterable[dict[str, Any]] | None = None,
+    history_blob: str | None = None,
 ) -> str:
     """Join every text fragment offered, for a plain substring membership check.
 
@@ -83,6 +84,8 @@ def build_grounding_context(
             content = message.get("content")
             if content:
                 parts.append(str(content))
+    if history_blob:
+        parts.append(history_blob)
     return "\n".join(part for part in parts if part)
 
 
@@ -91,6 +94,7 @@ def build_grounding_pools(
     last_user_text: str | None,
     briefing_evidence: str | None,
     memory_result: Any = None,
+    history_texts: Iterable[str] | None = None,
 ) -> tuple[str | None, str | None]:
     """Return ``(full_context, memory_pool)``, or ``(None, None)`` when off.
 
@@ -99,17 +103,28 @@ def build_grounding_pools(
     with ``getattr`` and only after the flag check, so a caller can pass
     whatever it already has on hand (a real ``RetrievalResult``, ``None``, or
     a test stand-in) without the *caller* needing to shape it first.
+
+    ``history_texts`` (D1, 2026-08-25): the conversation-history messages the
+    model actually received this turn. The E2-C2 blind diagnosis showed
+    flagged "invented" handles were often present in that history window —
+    real prompt evidence the signal pool omitted, the same measurement gap
+    class the memory/journal exposure fixed for E2-C1. History therefore
+    joins both the guard's own pool and the exposed ``memory_pool`` signal;
+    the gate's definition of a violation is unchanged.
     """
     if not HANDLE_GROUNDING_GUARD_ENABLED:
         return None, None
     memory_block = getattr(memory_result, "block", "") or ""
     journal_messages = getattr(memory_result, "journal_messages", None) or ()
+    history_blob = "\n".join(str(item) for item in (history_texts or ()) if item)
     memory_pool = build_grounding_context(
         memory_block=memory_block, journal_messages=journal_messages,
+        history_blob=history_blob,
     )
     full_context = build_grounding_context(
         last_user_text=last_user_text, briefing_evidence=briefing_evidence,
         memory_block=memory_block, journal_messages=journal_messages,
+        history_blob=history_blob,
     )
     return full_context, memory_pool
 

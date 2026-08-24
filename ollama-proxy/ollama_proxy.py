@@ -88,6 +88,7 @@ from output_moderation import OutputModerationRuntime, load_moderation_policy
 from epistemic_confidence import build_runtime as build_epistemic_confidence_runtime
 from broadcast_contract import apply_broadcast_contract, broadcast_contract_enabled
 from memory_claim_guard import guard_memory_claim
+import deterministic_utterance_layer
 import handle_grounding_guard
 from live_broadcast_runtime import LiveBroadcastRuntime, BroadcastControlError
 
@@ -6337,6 +6338,7 @@ def prepare_openai_sse_dialogue(
     *,
     grounding_context: str | None = None,
     memory_grounding_pool: str | None = None,
+    deterministic_inputs: dict[str, object] | None = None,
 ) -> tuple[str, dict[str, object] | None]:
     """Return the exact dialogue text and signal intended for the public wire.
 
@@ -6367,6 +6369,18 @@ def prepare_openai_sse_dialogue(
         )
         if handle_signal is not None:
             moderation = {**(moderation or {}), "handle_grounding": handle_signal}
+    if (
+        content
+        and deterministic_inputs is not None
+        and deterministic_utterance_layer.DETERMINISTIC_UTTERANCE_LAYER_ENABLED
+    ):
+        content, deterministic_signal = (
+            deterministic_utterance_layer.apply_deterministic_utterance_layer(
+                content, **deterministic_inputs,
+            )
+        )
+        if deterministic_signal is not None:
+            moderation = {**(moderation or {}), "deterministic_layer": deterministic_signal}
     return content, moderation
 
 
@@ -7042,6 +7056,7 @@ async def health() -> dict[str, object]:
         "broadcast_contract": broadcast_contract_enabled(),
         "memory_claim_guard": MEMORY_CLAIM_GUARD_ENABLED,
         "handle_grounding_guard": handle_grounding_guard.HANDLE_GROUNDING_GUARD_ENABLED,
+        "deterministic_utterance_layer": deterministic_utterance_layer.DETERMINISTIC_UTTERANCE_LAYER_ENABLED,
         "chat_model": chat_model_telemetry.health(),
         "system_prompt_overridden": False,
         "active_character_card_merge": True,
@@ -7539,11 +7554,31 @@ async def stream_local_with_ack(
         # Computed once and reused at every real-dialogue emission point
         # below: with the guard's env flag off this is a single boolean
         # check, and both pools stay None.
+        _dialogue_history_texts = [
+            str(message.get("content"))
+            for message in context.original_messages
+            if isinstance(message, dict)
+            and message.get("role") in ("user", "assistant")
+            and message.get("content")
+        ] if (
+            handle_grounding_guard.HANDLE_GROUNDING_GUARD_ENABLED
+            or deterministic_utterance_layer.DETERMINISTIC_UTTERANCE_LAYER_ENABLED
+        ) else []
         _grounding_context, _memory_grounding_pool = handle_grounding_guard.build_grounding_pools(
             last_user_text=context.last_user_text,
             briefing_evidence=context.briefing_evidence,
             memory_result=_memory_result,
+            history_texts=_dialogue_history_texts,
         )
+        # D1 deterministic utterance layer inputs (flag off → None, no cost).
+        _deterministic_inputs = deterministic_utterance_layer.build_layer_inputs(
+            user_text=context.last_user_text,
+            briefing_evidence=context.briefing_evidence,
+            memory_result=_memory_result,
+            history_texts=_dialogue_history_texts,
+            session_id=context.memory_session_id,
+            original_messages=context.original_messages,
+        ) if not context.proactive_turn else None
         absence_required = not context.proactive_turn and memory_absence_fallback_required(
             context.memory_question, _memory_result, context.original_messages
         )
@@ -7863,6 +7898,7 @@ async def stream_local_with_ack(
                             early_candidate,
                             grounding_context=_grounding_context,
                             memory_grounding_pool=_memory_grounding_pool,
+                            deterministic_inputs=_deterministic_inputs,
                         )
                         emitted_substantive = True
                         emit_substantive_content(context.trace_id, context.request_started)
@@ -8311,6 +8347,7 @@ async def stream_local_with_ack(
                 dialogue,
                 grounding_context=_grounding_context,
                 memory_grounding_pool=_memory_grounding_pool,
+                deterministic_inputs=_deterministic_inputs,
             )
             emitted_substantive = True
             emit_substantive_content(context.trace_id, context.request_started)

@@ -7,6 +7,14 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-25 D1 결정론 발화 계층 구현
+
+- 06:05 KST (클로드 PC, Fable 감독) `deterministic_utterance_layer.py`(P2~P5) + P1
+  (guard pool에 history 합류) + 프록시 3번째 gate 배선 + `/health` 노출. 신규 25 +
+  guard 18 + proxy 377 + broadcast_sim 137+1s + rehearsal 85 전부 pass,
+  `test-current-checkpoint.ps1` PASS, CI shard 등록. 기본 off·off 무변화 회귀 포함.
+  발견: first-sentence cutoff에서 P4 전량 드롭 시 폴백 방송(fail-safe 문서화).
+
 ## 2026-08-25 D1 goal 접수 + 결정론 발화 계층 설계 동결
 
 - 05:20 KST (클로드 PC, Fable 감독) 사용자 `/goal` D1(무학습, 결정론 계층으로 게이트

@@ -7439,6 +7439,83 @@ class ImmediateAckMetadataTests(unittest.TestCase):
             response = post_stream("나 민지인데 방금 들어왔어")
         self.assertIn("민지님, 잘 지냈어?", openai_sse_content(response.text))
 
+    def test_deterministic_layer_off_by_default_leaves_the_draft_untouched(self) -> None:
+        self.assertFalse(
+            ollama_proxy.deterministic_utterance_layer.DETERMINISTIC_UTTERANCE_LAYER_ENABLED)
+        with mock.patch.object(ollama_proxy, "needs_grounding_retry", lambda *a, **k: False), \
+                mock.patch.object(ollama_proxy, "memory_absence_fallback_required", lambda *a, **k: False), \
+                mock.patch.object(ollama_proxy, "client", _CapturingChatClient("글쎄, 기억이 잘 안 나네.")):
+            response = post_stream_messages([
+                {"role": "user", "content": "등불신호는 붉은빛 말고 초록빛으로 걸자"},
+                {"role": "assistant", "content": "좋아, 그렇게 하자."},
+                {"role": "user", "content": "등불 신호는 무슨 빛으로 걸기로 했지?"},
+            ])
+        self.assertIn("글쎄, 기억이 잘 안 나네.", openai_sse_content(response.text))
+
+    def test_deterministic_layer_answers_a_recall_question_from_history_when_enabled(self) -> None:
+        # D1 (2026-08-25): 회수 질문의 답이 이번 턴 프롬프트 증거(history)에
+        # 있으면 모델 추측 대신 코드가 확정 옵션으로 답한다.
+        with mock.patch.object(
+                ollama_proxy.deterministic_utterance_layer,
+                "DETERMINISTIC_UTTERANCE_LAYER_ENABLED", True), \
+                mock.patch.object(
+                    ollama_proxy.deterministic_utterance_layer, "session_cache",
+                    ollama_proxy.deterministic_utterance_layer.SessionTokenCache()), \
+                mock.patch.object(ollama_proxy, "needs_grounding_retry", lambda *a, **k: False), \
+                mock.patch.object(ollama_proxy, "memory_absence_fallback_required", lambda *a, **k: False), \
+                mock.patch.object(ollama_proxy, "client", _CapturingChatClient("글쎄, 기억이 잘 안 나네.")):
+            response = post_stream_messages([
+                {"role": "user", "content": "등불신호는 붉은빛 말고 초록빛으로 걸자"},
+                {"role": "assistant", "content": "좋아, 그렇게 하자."},
+                {"role": "user", "content": "등불 신호는 무슨 빛으로 걸기로 했지?"},
+            ])
+        content = openai_sse_content(response.text)
+        self.assertIn("초록빛", content)
+        self.assertNotIn("붉은빛", content)
+        self.assertNotIn("글쎄", content)
+
+    def test_deterministic_layer_drops_a_rejected_branch_sentence_when_enabled(self) -> None:
+        with mock.patch.object(
+                ollama_proxy.deterministic_utterance_layer,
+                "DETERMINISTIC_UTTERANCE_LAYER_ENABLED", True), \
+                mock.patch.object(
+                    ollama_proxy.deterministic_utterance_layer, "session_cache",
+                    ollama_proxy.deterministic_utterance_layer.SessionTokenCache()), \
+                mock.patch.object(ollama_proxy, "needs_grounding_retry", lambda *a, **k: False), \
+                mock.patch.object(ollama_proxy, "memory_absence_fallback_required", lambda *a, **k: False), \
+                mock.patch.object(ollama_proxy, "client",
+                                  _CapturingChatClient("붉은빛으로 걸어도 예뻐. 초록빛도 준비했어.")):
+            response = post_stream_messages([
+                {"role": "user", "content": "등불신호는 붉은빛 말고 초록빛으로 걸자"},
+                {"role": "assistant", "content": "좋아, 그렇게 하자."},
+                {"role": "user", "content": "등불 준비 어때?"},
+            ])
+        content = openai_sse_content(response.text)
+        # The first-safe-sentence cutoff may leave only the rejected-branch
+        # sentence as the public draft; the guarantee is that the rejected
+        # option never airs — dropped sentences fail over to the safe line.
+        self.assertNotIn("붉은빛", content)
+        self.assertTrue(content.strip())
+
+    def test_deterministic_layer_appends_a_donation_echo_when_enabled(self) -> None:
+        marker = ollama_proxy.deterministic_utterance_layer.DONATION_CONTINUATION_MARKER
+        with mock.patch.object(
+                ollama_proxy.deterministic_utterance_layer,
+                "DETERMINISTIC_UTTERANCE_LAYER_ENABLED", True), \
+                mock.patch.object(
+                    ollama_proxy.deterministic_utterance_layer, "session_cache",
+                    ollama_proxy.deterministic_utterance_layer.SessionTokenCache()), \
+                mock.patch.object(ollama_proxy, "needs_grounding_retry", lambda *a, **k: False), \
+                mock.patch.object(ollama_proxy, "memory_absence_fallback_required", lambda *a, **k: False), \
+                mock.patch.object(ollama_proxy, "client", _CapturingChatClient("정말 든든하다!")):
+            response = post_stream_messages([
+                {"role": "system", "content": "방송 지시.\n\n" + marker + "\n이어서 말해."},
+                {"role": "user", "content": "[YouTube] 등불값 보태"},
+            ])
+        content = openai_sse_content(response.text)
+        self.assertIn("등불값", content)
+        self.assertIn("고마워", content)
+
     def test_immediate_ack_mode_parses_conservatively(self) -> None:
         for raw, expected in ((None, "audible"), ("", "audible"), ("MARKER", "marker"),
                               (" off ", "off"), ("audible", "audible"), ("banana", "audible")):
