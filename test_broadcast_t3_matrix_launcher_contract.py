@@ -295,9 +295,9 @@ class E2C1BlindProfileContract(LauncherHarness, unittest.TestCase):
             cwd=ROOT, text=True, capture_output=True)
         self.assertEqual(ast.returncode, 0, ast.stdout + ast.stderr)
         source = SCRIPT.read_text(encoding='utf-8')
-        for required in ("[ValidateSet('t3','e2c1')] [string]$MatrixProfile = 't3'",
+        for required in ("[ValidateSet('t3','e2c1','e2c2')] [string]$MatrixProfile = 't3'",
                          '[string]$BlindRoot',
-                         "The e2c1 profile requires -BlindRoot.",
+                         'The $MatrixProfile profile requires -BlindRoot.',
                          "@('baseline','e2','e2-c1')",
                          'airi_e2_c1_blind_commitment.json',
                          'airi_e2_c1_metric_policy.json',
@@ -310,7 +310,7 @@ class E2C1BlindProfileContract(LauncherHarness, unittest.TestCase):
                          'blind_commitment_sha256=$commitmentSha256'):
             self.assertIn(required, source)
 
-    def test_matrix_profile_is_a_two_value_validate_set(self):
+    def test_matrix_profile_is_a_three_value_validate_set(self):
         query = subprocess.run(
             ['powershell', '-NoProfile', '-Command',
              "$e=$null;$t=$null;"
@@ -322,7 +322,82 @@ class E2C1BlindProfileContract(LauncherHarness, unittest.TestCase):
              ").PositionalArguments.Value -join ','"],
             cwd=ROOT, text=True, capture_output=True)
         self.assertEqual(query.returncode, 0, query.stderr)
-        self.assertEqual(query.stdout.strip(), 't3,e2c1')
+        self.assertEqual(query.stdout.strip(), 't3,e2c1,e2c2')
+
+
+class E2C2BlindProfileContract(LauncherHarness, unittest.TestCase):
+    """The e2c2 profile adds the pinned handle-grounding-guard measurement."""
+
+    def e2c2_manifest(self):
+        arms = [
+            {'name': 'baseline', 'tag': 'base:one', 'digest': 'a' * 64},
+            {'name': 'e2', 'tag': 'e2:one', 'digest': 'b' * 64},
+            {'name': 'e2-c2', 'tag': 'e2c2:one', 'digest': 'c' * 64},
+        ]
+        return {'schema_version': 'airi.broadcast-sim-t3-model-manifest.v2', 'arms': arms}
+
+    def e2c2_tags(self):
+        return {'models': [{'name': 'base:one', 'digest': 'a' * 64},
+                           {'name': 'e2:one', 'digest': 'b' * 64},
+                           {'name': 'e2c2:one', 'digest': 'c' * 64}]}
+
+    def test_e2c2_requires_blind_root(self):
+        with tempfile.TemporaryDirectory() as temp:
+            result, out = self.invoke(Path(temp), self.e2c2_manifest(), self.e2c2_tags(),
+                                      '-PreflightOnly', '-MatrixProfile', 'e2c2')
+            self.assertNotEqual(result.returncode, 0); self.assertFalse(out.exists())
+
+    def test_e2c2_rejects_the_e2c1_arm_set(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp); blind = path/'blind'; blind.mkdir()
+            result, out = self.invoke(path, self.blind_manifest(), self.blind_tags(),
+                                      '-PreflightOnly', '-MatrixProfile', 'e2c2',
+                                      '-BlindRoot', str(blind))
+            self.assertNotEqual(result.returncode, 0); self.assertFalse(out.exists())
+
+    def test_e2c2_fails_closed_on_an_unbound_blind_root(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp); blind = path/'blind'; blind.mkdir()
+            (blind/'identity_unknown_and_donation_ritual.json').write_text('{}', encoding='utf-8')
+            result, out = self.invoke(path, self.e2c2_manifest(), self.e2c2_tags(),
+                                      '-PreflightOnly', '-MatrixProfile', 'e2c2',
+                                      '-BlindRoot', str(blind))
+            self.assertNotEqual(result.returncode, 0); self.assertFalse(out.exists())
+
+    def test_launcher_pins_the_frozen_e2c2_inputs_and_the_guard(self):
+        source = SCRIPT.read_text(encoding='utf-8')
+        for required in ("@('baseline','e2','e2-c2')",
+                         'airi_e2_c2_blind_commitment.json',
+                         'airi_e2_c2_metric_policy.json',
+                         "airi-e2-c2-blind-freeze-20260824-v3",
+                         'f878fe2e01713ccf4024771e66d44ee83ee626509cadf7252878d8df37484931',
+                         'compare_e2c2_blind.py',
+                         "airi.e2-c2-environment-attestation.v1",
+                         "airi.e2-c2-blind-comparison.v1",
+                         "$env:AIRI_HANDLE_GROUNDING_GUARD = 'on'",
+                         'Restore-Env AIRI_HANDLE_GROUNDING_GUARD $previousGuard',
+                         "handle_grounding_guard'] = 'on'",
+                         'handle_grounding_guard_health_attested',
+                         'handle grounding guard is ON'):
+            self.assertIn(required, source)
+
+    def test_guard_health_check_is_scoped_to_the_e2c2_profile(self):
+        # Assert-Health's guard branch cannot be exercised offline (the e2c2
+        # preflight binds the external sealed root before any health fixture),
+        # so pin its shape instead: the check exists, is gated on the e2c2-only
+        # flag, and uses safe property access under strict mode.
+        source = SCRIPT.read_text(encoding='utf-8')
+        self.assertIn("$requireGuardHealth = ($MatrixProfile -ceq 'e2c2')", source)
+        self.assertIn("if ($requireGuardHealth) {", source)
+        self.assertIn("$H.PSObject.Properties['handle_grounding_guard']", source)
+
+    def test_t3_health_fixture_stays_green_without_the_guard_field(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp); health = path/'health.json'
+            health.write_text(json.dumps(self.health()), encoding='utf-8')
+            result, out = self.invoke(path, self.manifest(), self.tags(), '-PreflightOnly',
+                                      '-HealthFixtureFile', str(health))
+            self.assertEqual(result.returncode, 0, result.stderr); self.assertFalse(out.exists())
 
 
 if __name__ == '__main__':

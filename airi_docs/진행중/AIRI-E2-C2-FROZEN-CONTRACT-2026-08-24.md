@@ -92,6 +92,32 @@ E2-C1과 동일하게 SHA 핀 결속 하에 실행하고, Ollama 등록은 **평
 
 ## 5. retained blind v3와 평가 계약
 
+**2026-08-24 18:20 KST 결과-전(pre-result) 봉인 pin** — 아래 원칙대로 저작·검증·봉인이
+완료됐다. E2-C2 모델은 아직 존재하지 않고 어떤 arm의 응답도 생성된 적 없다
+(`response_viewed=false`). 이 pin은 결과를 본 뒤 바꾸지 않는다.
+
+- root: `D:\AIRI-Models\airi-e2-c2-blind-freeze-20260824-v3`
+  (root_id `airi-e2-c2-blind-freeze-20260824-v3`)
+- sealed manifest raw SHA-256
+  `f878fe2e01713ccf4024771e66d44ee83ee626509cadf7252878d8df37484931`,
+  validation receipt raw SHA-256
+  `17e9ebf2e9f6af0245c5522eae1136c715ee44f5af05dc170dd4ba4865f53dba`
+
+| role | size | raw SHA-256 | canonical SHA-256 |
+|---|---:|---|---|
+| identity/unknown/donation | 7,559 | `99945ebb2cbffd1b831e73ec10e29271eb9b3c1daac3bb3a5d959ce1e2a65b61` | `7dc54f119f1b87443677047aa853544c17bf1724318246871d1a0d32e496c86f` |
+| continuity/stale transition | 12,968 | `ed50352d2bce3570d938aca4c752ce98b16f426cb484dbf61bbe50c95e300acd` | `4df78907c6b8606acb9501b4a9538813b0777c110740a902e07701da73a89b1c` |
+| factual/show arc | 11,042 | `5175b4e005eedf973b41e27021d90b4ceb68324bcba1be77e225f9eccc2e17e9` | `374f470837506f07133dd9634efc88904dc065175dcd182097d2c5fcdbb60956` |
+
+offline 검증(`seal_e2c2_blind.py`, model_calls 0): fixture schema PASS, fixture당 한글
+886/1443/1222자(하한 800), 4 seeds × 3 fixture 결정론 stream의 전 메시지 한글 함유,
+교정 proper noun 51종 양방향 충돌 0, 공개 fixture 핸들·hash 충돌 0, v1+v2 root의
+hash·핸들·archetype 템플릿 재사용 0(검사가 v2 템플릿 동일 문자열 3건을 적발해 저작
+단계에서 교체됨). repository commitment는
+`airi_e2_c2_blind_commitment.json`/`airi_e2_c2_metric_policy.json`, 실행은
+`run-airi-broadcast-t3-matrix.ps1 -MatrixProfile e2c2`(가드 ON 강제 + /health 관측 attest)
++ `compare_e2c2_blind.py`다.
+
 - **신규 저작**: 3 fixture(logical role은 비교 가능성을 위해 E2-C1과 동일 —
   `identity_unknown_and_donation_ritual`, `long_continuity_and_stale_transition`,
   `factual_grounding_and_complete_show_arc`), 전부 **처음 쓰는 한국어 본문**이다.

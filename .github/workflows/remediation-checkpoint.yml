@@ -157,7 +157,10 @@ jobs:
               ollama-proxy/eval/broadcast_sim/test_broadcast_sim.py
               ollama-proxy/eval/broadcast_sim/test_compare_broadcast_t3.py
               ollama-proxy/eval/broadcast_sim/test_compare_e2c1_blind.py
+              ollama-proxy/eval/broadcast_sim/test_compare_e2c2_blind.py
               ollama-proxy/eval/broadcast_sim/test_e2_c1_blind_commitment.py
+              ollama-proxy/eval/broadcast_sim/test_e2_c2_blind_commitment.py
+              ollama-proxy/eval/broadcast_sim/test_seal_e2c2_blind.py
               ollama-proxy/eval/broadcast_sim/test_long_broadcast_continuity.py
               ollama-proxy/eval/broadcast_sim/test_third_long_broadcast_heldout.py
               ollama-proxy/eval/live_broadcast_campaign/test_live_campaign.py

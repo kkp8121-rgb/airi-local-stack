@@ -7,6 +7,20 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-24 E2-C2 blind v3 봉인 + 평가 하네스 구현
+
+- 18:25 KST (클로드 PC, Fable 감독) blind v3 3종을 감독이 직접 저작(직조 공방/간이역
+  신호소/가마터 — v2와 구조 수치 동일, 전부 신규 한국어 본문·고유명)하고 신규
+  `seal_e2c2_blind.py`로 offline 검증(schema/한글 하한·전 메시지 한글/교정 proper noun 51종
+  양방향 0/공개·v1·v2 hash·핸들·템플릿 재사용 0 — v2 템플릿 동일 문자열 3건 적발·교체) 후
+  `D:\AIRI-Models\airi-e2-c2-blind-freeze-20260824-v3`에 봉인(sealed manifest
+  `f878fe2e...4931`). 하네스: `compare_e2c2_blind.py`(+15 tests, attestation에 guard=on 필수),
+  `verify_e2_c2_frozen_contract.py`(dataset byte-exact 위임+1536/96/2e-5 동결, sealed root
+  실검증 PASS), commitment/policy JSON(+8 tests, threshold 값 e2c1과 동일성 테스트로 고정),
+  `test_seal_e2c2_blind.py`(10), launcher `e2c2` profile(가드 ON 강제+/health 관측 attest,
+  계약 테스트 20), CI shard 등록. broadcast_sim 137+1s, `test-current-checkpoint.ps1` PASS,
+  diff 0. GPU 0. 다음 배치: bounded GPU smoke → durable 1536/96 본 학습.
+
 ## 2026-08-24 E2-C2 goal 접수 + 레시피 설계 동결
 
 - 17:20 KST (클로드 PC, Fable 감독) 사용자 `/goal`(E2-C2 재설계 + 신규 blind + guard=on

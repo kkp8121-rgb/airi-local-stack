@@ -1,7 +1,7 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 17:20:00 +09:00"
-checkpoint_id: "20260824-172000-e2c2-recipe-design-frozen-receipt"
+updated_at_kst: "2026-08-24 18:25:00 +09:00"
+checkpoint_id: "20260824-182500-e2c2-harness-implemented-receipt"
 goal_status: "active"
 authorization: "user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
 active_phase: "e2-c2-recipe-design"
@@ -22,6 +22,65 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 18:25 KST **e2c2 평가 하네스 구현 receipt (offline 전체 PASS)**: 신규 리포 파일
+  8종 + 수정 3종. 신규: `compare_e2c2_blind.py`(implementer 위임 — e2c1 사본 최소 수정,
+  candidate e2-c2/schema `airi.e2-c2-blind-comparison.v1`/attestation에
+  `handle_grounding_guard=='on'` 필수) + `test_compare_e2c2_blind.py`(15 tests, 신규 가드
+  누락/off 2건 포함), `seal_e2c2_blind.py` + `test_seal_e2c2_blind.py`(10 tests, fail-closed
+  전 경로), `verify_e2_c2_frozen_contract.py`(e2c1 verifier에 dataset byte-exact 위임 +
+  E2-C2 학습 계약 상수 1536/96/2e-5 + e2c2 policy/commitment shape + v1/v2 reseal 금지 —
+  sealed root 포함 실검증 exit 0 PASS), `airi_e2_c2_blind_commitment.json`/
+  `airi_e2_c2_metric_policy.json`(threshold는 e2c1 값 그대로, selection 키만 e2_c2_*로 개명
+  — 테스트가 값 동일성을 e2c1 파일과 직접 대조), `test_e2_c2_blind_commitment.py`(8 tests).
+  수정: `run-airi-broadcast-t3-matrix.ps1`(+e2c2 profile: arms baseline/e2/e2-c2, v3 root/
+  sealed SHA 핀, run별 `AIRI_HANDLE_GROUNDING_GUARD=on` 설정+종료 복원, Assert-Health가
+  e2c2에서 `/health.handle_grounding_guard=true` 강제(strict-mode 안전 접근), attestation
+  신 schema에 guard 관측 필드; t3/e2c1 경로 리터럴·동작 보존),
+  `test_broadcast_t3_matrix_launcher_contract.py`(20 tests로 확장: e2c2 pin/fail-closed/
+  ValidateSet 3값), CI workflow shard에 신규 py 테스트 3종 등록. 검증: broadcast_sim 전체
+  137 passed+1 skipped(+32 subtests), launcher contract 20, e2c1 frozen verifier 6,
+  `test-current-checkpoint.ps1` 최종 PASS(1차 실행 시 durability 계약 1회 flake 관측 —
+  단독 재실행·전체 재실행 모두 PASS; patch-manifest의 untracked-테스트 가드가 스테이징
+  전 정상 fail-closed로 한 번 잡음), diff-check 0. implementer 부산물 `.claude/` 디렉터리
+  1개 제거. frozen contract 문서 §5에 결과-전 blind pin 추가. 이 receipt 직후 LOG 기록 후
+  commit/push. GPU 0 유지.
+- 2026-08-24 17:50 KST **blind v3 저작·offline 검증·봉인 receipt**: 신규 fixture 3종을 감독이
+  직접 저작(주제: 심야 직조 공방 24분 / 간이역 야간 신호소 90분 / 언덕 가마터 60분 — v2와
+  구조 수치 동일: donation 6/3/4, probe 3/3/4, arc 0/12/8, viewer 18/20/20, seeds·arms·36
+  reports 불변). 신규 `ollama-proxy/eval/broadcast_sim/seal_e2c2_blind.py`(리포 내, body-free)
+  로 offline 검증: schema `validate_fixture` PASS, fixture당 한글 886/1443/1222자(하한 800),
+  4 seeds × 3 fixture 결정론 stream 전 메시지 한글 함유(model_calls 0, v1 재발 방지), 교정
+  proper noun 51종 양방향 충돌 0, 공개 fixture 핸들/hash 충돌 0, v1+v2 root hash·핸들·
+  템플릿 재사용 0 — 검사가 실제 재사용 3건("ㅋㅋ 좋다"/"방금 그 구간 얘기 더 해줘"/"조용히
+  볼게" v2 템플릿 동일 문자열)을 잡아 교체 후 PASS. exit 0 봉인 완료:
+  root `D:\AIRI-Models\airi-e2-c2-blind-freeze-20260824-v3`, sealed_manifest raw SHA
+  `f878fe2e01713ccf4024771e66d44ee83ee626509cadf7252878d8df37484931`, validation receipt raw
+  SHA `17e9ebf2e9f6af0245c5522eae1136c715ee44f5af05dc170dd4ba4865f53dba`, fixture pins
+  identity 7,559B raw `99945ebb...a65b61`/canon `7dc54f11...96c86f`, continuity 12,968B raw
+  `ed50352d...300acd`/canon `4df78907...a89b1c`, factual 11,042B raw `5175b4e0...2e17e9`/canon
+  `374f4708...b60956`. response_viewed=false — E2-C2 모델은 아직 존재하지 않고 어떤 arm의
+  응답도 생성된 적 없다. staging 사본은 scratchpad(리포 밖). 다음: commitment/policy JSON +
+  verifier + comparator + launcher e2c2 profile + 테스트 구현.
+- 2026-08-24 17:25 KST **phase 2 intent — blind v3 저작·봉인 + e2c2 하네스 구현**: 설계 배치
+  `4ebfa17` push 후 read-only 정밀 조사 완료(comparator 519줄 전체, verifier policy/commitment
+  shape 함수, launcher e2c1 분기 전체, v2 fixture 3종 본문 — v2는 채점 완료라 열람 허용 선례,
+  §11). 확정 구현 계획: (1) **fixture 3종 신규 한국어 저작**(감독 직접) — 주제 직조 공방(24분,
+  identity/donation) · 간이역 야간 신호소(90분, continuity/stale) · 도자기 가마(60분,
+  factual/arc), v2와 구조 수치(도네이션/probe/arc/뷰어 수, 분량) 동일 유지로 난이도 등가 확보,
+  회피 목록 = 교정 proper noun 51종(_HANDLES 18/_UNKNOWN 16/_DONORS 17) + 공개 fixture 핸들
+  4세트 + v2 핸들 3세트, staging은 scratchpad(리포 밖). (2) `seal_e2c2_blind.py` 신규(리포 내,
+  body-free): schema validate + 메시지 단위 한글 검사(v1 재발 방지) + proper noun 양방향 충돌
+  0 + v1/v2/공개 hash 충돌 0 + stream-only plan 4 seeds(model_calls 0) → sealed manifest/
+  validation receipt(`airi.e2-c2-blind-*.v1`) 봉인. (3) `verify_e2_c2_frozen_contract.py`:
+  e2c1 verifier import로 dataset byte-exact 검증 재사용 + E2-C2 학습 계약 상수(1536/96/2e-5)
+  + e2c2 policy/commitment shape. (4) commitment/policy JSON + `test_e2_c2_blind_commitment.py`
+  (superseded 가드에 v1+v2 root/hash 모두 고정). (5) `compare_e2c2_blind.py`: e2c1 comparator
+  사본 최소 수정(candidate e2-c2, schema v1 신규, attestation에 handle_grounding_guard 필수
+  필드) + 테스트 13종 적응. (6) launcher `e2c2` profile: arms baseline/e2/e2-c2, 봉인 pin
+  하드코딩, run별 `AIRI_HANDLE_GROUNDING_GUARD=on` 주입(+종료 시 복원), Assert-Health에
+  `/health.handle_grounding_guard=true` 검사(e2c2 한정), attestation 신 schema. (7) CI shard
+  등록. 실행 순서: fixture 저작→seal→pin 반영 코드→오프라인 전체 회귀→commit/push. GPU 0
+  유지, 기존 t3/e2c1 경로 동작 불변이 회귀 기준.
 - 2026-08-24 17:20 KST **E2-C2 레시피 설계 동결 receipt (phase 1 완료)**: read-only 조사
   (scout 3: trainer 파라미터화 / dataset 도구 / blind·matrix 도구) + E2-C1 verdict JSON
   실측으로 설계를 확정, `airi_docs/진행중/AIRI-E2-C2-FROZEN-CONTRACT-2026-08-24.md` 신규
