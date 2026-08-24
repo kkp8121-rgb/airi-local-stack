@@ -1,7 +1,21 @@
 # AIRI 다음 세션 안내
 
-> **2026-08-25 02:40 KST 최우선 진입점 — E2-C2 NO_WINNER 종결, 다음 방향은 사용자
-> 결정:** 언더트레이닝 교정 후보 E2-C2(E2 adapter init, 1536 microsteps/96 opt steps
+> **2026-08-25 07:10 KST 최우선 진입점 — D1(결정론 계층) 3/5 단계 완료, 코덱스 인계
+> 중:** 사용자 승인 goal D1은 **GPU 학습 없이** 결정론 계층으로 hard/perfect 게이트를
+> 닫으려는 라운드다. 완료: (1) 계층 설계 동결, (2) `deterministic_utterance_layer.py`
+> 구현(P1 history 근거 확장 / P2 과거-전용 토큰 가드 / P3 결정·사실 회수 렌더러 /
+> P4 거부-옵션 억제 / P5 후원 echo, 기본 off·off 무변화, 프록시 3번째 gate + /health
+> 노출), (3) blind v4 봉인 + D1 commitment/policy/verifier + 4-arm comparator +
+> CI 등록. 남은 것: **launcher `d1` 프로파일(3 arm/36 → 4 arm/48 일반화, 가드+계층
+> 두 플래그 ON 강제, attestation schema) → 48-report matrix → winner면 3×500
+> campaign / no_winner면 진단 후 대기.**
+>
+> **인계 문서 하나만 보면 된다: `airi_docs/진행중/AIRI-D1-CODEX-HANDOFF-2026-08-25.md`**
+> (남은 단계의 exact 지시, 봉인 pin, model manifest 값, 환경 함정까지 포함). 설계
+> 원문은 `AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md`. HEAD=origin/main
+> `a3f2f39`, GPU/AIRI PID 0, adoption=false 유지.
+
+> **(이력) 2026-08-25 02:40 KST — E2-C2 NO_WINNER 종결:** 언더트레이닝 교정 후보 E2-C2(E2 adapter init, 1536 microsteps/96 opt steps
 > = 3 epochs, LR 2e-5, frozen dataset 그대로)는 학습 자체는 이상적으로 끝났다 — dev
 > loss 2.0723→1.8219→1.6105 3 epoch 단조 하강(E2-C1 2.2351 대비 -0.62), smoke/merge/
 > Q4_K_M 패키징 전부 exit 0. 그러나 새 blind v3(직조 공방/간이역 신호소/가마터, 가드

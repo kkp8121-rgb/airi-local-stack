@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 06:05:00 +09:00"
-checkpoint_id: "20260825-060500-d1-layer-implemented-receipt"
+updated_at_kst: "2026-08-25 07:10:00 +09:00"
+checkpoint_id: "20260825-071000-d1-harness-receipt-codex-handoff"
 matrix_note: "E2-C2 no_winner 종결(receipt 7e9f8e3). 신규 goal D1 접수"
 active_trainer_note: "e2c2 본 학습 terminal complete(1536/96, exit 0). 사용자 지시로 merge/패키징/matrix 진행하지 않고 대기. 재개 신호 = 사용자 '게임 끝' 통지. trainer/runner PID 0, AIRI GPU 워크로드 0"
 goal_status: "active"
 authorization: "user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "d1-deterministic-layer-design"
+active_phase: "d1-awaiting-codex-launcher-profile-and-matrix"
 git_head: "9a2195b4ec4c9dba9bf449967ce840a8849667d9"
 worktree_state: "HEAD-local-remote-exact-9a2195b(harness batch); dirty: live-state heartbeat + verify_e2_c2 deterministic_validation key (commit with smoke receipt); AIRI-PID-0; trainer 0; GPU idle 479MiB"
 active_trainer_count: 0
@@ -24,6 +24,30 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-25 07:10 KST **D1 하네스 receipt + 코덱스 인계 (배치 3, Claude 세션 종료
+  지점)**: 사용자 지시로 여기까지 진행하고 인계 문서를 작성했다 —
+  `airi_docs/진행중/AIRI-D1-CODEX-HANDOFF-2026-08-25.md`(남은 작업의 단일 진입점).
+  이 배치 내용: (a) **blind v4 봉인** — 신규 한국어 fixture 3종(심야 국숫집/겨울 온실
+  야간 당번/마을 방앗간 떡메치기) 저작 후 seal 도구로 offline 검증(model_calls 0,
+  한글·교정 proper noun·공개·v1/v2/v3 hash·핸들·템플릿 재사용 전부 0 — 검사가 실제
+  템플릿 재사용 1건 적발·교체), root
+  `D:\AIRI-Models\airi-d1-blind-freeze-20260825-v4`, sealed manifest raw SHA
+  `44c05fbd475a6ca9b87fc3a8f07ec0af7a2eef9e023b993c89398ceb3b071682`, receipt raw SHA
+  `8542bd61abe643825f500fd0112d0c8a33c8edf493e212981da105bb0f2b95f4`,
+  `response_viewed=false`. (b) `seal_e2c2_blind.py`를 `GENERATIONS`+`--generation`으로
+  일반화(e2c2 동작·테스트 불변, d1 세대는 4 arms·v3 superseded 확장). (c)
+  commitment/policy JSON(threshold 값 E2-C2와 전부 동일, 바뀐 것은 4-arm/48 shape +
+  신규 `arm_rules` + selection 키 개명뿐 — 테스트가 e2c2 policy와 값 동일성 직접 대조).
+  (d) `verify_d1_frozen_contract.py`(sealed root 포함 실행 exit 0) + 8 tests. (e)
+  `compare_d1_blind.py` 4-arm comparator(implementer 위임, 24 tests): 절대 최소선은 전
+  arm, delta·legacy는 학습 후보 arm만, margin은 전 arm 대비, attestation에 guard와
+  layer 둘 다 'on' 요구, run_count는 commitment에서 파생. (f) CI shard에 신규 테스트
+  2종 등록. 검증: broadcast_sim 169 passed/1 skipped(+32 subtests), proxy 377,
+  `test-current-checkpoint.ps1` PASS(1차 durability 30초 flake 1회 관측 — 재실행 PASS,
+  이전 배치와 동일 증상), diff-check 0. push `a3f2f39`. **남은 것: launcher `d1`
+  프로파일(3 arm/36 하드코딩을 4/48로 일반화 + 두 런타임 플래그 ON + attestation
+  schema) → 48-report matrix → winner면 campaign / no_winner면 진단 후 대기.** GPU
+  학습 0, 관련 PID 0.
 - 2026-08-25 06:05 KST **D1 계층 구현 receipt (배치 2)**: 신규
   `ollama-proxy/deterministic_utterance_layer.py`(P2 세션 과거-전용 토큰 가드 + 조사
   교정, P3 결정/사실 회수 렌더러("S는 A 말고 B"/"내 X는 Y" 추출, 미발견 시 안전 폴백),

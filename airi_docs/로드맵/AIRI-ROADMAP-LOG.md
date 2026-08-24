@@ -7,6 +7,18 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-25 D1 blind v4 봉인 + 4-arm 하네스 + 코덱스 인계
+
+- 07:10 KST (클로드 PC, Fable 감독) blind v4 3종 신규 저작·검증·봉인(root
+  `airi-d1-blind-freeze-20260825-v4`, sealed manifest `44c05fbd...1682`, v1/v2/v3
+  재사용 0), seal 도구 `--generation` 일반화, D1 commitment/policy(threshold 완화 0,
+  4-arm shape+arm_rules만 추가), `verify_d1_frozen_contract.py`(8 tests),
+  `compare_d1_blind.py` 4-arm comparator(24 tests, 절대선은 전 arm·delta는 학습 후보만·
+  attestation에 guard+layer 둘 다 요구), CI 등록. broadcast_sim 169+1s, proxy 377,
+  checkpoint PASS, push `a3f2f39`. 사용자 지시로 여기까지 하고 코덱스 인계 문서
+  `진행중/AIRI-D1-CODEX-HANDOFF-2026-08-25.md` 작성 — 남은 것은 launcher d1 프로파일
+  (4 arm/48) → 48-report matrix → 분기.
+
 ## 2026-08-25 D1 결정론 발화 계층 구현
 
 - 06:05 KST (클로드 PC, Fable 감독) `deterministic_utterance_layer.py`(P2~P5) + P1

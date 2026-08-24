@@ -7,6 +7,14 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
+> **2026-08-25 07:10 KST D1(결정론 계층) 진행 중 — 3/5 단계, 코덱스 인계:** 두 학습
+> 후보의 실패를 받아 로드맵 v3 원칙(프롬프트/학습보다 결정론 계층)대로 **GPU 학습 없이**
+> 게이트를 코드로 닫는 라운드다. 계층 구현(P1~P5, 기본 off)·blind v4 봉인·D1
+> commitment/policy/verifier·4-arm comparator·CI 등록까지 push(`a3f2f39`). 남은 것은
+> launcher `d1` 프로파일(4 arm/48, 가드+계층 ON 강제) → 48-report matrix → winner면
+> 3×500 campaign / no_winner면 진단 후 대기. threshold 완화 0, adoption=false 유지.
+> 인계 문서: `진행중/AIRI-D1-CODEX-HANDOFF-2026-08-25.md`.
+>
 > **2026-08-25 02:40 KST E2-C2 no_winner 종결:** 언더트레이닝 교정 후보 E2-C2(1536/96,
 > LR 2e-5, 3 epochs — dev loss 2.24→1.61)를 새 blind v3(가드 신호 ON 측정)에서 36-report로
 > 평가한 결과 **winner=null이며 후보 score(0.1875)가 E2(0.2019)보다 낮았다**(첫 역전).
