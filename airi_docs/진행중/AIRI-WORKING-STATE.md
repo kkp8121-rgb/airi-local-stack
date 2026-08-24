@@ -1,7 +1,7 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-24 12:02:00 +09:00"
-checkpoint_id: "20260824-120200-matrix-impl-verified-commit-and-run-intent"
+updated_at_kst: "2026-08-24 12:40:00 +09:00"
+checkpoint_id: "20260824-124000-blind-root-defect-receipt-v2-reseal-intent"
 goal_status: "active"
 authorization: "user-goal-2026-08-24: repository-gpu-unlimited-training-packaging-36-report-campaign-on-winner-e2-c2-on-no-winner-local-services-t3-readonly-diagnosis-t05-sample-synthesis-commit-push-authorized; forbidden: post-blind-target-fixture-threshold-seed-change, blind-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-on, speaker-126-operational-promotion; operational-adoption-forbidden-until-separate-user-approval"
 active_phase: "e2-c1-blind-36-report-matrix"
@@ -22,6 +22,22 @@ reconciliation_receipt: "2026-08-24 09:55 KST E2-C1 bounded GPU smoke intent (Cl
 
 ## 1. 권한과 현재 사실
 
+- 2026-08-24 12:40 KST **blind root 실행-불능 결함 receipt + v2 재봉인 intent**: matrix 첫 실행이
+  launcher line 419에서 sim traceback으로 중단됐다(부분 root 2개 `run-aborted-toolcap`/
+  `run-failed-noerrlog` 보존, 서비스 정리 후 PID/listener 0). 진단: 공개 fixture 단일 라이브 런은
+  exit 0(transport 0), blind fixture는
+  `live broadcast fixture input was rejected before capability claim (category=unsupported_language)`
+  (`run_broadcast_sim.py:330`). 원인: 봉인된 blind 3종의 archetype/probe 문구가 **전부 영어**
+  (한글 0자; 공개 fixture는 한글 1,170·1,429자) → 운영 입력 스크리닝(한국어 우선)이 정당하게
+  차단 → 세 fixture 모두 실행 불가. 봉인 검증(schema/counts/collision)이 실행을 포함하지 않아
+  놓친 저작 결함이다. 진단 중 blind 노출: fixture 생성 스펙과 stream-only 생성 입력 일부를
+  읽었다(모델 응답은 blind fixture로 생성하지 않음; seed 7 시도는 screening 거부로 응답 0).
+  goal 사전 허가(`no_winner 시 새 retained blind 봉인 연속 진행`)의 취지에 따라 **blind v2 재봉인**:
+  같은 3 role·seeds [73,89,97,20260824]·arms·threshold/metric policy 불변, 한국어 archetype/
+  probe/사실로 재저작(교정 480행의 이름·사실·문구 재사용 금지), 새 external root에 봉인,
+  commitment v2 + verifier/test 갱신, stream-only 한국어 검증(모델 무호출)만 수행 후 matrix
+  재실행. 결함 root는 증거로 보존한다. threshold/seed/arms 변경 0 — fixture body 교체만이며
+  E2-C1 응답을 본 적이 없으므로 결과-후 변경이 아니다.
 - 2026-08-24 12:02 KST **matrix 구현 검증 receipt + commit/실행 intent**: implementer
   `e2c1-matrix` 산출(launcher e2c1 profile +168/-37, comparator 596줄+13 tests, contract 6
   cases, CI 등록)을 감독이 검토·독립 재실행으로 확인했다 — comparator/legacy/commitment
