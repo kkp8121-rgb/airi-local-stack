@@ -15,6 +15,7 @@ from affect_expression import render_affect_expression_contract
 from affect_state import AffectStateRuntime, AffectValidationError, EVENT_SCHEMA_VERSION, reduce_affect, render_continuity_snapshot
 from broadcast_affect_event_mapper import BROADCAST_AFFECT_OUTCOME_CANDIDATE_SCHEMA_VERSION, BroadcastAffectMappingError, map_broadcast_outcome_candidate
 from broadcast_arc_ledger import BroadcastArcLedger, render_open_arcs
+from deterministic_utterance_layer import BRIEFING_EVIDENCE_MARKER
 
 _ID = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$')
 _TRACE_ID = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$')
@@ -86,6 +87,7 @@ class _Capability:
     turn_index: int | None = None
     preview_state: dict[str, Any] | None = None
     context_note: str = ''
+    deterministic_context_note: str = ''
 
 
 class BroadcastNotes(NamedTuple):
@@ -95,8 +97,10 @@ class BroadcastNotes(NamedTuple):
     context_note: str
 
 
-def render_broadcast_context(value: object) -> str:
+def render_broadcast_context(value: object, *, briefing_evidence_marker: bool = False) -> str:
     """Validate the closed v1 wire shape and produce bounded model context."""
+    if type(briefing_evidence_marker) is not bool:
+        raise _invalid()
     if type(value) is not dict or set(value) != _BROADCAST_CONTEXT_KEYS:
         raise _invalid()
     if type(value.get('schema_version')) is not int or value['schema_version'] != 1:
@@ -120,7 +124,10 @@ def render_broadcast_context(value: object) -> str:
         '- 주제에서 벗어난 채팅에는 짧게 반응하고 현재 주제로 돌아와.'
     )
     if briefing:
-        note += '\n\n' + briefing
+        note += '\n\n'
+        if briefing_evidence_marker:
+            note += BRIEFING_EVIDENCE_MARKER + '\n'
+        note += briefing
     if value['donation_continuation']:
         note += '\n\n' + DONATION_CONTINUATION_CONTRACT
     if len(note) > 4096:
@@ -327,7 +334,13 @@ class LiveBroadcastRuntime:
         if (show_id, action_id) in self._tombstones or any(cap.show_id == show_id and cap.action_id == action_id for cap in self._turn_tokens.values()) or len(self._turn_tokens) >= _MAX_CAPABILITIES:
             raise _invalid()
         arc_id = payload.get('arc_id') if turn_type in _ARC_TURNS else None
-        context_note = render_broadcast_context(payload['broadcast_context']) if 'broadcast_context' in payload else ''
+        context_note = ''
+        deterministic_context_note = ''
+        if 'broadcast_context' in payload:
+            context_note = render_broadcast_context(payload['broadcast_context'])
+            deterministic_context_note = render_broadcast_context(
+                payload['broadcast_context'], briefing_evidence_marker=True,
+            )
         if turn_type in _ARC_TURNS:
             if not isinstance(arc_id, str) or not any(
                 arc.arc_id == arc_id
@@ -335,15 +348,22 @@ class LiveBroadcastRuntime:
             ):
                 raise _invalid()
         turn_token, delivery_token = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
-        cap = _Capability(show_id, action_id, turn_type, delivery, arc_id, delivery_token, 'issued', time.monotonic(), context_note=context_note)
+        cap = _Capability(
+            show_id, action_id, turn_type, delivery, arc_id, delivery_token,
+            'issued', time.monotonic(), context_note=context_note,
+            deterministic_context_note=deterministic_context_note,
+        )
         self._turn_tokens[turn_token], self._delivery_tokens[delivery_token] = cap, cap
         self._counters['issued'] += 1
         return {'turn_token': turn_token, 'delivery_token': delivery_token}
 
-    def claim_turn(self, token: object, *, screening_ready: bool, trace_id: str, knowledge_required: bool = False) -> BroadcastNotes | None:
+    def claim_turn(self, token: object, *, screening_ready: bool, trace_id: str,
+                   knowledge_required: bool = False,
+                   deterministic_layer: bool = False) -> BroadcastNotes | None:
         if (
             not self.ready_for_chat(screening_ready) or not isinstance(token, str) or not _TOKEN.fullmatch(token)
-            or not isinstance(trace_id, str) or not _TRACE_ID.fullmatch(trace_id) or type(knowledge_required) is not bool
+            or not isinstance(trace_id, str) or not _TRACE_ID.fullmatch(trace_id)
+            or type(knowledge_required) is not bool or type(deterministic_layer) is not bool
         ):
             return None
         with self._lock:
@@ -381,7 +401,7 @@ class LiveBroadcastRuntime:
             return BroadcastNotes(
                 arc_note,
                 render_continuity_snapshot(cap.preview_state) + '\n' + render_affect_expression_contract(cap.preview_state),
-                cap.context_note,
+                cap.deterministic_context_note if deterministic_layer else cap.context_note,
             )
 
     def confirm_injected(self, token: object) -> bool:

@@ -7,6 +7,16 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
+> **2026-08-25 22:55 KST M4 §3.1~§3.4 완료 — d1v6 preflight·precommit PASS:** live 결정론 계층이
+> 주입된 브리핑·후원 note를 받도록 배선했고 pre-fix 2 FAIL → 수정 후 2 PASS, P3 v5 arc
+> 12/12를 확인했다. 새 blind v6는 v1~v5와 topic 불일치, handle-topic collision 0을 독립
+> 감사한 뒤 정확히 한 번 봉인했고(manifest `18a1987f...1c2e`), commitment/launcher/verifier/
+> CI 및 실제 comparator synthetic 48-report를 PASS했다. fresh external root의 실제
+> `-PreflightOnly`도 48/48 unique run, num_ctx 4096으로 PASS했다. flag OFF exact와 P3 predicate
+> P1 수리 후 proxy/runtime 403 OK, affected 435 passed/3 skipped/276 subtests, 독립 P0/P1/P2 0이다.
+> 다음은 exact 20-path repo commit/push
+> 뒤 exact-once matrix다. matrix·campaign·GPU 학습·adoption은 아직 0.
+
 > **2026-08-25 21:22 KST M3 — d1v5 재측정 `no_winner`, 결정론 계층 배선 결함 확정:** blind v5로
 > 4-arm 48-report를 재실행해 계측이 실제로 작동함을 확인했다(`service_error` 0, memory_probe
 > 36/40, `unknown_identity_safe` 학습 arm 1.0, 점수 0.34~0.37 — D1 0.11의 3배). 그러나

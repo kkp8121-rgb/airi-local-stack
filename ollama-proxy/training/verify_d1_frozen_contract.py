@@ -24,11 +24,19 @@ ROOT_ID = 'airi-d1-blind-freeze-20260825-v4'
 # superseded inventory applies to it.  v5 is the D1 re-measurement (M3,
 # 2026-08-25): identical arms, seeds, policy and comparator; only the sealed
 # bodies changed, because v4 was consumed by the 48-report D1 matrix and the
-# prompt then changed (briefing evidence marker, num_ctx 4096).  The d1v5
-# matrix's comparator was rejected at this exact check before v5 was listed.
+# prompt then changed (briefing evidence marker, num_ctx 4096).  v6 repeats the
+# same frozen evaluation after the live layer-input wiring fix and adds only a
+# fresh sealed root.  The d1v5 matrix's comparator was rejected at this exact
+# check before v5 was listed, so every accepted root is explicit here.
 ROOT_GENERATIONS = {
     ROOT_ID: 'd1',
     'airi-d1-blind-freeze-20260825-v5': 'd1v5',
+    'airi-d1-blind-freeze-20260825-v6': 'd1v6',
+}
+ROOT_COMMITMENT_FILES = {
+    ROOT_ID: 'airi_d1_blind_commitment.json',
+    'airi-d1-blind-freeze-20260825-v5': 'airi_d1v5_blind_commitment.json',
+    'airi-d1-blind-freeze-20260825-v6': 'airi_d1v6_blind_commitment.json',
 }
 ARMS = ['baseline', 'e2', 'e2-c1', 'e2-c2']
 REFERENCE_ARM = 'e2'
@@ -182,6 +190,8 @@ def commitment(c, external) -> None:
                     'public_raw_or_canonical_hash_collision': False,
                     'correction_proper_noun_collision': False,
                     'superseded_hash_collision': False, 'body_output': False}
+        if generation.get('check_handle_topic_collision'):
+            required['handle_topic_collision'] = False
         language = {'hangul_stream_check': 'pass', 'model_calls': 0}
         if (set(receipt) != {'schema_version', 'root_id', 'sealed_manifest_raw_sha256', 'validation',
                              'language_validation', 'attestation'}
@@ -192,13 +202,15 @@ def commitment(c, external) -> None:
             raise FrozenContractError('blind receipt')
 
 
-def verify(repo_root=None, external_blind_root=None):
+def verify(repo_root=None, external_blind_root=None, root_id=ROOT_ID):
     e2c1 = _e2c1()
     root = (repo_root or HERE.parents[1]).resolve()
     commitments = root / 'ollama-proxy' / 'eval' / 'broadcast_sim' / 'fixtures' / 'commitments'
+    if root_id not in ROOT_COMMITMENT_FILES:
+        raise FrozenContractError('root id')
     policy(e2c1.obj(commitments / 'airi_d1_metric_policy.json'))
-    commitment(e2c1.obj(commitments / 'airi_d1_blind_commitment.json'), external_blind_root)
-    return {'status': 'pass', 'generation': 'D1', 'root_id': ROOT_ID, 'arms': ARMS,
+    commitment(e2c1.obj(commitments / ROOT_COMMITMENT_FILES[root_id]), external_blind_root)
+    return {'status': 'pass', 'generation': 'D1', 'root_id': root_id, 'arms': ARMS,
             'expected_reports': EXPECTED_REPORTS,
             'required_runtime_layers': list(REQUIRED_RUNTIME_LAYERS)}
 
@@ -207,10 +219,12 @@ def run_cli(argv=None, output=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--repo-root', type=Path)
     parser.add_argument('--external-blind-root', type=Path)
+    parser.add_argument('--root-id', choices=sorted(ROOT_COMMITMENT_FILES), default=ROOT_ID)
     args = parser.parse_args(argv)
     stream = output if output is not None else sys.stdout
     try:
-        result = verify(repo_root=args.repo_root, external_blind_root=args.external_blind_root)
+        result = verify(repo_root=args.repo_root, external_blind_root=args.external_blind_root,
+                        root_id=args.root_id)
     except FrozenContractError as exc:
         print(json.dumps({'status': 'fail', 'error': str(exc)}, ensure_ascii=False), file=stream)
         return 1

@@ -83,7 +83,13 @@ _INTERROGATIVE_RE = re.compile(
 # "S는 … A 말고/아니라 B …" — capture the phrase right before 말고/아니라 (the
 # rejected branch) and the phrase right after (the affirmed branch).
 _REJECTED_BRANCH_RE = re.compile(
-    r"([가-힣0-9a-z ]{1,24}?)([가-힣0-9a-z]{2,12})\s*(?:말고|(?:이|가)?\s*아니라)\s*([가-힣0-9a-z]{2,12})"
+    r"(?:(?P<subject>[가-힣0-9a-z]{1,12})(?:은|는)\s+)?"
+    r"(?P<rejected>[가-힣0-9a-z]{1,12}(?:\s+[가-힣0-9a-z]{1,12})?)\s*"
+    r"(?:말고|(?:이|가)?\s*아니라)\s*"
+    r"(?P<affirmed>[가-힣0-9a-z]{1,12}(?:\s+[가-힣0-9a-z]{1,12})?)"
+)
+_TRAILING_DECISION_VERB_RE = re.compile(
+    r"(?:하|가|긋|걸|찍|흔들|넣|당기|덮|지키|잠그|올리|채우|막|깎|돌리|보내|두)자(?:고)?"
 )
 _POSSESSIVE_FACT_RE = re.compile(
     r"내\s*([가-힣0-9a-z ]{1,14}?)[은는]\s*([가-힣0-9a-z]{2,14}?)(?:이야|이예요|이다|야|예요|다)(?![가-힣])"
@@ -239,12 +245,14 @@ def find_rejected_branches(pool_text: str) -> list[dict[str, str]]:
     found: list[dict[str, str]] = []
     for line in (pool_text or "").splitlines():
         for match in _REJECTED_BRANCH_RE.finditer(line):
-            rejected = match.group(2)
-            affirmed = _JOSA_STRIP_RE.sub("", match.group(3))
-            prefix = (match.group(1) or "").strip()
-            subject_match = re.match(r"([가-힣0-9a-z]{2,12})", prefix)
-            subject = _JOSA_STRIP_RE.sub("", subject_match.group(1)) if subject_match else ""
-            if rejected in _COMMON_STOPWORDS or len(rejected) < 2:
+            rejected = match.group("rejected")
+            affirmed_parts = match.group("affirmed").split()
+            if len(affirmed_parts) == 2 and _TRAILING_DECISION_VERB_RE.fullmatch(
+                    affirmed_parts[-1]):
+                affirmed_parts.pop()
+            affirmed = _JOSA_STRIP_RE.sub("", " ".join(affirmed_parts))
+            subject = match.group("subject") or ""
+            if rejected in _COMMON_STOPWORDS:
                 continue
             found.append({
                 "subject": subject,
@@ -370,7 +378,8 @@ def system_briefing_evidence(content: str) -> str:
     index = (content or "").find(BRIEFING_EVIDENCE_MARKER)
     if index < 0:
         return ""
-    return content[index + len(BRIEFING_EVIDENCE_MARKER):].strip()
+    evidence = content[index + len(BRIEFING_EVIDENCE_MARKER):]
+    return evidence.split(DONATION_CONTINUATION_MARKER, 1)[0].strip()
 
 
 def build_layer_inputs(
@@ -381,6 +390,7 @@ def build_layer_inputs(
     history_texts: Iterable[str] | None = None,
     session_id: str | None = None,
     original_messages: Iterable[dict[str, Any]] | None = None,
+    live_context_note: str | None = None,
 ) -> dict[str, Any] | None:
     """Assemble ``apply_deterministic_utterance_layer`` kwargs, or None when off.
 
@@ -406,6 +416,12 @@ def build_layer_inputs(
     # phrasing that is instruction, not a broadcast decision.
     donation_turn = False
     system_parts: list[str] = []
+    if live_context_note:
+        system_parts.append(live_context_note)
+        donation_turn = DONATION_CONTINUATION_MARKER in live_context_note
+        marked = system_briefing_evidence(live_context_note)
+        if marked:
+            evidence_parts.append(marked)
     for message in original_messages or ():
         if not isinstance(message, dict):
             continue

@@ -7,9 +7,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from live_broadcast_runtime import (
+    BRIEFING_EVIDENCE_MARKER,
     BROADCAST_BRIEFING_HEADER,
     BroadcastControlError,
     LiveBroadcastRuntime,
+    render_broadcast_context,
 )
 
 
@@ -283,7 +285,23 @@ class LiveBroadcastRuntimeTests(unittest.TestCase):
         self.assertIn(context['briefing'], notes.context_note)
         self.assertIn('[후원 본문 이어말하기]', notes.context_note)
         self.assertEqual(notes.context_note.count('[오늘 방송]'), 1)
+        self.assertNotIn(BRIEFING_EVIDENCE_MARKER, notes.context_note)
         self.runtime.cancel_turn(capability['turn_token'])
+
+        marked_capability = self.issue(
+            action_id='marked-context', broadcast_context=context,
+        )
+        marked_notes = self.runtime.claim_turn(
+            marked_capability['turn_token'], screening_ready=True,
+            trace_id='marked-context-trace', deterministic_layer=True,
+        )
+        self.assertIsNotNone(marked_notes)
+        self.assertIn(
+            BRIEFING_EVIDENCE_MARKER + '\n' + BROADCAST_BRIEFING_HEADER,
+            marked_notes.context_note,
+        )
+        self.assertEqual(render_broadcast_context(context), notes.context_note)
+        self.runtime.cancel_turn(marked_capability['turn_token'])
 
         for change in (
             {'schema_version': 2},

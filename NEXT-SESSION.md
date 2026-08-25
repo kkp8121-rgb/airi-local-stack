@@ -1,5 +1,15 @@
 # AIRI 다음 세션 안내
 
+> **2026-08-25 22:55 KST 최우선 — M4 blind v6 봉인·계약·preflight·precommit PASS:** live 배선과
+> P3 정규식 수리, pre-fix 실패 증명, 새 v6 저작/독립 충돌 감사/no-overwrite 봉인, body-free
+> commitment·d1v6 launcher/verifier/tests/CI, 실제 comparator synthetic 48-report 검증과 fresh
+> external root의 실제 `-PreflightOnly` 48/48까지 PASS했다. flag OFF exact와 P3 predicate
+> P1 수리 후 fresh precommit은 proxy/runtime 403 OK, affected 435 passed/3 skipped/276 subtests,
+> 독립 P0/P1/P2 0이고 exact stage 기준 patch/checkpoint/continuity/diff 계약도 PASS했다.
+> 다음 순서는 WORKING intent대로 exact 20-path repo commit/push →
+> detached exact-once 48-report matrix다. 현재 matrix·서비스·
+> GPU 학습 0, adoption=false. 단일 진입점은 M4 handoff이며 blind v1~v6 재봉인/재사용 금지.
+>
 > **2026-08-25 21:39 KST — M4 Codex 인계 문서 작성:** 다음 라운드(계층 입력 배선 수정 + live
 > 경로 통합 테스트 + P3 정규식 + blind v6 재측정)의 단일 진입점은
 > `airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-08-25-M4.md`다. 착수는 사용자 `/goal` 승인 뒤.

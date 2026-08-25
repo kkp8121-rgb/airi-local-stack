@@ -15,9 +15,7 @@ POOL = "\n".join([
 class RecallQuestionTests(unittest.TestCase):
     def test_decision_recall_extracts_the_affirmed_branch(self) -> None:
         answer = dul.answer_recall_question("등불 신호는 무슨 빛으로 걸기로 했지?", POOL)
-        self.assertIsNotNone(answer)
-        self.assertIn("초록빛", answer)
-        self.assertNotIn("붉은빛", answer)
+        self.assertEqual(answer, "등불신호는 초록빛으로 하기로 했지! 그대로 가자.")
 
     def test_possessive_fact_recall_extracts_the_value(self) -> None:
         answer = dul.answer_recall_question("내 바구니 표식 뭐였지?", POOL)
@@ -40,6 +38,24 @@ class RecallQuestionTests(unittest.TestCase):
 
 
 class RejectedBranchTests(unittest.TestCase):
+    def test_trailing_decision_verb_is_not_part_of_the_affirmed_branch(self) -> None:
+        decision = dul.find_rejected_branches(
+            "등불신호는 붉은빛 말고 초록빛으로 걸자",
+        )[0]
+        self.assertEqual(decision["rejected"], "붉은빛")
+        self.assertEqual(decision["affirmed"], "초록빛")
+
+    def test_extracts_one_character_and_two_word_branches(self) -> None:
+        for line, rejected, affirmed in (
+            ("표식은 나 말고 너", "나", "너"),
+            ("무적나팔은 한 번씩 말고 두 번씩 울리자", "한 번씩", "두 번씩"),
+            ("유리창닦기는 젖은 천 말고 마른 천으로 하자", "젖은 천", "마른 천"),
+        ):
+            with self.subTest(line=line):
+                decision = dul.find_rejected_branches(line)[0]
+                self.assertEqual(decision["rejected"], rejected)
+                self.assertEqual(decision["affirmed"], affirmed)
+
     def test_sentences_repeating_a_rejected_branch_are_dropped(self) -> None:
         text = "붉은빛으로 걸면 예쁘겠다. 초록빛 준비는 끝났어."
         result, dropped, ack = dul.suppress_rejected_branch(

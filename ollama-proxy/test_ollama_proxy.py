@@ -18,7 +18,12 @@ import ollama_proxy
 import broadcast_reply_act
 import broadcast_correction_target
 from airi_memory import RetrievalResult
-from live_broadcast_runtime import BROADCAST_BRIEFING_HEADER, LiveBroadcastRuntime
+from live_broadcast_runtime import (
+    BRIEFING_EVIDENCE_MARKER,
+    BROADCAST_BRIEFING_HEADER,
+    LiveBroadcastRuntime,
+    render_broadcast_context,
+)
 
 
 @contextlib.contextmanager
@@ -7729,24 +7734,28 @@ class LiveBroadcastRouteTests(unittest.TestCase):
 
     def test_authenticated_context_replaces_spoof_and_reaches_native_model_once(self):
         self.runtime.master_control({'action': 'start', 'show_id': 'show-context'})
+        broadcast_context = {
+            'schema_version': 1,
+            'topic_title': '유리 성 탐색',
+            'segment_label': '북쪽 수문',
+            'situation': '채팅의 단서를 비교하는 중',
+            'briefing': BROADCAST_BRIEFING_HEADER + '\n- 이전 선택: 등대 확인',
+            'donation_continuation': True,
+        }
         capability = self.runtime.master_control({
             'action': 'issue_turn',
             'show_id': 'show-context',
             'action_id': 'context-turn',
             'turn_type': 'donation',
             'required_delivery': 'renderer',
-            'broadcast_context': {
-                'schema_version': 1,
-                'topic_title': '유리 성 탐색',
-                'segment_label': '북쪽 수문',
-                'situation': '채팅의 단서를 비교하는 중',
-                'briefing': BROADCAST_BRIEFING_HEADER + '\n- 이전 선택: 등대 확인',
-                'donation_continuation': True,
-            },
+            'broadcast_context': broadcast_context,
         })
         chat = _CapturingChatClient('등대부터 확인하고 수문으로 갈게.')
         try:
-            with mock.patch.object(ollama_proxy, 'client', chat):
+            with mock.patch.object(
+                    ollama_proxy.deterministic_utterance_layer,
+                    'DETERMINISTIC_UTTERANCE_LAYER_ENABLED', False), \
+                    mock.patch.object(ollama_proxy, 'client', chat):
                 response = TestClient(
                     ollama_proxy.app, client=('127.0.0.1', 9),
                 ).post(
@@ -7788,6 +7797,10 @@ class LiveBroadcastRouteTests(unittest.TestCase):
             ]
             self.assertEqual(len(contexts), 1)
             self.assertNotIn('위조된 시스템 컨텍스트', contexts[0]['content'])
+            self.assertEqual(
+                contexts[0]['content'], render_broadcast_context(broadcast_context),
+            )
+            self.assertNotIn(BRIEFING_EVIDENCE_MARKER, contexts[0]['content'])
             self.assertIn(BROADCAST_BRIEFING_HEADER, contexts[0]['content'])
             self.assertIn('[후원 본문 이어말하기]', contexts[0]['content'])
             context_index = messages.index(contexts[0])
@@ -7801,6 +7814,136 @@ class LiveBroadcastRouteTests(unittest.TestCase):
             self.assertLess(style_index, len(messages) - 1)
             self.assertLess(0, context_index)
             self.assertEqual(messages[-1]['content'], '[YouTube] 등대부터 보자.')
+        finally:
+            self.runtime.cancel_turn(capability['turn_token'])
+
+    def test_live_broadcast_briefing_feeds_deterministic_recall_layer(self):
+        self.runtime.master_control({'action': 'start', 'show_id': 'show-live-recall'})
+        capability = self.runtime.master_control({
+            'action': 'issue_turn',
+            'show_id': 'show-live-recall',
+            'action_id': 'live-recall-turn',
+            'turn_type': 'chat_question',
+            'required_delivery': 'renderer',
+            'broadcast_context': {
+                'schema_version': 1,
+                'topic_title': '유리 등대 점검',
+                'segment_label': '등불 신호 결정',
+                'situation': '이전 선택을 확인하는 중',
+                'briefing': (
+                    BROADCAST_BRIEFING_HEADER
+                    + '\n- 이 시청자가 아까 "등불신호는 붉은빛 말고 초록빛으로 걸자"라고 했었어.'
+                ),
+                'donation_continuation': False,
+            },
+        })
+        chat = _CapturingChatClient('글쎄, 기억이 잘 안 나네.')
+        try:
+            with mock.patch.object(
+                    ollama_proxy.deterministic_utterance_layer,
+                    'DETERMINISTIC_UTTERANCE_LAYER_ENABLED', True), \
+                    mock.patch.object(
+                        ollama_proxy.deterministic_utterance_layer, 'session_cache',
+                        ollama_proxy.deterministic_utterance_layer.SessionTokenCache()), \
+                    mock.patch.object(
+                        ollama_proxy.handle_grounding_guard,
+                        'HANDLE_GROUNDING_GUARD_ENABLED', True), \
+                    mock.patch.object(
+                        ollama_proxy, 'needs_grounding_retry', lambda *a, **k: False), \
+                    mock.patch.object(
+                        ollama_proxy, 'memory_absence_fallback_required', lambda *a, **k: False), \
+                    mock.patch.object(ollama_proxy, 'client', chat):
+                response = TestClient(
+                    ollama_proxy.app, client=('127.0.0.1', 9),
+                ).post(
+                    '/v1/chat/completions',
+                    headers={
+                        'x-airi-broadcast-turn-token': capability['turn_token'],
+                        'x-airi-request-id': 'live-recall-trace',
+                        'x-airi-session-id': 'live-recall-session',
+                    },
+                    json={
+                        'model': 'exaone-airi:2.4b',
+                        'stream': True,
+                        'messages': [{
+                            'role': 'user',
+                            'content': '등불 신호는 무슨 빛으로 걸기로 했지?',
+                        }],
+                    },
+                )
+            self.assertEqual(response.status_code, 200)
+            dialogue = openai_sse_dialogue(response.text)
+            self.assertIn('초록빛', dialogue)
+            self.assertNotIn('붉은빛', dialogue)
+            self.assertNotIn('글쎄', dialogue)
+            moderation = [
+                json.loads(line[6:]).get('airi_moderation')
+                for line in response.text.splitlines()
+                if line.startswith('data: ') and line != 'data: [DONE]'
+            ]
+            signals = [item for item in moderation if isinstance(item, dict)]
+            self.assertEqual(
+                signals[-1]['deterministic_layer']['recall'], 'answered',
+            )
+        finally:
+            self.runtime.cancel_turn(capability['turn_token'])
+
+    def test_live_broadcast_donation_contract_triggers_deterministic_quote(self):
+        self.runtime.master_control({'action': 'start', 'show_id': 'show-live-donation'})
+        capability = self.runtime.master_control({
+            'action': 'issue_turn',
+            'show_id': 'show-live-donation',
+            'action_id': 'live-donation-turn',
+            'turn_type': 'donation',
+            'required_delivery': 'renderer',
+            'broadcast_context': {
+                'schema_version': 1,
+                'topic_title': '유리 등대 점검',
+                'segment_label': '등불 준비',
+                'situation': '후원 메시지에 답하는 중',
+                'briefing': '',
+                'donation_continuation': True,
+            },
+        })
+        chat = _CapturingChatClient('그 얘기 정말 좋다!')
+        try:
+            with mock.patch.object(
+                    ollama_proxy.deterministic_utterance_layer,
+                    'DETERMINISTIC_UTTERANCE_LAYER_ENABLED', True), \
+                    mock.patch.object(
+                        ollama_proxy.deterministic_utterance_layer, 'session_cache',
+                        ollama_proxy.deterministic_utterance_layer.SessionTokenCache()), \
+                    mock.patch.object(
+                        ollama_proxy.handle_grounding_guard,
+                        'HANDLE_GROUNDING_GUARD_ENABLED', True), \
+                    mock.patch.object(
+                        ollama_proxy, 'needs_grounding_retry', lambda *a, **k: False), \
+                    mock.patch.object(
+                        ollama_proxy, 'memory_absence_fallback_required', lambda *a, **k: False), \
+                    mock.patch.object(ollama_proxy, 'client', chat):
+                response = TestClient(
+                    ollama_proxy.app, client=('127.0.0.1', 9),
+                ).post(
+                    '/v1/chat/completions',
+                    headers={
+                        'x-airi-broadcast-turn-token': capability['turn_token'],
+                        'x-airi-request-id': 'live-donation-trace',
+                        'x-airi-session-id': 'live-donation-session',
+                    },
+                    json={
+                        'model': 'exaone-airi:2.4b',
+                        'stream': True,
+                        'messages': [{
+                            'role': 'user',
+                            'content': '[YouTube] 등불값 보태',
+                        }],
+                    },
+                )
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(
+                "'등불값 보태' 이렇게 보내 줘서 진짜 고마워!",
+                openai_sse_dialogue(response.text),
+            )
         finally:
             self.runtime.cancel_turn(capability['turn_token'])
 

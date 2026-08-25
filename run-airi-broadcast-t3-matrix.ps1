@@ -12,7 +12,7 @@ param(
     # 'e2c2' runs the frozen E2-C2 blind evaluation (baseline/e2/e2-c2) over its
     # own sealed root, with the proxy handle-grounding guard pinned ON and
     # attested per run through /health.
-    [ValidateSet('t3','e2c1','e2c2','d1','d1v5')] [string]$MatrixProfile = 't3',
+    [ValidateSet('t3','e2c1','e2c2','d1','d1v5','d1v6')] [string]$MatrixProfile = 't3',
     [string]$BlindRoot = '',
     # Offline contract-test seam; production always performs the localhost lookup.
     [string]$OllamaTagsFile = '',
@@ -32,15 +32,15 @@ $root = [IO.Path]::GetFullPath($PSScriptRoot)
 $out = [IO.Path]::GetFullPath($OutputDir)
 $python = (Get-Command python -ErrorAction Stop).Source
 $ports = @(11435, 11436, 8880, 9880, 8892, 8890)
-# d1v5 is the D1 re-measurement on a fresh blind (v5) after the prompt changed
-# (briefing evidence marker, num_ctx 4096); every gate, flag and comparator is
-# identical to d1 — only the sealed root binding differs.
-$isDeterministicLayerProfile = ($MatrixProfile -ceq 'd1' -or $MatrixProfile -ceq 'd1v5')
+# d1v5/d1v6 re-measure D1 on fresh blinds after prompt/runtime wiring changes;
+# every gate, flag and comparator is identical to d1 -- only the sealed root
+# binding differs.
+$isDeterministicLayerProfile = ($MatrixProfile -ceq 'd1' -or $MatrixProfile -ceq 'd1v5' -or $MatrixProfile -ceq 'd1v6')
 $isBlindProfile = ($MatrixProfile -ceq 'e2c1' -or $MatrixProfile -ceq 'e2c2' -or $isDeterministicLayerProfile)
 # The e2c2 matrix is measured with the handle-grounding guard ON; /health must
 # prove it on every run because the report schema has no field for it.
 $requireGuardHealth = ($MatrixProfile -ceq 'e2c2' -or $isDeterministicLayerProfile)
-$requireDeterministicLayerHealth = ($MatrixProfile -ceq 'd1' -or $MatrixProfile -ceq 'd1v5')
+$requireDeterministicLayerHealth = $isDeterministicLayerProfile
 
 function New-Capability {
     $b = New-Object byte[] 48; $r = [Security.Cryptography.RandomNumberGenerator]::Create()
@@ -213,7 +213,7 @@ function Assert-Report([string]$Path, [object]$Arm, [object]$Fixture, [int]$Seed
 # Everything below this line is preflight-only until the manifest and all fixtures validate.
 if (Test-Path -LiteralPath $out) { throw 'OutputDir must not exist: evidence is no-overwrite.' }
 if ($isBlindProfile -and -not $BlindRoot) { throw "The $MatrixProfile profile requires -BlindRoot." }
-if (-not $isBlindProfile -and $BlindRoot) { throw '-BlindRoot is only valid for the e2c1, e2c2, d1, and d1v5 profiles.' }
+if (-not $isBlindProfile -and $BlindRoot) { throw '-BlindRoot is only valid for the e2c1, e2c2, d1, d1v5, and d1v6 profiles.' }
 if (($OllamaTagsFile -or $HealthFixtureFile -or $ReportFixtureFile -or $ReportPlanFixtureFile) -and -not $PreflightOnly) { throw 'Offline fixture seams are PreflightOnly and forbidden for production runs.' }
 $strictUtf8 = [Text.UTF8Encoding]::new($false, $true)
 $modelManifestBytes = [IO.File]::ReadAllBytes((Get-Item -LiteralPath $ModelManifest -ErrorAction Stop).FullName)
@@ -261,13 +261,20 @@ if ($isBlindProfile) {
         $blindCommitmentSchema = 'airi.d1-blind-commitment.v1'
         $blindRootId = 'airi-d1-blind-freeze-20260825-v4'
         $expectedSealedSha256 = '44c05fbd475a6ca9b87fc3a8f07ec0af7a2eef9e023b993c89398ceb3b071682'
-    } else {
+    } elseif ($MatrixProfile -ceq 'd1v5') {
         # d1v5: blind v4 was consumed; same policy and comparator, new sealed root.
         $blindCommitmentFile = 'airi_d1v5_blind_commitment.json'
         $blindPolicyFile = 'airi_d1_metric_policy.json'
         $blindCommitmentSchema = 'airi.d1-blind-commitment.v1'
         $blindRootId = 'airi-d1-blind-freeze-20260825-v5'
         $expectedSealedSha256 = 'd9c07fea3a4bf965ed4d05c4a8175341eae58d5106b275492692c5d05b4e7c45'
+    } else {
+        # d1v6: v5 was consumed; same policy/comparator, live-wiring-fixed root.
+        $blindCommitmentFile = 'airi_d1v6_blind_commitment.json'
+        $blindPolicyFile = 'airi_d1_metric_policy.json'
+        $blindCommitmentSchema = 'airi.d1-blind-commitment.v1'
+        $blindRootId = 'airi-d1-blind-freeze-20260825-v6'
+        $expectedSealedSha256 = '18a1987ff4905c3068ca8ab3853c1852ee58209990496cada8fc6a3b51e41c2e'
     }
     $commitmentPath = Join-Path $root ('ollama-proxy\eval\broadcast_sim\fixtures\commitments\' + $blindCommitmentFile)
     $commitmentBytes = [IO.File]::ReadAllBytes((Get-Item -LiteralPath $commitmentPath -ErrorAction Stop).FullName)

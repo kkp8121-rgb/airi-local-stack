@@ -7490,6 +7490,7 @@ class LocalStreamRequestContext:
     proactive_turn: bool
     nonmutating_turn: bool
     briefing_evidence: str
+    live_context_note: str
     synthetic_evaluation_turn: bool
     quality_probe_turn: bool
     topic_board_runtime: object
@@ -7616,6 +7617,7 @@ async def stream_local_with_ack(
             history_texts=_dialogue_history_texts,
             session_id=context.memory_session_id,
             original_messages=context.original_messages,
+            live_context_note=context.live_context_note,
         ) if not context.proactive_turn else None
         absence_required = not context.proactive_turn and memory_absence_fallback_required(
             context.memory_question, _memory_result, context.original_messages
@@ -8929,6 +8931,9 @@ async def proxy(path: str, request: Request):
             broadcast_notes = live_broadcast_runtime.claim_turn(
                 broadcast_turn_token, screening_ready=screening_ready, trace_id=trace_id,
                 knowledge_required=request.headers.get('x-airi-knowledge-probe') == 'on',
+                deterministic_layer=(
+                    deterministic_utterance_layer.DETERMINISTIC_UTTERANCE_LAYER_ENABLED
+                ),
             )
     if broadcast_notes is not None:
         original_body = strip_caller_system_messages_for_live_broadcast(original_body)
@@ -8973,6 +8978,7 @@ async def proxy(path: str, request: Request):
     except Exception:
         live_broadcast_runtime.cancel_turn(broadcast_turn_token)
         raise
+    live_context_note = ""
     if broadcast_notes is not None:
         body, injected = inject_live_broadcast_notes(
             body,
@@ -8980,7 +8986,9 @@ async def proxy(path: str, request: Request):
             broadcast_notes.affect_note,
             broadcast_notes.context_note,
         )
-        if not injected or not live_broadcast_runtime.confirm_injected(broadcast_turn_token):
+        if injected and live_broadcast_runtime.confirm_injected(broadcast_turn_token):
+            live_context_note = broadcast_notes.context_note
+        else:
             live_broadcast_runtime.cancel_turn(broadcast_turn_token)
     if is_chat_request:
         # The launcher owns the foreground model. A desktop build or provider
@@ -9711,6 +9719,7 @@ async def proxy(path: str, request: Request):
             memory_question=memory_question, last_user_text=last_user_text,
             user_prefers_korean=user_prefers_korean, proactive_turn=proactive_turn,
             nonmutating_turn=nonmutating_turn, briefing_evidence=briefing_evidence,
+            live_context_note=live_context_note,
             synthetic_evaluation_turn=synthetic_evaluation_turn,
             quality_probe_turn=quality_probe_turn, topic_board_runtime=topic_board_runtime,
         )

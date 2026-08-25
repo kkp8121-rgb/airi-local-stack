@@ -7,6 +7,24 @@
 > 실행 중 PID, owned 포트를 **read-only로 대조**하고 나서야 실행한다. 채팅 요약을 믿지 않는다.
 > 작성: Claude main 세션(airi-d6), 2026-08-25 21:39 KST, HEAD `91792a1`.
 
+## -1. M4 진행 상태 (2026-08-25 22:55 KST)
+
+- §3.1~§3.3 완료: live `context_note` 배선, server-owned briefing marker, donation P5,
+  pre-fix `07ad82f` 2 FAIL → 현 트리 2 PASS, P3 v5 arc 12/12. 독립 감사 P1 수리 뒤
+  flag OFF live context exact와 trailing decision verb 제거를 회귀로 고정했다.
+- §3.4 완료: 새 blind v6를 direct check 후 정확히 한 번 봉인했다. root
+  `airi-d1-blind-freeze-20260825-v6`, sealed manifest SHA `18a1987f...1c2e`, response viewed
+  false, handle-topic collision 0. body-free commitment/launcher/verifier/tests/CI까지 배선했다.
+- 증거: focused 71 passed, broadcast_sim+launcher 242 passed/1 skipped/43 subtests,
+  patch-manifest PASS, external verifier PASS, 실제 comparator synthetic 48-report PASS.
+- §3.5 preflight 완료: fresh external root에서 pinned model manifest와 no-overwrite wrapper를
+  검증했고 실제 `-PreflightOnly`가 48/48 unique run, num_ctx 4096으로 exit 0이었다. `run`과
+  start/exit receipt는 아직 없다. fresh precommit 회귀는 proxy/runtime 403 OK,
+  blind/launcher/deterministic 435 passed/3 skipped/276 subtests, v6 external verifier PASS다.
+  exact 20-path stage 뒤 patch-manifest/current-checkpoint/work-continuity/staged diff-check도 PASS했다.
+  현재 다음은 WORKING intent에 고정한 exact 20-path repo commit/push 뒤
+  detached wrapper를 한 번 시작하는 것이다. matrix·서비스·GPU 학습은 아직 0, adoption=false.
+
 ## 0. 인계 시점 상태 (관측값)
 
 | 항목 | 값 |

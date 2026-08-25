@@ -1,14 +1,15 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 21:40:00 +09:00"
-checkpoint_id: "20260825-214000-main-session-handed-to-codex"
-matrix_note: "메인 세션 = Codex (2026-08-25 사용자 선언). 진입점 AIRI-CODEX-HANDOFF-2026-08-25-M4.md. 실행 중 matrix 0, blind v1~v5 소비"
+updated_at_kst: "2026-08-25 22:58:32 +09:00"
+checkpoint_id: "20260825-225832-m4-precommit-validation-receipt-commit-push-intent"
+matrix_note: "M4 precommit PASS: exact 20-path stage, missing/extra/unstaged/untracked 0; patch manifest, current checkpoint, work continuity, staged diff-check all exit 0. Earlier fresh suites remain proxy/runtime 403 OK and affected 435 passed, 3 skipped, 276 subtests; v5 12/12; v6 verifier PASS; independent P0/P1/P2 0. Next commit 'fix: wire live deterministic layer for blind v6', push origin main, verify exact clean; matrix root unstarted, service/GPU 0"
 active_trainer_note: "GPU 학습 없음. lm-eval 추론만 사용했고 종료(GPU 370 MiB). AIRI 서비스 0"
 goal_status: "active"
 authorization: "user-goal-2026-08-25-1720-m3: approve-all-three-recommendations (blind-v5-seal-then-4-arm-48-report-rematrix-with-marker-and-num_ctx-4096, enforce-lm-eval-general-capability-gate-le-2pp-vs-stock, fix-native-baseline-fixture-pin); no-gpu-training; matrix-exact-once; operational-adoption-forbidden-until-separate-user-approval. superseded: user-goal-2026-08-25-1630-m2: proceed-with-proposed-direction (review-docs-into-참조+INDEX, num_ctx-4096-prompt-budget, R2-F7-campaign-code-gate) and adopt-tools-judged-beneficial (lm-eval, llama.cpp perplexity; unsloth/DPO deferred); no-gpu-training; operational-adoption-still-separate-approval. superseded: user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
+m4_authorization: "user-goal-2026-08-25-m4: fix live deterministic-layer wiring, add pre-fix-failing/live-path tests, expand P3 rejected-branch extraction, author/seal fresh blind-v6 with handle-topic collision gate, exact-once 48-report d1v6 matrix, winner-only 3x500 campaign, otherwise diagnose-and-wait; no GPU/new candidate training; no blind-v1-v5 reuse; no gate/threshold/metric/seed/fixture-definition changes; operational adoption forbidden without separate approval"
 active_phase: "m4-main-session-is-codex"
-git_head: "c38f2d04c8cf6896d056cc3ddf5717f198beec6d"
-worktree_state: "main c38f2d0 clean before this receipt; Claude 세션은 이 receipt push 후 C:/Projects/airi 를 더 이상 변경하지 않음; AIRI 서비스 0, GPU 유휴"
+git_head: "585394e882b43715bcc8581c49c3b5bf713db7af"
+worktree_state: "main/local origin/main/remote main exact 585394e882b43715bcc8581c49c3b5bf713db7af; expected M4 repo changes 20 paths (18 modified, 2 untracked); stage 0; only main worktree; AIRI-related process 0; owned listeners 11435/11436/8880/9880/8890/8892 all 0"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
@@ -23,6 +24,131 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 > 기준 상태다. checkpoint를 포함한 commit 자체의 SHA를 자가 참조하지 않는다.
 
 ## 1. 권한과 현재 사실
+
+- 2026-08-25 22:58 KST **M4 precommit validation receipt + commit/push intent**: exact
+  20-path `git add` 후 Unicode quote를 비활성화한 경로 대조에서 staged 20/20,
+  missing/extra/unstaged/untracked 0이다. normal index의 `test-patch-manifest.ps1` exit 0,
+  `test-current-checkpoint.ps1` exit 0(내부 durability·patch·offline contracts 포함),
+  standalone `test-airi-work-continuity.ps1` exit 0, staged diff-check exit 0/출력 0이다.
+  앞선 proxy/runtime 403 OK, affected 435 passed/3 skipped/276 subtests, v5 12/12,
+  external v6 verifier PASS, 독립 P0/P1/P2 0도 유지된다. 다음 exact 상태 변경은
+  `git commit -m "fix: wire live deterministic layer for blind v6"` 후 `git push origin main`이다.
+  commit 또는 push 실패 시 wrapper를 시작하지 않으며, push 뒤 HEAD/local/origin/remote exact와
+  worktree clean·owned PID/listener 0을 다시 확인한 경우에만 exact-once wrapper로 이동한다.
+
+- 2026-08-25 22:55 KST **M4 P1 수정 fresh 재검증 receipt + precommit intent**:
+  compact 복구 뒤 프록시/runtime 전체 unittest는 403/403 OK, broadcast_sim·affect_broadcast·
+  launcher·deterministic/guard 묶음은 435 passed, 3 skipped, 276 subtests로 exit 0이다.
+  sealed v5 continuity seed는 decision branch 12/12 추출, standalone v6 frozen-contract CLI는
+  root `airi-d1-blind-freeze-20260825-v6`, expected reports 48, 두 runtime layer로 PASS했다.
+  독립 재감사는 flag OFF plain context exact, flag ON trusted marker, `초록빛으로 걸자`의
+  affirmed=`초록빛`을 확인해 P0/P1/P2 0이다. 다음 상태 변경은 예상 20경로만 exact stage한 뒤
+  staged diff를 검토하고 `test-patch-manifest`, `test-current-checkpoint`, work-continuity,
+  diff-check를 모두 실행하는 것이다. 하나라도 실패하면 commit/push/wrapper를 시작하지 않는다.
+  matrix root의 run/start/exit receipt, 관련 service/GPU/adoption은 여전히 0이다.
+
+- 2026-08-25 22:51 KST **M4 compact 복구 재대조 receipt**: WORKING-STATE 6,544행을
+  UTF-8로 EOF까지 다시 읽고 Goal `active`, HEAD/local main/local origin/main/remote main
+  모두 `585394e882b43715bcc8581c49c3b5bf713db7af`, stage 0, 별도 worktree 0을 확인했다.
+  P1 flag-off 회귀 파일 추가 때문에 예상 M4 worktree는 직전 기록의 19가 아니라 20경로
+  (18 modified + 신규 commitment/test 2)이며 관측값으로 정정했다. sealed v6 root의
+  `sealed_manifest.json` 1,119 B SHA `18a1987f...1c2e`, `validation_receipt.json` 903 B
+  SHA `d3493490...40a5`, fixture 3개 크기/SHA가 staging 및 직전 receipt와 exact하다.
+  matrix root는 model manifest SHA `050ae10f...e330`와 wrapper SHA `e8820118...acb9`만
+  있고 `run`, start/exit receipt는 absent다. 관련 AIRI process 0, owned listener 6개 0이며
+  GPU 학습/matrix/adoption 0이다. 다음 한 동작은 P1 최소 수정과 standalone v6 verifier를
+  fresh 재검증하고 독립 감사 결과(P0/P1/P2 0)를 대조한 뒤 precommit 전체 검증을 실행하는 것이다.
+
+- 2026-08-25 22:43 KST **M4 precommit 독립 감사 P1 fix intent**: proxy/runtime fresh
+  403 OK, deterministic/guard 51 passed+10 subtests. handoff §5 대형 pinned pytest는 기록된 환경
+  결함과 동일하게 pinned venv의 `httpx` 부재로 continuity-v4 수집에서 exit 2(코드 실패 아님),
+  current-checkpoint는 신규 test가 아직 untracked라 내부 patch-manifest strict equality에서 exit 1;
+  별도 임시 index patch-manifest PASS는 유지된다. 독립 diff 감사에서 commit 차단 P1 두 건을
+  확인했다: (1) runtime marker가 결정론 flag OFF live outbound prompt까지 바꿈, (2) 확장 regex가
+  `초록빛으로 걸자`의 `걸자`를 affirmed branch에 흡수함. 다음 최소 수정은 runtime이 동일 wire
+  context의 plain/marked 두 렌더를 만들고 proxy claim 시 layer flag가 ON일 때만 marked note를
+  선택해 OFF outbound bytes를 보존하며, affirmed 두 번째 어절이 결정 동사 predicate면 제거하는
+  것이다. live flag-off upstream request와 exact `초록빛` recall 회귀를 추가한다. P2로 standalone
+  verifier가 v4 commitment만 고르는 문제도 explicit root selection을 추가해 v6 external CLI로
+  검증한다. 수정 후 모든 focused/full 검증을 다시 실행하기 전에는 commit/push/wrapper 시작 0이다.
+
+- 2026-08-25 22:38 KST **M4 d1v6 preflight receipt + pre-matrix commit/push intent**:
+  fresh external matrix root에는 model manifest 767 B SHA `050ae10f...e330`와 wrapper 1,198 B
+  SHA `e8820118...acb9`만 있고 `run`, start/exit receipt는 absent다. wrapper는 d1v5 구조와
+  exact하며 profile/root/path만 v6로 바뀌었고 AST PASS. 실제 launcher `-PreflightOnly`는
+  exit 0, 4 arms × 3 fixtures × 4 seeds = 고유 48 run, `num_ctx=4096`, live context on,
+  max_tokens 220을 발행했고 output을 만들지 않았다. HEAD/local/origin/remote는 여전히
+  `585394e882b43715bcc8581c49c3b5bf713db7af`, repo는 예상 M4 19경로(17 modified + 신규
+  commitment/test 2), owned listener 0이다. 다음은 diff/security와 precommit 회귀를 fresh
+  실행하고 아래 19경로만 exact stage해 `fix: wire live deterministic layer for blind v6`로
+  commit/push하는 것이다. push 뒤 HEAD/local/origin exact와 clean을 확인한 경우에만 detached
+  wrapper를 **한 번** 시작한다. wrapper command는 `powershell.exe -NoProfile -File
+  D:\AIRI-Models\airi-d1v6-blind-matrix-20260825\launch-d1v6-matrix.ps1`; start receipt는 repo
+  HEAD, wrapper/model manifest/sealed manifest SHA와 PID/command를 no-overwrite JSON으로 남긴다.
+  실패 시 같은 wrapper를 반복하지 않고 root를 보존한다. 서비스·matrix·GPU·adoption 0이다.
+
+- 2026-08-25 22:36 KST **M4 §3.4 receipt + §3.5 preflight-root intent**: body-free
+  `airi_d1v6_blind_commitment.json`, launcher d1v6 binding(root v6, manifest SHA
+  `18a1987f...1c2e`), verifier `ROOT_GENERATIONS`, v1~v5 30-hash supersession,
+  v6 commitment/launcher 계약, CI 등록을 완료했다. focused 71 passed; broadcast_sim+launcher
+  242 passed, 1 skipped, 43 subtests; 실제 index를 바꾸지 않은 임시 index에서
+  `test-patch-manifest.ps1` PASS 후 임시 파일 삭제·main index SHA 불변을 확인했다. 실제 v6
+  policy/commitment/external root verifier PASS(commitment SHA `76c5c62b...1044`, policy SHA
+  `6c27ea3b...2f79`), 실제 `compare_d1_blind.py` CLI는 임시 synthetic 48 reports로 exit 0,
+  `airi.d1-blind-comparison.v1`, report_count 48, root v6를 발행했다. 다음 상태 변경은 fresh
+  `D:\AIRI-Models\airi-d1v6-blind-matrix-20260825` root에 검증된 model manifest와 v5 구조의
+  no-overwrite wrapper를 준비하고 `-PreflightOnly` 48/48을 실행하는 것이다. 기존 matrix/blind
+  root는 재사용·재실행하지 않고 서비스·GPU 학습·adoption 0이다.
+
+- 2026-08-25 22:27 KST **M4 blind v6 seal receipt + repository contracts intent**:
+  intent의 no-overwrite seal 명령을 정확히 한 번 실행해 exit 0으로
+  `D:\AIRI-Models\airi-d1-blind-freeze-20260825-v6`를 만들었다. sealed manifest는
+  1,119 B SHA `18a1987ff4905c3068ca8ab3853c1852ee58209990496cada8fc6a3b51e41c2e`,
+  receipt는 903 B SHA `d34934909fab3e1600b2184730b693a762deebb335278a44a72ba04fcdcc40a5`다.
+  별도 검증에서 fixture copy 3개가 staging과 byte-identical, 두 schema와 root id exact,
+  expected report 48, `response_viewed=false`, `body_output=false`, model calls 0,
+  `handle_topic_collision=false`를 모두 확인했다. blind v6는 이제 봉인됐고 재봉인하지 않는다.
+  다음 변경은 repository의 v6 body-free commitment, launcher binding, verifier generation,
+  commitment/launcher/CI 계약과 synthetic 48-report comparator 검증이다. sealed body·기존
+  fixture/gate/threshold/metric/seed는 변경하지 않으며 matrix·서비스·GPU·adoption 0이다.
+
+- 2026-08-25 22:26 KST **M4 blind v6 no-overwrite seal intent**: 독립 감사가 fixture pin
+  3/3, v1~v5 15 topic 대비 v6 topic reuse 0/3, handle 58개 × protected source 216개/
+  token 475개 collision 0으로 PASS했다. 이어 pinned Python 3.12로 공식 `seal_e2c2_blind.py
+  --staging-dir D:\AIRI-Models\airi-d1-blind-staging-v6 --generation d1v6 --check`와 v1~v5
+  superseded root 5개를 직접 재실행해 exit 0, raw/canonical pin 6개가 22:24 receipt 및 독립
+  계산과 exact 일치했다. output `D:\AIRI-Models\airi-d1-blind-freeze-20260825-v6`는 absent,
+  owned listener 6개 0이다. 다음 exact 상태 변경은 같은 인자에서 `--check`를 빼고
+  `--output-root ...v6 --root-id airi-d1-blind-freeze-20260825-v6`를 넣은 no-overwrite seal
+  명령을 **한 번만** 실행하는 것이다. 완료 조건은 exit 0, fixture copy 3개 pin 일치,
+  manifest/receipt schema·root·`response_viewed=false`·expected reports 48·handle collision false다.
+  실패 시 root를 보존하고 반복 봉인하지 않는다. matrix·서비스·GPU·adoption 0이다.
+
+- 2026-08-25 22:24 KST **M4 compact 복구 재대조 + v6 direct check receipt**:
+  WORKING-STATE 6,466행을 UTF-8로 EOF까지 다시 읽고 Goal `active`, HEAD/local main/
+  local origin/main/remote main 모두 `585394e882b43715bcc8581c49c3b5bf713db7af`, 예상 M4
+  modified 12경로, staged/untracked 0, 별도 worktree 0을 대조했다. 대조 명령 자체를 제외한
+  관련 AIRI process 0, owned listener 6개 0이다. staging author 참조 수리는 완료됐고 direct
+  d1v6 `--check`가 exit 0: factual 10,705 B raw `52ea386f...ef55` / canonical
+  `05259e47...eb30`, identity 7,280 B raw `38915da5...e9a4` / canonical
+  `a738f04f...204f`, long 12,076 B raw `2aece67c...4efc` / canonical
+  `f3560c55...f820`. sealed v6 root는 absent다. 직전 22:20 checkpoint의 factual SHA와
+  schema blocker는 이 완료분보다 뒤처졌으므로 관측 사실로 정정했다. 다음 한 동작은 별도
+  read-only 스크립트로 3개 pin, v1~v5와 topic 설정 차이, 전 protected body에 대한 handle
+  collision 0을 독립 대조하는 것이다. 봉인·matrix·서비스·GPU는 아직 0이다.
+
+- 2026-08-25 22:20 KST **M4 post-compact 복구 정합 receipt + v6 staging 수리 intent**:
+  `AIRI-WORKING-STATE.md` 6,450행을 UTF-8로 EOF까지 다시 읽고 실제 상태를 read-only로
+  대조했다. Goal은 `active`; HEAD/local main/local origin/main/remote main은 모두
+  `585394e882b43715bcc8581c49c3b5bf713db7af` exact다. worktree는 M4가 만든 예상 12경로만
+  modified이고 staged/untracked 0, 별도 worktree 0이다. 관련 AIRI process 0, owned listener
+  11435/11436/8880/9880/8890/8892는 모두 0이다. v6 staging 3개는 10,705/7,280/12,076 B,
+  raw SHA `6118aa75...0aaa`/`38915da5...e9a4`/`2aece67c...4efc`로 존재하며 sealed v6 root는
+  absent다. 직전 direct `--check`의 blocker는 핸들 교체 뒤 continuity arc author를 같이 바꾸지
+  않아 `arc-feed-spoon references an unknown author`가 난 fixture schema 결함이다. 다음 변경은
+  external staging 안의 기존 author 참조만 viewer handle과 일치시키고 전체 author 집합을
+  검증하는 것이다. protected body·seed·callback·donation 본문, repo threshold/metric/seed,
+  서비스/GPU/matrix는 변경·실행하지 않는다.
 
 - 2026-08-25 21:40 KST **메인 세션 Codex 이관 receipt**: 사용자 선언("이제 메인 세션은 코덱스")에
   따라 이 시각부터 **Codex가 메인 세션**이다. Claude 세션(airi-d6)은 이 receipt commit/push 뒤
@@ -1926,6 +2052,18 @@ eports\e2-c1\`에 12개(3 fixture×4 seed)
 
 ## 2. 현재 작업 트랜잭션
 
+### M4 current transaction — 2026-08-25 21:59 KST
+
+| 항목 | 값 |
+|---|---|
+| 의도 | M4 handoff §3 순서대로 live deterministic-layer 배선과 통합 회귀를 닫고, 다음으로 P3 rejected-branch 추출을 1글자·최대 2어절까지 확장한다. |
+| 입력 pins | 시작 HEAD/local origin/main/remote main `585394e882b43715bcc8581c49c3b5bf713db7af`, clean, 관련 PID 0, owned listener 6개 0. pre-fix 증명 tree는 별도 detached worktree의 `07ad82f`이고 production 수정은 0이다. |
+| 완료 receipt | `original_messages` 의미는 보존하고 성공적으로 주입·확인된 `live_context_note`만 계층 입력에 전달했다. runtime이 briefing 앞에 `BRIEFING_EVIDENCE_MARKER`를 붙이며 후원 계약은 `donation_turn`만 활성화하고 P3/P4 근거 풀에서는 제외한다. 기존 deterministic/runtime tests 52 passed + 7 subtests, proxy full unittest 381 OK. 신규 live P3/P5 테스트는 `07ad82f`에서 exit 1·failures=2, 현 트리에서 exit 0·2 OK다. |
+| 현재 행동 | v5 sealed continuity arc 12개 seed를 읽기 전용 입력으로 사용해 정규식 추출 12/12와 기존 회귀를 검증한다. blind v5 matrix·서비스·GPU 학습은 실행하지 않는다. |
+| 다음 성공 조건 | 12/12 rejected/affirmed branch 추출, 기존 deterministic/runtime/proxy tests PASS, diff-check PASS 뒤 receipt와 ROADMAP-LOG를 기록한다. |
+
+아래 표는 이전 E2-C1 트랜잭션의 보존 기록이다.
+
 | 항목 | 값 |
 |---|---|
 | 의도 | GPU 없이 E2-C1 첫 milestone을 구현한다. 새 synthetic correction 480행과 검증된 v4 replay 200행을 분리 생성·검증하고, combined train/dev/test 512/84/84와 train correction:replay 352:160=`11:5`를 동결한다. evaluator가 별도 보관하는 새 blind fixture 3종의 body는 Git/학습 경로에 노출하지 않고 commitment·seed·metric policy만 동결한다. |
@@ -1941,6 +2079,23 @@ eports\e2-c1\`에 12개(3 fixture×4 seed)
 | 현재 행동 | current frozen code/data를 더 수정하지 않는다. frozen contract와 handoff/roadmap/NEXT/index를 같은 PASS 사실로 맞춰 continuity/boundary/diff/security를 검증하고 exact milestone commit/push·HEAD clean을 완료한다. trainer adapter-init은 first milestone push/clean 뒤 별도 intent에서만 감사·수정한다. |
 
 ## 3. 마지막 내구성 체크포인트
+
+- `20260825-220246-m4-steps1-3-receipt-v6-authoring-intent`: P3 regex가 1글자와 최대
+  2어절 rejected/affirmed branch를 받도록 확장됐고 `_COMMON_STOPWORDS` 거부는 유지됐다.
+  sealed v5 continuity arc seed 12개를 read-only로 대조한 결과 forbidden/required 구 추출
+  12/12, deterministic/runtime 53 passed+10 subtests, proxy full 383 OK다. 임시 pre-fix
+  worktree는 exact `07ad82f`, 수정 파일 1개를 확인한 뒤 제거했으며 main worktree만 남았다.
+  다음 intent는 새 v6 staging 저작, handle-topic collision fail-closed 검사, direct `--check`,
+  seal, repo commitment/launcher/verifier/test/CI, synthetic comparator 확인이다. GPU/model/service/
+  matrix 실행은 아직 0이고 blind v1~v5는 재사용하지 않는다.
+
+- `20260825-215901-m4-live-wiring-tests-receipt-p3-intent`: startup protocol을 전부 읽고
+  Goal active, HEAD/local/remote exact `585394e882b43715bcc8581c49c3b5bf713db7af`, clean,
+  AIRI 관련 PID와 6개 owned listener 0을 확인했다. live-broadcast `context_note`를 별도
+  request field로 deterministic layer에 전달해 `original_messages`를 보존했고, runtime이
+  briefing marker를 server-owned note에 추가한다. 신규 live recall/P5 테스트는 별도
+  detached `07ad82f`에서 exit 1·2 failures, 현 트리에서 exit 0·2 OK다. 기존 단계 검증은
+  deterministic/runtime 52 passed+7 subtests, proxy 381 OK다. 다음은 P3 regex/12 arc뿐이다.
 
 - `20260824-020037-e2-c1-full-freeze-validation-receipt-docs-intent`: current final bytes는
   pinned pycompile exit 0, generator+independent verifier full unit 12 OK, blind pytest 5 passed,

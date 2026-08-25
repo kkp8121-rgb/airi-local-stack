@@ -142,6 +142,47 @@ def test_fixture_handle_inside_correction_text_fails_closed(tmp_path):
         _validate(seal, staging, tmp_path, correction_text='… 직조첫손님 이 언급된 교정 행 …')
 
 
+def test_d1v6_generation_enforces_handle_topic_collision(tmp_path):
+    seal = _load_seal()
+    staging = _staging(tmp_path, seal)
+    with pytest.raises(seal.BlindSealError, match='handle-topic collision'):
+        _validate(seal, staging, tmp_path, generation=seal.GENERATIONS['d1v6'])
+
+
+@pytest.mark.parametrize('source_key,source_value', (
+    ('title', '모람 관찰 방송'),
+    ('anchor', '모람빛'),
+    ('template', '모람이 눈에 띈다'),
+    ('seed_text', '모람 대신 다른 표식을 쓰자'),
+    ('callback_text', '모람 표식은 무엇이었지'),
+    ('donation', '모람 준비에 보태 줘'),
+))
+def test_handle_topic_collision_covers_v6_authored_text(source_key, source_value):
+    seal = _load_seal()
+    fixture = _fixture('직조')
+    fixture['archetypes']['supporter']['templates'] = ['차분히 살펴보자']
+    fixture['archetypes']['offtopic_chatter']['templates'] = ['다른 소식도 궁금해']
+    fixture['topic']['title'] = '합성 검증 방송'
+    fixture['topic']['beats'][0]['anchors'] = ['열기']
+    fixture['continuity_arcs'] = [{
+        'seed_text': '표식은 낮게 달자',
+        'callback_text': '표식은 어떻게 달기로 했지',
+    }]
+    fixture['donations'] = [{'message': '준비에 보태 줘'}]
+    if source_key == 'title':
+        fixture['topic']['title'] = source_value
+    elif source_key == 'anchor':
+        fixture['topic']['beats'][0]['anchors'] = [source_value]
+    elif source_key == 'template':
+        fixture['archetypes']['supporter']['templates'] = [source_value]
+    elif source_key in ('seed_text', 'callback_text'):
+        fixture['continuity_arcs'][0][source_key] = source_value
+    else:
+        fixture['donations'][0]['message'] = source_value
+    with pytest.raises(seal.BlindSealError, match='handle-topic collision'):
+        seal.check_handle_topic_collision(fixture, 'fixture.json', {'모람'})
+
+
 def test_public_handle_reuse_fails_closed(tmp_path):
     seal = _load_seal()
     staging = _staging(tmp_path, seal)

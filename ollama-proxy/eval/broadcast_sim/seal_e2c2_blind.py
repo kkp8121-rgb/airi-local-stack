@@ -123,6 +123,42 @@ GENERATIONS: dict[str, dict[str, Any]] = {
             '4e30d9986a78f2802fe24ce87f0de12bfaba784e4ffbf21b539a14e112912d80',
         }),
     },
+    # M4 re-measurement after the live deterministic-layer wiring fix.  Blind
+    # v5 is consumed too, and v6 additionally rejects viewer handles whose
+    # text overlaps the fixture topic/evidence vocabulary.
+    'd1v6': {
+        'sealed_schema': 'airi.d1-blind-sealed-manifest.v1',
+        'receipt_schema': 'airi.d1-blind-validation-receipt.v1',
+        'root_prefix': 'airi-d1-blind-freeze-',
+        'arms': ('baseline', 'e2', 'e2-c1', 'e2-c2'),
+        'extra_superseded_root_ids': ('airi-e2-c2-blind-freeze-20260824-v3',
+                                      'airi-d1-blind-freeze-20260825-v4',
+                                      'airi-d1-blind-freeze-20260825-v5'),
+        'extra_superseded_hashes': frozenset({
+            # v3 (consumed by the E2-C2 matrix)
+            '99945ebb2cbffd1b831e73ec10e29271eb9b3c1daac3bb3a5d959ce1e2a65b61',
+            '7dc54f119f1b87443677047aa853544c17bf1724318246871d1a0d32e496c86f',
+            'ed50352d2bce3570d938aca4c752ce98b16f426cb484dbf61bbe50c95e300acd',
+            '4df78907c6b8606acb9501b4a9538813b0777c110740a902e07701da73a89b1c',
+            '5175b4e005eedf973b41e27021d90b4ceb68324bcba1be77e225f9eccc2e17e9',
+            '374f470837506f07133dd9634efc88904dc065175dcd182097d2c5fcdbb60956',
+            # v4 (consumed by the D1 matrix)
+            'c210b7df96324f137b448066a6a8a7346a0b36edc0a3e03f491f992d37823420',
+            '9879c919f98420f4fb88523b8093dd3aa09ff2011e4a54fbca5a1d9c1c076e2d',
+            '82e5eaab37e07d18c2630d50b59c5263a969259b6a39089778e8120c904d8ab8',
+            '5057f5c723b0a38265fa3a89626056f2b6ef64175c55774724699dc99a9ac320',
+            '64a5df12e52c8f49d4e66d75ced74b686084aabc59d8bb3482e62a6726c14dd1',
+            '4e30d9986a78f2802fe24ce87f0de12bfaba784e4ffbf21b539a14e112912d80',
+            # v5 (consumed by the D1 M3 re-measurement)
+            'fa347d6052a3c8b0d57efde2a2c0089022261fde44b6b7f5895f7b2852ce54ac',
+            '51839feb64a5208519c5efc19076e7e3d3b85b07ec1aa67a634c9f345d034538',
+            '6f6ce79aba6b93d1b3bce94b0951bd0fbb95cc4456a1d020f919c77db19f15fc',
+            'ad69104425cc7290a73701f21809e57b21121f9e126e09183788804e3c6fb24d',
+            '3cc28bf8aeaae541d1d2146aa0c5da9bc8ed4cb256bb43ebe5ed88665b34db70',
+            '5508cb09e6be6627347f250d64a206231e4528536fe51ce93ee642e169430744',
+        }),
+        'check_handle_topic_collision': True,
+    },
 }
 
 
@@ -167,6 +203,46 @@ def fixture_handles(fixture: dict[str, Any]) -> set[str]:
 def fixture_templates(fixture: dict[str, Any]) -> set[str]:
     return {template for archetype in fixture['archetypes'].values()
             for template in archetype['templates']}
+
+
+def check_handle_topic_collision(fixture: dict[str, Any], filename: str,
+                                 handles: Iterable[str] | None = None) -> None:
+    """Reject v6 handles that overlap topic/evidence tokens in either direction."""
+    sources: list[str] = []
+    topic = fixture.get('topic', {})
+    if isinstance(topic, dict):
+        title = topic.get('title')
+        if isinstance(title, str):
+            sources.append(title)
+        for beat in topic.get('beats', ()):
+            if isinstance(beat, dict):
+                sources.extend(str(value) for value in beat.get('anchors', ())
+                               if isinstance(value, str))
+    sources.extend(fixture_templates(fixture))
+    for key, text_keys in (
+        ('continuity_arcs', ('seed_text', 'callback_text')),
+        ('memory_probes', ('seed_text', 'probe_text')),
+        ('donations', ('message',)),
+    ):
+        for item in fixture.get(key, ()):
+            if not isinstance(item, dict):
+                continue
+            sources.extend(str(item[text_key]) for text_key in text_keys
+                           if isinstance(item.get(text_key), str))
+    tokens = {
+        token.casefold()
+        for source in sources
+        for token in re.findall(r'[가-힣0-9a-z]+', source.casefold())
+    }
+    for handle in sorted(handles if handles is not None else fixture_handles(fixture)):
+        if not re.fullmatch(r'[가-힣]{2,6}', handle):
+            raise BlindSealError(f'{filename}: handle must be 2-6 Hangul syllables: {handle!r}')
+        folded = handle.casefold()
+        collision = next((token for token in sorted(tokens)
+                          if folded in token or token in folded), None)
+        if collision is not None:
+            raise BlindSealError(f'{filename}: handle-topic collision: '
+                                 f'{handle!r} overlaps {collision!r}')
 
 
 def check_hangul(fixture: dict[str, Any], filename: str) -> int:
@@ -286,6 +362,7 @@ def validate_staging(staging_dir: Path, superseded_roots: Sequence[Path],
         raise BlindSealError(f'staging directory must hold exactly {expected_names}, found {entries}')
 
     all_handles: dict[str, str] = {}
+    staged_fixtures: list[tuple[str, dict[str, Any]]] = []
     pins: list[dict[str, Any]] = []
     for filename, role in EXPECTED_FIXTURES:
         raw = (staging_dir / filename).read_bytes()
@@ -304,6 +381,7 @@ def validate_staging(staging_dir: Path, superseded_roots: Sequence[Path],
                 raise BlindSealError(f'handle {handle} appears in both {all_handles[handle]} '
                                      f'and {filename}')
             all_handles[handle] = filename
+        staged_fixtures.append((filename, fixture))
         pins.append({
             'filename': filename,
             'logical_role': role,
@@ -311,6 +389,9 @@ def validate_staging(staging_dir: Path, superseded_roots: Sequence[Path],
             'raw_sha256': sha256_hex(raw),
             'canonical_sha256': sha256_hex(canonical_bytes(fixture)),
         })
+    if generation.get('check_handle_topic_collision'):
+        for filename, fixture in staged_fixtures:
+            check_handle_topic_collision(fixture, filename, all_handles)
     return pins
 
 
@@ -361,6 +442,8 @@ def seal(staging_dir: Path, output_root: Path, root_id: str,
             'thresholds_frozen': True,
         },
     }
+    if generation.get('check_handle_topic_collision'):
+        receipt['validation']['handle_topic_collision'] = False
 
     output_root.mkdir(parents=True, exist_ok=False)
     for filename, _role in EXPECTED_FIXTURES:

@@ -7,6 +7,52 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-25 M4 — live 결정론 계층 배선·P3 추출 수리
+
+- 22:55 KST precommit 독립 감사 P1 두 건을 최소 수정했다. runtime은 plain/marked note를
+  함께 보관하되 현재 결정론 flag가 ON일 때만 marked note를 claim해 OFF outbound context
+  bytes를 보존하고, P3 parser는 두 번째 어절이 결정 동사일 때 이를 affirmed branch에서
+  제외한다. standalone verifier는 explicit v6 root를 선택한다. fresh 검증은 proxy/runtime
+  403 OK, blind/launcher/deterministic 435 passed/3 skipped/276 subtests, v5 arc 12/12,
+  v6 external CLI PASS, 독립 재감사 P0/P1/P2 0이다. 다음은 exact 20-path stage 후 repository
+  계약 검증·commit/push이며 matrix·서비스·GPU·adoption 0이다. exact stage 뒤 normal
+  patch-manifest, current-checkpoint, work-continuity, staged diff-check도 모두 exit 0/PASS했다.
+
+- 22:38 KST fresh d1v6 matrix root의 model manifest SHA `050ae10f...e330`과 v5 구조의
+  no-overwrite wrapper SHA `e8820118...acb9`를 고정했다. 실제 `-PreflightOnly`가 exit 0,
+  4 arms×3 fixtures×4 seeds=48 unique runs, num_ctx 4096을 확인했고 run/start/exit artifact는
+  만들지 않았다. 다음은 precommit 검증·exact 20-path commit/push 뒤 wrapper exact-once 시작이다.
+
+- 22:36 KST M4 §3.4를 닫았다. body-free v6 commitment, launcher/verifier/root binding,
+  v1~v5 30-hash supersession, v6 commitment·launcher 계약 클래스와 CI를 추가했다. 검증은
+  focused 71 passed, broadcast_sim+launcher 242 passed/1 skipped/43 subtests, patch-manifest
+  PASS, actual external verifier PASS, 실제 comparator CLI synthetic 48-report PASS(schema v1,
+  report_count 48). 서비스·matrix·GPU·adoption 0이며 다음은 fresh external root 준비와
+  `-PreflightOnly` 48/48이다.
+
+- 22:27 KST fresh blind v6를 direct check 재실행 뒤 no-overwrite로 정확히 한 번 봉인했다.
+  독립 감사는 v1~v5 topic 15개와 reuse 0, handle 58개 × protected token 475개 collision 0;
+  봉인 후 fixture copy 3개 byte-identical, expected reports 48, response/body viewed false를 확인했다.
+  manifest 1,119 B SHA `18a1987f...1c2e`, receipt 903 B SHA `d3493490...40a5`이며 외부 root만
+  body를 보유한다. 다음 배치는 body-free commitment·d1v6 launcher/verifier/tests/CI와 실제
+  comparator의 synthetic 48-report offline 실행이다. matrix·서비스·GPU·adoption 0이다.
+
+- 22:24 KST compact 복구에서 Goal/HEAD/origin/worktree/PID/listener를 재대조하고, staging의
+  continuity author 수리 뒤 direct d1v6 `--check`가 3 fixture 모두 PASS했음을 receipt로
+  승격했다(raw pins factual `52ea386f...ef55`, identity `38915da5...e9a4`, long
+  `2aece67c...4efc`; canonical pins도 direct 출력과 일치). sealed v6 root는 아직 absent이며,
+  다음은 독립 pin/topic/handle-collision 감사 → direct check 재실행 → no-overwrite 봉인이다.
+  matrix·서비스·GPU 학습·운영 채택은 0이다.
+
+- 22:02 KST M4 §3.1~§3.3 PASS: 주입 전 `original_messages` 의미를 바꾸지 않고 인증·주입
+  성공한 live `context_note`를 계층 입력에 별도 전달했다. runtime은 브리핑 앞에 server-owned
+  `BRIEFING_EVIDENCE_MARKER`를 붙이고 후원 계약은 P3/P4 근거 풀에서 제외하면서 P5
+  `donation_turn`을 켠다. 신규 live P3 recall/P5 quote 통합 테스트는 detached `07ad82f`에서
+  exit 1·2 failures, 현 트리에서 exit 0·2 OK로 회귀 민감성을 확인했다. P3 정규식은 1글자와
+  최대 2어절을 지원하고 v5 sealed continuity arc 12/12를 추출했다. 전체 affected 검증은
+  deterministic/runtime 53 passed+10 subtests, proxy 383 OK. 서비스·matrix·GPU 학습 0,
+  다음 배치는 fresh blind v6 저작·봉인과 repository launcher/CI 계약이다.
+
 ## 2026-08-25 병렬 오프라인 배치 — comparator F5/F6 · 능력 게이트 배선 · P2-4b · P3-T4 설계 (branch `feature/parallel-offline-20260825`, main 미병합)
 
 - 18:40 KST 병렬 세션이 main 세션의 d1v5 matrix와 자원을 공유하지 않는 오프라인 작업 4건을
