@@ -7,6 +7,27 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-25 병렬 오프라인 배치 — comparator F5/F6 · 능력 게이트 배선 · P2-4b · P3-T4 설계 (branch `feature/parallel-offline-20260825`, main 미병합)
+
+- 18:40 KST 병렬 세션이 main 세션의 d1v5 matrix와 자원을 공유하지 않는 오프라인 작업 4건을
+  branch에 commit했다(main commit/push 0, WORKING-STATE 수정 0). ① `3895921` legacy
+  comparator `compare_broadcast_t3.py`에 fixture당 seed 하한 4 fail-closed(R2 F5)와
+  `memory_arm`/`contract_version`/`max_tokens`/`model`/`model_digest` exact 비교(R2 F6) 추가,
+  `run_broadcast_sim.py` payload에 `max_tokens`·`model_digest`(/health `chat_model.digest`,
+  show close 후 판독) 기록, 교락 FAIL 재현 테스트 7건. ② `d2d3dfc` `verify_general_capability_gate.py
+  --package-evidence`: verdict를 `package-evidence.json` 옆 `general-capability-verdict.json`
+  (no-overwrite, evidence SHA·tag 결속)에 두는 경로 계약 + 패키저 evidence
+  `general_capability_gate: pending` + training README 절차 절. ③ `9de8f7a` P2-4b
+  cheer/sincere 수신 오프너 렌더러(`eval/affect_broadcast/reception_opener_realization.py`,
+  `AIRI_RECEPTION_OPENER` 기본 off, 러너 미배선, CI 등록). ④ P3-T4 설계안
+  `진행예정/AIRI-P3-T4-HARDCODING-REDUCTION-DESIGN-2026-08-25.md`(코드 변경 0).
+  검증: broadcast_sim 190 passed/1 skipped, training 360 passed(기존 실패 behavior_v2 2건은
+  untouched main worktree에서도 동일 실패), affect_broadcast 134 passed, checkpoint PASS,
+  patch-manifest PASS, diff-check 0. launcher 계약 3건은 matrix가 점유한 포트 때문에 이 PC에서
+  실행 불가(환경 요인). **주의**: branch checkout이 단일 working tree에서 matrix 실행 중
+  일어나 `3895921` 이후 생성된 d1v5 report는 `model_digest`/`max_tokens` 키를 추가로 갖는다
+  (main 세션 확인: 게이트 영향 0). 상세·미완 사유는 `진행중/AIRI-PARALLEL-HANDOFF-2026-08-25.md`.
+
 ## 2026-08-25 M3 — 승인 3건 착수: 핀 수리 · 일반 능력 게이트 · blind v5
 
 - 17:34 KST blind v5 봉인 완료: subagent가 외부 staging에 저작한 fixture 3종(시계방/등대/양봉장)을
