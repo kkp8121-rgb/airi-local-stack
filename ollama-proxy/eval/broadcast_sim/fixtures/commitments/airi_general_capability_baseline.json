@@ -1,0 +1,43 @@
+{
+  "schema_version": "airi.general-capability-baseline.v1",
+  "measured_at": "2026-08-25",
+  "evidence": "airi_docs/완료/AIRI-M2-GREYBOX-EVAL-2026-08-25.md",
+  "harness": {
+    "tool": "lm-evaluation-harness",
+    "lm_eval_version": "0.4.12",
+    "transformers_version": "5.15.1",
+    "tasks": "kobest,haerae",
+    "num_fewshot": 0,
+    "dtype": "bfloat16",
+    "batch_size": 16,
+    "seed": 42,
+    "limit": null
+  },
+  "stock_model": {
+    "name": "midm-2.0-mini-instruct-hf",
+    "hf_id": "K-intelligence/Midm-2.0-Mini-Instruct",
+    "results_sha256": "f58250c93f3e7b059ce22ff52e713afaee6103731fa633f038380052565e9f9d"
+  },
+  "metric": "acc,none",
+  "groups": {
+    "kobest": 0.6838,
+    "haerae": 0.7195
+  },
+  "subtasks": {
+    "kobest_boolq": 0.8746,
+    "kobest_copa": 0.768,
+    "kobest_hellaswag": 0.45,
+    "kobest_sentineg": 0.7128,
+    "kobest_wic": 0.4881,
+    "haerae_general_knowledge": 0.4545,
+    "haerae_history": 0.8138,
+    "haerae_loan_word": 0.7101,
+    "haerae_rare_word": 0.7852,
+    "haerae_standard_nomenclature": 0.7451
+  },
+  "gate": {
+    "max_group_drop_pct_points": 2.0,
+    "applies_to": "every trained merge before packaging; measured with the identical harness settings above",
+    "on_missing_group_or_task": "fail_closed"
+  }
+}

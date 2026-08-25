@@ -26,7 +26,10 @@ from run_airi_native_fit_probe import (
 
 
 REPORT_SCHEMA = "airi.native-transformers-baseline.v1"
-CASES_SHA256 = "f3fd3d212567a42e0272b329608e083c58b4adfa91f0d78592bf541fe6633f64"
+# Pinned to the committed fixture blob (a7412af, unchanged since).  The
+# previous value never matched any committed revision of the file, so the
+# "immutable" gate had been failing closed since 565cc65 (2026-08-14).
+CASES_SHA256 = "95309e101e30009ec12a9edb4d047e69a46aec42c2f46df0a8b70962225dc3be"
 DEFAULT_CASES = Path(__file__).with_name("airi_baseline_cases.json")
 
 
