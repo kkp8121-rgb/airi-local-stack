@@ -9,6 +9,12 @@
 
 ## 2026-08-25 D1 launcher 프로파일 구현·offline PASS
 
+- 09:42 KST exact-once matrix는 wrapper PID 7832 live, reports 4/48, stderr 0 B,
+  exit receipt absent다. 첫 3 report를 동결 comparator derivation으로 재계산해 적용 가능한
+  분모 identity 9/donation 18/decoy 18이 모두 nonzero이고, health 3개 모두 guard와
+  deterministic layer의 before/after=true임을 확인했다. stale 분모 0은 첫 4개가 같은
+  identity fixture인 동결 run 순서의 결과이므로 어떤 gate·fixture·seed·순서도 바꾸지
+  않고 첫 continuity report에서 별도 확인한다. blind v4 재실행은 금지 상태를 유지한다.
 - 09:29 KST intent commit `310e81a` push 후 detached wrapper PID 7832를 정확히 한 번
   시작했다(09:28:26 KST, start receipt SHA `2be69835...fdc6`). run dir 생성,
   stdout 677 B/stderr 0 B, reports 0/48, first-run services startup 중이다. blind v4는 이
