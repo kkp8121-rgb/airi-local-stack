@@ -100,3 +100,40 @@ Without the opt-in flag the audit emits `disabled` and exits `0`. A mechanically
 valid pair emits `candidate` and exits `0`; missing, invalid, or unsafe inputs emit
 `not-ready` and exit `2`. These are readiness states only and do not approve
 fixtures or authorize review, training, or deployment.
+
+## General-capability gate after merge/package
+
+Run `verify_general_capability_gate.py` exactly once per packaged candidate,
+immediately after `merge_airi_behavior_lora.py` → `package_airi_gguf.py` and
+before any T3/blind matrix consumes the new tag. The packager never runs it; its
+`package-evidence.json` records `"general_capability_gate": "pending"` and the
+verdict file is the only thing that changes that state.
+
+1. Measure the merged HF checkpoint (the packager's `--merged-dir`, not the GGUF)
+   with lm-evaluation-harness using the settings pinned in
+   `eval/broadcast_sim/fixtures/commitments/airi_general_capability_baseline.json`
+   (`harness`: tasks `kobest,haerae`, `num_fewshot 0`, `batch_size 16`, no
+   `limit`, bf16, seed 42). Keep the `results_*.json` outside Git.
+2. Judge it against the committed stock baseline and bind the verdict to the
+   package evidence:
+
+```powershell
+python .\verify_general_capability_gate.py `
+  --candidate D:\path\to\lm-eval\results_<timestamp>.json `
+  --package-evidence D:\path\to\package\package-evidence.json
+```
+
+Path contract (fixed by `tests/test_package_airi_gguf.py` and
+`tests/test_verify_general_capability_gate.py`): `--package-evidence` must point at
+a file literally named `package-evidence.json`; the verdict is written beside it as
+`general-capability-verdict.json` (schema
+`airi.general-capability-gate-verdict.v1`), never overwritten, and carries the
+evidence file's SHA-256 and `tag_evidence.tag`. `--output` remains available for
+ad-hoc judgements and is mutually exclusive with `--package-evidence`.
+
+Exit `0` with `"status": "pass"` means every committed group dropped at most
+`max_group_drop_pct_points` (2.0) versus stock. Any other outcome — a failing
+group, a missing group/subtask, differing harness settings, an unreadable evidence
+file, or an existing verdict — exits `1` and the tag must not proceed to a matrix
+or campaign. The threshold cannot be relaxed from the command line; a pass does not
+authorize adoption (`adoption_authorized` stays `false`).

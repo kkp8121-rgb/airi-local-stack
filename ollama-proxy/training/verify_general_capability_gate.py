@@ -24,6 +24,10 @@ VERDICT_SCHEMA_VERSION = "airi.general-capability-gate-verdict.v1"
 DEFAULT_BASELINE = (Path(__file__).resolve().parents[1] / "eval" / "broadcast_sim" / "fixtures"
                     / "commitments" / "airi_general_capability_baseline.json")
 EPSILON = 1e-9
+# Path contract shared with package_airi_gguf.py: the verdict sits beside the
+# packager's evidence file so one output directory carries both.
+PACKAGE_EVIDENCE_FILENAME = "package-evidence.json"
+VERDICT_FILENAME = "general-capability-verdict.json"
 
 
 class GateError(ValueError):
@@ -130,24 +134,54 @@ def judge(baseline: dict[str, Any], candidate: dict[str, Any], candidate_sha256:
     }
 
 
+def verdict_path_for_package(evidence_path: Path) -> Path:
+    """The verdict lives next to ``package-evidence.json`` under a fixed name."""
+    if evidence_path.name != PACKAGE_EVIDENCE_FILENAME:
+        raise GateError(f"package evidence must be named {PACKAGE_EVIDENCE_FILENAME}")
+    return evidence_path.with_name(VERDICT_FILENAME)
+
+
+def bind_package_evidence(verdict: dict[str, Any], evidence_path: Path) -> dict[str, Any]:
+    """Record which packaged tag this verdict judges; never mutates the evidence."""
+    evidence = _read_json(evidence_path, "package evidence")
+    tag = evidence.get("tag_evidence", {}).get("tag") if isinstance(evidence.get("tag_evidence"), dict) else None
+    if not isinstance(tag, str) or not tag:
+        raise GateError("package evidence lacks tag_evidence.tag")
+    if evidence.get("adoption_authorized") is not False:
+        raise GateError("package evidence must carry adoption_authorized=false")
+    return {**verdict, "package_evidence": {
+        "name": PACKAGE_EVIDENCE_FILENAME,
+        "sha256": hashlib.sha256(evidence_path.read_bytes()).hexdigest(),
+        "tag": tag,
+    }}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--candidate", type=Path, required=True,
                         help="lm-eval results_*.json for the trained merge")
     parser.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE,
                         help="frozen stock baseline commitment (default: in-repo)")
-    parser.add_argument("--output", type=Path, help="write the verdict JSON here (no overwrite)")
+    destination = parser.add_mutually_exclusive_group()
+    destination.add_argument("--output", type=Path, help="write the verdict JSON here (no overwrite)")
+    destination.add_argument("--package-evidence", type=Path,
+                             help=f"package_airi_gguf.py {PACKAGE_EVIDENCE_FILENAME}; the verdict is written "
+                                  f"next to it as {VERDICT_FILENAME} and bound to its tag and SHA-256")
     args = parser.parse_args(argv)
     try:
         baseline = load_baseline(args.baseline)
         candidate, sha = load_candidate_results(args.candidate)
         verdict = judge(baseline, candidate, sha)
-        if args.output is not None:
-            if args.output.exists():
-                raise GateError(f"verdict already exists: {args.output}")
-            args.output.parent.mkdir(parents=True, exist_ok=True)
-            args.output.write_text(json.dumps(verdict, ensure_ascii=False, indent=1, sort_keys=True) + "\n",
-                                   encoding="utf-8")
+        output = args.output
+        if args.package_evidence is not None:
+            output = verdict_path_for_package(args.package_evidence)
+            verdict = bind_package_evidence(verdict, args.package_evidence)
+        if output is not None:
+            if output.exists():
+                raise GateError(f"verdict already exists: {output}")
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(json.dumps(verdict, ensure_ascii=False, indent=1, sort_keys=True) + "\n",
+                              encoding="utf-8")
     except GateError as exc:
         print(json.dumps({"schema_version": VERDICT_SCHEMA_VERSION, "status": "fail",
                           "adoption_authorized": False, "reason": str(exc)}, ensure_ascii=False))

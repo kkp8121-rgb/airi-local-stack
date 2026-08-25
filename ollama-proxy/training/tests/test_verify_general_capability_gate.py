@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 import sys
 import tempfile
@@ -90,6 +91,47 @@ class GeneralCapabilityGateTests(unittest.TestCase):
             self.assertEqual(verdict["schema_version"], gate.VERDICT_SCHEMA_VERSION)
             self.assertEqual(verdict["status"], "pass")
             self.assertEqual(gate.main(["--candidate", str(candidate), "--output", str(out)]), 1)
+
+    def test_package_evidence_binding_writes_the_verdict_beside_the_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            candidate = root / "results.json"
+            candidate.write_text(json.dumps(_candidate(self.groups, self.subtasks)), encoding="utf-8")
+            package = root / "package"; package.mkdir()
+            evidence = package / gate.PACKAGE_EVIDENCE_FILENAME
+            evidence.write_text(json.dumps({"schema_version": 1, "adoption_authorized": False, "t3": "pending",
+                                            "general_capability_gate": "pending",
+                                            "tag_evidence": {"tag": "airi:build-" + "1" * 32}}), encoding="utf-8")
+            self.assertEqual(gate.main(["--candidate", str(candidate), "--package-evidence", str(evidence)]), 0)
+            verdict_path = package / gate.VERDICT_FILENAME
+            self.assertEqual(sorted(p.name for p in package.iterdir()), sorted([gate.PACKAGE_EVIDENCE_FILENAME, gate.VERDICT_FILENAME]))
+            verdict = json.loads(verdict_path.read_text(encoding="utf-8"))
+            self.assertEqual(verdict["status"], "pass")
+            self.assertFalse(verdict["adoption_authorized"])
+            self.assertEqual(verdict["package_evidence"], {
+                "name": gate.PACKAGE_EVIDENCE_FILENAME, "tag": "airi:build-" + "1" * 32,
+                "sha256": hashlib.sha256(evidence.read_bytes()).hexdigest()})
+            # The evidence file itself is never touched and the verdict is never overwritten.
+            self.assertEqual(json.loads(evidence.read_text(encoding="utf-8"))["general_capability_gate"], "pending")
+            self.assertEqual(gate.main(["--candidate", str(candidate), "--package-evidence", str(evidence)]), 1)
+
+    def test_package_evidence_binding_fails_closed_on_bad_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            candidate = root / "results.json"
+            candidate.write_text(json.dumps(_candidate(self.groups, self.subtasks)), encoding="utf-8")
+            wrong_name = root / "evidence.json"
+            wrong_name.write_text(json.dumps({"adoption_authorized": False, "tag_evidence": {"tag": "airi:x"}}), encoding="utf-8")
+            self.assertEqual(gate.main(["--candidate", str(candidate), "--package-evidence", str(wrong_name)]), 1)
+            evidence = root / gate.PACKAGE_EVIDENCE_FILENAME
+            for document in ({"adoption_authorized": False}, {"adoption_authorized": True, "tag_evidence": {"tag": "airi:x"}}):
+                with self.subTest(document=document):
+                    evidence.write_text(json.dumps(document), encoding="utf-8")
+                    self.assertEqual(gate.main(["--candidate", str(candidate), "--package-evidence", str(evidence)]), 1)
+                    self.assertFalse((root / gate.VERDICT_FILENAME).exists())
+            self.assertEqual(gate.main(["--candidate", str(candidate), "--package-evidence", str(root / "missing" / gate.PACKAGE_EVIDENCE_FILENAME)]), 1)
+            with self.assertRaises(SystemExit):
+                gate.main(["--candidate", str(candidate), "--package-evidence", str(evidence), "--output", str(root / "v.json")])
 
     def test_tampered_baseline_is_refused(self) -> None:
         tampered = copy.deepcopy(self.baseline)
