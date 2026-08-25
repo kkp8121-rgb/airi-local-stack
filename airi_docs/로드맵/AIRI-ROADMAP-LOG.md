@@ -7,6 +7,16 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-25 M3 — 승인 3건 착수: 핀 수리 · 일반 능력 게이트 · blind v5
+
+- 17:40 KST 사용자 `/goal`("모두 추천 방향으로 승인")로 착수. (1) `test_airi_native_baseline`
+  실패 원인 확정: 픽스처는 `a7412af` 이후 불변인데 핀 `f3fd3d21…`은 `565cc65`에서 어떤 커밋
+  blob과도 맞지 않게 추가됐다 → 핀을 blob SHA `95309e10…`으로 교체, 4 passed. (2)
+  `verify_general_capability_gate.py` + `airi_general_capability_baseline.json`(stock 기준선,
+  예산 2.0%p) + 테스트 10 + CI 등록; 실제 results 3건 모두 pass(e2c2 haerae 1.92%p로 경계).
+  (3) seal 도구 `d1v5` generation(v3·v4 superseded) 추가, 외부 staging에서 새 fixture 3종
+  저작을 subagent에 위임(--check 검증, 봉인 전).
+
 ## 2026-08-25 M2 배치 B — lm-eval · llama.cpp perplexity greybox 기준선
 
 - 17:05 KST 서베이가 지목한 두 평가 축을 처음 계측했다. lm-eval 0.4.12(kobest+haerae,
