@@ -7,12 +7,13 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
-> **2026-08-25 09:23 KST D1 launcher SHIPPED — matrix preflight 대기:** `d1`
+> **2026-08-25 09:26 KST D1 launcher SHIPPED + preflight PASS — matrix intent 대기:** `d1`
 > 4-arm/48-run, guard+deterministic layer ON/복원, 두 `/health` attest, D1 comparator
 > 배선을 구현·검증해 `9e6b1f4`+receipt `a510004`로 origin/main push했다. 기존
-> t3/e2c1/e2c2 3-arm/36 동작은 계약 테스트로 유지된다. external matrix root는 아직
-> 없고 blind v4 미소비다. 다음은 4-arm model manifest 생성 → `-PreflightOnly` 48 key
-> 확인 → intent 뒤 detached matrix 정확히 1회다. adoption=false 유지.
+> t3/e2c1/e2c2 3-arm/36 동작은 계약 테스트로 유지된다. model manifest SHA
+> `050ae10f...e330`, `-PreflightOnly` 48/48 unique key와 v4 binding PASS, OutputDir와
+> 응답 생성 0이다. 다음은 detached wrapper 고정 → 별도 intent 뒤 matrix 정확히 1회다.
+> adoption=false 유지.
 
 > **2026-08-25 07:10 KST D1(결정론 계층) 진행 중 — 3/5 단계, 코덱스 인계:** 두 학습
 > 후보의 실패를 받아 로드맵 v3 원칙(프롬프트/학습보다 결정론 계층)대로 **GPU 학습 없이**

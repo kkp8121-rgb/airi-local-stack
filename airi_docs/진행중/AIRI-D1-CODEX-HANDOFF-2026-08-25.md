@@ -165,6 +165,11 @@ checkpoint/AST/diff-check를 통과했다. 기존 t3/e2c1/e2c2는 3 arm/36을 �
 launcher 배치를 검증·commit/push한 뒤, intent checkpoint를 쓰고 **정확히 한 번**
 detached로 실행한다:
 
+2026-08-25 09:26 KST preflight PASS: external model manifest 767 B SHA
+`050ae10f86cef5801b625a54bdfaa136ad927873e62b0e44226fa241b38ae330`, 48/48
+unique run keys, arm 순서 4개, seed sets 3×4, comparison d1-blind, OutputDir 미생성.
+blind 응답 생성은 아직 0이다. 다음은 detached wrapper SHA와 matrix intent 고정이다.
+
 ```powershell
 .\run-airi-broadcast-t3-matrix.ps1 -MatrixProfile d1 `
   -OutputDir 'D:\AIRI-Models\airi-d1-blind-matrix-20260825\run' `

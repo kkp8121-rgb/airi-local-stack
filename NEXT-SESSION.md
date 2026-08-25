@@ -1,11 +1,12 @@
 # AIRI 다음 세션 안내
 
-> **2026-08-25 09:23 KST 최우선 — D1 launcher SHIPPED, matrix preflight 직전:**
+> **2026-08-25 09:26 KST 최우선 — D1 preflight PASS, detached matrix intent 직전:**
 > `d1` 4-arm/48-run 프로파일과 guard+deterministic layer 이중 health attestation을
 > 구현·검증해 `9e6b1f4`+receipt `a510004`로 origin/main push했다. external D1 matrix
-> root/manifest/run은 아직 없고 blind v4는 미소비다. 다음 순서는 인계 문서 §2.1의
-> 네 tag/digest로 model manifest 생성 → `-PreflightOnly`에서 48 unique key와 blind v4
-> binding 확인 → WORKING-STATE matrix intent → detached 실행 정확히 1회다.
+> root와 model manifest(SHA `050ae10f...e330`)를 만들고 `-PreflightOnly` 48/48 unique
+> key·blind v4 binding을 통과했으며 run/응답 생성은 0이다. 다음 순서는 exit-code
+> receipt wrapper 고정 → WORKING-STATE matrix intent commit/push → detached 실행
+> 정확히 1회다.
 
 > **2026-08-25 07:10 KST 최우선 진입점 — D1(결정론 계층) 3/5 단계 완료, 코덱스 인계
 > 중:** 사용자 승인 goal D1은 **GPU 학습 없이** 결정론 계층으로 hard/perfect 게이트를

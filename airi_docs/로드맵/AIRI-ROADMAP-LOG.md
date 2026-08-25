@@ -9,6 +9,10 @@
 
 ## 2026-08-25 D1 launcher 프로파일 구현·offline PASS
 
+- 09:26 KST external D1 model manifest(767 B, SHA `050ae10f...e330`)를 no-overwrite
+  생성하고 `-MatrixProfile d1 -PreflightOnly` exit 0을 확인했다: 48/48 unique key,
+  4 arms, seed sets 3×4, d1-blind, OutputDir 미생성. blind v4 응답 생성 0·미소비.
+  다음은 exit-code receipt를 남기는 detached wrapper 고정과 별도 matrix launch intent다.
 - 09:23 KST launcher `9e6b1f4` + receipt `a510004`를 origin/main에 push했고
   HEAD/local/origin-main exact·clean, 관련 PID/listener 0이다. external D1 matrix
   root/manifest/run은 아직 없고 blind v4 미소비다. 장기 상태 문서를 launcher 완료로
