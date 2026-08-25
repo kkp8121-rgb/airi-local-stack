@@ -1,5 +1,13 @@
 # AIRI 다음 세션 안내
 
+> **2026-08-25 17:20 KST 최우선 — M2 배치 A 완료(`num_ctx` 4096 · F7 코드 게이트 · 검토 문서
+> 편입), 배치 B(lm-eval·perplexity greybox) 진행:** M1에서 확정한 프록시 400
+> `exceed_context_size_error`의 고정비 원인이 GGUF 내장 KT 프리앰블(≈514토큰, GPU PC
+> 패키징 태그에서 재검증)임을 `참조/AIRI-CLAUDE-REVIEW-2026-08-25.md` §5로 확인하고
+> `num_ctx` 기본값을 4096으로 올렸다. `run-airi-live-broadcast-campaign.ps1`은 이제 필수
+> `-ComparatorVerdict`/`-ModelManifest`로 blind 승자 arm의 exact tag/digest가 아니면 서비스
+> 기동 전에 거부한다(R2 F7 종결). 재측정은 새 blind가 필요하며 별도 승인 사항이다.
+
 > **2026-08-25 13:05 KST 최우선 — D1 종결(`no_winner`), 다음 행동은 사용자 지시 대기:**
 > 48-report matrix는 12:38:14 KST exit 0으로 완주했고 comparator는 `winner=null`이다.
 > goal의 `no_winner` 경로대로 **3×500 campaign을 실행하지 않았고 자동 후속 라운드도
@@ -243,8 +251,11 @@ E1/E2 merge/package → 36 T3 → 승자 3×500 →
 ## 운영 기본값 (변경 시 이 절 갱신)
 
 - Chat model: Mi:dm (`midm-airi:2.0-mini`) digest pin 유지 (사용자 결정 6)
-- `num_ctx=2048` (주의: 고정 주제 블록+카드 병합 시 2,246토큰 — 시뮬레이션
-  실측은 4096 필요. 예산 재배분은 P1 과제)
+- `num_ctx=4096` (2026-08-25 M2에서 2048→4096. 근거: 세 blind 라운드에서 전 arm 턴의
+  ~34%가 Ollama 400 `exceed_context_size_error`로 죽었고 관측 `n_prompt_tokens`
+  2,552~2,827; GGUF 내장 KT 프리앰블 ≈514토큰이 고정비라 실효 예산이 ~1,534였다.
+  프록시 `NUM_CTX`·세 런처 기본값 동시 변경, 태그 재패키징 없음, `/health`에
+  `prompt_budget.context_exceeded_observations` 추가)
 - 방송 기본 프로파일: chat/text 입력, STT/마이크 OFF (마이크는 사용자
   "마이크 테스트 시작" 요청 시에만 `-Stt on`)
 - 기억 추출 OFF (통과 extractor 없음 — 다음 수순은 Stage A 재설계이지

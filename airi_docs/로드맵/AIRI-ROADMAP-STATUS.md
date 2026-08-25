@@ -7,6 +7,15 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
+> **2026-08-25 17:20 KST M2 배치 A — 계측 근본 원인 수리·F7 게이트·검토 문서 편입:**
+> 프록시 400 `exceed_context_size_error`의 고정비는 GGUF 내장 KT 프리앰블 ≈514토큰(Ollama가
+> Modelfile TEMPLATE를 무시, GPU PC 패키징 태그 재검증: user 1건 `prompt_eval_count` 514)이라
+> `num_ctx` 기본값을 2048→**4096**으로 올렸다(프록시 `NUM_CTX` + 세 런처, 태그 재패키징 0,
+> `/health`에 `context_exceeded_observations` 추가). campaign 런처에 blind comparator 승자
+> exact tag/digest 게이트(R2 F7)를 넣어 `no_winner`·digest 불일치를 서비스 기동 전에 거부한다.
+> 검토 PC 문서 2건을 `참조/`에 시점 고정으로 편입했다. 다음은 lm-eval·llama.cpp perplexity
+> greybox 기준선. 재측정용 새 blind와 adoption은 별도 승인.
+
 > **2026-08-25 13:05 KST D1 종결 — 48-report matrix 완주, `winner=null`, campaign 미실행:**
 > exact-once detached matrix가 12:38:14 KST에 exit 0으로 끝났다(reports/health/
 > run-contract/packets/runtime 48/48, 두 런타임 플래그 48/48 attest, comparator

@@ -7,6 +7,30 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-25 M2 배치 A — num_ctx 4096 · F7 게이트 · 검토 문서 편입
+
+- 17:20 KST 사용자 `/goal`("제안 방향대로 진행, 이로운 툴 도입")로 배치 A를 마쳤다.
+  (1) 검토 PC 문서 2건을 `참조/`에 편입(머리글에 시점 고정·§5 GPU PC 재검증·§3/§9 시효
+  만료 명기), INDEX 등록. (2) `num_ctx` 2048→4096: `ollama_proxy.py NUM_CTX`,
+  `start-airi-local-stack.ps1` fallback, `start-local-ollama-proxy.ps1`,
+  `run-airi-broadcast-t3-matrix.ps1`, `run-airi-live-broadcast-campaign.ps1`; 근거는 관측
+  최대 2,827+220 < 4,096, 프리앰블 514 고정비, 08-20 CTX-BUDGET 실측(4096이 history 12
+  수용). `broadcast_contract.py` 계약 블록 예산과 source 문자열은 동결이라 불변.
+  (3) `PromptBudgetTelemetry.context_exceeded()` + `/health.prompt_budget.
+  context_exceeded_observations` — 400으로 죽은 턴이 saturation에 안 잡히던 구멍을 닫았다.
+  (4) R2 F7: campaign 런처에 필수 `-ComparatorVerdict`/`-ModelManifest`와
+  `Test-AiriCampaignWinnerGate`(blind 스키마·status pass·adoption_authorized=false·winner
+  존재·winner arm tag/digest exact 일치)를 포트 검사보다 앞에 두었다. 실제 D1 verdict
+  (`winner=null`)로 거부, 합성 pass verdict+digest 불일치로 거부, exact 일치로 통과를
+  실측했고 세 경우 모두 OutputDir 생성 0·listener 0이었다.
+- 검증: proxy `test_ollama_proxy` 381 OK(신규 1), 캠페인 계약 6 OK(신규 1),
+  `pytest ollama-proxy/eval + 루트 + latency-monitor` 585 passed/5 skipped(+381 subtests),
+  `test-current-checkpoint.ps1` PASS, work-continuity PASS, diff-check 0. **기존 실패 1건
+  기록**: `eval/test_airi_native_baseline.py::test_pinned_fixture_has_sixteen_cases`는 이
+  변경 전 HEAD에서도 실패한다(커밋된 픽스처 blob SHA `95309e10…`이 핀 `f3fd3d21…`과 불일치 — 이력상 픽스처 또는 핀이 어긋난 것이며 줄바꿈 문제 아님) — CI
+  matrix에 포함된 파일이므로 별도 배치로 다룬다. fastapi 의존 5개 파일은 py3.12 venv
+  collection 오류(환경)이며 py3.14 unittest로 대체 실행했다.
+
 ## 2026-08-25 M1 계측 복구 (D1 진단 후속)
 
 - 15:45 KST 사용자 승인안대로 P3 브리핑 마커를 구현했다. 계층에
