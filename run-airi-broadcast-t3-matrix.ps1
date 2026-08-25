@@ -23,7 +23,7 @@ param(
     [string]$FixtureArmName = 'baseline',
     [int]$ReportFixtureIndex = 1,
     [int]$ReportFixtureSeed = 11,
-    [ValidateRange(512, 32768)] [int]$NumCtx = 2048
+    [ValidateRange(512, 32768)] [int]$NumCtx = 4096
 )
 
 $ErrorActionPreference = 'Stop'

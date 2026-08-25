@@ -118,7 +118,7 @@ function New-AiriLiveBroadcastMasterToken {
     }
     return [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
 }
-$NumCtx = Resolve-AiriNumCtx $(if ($null -ne $NumCtx) { $NumCtx } elseif (-not [string]::IsNullOrWhiteSpace($env:AIRI_NUM_CTX)) { $env:AIRI_NUM_CTX } else { 2048 })
+$NumCtx = Resolve-AiriNumCtx $(if ($null -ne $NumCtx) { $NumCtx } elseif (-not [string]::IsNullOrWhiteSpace($env:AIRI_NUM_CTX)) { $env:AIRI_NUM_CTX } else { 4096 })
 $OutputModeration = $OutputModeration.ToLowerInvariant()
 if ($OutputModeration -notin @('on', 'off')) {
     throw 'OutputModeration must be on or off. Check the parameter or AIRI_OUTPUT_MODERATION.'

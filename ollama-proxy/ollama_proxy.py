@@ -141,6 +141,16 @@ class PromptBudgetTelemetry:
         self._last_prepared_input_chars = 0
         self._last_prompt_eval_count = 0
         self._last_utilization = 0.0
+        # ``terminal`` only ever sees a successful native done row, so a
+        # prompt the upstream rejected outright never reached
+        # saturation_observations.  Count those rejections separately.
+        self._context_exceeded_observations = 0
+
+    def context_exceeded(self) -> None:
+        with self._lock:
+            self._context_exceeded_observations = min(
+                self._context_exceeded_observations + 1, OLLAMA_MAX_COUNT
+            )
 
     @staticmethod
     def _native_payload_stats(body: bytes) -> tuple[int, int]:
@@ -209,6 +219,7 @@ class PromptBudgetTelemetry:
                 "last_prepared_input_chars": self._last_prepared_input_chars,
                 "last_prompt_eval_count": self._last_prompt_eval_count,
                 "last_utilization": self._last_utilization,
+                "context_exceeded_observations": self._context_exceeded_observations,
             }
 
 
@@ -249,7 +260,13 @@ def merge_ollama_terminal_metrics(
 app = FastAPI(title="AIRI Ollama compatibility proxy")
 
 UPSTREAM = "http://127.0.0.1:11434"
-NUM_CTX = 2048
+# 2026-08-25: raised from 2048.  Three blind rounds lost ~34% of every arm's
+# turns to Ollama 400 exceed_context_size_error (observed n_prompt_tokens
+# 2,552-2,827), and ~514 of the old window was the GGUF-embedded KT preamble
+# that no Modelfile TEMPLATE can remove.  Observed max 2,827 + 220 output
+# tokens fits with headroom; the 2026-08-20 ctx-budget measurement already
+# showed 4096 absorbing history_turns=12.
+NUM_CTX = 4096
 NUM_GPU = 999
 OLLAMA_KEEP_ALIVE_RE = re.compile(r"^(?:-1|0|[1-9][0-9]*(?:ms|s|m|h))$")
 
@@ -2369,6 +2386,9 @@ LOCAL_ERROR_DIALOGUE = "답을 만들다가 문제가 생겼어. 다시 말해�
 # Bound the detail so an upstream body cannot flood the log or carry a whole
 # prompt back into it, but never drop it entirely.
 LOCAL_ERROR_DETAIL_LIMIT = 300
+# Ollama's error ``type`` for a prompt longer than num_ctx; the body is
+# quoted into the "Ollama returned 400: ..." RuntimeError verbatim.
+CONTEXT_EXCEEDED_MARKER = "exceed_context_size_error"
 UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE = "답이 늦어져서 잠깐 멈췄어."
 # A rejected draft must not become total silence.  The user cannot tell an
 # intentionally withheld answer apart from a broken pipeline, and the turn is
@@ -8511,6 +8531,8 @@ async def stream_local_with_ack(
     except Exception as exc:
         if context.proactive_turn:
             proactive_output_telemetry.error()
+        if CONTEXT_EXCEEDED_MARKER in str(exc):
+            prompt_budget_telemetry.context_exceeded()
         if upstream_response is None and send_task is not None:
             discard_upstream_task(send_task)
         emit_latency_event(

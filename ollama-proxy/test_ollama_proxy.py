@@ -2458,7 +2458,22 @@ class SseContractTests(unittest.TestCase):
         self.assertEqual(health["last_prepared_input_chars"], len(secret) + 5)
         self.assertEqual(health["last_prompt_eval_count"], ollama_proxy.OLLAMA_MAX_COUNT)
         self.assertEqual(health["last_utilization"], 1.0)
+        self.assertEqual(health["context_exceeded_observations"], 0)
         self.assertNotIn(secret, json.dumps(health))
+
+    def test_prompt_budget_telemetry_counts_upstream_context_rejections(self) -> None:
+        # A prompt Ollama rejects with exceed_context_size_error never yields a
+        # done row, so it was invisible to saturation_observations: the D1
+        # matrix health reported 3 saturations while 34 turns had died of it.
+        telemetry = ollama_proxy.PromptBudgetTelemetry()
+        telemetry.context_exceeded()
+        telemetry.context_exceeded()
+        health = telemetry.health(4096)
+        self.assertEqual(health["context_exceeded_observations"], 2)
+        self.assertEqual(health["saturation_observations"], 0)
+        self.assertIn(ollama_proxy.CONTEXT_EXCEEDED_MARKER, str(RuntimeError(
+            'Ollama returned 400: {"error":"{\\"type\\":\\"exceed_context_size_error\\"}"}'
+        )))
 
     def test_local_fallback_dialogue_records_native_prompt_budget(self) -> None:
         class FallbackClient:
@@ -6059,14 +6074,16 @@ class ForegroundContextTests(unittest.TestCase):
             {"role": "user", "content": "현재 질문이야."},
         ]}).encode()
         transformed, *_ = ollama_proxy.transform_body(
-            "api/chat", body, num_ctx=4096, num_gpu=0
+            "api/chat", body, num_ctx=8192, num_gpu=0
         )
         native = json.loads(ollama_proxy.native_chat_stream_body(
-            transformed, num_ctx=4096, num_gpu=0
+            transformed, num_ctx=8192, num_gpu=0
         ))
-        self.assertEqual(native["options"]["num_ctx"], 4096)
+        self.assertEqual(native["options"]["num_ctx"], 8192)
         self.assertEqual(native["options"]["num_gpu"], 0)
-        self.assertEqual(ollama_proxy.NUM_CTX, 2048)
+        # The explicit override above must differ from the default so this
+        # test keeps proving that per-call num_ctx is honoured.
+        self.assertEqual(ollama_proxy.NUM_CTX, 4096)
 
     def test_independent_scene_is_dropped(self) -> None:
         body = json.dumps({"messages": [

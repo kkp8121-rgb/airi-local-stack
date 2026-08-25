@@ -1,5 +1,5 @@
 param(
-    [object]$NumCtx = 2048,
+    [object]$NumCtx = 4096,
     [ValidateRange(0, 999)]
     # Ollama interprets num_gpu=0 as CPU-only. AIRI's local model is small
     # enough to fully offload on the supported local GPU; callers can still
