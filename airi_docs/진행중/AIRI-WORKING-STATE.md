@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 21:28:00 +09:00"
-checkpoint_id: "20260825-212800-parallel-branch-merged-goal-complete"
+updated_at_kst: "2026-08-25 21:39:00 +09:00"
+checkpoint_id: "20260825-213900-m4-codex-handoff-written"
 matrix_note: "d1v5 48/48 완주, comparator verdict winner=null(오프라인 재실행으로 발행). campaign 미실행. 근본 원인: live-broadcast 경로에서 결정론 계층이 브리핑/후원 note를 못 봄. 사용자 결정 대기"
 active_trainer_note: "GPU 학습 없음. lm-eval 추론만 사용했고 종료(GPU 370 MiB). AIRI 서비스 0"
 goal_status: "active"
 authorization: "user-goal-2026-08-25-1720-m3: approve-all-three-recommendations (blind-v5-seal-then-4-arm-48-report-rematrix-with-marker-and-num_ctx-4096, enforce-lm-eval-general-capability-gate-le-2pp-vs-stock, fix-native-baseline-fixture-pin); no-gpu-training; matrix-exact-once; operational-adoption-forbidden-until-separate-user-approval. superseded: user-goal-2026-08-25-1630-m2: proceed-with-proposed-direction (review-docs-into-참조+INDEX, num_ctx-4096-prompt-budget, R2-F7-campaign-code-gate) and adopt-tools-judged-beneficial (lm-eval, llama.cpp perplexity; unsloth/DPO deferred); no-gpu-training; operational-adoption-still-separate-approval. superseded: user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "m3-complete-awaiting-user-decision"
-git_head: "9ccf870d339f558f37dd797b7bb6e6b306d7a361"
-worktree_state: "main 9ccf870 = 병렬 branch 병합 commit; INDEX·WORKING만 dirty(이 receipt); 임시 worktree 제거·prune 완료; AIRI 서비스 0, GPU 유휴"
+active_phase: "m4-handoff-to-codex-awaiting-user-goal"
+git_head: "91792a14447fd52cd561d93f95ce27264e55b1ee"
+worktree_state: "main 91792a1 clean before this receipt; M4 handoff·INDEX·NEXT-SESSION·WORKING만 dirty; AIRI 서비스 0, GPU 유휴"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
@@ -23,6 +23,16 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 > 기준 상태다. checkpoint를 포함한 commit 자체의 SHA를 자가 참조하지 않는다.
 
 ## 1. 권한과 현재 사실
+
+- 2026-08-25 21:39 KST **M4 Codex 인계 문서 receipt**: 사용자 요청으로
+  `airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-08-25-M4.md`를 작성했다 — 인계 시점 상태, 오늘 배치
+  commit 목록, 확정 결함의 코드 위치(`ollama_proxy.py:7612/:8935/:8977`,
+  `live_broadcast_runtime.py:98-125`, `run_broadcast_sim.py:540`, `_REJECTED_BRANCH_RE :85`),
+  M4 작업 계약 5단계(배선 수정 → live 통합 테스트 → P3 정규식 → blind v6 → matrix·verdict),
+  환경 함정, 검증 명령, 금지선, 기록 의무. INDEX 진행중 절 등록, NEXT-SESSION 머리글에 진입점
+  추가. Codex 실행 명령은 OpenAI Codex CLI 문서(`codex [PROMPT]`, `-C`, `-a on-request`,
+  `-s workspace-write`; `--full-auto`는 deprecated)를 근거로 사용자에게 제시했다. 코드 변경 0,
+  서비스 0. M4 착수는 사용자 `/goal` 승인 뒤 Codex가 수행한다.
 
 - 2026-08-25 21:28 KST **병렬 branch 병합 receipt + M3 goal 결산**: verdict/진단 docs push
   (`07ad82f` verifier 수정, `e6880ab` docs) 뒤 `origin/feature/parallel-offline-20260825`

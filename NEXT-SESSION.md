@@ -1,5 +1,9 @@
 # AIRI 다음 세션 안내
 
+> **2026-08-25 21:39 KST — M4 Codex 인계 문서 작성:** 다음 라운드(계층 입력 배선 수정 + live
+> 경로 통합 테스트 + P3 정규식 + blind v6 재측정)의 단일 진입점은
+> `airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-08-25-M4.md`다. 착수는 사용자 `/goal` 승인 뒤.
+>
 > **2026-08-25 21:22 KST 최우선 — d1v5 `no_winner`, 다음 라운드는 사용자 결정:** 계측은
 > 이제 실제로 작동한다(service_error 0, probe 36/40). 남은 실패의 근본 원인은 **결정론 계층이
 > 운영 live 경로에서 브리핑·후원 note를 못 받는 배선 결함**(`build_layer_inputs`에 주입 전

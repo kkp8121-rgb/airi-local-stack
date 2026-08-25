@@ -40,6 +40,12 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
 
 ## 진행중 — 현행 계약
 
+- `AIRI-CODEX-HANDOFF-2026-08-25-M4.md` — **Codex 단일 진입점(M4).** d1v5 `no_winner`
+  진단으로 확정된 결함(결정론 계층이 live-broadcast 경로에서 주입 전 메시지만 받아 브리핑·후원
+  note를 못 봄 — `ollama_proxy.py:7612`/`:8935`/`:8977`, `live_broadcast_runtime.py:98-125`)을
+  코드 위치와 함께 정리하고, M4 작업 계약(계층 입력 배선 수정 → live 경로 통합 테스트 → P3
+  정규식 확장 → blind v6 저작·봉인(handle-주제 어휘 충돌 검사) → matrix exact-once → verdict
+  분기), 환경 함정, 검증 명령, 금지선을 담는다.
 - `AIRI-PARALLEL-HANDOFF-2026-08-25.md` — 병렬 오프라인 세션(branch
   `feature/parallel-offline-20260825`, 2026-08-25 21:2x 병합 `9ccf870`)의 인계 기록: legacy T3
   comparator R2 F5/F6(seed 하한·교락 필드 exact 비교, sim payload에 `model_digest`/`max_tokens`),
