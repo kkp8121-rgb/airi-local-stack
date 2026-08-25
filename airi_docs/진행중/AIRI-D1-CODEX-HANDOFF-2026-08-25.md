@@ -11,15 +11,15 @@
 
 | 항목 | 값 |
 |---|---|
-| HEAD = origin/main | `a3f2f394289a91bd54a39725bc8917cfcb994b00` |
+| HEAD = origin/main | `a510004784a2d6dcfb3bdb8b7e9e2839d09e98b9` |
 | worktree | clean (이 문서 추가 전 기준) |
 | AIRI 관련 PID | 0 (Ollama `serve` 11434만 상시) |
 | GPU | idle — **D1은 GPU 학습이 전혀 없다** |
 | goal | `user-goal-2026-08-25-0454-d1` (WORKING-STATE frontmatter `authorization` 참조) |
 | adoption | `false` 고정. campaign 결과와 무관하게 별도 사용자 승인 사항 |
 
-D1 goal 5단계 중 **1·2·3이 끝났고 4(48-report matrix)와 5(분기)가 남았다.** 남은
-작업의 유일한 코드 과제는 **launcher `d1` 프로파일**이다.
+D1 goal 5단계 중 **1·2·3과 launcher 구현이 끝났고 4(48-report matrix)와 5(분기)가
+남았다.** 남은 실행 과제는 model manifest 생성·preflight와 matrix다.
 
 ## 1. 끝난 것 (검증·push 완료)
 
@@ -101,12 +101,17 @@ D1 goal 5단계 중 **1·2·3이 끝났고 4(48-report matrix)와 5(분기)가 �
 
 ## 2. 남은 작업 (코덱스가 이어받는 부분)
 
-### 2.1 [필수] launcher `d1` 프로파일 — 유일한 코드 과제
+### 2.1 [완료] launcher `d1` 프로파일 — commit `9e6b1f4`, receipt `a510004`
 
-`run-airi-broadcast-t3-matrix.ps1`은 현재 `t3`/`e2c1`/`e2c2` 3개 프로파일을 갖고 있고
-**3 arm / 36 report를 하드코딩**한다. `e2c2` 프로파일이 정확한 템플릿이므로 그 분기를
-따라가되 다음을 4 arm/48로 일반화한다. (라인 번호는 `a3f2f39` 기준이며 편집하면
-움직인다. 반드시 현재 파일에서 재확인할 것.)
+2026-08-25 09:23 KST 코덱스가 아래 계약을 구현해 origin/main에 push했다. root 검토로
+기존 E2-C2 unbound-root 테스트 약화 1건을 원복한 뒤 launcher 25 pass,
+broadcast_sim+launcher 194 pass/1 skip(+32 subtests), proxy 377 OK, 전체 offline
+checkpoint/AST/diff-check를 통과했다. 기존 t3/e2c1/e2c2는 3 arm/36을 유지한다.
+
+`run-airi-broadcast-t3-matrix.ps1`은 이제 `t3`/`e2c1`/`e2c2`/`d1` 4개 프로파일을
+가지며, 아래 구현 항목은 commit `9e6b1f4`에서 완료됐다. 기존 세 프로파일은 3 arm/
+36 report를 유지하고 d1만 4 arm/48 report다. (아래 라인 번호는 구현 전 `a3f2f39`
+기준의 역사적 seam이다.)
 
 1. `[ValidateSet('t3','e2c1','e2c2')]` → `d1` 추가 (line ~15).
 2. `$isBlindProfile`에 `d1` 포함, `$requireGuardHealth`(현재 e2c2 전용)를 **d1도

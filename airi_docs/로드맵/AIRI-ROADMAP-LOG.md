@@ -9,6 +9,10 @@
 
 ## 2026-08-25 D1 launcher 프로파일 구현·offline PASS
 
+- 09:23 KST launcher `9e6b1f4` + receipt `a510004`를 origin/main에 push했고
+  HEAD/local/origin-main exact·clean, 관련 PID/listener 0이다. external D1 matrix
+  root/manifest/run은 아직 없고 blind v4 미소비다. 장기 상태 문서를 launcher 완료로
+  finalization한 뒤 manifest 생성과 `-PreflightOnly`로 이동한다.
 - 09:17 KST `run-airi-broadcast-t3-matrix.ps1`에 기존 프로파일을 보존한 `d1`
   4-arm/48-run 프로파일, blind v4 결속, guard+deterministic layer 환경 강제·복원,
   strict `/health` 이중 attest, D1 comparator/attestation을 추가했다. 계약 테스트는
