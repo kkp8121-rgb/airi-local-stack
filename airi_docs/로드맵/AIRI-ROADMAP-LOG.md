@@ -9,6 +9,13 @@
 
 ## 2026-08-25 M3 — 승인 3건 착수: 핀 수리 · 일반 능력 게이트 · blind v5
 
+- 17:34 KST blind v5 봉인 완료: subagent가 외부 staging에 저작한 fixture 3종(시계방/등대/양봉장)을
+  직접 `--check` 재검증(pins exact 일치) 후 `airi-d1-blind-freeze-20260825-v5`로 봉인 — sealed
+  manifest `d9c07fea…7c45`, receipt `823c4695…f02c`, 본문 리포 미포함. launcher `d1v5` 프로파일
+  (d1과 게이트·comparator 공유, 바인딩만 v5), commitment `airi_d1v5_blind_commitment.json`,
+  seal `d1v5` generation, 테스트 신규/갱신, CI 등록. 실제 preflight 48/48·num_ctx 4096 PASS.
+  배치 A 회귀(launcher harness num_ctx 2048) 정정. policy/threshold 변경 0.
+
 - 17:40 KST 사용자 `/goal`("모두 추천 방향으로 승인")로 착수. (1) `test_airi_native_baseline`
   실패 원인 확정: 픽스처는 `a7412af` 이후 불변인데 핀 `f3fd3d21…`은 `565cc65`에서 어떤 커밋
   blob과도 맞지 않게 추가됐다 → 핀을 blob SHA `95309e10…`으로 교체, 4 passed. (2)

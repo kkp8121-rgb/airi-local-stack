@@ -1,13 +1,13 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 17:40:00 +09:00"
-checkpoint_id: "20260825-174000-m3-pin-fix-and-capability-gate-receipt"
+updated_at_kst: "2026-08-25 17:34:00 +09:00"
+checkpoint_id: "20260825-173400-m3-blind-v5-sealed-d1v5-wired"
 matrix_note: "D1 종결. M2 배치 A(num_ctx 4096·F7 게이트·문서 편입) push, 배치 B(lm-eval·perplexity 기준선) 완료. 재측정용 새 blind·게이트 강제·adoption은 별도 사용자 결정"
 active_trainer_note: "GPU 학습 없음. lm-eval 추론만 사용했고 종료(GPU 370 MiB). AIRI 서비스 0"
 goal_status: "active"
 authorization: "user-goal-2026-08-25-1720-m3: approve-all-three-recommendations (blind-v5-seal-then-4-arm-48-report-rematrix-with-marker-and-num_ctx-4096, enforce-lm-eval-general-capability-gate-le-2pp-vs-stock, fix-native-baseline-fixture-pin); no-gpu-training; matrix-exact-once; operational-adoption-forbidden-until-separate-user-approval. superseded: user-goal-2026-08-25-1630-m2: proceed-with-proposed-direction (review-docs-into-참조+INDEX, num_ctx-4096-prompt-budget, R2-F7-campaign-code-gate) and adopt-tools-judged-beneficial (lm-eval, llama.cpp perplexity; unsloth/DPO deferred); no-gpu-training; operational-adoption-still-separate-approval. superseded: user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
 active_phase: "m3-blind-v5-seal-and-gates"
-git_head: "bae4e4a8d59fdc91189aee3119780429a9ebfc10"
+git_head: "2061f10dc43a0857a1f85fe3a0c8874f55cf6621"
 worktree_state: "HEAD/local main/origin-main exact 956a226 and clean at 2026-08-25 17:10 KST; M2 complete, no AIRI services, GPU idle"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
@@ -23,6 +23,32 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 > 기준 상태다. checkpoint를 포함한 commit 자체의 SHA를 자가 참조하지 않는다.
 
 ## 1. 권한과 현재 사실
+
+- 2026-08-25 17:34 KST **M3 항목 3 receipt — blind v5 봉인 + launcher `d1v5` 배선 (commit 직전)**:
+  - **저작**: opus 구현자 subagent가 외부 staging `D:\AIRI-Models\airi-d1-blind-staging-v5\`에
+    새 한국어 fixture 3종을 저작했다(낡은 시계방 괘종시계 / 밤바다 등대 야간 당직 / 봄 양봉장
+    벌통). v4와 구조 동일(beats/arcs/donations/probes/waves/viewers 수, rates·briefing·
+    pickup_priority 동일), superseded 4 root의 handle·template 재사용 0(도구가 2회 잡아낸
+    template 충돌을 교체), 한글 1,009/1,427/1,293자, 4 seed stream 전 메시지 라틴 0.
+  - **재검증·봉인(직접 수행)**: 위임 결과를 신뢰하지 않고 `--check --generation d1v5`를 다시
+    실행해 pins 3종이 보고와 exact 일치함을 확인한 뒤 `--root-id airi-d1-blind-freeze-20260825-v5
+    --output-root D:\AIRI-Models\airi-d1-blind-freeze-20260825-v5` 로 봉인(exit 0). sealed
+    manifest raw SHA **`d9c07fea3a4bf965ed4d05c4a8175341eae58d5106b275492692c5d05b4e7c45`**
+    (1,119 B), validation receipt **`823c469539876de2a3328df899ec93cc364e4fb5d3f9c8b87a41c5f7d5eff02c`**
+    (872 B), `response_viewed=false`. fixture raw/canonical: identity `fa347d60…`/`51839feb…`
+    7,945 B, continuity `6f6ce79a…`/`ad691044…` 12,906 B, factual `3cc28bf8…`/`5508cb09…`
+    11,291 B. 리포에는 hash만 있고 본문 0.
+  - **배선**: commitment `fixtures/commitments/airi_d1v5_blind_commitment.json`(d1 commitment와
+    key set 동일, root_id v5, sha `cb66b4d9…`), launcher `d1v5` 프로파일(`$isDeterministicLayerProfile`
+    로 d1과 게이트·플래그·attestation·comparator 공유, 바인딩만 v5 root/commitment/sealed SHA),
+    seal 도구 `d1v5` generation(v3·v4 superseded 24 hash), 테스트: `test_d1v5_blind_commitment.py`
+    (신규, CI 등록; v4 검증기가 v5를 거부함도 고정), launcher 계약 `D1V5BlindProfileContract`.
+    배치 A 회귀 정정: launcher 계약 harness의 `num_ctx` 2048→4096(2 failed였음).
+  - **검증**: commitment/seal/comparator 51 passed, launcher 계약 31 passed, 캠페인 계약 포함
+    37, **실제 `-PreflightOnly`**(v5 sealed root + D1 model manifest `050ae10f…`) runs=48·
+    unique keys 48·comparison d1-blind·num_ctx 4096·OutputDir 미생성, patch-manifest PASS,
+    checkpoint PASS, diff-check 0. threshold/policy 변경 0(`airi_d1_metric_policy.json` 그대로).
+  - 다음: commit/push → matrix intent → detached wrapper로 정확히 1회 실행.
 
 - 2026-08-25 17:40 KST **M3 항목 1·2 receipt (commit 직전)**:
   - **native_baseline 핀 수리**: `run_airi_native_baseline.py` `CASES_SHA256`을 커밋 blob SHA
