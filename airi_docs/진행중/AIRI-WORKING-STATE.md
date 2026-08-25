@@ -1,16 +1,16 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-26 03:54:29 +09:00"
-checkpoint_id: "20260826-035429-m4-dashboard-commit-receipt"
-matrix_note: "M4 plus roadmap-dashboard goal active. D1v6 terminal/no_winner, campaign N/A, dashboard skill/audit/final validation complete. Primary exact 13-path commit c7500a3 created; local main is ahead of origin/main 1 with clean tree before this receipt update. M4-10 is decision-waiting: push requires fresh user approval; adoption/follow-up remain separately forbidden"
+updated_at_kst: "2026-08-26 04:00:18 +09:00"
+checkpoint_id: "20260826-040018-m4-final-sync-intent"
+matrix_note: "M4 plus roadmap-dashboard goal active. D1v6 terminal/no_winner, campaign N/A, dashboard skill/audit/final validation complete. Primary commit c7500a3 and receipt commit 8463e80 exist locally; local main is ahead of origin/main 2 and was clean before this final synchronization checkpoint. M4-10 is decision-waiting: push requires fresh user approval; adoption/follow-up remain separately forbidden"
 active_trainer_note: "GPU 학습 없음. d1v6 48-report inference matrix 종료; wrapper PID 10264 absent, owned process/listener 0, owned ports 11435/11436/8880/9880/8890/8892 all free"
 goal_status: "active"
 authorization: "user-goal-2026-08-25-1720-m3: approve-all-three-recommendations (blind-v5-seal-then-4-arm-48-report-rematrix-with-marker-and-num_ctx-4096, enforce-lm-eval-general-capability-gate-le-2pp-vs-stock, fix-native-baseline-fixture-pin); no-gpu-training; matrix-exact-once; operational-adoption-forbidden-until-separate-user-approval. superseded: user-goal-2026-08-25-1630-m2: proceed-with-proposed-direction (review-docs-into-참조+INDEX, num_ctx-4096-prompt-budget, R2-F7-campaign-code-gate) and adopt-tools-judged-beneficial (lm-eval, llama.cpp perplexity; unsloth/DPO deferred); no-gpu-training; operational-adoption-still-separate-approval. superseded: user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
 m4_authorization: "user-goal-2026-08-25-m4: fix live deterministic-layer wiring, add pre-fix-failing/live-path tests, expand P3 rejected-branch extraction, author/seal fresh blind-v6 with handle-topic collision gate, exact-once 48-report d1v6 matrix, winner-only 3x500 campaign, otherwise diagnose-and-wait; no GPU/new candidate training; no blind-v1-v5 reuse; no gate/threshold/metric/seed/fixture-definition changes; operational adoption forbidden without separate approval"
 m4_dashboard_authorization: "user-additional-goal-2026-08-26: keep running M4 matrix untouched; add evidence-backed user roadmap live dashboard, normalize stale whole-roadmap checklist after terminal, create shared-contract Codex+Claude project skill airi-roadmap-dashboard with skill-creator after terminal, update WORKING+ROADMAP together every <=14m; no skill/test/contract files during matrix; push requires fresh separate user approval"
 active_phase: "m4-main-session-is-codex"
-git_head: "c7500a3e1ef3e48786378c906057958406030386"
-worktree_state: "primary exact 13-path commit c7500a3 created; local main ahead of origin/main 1, clean immediately after commit. This receipt update makes only milestone docs dirty until receipt commit. wrapper/owned process/listener 0; no_winner, campaign N/A; push blocked on fresh user approval"
+git_head: "8463e8017450c5cacb962f4eedb5ed9373aae1f2"
+worktree_state: "primary commit c7500a3 and receipt commit 8463e80 created; local main ahead of origin/main 2 and clean immediately before this checkpoint. This final synchronization update makes only five milestone docs dirty until its exact commit. wrapper/owned process/listener 0; no_winner, campaign N/A; push blocked on fresh user approval"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
@@ -25,6 +25,17 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 > 기준 상태다. checkpoint를 포함한 commit 자체의 SHA를 자가 참조하지 않는다.
 
 ## 1. 권한과 현재 사실
+
+- 2026-08-26 04:00 KST **M4 final machine-state reconciliation + push-gate intent**:
+  WORKING 전체와 M4 handoff·D1 contract §6·§7·ROADMAP·NEXT를 다시 읽고 실제 상태를
+  대조했다. HEAD/local main은 receipt commit
+  `8463e8017450c5cacb962f4eedb5ed9373aae1f2`, origin/main과 remote main은
+  `30fe3524996756fbb0a969b94b10d98f208f8508`, local ahead 2, worktree/stage/untracked 0이었다.
+  d1v6는 report·health·run-contract·packet 각 48개, 고유 union/intersection 48/48,
+  duplicate·missing 0, launcher exit 0, summary/comparison pass를 유지하며 wrapper·관련 process·
+  owned listener 0이다. 이 관측값을 다섯 milestone 문서에 동기화하고 계약 검증 뒤 exact
+  Conventional Commit으로 닫는다. 그 뒤에도 push는 수행하지 않고 정확한 새 HEAD를 제시해
+  fresh 사용자 승인을 요청한다. 운영 채택·campaign·자동 후속 라운드는 계속 금지다.
 
 - 2026-08-26 03:54 KST **M4 dashboard primary commit receipt + push decision gate**:
   `git commit -m "docs: add evidence-backed roadmap dashboard"` exit 0, commit

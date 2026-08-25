@@ -7,7 +7,7 @@
 > 실행 중 PID, owned 포트를 **read-only로 대조**하고 나서야 실행한다. 채팅 요약을 믿지 않는다.
 > 작성: Claude main 세션(airi-d6), 2026-08-25 21:39 KST, HEAD `91792a1`.
 
-## -1. M4 진행 상태 (2026-08-26 03:35 KST)
+## -1. M4 진행 상태 (2026-08-26 04:00 KST)
 
 - §3.1~§3.4 완료·origin/main 반영: live `context_note` 배선, server-owned briefing marker,
   donation P5, pre-fix `07ad82f` 2 FAIL → 수정 후 2 PASS, flag OFF exact, P3 v5 arc 12/12,
@@ -29,15 +29,16 @@
   문서에 고정된 기존 behavior-v2 2 failure만 재현했고, interpreter/known-failure를 분리한
   affected clean run 739 passed/9 skipped/297 subtests와 proxy/runtime 403 OK,
   deterministic/guard 52 passed+10 subtests, checkpoint·continuity·dashboard·skill validator·
-  diff-check가 PASS했다. exact 13-path primary commit은 `c7500a3`로 완료됐다. receipt commit 뒤
-  push는 직전 별도 사용자 승인을 받아야 하며 `adoption_authorized=false`다.
+  diff-check가 PASS했다. exact 13-path primary commit `c7500a3`와 receipt commit `8463e80`이
+  로컬에 있고, 마지막 실제 기계 상태는 이 동기화 checkpoint를 포함한 final local commit으로
+  닫는다. 다음 상태 변경인 push는 직전 별도 사용자 승인을 받아야 한다. `adoption_authorized=false`다.
 
 ## 0. 인계 시점 상태 (관측값)
 
 | 항목 | 값 |
 |---|---|
-| HEAD = local main = origin/main | `30fe352` (`fix: wire live deterministic layer for blind v6`) |
-| worktree | M4 terminal 진단·dashboard/skill/contract/test/docs 배치만 unstaged. 사용자 변경·stage 0 |
+| HEAD = local main | `8463e80` (`docs: record M4 dashboard receipt`), origin/remote `30fe352`, ahead 2 — final sync 직전 관측 |
+| worktree | final sync 직전 clean. 현재는 이 milestone 문서 묶음만 exact commit 전 수정 |
 | 실행 중 프로세스 | d1v6 wrapper·owned process/listener 0. owned 포트 11435/11436/8880/9880/8890/8892 free |
 | GPU | RTX 3060 Ti 8GB 유휴. **M4는 GPU 학습이 없다** (추론 matrix만) |
 | 마지막 verdict | d1v6 `D:\AIRI-Models\airi-d1v6-blind-matrix-20260825\run\comparisons\d1-blind.json` — `winner=null`, 실패 29 게이트 |
