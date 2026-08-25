@@ -40,6 +40,13 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
 
 ## 진행중 — 현행 계약
 
+- `AIRI-PARALLEL-HANDOFF-2026-08-25.md` — 병렬 오프라인 세션(branch
+  `feature/parallel-offline-20260825`, 2026-08-25 21:2x 병합 `9ccf870`)의 인계 기록: legacy T3
+  comparator R2 F5/F6(seed 하한·교락 필드 exact 비교, sim payload에 `model_digest`/`max_tokens`),
+  일반 능력 게이트의 package evidence 바인딩, P2-4b cheer/sincere 수신 오프너(기본 off), P3-T4
+  설계안. §0에 **단일 working tree에서 matrix 실행 중 branch checkout이 일어난 사고**와 그
+  영향(report 36개에 payload 키 추가, 판정 영향 0)을 기록. 향후 병렬 작업은 `git worktree add`
+  로 분리한다.
 - `AIRI-WORKING-STATE.md` — **세션 시작·goal resume·재부팅·compact 직후 가장
   먼저 읽는 가변 live SSoT.** 실제 goal status·HEAD/worktree·PID·산출물과 대조한
   현재 행동, 권한, 마지막 receipt, 다음 한 동작을 보존한다. active goal은 최대
@@ -97,6 +104,10 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
 
 ## 진행예정 — 계획
 
+- `AIRI-P3-T4-HARDCODING-REDUCTION-DESIGN-2026-08-25.md` — 로드맵 P3-T4(하드코딩 축소)
+  설계안, 코드 변경 0. 결정론 계층(P1~P5)·가드·폴백·오프너 인벤토리를 게이트에 대응시키고
+  "T3 통과 행동" 전제가 아직 성립하지 않음을 명시. 병렬 세션 산출(`9ccf870` 병합). d1v5
+  진단(contract §7 — live 경로 배선 결함)과 함께 읽을 것.
 - `AIRI-EXTRACTION-REVIEW-FORM-2026-08-20.html` — **현행 추출 SFT 검수 폼
   (회신 대기).** 스팬 계약(`conversation-v3-span`) 학습쌍 102건·추출 항목
   144건 전량 렌더, 클릭형 승인/수정/거부 + 예외만 회신. rewrite는 브라우저

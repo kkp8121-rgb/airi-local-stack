@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 21:22:00 +09:00"
-checkpoint_id: "20260825-212200-d1v5-verdict-no-winner-diagnosis"
+updated_at_kst: "2026-08-25 21:28:00 +09:00"
+checkpoint_id: "20260825-212800-parallel-branch-merged-goal-complete"
 matrix_note: "d1v5 48/48 완주, comparator verdict winner=null(오프라인 재실행으로 발행). campaign 미실행. 근본 원인: live-broadcast 경로에서 결정론 계층이 브리핑/후원 note를 못 봄. 사용자 결정 대기"
 active_trainer_note: "GPU 학습 없음. lm-eval 추론만 사용했고 종료(GPU 370 MiB). AIRI 서비스 0"
 goal_status: "active"
 authorization: "user-goal-2026-08-25-1720-m3: approve-all-three-recommendations (blind-v5-seal-then-4-arm-48-report-rematrix-with-marker-and-num_ctx-4096, enforce-lm-eval-general-capability-gate-le-2pp-vs-stock, fix-native-baseline-fixture-pin); no-gpu-training; matrix-exact-once; operational-adoption-forbidden-until-separate-user-approval. superseded: user-goal-2026-08-25-1630-m2: proceed-with-proposed-direction (review-docs-into-참조+INDEX, num_ctx-4096-prompt-budget, R2-F7-campaign-code-gate) and adopt-tools-judged-beneficial (lm-eval, llama.cpp perplexity; unsloth/DPO deferred); no-gpu-training; operational-adoption-still-separate-approval. superseded: user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "d1v5-no-winner-diagnosed-merge-parallel-then-await-user"
-git_head: "973a6bed6744f8887fe587fdd3abe1e42ba7c7e4"
-worktree_state: "tree를 main으로 복귀(973a6be); verifier 수정·v5 테스트·WORKING만 dirty; 병렬 branch origin/feature/parallel-offline-20260825(4 commit, 충돌 0) 병합 예정; AIRI 서비스 0, owned 포트 free"
+active_phase: "m3-complete-awaiting-user-decision"
+git_head: "9ccf870d339f558f37dd797b7bb6e6b306d7a361"
+worktree_state: "main 9ccf870 = 병렬 branch 병합 commit; INDEX·WORKING만 dirty(이 receipt); 임시 worktree 제거·prune 완료; AIRI 서비스 0, GPU 유휴"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
@@ -23,6 +23,25 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 > 기준 상태다. checkpoint를 포함한 commit 자체의 SHA를 자가 참조하지 않는다.
 
 ## 1. 권한과 현재 사실
+
+- 2026-08-25 21:28 KST **병렬 branch 병합 receipt + M3 goal 결산**: verdict/진단 docs push
+  (`07ad82f` verifier 수정, `e6880ab` docs) 뒤 `origin/feature/parallel-offline-20260825`
+  (4 commit: `3895921` legacy T3 comparator F5/F6 + sim payload digest/max_tokens, `d2d3dfc`
+  일반 능력 게이트 package evidence 바인딩, `9de8f7a` P2-4b 수신 오프너 기본 off, `5774fcd`
+  P3-T4 설계안·병렬 handoff)를 `--no-ff`로 병합(`9ccf870`, 충돌 0, main과 겹치는 파일 0).
+  병합 tree 검증: launcher·campaign 계약 + broadcast_sim + affect_broadcast + training/tests
+  **721 passed / 9 skipped**, patch-manifest PASS(branch 신규 테스트 6개 전부 CI matrix 등록됨),
+  checkpoint PASS, work-continuity PASS, diff-check 0. INDEX에 두 문서 등록.
+  **기존 실패 기록(병합 기인 아님)**: `training/tests/test_synthesize_broadcast_behavior_v2.py`
+  2건(`committed_source_is_exact_deterministic_output`, `no_reference_identity_urls_pii_…`)이
+  병합 전 `e6880ab`의 임시 worktree에서도 동일 실패 — 환경/데이터 의존으로 보이며 별도 과제.
+  `test_synthesize_broadcast_continuity_v4.py`는 py3.12 venv collection 오류(의존성, 기존).
+  임시 worktree는 제거·prune했다.
+  **M3 goal 결산**: ① native_baseline 핀 수리 ✔ ② 일반 능력 게이트 강제 ✔(+병렬 evidence
+  바인딩) ③ blind v5 봉인·d1v5 48-report 재측정 ✔ → `winner=null`, campaign 미실행,
+  근본 원인(live 경로 결정론 계층 입력 배선) 확정·문서화. 병렬 branch 병합 ✔.
+  **다음 라운드는 사용자 결정**(계층 입력 배선 수정 + live 통합 테스트 + P3 정규식 + blind v6).
+  GPU 학습 0, adoption 0.
 
 - 2026-08-25 21:22 KST **d1v5 verdict receipt — `no_winner` + 진단(사용자 결정 대기)**:
   - **verdict 발행**: comparator가 v4 하드코딩 verifier에 막힌 원인을 `verify_d1_frozen_contract.py`
