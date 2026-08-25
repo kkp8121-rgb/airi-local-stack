@@ -27,6 +27,10 @@ Runner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
 ApiCall = Callable[[str, str, dict[str, Any] | None], dict[str, Any]]
 SHA256 = re.compile(r"[0-9a-f]{64}")
 TAG_PREFIX = re.compile(r"(?!-)(?!.*[\x00-\x1f\s])[A-Za-z0-9][A-Za-z0-9._/-]*:[A-Za-z0-9][A-Za-z0-9._-]*$")
+EVIDENCE_FILENAME = "package-evidence.json"
+# verify_general_capability_gate.py --package-evidence writes its verdict here,
+# beside the evidence.  Packaging never runs the gate; it only marks it pending.
+GENERAL_CAPABILITY_VERDICT_FILENAME = "general-capability-verdict.json"
 
 
 def sha256_and_size(path: Path) -> dict[str, Any]:
@@ -269,12 +273,13 @@ def package(args: argparse.Namespace, runner: Runner = default_runner,
             "tag_evidence": tag_evidence,
             "adoption_authorized": False,
             "t3": "pending",
+            "general_capability_gate": "pending",
         }
-        evidence_tmp = output_dir / "package-evidence.json.tmp"
+        evidence_tmp = output_dir / (EVIDENCE_FILENAME + ".tmp")
         evidence_tmp.write_text(
             json.dumps(evidence, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        evidence_tmp.replace(output_dir / "package-evidence.json")
-        return output_dir / "package-evidence.json"
+        evidence_tmp.replace(output_dir / EVIDENCE_FILENAME)
+        return output_dir / EVIDENCE_FILENAME
     except Exception as exc:
         cleanup_error: PackagingError | None = None
         retain_output = False

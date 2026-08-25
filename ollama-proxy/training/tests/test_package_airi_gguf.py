@@ -11,6 +11,10 @@ SPEC = importlib.util.spec_from_file_location("package_airi_gguf_test", HERE / "
 assert SPEC is not None and SPEC.loader is not None
 packager = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(packager)
+GATE_SPEC = importlib.util.spec_from_file_location("verify_general_capability_gate_test", HERE / "verify_general_capability_gate.py")
+assert GATE_SPEC is not None and GATE_SPEC.loader is not None
+GATE = importlib.util.module_from_spec(GATE_SPEC)
+GATE_SPEC.loader.exec_module(GATE)
 BUILD_ID = "1" * 32
 
 
@@ -130,6 +134,28 @@ class PackageTests(unittest.TestCase):
             with self.assertRaises(packager.PackagingError): self.call(args)
             Path(args.output_dir).rmdir(); (Path(args.quantizer).parent / "bad").mkdir()
             with self.assertRaisesRegex(packager.PackagingError, "regular non-symlink"): self.call(args)
+
+    def test_general_capability_verdict_is_a_pending_sibling_of_the_evidence(self):
+        # The packager marks the gate pending; only the verifier's verdict file, placed
+        # beside package-evidence.json under a fixed name, can change that state.
+        self.assertEqual(packager.EVIDENCE_FILENAME, "package-evidence.json")
+        self.assertEqual(packager.GENERAL_CAPABILITY_VERDICT_FILENAME, "general-capability-verdict.json")
+        self.assertEqual(GATE.PACKAGE_EVIDENCE_FILENAME, packager.EVIDENCE_FILENAME)
+        self.assertEqual(GATE.VERDICT_FILENAME, packager.GENERAL_CAPABILITY_VERDICT_FILENAME)
+        with tempfile.TemporaryDirectory() as raw:
+            evidence_path, _runner, tag = self.call(self.make_args(Path(raw)))
+            self.assertEqual(evidence_path.name, packager.EVIDENCE_FILENAME)
+            evidence = json.loads(evidence_path.read_text())
+            self.assertEqual(evidence["general_capability_gate"], "pending")
+            self.assertEqual(evidence["t3"], "pending")
+            verdict_path = GATE.verdict_path_for_package(evidence_path)
+            self.assertEqual(verdict_path, evidence_path.parent / packager.GENERAL_CAPABILITY_VERDICT_FILENAME)
+            self.assertFalse(verdict_path.exists())
+            bound = GATE.bind_package_evidence({"status": "pass"}, evidence_path)
+            self.assertEqual(bound["package_evidence"]["tag"], tag)
+            self.assertEqual(bound["package_evidence"]["sha256"], hashlib.sha256(evidence_path.read_bytes()).hexdigest())
+            with self.assertRaisesRegex(GATE.GateError, "must be named"):
+                GATE.verdict_path_for_package(evidence_path.with_name("evidence.json"))
 
 
 if __name__ == "__main__": unittest.main()

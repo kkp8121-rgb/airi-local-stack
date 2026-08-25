@@ -148,6 +148,7 @@ jobs:
               ollama-proxy/eval/affect_broadcast/test_affect_broadcast_eval.py
               ollama-proxy/eval/affect_broadcast/test_guarded_delta_eval.py
               ollama-proxy/eval/affect_broadcast/test_must_act_realization.py
+              ollama-proxy/eval/affect_broadcast/test_reception_opener_realization.py
               ollama-proxy/eval/affect_broadcast/test_correction_target.py
               ollama-proxy/eval/affect_broadcast/test_correction_target_realization.py
               ollama-proxy/eval/affect_broadcast/test_run_correction_realization_postcondition_eval.py

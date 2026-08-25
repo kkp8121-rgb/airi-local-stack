@@ -3,8 +3,10 @@ from __future__ import annotations
 import ast
 import copy
 import importlib.util
+import json
 import os
 import sys
+import tempfile
 import types
 import unittest
 from unittest import mock
@@ -508,6 +510,32 @@ class LiveBroadcastContextRunnerTests(unittest.TestCase):
         self.assertEqual(receipt["user_sha256"], runner.sha256_text(user_content))
         self.assertEqual(receipt["answer_sha256"], runner.sha256_text("live answer"))
         self.assertEqual(transport.events[6][0], "close")
+
+    def test_report_records_max_tokens_and_served_model_digest(self) -> None:
+        # R2 F6: the report must carry the confounders the comparator compares.
+        digest = "f" * 64
+        health = {"broadcast_contract": True, "immediate_ack": "marker",
+                  "chat_model": {"digest": {"status": "pinned", "verified": True, "digest": digest}}}
+        environment = {
+            runner.LIVE_CONTEXT_ENV_MASTER: "m" * 32,
+            runner.LIVE_CONTEXT_ENV_OBSERVER: "o" * 32,
+        }
+        with tempfile.TemporaryDirectory() as raw:
+            report_path = Path(raw) / "report.json"
+            for label, transport in (("pinned", _LiveTransport(health)), ("absent", _LiveTransport())):
+                with self.subTest(health=label), \
+                     mock.patch.object(runner.ab, "HttpTransport", return_value=transport), \
+                     mock.patch.dict(os.environ, environment, clear=False), \
+                     mock.patch.object(runner.time, "sleep", return_value=None):
+                    report_path.unlink(missing_ok=True)
+                    self.assertEqual(runner.main(["--max-turns", "1", "--live-broadcast-context", "on",
+                                                  "--max-tokens", "96", "--report", str(report_path)]), 0)
+                report = json.loads(report_path.read_text(encoding="utf-8"))
+                self.assertEqual(report["max_tokens"], 96)
+                self.assertEqual(report["model_digest"], digest if label == "pinned" else None)
+                # The digest is read after the show closes and before the transport closes.
+                names = [event[0] for event in transport.events]
+                self.assertEqual(names[-3:], ["close", "health", "transport_close"])
 
     def test_live_contract_must_match_on_off_and_be_present(self) -> None:
         for contract, health in (("on", {"broadcast_contract": False, "immediate_ack": "marker"}),

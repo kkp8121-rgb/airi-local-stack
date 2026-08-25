@@ -161,6 +161,26 @@ def read_journal_failure_state(transport: Any, health_url: str) -> dict[str, obj
         return {}
 
 
+def read_model_digest(transport: Any, health_url: str) -> str | None:
+    """Content-free model identity from ``/health`` (``chat_model.digest.digest``).
+
+    Returns ``None`` when the proxy does not advertise a 64-hex digest; the
+    comparator treats that as a missing confounder and fails closed.
+    """
+    try:
+        response = transport.client.get(health_url, timeout=5.0)
+        response.raise_for_status()
+        health = response.json()
+        chat_model = health.get("chat_model") if isinstance(health, dict) else None
+        digest = chat_model.get("digest") if isinstance(chat_model, dict) else None
+        value = digest.get("digest") if isinstance(digest, dict) else None
+    except Exception:
+        return None
+    if not isinstance(value, str) or len(value) != 64 or set(value) - set("0123456789abcdef"):
+        return None
+    return value
+
+
 def verify_live_contract(transport: Any, health_url: str, contract: str) -> bool:
     """Fail closed unless the live proxy advertises the requested contract."""
     try:
@@ -801,6 +821,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     live_broadcast: dict[str, str] | None = None
     live_contract_verified: bool | None = None
     primary_error: BaseException | None = None
+    model_digest: str | None = None
     try:
         if args.live_broadcast_context == "on":
             # Read capability secrets only at the invocation boundary.  They are
@@ -886,12 +907,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                     if primary_error is None:
                         raise
         finally:
+            if primary_error is None:
+                # R2 F6: bind the report to the model the proxy actually served.
+                model_digest = read_model_digest(transport, proxy_health_url(args.base_url))
             transport.close()
 
     payload = {
         "schema_version": sim.REPORT_SCHEMA_VERSION,
         "topic_title": stream["topic_title"],
         "model": args.model,
+        "model_digest": model_digest,
+        "max_tokens": args.max_tokens,
         "memory_arm": args.memory_arm,
         "briefing": args.briefing,
         "acts": args.acts,

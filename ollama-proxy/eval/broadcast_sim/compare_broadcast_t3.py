@@ -14,6 +14,53 @@ SETTINGS = ('contract', 'briefing', 'acts', 'briefing_evidence',
             'live_broadcast_context', 'history_turns', 'protocol', 'author_format')
 REQUIRED_METRICS = ('donation_callout_correct', 'memory_probe',
                     'topic_anchored', 'viewer_fact_usage')
+# R2 F5: a fixture with fewer seeds than this cannot support a paired verdict.
+MIN_SEEDS_PER_FIXTURE = 4
+# R2 F6: confounders that must be identical across every report on both sides.
+# ``model``/``model_digest`` must be constant within one side and the digests
+# must differ between sides, or the two directories do not compare two models.
+CONFOUNDERS = ('memory_arm', 'contract_version', 'max_tokens')
+ARM_IDENTITY = ('model', 'model_digest')
+DIGEST_HEX = frozenset('0123456789abcdef')
+
+
+def confounders(report: dict[str, Any]) -> tuple[tuple[str, Any], ...]:
+    for name in CONFOUNDERS + ARM_IDENTITY:
+        if name not in report:
+            raise ValueError(f'missing confounder field: {name}')
+    memory_arm, max_tokens = report['memory_arm'], report['max_tokens']
+    if not isinstance(memory_arm, str) or not memory_arm:
+        raise ValueError('memory_arm is not a non-empty string')
+    if isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or max_tokens <= 0:
+        raise ValueError('max_tokens is not a positive integer')
+    model, digest = report['model'], report['model_digest']
+    if not isinstance(model, str) or not model:
+        raise ValueError('model is not a non-empty string')
+    if not isinstance(digest, str) or len(digest) != 64 or set(digest) - DIGEST_HEX:
+        raise ValueError('model_digest is not a 64-hex digest')
+    return tuple((name, report[name]) for name in CONFOUNDERS + ARM_IDENTITY)
+
+
+def verify_confounders(base: dict[Any, dict[str, Any]], candidate: dict[Any, dict[str, Any]]) -> None:
+    sides = []
+    for reports in (base, candidate):
+        observed = {confounders(report) for report in reports.values()}
+        if len(observed) != 1:
+            raise ValueError('confounder fields differ within one report directory')
+        sides.append(dict(observed.pop()))
+    left, right = sides
+    if any(left[name] != right[name] for name in CONFOUNDERS):
+        raise ValueError('confounder fields differ between base and candidate')
+    if left['model_digest'] == right['model_digest']:
+        raise ValueError('base and candidate share one model digest')
+
+
+def verify_seed_floor(keys: set[tuple[str, int]]) -> None:
+    seeds: dict[str, set[int]] = defaultdict(set)
+    for sha, seed in keys:
+        seeds[sha].add(seed)
+    if any(len(values) < MIN_SEEDS_PER_FIXTURE for values in seeds.values()):
+        raise ValueError(f'fixture seed count below minimum {MIN_SEEDS_PER_FIXTURE}')
 
 
 def canonical_sha(value: Any) -> str:
@@ -138,6 +185,8 @@ def compare(base_dir: Path, candidate_dir: Path, manifest_path: Path,
         present = {sha for sha, _seed in base}
         if present != allowed:
             raise ValueError('missing or extra manifest fixture')
+        verify_seed_floor(set(base))
+        verify_confounders(base, candidate)
         aggregate = {name: {'base_hits': 0, 'base_of': 0, 'candidate_hits': 0, 'candidate_of': 0}
                      for name in REQUIRED_METRICS}
         calibration_fact_deltas = []
