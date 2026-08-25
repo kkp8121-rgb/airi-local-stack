@@ -1,5 +1,13 @@
 # AIRI 다음 세션 안내
 
+> **2026-08-25 10:27 KST 최우선 — D1 실행 감독을 Claude Code가 인수:** detached
+> wrapper PID 7832는 exact command 그대로 live이고 reports/health 15/48, stdout
+> 75,211 B, stderr 0 B, exit receipt absent다. Codex monitor subagent만 중단했고 matrix·
+> 서비스 제어는 0이다. blind v4는 이미 소비됐으므로 launcher/wrapper를 재실행·재시도하지
+> 않는다. Claude는 `airi_docs/진행중/AIRI-D1-CODEX-HANDOFF-2026-08-25.md` 하나를 단일
+> 진입점으로 읽고 PID/로그/report를 read-only 감시한 뒤 48/48에서 기존 comparator
+> verdict 분기를 수행한다. Codex는 이관 후 감시·verdict·campaign을 수행하지 않는다.
+
 > **2026-08-25 09:26 KST 최우선 — D1 preflight PASS, detached matrix intent 직전:**
 > `d1` 4-arm/48-run 프로파일과 guard+deterministic layer 이중 health attestation을
 > 구현·검증해 `9e6b1f4`+receipt `a510004`로 origin/main push했다. external D1 matrix

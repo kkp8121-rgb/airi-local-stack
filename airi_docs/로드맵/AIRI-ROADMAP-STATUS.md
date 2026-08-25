@@ -7,6 +7,14 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
+> **2026-08-25 10:27 KST D1 matrix 실행 유지, 감독 Claude 이관:** exact-once detached
+> wrapper PID 7832는 live이고 reports/health 15/48, stdout 75,211 B, stderr 0 B,
+> exit receipt absent다. Codex monitor subagent만 종료했으며 matrix launcher·wrapper·
+> 서비스에는 제어 0이다. blind v4는 소비됐고 재실행·재사용 금지다. Claude는
+> `진행중/AIRI-D1-CODEX-HANDOFF-2026-08-25.md`를 단일 진입점으로 read-only 감시를
+> 이어받아 48/48 후 D1 comparator verdict 분기만 수행한다. Codex는 더 이상 감시·
+> verdict·campaign을 수행하지 않는다. adoption=false 유지.
+
 > **2026-08-25 09:26 KST D1 launcher SHIPPED + preflight PASS — matrix intent 대기:** `d1`
 > 4-arm/48-run, guard+deterministic layer ON/복원, 두 `/health` attest, D1 comparator
 > 배선을 구현·검증해 `9e6b1f4`+receipt `a510004`로 origin/main push했다. 기존

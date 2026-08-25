@@ -1,25 +1,32 @@
-# AIRI D1 코덱스 인계 문서 (2026-08-25)
+# AIRI D1 실행 인계 문서 (2026-08-25)
 
-> **이 문서 하나로 D1 goal의 남은 작업을 이어받는다.** 작성자는 Claude Fable 세션
-> (감독), 인계 대상은 코덱스다. 세션 시작 프로토콜은 그대로다 — `AGENTS.md` →
+> **2026-08-25 10:27 KST 최신 — 감독권을 Codex에서 Claude Code로 이관했다. 이 문서가
+> Claude의 단일 진입점이다.** detached matrix는 중단하지 않았고 재실행하지 않는다.
+> Claude는 `AGENTS.md` →
 > `airi_docs/진행중/AIRI-WORKING-STATE.md` → **이 문서** → `AIRI-ROADMAP-STATUS.md` →
 > `NEXT-SESSION.md`를 읽고 `git status`/HEAD/PID/산출물 SHA를 read-only로 대조한 뒤에
-> 실행한다. 설계 계약 원문은 `AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md`이고
+> 감시를 재개한다. 설계 계약 원문은 `AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md`이고
 > 이 문서는 그 계약의 **실행 상태와 남은 단계**만 다룬다.
 
 ## 0. 인계 시점 상태 (관측값)
 
 | 항목 | 값 |
 |---|---|
-| HEAD = origin/main | `a510004784a2d6dcfb3bdb8b7e9e2839d09e98b9` |
-| worktree | clean (이 문서 추가 전 기준) |
-| AIRI 관련 PID | 0 (Ollama `serve` 11434만 상시) |
+| 관측 시각 | `2026-08-25T10:27:00.9700198+09:00` |
+| HEAD = origin/main | `d5bab18f00450c63bc2131ee246f0c8b1f73e76e` (이관 문서 commit 전 기준) |
+| worktree | 기존 WORKING/ROADMAP-LOG receipt diff만 dirty; 사용자 코드 변경 0 |
+| detached wrapper | PID `7832` live |
+| exact command | `"C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -File D:\AIRI-Models\airi-d1-blind-matrix-20260825\launch-d1-matrix.ps1` |
+| matrix 진행 | reports `15/48`, health `15/48`, stdout `75,211 B`, stderr `0 B`, exit receipt absent |
+| Codex monitor | `/root/monitor_d1_matrix`만 `interrupted`; wrapper·launcher·서비스 제어 0 |
 | GPU | idle — **D1은 GPU 학습이 전혀 없다** |
 | goal | `user-goal-2026-08-25-0454-d1` (WORKING-STATE frontmatter `authorization` 참조) |
 | adoption | `false` 고정. campaign 결과와 무관하게 별도 사용자 승인 사항 |
 
-D1 goal 5단계 중 **1·2·3과 launcher 구현이 끝났고 4(48-report matrix)와 5(분기)가
-남았다.** 남은 실행 과제는 model manifest 생성·preflight와 matrix다.
+D1 goal 5단계 중 **1·2·3과 launcher/preflight가 끝났고 4(48-report matrix)가 exact-once
+실행 중이며 5(분기)가 남았다.** blind v4는 이 실행으로 이미 소비됐다. Claude는 PID
+7832를 중단·재실행·재시도하지 말고 read-only로 완주를 감시한 뒤 기존 comparator
+verdict에 따라 §2.3 분기만 수행한다.
 
 ## 1. 끝난 것 (검증·push 완료)
 
@@ -99,7 +106,7 @@ D1 goal 5단계 중 **1·2·3과 launcher 구현이 끝났고 4(48-report matrix
   delta ≥0.132, improved ≥4). 테스트는 그 분기를 검증하려고 **테스트 전용** policy
   변형(0.5/5)을 쓴다. 배포 policy 값은 0.02/0.08/4 그대로다.
 
-## 2. 남은 작업 (코덱스가 이어받는 부분)
+## 2. 남은 작업 (Claude가 이어받는 부분)
 
 ### 2.1 [완료] launcher `d1` 프로파일 — commit `9e6b1f4`, receipt `a510004`
 
@@ -160,24 +167,33 @@ checkpoint/AST/diff-check를 통과했다. 기존 t3/e2c1/e2c2는 3 arm/36을 �
  {"name":"e2-c2","tag":"midm-airi:e2c2-broadcast-v4-20260824-5eda8184e7118093773b4eafe513ec96","digest":"66364b4a1eeb33459b957d5024d864a45264897d121c2db0cc1f528b7bd48252"}]}
 ```
 
-### 2.2 [필수] 48-report matrix 실행
+### 2.2 [실행 중] 48-report matrix 감시 — 재실행 금지
 
-launcher 배치를 검증·commit/push한 뒤, intent checkpoint를 쓰고 **정확히 한 번**
-detached로 실행한다:
+2026-08-25 09:28:26 KST detached wrapper PID 7832로 정확히 한 번 시작했고 blind v4는
+소비됐다. 10:27:00 KST 기준 reports/health 15/48, stdout 75,211 B, stderr 0 B, exit
+receipt absent다. Codex monitor subagent만 종료됐으며 wrapper·launcher·서비스는 계속
+실행 중이다. **아래 launcher 명령은 역사적 호출 계약일 뿐 다시 실행하지 않는다.**
+Claude의 다음 행동은 PID/command, report/health 증가, stdout/stderr, exit receipt를
+read-only로 감시하고, 종료 뒤 48/48 completeness와 `comparisons\d1-blind.json` verdict를
+검증하는 것이다.
 
-2026-08-25 09:26 KST preflight PASS: external model manifest 767 B SHA
+다음 두 문단과 명령은 **이미 완료된 09:26~09:28 KST 시작 절차의 역사 기록**이다.
+현재 세션에서 실행하지 않는다.
+
+2026-08-25 09:26 KST 당시 preflight PASS: external model manifest 767 B SHA
 `050ae10f86cef5801b625a54bdfaa136ad927873e62b0e44226fa241b38ae330`, 48/48
 unique run keys, arm 순서 4개, seed sets 3×4, comparison d1-blind, OutputDir 미생성.
-blind 응답 생성은 아직 0이다. 다음은 detached wrapper SHA와 matrix intent 고정이다.
+그 시점에는 blind 응답 생성이 0이었고, 이후 09:28:26 KST exact-once wrapper가 시작됐다.
 
 ```powershell
+# HISTORICAL EXACT COMMAND — DO NOT RUN AGAIN
 .\run-airi-broadcast-t3-matrix.ps1 -MatrixProfile d1 `
   -OutputDir 'D:\AIRI-Models\airi-d1-blind-matrix-20260825\run' `
   -ModelManifest 'D:\AIRI-Models\airi-d1-blind-matrix-20260825\d1-model-manifest.json' `
   -BlindRoot 'D:\AIRI-Models\airi-d1-blind-freeze-20260825-v4'
 ```
 
-- 먼저 `-PreflightOnly`로 48 run key와 blind 바인딩을 확인한다(출력 JSON의 `runs`).
+- `-PreflightOnly` 48 run key와 blind 바인딩은 이미 PASS했다. 다시 실행하지 않는다.
 - 실측 기준: E2-C2의 36-report matrix가 약 2시간 40분이었다. 48은 **3.5~4시간** 예상.
   heartbeat 상한 14분, 첫 3 report에서 perfect-rate 분모 nonzero와
   `evidence\health-*.json`의 두 플래그 attest를 조기 확인할 것.

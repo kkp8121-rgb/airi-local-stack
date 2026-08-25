@@ -7,8 +7,20 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-25 D1 실행 감독 Claude 이관
+
+- 10:27 KST 최신 사용자 지시로 matrix 자체는 유지하고 감독·후속 verdict 분기만
+  Claude Code로 이관한다. wrapper PID 7832 exact command live, reports/health 15/48,
+  stdout 75,211 B, stderr 0 B, exit receipt absent다. Codex monitor subagent만
+  `interrupted`; launcher/wrapper/서비스 제어·재실행·재시도 0, blind v4 재사용 0이다.
+  `진행중/AIRI-D1-CODEX-HANDOFF-2026-08-25.md`를 Claude 단일 진입점으로 갱신하며
+  Codex는 commit/push와 wrapper 생존 재확인 뒤 감시·verdict·campaign을 종료한다.
+
 ## 2026-08-25 D1 launcher 프로파일 구현·offline PASS
 
+- 10:18 KST baseline arm receipt 문서를 work-continuity/diff-check PASS 후 commit
+  `d5bab18`로 고정하고 origin/main에 push했다. HEAD/local/origin exact이며 matrix는
+  12/48, wrapper live, stderr 0 B다.
 - 10:17 KST baseline arm batch 12/12 완료: reports/health/run-contract가 모두 12이고,
   12개 health 전부 guard/layer before/after=true다. total 12/48, wrapper live, stderr
   0 B이며 다음 e2 arm으로 진행한다. 최종 gate 평가는 comparator까지 유보한다.
