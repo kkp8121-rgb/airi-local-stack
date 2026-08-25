@@ -525,6 +525,16 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 
 ## 참조
 
+- `AIRI-CLAUDE-REVIEW-2026-08-25.md` — 검토 PC(GPU 없음)에서 08-21 HEAD 기준으로 쓴
+  파인튜닝 파이프라인 재검토의 **시점 고정 실측 기록**. §3/§9 파이프라인 상태는 시효
+  만료. 유효한 발견은 §5 — Ollama 0.32.x는 GGUF 내장 Jinja가 Modelfile TEMPLATE보다
+  우선해 **KT 프리앰블 ≈514토큰이 매 턴 고정 소모**된다(GPU PC 패키징 태그에서 재검증,
+  user 1건 `prompt_eval_count` 514). M1에서 확정한 프록시 400 `exceed_context_size_error`
+  의 고정비 원인이며 `num_ctx` 4096 승격 근거.
+- `AIRI-FINETUNE-TOOLING-SURVEY-2026-08-25.md` — 로컬 파인튜닝 도구 판정표(Mi:dm Mini·
+  RTX 3060 Ti 8GB 기준). 현행 트레이너가 정석이라 프레임워크 교체 이득 없음; 채택은
+  lm-evaluation-harness(일반 능력 회귀 가드)·llama.cpp `perplexity`(양자화 손실) 두 평가
+  축이며 M2에서 greybox 도입. Unsloth·DPO는 보류.
 - `AIRI-MEMORY-TECH-RESEARCH-2026-08-18.md` — 장기기억 기술 3트랙
   리서치 종합(학술·OSS 20여종·자체 레포). 결론: 교체 없음 + 선별 차용,
   실행 로드맵 5단계. Qwen3-8B·임베딩 A/B 실측으로 일부 정정 반영됨.
