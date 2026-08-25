@@ -1,0 +1,6 @@
+interface:
+  display_name: "AIRI 로드맵 대시보드"
+  short_description: "실제 작업 상태와 로드맵 체크리스트를 동기화합니다"
+  default_prompt: "$airi-roadmap-dashboard를 사용해 AIRI의 현재 작업 상태를 실제 프로세스와 산출물로 대조한 뒤 사용자용 로드맵 대시보드를 갱신해 주세요."
+policy:
+  allow_implicit_invocation: true

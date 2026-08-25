@@ -1,15 +1,16 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 22:58:32 +09:00"
-checkpoint_id: "20260825-225832-m4-precommit-validation-receipt-commit-push-intent"
-matrix_note: "M4 precommit PASS: exact 20-path stage, missing/extra/unstaged/untracked 0; patch manifest, current checkpoint, work continuity, staged diff-check all exit 0. Earlier fresh suites remain proxy/runtime 403 OK and affected 435 passed, 3 skipped, 276 subtests; v5 12/12; v6 verifier PASS; independent P0/P1/P2 0. Next commit 'fix: wire live deterministic layer for blind v6', push origin main, verify exact clean; matrix root unstarted, service/GPU 0"
-active_trainer_note: "GPU 학습 없음. lm-eval 추론만 사용했고 종료(GPU 370 MiB). AIRI 서비스 0"
+updated_at_kst: "2026-08-26 03:53:35 +09:00"
+checkpoint_id: "20260826-035335-m4-exact-stage-receipt"
+matrix_note: "M4 plus roadmap-dashboard goal active. D1v6 terminal/no_winner, campaign N/A, M4-9 dashboard skill and docs synchronized. Final validation receipt: affected clean 739 passed/9 skipped/297 subtests, proxy/runtime 403 OK, deterministic/guard 52+10, offline/continuity/dashboard/skill/diff contracts PASS; exact pinned command reproduced only documented interpreter split and two known behavior-v2 failures. Exact 13-path stage/commit next; push awaits fresh approval"
+active_trainer_note: "GPU 학습 없음. d1v6 48-report inference matrix 종료; wrapper PID 10264 absent, owned process/listener 0, owned ports 11435/11436/8880/9880/8890/8892 all free"
 goal_status: "active"
 authorization: "user-goal-2026-08-25-1720-m3: approve-all-three-recommendations (blind-v5-seal-then-4-arm-48-report-rematrix-with-marker-and-num_ctx-4096, enforce-lm-eval-general-capability-gate-le-2pp-vs-stock, fix-native-baseline-fixture-pin); no-gpu-training; matrix-exact-once; operational-adoption-forbidden-until-separate-user-approval. superseded: user-goal-2026-08-25-1630-m2: proceed-with-proposed-direction (review-docs-into-참조+INDEX, num_ctx-4096-prompt-budget, R2-F7-campaign-code-gate) and adopt-tools-judged-beneficial (lm-eval, llama.cpp perplexity; unsloth/DPO deferred); no-gpu-training; operational-adoption-still-separate-approval. superseded: user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
 m4_authorization: "user-goal-2026-08-25-m4: fix live deterministic-layer wiring, add pre-fix-failing/live-path tests, expand P3 rejected-branch extraction, author/seal fresh blind-v6 with handle-topic collision gate, exact-once 48-report d1v6 matrix, winner-only 3x500 campaign, otherwise diagnose-and-wait; no GPU/new candidate training; no blind-v1-v5 reuse; no gate/threshold/metric/seed/fixture-definition changes; operational adoption forbidden without separate approval"
+m4_dashboard_authorization: "user-additional-goal-2026-08-26: keep running M4 matrix untouched; add evidence-backed user roadmap live dashboard, normalize stale whole-roadmap checklist after terminal, create shared-contract Codex+Claude project skill airi-roadmap-dashboard with skill-creator after terminal, update WORKING+ROADMAP together every <=14m; no skill/test/contract files during matrix; push requires fresh separate user approval"
 active_phase: "m4-main-session-is-codex"
-git_head: "585394e882b43715bcc8581c49c3b5bf713db7af"
-worktree_state: "main/local origin/main/remote main exact 585394e882b43715bcc8581c49c3b5bf713db7af; expected M4 repo changes 20 paths (18 modified, 2 untracked); stage 0; only main worktree; AIRI-related process 0; owned listeners 11435/11436/8880/9880/8890/8892 all 0"
+git_head: "30fe3524996756fbb0a969b94b10d98f208f8508"
+worktree_state: "main/local origin/main exact 30fe3524996756fbb0a969b94b10d98f208f8508; dashboard/M4 docs, two skill entries, shared contract, root contract test, current-checkpoint and patch-manifest edits are unstaged; stage 0. wrapper/owned process/listener 0; no_winner diagnosis complete, campaign N/A; M4-10 docs sync/full verification in progress"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
@@ -24,6 +25,154 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 > 기준 상태다. checkpoint를 포함한 commit 자체의 SHA를 자가 참조하지 않는다.
 
 ## 1. 권한과 현재 사실
+
+- 2026-08-26 03:53 KST **M4 exact stage receipt + commit intent**: dashboard/skill/
+  contract/test/docs exact 13경로를 stage했다. Unicode quote를 비활성화한 경로 대조에서
+  staged 13/13, missing/extra/unstaged/untracked 0이다. staged 상태의 patch-manifest,
+  current-checkpoint, standalone work-continuity, dashboard contract가 모두 PASS했고
+  `skill-creator` validator와 staged diff-check도 exit 0이다. HEAD/local/origin은 여전히
+  `30fe3524996756fbb0a969b94b10d98f208f8508`다. 이 receipt와 ROADMAP live 행을 재stage해
+  동일 manifest·계약을 확인한 뒤 `git commit -m "docs: add evidence-backed roadmap dashboard"`
+  를 실행한다. commit 실패 시 push/완료로 승격하지 않으며 push는 성공 뒤 별도 승인을 요청한다.
+
+- 2026-08-26 03:49 KST **M4-10 final validation receipt + exact stage intent**: handoff §5
+  exact pinned command는 앞 receipt의 `httpx` collection 함정으로 exit 1, 그 파일을 계약된
+  WindowsApps Python으로 실행해 8/8 OK했다. pinned 나머지는 문서에 고정된 기존
+  `test_synthesize_broadcast_behavior_v2.py` 2건만 실패하면서 743 passed/9 skipped/297 subtests,
+  두 환경·기존 실패 파일을 제외한 M4 affected clean run은 739 passed/9 skipped/297 subtests로
+  exit 0이다. proxy/runtime 403 OK, deterministic/guard 52 passed+10 subtests,
+  patch-manifest·current-checkpoint·work-continuity·dashboard contract PASS, `skill-creator`
+  validator PASS, diff-check exit 0이다. HEAD는 `30fe352`, stage 0, owned listener 0이며 GPU·
+  service·campaign·외부 Claude 호출은 0이다. 다음 상태 변경은 관측된 M4 dashboard/skill/
+  contract/test/docs 13개 exact path만 stage하고 staged manifest·diff·contract를 재검증한 뒤
+  Conventional Commit하는 것이다. push는 수행하지 않고 직전 별도 사용자 승인을 요청한다.
+
+- 2026-08-26 03:40 KST **handoff §5 pinned pytest environment receipt**: §5 첫 exact
+  pinned Python command는 65.94초 뒤 collection exit 1이었다. 실패는 코드 assertion이 아니라
+  `training/tests/test_synthesize_broadcast_continuity_v4.py` import가 `ollama_proxy.py`의
+  `httpx`를 요구하지만 pinned venv에 module이 없는 기존 §4 interpreter split 함정 하나다.
+  다른 test는 collection 중단으로 실행되지 않았다. stage/commit은 계속 차단한다. 다음은 이
+  unittest 파일을 WindowsApps Python 3.14로 실행하고, pinned suite는 해당 파일을 명시적으로
+  제외해 나머지를 실행한다. 문서에 고정된 기존 `test_synthesize_broadcast_behavior_v2.py`
+  2 failure 이외의 실패가 없음을 확인한 뒤 known-failure 파일도 제외한 clean affected pass를
+  별도로 남긴다.
+
+- 2026-08-26 03:38 KST **M4-10 final validation intent**: HEAD/local/origin은
+  `30fe3524996756fbb0a969b94b10d98f208f8508`, stage 0, owned listener 0이고 관측된 dirty는
+  M4 terminal·dashboard/skill/contract/test/docs 배치뿐이다. 10분을 넘을 수 있는 handoff §5
+  전체 명령을 순서대로 실행한다: pinned Python broadcast_sim·affect·training·launcher pytest,
+  WindowsApps Python proxy/runtime unittest, pinned deterministic/guard pytest, patch-manifest·
+  current-checkpoint·work-continuity·dashboard contract, `skill-creator` validator, repo diff-check.
+  각 exit와 test count를 읽고 하나라도 실패하면 stage/commit으로 승격하지 않는다. GPU 학습,
+  서비스, blind 재실행, campaign, 외부 Claude 호출은 0을 유지한다.
+
+- 2026-08-26 03:35 KST **M4-9 shared dashboard skill receipt**: 공통 계약 하나를 참조하는
+  byte-identical Codex `.agents/skills/airi-roadmap-dashboard/SKILL.md`와 Claude
+  `.claude/skills/airi-roadmap-dashboard/SKILL.md`, Codex UI metadata를 만들었다. 새 root
+  contract test는 허용 상태, 현재 Goal `[~]` 최대 1개, `[B]` 원인·재개 조건, `[?]` 0,
+  heartbeat 시각/장기 수치, `[S]`·`[N/A]` 분모 제외, M4·전체 비율 재계산, 동일 공통 계약
+  참조와 링크·metadata를 실제 파싱해 PASS했다. `skill-creator` quick validator는 Windows
+  기본 cp949 첫 실행이 UTF-8 SKILL을 읽지 못해 exit 1이었고 `PYTHONUTF8=1`로 같은 validator를
+  재실행해 `Skill is valid!`/exit 0을 받았다. Claude Code `2.1.245` 설치 binary의 project
+  `.claude/skills/` 자동 발견 문구도 read-only로 확인해 project `CLAUDE.md` routing 추가는
+  불필요하다. 외부 Claude 호출은 0이다. 다음 한 동작은 M4 handoff·LOG·NEXT를 동기화하고
+  handoff §5 전체 검증을 실행하는 것이다.
+
+- 2026-08-26 03:30 KST **compact 복구 재대조 receipt + M4-9 계속**: WORKING-STATE
+  6,666행을 UTF-8로 EOF까지 다시 읽고 HEAD/local main/origin main exact
+  `30fe3524996756fbb0a969b94b10d98f208f8508`, stage 0, 현재 tracked dirty 3개와
+  untracked Codex·Claude skill 진입점/공통 계약을 확인했다. d1v6는 exit-code receipt 0,
+  report·health·run-contract·packet 고유 교집합/합집합 48/48, duplicate·missing 0,
+  summary/comparison pass, no_winner이며 wrapper/owned PID/listener 0과 소유 포트 6개 free다.
+  채팅 요약과 달랐던 frontmatter의 `stage/untracked 0`을 관측값으로 정정했다. 다음 한 동작은
+  전체 로드맵 계산값을 확정하고 공용 skill 운영 불변식 contract test를 추가·실행하는 것이다.
+
+- 2026-08-26 00:29 KST **사용자용 로드맵 대시보드 추가 Goal 병합 + matrix heartbeat
+  16/48**: 추가 사용자 지시로 M4를 중단하지 않고 evidence-backed live dashboard, 전체
+  체크리스트 노후화 감사, Codex/Claude 공통 계약 기반 `airi-roadmap-dashboard` 프로젝트
+  스킬을 기존 Goal에 합쳤다. matrix 중 허용 write는 WORKING과 ROADMAP-STATUS heartbeat뿐이며
+  스킬/테스트/공통 계약 파일은 terminal receipt 뒤에만 만든다. push는 기존 허가를 재사용하지
+  않고 직전 별도 승인을 요청한다. 실제 대조는 wrapper PID 10264 exact command live,
+  report/health/run-contract/packet 고유 교집합 16/48, union 16, duplicate/incomplete 0,
+  stdout 81,518 B, stderr 0 B, exit absent, listener 11435/8880/9880/8892 exact command,
+  금지 11436/8890 free다. `skill-creator` 본문은 전체 읽었고 제작은 terminal까지 차단한다.
+
+- 2026-08-25 23:59 KST **M4 d1v6 matrix heartbeat 9/48**: wrapper PID 10264 live,
+  reports/health/run-contract/packets 각 9/48, runtime dir 10, duplicate report key 0이다.
+  stdout stream 46,673 B, stderr 0 B, exit receipt absent다. 현재 격리 listener는
+  11435 PID 29260, 8880 PID 24540, 9880 PID 27416, 8892 PID 22720이고 11436/8890은
+  free다. first3 early gate PASS는 유지되며 다음은 동일 read-only 감시와 14분 이하 heartbeat다.
+
+- 2026-08-25 23:48 KST **M4 d1v6 matrix heartbeat 8/48**: wrapper PID 10264 live,
+  reports/health/run-contract/packets 각 8/48, runtime dir 9, duplicate report key 0이다.
+  stdout stream 41,470 B, stderr 0 B, exit receipt absent다. 현재 격리 listener는
+  11435 PID 8864, 8880 PID 30868, 9880 PID 2444, 8892 PID 1820이고 11436/8890은
+  free다. first3 early gate PASS는 유지되며 다음은 동일 read-only 감시와 14분 이하 heartbeat다.
+
+- 2026-08-25 23:37 KST **M4 d1v6 matrix heartbeat 6/48**: wrapper PID 10264 live,
+  reports/health/run-contract/packets 각 6/48, runtime dir 7, duplicate report key 0이다.
+  stdout stream 30,928 B, stderr 0 B, exit receipt absent다. 현재 격리 listener는
+  11435 PID 27376, 8880 PID 13500, 9880 PID 29372, 8892 PID 22616이고 11436/8890은
+  free다. first3 early gate PASS는 유지되며 다음은 동일 read-only 감시와 14분 이하 heartbeat다.
+
+- 2026-08-25 23:27 KST **M4 d1v6 matrix heartbeat 5/48**: wrapper PID 10264 live,
+  reports/health/run-contract/packets 각 5/48, runtime dir 6, duplicate report key 0이다.
+  stdout stream 23,190 B, stderr 0 B, exit receipt absent다. 현재 격리 listener는
+  11435 PID 24060, 8880 PID 12508, 9880 PID 30076, 8892 PID 24548이고 11436/8890은
+  free다. first3 early gate PASS는 유지되며 다음은 동일 read-only 감시와 14분 이하 heartbeat다.
+
+- 2026-08-25 23:16 KST **M4 first 3 report early-gate receipt**: 첫 3/48 report와
+  `health-<run-key>.json`을 report creation order로 독립 재검증했다. 세 key 모두
+  before/after `handle_grounding_guard=true`, `deterministic_utterance_layer=true`, 정확한 nested
+  `prompt_budget.context_exceeded_observations=0/0`, report `summary.service_error.hits=0`이며
+  fail 0이다. wrapper PID 10264도 live다. 다음은 상태 이상·종료 전까지 채팅 보고 없이
+  read-only 완주 감시와 14분 이하 WORKING-only heartbeat뿐이며 wrapper 재시작은 금지다.
+
+- 2026-08-25 23:15 KST **M4 d1v6 matrix heartbeat 2/48**: wrapper PID 10264 live,
+  reports/paired health 2/48다. 첫 두 key 각각 두 health snapshot의
+  `handle_grounding_guard=true`, `deterministic_utterance_layer=true`,
+  `prompt_budget.context_exceeded_observations=0`, report `service_error.hits=0`이다.
+  stdout stream 10,632 B, stderr 0 B, exit receipt absent다. 현재 격리 run이 소유한
+  listener는 11435/8880/9880/8892이고 금지된 11436/8890은 free다. 첫 3 report 완료 시
+  같은 필드를 correct nested path로 다시 독립 검증하고, 이상이 없으면 채팅 보고 없이
+  14분 이하 WORKING-only heartbeat를 계속한다.
+
+- 2026-08-25 23:02 KST **M4 d1v6 exact-once matrix start receipt**: 분리 precheck가
+  HEAD/origin `30fe3524996756fbb0a969b94b10d98f208f8508`, WORKING-only dirty, launch artifact/PID/
+  listener 0, wrapper/model/sealed SHA exact를 PASS한 뒤 hidden `Start-Process`를 OS 수준에서
+  정확히 한 번 실행했다. wrapper PID `10264`, exact command는 intent와 일치하고 live다.
+  `launcher-start-receipt.json`은 schema `airi.d1-matrix-launch-receipt.v1`, 691 B, SHA
+  `b1a958ee994a7da4906fc454136711e0ba58f4ea922ec1d948f6170714237d29`이며 PID·시각
+  `2026-08-25T23:02:12.3275332+09:00`·repo HEAD·wrapper/model/sealed SHA에 결속됐다.
+  run root는 생성됐고 reports 0, stdout 677 B, stderr 0 B, exit receipt absent다. owned
+  listener는 11435 PID 1532, 8892 PID 30376가 올라왔고 나머지 4개는 free다. 이제 wrapper를
+  절대 재시작하지 않고 첫 3 report의 두 flag attest·context_exceeded 0·service_error 0을
+  조기 확인한 뒤 14분 이하 WORKING-only heartbeat로 완주를 감시한다.
+
+- 2026-08-25 23:01 KST **M4 launch tool-level rejection receipt + split launch intent**:
+  precheck·Start-Process·receipt를 한 긴 PowerShell 문자열에 합친 첫 도구 호출은
+  `CreateProcess ... rejected: blocked by policy`로 OS 실행 전에 거부됐다. 즉 wrapper
+  실행 횟수는 0이며 retry가 아니라 미실행 경로의 호출 형식 변경이다. 직후 read-only 대조에서
+  `run`, launcher stdout/stderr, start/exit receipt 전부 absent, 관련 wrapper PID 0,
+  owned listener 6개 free다. 다음은 (1) HEAD/WORKING-only dirty/path/hash/PID/port read-only
+  precheck, (2) redirect+hidden 옵션만 가진 짧은 `Start-Process`를 **한 번**, (3) 반환 PID에
+  결속한 no-overwrite start receipt 생성으로 분리한다. OS-level start가 반환된 뒤에는 receipt나
+  wrapper 상태와 무관하게 같은 wrapper를 다시 시작하지 않는다.
+
+- 2026-08-25 23:00 KST **M4 implementation push receipt + exact-once matrix launch
+  intent**: commit `30fe3524996756fbb0a969b94b10d98f208f8508`
+  (`fix: wire live deterministic layer for blind v6`)은 `585394e..30fe352 main -> main`으로
+  push됐고 HEAD/local main/local origin/main/remote main exact, worktree/stage/untracked 0을
+  확인했다. 외부 v6 root는 wrapper 1,198 B SHA `e8820118...acb9`, model manifest 767 B
+  SHA `050ae10f...e330`만 있으며 `run`, launcher stdout/stderr, start/exit receipt는 absent다.
+  다음 상태 변경은 `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile
+  -File D:\AIRI-Models\airi-d1v6-blind-matrix-20260825\launch-d1v6-matrix.ps1`를 hidden
+  `Start-Process`로 정확히 한 번 시작하고 stdout/stderr를 같은 root에 연결하는 것이다.
+  시작 직후 schema `airi.d1-matrix-launch-receipt.v1`, PID, exact command, repo HEAD,
+  wrapper/model/sealed manifest SHA, blind/output root를 원자적 no-overwrite JSON으로 기록한다.
+  이미 파일·PID·listener가 생겼거나 start/receipt 작성이 실패하면 같은 wrapper를 반복하지 않고
+  root를 보존한다. 첫 3 report에서 두 flag attest와 context/service error 0을 확인하며,
+  완료 전에는 이 tree의 `ollama-proxy/**`와 `run-airi-*.ps1`을 수정하지 않는다.
 
 - 2026-08-25 22:58 KST **M4 precommit validation receipt + commit/push intent**: exact
   20-path `git add` 후 Unicode quote를 비활성화한 경로 대조에서 staged 20/20,

@@ -7,34 +7,41 @@
 > 실행 중 PID, owned 포트를 **read-only로 대조**하고 나서야 실행한다. 채팅 요약을 믿지 않는다.
 > 작성: Claude main 세션(airi-d6), 2026-08-25 21:39 KST, HEAD `91792a1`.
 
-## -1. M4 진행 상태 (2026-08-25 22:55 KST)
+## -1. M4 진행 상태 (2026-08-26 03:35 KST)
 
-- §3.1~§3.3 완료: live `context_note` 배선, server-owned briefing marker, donation P5,
-  pre-fix `07ad82f` 2 FAIL → 현 트리 2 PASS, P3 v5 arc 12/12. 독립 감사 P1 수리 뒤
-  flag OFF live context exact와 trailing decision verb 제거를 회귀로 고정했다.
-- §3.4 완료: 새 blind v6를 direct check 후 정확히 한 번 봉인했다. root
-  `airi-d1-blind-freeze-20260825-v6`, sealed manifest SHA `18a1987f...1c2e`, response viewed
-  false, handle-topic collision 0. body-free commitment/launcher/verifier/tests/CI까지 배선했다.
-- 증거: focused 71 passed, broadcast_sim+launcher 242 passed/1 skipped/43 subtests,
-  patch-manifest PASS, external verifier PASS, 실제 comparator synthetic 48-report PASS.
-- §3.5 preflight 완료: fresh external root에서 pinned model manifest와 no-overwrite wrapper를
-  검증했고 실제 `-PreflightOnly`가 48/48 unique run, num_ctx 4096으로 exit 0이었다. `run`과
-  start/exit receipt는 아직 없다. fresh precommit 회귀는 proxy/runtime 403 OK,
-  blind/launcher/deterministic 435 passed/3 skipped/276 subtests, v6 external verifier PASS다.
-  exact 20-path stage 뒤 patch-manifest/current-checkpoint/work-continuity/staged diff-check도 PASS했다.
-  현재 다음은 WORKING intent에 고정한 exact 20-path repo commit/push 뒤
-  detached wrapper를 한 번 시작하는 것이다. matrix·서비스·GPU 학습은 아직 0, adoption=false.
+- §3.1~§3.4 완료·origin/main 반영: live `context_note` 배선, server-owned briefing marker,
+  donation P5, pre-fix `07ad82f` 2 FAIL → 수정 후 2 PASS, flag OFF exact, P3 v5 arc 12/12,
+  blind v6 봉인·commitment·launcher/verifier/tests/CI를 commit `30fe352`로 push했다.
+- §3.5 완료: fresh external root에서 `-PreflightOnly` 48/48 뒤 detached wrapper를 정확히 한 번
+  시작했다. exit-code receipt `0`, report·health·run-contract·packet 고유 교집합/합집합 48/48,
+  duplicate·missing 0, 두 flag 48/48 before·after, context/service error 0, summary/comparison
+  `status=pass`, wrapper·owned PID/listener 0이다. comparison schema는
+  `airi.d1-blind-comparison.v1`, verdict는 `winner=null`(`no_winner`, 실패 gate 29개)다.
+- §3.5 분기 완료: 최고 점수 e2-c2도 자기 gate 10개를 실패해 retained model이 아니다.
+  P5 donation composite와 P4 decoy는 전 arm 1.0/0.0으로 닫혔지만 P3 required recall,
+  P2 잔여 호명, 공통 polite gate가 남았다. campaign·자동 후속 라운드·운영 채택은 0이다.
+  상세 귀책은 D1 contract §8에 있다.
+- 추가 목표 M4-9 완료: 과거 raw 55행 중 31개 노후 상태를 정정하고 복합 행 분리로 12행을
+  추가해 전체 77행을 정규화했다. Codex·Claude project skill은 같은 공통 계약을 참조하며
+  dashboard invariant test, `skill-creator` validator, Claude Code 2.1.245 project
+  `.claude/skills/` 발견 경로를 검증했다. 외부 Claude 호출은 0이다.
+- 현재 M4-10: 문서 동기화와 §5 전체 검증을 마쳤다. pinned broad command의 `httpx` 환경 분리와
+  문서에 고정된 기존 behavior-v2 2 failure만 재현했고, interpreter/known-failure를 분리한
+  affected clean run 739 passed/9 skipped/297 subtests와 proxy/runtime 403 OK,
+  deterministic/guard 52 passed+10 subtests, checkpoint·continuity·dashboard·skill validator·
+  diff-check가 PASS했다. 다음은 exact 13-path stage·commit이다. push는 직전 별도 사용자 승인을
+  받아야 하며 `adoption_authorized=false`다.
 
 ## 0. 인계 시점 상태 (관측값)
 
 | 항목 | 값 |
 |---|---|
-| HEAD = local main = origin/main | `91792a1` (`docs: register parallel batch documents and record the merge receipt`) |
-| worktree | clean. 병렬 branch `feature/parallel-offline-20260825`는 `9ccf870`로 main에 병합 완료 |
-| 실행 중 프로세스 | AIRI 0 (상시 `ollama serve` PID 18616 제외). owned 포트 11435/11436/8880/9880/8890/8892 free |
+| HEAD = local main = origin/main | `30fe352` (`fix: wire live deterministic layer for blind v6`) |
+| worktree | M4 terminal 진단·dashboard/skill/contract/test/docs 배치만 unstaged. 사용자 변경·stage 0 |
+| 실행 중 프로세스 | d1v6 wrapper·owned process/listener 0. owned 포트 11435/11436/8880/9880/8890/8892 free |
 | GPU | RTX 3060 Ti 8GB 유휴. **M4는 GPU 학습이 없다** (추론 matrix만) |
-| 마지막 verdict | d1v5 `D:\AIRI-Models\airi-d1v5-blind-matrix-20260825\run\comparisons\d1-blind.json` — `winner=null`, 실패 38 게이트 |
-| 소비된 blind | v1·v2·v3·v4·**v5** 전부 소비. 재사용·재실행 금지 |
+| 마지막 verdict | d1v6 `D:\AIRI-Models\airi-d1v6-blind-matrix-20260825\run\comparisons\d1-blind.json` — `winner=null`, 실패 29 게이트 |
+| 소비된 blind | v1·v2·v3·v4·v5·**v6** 전부 소비. 재사용·재실행 금지 |
 | adoption | `false` 고정. campaign 결과와 무관하게 별도 사용자 승인 |
 | 알려진 기존 실패 | `ollama-proxy/training/tests/test_synthesize_broadcast_behavior_v2.py` 2건(병합 전부터, CI matrix 포함) — M4 범위 밖, 건드리지 말고 기록만 유지 |
 
@@ -149,6 +156,19 @@ d1v5 결과 핵심: 계측은 작동한다(`service_error` 0/1,132×4, memory_pr
   -ModelManifest <retained manifest>`**를 반드시 넘긴다(F7 게이트). seeds 101,202,303 × 500턴.
   no_winner → campaign 0, 진단(P2~P5 row 귀책) 후 대기. 어느 쪽이든 adoption=false.
 
+### 3.6 사용자용 roadmap dashboard 공용 skill (추가 Goal)
+
+- 권위 있는 live dashboard를 `AIRI-ROADMAP-STATUS.md` 최상단에 두고 현재 목표·단계·정지
+  사유·다음 작업과 M4/전체 정상 완료율·처리 종료율을 실제 체크리스트에서 계산한다.
+- 공통 계약은 `AIRI-ROADMAP-DASHBOARD-CONTRACT.md` 하나다. Codex 진입점
+  `.agents/skills/airi-roadmap-dashboard/SKILL.md`와 Claude 진입점
+  `.claude/skills/airi-roadmap-dashboard/SKILL.md`는 byte-identical하고 이 계약만 참조한다.
+- root `test-airi-roadmap-dashboard-contract.ps1`가 허용 상태, 현재 Goal `[~]` 최대 1개,
+  `[B]` 원인·재개 조건, `[?]` 0, heartbeat 수치·시각, 분모 제외, 양쪽 동일 계약·링크·metadata,
+  M4/전체 계산 일치를 실제 파싱한다. `test-current-checkpoint.ps1`에서 항상 실행한다.
+- matrix terminal 전에는 skill/contract/test를 만들지 않았고 terminal 뒤에만 작성했다.
+  skill은 mutation·장시간 실행·commit·push 권한을 자동 부여하지 않는다.
+
 ## 4. 환경 함정 (오늘 실측)
 
 - **인터프리터**: pytest는 `D:\AIRI-Models\venv-midm-broadcast-qlora-py312\Scripts\python.exe`;
@@ -180,6 +200,8 @@ D:\AIRI-Models\venv-midm-broadcast-qlora-py312\Scripts\python.exe -m pytest -q o
 C:\Users\kkp74\AppData\Local\Microsoft\WindowsApps\python.exe -m unittest test_ollama_proxy test_live_broadcast_runtime   # ollama-proxy 디렉터리에서
 D:\AIRI-Models\venv-midm-broadcast-qlora-py312\Scripts\python.exe -m pytest -q ollama-proxy/test_deterministic_utterance_layer.py ollama-proxy/test_handle_grounding_guard.py
 .\test-patch-manifest.ps1; .\test-current-checkpoint.ps1; .\test-airi-work-continuity.ps1
+.\test-airi-roadmap-dashboard-contract.ps1
+$env:PYTHONUTF8='1'; D:\AIRI-Models\venv-midm-broadcast-qlora-py312\Scripts\python.exe C:\Users\kkp74\.codex\skills\.system\skill-creator\scripts\quick_validate.py .agents\skills\airi-roadmap-dashboard
 git diff --check -- . ':(exclude)airi_docs/patches/*.patch'
 ```
 

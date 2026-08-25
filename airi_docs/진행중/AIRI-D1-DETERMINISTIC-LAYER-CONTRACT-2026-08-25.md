@@ -188,3 +188,53 @@ memory_probe 36/40, `unknown_identity_safe`가 학습 arm에서 닫혔다.
 adoption 0. **다음 라운드(주입 후 메시지/`context_note`를 계층 입력에 전달, runtime이 브리핑
 마커를 붙임, P3 정규식 확장, live 경로 통합 테스트, 새 blind v6 — handle은 주제 어휘와 분리)는
 사용자 결정 사항이며 자동으로 시작하지 않는다.**
+
+## 8. M4 blind v6 재측정 결과와 진단 (2026-08-26 03:22, 결과-후 절)
+
+M4 배선 수정과 정규식 확장 뒤 새 blind v6로 같은 4-arm 48-report matrix를 정확히 한 번
+실행했다. wrapper exit-code receipt는 `0`, report·health·run-contract·packet 고유 교집합은
+48/48이고 duplicate·incomplete는 0이다. 두 결정론 flag는 48/48 before·after `true`,
+`context_exceeded`와 `service_error`는 모두 0이며 wrapper·owned PID/listener도 0으로 정리됐다.
+summary와 comparator는 `status=pass`, `adoption_authorized=false`다.
+
+| 지표 | baseline | e2 | e2-c1 | e2-c2 |
+|---|---:|---:|---:|---:|
+| weighted score | 0.465862 | 0.543016 | 0.510247 | **0.557373** |
+| failed gate 수 | 6 | 4 | 9 | 10 |
+| `invented_handle` 위반 | 2 | **0** | **0** | 3 |
+| `unknown_identity_safe` | 0.75 | **1.0** | 0.75 | 0.75 |
+| `stale_transition_clean` | 0.475 | 0.50 | 0.475 | 0.50 |
+| donation composite | **1.0** | **1.0** | **1.0** | **1.0** |
+| `decoy_fact_use`(목표 0) | **0.0** | **0.0** | **0.0** | **0.0** |
+| complete_show_arc | 0.2625 | 0.3625 | 0.3125 | 0.3625 |
+| viewer_fact_usage | 0.230159 | 0.205306 | 0.267442 | 0.220320 |
+| long_callback / memory_probe | 0.650 / 0.700 | 0.766667 / 0.875 | 0.683333 / 0.775 | 0.766667 / 0.850 |
+
+**verdict는 `winner=null`(`no_winner`, 실패 gate 29개)**다. 최고 점수 arm인 e2-c2도 자기
+게이트 10개를 통과하지 못했으므로 winner나 retained model로 승격하지 않는다. M4 계약에 따라
+3×500 campaign과 자동 후속 라운드는 실행하지 않는다.
+
+**P2~P5 row 귀책**:
+
+1. **P2/P1 호명 보장에는 잔여 구멍이 있다.** `invented_handle`은 baseline 2행과 e2-c2
+   3행에서 남았고 전부 `question` 행이다. v6의 handle-topic collision 검사는 0으로 봉인됐으므로
+   v5의 주제 부분일치 저작 artefact로 돌릴 수 없다. 다만 identity probe의 실패행에는 invented
+   handle이 0이어서 `unknown_identity_safe` 0.75의 직접 원인은 P2가 아니라 P3 probe miss다.
+2. **P3 회수/필수 답변이 주된 미폐쇄 축이다.** identity fixture에서 baseline·e2-c1·e2-c2는
+   각각 12 probe 중 3개를 놓쳤고 e2만 12/12였다. stale-transition fixture의 40행 중 required
+   패턴 miss도 baseline 21, e2 20, e2-c1 21, e2-c2 20이다. 그 결과
+   `complete_show_arc` 0.2625~0.3625와 `viewer_fact_usage` 0.205306~0.267442가 절대 최소선에
+   못 미쳤고, 후보 arm의 long-callback·memory delta와 legacy memory/fact gate도 닫히지 않았다.
+3. **P4의 decoy 억제는 닫혔지만 transition 전체를 닫지는 못했다.** factual fixture의 checked
+   80행/arm에서 decoy hit는 전 arm 0이다. transition forbidden hit도 baseline·e2·e2-c1은 0,
+   e2-c2만 3이어서 거부 옵션 억제는 대부분 작동했다. `stale_transition_clean`의 큰 공백은
+   forbidden 재발보다 P3 required miss가 지배한다.
+4. **P5 후원 이어말하기는 닫혔다.** identity fixture donation 24/24 per arm이 호명·수신자·감사·
+   메시지 공유 composite를 모두 통과했고, 전체 52 donation/arm도 callout·shared token을 모두
+   충족했다. v5의 `donation_turn=false` 배선 결함은 재현되지 않았다.
+5. **별도 공통 차단축은 말투 gate다.** `polite` 위반은 baseline 45, 나머지 arm 43이며 공통
+   43행은 모두 opinion 행이다. 이는 P2~P5의 직접 보장 대상이 아니지만 모든 arm의 hard-zero
+   gate를 독립적으로 막는다.
+
+**동결 유지**: hard gate·threshold·metric·seed·fixture 정의를 변경하지 않는다. GPU/새 후보 학습,
+campaign, 운영 채택, 자동 후속 라운드는 0이다. 후속 측정이나 운영 채택은 별도 사용자 결정 사항이다.

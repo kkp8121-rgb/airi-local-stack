@@ -5,6 +5,7 @@ param()
 $ErrorActionPreference = 'Stop'
 
 & (Join-Path $PSScriptRoot 'test-airi-work-continuity.ps1')
+& (Join-Path $PSScriptRoot 'test-airi-roadmap-dashboard-contract.ps1')
 & (Join-Path $PSScriptRoot 'test-airi-training-durability.ps1')
 & (Join-Path $PSScriptRoot 'test-patch-manifest.ps1')
 & (Join-Path $PSScriptRoot 'test-source-archive-manifest.ps1')

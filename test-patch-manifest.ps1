@@ -284,6 +284,9 @@ if ($missingProxyTests.Count -or $staleProxyTests.Count) {
 
 $checkpointPath = Join-Path $root 'test-current-checkpoint.ps1'
 $checkpoint = Get-Content -LiteralPath $checkpointPath -Raw
+if ($checkpoint -notmatch [regex]::Escape('test-airi-roadmap-dashboard-contract.ps1')) {
+    throw 'Offline checkpoint must enforce the AIRI roadmap dashboard contract.'
+}
 if ($checkpoint -notmatch [regex]::Escape('gpt-sovits\test_start_local_stack_contract.ps1')) {
     throw 'Offline checkpoint must enforce the GPT-SoVITS cache-ready launcher contract.'
 }

@@ -7,6 +7,32 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-26 M4 — d1v6 no_winner 종결·사용자용 roadmap dashboard 공용 skill
+
+- 03:49 KST M4-10 final verification을 마쳤다. handoff §5 exact pinned 명령은 pinned venv의
+  `httpx` 부재로 continuity-v4 collection이 중단됐고, WindowsApps Python으로 해당 8 tests를
+  OK 확인했다. pinned 나머지는 문서에 고정된 기존 behavior-v2 2 failure만 재현하면서
+  743 passed/9 skipped/297 subtests, 두 기존 경계를 제외한 affected clean run은
+  739 passed/9 skipped/297 subtests다. proxy/runtime 403 OK, deterministic/guard
+  52 passed+10 subtests, patch/current/work-continuity/dashboard/skill validator/diff-check도 PASS했다.
+  다음은 exact 13-path commit이며 push는 직전 별도 사용자 승인이 필요하다.
+- 03:35 KST 추가 dashboard 목표 M4-9를 닫았다. 과거 raw checklist 55행을 코드·테스트·
+  receipt·commit·사용자 결정과 대조해 노후 상태 31개를 정정하고 복합 항목을 분리해 12행을
+  추가했다. 현재 M4 10행을 합친 전체 77행은 `[x]` 44, `[~]` 1, `[Q]` 1, `[P]` 5,
+  `[B]` 7, `[D]` 8, `[F]` 6, `[S]` 2, `[N/A]` 3이며 `[ ]`·`[?]` 0이다. 활성 분모 72의
+  정상 완료율 61.1%, 처리 종료율 69.4%, 진행 지수 73.6%다.
+- Codex `.agents/skills/airi-roadmap-dashboard/`와 Claude
+  `.claude/skills/airi-roadmap-dashboard/`의 byte-identical 진입점이 공통
+  `AIRI-ROADMAP-DASHBOARD-CONTRACT.md` 하나를 참조한다. root invariant test는 상태 기호,
+  `[~]` 단일성, `[B]` 원인·재개 조건, heartbeat 시각/수치, 완료율 분모·계산, 동일 계약·링크와
+  UI metadata를 실제 파싱해 PASS했다. `skill-creator` quick validator도 `PYTHONUTF8=1`에서
+  PASS했고 Claude Code 2.1.245의 project `.claude/skills/` 자동 발견을 read-only 확인했다.
+  외부 Claude 호출은 0이며 project `CLAUDE.md` routing 추가는 불필요하다.
+- d1v6 exact-once wrapper는 exit 0, 48/48 complete set, 두 flag attest, context/service error 0,
+  terminal process/listener 정리 뒤 `winner=null`로 끝났다. 실패 gate는 29개다. P5 donation과
+  P4 decoy는 닫혔지만 P3 required recall, P2 잔여 호명, 공통 polite gate가 남아 campaign과
+  자동 후속 라운드는 실행하지 않았다. 상세 P2~P5 귀책은 D1 contract §8에 기록했다.
+
 ## 2026-08-25 M4 — live 결정론 계층 배선·P3 추출 수리
 
 - 22:55 KST precommit 독립 감사 P1 두 건을 최소 수정했다. runtime은 plain/marked note를

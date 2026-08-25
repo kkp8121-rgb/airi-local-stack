@@ -1,5 +1,72 @@
 # AIRI 로드맵 v3 — 방송 품질 중심 (2026-08-19 전면 개편)
 
+## 사용자용 현재 진행 대시보드
+
+> 이 절이 현재 Goal의 권위 있는 사용자용 요약이다. 수치는 로그 문구 하나가 아니라
+> 고유 run key의 report·health·run-contract·packet 교집합과 실제 PID/listener를 대조해 갱신한다.
+
+- 현재 목표: 결정론 계층을 실제 방송 경로에서 검증하고 새 비공개 평가로 재측정하기 (M4)
+- 현재 하는 일: 문서 동기화·전체 검증·정확한 commit 마감 (M4-10)
+- 왜 하는가: 실제 방송 경로에서도 회상·거부된 선택 억제·후원 이어말하기가 안정적으로
+  작동하는지 4개 모델 설정과 3개 평가 fixture로 확인하기 위해서다.
+- 현재 진행: **문서·전체 회귀 검증과 exact 13경로 stage 완료, commit 직전** — 2026-08-26 03:53 KST 기준
+- 정지 사유: 현재 작업에는 없음. 장시간 campaign은 winner 조건이 선택되지 않아 실행 대상이 아니다.
+- 완료 조건: M4 handoff §5와 work-continuity를 포함한 전체 검증 PASS, 정확한 stage·commit,
+  별도 사용자 push 승인 뒤 HEAD/local/origin 일치와 clean·PID/listener 0을 확인한다.
+- 다음 작업: 정확한 13개 경로만 stage해 staged diff와 계약을 재검증한 뒤 Conventional Commit한다.
+- 다음 결정: commit 뒤 push 직전 사용자 승인이 필요하다. 운영 채택과 후속 평가 라운드는 별도 결정이다.
+- M4 정상 완료율: **8/9 (88.9%)** — `[x] / 활성 항목 전체`
+- M4 처리 종료율: **8/9 (88.9%)** — `([x] + [F]) / 활성 항목 전체`
+- M4 진행 지수: **8.5/9 (94.4%)** — `([x] + [F] + 0.5×[P] + 0.5×[~]) / 활성 항목 전체`
+- 전체 로드맵 정상 완료율: **44/72 (61.1%)** — `[x] / 활성 항목 전체`
+- 전체 로드맵 처리 종료율: **50/72 (69.4%)** — `([x] + [F]) / 활성 항목 전체`
+- 전체 로드맵 진행 지수: **53/72 (73.6%)** — 77개 행 중 `[S]` 2개와 `[N/A]` 3개를 분모에서 제외;
+  2026-08-26 03:35 KST 증거 감사 기준
+- 마지막 실제 상태 대조: **2026-08-26 03:30 KST** — exit 0, report/health/run-contract/packet
+  고유 교집합 48/48, duplicate 0, incomplete 0, 두 flag 48/48 before·after, context/service error 0,
+  wrapper·owned PID/listener 0
+
+### 현재 주요 작업 단계(M4) 체크리스트
+
+- [x] 방송 경로에 결정론 입력 계층 연결 (M4-1)
+- [x] live 경로 통합 회귀 테스트 추가 및 red/green 입증 (M4-2)
+- [x] 거부된 분기 인식 확장과 기존 v5 연속성 12/12 확인 (M4-3)
+- [x] 새로운 blind v6 fixture·봉인·commitment·CI 계약 준비 (M4-4)
+- [x] 48회 평가 preflight 및 exact-once wrapper 시작 (M4-5)
+- [x] 비공개 48회 비교 평가 실행·감시 (M4-6, d1v6 matrix) — exit 0, 48/48, attestation·정리 검증
+- [x] 비교 결과 판정과 실패 축 진단 (M4-7) — no_winner, failed gate 29개 P2~P5 귀책 기록
+- [N/A] winner일 때만 장시간 방송 campaign 실행 (M4-8) — no_winner 분기가 선택되어 실행 대상 아님
+- [x] 사용자용 로드맵 대시보드 공용 스킬 만들기 (M4-9) — 공통 계약·두 진입점·불변식 검증 PASS
+- [~] 문서·전체 검증·정확한 commit/push 마감 (M4-10) — 2026-08-26 03:53 현재 작업 중
+
+### 상태 표준과 계산 기준
+
+- `[x]` 검증까지 성공적으로 완료 · `[~]` 현재 실제 실행 중(현재 Goal에서 정확히 하나)
+- `[Q]` 실행 준비 완료·순서 대기 · `[ ]` 미착수 · `[P]` 일부 완료·현재 비실행
+- `[B]` 차단/보류(원인·재개 조건 필수) · `[D]` 사용자 결정/승인 필요
+- `[F]` 실행됐지만 hard gate 실패 또는 no_winner로 종료 · `[S]` 후속 버전으로 대체
+- `[N/A]` 선택되지 않은 조건 분기 · `[?]` 증거 대조 중 임시 상태(방치 금지)
+- 활성 항목 전체는 `[S]`와 `[N/A]`를 제외한 행이다. `[F]`는 정상 완료에는 포함하지 않고
+  처리 종료에는 포함한다. 위 비율은 현재 M4의 10개 분리 행을 기준으로 계산했다.
+- 전체 로드맵의 과거 raw checkbox 55행을 코드·테스트·receipt·commit·사용자 결정과 대조했다.
+  이 중 노후 상태 31개를 정정하고 복합 항목 분리로 12행을 추가했다. 전체 77행의 상태별 개수는
+  `[x]` 44, `[~]` 1, `[Q]` 1, `[P]` 5,
+  `[B]` 7, `[D]` 8, `[F]` 6, `[S]` 2, `[N/A]` 3이며 `[ ]`·`[?]`는 없다.
+
+### 짧은 용어집
+
+- 주요 작업 단계(M): 이 대시보드에서 `M`은 Milestone이다. 현재 M4의 범위는 현행 handoff가
+  정의한 “결정론 계층 운영 경로 배선 수정 + blind v6 재측정”이며, 하단의 과거 M1~M5 분류는
+  전체 로드맵 감사 때 현재 상태 표준으로 재분류한다.
+- blind 평가: 평가 도중 정답·응답·결과를 보고 fixture·seed·기준을 바꾸지 않는 봉인 평가
+- matrix: 고정된 모델·fixture·seed 조합을 빠짐없이 실행하는 비교 평가 묶음
+- verdict: 모든 고정 게이트를 적용해 winner 또는 no_winner 분기를 내리는 최종 판정
+- campaign: winner 뒤에만 수행하는 3개 seed×500턴 장시간 방송 근사 검증
+- P1 근거 풀 확장: 요청 history를 근거로 인정 · P2 과거 전용 토큰 가드: 현재 근거 없는
+  과거 토큰을 안전한 지시어로 치환 · P3 결정 회수: 확정한 선택/사실을 근거에서 찾아 답변
+- P4 거부 선택 억제: “A 말고 B”에서 거부된 A를 응답에서 제거 · P5 후원 이어말하기 보강:
+  후원 본문 공유 토큰과 감사 표현이 없을 때 보수적인 인용 감사 문장을 추가
+
 > **이 문서가 프로젝트 최상위 SSoT다.** 부속 문서(GROWTH-STRATEGY·
 > MODEL-CUSTOMIZATION-PLAN·NEUROSAMA-LOW-LATENCY-PLAN)와 충돌하면
 > 이 문서가 우선한다. 갱신 로그는 `AIRI-ROADMAP-LOG.md`로 분리했다 —
@@ -279,7 +346,7 @@ v2 체제의 사이클은 "평가 → 결함 발견 → 가드 추가 → 위반
 I2a 기존 기반) · 방송 구간/경과 · 최근 화제 · 여론 현황 · 후원 이벤트.
 근거: seeded arm 실측 + 뉴로사마 구조(작은 모델 + 두꺼운 자동화 계층).
 
-- [~] P1-1 턴 브리핑 조립기 — 2026-08-19 시뮬레이션 배선·실측 완료
+- [x] P1-1a 턴 브리핑 조립기·프록시 근거 신호 — 2026-08-19~20 시뮬레이션 배선·실측 완료
   (`완료/AIRI-P1P2-BRIEFING-DETERMINISTIC-ACTS-2026-08-19.md`).
   **2026-08-20 추가**: 브리핑 근거를 프록시에 알리는 신호 계약
   `X-AIRI-Briefing-Evidence: memory`(정확 일치·루프백 전용) 구현·라이브
@@ -291,7 +358,8 @@ I2a 기존 기반) · 방송 구간/경과 · 최근 화제 · 여론 현황 · 
   해제 4→2(결정론적 감소)로 확정하고 행 단위 해제 관측성
   (`briefing_evidence_released`)을 신설
   (`완료/AIRI-BRIEFING-EVIDENCE-NARROW-2026-08-20.md`, `a5abc2c`+`6889d1e`).
-  운영 디렉터(B4a) 이식 잔여 — 이식 시 ①근거 판정은 좁힌 정의를 쓰고
+- [P] P1-1b 운영 디렉터(B4a) 브리핑 이식 — 구현 근거는 완료됐으나 현재 실행 중이 아니며,
+  이식 시 ①근거 판정은 좁힌 정의를 쓰고
   ②프록시 계약·루프백 제약은 그대로 두며 ③원격 디렉터가 되면 루프백
   제약 전체가 재검토 대상이고 ④해제 관측은 `/health` 누계 대조 대신
   프록시가 요청-응답 상관을 직접 남기는 텔레메트리로 승격을 검토한다
@@ -316,10 +384,10 @@ I2a 기존 기반) · 방송 구간/경과 · 최근 화제 · 여론 현황 · 
 
 모델이 프롬프트로는 못 하는 것(2회 실증)을 결정론으로 생산한다.
 
-- [~] P2-1 thank 렌더러 배선 — 시뮬레이션 5/5 실증 2026-08-19(생일
-  반사 소멸). 운영 B4b 어댑터 이식 잔여. 원계획: B4b 어댑터 →
-  `callout_context`. 렌더러 자체는 완료(2026-08-18, default-inert,
-  테스트 14). 배선·비공개 리허설·운영 ON은 사용자 승인 경유.
+- [x] P2-1a thank 렌더러와 시뮬레이션 배선 — 2026-08-19 5/5 실증(생일 반사 소멸),
+  렌더러 자체는 2026-08-18 default-inert·테스트 14로 완료.
+- [P] P2-1b 운영 B4b 어댑터·reaction 슬롯·비공개 리허설 — 원계획은 B4b 어댑터 →
+  `callout_context`이며 운영 ON은 사용자 승인 경유.
   근거: 생일 후원 반사 4/4 arm + 호명 0/5(닉네임 줘도 0).
   **2026-08-20 추가 실측**: 운영 후원은 액션 3종
   (`donation_name_callout_request`/`donation_read_request`/
@@ -327,12 +395,12 @@ I2a 기존 기반) · 방송 구간/경과 · 최근 화제 · 여론 현황 · 
   현행 렌더러는 **1번만 덮는다**. 시뮬 5/5는 후원 턴 전체를 렌더러가
   대체한 값이라 reaction 슬롯은 미검증 — dn04류 반사가 운영에서 재발할
   지점이다(P2-4 조사에서 P2-1 귀속 판정)
-- [~] P2-2 여론 집계 발화 — 승인 3종(2026-08-19) 시뮬레이션 6/6 실증.
-  운영 디렉터 이식 잔여
+- [x] P2-2a 여론 집계 발화 — 승인 3종(2026-08-19) 시뮬레이션 6/6 실증
+- [P] P2-2b 여론 집계 발화 운영 디렉터 이식 — 구현은 완료됐으나 운영 배선·실측 잔여
 - [x] P2-3 "기억나?" 가드 — 2026-08-19 프록시 방출 경계 배선 완료
   (`363c6a7`, env 기본 OFF·런처 ON). 기존 absence 폴백(증거 0)의
   잔여 구멍(증거 있는데 무내용 단정) 전용 보완
-- [~] P2-4 결정론 발화 격리 — **범위 재정의 2026-08-20**. 조사 결과
+- [x] P2-4a 결정론 발화 시뮬레이션 격리 — **범위 재정의 2026-08-20**. 조사 결과
   "이관할 렌더러가 더 있다"는 전제는 실측과 어긋났다(**이관 후보 0건**).
   사이드카 28케이스의 최종 실패 4건(2026-08-18 게이트) 중 dn04·b18은
   후원 이벤트류=렌더러 소관(시뮬 5/5×12런, 단 addressee 분모가 후원
@@ -346,17 +414,18 @@ I2a 기존 기반) · 방송 구간/경과 · 최근 화제 · 여론 현황 · 
   에코 사본만 이름 없는 A4.2 v1 문구로 치환(+4/−2줄, 채점·transcript는
   실제 발화 유지). 같은 시드 전/후 대조 `invented_handle_turns` 2→0,
   addressee·호명 5/5·존댓말 0/48·전송실패 0 무훼손, 테스트 52건 통과.
-  잔여: 운영 디렉터(B4a/B4b) 이식 + 사이드카 28케이스 재측정
+- [P] P2-4b 결정론 발화 운영 격리·사이드카 재측정 — 운영 디렉터(B4a/B4b) 이식 + 28케이스 재측정
   (마지막 측정 2026-08-18 게이트 런 — 렌더러가 시뮬 러너에만 배선돼
   `run_broadcast_chat_ab.py`·`run_broadcast_rehearsal.py`에는 acts 경로가
   없어 A4.2·P2 배선 이후 미재측정. v3 문서 §4-5의 회귀 자산 의무 미이행)
-- [ ] P2-4b (신설·저순위) cheer/sincere 수신 오프너 — 디렉터 분류는 이미
-  존재(`priority-policy.mjs` CHEER_CUES/SINCERE_CUES)하나 근거 표본이
-  sp01 1건(단발 한정)이고 다양성 지표를 누를 위험 → 착수 가치 낮음
-- [~] P2-5 affect→표현 선택(평가 전용, 2026-08-21) — 기존 13상태를
+- [P] P2-4c cheer/sincere 수신 오프너 — default-off 선택기·검증은 `9de8f7a`로 완료됐으나
+  운영 배선·실측·ON 승인은 남았다. 디렉터 분류는 `priority-policy.mjs`의
+  CHEER_CUES/SINCERE_CUES를 사용한다.
+- [x] P2-5a affect→표현 선택 계약·GPU probe 구현(평가 전용, 2026-08-21) — 기존 13상태를
   closed expression 계약으로 바꾸는 순수 선택기와 frozen fixture 3-arm
-  GPU probe를 추가했다. 5상태×3시드 15쌍에서 표현 arm은 문자열을 12/15
-  바꿨지만, 위트 0/3·pleased 반응 불변 3/3·competitive 문맥 이탈 3/3,
+  GPU probe를 추가했다.
+- [F] P2-5b affect 표현 품질 승격 — 5상태×3시드 15쌍에서 표현 arm은 문자열을 12/15
+  바꿨지만 위트 0/3·pleased 반응 불변 3/3·competitive 문맥 이탈 3/3,
   safety 안내 약화 2/3이어서 **품질 승격 실패**. 이는 런타임 선택 구조보다
   모델의 표현 팔레트가 선행 병목임을 보여준다. 별도 affect 행동 pending 120건과
   queue-SHA 결속 검수 폼까지 준비했으나, **2026-08-21 사용자 내용 검수에서 반려**됐다.
@@ -364,7 +433,7 @@ I2a 기존 기반) · 방송 구간/경과 · 최근 화제 · 여론 현황 · 
   이벤트 맥락·감사 의례·메시지별 반응·주제 확장·복귀 beat가 없는 챗봇형 Q→A다.
   두 큐와 폼은 실패 재현용으로만 보존하며 검수 회신·QLoRA에 쓰지 않는다. 이벤트
   ingress 배선·운영 ON은 별도 사용자 승인 전 금지하며 현재 기본/실행 모두 OFF
-- [~] **P2-6 한국 인터넷 방송 반응 메타 재관찰·행동 데이터 재설계
+- [x] **P2-6a 한국 인터넷 방송 반응 메타 재관찰·행동 데이터 재설계
   (2026-08-21)** — 탬탬버린 공식 다시보기/클립과 아리사 공식 영상의 확인 가능한
   입력→반응 장면을 비식별 코딩했다. 공통 단위는 `인지/감사 → 메시지별 반응 →
   의견·에피소드 확장 → 복귀·다음 훅`이며, 길이와 존댓말/반말은 전역 규칙이 아니라
@@ -382,7 +451,7 @@ I2a 기존 기반) · 방송 구간/경과 · 최근 화제 · 여론 현황 · 
   근거: `참조/AIRI-KR-BROADCAST-REGISTER-REFERENCE-2026-08-21.md`,
   `진행예정/AIRI-KR-BROADCAST-RESPONSE-PILOT-2026-08-21.md`
 
-  **2026-08-21 총평 반영 후 학습 트랙 진입:** 사용자가 파일럿의 길이·후원
+- [F] **P2-6b 총평 반영 학습·품질 트랙:** 사용자가 파일럿의 길이·후원
   의례·한국 방송식 주제 확장·RAG 연속성 방향을 묶음 단위로 승인했다.
   이 총평을 반영한 broadcast v2 240행 선행 학습은 T3에서 두 방송 사실 활용
   기준을 소폭 밑돌아 채택하지 않았다. 현행 v3는 120 card×10 연속성 변형+
@@ -390,6 +459,7 @@ I2a 기존 기반) · 방송 구간/경과 · 최근 화제 · 여론 현황 · 
   blocker 0건·quality gate PASS였다. v3 QLoRA 실행은 현행 v4 트랙으로 대체됐고,
   현재 학습 프로세스는 0이다. T3+사용자 승인 전에는 어떤 어댑터·양자화 모델도
   운영 채택하지 않는다.
+- [D] P2-6c 후속 행동 데이터·학습 라운드 — 현재 자동 재학습 대상이 아니며 별도 사용자 결정 필요
 
 ### P3. 생성 상한 재검토 — **게이트 열림 (2026-08-19 실측 판정)**
 
@@ -413,7 +483,12 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   (fact 126·addressee 15·register 10·substance 30), 운영 브리핑 포맷
   그대로, 전 정답 방송 채점기 통과, pending·eligible:false
   (`완료/AIRI-P3T1-BEHAVIOR-SFT-SYNTHESIS-2026-08-19.md`)
-- [~] **P3-T2 인간 검수 + QLoRA 학습** — 트레이너 준비 완료 2026-08-19
+- [x] P3-T2a 인간 검수·익스포트·QLoRA trainer 계약 구현 — 2026-08-19~21 완료
+- [S] P3-T2b 기존 행동 181건·affect 120건 큐 — 사용자 내용 검수에서 반려되어 후속 v2~v4로 대체
+- [x] P3-T2c runtime-shaped continuity v4 E1/E2 QLoRA 실행 — durable receipt와 provenance 검증 완료
+- [D] P3-T2d 추가 인간 검수·학습 라운드 — no_winner 뒤 자동 실행하지 않으며 사용자 결정 필요
+
+**P3-T2 상세 근거:** 트레이너 준비 완료 2026-08-19
   (`train_airi_behavior_lora.py` — sha 핀·로컬 전용·assistant 마스킹,
   CPU 스모크로 루프 검증). **2026-08-20 추가**: 2차(추출) 학습의 검수·
   익스포트 경로를 행동 SFT와 대칭으로 신설(`a473eb1`+`df31dc6`) — 폼→
@@ -452,7 +527,10 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   E1/E2 각각 HF safe-merge → BF16 GGUF → Q4_K_M 순서로 완료했다. 후보별
   artifact manifest, SHA, `package-evidence.json`의 최종 tag/digest가 완료 증거다.
   패키징은 후보 생성일 뿐 운영 채택이 아니다.
-- [~] **P3-T3 전/후 게이트 — authoritative FAIL** — 시뮬 하네스 그대로. **캘리브레이션 완료
+- [x] P3-T3a isolated T3 launcher·comparator·증적 계약 구현 및 검증 완료
+- [F] P3-T3b 전/후 게이트 실측 — production T3와 E2-C1 blind matrix 모두 no_winner
+
+**P3-T3 상세 근거 — authoritative FAIL:** 시뮬 하네스 그대로. **캘리브레이션 완료
   (2026-08-19 4-시드)**: 사실 활용은 12% 노이즈 천장 상회 필수, 결정론
   축 만점·존댓말 0 유지, 앵커·다양성은 3시드 평균 비교
   (`완료/AIRI-SPAN-CONTRACT-AND-VARIANCE-2026-08-19.md`). **held-out 2차
@@ -480,15 +558,18 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   blind v2(3 fixture×4 seed)로 baseline/e2/e2-c1 36-report를 별도 실행 — e2-c1 score
   최고(0.244)나 `invented_handle` 위반 53건(학습할수록 악화)으로 13개 게이트 전부 FAIL,
   winner 0. 다음은 원문 진단+결정론 가드+재검토된 E2-C2다.
-- [ ] **P3-T4 하드코딩 축소** — T3 통과 행동부터 결정론 계층 걷어냄
+- [x] P3-T4a 하드코딩 축소 설계 — `5774fcd`로 설계와 offline handoff 완료
+- [B] P3-T4b 하드코딩 축소 구현 — 차단 원인: T3 통과 행동이 없어 축소 대상 미확정;
+  재개 조건: 후속 gate 통과와 사용자 실행 승인
+  T3 통과 행동부터 결정론 계층 걷어냄
   (집계 오프너·폴백 후보). **thank 렌더러는 유지** — 후원 호명 오류
   비용이 커서 고정이 정석
 
 보조 경로 (T3 게이트 실패 시 재평가):
-- [ ] P3-M1 코덱스 GPU 재실측에 4B급 공존 옵션 포함 (Qwen3-4B 2.5GB)
-- [ ] P3-M2 챗 모델 체급 A/B (지연-품질, 기존 하네스)
-- [ ] P3-M3 클라우드 하이브리드 재평가 (결정 2 연동)
-- [ ] P3-M4 GPU 증설 — 최후 수단
+- [D] P3-M1 코덱스 GPU 재실측에 4B급 공존 옵션 포함 — 사용자 방향 결정 필요
+- [D] P3-M2 챗 모델 체급 A/B — 기존 하네스 재실행 여부를 사용자 결정
+- [D] P3-M3 클라우드 하이브리드 재평가 — 외부 provider·비용·결정 2 승인 필요
+- [D] P3-M4 GPU 증설 — 최후 수단이며 사용자 구매 결정 필요
 
 ## 4. 기존 트랙 → v3 매핑 (미완 항목 전수 이관)
 
@@ -507,12 +588,16 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
 | 모델 SSoT 게이트 | §2 가드 | 완결 유지 |
 
 **M1~M5 잔여** (방송 실행 게이트 — P축과 교차):
-- [~] M1: B0-1 streamList 쿼터 실측 마감(외부 자격증명 대기)
-- [~] M2: B1b 라이브 어댑터/OAuth/실주입 (보류: 외부 자격증명·운영 승인),
+- [B] 과거 방송 실행 M1: B0-1 streamList 쿼터 실측 — 차단 원인: 외부 자격증명 없음;
+  재개 조건: 사용자가 자격증명 사용을 승인하고 제공
+- [B] 과거 방송 실행 M2: B1b 라이브 어댑터/OAuth/실주입 — 차단 원인: 외부 자격증명·운영 승인 없음;
+  재개 조건: 사용자가 OAuth·운영 실주입을 승인
   I2 시청자 기억 → P1-2로 이동
-- [~] M3: B3-e 카테고리별 실기, B3-f replay(권한 대기), B2 송출(결정 2 이후)
-- [~] M4: B4 확장 = P1·P2 그 자체
-- [ ] M5: 비공개 리허설 → 데뷔 (조건 기반, 날짜 고정 없음 — 결정 4)
+- [B] 과거 방송 실행 M3: B3-e 실기·B3-f replay·B2 송출 — 차단 원인: 외부 권한과 결정 2 미완료;
+  재개 조건: replay 권한과 송출 결정을 사용자에게 승인받음
+- [S] 과거 방송 실행 M4 분류(B4 확장=P1·P2) — 현재 M4 handoff 단계 체계로 대체
+- [B] 과거 방송 실행 M5: 비공개 리허설→데뷔 — 차단 원인: 선행 방송 gate·결정 4 미완료;
+  재개 조건: 선행 gate 통과 뒤 사용자가 리허설·데뷔 실행 승인
 
 ## 5. 코덱스(GPU) 대기열
 
@@ -556,11 +641,11 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   report/SHA/manifest 검증 완료
 - [x] E1/E2 각각 safe-merge → BF16 GGUF → Q4_K_M 패키징 완료·미채택
 - [x] exact baseline/E1/E2 tag+digest manifest 작성·SHA 결속 완료
-- [~] isolated 36-report T3와 두 comparator는 terminal 실행 완료이나 양쪽 hard-gate FAIL,
+- [F] isolated 36-report T3와 두 comparator는 terminal 실행 완료이나 양쪽 hard-gate FAIL,
   PASS summary/winner 0
 - [x] E1/E2 각 12개 원본 report 위치와 1,248-turn aggregate, 실제 응답 대표 사례를
   사용자 검토용으로 제출했다. E2는 상대 우세하나 T3 PASS/winner로 승격하지 않았다.
-- [~] **E2-C1 교정 iteration 설계·데이터·평가 계약:** 사용자 승인 완료. same-data E3가
+- [x] **E2-C1 교정 iteration 설계·데이터·평가 계약:** 사용자 승인·동결·milestone push 완료. same-data E3가
   아니라 E2 weight-only init + fresh optimizer/scheduler/RNG/cursor다. correction/replay/
   mixture와 retained blind commitment/policy, exact dataset SHA, split/seed/step/LR/scheduler/
   checkpoint/metric 계약은 current bytes에서 full freeze validation PASS다. `으로/로` 5건과
@@ -569,7 +654,7 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
 - [x] **E2-C1 GPU 실행 완료:** smoke PASS(K=1 80/5 두 arm+resume) → 본 학습 512/32 terminal
   exit 0(mixture dev loss 2.235104) → safe merge(target l2 0.0865, non-target 무변경) →
   BF16/Q4_K_M 패키징(tag `midm-airi:e2c1-broadcast-v4-20260824-08df7ecf...`) — 전부 미채택
-- [x] **E2-C1 blind v2 36-report matrix — no_winner:** 한국어 재봉인 blind(v1은 영어 문구라
+- [F] **E2-C1 blind v2 36-report matrix — no_winner:** 한국어 재봉인 blind(v1은 영어 문구라
   실행 불능이던 결함 수리 후) 36/36 완주. score e2-c1 0.244(최고)·e2 0.225·baseline 0.218,
   additive 4/5 축 방향 개선하나 전부 절대 최소선 미달. `invented_handle` 위반 28/40/53으로
   후보가 최악 — hard/legacy/perfect-rate 13개 게이트 전부 실패. `adoption_authorized=false`
@@ -581,20 +666,21 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
   채점기 쪽에 memory/journal 근거를 노출해 `fact_tokens`로 합치는 방식으로 처리 —
   게이트 정의는 불변, 판정 입력 범위만 확장. 프록시 flag 기본 off, 신규 16 + 프록시
   373 + 시뮬레이터 88+85 전부 pass
-- [ ] 가드+채점기 신호 반영 후, 학습량/LR/correction:replay 비율을 재검토한 E2-C2를
-  새 retained blind(v1/v2 재사용 금지)로 재도전
-- [ ] T3(v4)·E2-C1(blind v2) 모두 승자 0이므로 3 seed × 500 turn full-stack live campaign
-  계속 차단
-- [~] T3 terminal 실패 aggregate·receipt·hash와 E1/E2 원본은 제출했다. 실제 승자 응답·
-  지연·TTS/RAG campaign 묶음은 winner 0으로 생성 금지
-- [ ] 사용자 승인 뒤에만 운영 채택 판단; 그전까지 `adoption_authorized=false`
+- [F] 가드+채점기 신호 뒤 E2-C2 재설계·학습·새 blind v3 36-report 재도전 — 36/36 exit 0이나
+  `winner=null`, e2-c2 score 0.187536으로 e2 0.201901보다 낮고 13 gate 실패
+- [N/A] T3(v4)·E2-C1·E2-C2 winner 조건부 3 seed × 500 turn campaign — 모든 verdict가
+  no_winner라 실행 대상 아님
+- [x] T3 terminal 실패 aggregate·receipt·hash와 E1/E2 원본 제출 완료
+- [N/A] 실제 승자 응답·지연·TTS/RAG campaign 묶음 — winner 0이라 생성 대상 아님
+- [D] 운영 채택 판단 — `adoption_authorized=false`; 사용자 별도 승인 필요
 
 각 단계의 fail-closed 완료 증거와 정확한 명령은
 `진행중/AIRI-CODEX-HANDOFF-2026-08-21.md` §8을 따른다.
 
 ### 기존 GPU 대기열
 
-- [~] GPU 재실측 — ctx/narrow/Qwen3-8B span은 2026-08-20 실행 완료.
+GPU 재실측의 완료·잔여 상태는 아래 분리 행을 권위로 삼는다. ctx/narrow/Qwen3-8B span은
+2026-08-20 실행 완료.
   marker 실제 render TTFT A/B는 외부 GPT-SoVITS venv 불완전으로 보류,
   게이트 경로 폴백률 reps 확대·치환표 중기 조치 ①② 판단은 잔여
 - [x] **ctx 예산 GPU 단일조건 재실측 (2026-08-20 완료)** —
@@ -618,11 +704,12 @@ LightMem 실증(작은 모델+좁은 LoRA > 큰 모델)과 정합. 기존
 - [x] **Qwen3-8B + `conversation-v3-span` GPU 1회** — 구조 schema 3종은
   1.0이나 connectivity/B coverage 0.857, recall 0.262, op-alias 0.143,
   failure code 1건으로 balanced gate FAIL. 운영 승인·span 활성화 근거 아님
-- [~] TTS 재검증 (v2ProPlus 스트리밍 계약) — proxy 계약 23 passed.
-  live 7문장 gate는 외부 GPT-SoVITS venv의 다수 선언 의존성 누락으로 보류
-- [ ] B1b 라이브 어댑터 (외부 자격증명과 함께)
-- [ ] 인간 검수 100건 수집
-- [ ] 실제 마이크 음성 체인 P50/P95 (보류: 사용자 요청 시)
+- [B] TTS 재검증(v2ProPlus 스트리밍 계약) — proxy 계약 23 passed. 차단 원인: 외부
+  GPT-SoVITS venv 선언 의존성 누락; 재개 조건: 의존성 환경 복구 뒤 live 7문장 gate 재실행
+- [B] B1b 라이브 어댑터 — 차단 원인: 외부 자격증명·운영 승인 없음;
+  재개 조건: 사용자가 자격증명 사용과 live adapter 실행을 승인
+- [D] 인간 검수 100건 수집 — 대상 데이터 라운드와 검수 착수에 사용자 결정 필요
+- [Q] 실제 마이크 음성 체인 P50/P95 — 사용자 요청 시 실행 준비
 
 ## 6. 사용자 결정 큐 (2026-08-19 정리)
 
