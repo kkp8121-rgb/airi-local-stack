@@ -16,7 +16,7 @@
   unbound-root fixture 1건을 원복했다. fresh 검증: launcher 25 pass,
   broadcast_sim+launcher 194 pass/1 skip(+32 subtests), proxy 377 OK, 전체 checkpoint
   PASS, AST/diff-check 0. matrix/서비스/blind 응답 생성은 0이며 검증된 4-path 배치를
-  commit/push한다.
+  commit `9e6b1f4`로 고정했다. push receipt 전에는 matrix를 시작하지 않는다.
 
 ## 2026-08-25 D1 코덱스 세션 복구 정합
 
