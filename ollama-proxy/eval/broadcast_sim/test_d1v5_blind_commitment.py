@@ -131,14 +131,21 @@ def test_policy_thresholds_equal_the_e2c2_values_with_no_relaxation():
     assert policy['arm_rules'] == {'reference_arm': 'e2', 'delta_gated_arms': ['e2-c1', 'e2-c2']}
 
 
-def test_v4_frozen_verifier_refuses_the_v5_commitment():
-    # verify_d1_frozen_contract.py pins the consumed v4 root; the v5 round is
-    # frozen by the launcher binding, this commitment, and the d1v5 seal
-    # generation instead.  The old verifier must not accept v5 by accident.
+def test_frozen_verifier_accepts_v5_and_still_refuses_unknown_roots():
+    # The d1v5 matrix's comparator calls this verifier; v5 must be an accepted
+    # frozen root (same policy) while an unlisted root stays rejected.
     verifier = _verifier()
     verifier.policy(_read(POLICY_PATH))
-    with pytest.raises(verifier.FrozenContractError):
-        verifier.commitment(_read(COMMITMENT_PATH), None)
+    verifier.commitment(_read(COMMITMENT_PATH), None)
+    assert verifier.ROOT_GENERATIONS['airi-d1-blind-freeze-20260825-v5'] == 'd1v5'
+    unknown = _read(COMMITMENT_PATH)
+    unknown['root_id'] = 'airi-d1-blind-freeze-20260825-v6'
+    with pytest.raises(verifier.FrozenContractError, match='commitment'):
+        verifier.commitment(unknown, None)
+    resealed = _read(COMMITMENT_PATH)
+    resealed['fixtures'][0]['raw_sha256'] =         'c210b7df96324f137b448066a6a8a7346a0b36edc0a3e03f491f992d37823420'  # v4 body
+    with pytest.raises(verifier.FrozenContractError, match='superseded'):
+        verifier.commitment(resealed, None)
 
 
 def test_launcher_binds_d1v5_to_this_commitment_and_the_sealed_root():

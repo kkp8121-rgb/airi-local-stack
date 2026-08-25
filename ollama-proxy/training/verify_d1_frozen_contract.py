@@ -20,6 +20,16 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 
 ROOT_ID = 'airi-d1-blind-freeze-20260825-v4'
+# Every frozen root this contract accepts, mapped to the seal generation whose
+# superseded inventory applies to it.  v5 is the D1 re-measurement (M3,
+# 2026-08-25): identical arms, seeds, policy and comparator; only the sealed
+# bodies changed, because v4 was consumed by the 48-report D1 matrix and the
+# prompt then changed (briefing evidence marker, num_ctx 4096).  The d1v5
+# matrix's comparator was rejected at this exact check before v5 was listed.
+ROOT_GENERATIONS = {
+    ROOT_ID: 'd1',
+    'airi-d1-blind-freeze-20260825-v5': 'd1v5',
+}
 ARMS = ['baseline', 'e2', 'e2-c1', 'e2-c2']
 REFERENCE_ARM = 'e2'
 DELTA_GATED_ARMS = ['e2-c1', 'e2-c2']
@@ -121,16 +131,16 @@ def commitment(c, external) -> None:
     fs = c.get('fixtures')
     if (set(c) != {'schema_version', 'root_id', 'fixture_schema_version', 'canonicalization', 'seeds',
                    'arms', 'expected_matrix_reports', 'fixtures', 'pre_result_attestation'}
-            or c.get('schema_version') != COMMITMENT_SCHEMA or c.get('root_id') != ROOT_ID
+            or c.get('schema_version') != COMMITMENT_SCHEMA or c.get('root_id') not in ROOT_GENERATIONS
             or c.get('fixture_schema_version') != 'airi.broadcast-sim-fixture.v1'
             or c.get('canonicalization') != canonical or c.get('seeds') != SEEDS
             or c.get('arms') != ARMS or c.get('expected_matrix_reports') != EXPECTED_REPORTS
             or c.get('pre_result_attestation') != attest or not isinstance(fs, list) or len(fs) != 3
             or [(x.get('filename'), x.get('logical_role')) for x in fs] != mapping):
         raise FrozenContractError('commitment')
-    superseded_root_ids = tuple(seal.SUPERSEDED_ROOT_IDS) + tuple(
-        seal.GENERATIONS['d1']['extra_superseded_root_ids'])
-    superseded_hashes = seal.SUPERSEDED_HASHES | seal.GENERATIONS['d1']['extra_superseded_hashes']
+    generation = seal.GENERATIONS[ROOT_GENERATIONS[c['root_id']]]
+    superseded_root_ids = tuple(seal.SUPERSEDED_ROOT_IDS) + tuple(generation['extra_superseded_root_ids'])
+    superseded_hashes = seal.SUPERSEDED_HASHES | generation['extra_superseded_hashes']
     if c['root_id'] in superseded_root_ids:
         raise FrozenContractError('superseded root reseal')
     names = []
