@@ -12,7 +12,7 @@ param(
     # 'e2c2' runs the frozen E2-C2 blind evaluation (baseline/e2/e2-c2) over its
     # own sealed root, with the proxy handle-grounding guard pinned ON and
     # attested per run through /health.
-    [ValidateSet('t3','e2c1','e2c2','d1')] [string]$MatrixProfile = 't3',
+    [ValidateSet('t3','e2c1','e2c2','d1','d1v5')] [string]$MatrixProfile = 't3',
     [string]$BlindRoot = '',
     # Offline contract-test seam; production always performs the localhost lookup.
     [string]$OllamaTagsFile = '',
@@ -32,11 +32,15 @@ $root = [IO.Path]::GetFullPath($PSScriptRoot)
 $out = [IO.Path]::GetFullPath($OutputDir)
 $python = (Get-Command python -ErrorAction Stop).Source
 $ports = @(11435, 11436, 8880, 9880, 8892, 8890)
-$isBlindProfile = ($MatrixProfile -ceq 'e2c1' -or $MatrixProfile -ceq 'e2c2' -or $MatrixProfile -ceq 'd1')
+# d1v5 is the D1 re-measurement on a fresh blind (v5) after the prompt changed
+# (briefing evidence marker, num_ctx 4096); every gate, flag and comparator is
+# identical to d1 — only the sealed root binding differs.
+$isDeterministicLayerProfile = ($MatrixProfile -ceq 'd1' -or $MatrixProfile -ceq 'd1v5')
+$isBlindProfile = ($MatrixProfile -ceq 'e2c1' -or $MatrixProfile -ceq 'e2c2' -or $isDeterministicLayerProfile)
 # The e2c2 matrix is measured with the handle-grounding guard ON; /health must
 # prove it on every run because the report schema has no field for it.
-$requireGuardHealth = ($MatrixProfile -ceq 'e2c2' -or $MatrixProfile -ceq 'd1')
-$requireDeterministicLayerHealth = ($MatrixProfile -ceq 'd1')
+$requireGuardHealth = ($MatrixProfile -ceq 'e2c2' -or $isDeterministicLayerProfile)
+$requireDeterministicLayerHealth = ($MatrixProfile -ceq 'd1' -or $MatrixProfile -ceq 'd1v5')
 
 function New-Capability {
     $b = New-Object byte[] 48; $r = [Security.Cryptography.RandomNumberGenerator]::Create()
@@ -209,7 +213,7 @@ function Assert-Report([string]$Path, [object]$Arm, [object]$Fixture, [int]$Seed
 # Everything below this line is preflight-only until the manifest and all fixtures validate.
 if (Test-Path -LiteralPath $out) { throw 'OutputDir must not exist: evidence is no-overwrite.' }
 if ($isBlindProfile -and -not $BlindRoot) { throw "The $MatrixProfile profile requires -BlindRoot." }
-if (-not $isBlindProfile -and $BlindRoot) { throw '-BlindRoot is only valid for the e2c1, e2c2, and d1 profiles.' }
+if (-not $isBlindProfile -and $BlindRoot) { throw '-BlindRoot is only valid for the e2c1, e2c2, d1, and d1v5 profiles.' }
 if (($OllamaTagsFile -or $HealthFixtureFile -or $ReportFixtureFile -or $ReportPlanFixtureFile) -and -not $PreflightOnly) { throw 'Offline fixture seams are PreflightOnly and forbidden for production runs.' }
 $strictUtf8 = [Text.UTF8Encoding]::new($false, $true)
 $modelManifestBytes = [IO.File]::ReadAllBytes((Get-Item -LiteralPath $ModelManifest -ErrorAction Stop).FullName)
@@ -219,7 +223,7 @@ $armProperties = @($armsDoc.PSObject.Properties.Name | Sort-Object)
 if ($armsDoc.schema_version -cne 'airi.broadcast-sim-t3-model-manifest.v2' -or $armProperties.Count -ne 2 -or $armProperties[0] -cne 'arms' -or $armProperties[1] -cne 'schema_version') { throw 'Model manifest schema or key set is invalid.' }
 $arms = @($armsDoc.arms)
 $armNames = @($arms.name | Sort-Object)
-$expectedArmNames = if ($MatrixProfile -ceq 'e2c1') { @('baseline','e2','e2-c1') } elseif ($MatrixProfile -ceq 'e2c2') { @('baseline','e2','e2-c2') } elseif ($MatrixProfile -ceq 'd1') { @('baseline','e2','e2-c1','e2-c2') } else { @('baseline','e1','e2') }
+$expectedArmNames = if ($MatrixProfile -ceq 'e2c1') { @('baseline','e2','e2-c1') } elseif ($MatrixProfile -ceq 'e2c2') { @('baseline','e2','e2-c2') } elseif ($isDeterministicLayerProfile) { @('baseline','e2','e2-c1','e2-c2') } else { @('baseline','e1','e2') }
 $expectedReportCount = $expectedArmNames.Count * 3 * 4
 $armNamesMatch = $arms.Count -eq $expectedArmNames.Count -and @($arms.name | Sort-Object -Unique).Count -eq $expectedArmNames.Count -and $armNames.Count -eq $expectedArmNames.Count
 if ($armNamesMatch) { for ($i=0; $i -lt $expectedArmNames.Count; $i++) { if ($armNames[$i] -cne $expectedArmNames[$i]) { $armNamesMatch = $false; break } } }
@@ -251,12 +255,19 @@ if ($isBlindProfile) {
         $blindCommitmentSchema = 'airi.e2-c2-blind-commitment.v1'
         $blindRootId = 'airi-e2-c2-blind-freeze-20260824-v3'
         $expectedSealedSha256 = 'f878fe2e01713ccf4024771e66d44ee83ee626509cadf7252878d8df37484931'
-    } else {
+    } elseif ($MatrixProfile -ceq 'd1') {
         $blindCommitmentFile = 'airi_d1_blind_commitment.json'
         $blindPolicyFile = 'airi_d1_metric_policy.json'
         $blindCommitmentSchema = 'airi.d1-blind-commitment.v1'
         $blindRootId = 'airi-d1-blind-freeze-20260825-v4'
         $expectedSealedSha256 = '44c05fbd475a6ca9b87fc3a8f07ec0af7a2eef9e023b993c89398ceb3b071682'
+    } else {
+        # d1v5: blind v4 was consumed; same policy and comparator, new sealed root.
+        $blindCommitmentFile = 'airi_d1v5_blind_commitment.json'
+        $blindPolicyFile = 'airi_d1_metric_policy.json'
+        $blindCommitmentSchema = 'airi.d1-blind-commitment.v1'
+        $blindRootId = 'airi-d1-blind-freeze-20260825-v5'
+        $expectedSealedSha256 = 'd9c07fea3a4bf965ed4d05c4a8175341eae58d5106b275492692c5d05b4e7c45'
     }
     $commitmentPath = Join-Path $root ('ollama-proxy\eval\broadcast_sim\fixtures\commitments\' + $blindCommitmentFile)
     $commitmentBytes = [IO.File]::ReadAllBytes((Get-Item -LiteralPath $commitmentPath -ErrorAction Stop).FullName)
@@ -330,7 +341,7 @@ if ($PreflightOnly) {
         if ($ReportFixtureIndex -lt 1 -or $ReportFixtureIndex -gt 3) { throw 'Report fixture index must be 1..3.' }
         Assert-Report $ReportFixtureFile @($arms | Where-Object { $_.name -ceq $FixtureArmName })[0] $fixtures[$ReportFixtureIndex - 1] $ReportFixtureSeed $ReportPlanFixtureFile
     }
-    $plannedComparisons = if ($MatrixProfile -ceq 'e2c1') { @('e2c1-blind') } elseif ($MatrixProfile -ceq 'e2c2') { @('e2c2-blind') } elseif ($MatrixProfile -ceq 'd1') { @('d1-blind') } else { @('baseline-vs-e1','baseline-vs-e2') }
+    $plannedComparisons = if ($MatrixProfile -ceq 'e2c1') { @('e2c1-blind') } elseif ($MatrixProfile -ceq 'e2c2') { @('e2c2-blind') } elseif ($isDeterministicLayerProfile) { @('d1-blind') } else { @('baseline-vs-e1','baseline-vs-e2') }
     [pscustomobject]@{ runs = $expectedReportCount; run_keys = $plannedKeys; arms = @($arms.name); seed_sets = $seedSets; comparisons = $plannedComparisons; common = @{ memory_arm='seeded'; max_tokens=220; timeout_seconds=180; num_ctx=$NumCtx; live_context='on' } } | ConvertTo-Json -Depth 8 -Compress
     exit 0
 }
@@ -354,12 +365,12 @@ try {
     # embedding-cache wrapper on 9880, this makes listener ownership and cleanup
     # use the same exact command identity on every run.
     $env:AIRI_GPT_SOVITS_SV_CACHE = 'on'
-    if ($MatrixProfile -ceq 'e2c2' -or $MatrixProfile -ceq 'd1') {
+    if ($MatrixProfile -ceq 'e2c2' -or $isDeterministicLayerProfile) {
         # Pin the handle-grounding guard ON for every proxy this matrix starts;
         # /health attestation and the environment attestation both prove it.
         $env:AIRI_HANDLE_GROUNDING_GUARD = 'on'
     }
-    if ($MatrixProfile -ceq 'd1') { $env:AIRI_DETERMINISTIC_UTTERANCE_LAYER = 'on' }
+    if ($isDeterministicLayerProfile) { $env:AIRI_DETERMINISTIC_UTTERANCE_LAYER = 'on' }
     # The training venv is intentionally used for deterministic simulation,
     # but it does not carry the local service web dependencies.  Bind the
     # stack launcher to an existing service venv so the proxy cannot silently
@@ -533,13 +544,13 @@ try {
             verified_by='run-airi-broadcast-t3-matrix.ps1'
             evidence=@{chat_provider_local_only=$true;chat_provider_external_approved=$false;external_chat_allowed=$false;external_search_allowed=$false;external_memory_extraction_allowed=$false;loopback_only_endpoints=$true;memory_extraction_listener_absent=$true;stt_listener_absent=$true;per_run_isolated_databases=$true}
         }
-        if ($MatrixProfile -ceq 'e2c2' -or $MatrixProfile -ceq 'd1') {
+        if ($MatrixProfile -ceq 'e2c2' -or $isDeterministicLayerProfile) {
             # Every run's before/after /health proved handle_grounding_guard=true
             # (Assert-Health throws otherwise), so this is observed, not assumed.
             $attestationDocument['handle_grounding_guard'] = 'on'
             $attestationDocument.evidence['handle_grounding_guard_health_attested'] = $true
         }
-        if ($MatrixProfile -ceq 'd1') {
+        if ($isDeterministicLayerProfile) {
             $attestationDocument['deterministic_utterance_layer'] = 'on'
             $attestationDocument.evidence['deterministic_utterance_layer_health_attested'] = $true
         }
