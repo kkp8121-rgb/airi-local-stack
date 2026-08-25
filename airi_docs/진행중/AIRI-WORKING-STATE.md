@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 14:40:00 +09:00"
-checkpoint_id: "20260825-144000-m1-instrumentation-repair-receipt"
-matrix_note: "D1 matrix 종결(48/48, winner=null). 신규 M1 계측 복구 작업 착수; matrix 재실행 0"
+updated_at_kst: "2026-08-25 15:20:00 +09:00"
+checkpoint_id: "20260825-152000-proxy-error-root-cause-confirmed"
+matrix_note: "D1 종결. M1 계측 복구 push(aed7562). 프록시 오류 근본 원인 = Ollama 400 exceed_context_size_error(num_ctx 2048 초과) 확정"
 active_trainer_note: "D1 GPU 학습 없음. matrix 종료·소유 서비스 정리 완료; 잔여 AIRI 프로세스 0"
 goal_status: "active"
 authorization: "user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "m1-instrumentation-repair-partial"
+active_phase: "m1-root-cause-confirmed-awaiting-fix-decision"
 git_head: "c312530581aa5ba5dbc10137ec2388dafe28d743"
 worktree_state: "HEAD/local main/origin-main exact c312530 and clean at 2026-08-25 13:18 KST before this receipt; matrix ended (exit 0), AIRI processes 0"
 active_trainer_count: 0
@@ -23,6 +23,80 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 > 기준 상태다. checkpoint를 포함한 commit 자체의 SHA를 자가 참조하지 않는다.
 
 ## 1. 권한과 현재 사실
+
+- 2026-08-25 15:20 KST **프록시 오류 근본 원인 확정 receipt — Ollama 400
+  `exceed_context_size_error`**: 재현 실행으로 실제 메시지를 회수했다. 세 blind
+  라운드 내내 전 arm 턴의 1/3을 차지하던 `RuntimeError`의 정체다.
+
+  **실행**: 15:00~15:15 KST. `start-airi-local-stack.ps1`
+  (`-ChatModel midm-airi:2.0-mini-broadcast-v3-q4-20260821-…04d64a38ee…`,
+  digest `e683802b…ff5291`, `-NumCtx 2048`, guard/layer 두 플래그 on) exit 0,
+  proxy PID 21136. `run_broadcast_sim.py`를 **공개** fixture
+  `long_broadcast_continuity_v1.json`(seed 73, history-turns 8, max-tokens 220,
+  briefing on, briefing-evidence on, acts on)로 1회 실행 exit 0. **blind v1~v4는
+  열지도 쓰지도 않았고**, manifest에서 `final_blind` role인
+  `third_long_broadcast_heldout_v1.json`도 쓰지 않았다. 종료 후
+  `stop-airi-local-stack.ps1` exit 0, owned 포트 11435/11436/8880/9880/8890/8892
+  전부 free를 재확인했다. 프록시 로그 사본은 세션 scratchpad에 보존했다.
+
+  **회수한 원문**(신규 `error` 필드 덕분에 처음으로 보인다):
+
+  ```
+  RuntimeError: Ollama returned 400: {"error":{"code":400,
+  "message":"request (2608 tokens) exceeds the available context size
+  (2048 tokens), try increasing it",
+  "type":"exceed_context_size_error","n_prompt_tokens":2608,"n_ctx":2048}}
+  ```
+
+  chat_request 219건 중 210건이 이 오류이고, 토큰 수가 찍힌 199건 기준
+  `n_prompt_tokens`는 **min 2,552 / p50 2,721 / p90 2,751 / max 2,827**로
+  `n_ctx=2048`을 **+504~+779** 초과한다.
+
+  **근본 원인**: 프록시에 **프롬프트 예산 강제가 아예 없다.** `PromptBudgetTelemetry`
+  (`ollama_proxy.py` ~123-215)는 이름과 달리 **관측 전용**이다 — 준비된 메시지 수와
+  문자 수를 세고 upstream이 돌려준 `prompt_eval_count`를 기록할 뿐, 자르지도 막지도
+  않는다. system(계약) + 브리핑 + history 8턴을 그대로 조립해 보내고, num_ctx를
+  넘으면 Ollama가 400을 돌려준다. 예전에는 upstream이 조용히 잘라 줬을 수 있으나
+  현재 버전은 `exceed_context_size_error`로 거절한다.
+
+  **두 번째 관측 구멍(같은 원인)**: `PromptBudgetTelemetry.terminal()`은 성공한
+  native `done` row에서만 동작한다. 그래서 400으로 죽은 턴은 `saturation_observations`
+  에조차 잡히지 않는다 — D1 health가 포화 관측 3건만 보고하면서 실제로는 34건이
+  포화로 죽어 있던 이유다.
+
+  **관측된 사실 하나 더**: D1 matrix 로그의 실패 34건은 전부
+  `message_count_out == 6`(준비 프롬프트 최대치)였고 `message_count_out < 6`인 6건은
+  실패 0건이었다. 즉 히스토리 창이 찬 뒤에만 죽는다는 상관은 이 원인과 정확히 맞는다.
+
+  **수리는 착수하지 않았다.** 세 가지 방법이 서로 다른 대가를 갖고, 그중 하나는
+  동결 matrix 계약의 `num_ctx 2048` 핀을 건드리므로 사용자 결정 사항이다:
+  (a) `num_ctx`를 4096으로 올린다 — 관측 최대 2,827 + 출력 220 ≈ 3,047이라 여유가
+  있고 코드 위험 0이지만 `common_settings.num_ctx` 핀이 바뀌어 과거 라운드와 직접
+  비교가 끊긴다. (b) 400 `exceed_context_size_error`에 history를 줄여 1회 재시도한다
+  — 추정 없이 upstream ground truth를 쓰지만, 기존 corrective retry 블록이 인라인
+  중복 구조라 스트리밍 핫패스에 세 번째 중복 블록이 생긴다. (c) 전송 전에 문자 예산
+  추정으로 history를 자른다 — 삽입 지점이 1곳이고 오프라인 단위 테스트가 쉽지만
+  문자→토큰 비율(실측 약 1.88 chars/token)이 내용에 따라 흔들려 과·소절단 위험이 있다.
+
+  **경계 준수**: GPU 학습 0, blind 재사용 0, matrix 재실행 0, comparator 재실행 0,
+  게이트·threshold·seed·fixture 변경 0, 운영 모델·태그 변경 0, adoption 0.
+
+- 2026-08-25 14:55 KST **프록시 오류 재현 실행 intent (사용자 승인)**: 사용자가
+  두 결정을 내렸다 — (a) P3 근거 통로는 **프록시 자체 브리핑 마커 도입**으로 닫고,
+  (b) 프록시 오류 실제 메시지 회수를 위한 **짧은 재현 실행을 지금 수행**한다.
+  이 checkpoint는 (b)의 intent다.
+
+  M1 코드는 `aed75621acda86cf2a46f1c2c9566237cffa3236`로 push된 상태이며 재현은 그
+  코드(= `local_error_detail` 포함)로 돌린다. 목적은 포화 요청에서 나는
+  `RuntimeError`의 실제 문자열을 `ollama-proxy/ollama-proxy.out.log`의 새 `error`
+  필드로 확인하는 것 하나다.
+
+  **경계**: blind v1~v4 fixture는 열지도 쓰지도 않는다. 재현은 **공개** fixture
+  `ollama-proxy/eval/broadcast_sim/long_broadcast_continuity_v1.json`으로만 하며
+  manifest에서 `final_blind` role인 `third_long_broadcast_heldout_v1.json`은 쓰지
+  않는다. 모델은 baseline 운영 태그를 그대로 쓰고 변경하지 않는다. matrix 재실행 0,
+  GPU 학습 0, comparator 재실행 0, 운영 채택 0. 실행 후 스택은 정지하고 owned 포트를
+  다시 비운다. 프록시 stdout은 기동 시 덮어쓰므로 실행 직후 즉시 회수한다.
 
 - 2026-08-25 14:40 KST **M1 계측 복구 receipt (부분 완료 + 근본 원인 확정)**:
   오프라인 회귀 전량 통과. 코드 3개·테스트 3개를 고쳤고, 남은 한 축은 동결 계약과

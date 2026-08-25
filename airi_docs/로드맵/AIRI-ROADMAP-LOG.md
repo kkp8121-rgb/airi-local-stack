@@ -9,6 +9,16 @@
 
 ## 2026-08-25 M1 계측 복구 (D1 진단 후속)
 
+- 15:20 KST 재현 실행으로 프록시 오류 근본 원인을 확정했다: Ollama **400
+  `exceed_context_size_error`** — `n_prompt_tokens` min 2,552 / p50 2,721 / max 2,827
+  vs `n_ctx` 2,048(+504~+779 초과). 원인은 프록시에 프롬프트 예산 **강제**가 없다는
+  것이다(`PromptBudgetTelemetry`는 관측 전용). 부수 발견: 같은 클래스의 `terminal()`이
+  성공한 done row에서만 동작해 400으로 죽은 턴은 `saturation_observations`에도 안
+  잡힌다. 재현은 공개 fixture `long_broadcast_continuity_v1.json` 1회(blind 재사용 0,
+  final_blind fixture 미사용), 실행 후 스택 정지·owned 포트 6개 free 확인. 수리 방법
+  3안(num_ctx 상향 / 400 재시도 / 전송 전 절단)은 동결 `num_ctx 2048` 핀과 얽혀
+  사용자 결정으로 남겼다.
+
 - 14:40 KST 사용자 지시("계측 2건을 고치자")로 세 곳을 고쳤다. (1) 프록시 두 오류
   핸들러가 `local_error_detail()`로 예외 메시지를 bounded 기록하고, 무기록이던 memory
   경로도 `stage=memory_recall` 이벤트를 낸다. (2) 시뮬레이터에 `service_error` row
