@@ -63,6 +63,10 @@ FALLBACK_POOL = (
 # ollama_proxy 의 파이프라인 실패 안내 문구와 바이트로 같아야 오류율이 의미를
 # 갖는다. 침묵 폴백(FALLBACK_POOL)과 달리 이 응답은 모델 발화가 아예 없었다는
 # 뜻이라 어떤 축으로도 채점할 수 없다.
+# deterministic_utterance_layer.BRIEFING_EVIDENCE_MARKER 와 바이트로 같아야 한다
+# (후원 마커와 같은 방식으로 하드코딩하고 AST 대조 테스트로 고정한다). 마커 뒤
+# 전체가 이 턴의 증거이며, 마커가 없으면 계층은 예전처럼 system 을 전부 제외한다.
+BRIEFING_EVIDENCE_BLOCK_MARKER = "[턴 근거 메모]"
 SERVICE_ERROR_POOL = (
     "답을 만들다가 문제가 생겼어. 다시 말해줘.",
     "답이 너무 늦어서 잠깐 멈췄어. 다시 말해줘.",
@@ -481,7 +485,10 @@ def run_arm(
                 answered_picks, FALLBACK_POOL + DEGENERATE_ECHO_PREFIXES)
             briefing_text, carried_evidence = sim.build_turn_briefing_with_evidence(
                 fixture, stream, pick, echo_safe)
-            system_content += "\n\n" + briefing_text
+            # 브리핑은 이 턴이 실제로 받은 회수 재료다. 프록시 결정론 계층이
+            # 계약 산문과 구분해 증거 풀에 넣을 수 있도록 프록시가 정의한
+            # 마커를 앞에 붙인다(마커 뒤 전체가 증거).
+            system_content += "\n\n" + BRIEFING_EVIDENCE_BLOCK_MARKER + "\n" + briefing_text
         signalled = briefing_evidence == "on" and carried_evidence
         set_briefing_evidence_header(transport, signalled)
         user_content = format_user_content(message, author_format)

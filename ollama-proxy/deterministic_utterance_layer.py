@@ -350,6 +350,27 @@ def ensure_donation_engagement(text: str, *, user_text: str) -> tuple[str, bool]
 
 
 DONATION_CONTINUATION_MARKER = "[후원 본문 이어말하기]"
+# Producers (the live-broadcast director, the broadcast simulator) append the
+# turn's recall material to the system message.  Contract prose must stay out
+# of the P3/P4 decision pool, but that briefing is exactly the evidence the
+# turn was given, and excluding all system content excluded it too: in the D1
+# matrix every seed→callback distance was 38-66 turns, so the decision never
+# sat in the 8-turn history window and reached the model only through the
+# briefing.  P3 therefore found "no evidence" on every long callback and
+# overwrote correct answers with the don't-remember fallback.
+#
+# This marker is the opt-in seam, same shape as DONATION_CONTINUATION_MARKER:
+# whatever a system message carries from the marker to its end is evidence,
+# and everything before it stays prompt-only.
+BRIEFING_EVIDENCE_MARKER = "[턴 근거 메모]"
+
+
+def system_briefing_evidence(content: str) -> str:
+    """The marked evidence tail of one system message, or ""."""
+    index = (content or "").find(BRIEFING_EVIDENCE_MARKER)
+    if index < 0:
+        return ""
+    return content[index + len(BRIEFING_EVIDENCE_MARKER):].strip()
 
 
 def build_layer_inputs(
@@ -395,6 +416,9 @@ def build_layer_inputs(
             donation_turn = True
         if message.get("role") == "system":
             system_parts.append(content)
+            marked = system_briefing_evidence(content)
+            if marked:
+                evidence_parts.append(marked)
     pool_text = "\n".join(part for part in evidence_parts if part)
     prompt_text = "\n".join(part for part in [pool_text, *system_parts] if part)
     past_tokens = session_cache.snapshot(session_id)

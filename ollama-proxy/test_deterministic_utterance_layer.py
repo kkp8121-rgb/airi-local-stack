@@ -228,6 +228,47 @@ class LayerCompositionTests(unittest.TestCase):
         self.assertEqual(signal["recall"], "answered")
         self.assertIn("초록빛", text)
 
+    def test_marked_system_briefing_enters_the_decision_pool(self) -> None:
+        # D1 근본 원인 수리: 브리핑은 system 메시지로 오지만 이 턴이 실제로 받은
+        # 증거다. 마커 뒤 내용만 풀에 들어가고 계약 산문은 그대로 제외된다.
+        contract = "너는 방송 캐릭터다. 시청자 이름을 지어내지 말고 근거만 말해."
+        briefing = "- 이 시청자가 아까 한 말: \"등불신호는 붉은빛 말고 초록빛으로 걸자\""
+        with mock.patch.object(dul, "DETERMINISTIC_UTTERANCE_LAYER_ENABLED", True), \
+                mock.patch.object(dul, "session_cache", dul.SessionTokenCache()):
+            inputs = dul.build_layer_inputs(
+                user_text="등불 신호 무슨 빛으로 걸기로 했지?",
+                briefing_evidence=None, session_id="s-brief",
+                original_messages=[{
+                    "role": "system",
+                    "content": contract + "\n\n" + dul.BRIEFING_EVIDENCE_MARKER + "\n" + briefing,
+                }])
+        self.assertIn("초록빛", inputs["pool_text"])
+        self.assertNotIn("지어내지", inputs["pool_text"])
+        self.assertIn("지어내지", inputs["prompt_text"])
+        # 그 근거로 P3가 폴백 대신 결정론 응답을 낸다.
+        text, signal = dul.apply_deterministic_utterance_layer(
+            "글쎄, 잘 모르겠는데.", user_text=inputs["user_text"],
+            prompt_text=inputs["prompt_text"], pool_text=inputs["pool_text"],
+            past_tokens=frozenset(), donation_turn=False)
+        self.assertEqual(signal["recall"], "answered")
+        self.assertIn("초록빛", text)
+
+    def test_unmarked_system_content_still_stays_out_of_the_pool(self) -> None:
+        with mock.patch.object(dul, "DETERMINISTIC_UTTERANCE_LAYER_ENABLED", True), \
+                mock.patch.object(dul, "session_cache", dul.SessionTokenCache()):
+            inputs = dul.build_layer_inputs(
+                user_text="안녕", briefing_evidence=None, session_id="s-plain",
+                original_messages=[{"role": "system", "content": "붉은빛 말고 초록빛 얘기는 하지 마."}])
+        self.assertNotIn("초록빛", inputs["pool_text"])
+        self.assertIn("초록빛", inputs["prompt_text"])
+
+    def test_briefing_evidence_extractor_handles_absent_and_empty_marks(self) -> None:
+        self.assertEqual(dul.system_briefing_evidence("마커 없음"), "")
+        self.assertEqual(dul.system_briefing_evidence(dul.BRIEFING_EVIDENCE_MARKER + "\n  "), "")
+        self.assertEqual(
+            dul.system_briefing_evidence("앞 " + dul.BRIEFING_EVIDENCE_MARKER + "\n뒤 내용"),
+            "뒤 내용")
+
     def test_plain_turn_with_no_findings_returns_input_and_no_signal(self) -> None:
         text, signal = dul.apply_deterministic_utterance_layer(
             "등불 예쁘게 걸어 보자!",

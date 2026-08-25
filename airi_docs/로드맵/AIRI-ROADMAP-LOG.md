@@ -9,6 +9,15 @@
 
 ## 2026-08-25 M1 계측 복구 (D1 진단 후속)
 
+- 15:45 KST 사용자 승인안대로 P3 브리핑 마커를 구현했다. 계층에
+  `BRIEFING_EVIDENCE_MARKER = "[턴 근거 메모]"` + `system_briefing_evidence()`를 두고
+  `build_layer_inputs`가 마커 뒤 내용만 증거 풀에 넣는다(계약 산문 제외는 불변).
+  시뮬레이터가 브리핑 앞에 마커를 붙이고, 문자열은 후원 마커 선례대로 하드코딩 +
+  AST 대조 테스트로 고정했다. D1 실측상 `continuity_callback` 192행 중 112행(58%)이
+  `briefing_evidence=true`라 이 수리가 닿는 범위다. 검증: broadcast_sim+layer+guard
+  223 passed/1 skipped, proxy 380 OK, live_broadcast_runtime 20 OK, checkpoint PASS,
+  diff-check 0. 프롬프트 예산 강제는 사용자 결정 대기.
+
 - 15:20 KST 재현 실행으로 프록시 오류 근본 원인을 확정했다: Ollama **400
   `exceed_context_size_error`** — `n_prompt_tokens` min 2,552 / p50 2,721 / max 2,827
   vs `n_ctx` 2,048(+504~+779 초과). 원인은 프록시에 프롬프트 예산 **강제**가 없다는

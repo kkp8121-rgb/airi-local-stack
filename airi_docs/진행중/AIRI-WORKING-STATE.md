@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 15:20:00 +09:00"
-checkpoint_id: "20260825-152000-proxy-error-root-cause-confirmed"
+updated_at_kst: "2026-08-25 15:45:00 +09:00"
+checkpoint_id: "20260825-154500-p3-briefing-marker-receipt"
 matrix_note: "D1 종결. M1 계측 복구 push(aed7562). 프록시 오류 근본 원인 = Ollama 400 exceed_context_size_error(num_ctx 2048 초과) 확정"
 active_trainer_note: "D1 GPU 학습 없음. matrix 종료·소유 서비스 정리 완료; 잔여 AIRI 프로세스 0"
 goal_status: "active"
 authorization: "user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "m1-root-cause-confirmed-awaiting-fix-decision"
+active_phase: "m1-p3-closed-awaiting-prompt-budget-decision"
 git_head: "c312530581aa5ba5dbc10137ec2388dafe28d743"
 worktree_state: "HEAD/local main/origin-main exact c312530 and clean at 2026-08-25 13:18 KST before this receipt; matrix ended (exit 0), AIRI processes 0"
 active_trainer_count: 0
@@ -23,6 +23,43 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 > 기준 상태다. checkpoint를 포함한 commit 자체의 SHA를 자가 참조하지 않는다.
 
 ## 1. 권한과 현재 사실
+
+- 2026-08-25 15:45 KST **P3 브리핑 마커 receipt (사용자 승인안 (a) 구현 완료)**:
+  P3/P4 증거 풀이 브리핑을 볼 수 있게 하는 opt-in 마커를 넣었다. 후원 마커
+  (`DONATION_CONTINUATION_MARKER`)와 **같은 방식**이라 새 개념을 만들지 않는다.
+
+  - `deterministic_utterance_layer.py`: `BRIEFING_EVIDENCE_MARKER = "[턴 근거 메모]"`
+    와 `system_briefing_evidence()` 신설. `build_layer_inputs`가 system 메시지에서
+    **마커 뒤 전체만** 증거 풀에 넣는다. 마커가 없는 system 내용(계약 산문)은
+    예전 그대로 풀에서 제외되고 `prompt_text`에만 남는다 — "…지 말고" 오염 방지
+    설계는 불변이다.
+  - `run_broadcast_sim.py`: 브리핑을 system에 이어붙일 때 마커를 앞에 붙인다.
+    프록시 문자열은 후원 마커 선례대로 하드코딩하고 AST 대조 테스트로 고정했다
+    (러너가 계층을 런타임 import하지 않는다).
+  - **계층 docstring의 불변식은 지켰다**: 프록시는 시뮬레이터 문자열을 모르고,
+    시뮬레이터가 프록시가 정의한 마커를 쓴다. 평가 픽스처 검사 패턴 참조 0.
+
+  **예상 도달 범위(D1 산출물 실측)**: `continuity_callback` 192행 중 **112행(58%)**
+  이 `briefing_evidence=true`, 즉 브리핑이 실제 회수 재료를 싣고 있었다. 이 112행의
+  브리핑 인용문은 `"등불신호는 붉은빛 말고 초록빛으로 걸자"` 같은 `A 말고 B` 형태라
+  `answer_recall_question`이 파싱하는 바로 그 모양이다. 나머지 80행은 브리핑에도
+  재료가 없었으므로 폴백이 정직한 동작이다. **게이트가 닫힌다고 주장하지 않는다** —
+  재측정에는 새 blind가 필요하고 그건 별도 승인 사항이다.
+
+  **주의(기록)**: 마커는 system 프롬프트에 보이는 텍스트라 프롬프트 바이트가 바뀐다.
+  과거 라운드와 프롬프트가 동일하지 않으므로 어떤 재측정도 새 blind로 해야 한다
+  (blind v4는 이미 소비됐으니 실질 제약은 아니다).
+
+  **검증**: broadcast_sim+layer+guard **223 passed/1 skipped**(+42 subtests, 신규 4),
+  proxy `test_ollama_proxy` **380 OK**, `test_live_broadcast_runtime` 20 OK,
+  `test_memory_e2e` 1 OK, `test_input_screening` 19 OK,
+  `test-current-checkpoint.ps1` **PASS**, `git diff --check` 0. 신규 테스트 파일 0
+  (기존 파일 수정만)이라 CI matrix 갱신 불필요.
+
+  **남은 것 하나**: 프록시 프롬프트 예산 강제(Ollama 400 `exceed_context_size_error`).
+  근본 원인은 확정됐고 수리 3안(num_ctx 상향 / 400 재시도 / 전송 전 절단)은 동결
+  `num_ctx 2048` 핀과 얽혀 **사용자 결정 대기 중**이다. GPU 0, blind 재사용 0,
+  matrix 재실행 0, threshold 변경 0, adoption 0.
 
 - 2026-08-25 15:20 KST **프록시 오류 근본 원인 확정 receipt — Ollama 400
   `exceed_context_size_error`**: 재현 실행으로 실제 메시지를 회수했다. 세 blind

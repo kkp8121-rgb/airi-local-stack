@@ -1069,6 +1069,20 @@ class EchoFilterProxyContractTests(unittest.TestCase):
         self.assertEqual(len(live_pool), 6, live_pool)
         self.assertEqual(set(live_pool), set(runner.FALLBACK_POOL))
 
+    def test_runner_briefing_marker_matches_the_layer_constant(self) -> None:
+        # 러너가 브리핑 앞에 붙이는 마커는 계층이 인식하는 문자열과 바이트로
+        # 같아야 한다. 어긋나면 브리핑이 다시 P3/P4 증거 풀 밖으로 떨어진다.
+        layer = HERE.parent.parent / "deterministic_utterance_layer.py"
+        tree = ast.parse(layer.read_text(encoding="utf-8"))
+        marker = None
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "BRIEFING_EVIDENCE_MARKER":
+                        marker = ast.literal_eval(node.value)
+        self.assertIsNotNone(marker, "BRIEFING_EVIDENCE_MARKER 를 계층 소스에서 못 찾았다")
+        self.assertEqual(marker, runner.BRIEFING_EVIDENCE_BLOCK_MARKER)
+
     def _proxy_constant(self, name: str) -> str:
         for node in ast.walk(self._proxy_tree()):
             if isinstance(node, ast.Assign):
