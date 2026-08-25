@@ -1,35 +1,32 @@
 # AIRI D1 실행 인계 문서 (2026-08-25)
 
-> **2026-08-25 10:27 KST 최신 — 감독권을 Codex에서 Claude Code로 이관했다. 이 문서가
-> Claude의 단일 진입점이다.** detached matrix는 중단하지 않았고 재실행하지 않는다.
-> Claude는 `AGENTS.md` →
-> `airi_docs/진행중/AIRI-WORKING-STATE.md` → **이 문서** → `AIRI-ROADMAP-STATUS.md` →
-> `NEXT-SESSION.md`를 읽고 `git status`/HEAD/PID/산출물 SHA를 read-only로 대조한 뒤에
-> 감시를 재개한다. 설계 계약 원문은 `AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md`이고
-> 이 문서는 그 계약의 **실행 상태와 남은 단계**만 다룬다.
-> 이관 본문 commit `c74b2481a79c3faa1d503e6e08d46d4bcd555b2a`는 origin/main에
-> push됐고, 10:29:23 KST post-push에 HEAD/local/origin exact와 PID 7832 live를
-> 재확인했다.
+> **2026-08-25 13:05 KST 최신 — D1 matrix 완주, comparator `winner=null`. 실행 단계는
+> 끝났고 이 문서는 결과·진단 기록으로 넘어간다.** 48-report matrix는 12:38:14 KST에
+> exit 0으로 완주했고(48/48 전 증거), goal의 `no_winner` 경로대로 **3×500 campaign은
+> 실행하지 않았다**. 실패 root `D:\AIRI-Models\airi-d1-blind-matrix-20260825\`는 그대로
+> 보존한다. blind v4는 소비됐고 재사용·재실행 금지다. 진단 원문은
+> `AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md` **§6**, row 단위 근거는
+> WORKING-STATE 2026-08-25 13:05 receipt에 있다. **다음 라운드는 사용자 결정 사항이며
+> 자동으로 시작하지 않는다.**
 
-## 0. 인계 시점 상태 (관측값)
+## 0. 최종 상태 (관측값)
 
 | 항목 | 값 |
 |---|---|
-| 관측 시각 | `2026-08-25T10:29:23.9276509+09:00` |
-| HEAD = origin/main | `c74b2481a79c3faa1d503e6e08d46d4bcd555b2a` (이관 본문 push receipt) |
-| worktree | clean (이 receipt 작성 전 기준); 사용자 코드 변경 0 |
-| detached wrapper | PID `7832` live |
+| 관측 시각 | `2026-08-25T12:39:32.9033202+09:00` |
+| HEAD = origin/main | `927116ca38b39a6b1304b227f669e98c280b9bfb` (이 배치 직전 기준) |
+| worktree | 이 결과 문서 배치 전까지 clean; 사용자 코드 변경 0 |
+| detached wrapper | PID `7832` **종료**, `launcher.exit-code.txt = 0` |
 | exact command | `"C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -File D:\AIRI-Models\airi-d1-blind-matrix-20260825\launch-d1-matrix.ps1` |
-| matrix 진행 | reports `15/48`, health `15/48`, stdout `75,213 B`, stderr `0 B`, exit receipt absent |
-| Codex monitor | `/root/monitor_d1_matrix`만 `interrupted`; wrapper·launcher·서비스 제어 0 |
+| matrix 결과 | reports/health/run-contract/packets/runtime **48/48**, stdout `237,532 B`, stderr `0 B` |
+| comparator | `comparisons\d1-blind.json`, schema `airi.d1-blind-comparison.v1`, `status=pass`, **`winner=null`**, 실패 게이트 45 |
+| 서비스 정리 | owned 포트 11435/11436/8880/9880/8890/8892 전부 free, AIRI 잔여 프로세스 0 |
 | GPU | idle — **D1은 GPU 학습이 전혀 없다** |
 | goal | `user-goal-2026-08-25-0454-d1` (WORKING-STATE frontmatter `authorization` 참조) |
-| adoption | `false` 고정. campaign 결과와 무관하게 별도 사용자 승인 사항 |
+| adoption | `false` 고정. campaign 미실행이며 채택은 별도 사용자 승인 사항 |
 
-D1 goal 5단계 중 **1·2·3과 launcher/preflight가 끝났고 4(48-report matrix)가 exact-once
-실행 중이며 5(분기)가 남았다.** blind v4는 이 실행으로 이미 소비됐다. Claude는 PID
-7832를 중단·재실행·재시도하지 말고 read-only로 완주를 감시한 뒤 기존 comparator
-verdict에 따라 §2.3 분기만 수행한다.
+D1 goal 5단계 중 **1~4가 끝났고 5(분기)는 `no_winner` 경로로 종결**됐다. 남은 행동은
+없으며 다음 방향은 사용자 지시를 기다린다.
 
 ## 1. 끝난 것 (검증·push 완료)
 
@@ -109,7 +106,7 @@ verdict에 따라 §2.3 분기만 수행한다.
   delta ≥0.132, improved ≥4). 테스트는 그 분기를 검증하려고 **테스트 전용** policy
   변형(0.5/5)을 쓴다. 배포 policy 값은 0.02/0.08/4 그대로다.
 
-## 2. 남은 작업 (Claude가 이어받는 부분)
+## 2. 실행 단계 (전부 종결)
 
 ### 2.1 [완료] launcher `d1` 프로파일 — commit `9e6b1f4`, receipt `a510004`
 
@@ -170,47 +167,47 @@ checkpoint/AST/diff-check를 통과했다. 기존 t3/e2c1/e2c2는 3 arm/36을 �
  {"name":"e2-c2","tag":"midm-airi:e2c2-broadcast-v4-20260824-5eda8184e7118093773b4eafe513ec96","digest":"66364b4a1eeb33459b957d5024d864a45264897d121c2db0cc1f528b7bd48252"}]}
 ```
 
-### 2.2 [실행 중] 48-report matrix 감시 — 재실행 금지
+### 2.2 [완료] 48-report matrix — exit 0, 재실행 금지
 
-2026-08-25 09:28:26 KST detached wrapper PID 7832로 정확히 한 번 시작했고 blind v4는
-소비됐다. 10:27:00 KST 기준 reports/health 15/48, stdout 75,211 B, stderr 0 B, exit
-receipt absent다. Codex monitor subagent만 종료됐으며 wrapper·launcher·서비스는 계속
-실행 중이다. **아래 launcher 명령은 역사적 호출 계약일 뿐 다시 실행하지 않는다.**
-Claude의 다음 행동은 PID/command, report/health 증가, stdout/stderr, exit receipt를
-read-only로 감시하고, 종료 뒤 48/48 completeness와 `comparisons\d1-blind.json` verdict를
-검증하는 것이다.
+2026-08-25 09:28:26 KST detached wrapper PID 7832로 정확히 한 번 시작해 12:38:14 KST에
+종료했다. `launcher.exit-code.txt = 0`(2 B), reports/health/run-contract/packets/runtime
+**48/48**(arm별 12씩), plan evidence 12, comparisons 1, `summary.json`
+(`airi.t3-matrix-launcher.v2`, `matrix_profile=d1`, `run_count=48`,
+`comparisons={d1: pass-no-winner}`) 모두 계약치와 일치한다. health **48/48 전부**
+`before`·`after` 양쪽에서 `handle_grounding_guard=true`·`deterministic_utterance_layer=true`
+이고, environment attestation은 `airi.d1-environment-attestation.v1` / `run_count=48` /
+두 플래그 `'on'` / 두 `*_health_attested=true`다. retained `evidence\model-manifest.json`
+재계산 SHA는 summary의 `050ae10f...e330`과 exact 일치한다. stdout `transport_failures`
+전량 0, stderr 0 B다. **blind v4는 소비됐다. 이 matrix는 어떤 이유로도 재실행하지 않는다.**
 
-다음 두 문단과 명령은 **이미 완료된 09:26~09:28 KST 시작 절차의 역사 기록**이다.
-현재 세션에서 실행하지 않는다.
+### 2.3 [종결] 판정 — `no_winner`
 
-2026-08-25 09:26 KST 당시 preflight PASS: external model manifest 767 B SHA
-`050ae10f86cef5801b625a54bdfaa136ad927873e62b0e44226fa241b38ae330`, 48/48
-unique run keys, arm 순서 4개, seed sets 3×4, comparison d1-blind, OutputDir 미생성.
-그 시점에는 blind 응답 생성이 0이었고, 이후 09:28:26 KST exact-once wrapper가 시작됐다.
+comparator verdict는 `winner=null`, `no_winner_reason='no arm passed every applicable
+gate'`, 실패 게이트 45개다. score는 baseline 0.105751 / e2 0.109299 / e2-c1 0.116965 /
+e2-c2 0.108908이다. **goal의 `no_winner` 경로대로 3×500 live campaign을 실행하지 않았고
+자동 후속 라운드도 시작하지 않았다.** 실패 root를 보존하고 진단만 기록했다.
 
-```powershell
-# HISTORICAL EXACT COMMAND — DO NOT RUN AGAIN
-.\run-airi-broadcast-t3-matrix.ps1 -MatrixProfile d1 `
-  -OutputDir 'D:\AIRI-Models\airi-d1-blind-matrix-20260825\run' `
-  -ModelManifest 'D:\AIRI-Models\airi-d1-blind-matrix-20260825\d1-model-manifest.json' `
-  -BlindRoot 'D:\AIRI-Models\airi-d1-blind-freeze-20260825-v4'
-```
+진단 요약(전량 근거는 contract §6, row 단위 표는 WORKING-STATE 13:05 receipt):
 
-- `-PreflightOnly` 48 run key와 blind 바인딩은 이미 PASS했다. 다시 실행하지 않는다.
-- 실측 기준: E2-C2의 36-report matrix가 약 2시간 40분이었다. 48은 **3.5~4시간** 예상.
-  heartbeat 상한 14분, 첫 3 report에서 perfect-rate 분모 nonzero와
-  `evidence\health-*.json`의 두 플래그 attest를 조기 확인할 것.
-- 실패 시 root 보존, 같은 명령 반복 금지, 원인 확정 후 재기록.
+1. **전 arm 턴의 33.9~35.3%가 프록시 `LOCAL_ERROR_DIALOGUE`** 로 모델 발화가 없다.
+   D1 고유가 아니라 E2-C1 30.3~31.6%, E2-C2 37.2~38.6%로 **세 라운드 공통**이며
+   `summary.fallback`이 세지 않아 지금까지 보고된 적이 없다.
+2. **P3 `answer_recall_question` 과발동(D1 신규 회귀)** 이 `continuity_callback`
+   320행 중 176행(55%)을 회수 폴백으로 대체해 `long_callback`·`complete_show_arc`를
+   정확히 0.0으로 만들었다. 실제 모델 발화는 27행(8.4%)뿐이다.
+3. `unknown_identity_safe`는 분모 12행이 **전 arm 12/12 차단**이라 측정 자체가 불가능했다.
+   `stale_transition_clean`·donation composite도 25~58%가 차단돼 raw 1.0이 산술적으로
+   도달 불가였다.
+4. P4는 decoy 위반을 3라운드 최저(0.025~0.05)로 줄였지만 0에 미달, P5는 측정 가능한
+   donation 턴에서 live rate 0.688(e2-c2)로 최고였다. `invented_handle`은 5/4/8/6으로
+   85% 감소하고 학습 단조 악화도 사라졌으나, 감소분 일부는 발화 부재의 산술 효과이므로
+   가드 공로로 승격하지 않는다.
+5. **미확정**: 프록시 오류의 근본 원인은 프록시 stdout 미보존으로 특정하지 못했다.
+   코드상 후보는 memory 경로(`prepare_memory_body` → `fetch_local_dialogue`)의 포괄 예외
+   처리이며, 확정에는 프록시 stdout을 남기는 짧은 재현 실행이 필요하다(GPU 불필요).
 
-### 2.3 [분기] 판정 후속
-
-- **winner 있음** → top-score arm으로 3×500 turn live campaign을 이어서 실행한다
-  (goal 승인 범위). adoption은 여전히 별도 승인.
-- **no_winner** → campaign 없이 실패 축을 보존하고, 어떤 게이트가 왜 남았는지
-  진단해 보고한 뒤 대기한다. **자동으로 다음 라운드를 시작하지 않는다.**
-
-두 경우 모두 receipt를 WORKING-STATE에 쓰고, contract 문서(§7 자리)에 결과-후 절을
-추가하고, ROADMAP-LOG/STATUS/NEXT-SESSION을 갱신한 뒤 commit/push한다.
+결과 문서는 WORKING-STATE receipt, contract §6, ROADMAP-STATUS/LOG, NEXT-SESSION에
+반영했다. adoption은 `false` 유지이며 campaign 결과와 무관하게 별도 승인 사항이다.
 
 ## 3. 이번 라운드에서 무엇을 확인하려는가 (판정 해석의 사전 고정)
 
@@ -225,6 +222,12 @@ D1은 **학습 없이** 게이트가 닫히는지를 본다. 해석 기준을 �
   hard gate를 완화하지 않는다 — 판단은 사용자 몫이다.
 - 특정 게이트만 남으면 그 게이트의 실패 row를 원문으로 진단해(blind는 채점 완료 후
   열람 가능) 계층의 어느 부분(P2~P5)이 못 잡았는지 지목한다.
+
+**[결과-후 2026-08-25 13:05]** 위 세 해석 분기 중 어느 것도 그대로 적용할 수 없었다.
+네 목표 게이트의 분모가 25~100% 차단돼(프록시 오류 + P3 회수 폴백) "닫혔는가"를
+판정할 재료 자체가 부족했기 때문이다. 따라서 이번 라운드는 **게이트 체계의 타당성
+논의로 넘어가지 않는다** — 먼저 계측(프록시 오류율, P3 발동 범위)을 고치고 다시
+재야 한다. 어떤 경우에도 hard gate는 완화하지 않으며 판단은 사용자 몫이다.
 
 ## 4. 금지선 (goal 원문)
 

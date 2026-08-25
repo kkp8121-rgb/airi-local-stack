@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 10:30:00 +09:00"
-checkpoint_id: "20260825-103000-d1-claude-supervision-transfer-receipt"
-matrix_note: "D1 48-report matrix exact-once detached 실행 유지. wrapper PID 7832 live, reports/health 15/48; 감독만 Claude로 이관"
-active_trainer_note: "D1 GPU 학습 없음. Codex monitor subagent interrupted; wrapper PID 7832는 그대로 live·제어 금지"
+updated_at_kst: "2026-08-25 13:05:00 +09:00"
+checkpoint_id: "20260825-130500-d1-no-winner-diagnosis-receipt"
+matrix_note: "D1 48-report matrix 완주. wrapper PID 7832 exit 0, reports/health/run-contract/packets/runtime 48/48, comparator winner=null(no_winner). campaign 미실행, 진단 후 사용자 지시 대기"
+active_trainer_note: "D1 GPU 학습 없음. matrix 종료·소유 서비스 정리 완료; 잔여 AIRI 프로세스 0"
 goal_status: "active"
 authorization: "user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "d1-supervision-transferred-to-claude"
-git_head: "c74b2481a79c3faa1d503e6e08d46d4bcd555b2a"
-worktree_state: "HEAD/local main/origin-main exact c74b248 and clean before this receipt; wrapper PID 7832 live, exact command verified, reports/health 15/48, stdout 75,213 B, stderr 0 B, exit receipt absent"
+active_phase: "d1-no-winner-diagnosed-awaiting-user"
+git_head: "927116ca38b39a6b1304b227f669e98c280b9bfb"
+worktree_state: "HEAD/local main/origin-main exact 927116c at 2026-08-25 12:39:32 KST; WORKING-STATE heartbeat/receipt만 dirty; wrapper PID 7832 exited, launcher.exit-code.txt=0, stdout 237,532 B (stream length), stderr 0 B"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
@@ -23,6 +23,135 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 > 기준 상태다. checkpoint를 포함한 commit 자체의 SHA를 자가 참조하지 않는다.
 
 ## 1. 권한과 현재 사실
+
+- 2026-08-25 13:05 KST **D1 `no_winner` 진단 receipt — 이번 라운드는 게이트를
+  측정하지 못했다**: 채점이 끝난 blind v4 원문을 열람해 실패 축을 row 단위로 분류했다.
+  진단 스크립트는 comparator의 `perfect_rates`(0.0 / 0.2917·0.25·0.375·0.4583 /
+  0.2·0.225·0.3·0.3 / 0.05·0.0375·0.05·0.025)를 **소수점까지 재현**해 방법론을 검증한
+  뒤 같은 분모를 응답 종류별로 쪼갠 것이다.
+
+  **핵심 사실 — 전 arm 턴의 약 1/3에 모델 발화가 없다.** arm별 1,132턴 중 프록시의
+  `LOCAL_ERROR_DIALOGUE`(`ollama_proxy.py` `LOCAL_ERROR_DIALOGUE`, "답을 만들다가
+  문제가 생겼어…")가 baseline 384 / e2 400 / e2-c1 398 / e2-c2 392회(33.9~35.3%)다.
+  이는 D1 고유 문제가 아니라 **세 라운드 공통**이다 — E2-C1(blind v2) 30.3~31.6%,
+  E2-C2(blind v3) 37.2~38.6%, D1(blind v4) 33.9~35.3%. `summary.fallback`은 프록시의
+  침묵 폴백 풀만 세므로 이 오류 응답을 0/108로 보고했고, 어떤 게이트·리포트도 이
+  사실을 드러낸 적이 없다. `transport_failures`도 0이다(오류가 200 응답으로 나감).
+
+  **게이트별 분모 잠식(blocked = 프록시 오류 또는 P3 회수 폴백):**
+
+  | 게이트 | 분모/arm | blocked | live-only rate (baseline/e2/e2-c1/e2-c2) |
+  |---|---:|---:|---|
+  | `unknown_identity_safe` | 12 | **12/12 전부** | 측정 불능 (live 0) |
+  | `stale_transition_clean` | 40 | 20~23 (50~58%) | 0.444 / 0.450 / **0.706** / 0.632 |
+  | donation composite | 24 | 6~9 (25~38%) | 0.467 / 0.333 / 0.500 / **0.688** |
+  | `decoy_fact_use`(위반율, 목표 0) | 80 | 39~44 (49~55%) | 0.100 / 0.073 / 0.160 / 0.050 |
+
+  `unknown_identity_safe`가 전 arm 정확히 0.0인 이유는 모델이 틀려서가 아니라
+  **분모 12개가 전부 차단된 턴**이기 때문이다. `stale_transition_clean`과 donation
+  composite은 절반 안팎이 차단돼 raw rate의 산술 상한이 각각 ~0.45~0.5, ~0.62~0.75라
+  1.0 도달이 불가능했다.
+
+  **P2~P5 귀책 분류(row kind × 응답 종류, 48 report 전량):**
+
+  | row kind | n | 프록시 오류 | P3 회수 폴백 | 실제 발화 | 그중 `그거` 치환 |
+  |---|---:|---:|---:|---:|---:|
+  | `question` | 3,012 | 1,068 | 23 | 1,921 | 196 |
+  | `continuity_callback` | 320 | 117 | **176** | **27** | 4 |
+  | `memory_probe` | 160 | **152** | 8 | **0** | 0 |
+  | `donation` | 208 | 110 | 0 | 98 | 14 |
+  | `continuity_seed` | 320 | 34 | 0 | 286 | 11 |
+
+  - **P3 `answer_recall_question`이 이번 라운드 최대 손상원이다.** 회수형 판정이
+    과도하게 넓어 `continuity_callback` 320행 중 **176행(55%)** 을 근거 없음 →
+    `_RECALL_FALLBACK`("음… 그건 지금 확실하게 기억나지 않아…")로 **대체**했다.
+    프록시 오류 117행을 합치면 293행(91.6%)에 모델 답이 없고 실제 발화는 27행뿐이라
+    `long_callback`과 `complete_show_arc`가 전 arm 정확히 **0.0**이 됐다. 계층 OFF였던
+    E2-C2 라운드의 동일 턴은 "전철기 레버는 두 손으로 당겨서…" 같은 실제 콜백을
+    냈고 `long_callback` 0.23~0.25였다. **이 붕괴는 D1 신규 회귀다.**
+  - **P2 `guard_session_past_tokens`는 실제 발화 2,745행 중 257행(9.4%)** 에서 `그거`
+    치환 흔적을 남겼다(계층 OFF 라운드 동일 arm 표본은 0건, D1은 1,000자당 5.60건).
+    `topic_anchored`는 오히려 소폭 개선(0.373→0.415)이라 단독 손상 근거는 약하다.
+  - **P4 `suppress_rejected_branch`**: `decoy_fact_use` raw 위반율 0.025~0.05로 3개
+    라운드 중 최저지만 목표 0.0에 미달했다. 차단 행이 절반이라 실질 live 위반율은
+    0.05~0.16으로 오히려 높다 — **P4는 완전 억제에 실패했다.**
+  - **P5 `ensure_donation_engagement`**: donation composite live rate가 e2-c2 0.688로
+    측정 가능한 턴에서는 가장 높다. 남은 실패의 지배 요인은 P5가 아니라 donation
+    턴의 25~38% 차단이다.
+  - **`invented_handle`**: 5/4/8/6으로 v2(28/40/53)·v3(14/27/33) 대비 약 85% 감소했고
+    "학습할수록 악화" 단조성도 깨졌다(e2 4 < baseline 5). 다만 전 턴의 ~35%가 오류
+    응답이라 **감소분 일부는 가드 효과가 아니라 발화 자체가 없어서 생긴 산술 효과**다.
+    분리 측정 없이 가드 공로로 승격하지 않는다. 어느 쪽이든 0이 아니므로 hard gate는
+    실패다.
+
+  **미확정 1건**: 프록시 `LOCAL_ERROR_DIALOGUE`의 근본 원인은 이 산출물만으로 특정할
+  수 없다. matrix는 프록시 stdout을 남기지 않아 `{"event":"local_chat","status":
+  "error","error_type":...}` 이벤트를 회수할 수 없다. 코드상 후보는 `ollama_proxy.py`
+  9336행 인근의 memory 경로(`prepare_memory_body` → `fetch_local_dialogue`)가 모든 예외를
+  삼켜 `local_failed`로 떨어지는 분기이며, `memory_probe` 160행 중 152행(95%)이 이
+  종류의 턴이라는 관측과 일관된다. 확정하려면 프록시 stdout을 보존한 짧은 재현
+  실행이 필요하다(GPU 학습 불필요, 오프라인 아님).
+
+  **결론**: D1의 물음("학습 없이 결정론 계층으로 게이트가 닫히는가")은 이번 라운드
+  데이터로 답할 수 없다. 게이트 임계값이나 모델 체급 문제 이전에 (a) 세 라운드 내내
+  기록되지 않은 ~1/3 프록시 오류율과 (b) D1 신규 P3 과발동이라는 두 계측 결함이
+  분모를 절반~전부 잠식했다. 둘 다 코드 계층 문제이고 GPU 재학습이 필요 없다.
+  **자동 후속 라운드는 시작하지 않았다. 다음 방향은 사용자 결정 사항이다.**
+  hard gate 완화 0, threshold/metric/seed/fixture 변경 0, 운영 모델·태그 변경 0,
+  campaign 0, `adoption_authorized=false` 유지.
+
+- 2026-08-25 12:45 KST **D1 48-report matrix 완주 receipt — comparator `no_winner`**:
+  detached wrapper PID `7832`이 12:38:14 KST에 종료했고
+  `D:\AIRI-Models\airi-d1-blind-matrix-20260825\launcher.exit-code.txt`는 `0`(2 B)이다.
+  12:39:32 KST read-only 검증 결과는 전부 계약치와 일치한다.
+  - reports **48/48**(arm별 baseline 12 / e2 12 / e2-c1 12 / e2-c2 12),
+    health **48/48**, run-contract **48/48**, packets **48**, runtime **48**,
+    plan evidence **12**, comparisons **1**(`comparisons\d1-blind.json`), `summary.json` 존재.
+  - health **48/48 전부** `before`·`after` 양쪽에서
+    `handle_grounding_guard=true` **및** `deterministic_utterance_layer=true`.
+  - environment attestation: schema `airi.d1-environment-attestation.v1`,
+    `run_count=48`, `handle_grounding_guard='on'`, `deterministic_utterance_layer='on'`,
+    `evidence.handle_grounding_guard_health_attested=true`,
+    `evidence.deterministic_utterance_layer_health_attested=true`.
+  - summary: schema `airi.t3-matrix-launcher.v2`, `matrix_profile='d1'`, `status='pass'`,
+    `adoption_authorized=false`, `run_count=48`,
+    `blind_root_id='airi-d1-blind-freeze-20260825-v4'`,
+    `model_manifest_sha256=050ae10f86cef5801b625a54bdfaa136ad927873e62b0e44226fa241b38ae330`
+    (retained `evidence\model-manifest.json` 재계산 해시와 exact 일치),
+    `sealed_manifest_sha256=44c05fbd...b071682`, `comparisons={d1: pass-no-winner}`.
+  - comparator: schema `airi.d1-blind-comparison.v1`, `status='pass'`,
+    `adoption_authorized=false`, `report_count=48`, `root_id` 일치,
+    **`winner=null`**, `no_winner_reason='no arm passed every applicable gate'`,
+    실패 게이트 **45개**.
+  - stdout `transport_failures` 전량 0, stderr 0 B, error/exception/traceback 0.
+  - 정리: owned 포트 11435/11436/8880/9880/8890/8892 전부 free, AIRI 잔여 프로세스 0.
+    남은 listener는 상시 `ollama serve`(PID 18616, 2026-08-23 기동)와 그 자식
+    `llama-server`(PID 22896)뿐으로 matrix가 만든 것이 아니다. GPU 학습 0.
+  - **결과 분기: goal 5단계의 `no_winner` 경로다. 3×500 live campaign을 실행하지 않는다.**
+    실패 root를 그대로 보존하고 진단 후 사용자 지시를 기다린다. 자동 후속 라운드 0,
+    hard gate 완화 0, blind v4 재사용 0, 운영 채택 0(`adoption_authorized=false`).
+
+- 2026-08-25 11:10 KST **D1 감독 인수 대조 receipt (Claude)**: 시작 프로토콜
+  5문서(`AGENTS.md` → WORKING → `AIRI-D1-CODEX-HANDOFF-2026-08-25.md` →
+  ROADMAP-STATUS → NEXT-SESSION)를 읽고 실제 기계 상태를 read-only로 대조했다.
+  11:08:31 KST 관측: wrapper PID `7832` live, exact command 불변
+  (`"C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -File
+  D:\AIRI-Models\airi-d1-blind-matrix-20260825\launch-d1-matrix.ps1`), 시작 09:28:26.
+  reports 25/48, health 25/48, run-contract 25/48, packets 25,
+  `launcher.exit-code.txt` absent, stderr 0 B. stdout는 **디렉터리 메타데이터가
+  30,352 B로 stale**하고 열린 핸들 stream length 기준 **125,297 B**다 — 이후 stdout
+  크기는 stream length로만 기록한다. arm별 report는 baseline 12/12, e2 12/12,
+  e2-c1 1/12, e2-c2 0/12으로 계약 순서대로다. health 25/25 전부 `before`·`after`
+  양쪽에서 `handle_grounding_guard=true`·`deterministic_utterance_layer=true`이고,
+  stdout의 `transport_failures`는 전부 0, error/exception 라인 0이다. Git HEAD/local
+  main/origin-main 모두 `927116ca38b39a6b1304b227f669e98c280b9bfb` exact, worktree
+  clean이다. 인계 스냅샷(10:29:23 KST reports/health 15/48)과는 진척만 다르고 나머지
+  식별자는 일치한다. 실측 페이스는 run당 약 3.97분(09:31:41→11:06:52, 24 run
+  간격)이라 48/48 예상 완료는 12:35~12:45 KST다. **다음 행동은 wrapper·launcher·
+  서비스에 어떤 제어 신호도 보내지 않고 heartbeat 상한 14분으로 완주만 감시하는
+  것**이며, 종료 후 exit code 0·48/48 completeness·`comparisons\d1-blind.json`
+  verdict를 검증해 handoff §2.3 분기를 수행한다. 이번 인수에서 matrix/wrapper
+  재실행 0, 서비스 제어 0, blind v4 재사용 0이다.
 
 - 2026-08-25 10:30 KST **D1 실행 감독 Claude 이관 receipt**: 다섯 이관 문서만
   work-continuity PASS·diff-check 0·cached diff-check 0 후 commit
@@ -616,7 +745,9 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
   goal 문안을 그대로 승인(진단→가드→E2-C2, blind v1/v2 재사용·hard gate 완화·same-data E3·
   campaign은 금지, GPU 무제한, adoption은 별도 승인). preflight: HEAD/local/remote exact
   `57d0e53`, clean, 관련 AIRI PID 0. e2-c1 blind v2 report는
-  `D:\AIRI-Modelsiri-e2c1-blind-matrix-20260824uneports\e2-c1\`에 12개(3 fixture×4 seed)
+  `D:\AIRI-Modelsiri-e2c1-blind-matrix-20260824
+un
+eports\e2-c1\`에 12개(3 fixture×4 seed)
   존재 확인. report schema는 `rows[].invented_handles`(위반 handle 목록)와 `transcript[]`
   (stage=turn마다 author/chat/airi/deterministic_act, turn_index 순)를 모두 담아 이름의
   최초 등장 위치를 이 report 하나만으로 추적 가능함을 확인했다. scout(haiku)에게 12개

@@ -1,5 +1,22 @@
 # AIRI 다음 세션 안내
 
+> **2026-08-25 13:05 KST 최우선 — D1 종결(`no_winner`), 다음 행동은 사용자 지시 대기:**
+> 48-report matrix는 12:38:14 KST exit 0으로 완주했고 comparator는 `winner=null`이다.
+> goal의 `no_winner` 경로대로 **3×500 campaign을 실행하지 않았고 자동 후속 라운드도
+> 시작하지 않았다.** 실패 root `D:\AIRI-Models\airi-d1-blind-matrix-20260825\` 보존,
+> blind v4 소비·재사용 금지, adoption=false 유지다.
+>
+> **다음 세션이 먼저 알아야 할 것: 이번 라운드는 게이트를 측정하지 못했다.** 전 arm
+> 턴의 33.9~35.3%가 프록시 `LOCAL_ERROR_DIALOGUE`라 모델 발화가 없었고(세 blind 라운드
+> 공통, `summary.fallback` 미계수), P3 `answer_recall_question`이 `continuity_callback`
+> 320행 중 176행을 회수 폴백으로 대체했다(D1 신규 회귀). 그 결과 `long_callback`·
+> `complete_show_arc`·`memory_probe`·`unknown_identity_safe`가 전 arm 정확히 0.0이다.
+> 따라서 **게이트 임계값이나 모델 체급을 논하기 전에 계측 2건을 고쳐야 한다** —
+> ① 프록시 오류율의 근본 원인(프록시 stdout을 남기는 짧은 재현 실행 필요, GPU 불필요),
+> ② P3 발동 범위 축소. 둘 다 코드 계층이고 GPU 재학습이 필요 없다. 어떤 것도 사용자
+> 승인 없이 시작하지 않는다. 상세: `진행중/AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md`
+> §6, `진행중/AIRI-D1-CODEX-HANDOFF-2026-08-25.md` §0·§2.3, WORKING-STATE 13:05 receipt.
+
 > **2026-08-25 10:27 KST 최우선 — D1 실행 감독을 Claude Code가 인수:** detached
 > wrapper PID 7832는 exact command 그대로 live이고 reports/health 15/48, stdout
 > 75,211 B, stderr 0 B, exit receipt absent다. Codex monitor subagent만 중단했고 matrix·

@@ -100,3 +100,48 @@ P3(회수 성공)·P1(fact 인정 범위)이 memory_probe·long_callback·fact �
    → commit/push.
 4. 48-report matrix(계층 ON) → verdict.
 5. 분기: winner→campaign / no_winner→진단·대기. adoption은 어느 경우에도 별도 승인.
+
+## 6. 결과와 진단 (2026-08-25, 결과-후 절)
+
+48-report matrix는 12:38:14 KST에 exit 0으로 완주했다(48/48 reports·health·run-contract·
+packets·runtime, environment attestation `airi.d1-environment-attestation.v1`,
+comparator `airi.d1-blind-comparison.v1`). **결과는 `winner=null`(45개 게이트 실패)이며
+goal의 `no_winner` 경로에 따라 3×500 campaign은 실행하지 않았다.**
+
+| 지표 | baseline | e2 | e2-c1 | e2-c2 |
+|---|---:|---:|---:|---:|
+| weighted score | 0.105751 | 0.109299 | **0.116965** | 0.108908 |
+| `invented_handle` 위반 | 5 | 4 | 8 | 6 |
+| `unknown_identity_safe` | 0.0 | 0.0 | 0.0 | 0.0 |
+| `stale_transition_clean` | 0.200 | 0.225 | 0.300 | 0.300 |
+| donation composite | 0.292 | 0.250 | 0.375 | 0.458 |
+| `decoy_fact_use`(목표 0) | 0.050 | 0.038 | 0.050 | 0.025 |
+| `long_callback` / `complete_show_arc` / `memory_probe` | 0.0 | 0.0 | 0.0 | 0.0 |
+
+**이 숫자는 계층 성능이 아니라 계측 결함을 먼저 반영한다.** 채점 후 blind 원문을
+열람해 분류한 결과는 다음과 같다(전량 재현 가능, comparator rate 소수점 일치 검증됨).
+
+1. **프록시 오류 응답이 전 arm 턴의 33.9~35.3%** 다(`LOCAL_ERROR_DIALOGUE`). 이는
+   D1 고유가 아니라 E2-C1 30.3~31.6%, E2-C2 37.2~38.6%로 **세 blind 라운드 공통**이며
+   `summary.fallback`이 세지 않아 지금까지 한 번도 보고된 적이 없다.
+2. **P3 `answer_recall_question` 과발동(D1 신규 회귀)**: `continuity_callback` 320행
+   중 176행(55%)을 근거 없음 → `_RECALL_FALLBACK`으로 대체했다. 프록시 오류 117행을
+   더하면 실제 모델 발화는 27행(8.4%)뿐이고, 이것이 `long_callback`·
+   `complete_show_arc`를 정확히 0.0으로 만든 직접 원인이다.
+3. **`memory_probe` 160행 중 152행(95%)이 프록시 오류, 실제 발화 0행** — 이 축은 D1
+   이전에도 측정되지 않고 있었다(E2-C2 36~38/40 동일).
+4. `unknown_identity_safe`의 분모 12행은 **전 arm 12/12가 차단된 턴**이라 0.0은
+   모델 판정이 아니라 측정 불능이다.
+5. P4는 decoy 위반을 3라운드 최저(0.025~0.05)로 줄였으나 0에 못 미쳤고, P5는 측정
+   가능한 donation 턴에서 live rate 0.688(e2-c2)로 가장 높다. `invented_handle`은
+   85% 감소했으나 감소분 일부는 발화 부재의 산술 효과이므로 가드 공로로 승격하지
+   않는다.
+
+**미확정**: 프록시 오류의 근본 원인은 프록시 stdout이 보존되지 않아 특정하지 못했다.
+코드상 유력 후보는 memory 경로(`prepare_memory_body` → `fetch_local_dialogue`)의
+포괄 예외 처리다. 확정에는 프록시 stdout을 남기는 짧은 재현 실행이 필요하며 GPU
+학습은 필요 없다.
+
+**동결 유지**: §1~§5의 설계·게이트 정의·threshold·seed·fixture는 이 결과로 변경하지
+않는다. hard gate 완화 0, 운영 채택 0(`adoption_authorized=false`). 다음 라운드
+방향은 사용자 결정 사항이며 자동으로 시작하지 않는다.

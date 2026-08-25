@@ -7,6 +7,35 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-25 D1 48-report matrix 완주 → `no_winner` 종결·진단
+
+- 13:05 KST 채점 후 blind v4 원문을 열람해 실패 축을 row 단위로 분류했다. 진단
+  스크립트가 comparator `perfect_rates`를 소수점까지 재현한 뒤 같은 분모를 응답
+  종류별로 쪼갠 결과: 프록시 `LOCAL_ERROR_DIALOGUE`가 전 arm 턴의 33.9~35.3%
+  (E2-C1 30.3~31.6%, E2-C2 37.2~38.6%로 세 라운드 공통, `summary.fallback` 미계수),
+  P3 `answer_recall_question`이 `continuity_callback` 320행 중 176행(55%)을 회수
+  폴백으로 대체(D1 신규 회귀). `unknown_identity_safe` 분모 12행은 전 arm 전부 차단.
+  `memory_probe` 160행 중 152행 프록시 오류·실제 발화 0행(D1 이전에도 동일).
+  P4는 decoy 위반 3라운드 최저(0.025~0.05)지만 0 미달, P5는 donation live rate
+  0.688(e2-c2)로 최고. `invented_handle` 5/4/8/6(85% 감소, 학습 단조성 소멸)이나
+  감소분 일부는 발화 부재의 산술 효과라 공로 승격하지 않는다. 프록시 오류의 근본
+  원인은 프록시 stdout 미보존으로 미확정. WORKING receipt, contract §6, handoff §0/§2/§3,
+  ROADMAP-STATUS, NEXT-SESSION에 반영했다.
+- 12:45 KST matrix 완주 receipt: wrapper PID 7832가 12:38:14 KST 종료,
+  `launcher.exit-code.txt=0`, reports/health/run-contract/packets/runtime 48/48,
+  plan evidence 12, comparisons 1, summary `airi.t3-matrix-launcher.v2`
+  (`matrix_profile=d1`, `run_count=48`, `comparisons={d1: pass-no-winner}`),
+  environment attestation `airi.d1-environment-attestation.v1` 두 플래그 `'on'`·두
+  `*_health_attested=true`, health 48/48 before/after 두 플래그 true, retained model
+  manifest SHA `050ae10f...e330` exact 일치, stderr 0 B, `transport_failures` 0.
+  comparator `winner=null`·실패 게이트 45. **goal `no_winner` 경로로 campaign 미실행.**
+  owned 포트 6개 전부 free, AIRI 잔여 프로세스 0(상시 `ollama serve` PID 18616 제외).
+- 11:10~12:36 KST Claude가 감독을 인수해 read-only로 완주를 감시했다. 인수 시점
+  대조에서 PID 7832 exact command 불변·reports/health 25/48·HEAD `927116c` exact를
+  확인했고, stdout 크기는 디렉터리 메타데이터가 stale(30,352 B)해 열린 핸들 stream
+  length(125,297 B)로만 기록하도록 정정했다. 이후 14분 상한 heartbeat를 유지하며
+  wrapper·launcher·서비스 제어 0, matrix/wrapper 재실행 0, blind v4 재사용 0이었다.
+
 ## 2026-08-25 D1 실행 감독 Claude 이관
 
 - 10:30 KST 다섯 이관 문서만 검증해 commit `c74b248`로 origin/main에 push했다.

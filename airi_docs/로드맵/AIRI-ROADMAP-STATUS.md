@@ -7,6 +7,26 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
+> **2026-08-25 13:05 KST D1 종결 — 48-report matrix 완주, `winner=null`, campaign 미실행:**
+> exact-once detached matrix가 12:38:14 KST에 exit 0으로 끝났다(reports/health/
+> run-contract/packets/runtime 48/48, 두 런타임 플래그 48/48 attest, comparator
+> `airi.d1-blind-comparison.v1` `status=pass`). **`winner=null`(45 게이트 실패)이라 goal의
+> `no_winner` 경로대로 3×500 campaign을 실행하지 않았고 자동 후속 라운드도 없다.**
+> score baseline 0.1058 / e2 0.1093 / e2-c1 0.1170 / e2-c2 0.1089.
+>
+> 채점 후 원문 열람으로 확인한 실패 원인은 **모델도 임계값도 아니라 계측 결함 2건**이다.
+> ① 프록시 `LOCAL_ERROR_DIALOGUE`가 전 arm 턴의 33.9~35.3%를 차지한다 — D1 고유가
+> 아니라 E2-C1 30.3~31.6%, E2-C2 37.2~38.6%로 **세 blind 라운드 공통**이며
+> `summary.fallback`이 세지 않아 지금까지 보고된 적이 없다. ② **P3
+> `answer_recall_question` 과발동(D1 신규 회귀)** 이 `continuity_callback` 320행 중
+> 176행(55%)을 회수 폴백으로 대체해 `long_callback`·`complete_show_arc`를 정확히 0.0으로
+> 만들었다. `unknown_identity_safe`는 분모 12행이 전 arm 전부 차단이라 측정 자체가
+> 불가능했다. `invented_handle`은 5/4/8/6으로 v2(28/40/53)·v3(14/27/33) 대비 85% 감소하고
+> 학습 단조 악화도 사라졌으나, 감소분 일부는 발화 부재의 산술 효과라 가드 공로로
+> 승격하지 않는다. 프록시 오류의 근본 원인은 프록시 stdout 미보존으로 **미확정**이다.
+> 실패 root 보존, blind v4 소비·재사용 금지, hard gate 완화 0, adoption=false 유지.
+> **다음 방향은 사용자 결정 사항이다.** 상세: `진행중/AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md` §6.
+
 > **2026-08-25 10:27 KST D1 matrix 실행 유지, 감독 Claude 이관:** exact-once detached
 > wrapper PID 7832는 live이고 reports/health 15/48, stdout 75,211 B, stderr 0 B,
 > exit receipt absent다. Codex monitor subagent만 종료했으며 matrix launcher·wrapper·
