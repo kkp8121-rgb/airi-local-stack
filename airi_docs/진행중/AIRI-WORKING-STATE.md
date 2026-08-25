@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 17:05:00 +09:00"
-checkpoint_id: "20260825-170500-m2-batch-b-receipt-goal-complete"
+updated_at_kst: "2026-08-25 17:12:00 +09:00"
+checkpoint_id: "20260825-171200-m2-continuity-contract-fix"
 matrix_note: "D1 종결. M2 배치 A(num_ctx 4096·F7 게이트·문서 편입) push, 배치 B(lm-eval·perplexity 기준선) 완료. 재측정용 새 blind·게이트 강제·adoption은 별도 사용자 결정"
 active_trainer_note: "GPU 학습 없음. lm-eval 추론만 사용했고 종료(GPU 370 MiB). AIRI 서비스 0"
-goal_status: "complete-awaiting-user"
+goal_status: "active"
 authorization: "user-goal-2026-08-25-1630-m2: proceed-with-proposed-direction (review-docs-into-참조+INDEX, num_ctx-4096-prompt-budget, R2-F7-campaign-code-gate) and adopt-tools-judged-beneficial (lm-eval, llama.cpp perplexity; unsloth/DPO deferred); no-gpu-training; operational-adoption-still-separate-approval. superseded: user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
 active_phase: "m2-complete-awaiting-user"
-git_head: "50041f1"
-worktree_state: "HEAD/local main/origin-main exact 50041f1 and clean at 2026-08-25 16:26 KST (batch A: 6450a96 docs import, dd327cb num_ctx 4096, 19e558f F7 gate, 50041f1 receipt); no AIRI services running"
+git_head: "956a2260de824b1d3b1b6e074ebdebfe30c7cea0"
+worktree_state: "HEAD/local main/origin-main exact 956a226 and clean at 2026-08-25 17:10 KST; M2 complete, no AIRI services, GPU idle"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
@@ -23,6 +23,14 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 > 기준 상태다. checkpoint를 포함한 commit 자체의 SHA를 자가 참조하지 않는다.
 
 ## 1. 권한과 현재 사실
+
+- 2026-08-25 17:12 KST **work-continuity 계약 정정 receipt**: 직전 receipt commit `956a226`은
+  frontmatter `goal_status: "complete-awaiting-user"`(허용값 아님)와 `git_head` 축약 SHA로
+  `test-airi-work-continuity.ps1`을 통과하지 못한 채 push됐다(계약 실패가 `set -e`를 멈추지
+  못함). 세 현행 문서의 기계 판독 리터럴 `goal_status=active`와 맞추기 위해 `active`로 되돌리고
+  `git_head`를 40자 SHA로 고쳤다. M2 goal 자체는 완료 상태이며 다음 행동은 사용자 결정
+  3건(새 blind v5 재측정 / 일반 능력 게이트 강제 / native_baseline 픽스처 핀)이다.
+  operational-adoption-forbidden 유지.
 
 - 2026-08-25 17:05 KST **M2 배치 B receipt — goal 완료**: greybox 평가 툴 2종 도입·측정
   완료. 증거 문서 `완료/AIRI-M2-GREYBOX-EVAL-2026-08-25.md`(명령·exit·SHA 전부 수록), INDEX
