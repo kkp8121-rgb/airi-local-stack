@@ -64,6 +64,23 @@ class LiveCampaignLauncherContractTests(unittest.TestCase):
         self.assertIn("Restore-AiriEnvironmentValue 'GPT_SOVITS_STREAMING_MODE'", WRAPPER)
         self.assertIn("Restore-AiriEnvironmentValue 'GPT_SOVITS_MIN_CHUNK_LENGTH'", WRAPPER)
 
+    def test_campaign_is_gated_on_a_blind_comparator_winner(self) -> None:
+        # R2 F7 (BATCH-EVAL 2026-08-21): a campaign must be impossible without
+        # a passing blind verdict that names the exact arm being launched.
+        self.assertIn("[string]$ComparatorVerdict", WRAPPER)
+        self.assertIn("[string]$ModelManifest", WRAPPER)
+        self.assertIn("Test-AiriCampaignWinnerGate", WRAPPER)
+        self.assertIn("-blind-comparison\\.v[0-9]+$", WRAPPER)
+        self.assertIn("status -cne 'pass'", WRAPPER)
+        self.assertIn("adoption_authorized -ne $false", WRAPPER)
+        self.assertIn("names no winner (no_winner)", WRAPPER)
+        self.assertIn("do not match the comparator winner arm", WRAPPER)
+        # The gate runs before any port is inspected or any service started.
+        self.assertLess(WRAPPER.index("Test-AiriCampaignWinnerGate `"),
+                        WRAPPER.index("$ownedPorts = @("))
+        self.assertLess(WRAPPER.index("$campaignWinner = "),
+                        WRAPPER.index("start-airi-local-stack.ps1"))
+
     def test_tts_launcher_fail_closes_overlay_reuse_and_runs_guarded_wrapper(self) -> None:
         self.assertIn("ReferenceEmbeddingCache on requires a fresh 9880 backend", TTS_START)
         self.assertIn("run_v2proplus_with_sv_cache.py", TTS_START)

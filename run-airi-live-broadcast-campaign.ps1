@@ -11,7 +11,15 @@ param(
     [ValidateRange(500, 100000)]
     [int]$Turns = 500,
     [ValidateRange(512, 32768)]
-    [int]$NumCtx = 2048
+    [int]$NumCtx = 4096,
+    # R2 F7: a campaign is only ever run for the arm a blind comparator named
+    # as its unique passing winner.  Both files are the launcher's own retained
+    # evidence (comparisons\<profile>-blind.json, evidence\model-manifest.json);
+    # the gate refuses anything else before a single service starts.
+    [Parameter(Mandatory = $true)]
+    [string]$ComparatorVerdict,
+    [Parameter(Mandatory = $true)]
+    [string]$ModelManifest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,6 +32,57 @@ if (Test-Path -LiteralPath $outputRoot) {
 if ($Show -notmatch '^[A-Za-z0-9_-]{3,64}$') {
     throw 'Show must contain only 3-64 ASCII letters, digits, underscore, or hyphen.'
 }
+
+function Test-AiriCampaignWinnerGate {
+    param(
+        [string]$VerdictPath,
+        [string]$ManifestPath,
+        [string]$ExpectedTag,
+        [string]$ExpectedDigest
+    )
+    foreach ($path in @($VerdictPath, $ManifestPath)) {
+        $item = Get-Item -LiteralPath $path -ErrorAction Stop
+        if ($item.PSIsContainer -or $item -isnot [IO.FileInfo]) {
+            throw "Campaign gate input must be a regular file: $path"
+        }
+    }
+    $verdict = Get-Content -LiteralPath $VerdictPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    foreach ($name in @('schema_version', 'status', 'winner', 'adoption_authorized', 'arms')) {
+        if (-not $verdict.PSObject.Properties[$name]) {
+            throw "Comparator verdict lacks '$name'; refusing to run a campaign on it."
+        }
+    }
+    if ([string]$verdict.schema_version -notmatch '^airi\.[a-z0-9-]+-blind-comparison\.v[0-9]+$') {
+        throw 'Comparator verdict schema is not a blind comparison verdict.'
+    }
+    if ([string]$verdict.status -cne 'pass') {
+        throw 'Comparator verdict status is not pass; campaign refused.'
+    }
+    if ($verdict.adoption_authorized -ne $false) {
+        throw 'Comparator verdict must carry adoption_authorized=false; a campaign is not adoption.'
+    }
+    $winner = $verdict.winner
+    if ($null -eq $winner -or [string]::IsNullOrWhiteSpace([string]$winner)) {
+        throw 'Comparator verdict names no winner (no_winner); campaign refused.'
+    }
+    $winner = [string]$winner
+    if (@($verdict.arms | Where-Object { [string]$_ -ceq $winner }).Count -ne 1) {
+        throw 'Comparator winner is not one of the verdict arms.'
+    }
+    $manifest = Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (-not $manifest.PSObject.Properties['arms']) { throw 'Model manifest lacks arms.' }
+    $arm = @($manifest.arms | Where-Object { [string]$_.name -ceq $winner })
+    if ($arm.Count -ne 1) { throw "Model manifest does not pin exactly one arm named '$winner'." }
+    if ([string]$arm[0].tag -cne $ExpectedTag -or [string]$arm[0].digest -cne $ExpectedDigest) {
+        throw 'ChatModel/ChatModelDigest do not match the comparator winner arm; campaign refused.'
+    }
+    return $winner
+}
+
+$campaignWinner = Test-AiriCampaignWinnerGate `
+    -VerdictPath $ComparatorVerdict -ManifestPath $ModelManifest `
+    -ExpectedTag $ChatModel -ExpectedDigest $ChatModelDigest
+Write-Output "Campaign winner gate passed for arm '$campaignWinner'."
 
 $ownedPorts = @(11435, 11436, 8880, 9880, 8892, 8890)
 $occupied = @(
