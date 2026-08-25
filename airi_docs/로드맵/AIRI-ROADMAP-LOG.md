@@ -9,6 +9,16 @@
 
 ## 2026-08-25 D1 launcher 프로파일 구현·offline PASS
 
+- 10:17 KST baseline arm batch 12/12 완료: reports/health/run-contract가 모두 12이고,
+  12개 health 전부 guard/layer before/after=true다. total 12/48, wrapper live, stderr
+  0 B이며 다음 e2 arm으로 진행한다. 최종 gate 평가는 comparator까지 유보한다.
+- 09:47 KST 첫 continuity report(baseline/seed 73)를 root가 재검산해
+  stale_transition_clean 3/10(분모 10 > 0), 대응 health의 guard/layer before/after=true를
+  확인했다. reports/health 5/48, wrapper live, stderr 0 B다. 이로써 네 perfect-rate 분모와
+  두 flag의 조기 attest를 끝냈으며 최종 gate 판정은 48/48 comparator까지 유보한다.
+- 09:46 KST 첫 3 report receipt 두 commit을 push해 HEAD/local/origin-main이
+  `a6d275e`로 exact다. matrix는 reports/health 4/48, wrapper live, stderr 0 B이며 첫
+  continuity report의 stale 분모 확인으로 이동한다.
 - 09:45 KST 첫 3 report 조기 attestation 문서 배치를 commit `516acf2`로 고정했다.
   wrapper는 live, reports/health 4/48, stderr 0 B이며 local main 한 commit ahead다. commit
   receipt를 같은 두 문서로 고정한 뒤 두 commit을 origin/main에 한 번 push한다.
