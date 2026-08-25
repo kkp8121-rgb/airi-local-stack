@@ -9,6 +9,11 @@
 
 ## 2026-08-25 D1 launcher 프로파일 구현·offline PASS
 
+- 09:29 KST intent commit `310e81a` push 후 detached wrapper PID 7832를 정확히 한 번
+  시작했다(09:28:26 KST, start receipt SHA `2be69835...fdc6`). run dir 생성,
+  stdout 677 B/stderr 0 B, reports 0/48, first-run services startup 중이다. blind v4는 이
+  matrix로 소비되며 동일 명령 재실행 금지. 14분 heartbeat와 첫 3 report 조기 attest로
+  이동한다.
 - 09:27 KST detached wrapper를 external root에 고정했다(1,190 B, SHA
   `0da4ef4c...8c6e`, AST PASS). exact repo launcher args, manifest SHA `050ae10f...e330`,
   blind v4, no-overwrite exit-code receipt를 결속한다. run/log/exit/start receipt는 모두
