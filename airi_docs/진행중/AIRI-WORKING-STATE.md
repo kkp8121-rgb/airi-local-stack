@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 07:10:00 +09:00"
-checkpoint_id: "20260825-071000-d1-harness-receipt-codex-handoff"
-matrix_note: "E2-C2 no_winner 종결(receipt 7e9f8e3). 신규 goal D1 접수"
-active_trainer_note: "e2c2 본 학습 terminal complete(1536/96, exit 0). 사용자 지시로 merge/패키징/matrix 진행하지 않고 대기. 재개 신호 = 사용자 '게임 끝' 통지. trainer/runner PID 0, AIRI GPU 워크로드 0"
+updated_at_kst: "2026-08-25 09:20:00 +09:00"
+checkpoint_id: "20260825-092000-d1-launcher-stage-receipt-commit-intent"
+matrix_note: "D1 launcher 전체 offline 회귀 PASS, commit/push intent. matrix 미실행, blind v4 미소비"
+active_trainer_note: "D1은 GPU 학습 없음. trainer/runner/AIRI matrix PID 0, 11435/12393/12394 listener 0"
 goal_status: "active"
 authorization: "user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "d1-awaiting-codex-launcher-profile-and-matrix"
-git_head: "9a2195b4ec4c9dba9bf449967ce840a8849667d9"
-worktree_state: "HEAD-local-remote-exact-9a2195b(harness batch); dirty: live-state heartbeat + verify_e2_c2 deterministic_validation key (commit with smoke receipt); AIRI-PID-0; trainer 0; GPU idle 479MiB"
+active_phase: "d1-launcher-commit-push"
+git_head: "731416710207ae2f6f2679b2c11de97297c8b0e6"
+worktree_state: "HEAD/local main/origin-main exact 7314167 and clean before this checkpoint; related AIRI matrix/trainer PID 0; 11435/12393/12394 listener 0; blind v4 sealed pins exact"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
@@ -23,6 +23,63 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 > 기준 상태다. checkpoint를 포함한 commit 자체의 SHA를 자가 참조하지 않는다.
 
 ## 1. 권한과 현재 사실
+
+- 2026-08-25 09:20 KST **D1 launcher exact stage receipt + commit intent**: 검증된
+  launcher/test/WORKING/ROADMAP-LOG 네 경로만 `git add`했고 cached diff-check exit 0,
+  staged 4·unstaged 0·untracked 0이다. 이 receipt를 WORKING에 추가해 재stage한 뒤
+  동일 cached 경계와 관련 PID 0을 확인하고 `fix: add D1 matrix launcher profile`을
+  한 번 commit한다. 실패 시 push/matrix 없이 commit 전 상태를 보존한다.
+
+- 2026-08-25 09:17 KST **D1 launcher 전체 offline receipt + commit/push intent**:
+  fresh 결과는 launcher focused 25 pass, broadcast_sim+launcher 통합 `194 passed,
+  1 skipped, 32 subtests passed`, proxy `377 tests OK`, `test-current-checkpoint.ps1`
+  exit 0/최종 PASS, PowerShell AST와 diff-check exit 0이다. checkpoint에는 work-continuity,
+  durability, patch/entrypoint/applicability, Node/Python offline 계약이 포함됐다. 기존 세
+  profile을 한 helper에서 묶어 preflight하려던 진단 명령은 제품 실행 전 wrapper
+  PowerShell 문법과 자동 `$args` 재사용 때문에 두 번 exit 1했고 launcher 본문·서비스·
+  output에는 도달하지 않았다. 같은 helper 수리는 중단했으며 이를 기존 경로 PASS
+  근거로 세지 않는다; 기존 경로 보존 근거는 fresh 계약 25개와 전체 checkpoint다.
+  관련 PID/listener 0, dirty는 launcher/test/WORKING/ROADMAP-LOG 정확히 4개다. 이 네
+  경로만 stage해 `fix: add D1 matrix launcher profile`로 commit하고 `git push origin main`
+  한다. 실패 시 force/retry/matrix 없이 보존한다. push receipt 전에는 d1 preflight와
+  blind 응답 생성을 시작하지 않는다.
+
+- 2026-08-25 09:12 KST **D1 launcher focused receipt + 전체 offline 회귀 intent**:
+  launcher와 기존 계약 테스트 한 파일만 수정했다. root diff 검토에서 기존 E2-C2
+  unbound-root 테스트가 잘못된 arm fixture로 바뀌어 조기 실패하도록 약화된 1건을 잡아
+  원래 `e2c2_manifest/e2c2_tags`로 복원했다. fresh 검증은 pinned Python 3.12 launcher
+  계약 `25 passed in 20.74s`, PowerShell AST exit 0, repo diff-check exit 0(기존
+  LF→CRLF 경고만)이다. 다음 명령은 영향 Python 회귀(launcher 계약 + D1 comparator/
+  verifier + broadcast_sim 전체), proxy 회귀, `test-current-checkpoint.ps1`, 최종
+  diff/security 경계다. 출력은 테스트 로그 외 신규 산출물 0이며 실패 시 commit/push,
+  preflight, matrix를 시작하지 않는다. worktree는 launcher/test와 recovery
+  WORKING/ROADMAP-LOG 네 경로만 dirty다.
+
+- 2026-08-25 09:05 KST **D1 launcher 구현 intent**: 현재 launcher/test 전체와 독립
+  탐색 결과로 변경 seam을 확정했다. 소유 파일은 `run-airi-broadcast-t3-matrix.ps1`과
+  `test_broadcast_t3_matrix_launcher_contract.py` 두 개뿐이다. d1에만 4 arm/48 count,
+  blind v4 commitment/policy/pin, guard+deterministic layer ON과 strict `/health`
+  attestation, D1 comparator/schema를 추가하고 공통 count는 arm 수·commitment에서
+  파생한다. 기존 t3/e2c1/e2c2 리터럴과 36-run 동작은 기존/신규 계약 테스트로 보존한다.
+  구현 뒤 PowerShell AST와 focused pytest를 먼저 실행하며 실패 시 matrix·commit/push로
+  이동하지 않는다. 새 테스트 파일을 추가하지 않으므로 CI matrix 경로 추가는 없다.
+
+- 2026-08-25 09:05 KST **D1 코덱스 세션 복구 정합 receipt**: recovery intent 뒤
+  frontmatter를 실제 `7314167`/PID 0/blind v4 exact pin으로 정정했고, 그 차이를 같은
+  배치 ROADMAP-LOG에 기록했다. 수정 전 worktree clean이었고 이 receipt 시점 dirty는
+  WORKING-STATE와 ROADMAP-LOG 두 문서뿐이다. 구현·테스트·서비스·matrix·blind 응답 생성
+  0. 다음 한 동작은 launcher와 호출 테스트 전체를 읽어 현재 seam을 확정하는 것이다.
+
+- 2026-08-25 09:04 KST **D1 코덱스 세션 복구 정합 intent**: 사용자 `/goal`의 남은
+  launcher→48-report matrix→verdict 분기를 접수했다. 필독 순서를 완료한 뒤 실제 상태를
+  read-only 대조하니 HEAD/local main/origin-main은 모두 `7314167`이고 worktree clean,
+  관련 AIRI matrix/trainer PID와 11435/12393/12394 listener는 0이었다. blind v4
+  `sealed_manifest.json`/`validation_receipt.json`은 각각 1,119/872 B이고 SHA가
+  `44c05fbd...1682`/`8542bd61...95f4`로 인계 pin과 exact다. 기존 frontmatter의
+  `9a2195b`·dirty 설명은 07:10 handoff 직전 관측값과도 맞지 않는 stale 값이므로 이
+  관측 사실로 정정한다. 다음 상태 변경은 이 recovery receipt와 차이를 ROADMAP-LOG에
+  기록하는 것뿐이며, 그 뒤 launcher/test 파일을 읽고 별도 구현 intent를 쓴다. matrix,
+  서비스, GPU, blind 응답 생성은 아직 0이다.
 
 - 2026-08-25 07:10 KST **D1 하네스 receipt + 코덱스 인계 (배치 3, Claude 세션 종료
   지점)**: 사용자 지시로 여기까지 진행하고 인계 문서를 작성했다 —

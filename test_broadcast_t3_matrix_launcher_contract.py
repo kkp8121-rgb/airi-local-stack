@@ -295,7 +295,7 @@ class E2C1BlindProfileContract(LauncherHarness, unittest.TestCase):
             cwd=ROOT, text=True, capture_output=True)
         self.assertEqual(ast.returncode, 0, ast.stdout + ast.stderr)
         source = SCRIPT.read_text(encoding='utf-8')
-        for required in ("[ValidateSet('t3','e2c1','e2c2')] [string]$MatrixProfile = 't3'",
+        for required in ("[ValidateSet('t3','e2c1','e2c2','d1')] [string]$MatrixProfile = 't3'",
                          '[string]$BlindRoot',
                          'The $MatrixProfile profile requires -BlindRoot.',
                          "@('baseline','e2','e2-c1')",
@@ -310,7 +310,7 @@ class E2C1BlindProfileContract(LauncherHarness, unittest.TestCase):
                          'blind_commitment_sha256=$commitmentSha256'):
             self.assertIn(required, source)
 
-    def test_matrix_profile_is_a_three_value_validate_set(self):
+    def test_matrix_profile_is_a_four_value_validate_set(self):
         query = subprocess.run(
             ['powershell', '-NoProfile', '-Command',
              "$e=$null;$t=$null;"
@@ -322,7 +322,7 @@ class E2C1BlindProfileContract(LauncherHarness, unittest.TestCase):
              ").PositionalArguments.Value -join ','"],
             cwd=ROOT, text=True, capture_output=True)
         self.assertEqual(query.returncode, 0, query.stderr)
-        self.assertEqual(query.stdout.strip(), 't3,e2c1,e2c2')
+        self.assertEqual(query.stdout.strip(), 't3,e2c1,e2c2,d1')
 
 
 class E2C2BlindProfileContract(LauncherHarness, unittest.TestCase):
@@ -387,7 +387,7 @@ class E2C2BlindProfileContract(LauncherHarness, unittest.TestCase):
         # so pin its shape instead: the check exists, is gated on the e2c2-only
         # flag, and uses safe property access under strict mode.
         source = SCRIPT.read_text(encoding='utf-8')
-        self.assertIn("$requireGuardHealth = ($MatrixProfile -ceq 'e2c2')", source)
+        self.assertIn("$requireGuardHealth = ($MatrixProfile -ceq 'e2c2' -or $MatrixProfile -ceq 'd1')", source)
         self.assertIn("if ($requireGuardHealth) {", source)
         self.assertIn("$H.PSObject.Properties['handle_grounding_guard']", source)
 
@@ -398,6 +398,74 @@ class E2C2BlindProfileContract(LauncherHarness, unittest.TestCase):
             result, out = self.invoke(path, self.manifest(), self.tags(), '-PreflightOnly',
                                       '-HealthFixtureFile', str(health))
             self.assertEqual(result.returncode, 0, result.stderr); self.assertFalse(out.exists())
+
+
+class D1BlindProfileContract(LauncherHarness, unittest.TestCase):
+    """D1 is a four-arm frozen blind with both deterministic runtime gates pinned ON."""
+
+    def d1_manifest(self):
+        arms = [
+            {'name': 'baseline', 'tag': 'base:one', 'digest': 'a' * 64},
+            {'name': 'e2', 'tag': 'e2:one', 'digest': 'b' * 64},
+            {'name': 'e2-c1', 'tag': 'e2c1:one', 'digest': 'c' * 64},
+            {'name': 'e2-c2', 'tag': 'e2c2:one', 'digest': 'd' * 64},
+        ]
+        return {'schema_version': 'airi.broadcast-sim-t3-model-manifest.v2', 'arms': arms}
+
+    def d1_tags(self):
+        return {'models': [{'name': 'base:one', 'digest': 'a' * 64},
+                           {'name': 'e2:one', 'digest': 'b' * 64},
+                           {'name': 'e2c1:one', 'digest': 'c' * 64},
+                           {'name': 'e2c2:one', 'digest': 'd' * 64}]}
+
+    def test_d1_requires_blind_root(self):
+        with tempfile.TemporaryDirectory() as temp:
+            result, out = self.invoke(Path(temp), self.d1_manifest(), self.d1_tags(),
+                                      '-PreflightOnly', '-MatrixProfile', 'd1')
+            self.assertNotEqual(result.returncode, 0); self.assertFalse(out.exists())
+
+    def test_d1_rejects_other_profile_arm_sets(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp); blind = path/'blind'; blind.mkdir()
+            result, out = self.invoke(path, self.blind_manifest(), self.blind_tags(),
+                                      '-PreflightOnly', '-MatrixProfile', 'd1',
+                                      '-BlindRoot', str(blind))
+            self.assertNotEqual(result.returncode, 0); self.assertFalse(out.exists())
+
+    def test_d1_fails_closed_on_an_unbound_blind_root(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp); blind = path/'blind'; blind.mkdir()
+            (blind/'identity_unknown_and_donation_ritual.json').write_text('{}', encoding='utf-8')
+            result, out = self.invoke(path, self.d1_manifest(), self.d1_tags(),
+                                      '-PreflightOnly', '-MatrixProfile', 'd1',
+                                      '-BlindRoot', str(blind))
+            self.assertNotEqual(result.returncode, 0); self.assertFalse(out.exists())
+
+    def test_launcher_pins_d1_inputs_four_arms_and_runtime_attestation(self):
+        source = SCRIPT.read_text(encoding='utf-8')
+        for required in ("@('baseline','e2','e2-c1','e2-c2')",
+                         'airi_d1_blind_commitment.json', 'airi_d1_metric_policy.json',
+                         'airi.d1-blind-commitment.v1',
+                         'airi-d1-blind-freeze-20260825-v4',
+                         '44c05fbd475a6ca9b87fc3a8f07ec0af7a2eef9e023b993c89398ceb3b071682',
+                         'compare_d1_blind.py', 'd1-blind.json',
+                         'airi.d1-environment-attestation.v1',
+                         'airi.d1-blind-comparison.v1',
+                         '$expectedArmNames.Count * 3 * 4',
+                         "$env:AIRI_HANDLE_GROUNDING_GUARD = 'on'",
+                         "$env:AIRI_DETERMINISTIC_UTTERANCE_LAYER = 'on'",
+                         'Restore-Env AIRI_DETERMINISTIC_UTTERANCE_LAYER $previousDeterministicLayer',
+                         "handle_grounding_guard'] = 'on'",
+                         "deterministic_utterance_layer'] = 'on'",
+                         'handle_grounding_guard_health_attested',
+                         'deterministic_utterance_layer_health_attested'):
+            self.assertIn(required, source)
+
+    def test_d1_health_checks_use_strict_mode_safe_properties(self):
+        source = SCRIPT.read_text(encoding='utf-8')
+        self.assertIn("$requireDeterministicLayerHealth = ($MatrixProfile -ceq 'd1')", source)
+        self.assertIn("$H.PSObject.Properties['handle_grounding_guard']", source)
+        self.assertIn("$H.PSObject.Properties['deterministic_utterance_layer']", source)
 
 
 if __name__ == '__main__':

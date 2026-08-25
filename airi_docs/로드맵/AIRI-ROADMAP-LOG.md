@@ -7,6 +7,24 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-25 D1 launcher 프로파일 구현·offline PASS
+
+- 09:17 KST `run-airi-broadcast-t3-matrix.ps1`에 기존 프로파일을 보존한 `d1`
+  4-arm/48-run 프로파일, blind v4 결속, guard+deterministic layer 환경 강제·복원,
+  strict `/health` 이중 attest, D1 comparator/attestation을 추가했다. 계약 테스트는
+  D1 5건을 더하고 ValidateSet 4값을 고정했다. root 검토에서 약화된 기존 E2-C2
+  unbound-root fixture 1건을 원복했다. fresh 검증: launcher 25 pass,
+  broadcast_sim+launcher 194 pass/1 skip(+32 subtests), proxy 377 OK, 전체 checkpoint
+  PASS, AST/diff-check 0. matrix/서비스/blind 응답 생성은 0이며 검증된 4-path 배치를
+  commit/push한다.
+
+## 2026-08-25 D1 코덱스 세션 복구 정합
+
+- 09:05 KST 실제 HEAD/local main/origin-main이 `7314167`로 exact·worktree clean이고
+  관련 matrix/trainer PID와 11435/12393/12394 listener가 0임을 read-only 대조했다.
+  blind v4 봉인 manifest/receipt SHA도 인계 pin과 exact다. WORKING-STATE frontmatter의
+  stale `9a2195b`·dirty 설명을 실제 상태로 정정했다. matrix와 blind 응답 생성은 0이다.
+
 ## 2026-08-25 D1 blind v4 봉인 + 4-arm 하네스 + 코덱스 인계
 
 - 07:10 KST (클로드 PC, Fable 감독) blind v4 3종 신규 저작·검증·봉인(root
