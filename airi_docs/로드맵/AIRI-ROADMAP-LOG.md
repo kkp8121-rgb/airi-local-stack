@@ -9,6 +9,17 @@
 
 ## 2026-08-25 M3 — 승인 3건 착수: 핀 수리 · 일반 능력 게이트 · blind v5
 
+- 21:22 KST d1v5 matrix 종결: 17:35:52 시작 → 21:15 wrapper exit 1(48/48 완주 후 comparator가 v4
+  하드코딩 verifier에 막힘). `verify_d1_frozen_contract.py`에 root별 generation 매핑(v4·v5)을
+  넣고 동일 인자로 comparator 재실행 → `winner=null`, 실패 38 게이트, 점수 e2-c2 0.373 최고.
+  계측 복구 확정(`service_error` 0/1,132×4, memory_probe 36/40, unknown_identity_safe 학습 arm
+  1.0). 진단: live-broadcast 경로에서 `build_layer_inputs`가 주입 전 `original_messages`만 받아
+  P3/P4/P5가 브리핑·후원 note를 못 봄(714e196 마커는 live 모드 미전송 `system_content`에 붙어
+  무효) — D1·d1v5 공통 결함, 내 검증 누락. P3 정규식 1글자 토큰 공백(5/12 arc), v5 handle 주제
+  명사 충돌(invented_handle artefact), 부정 교정문 decoy. campaign 0, 자동 후속 0. 병렬 세션의
+  같은 worktree checkout으로 report 36개에 `model_digest`/`max_tokens` 키가 추가됐으나 판정
+  영향 0. 다음 라운드는 사용자 결정.
+
 - 17:34 KST blind v5 봉인 완료: subagent가 외부 staging에 저작한 fixture 3종(시계방/등대/양봉장)을
   직접 `--check` 재검증(pins exact 일치) 후 `airi-d1-blind-freeze-20260825-v5`로 봉인 — sealed
   manifest `d9c07fea…7c45`, receipt `823c4695…f02c`, 본문 리포 미포함. launcher `d1v5` 프로파일

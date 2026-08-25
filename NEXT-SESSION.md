@@ -1,5 +1,13 @@
 # AIRI 다음 세션 안내
 
+> **2026-08-25 21:22 KST 최우선 — d1v5 `no_winner`, 다음 라운드는 사용자 결정:** 계측은
+> 이제 실제로 작동한다(service_error 0, probe 36/40). 남은 실패의 근본 원인은 **결정론 계층이
+> 운영 live 경로에서 브리핑·후원 note를 못 받는 배선 결함**(`build_layer_inputs`에 주입 전
+> 메시지만 전달)이다. 다음 라운드 후보: ① 주입 후 메시지 또는 `context_note`를 계층 입력에
+> 전달 + runtime이 브리핑 마커 부착 + live 경로 통합 테스트, ② P3 `_REJECTED_BRANCH_RE` 1글자
+> 토큰·띄어쓴 구 확장, ③ blind v6(handle을 주제 어휘와 분리) 봉인 후 재측정. 어느 것도 승인
+> 없이 시작하지 않는다. 상세: contract §7, D1 handoff 머리글, WORKING 21:22 receipt.
+
 > **2026-08-25 17:05 KST 최우선 — M2 goal 완료, 다음은 사용자 결정 3건:** ① 프롬프트 마커·
 > `num_ctx` 4096으로 프롬프트가 바뀌어 과거 blind와 비교가 끊겼으므로 **새 blind v5 봉인 →
 > 4-arm 48-report 재측정** 여부(GPU 학습 불필요, ~3.5h). ② lm-eval 일반 능력 게이트(≤2%p)

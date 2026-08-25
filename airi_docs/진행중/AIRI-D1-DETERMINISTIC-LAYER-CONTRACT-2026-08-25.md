@@ -145,3 +145,46 @@ goal의 `no_winner` 경로에 따라 3×500 campaign은 실행하지 않았다.*
 **동결 유지**: §1~§5의 설계·게이트 정의·threshold·seed·fixture는 이 결과로 변경하지
 않는다. hard gate 완화 0, 운영 채택 0(`adoption_authorized=false`). 다음 라운드
 방향은 사용자 결정 사항이며 자동으로 시작하지 않는다.
+
+## 7. 재측정 d1v5 결과와 진단 (2026-08-25 21:22, 결과-후 절)
+
+M1·M2 계측 수리(프록시 오류 기록·`service_error` 지표·P3 probe/confirmation·num_ctx 4096·브리핑
+마커) 뒤 새 blind v5(`airi-d1-blind-freeze-20260825-v5`)로 같은 4-arm 48-report matrix를 정확히
+한 번 재실행했다. 48/48 완주, 두 런타임 플래그 48/48 attest, `context_exceeded 0`. comparator는
+v4 하드코딩 verifier에 막혀 launcher 단계에서 실패했고, verifier를 v5 root까지 받도록 고친 뒤
+동일 인자로 오프라인 재실행해 verdict를 발행했다(`summary.json` 미생성 기록).
+
+| 지표 | baseline | e2 | e2-c1 | e2-c2 |
+|---|---:|---:|---:|---:|
+| weighted score | 0.340 | 0.345 | 0.364 | **0.373** |
+| `invented_handle` | 7 | 17 | 11 | 9 |
+| `unknown_identity_safe` | 0.917 | **1.0** | **1.0** | **1.0** |
+| `stale_transition_clean` | 0.375 | 0.300 | 0.425 | 0.575 |
+| donation composite | 0.250 | 0.375 | 0.208 | 0.333 |
+| `decoy_fact_use`(목표 0) | 0.063 | 0.025 | 0.025 | 0.013 |
+| memory_probe / topic_anchored | 0.90 / 0.52 | 0.90 / 0.51 | 0.88 / 0.52 | 0.90 / **0.65** |
+| long_callback / complete_show_arc | 0.04 / 0.06 | 0.02 / 0.06 | 0.06 / 0.08 | 0.06 / 0.09 |
+
+**verdict `winner=null`**(실패 게이트 38). 계측은 이번에 실제로 작동했다 — `service_error` 0,
+memory_probe 36/40, `unknown_identity_safe`가 학습 arm에서 닫혔다.
+
+**진단(P2~P5 귀책)**:
+1. **결정론 계층은 운영 경로에서 근거를 받지 못한다(배선 결함).** live-broadcast 프로토콜에서
+   브리핑과 후원 계약은 `broadcast_context` → `airi_broadcast_context` system note로 **주입된
+   body**에만 존재하고, `build_layer_inputs`는 주입 전 `context.original_messages`를 받는다.
+   따라서 P3는 continuity callback 80행 중 62~65행을 폴백으로 덮었고(`released 0/80`), P5의
+   `donation_turn`은 한 번도 참이 아니었으며(donation composite miss 29~39/52 전부
+   `shared_tokens=false`), P4의 결정 풀도 비어 있었다. 714e196의 시뮬레이터 마커는 live 모드에서
+   전송되지 않는 `system_content`에 붙어 효과가 없었다. 이 결함은 D1(v4)에도 동일하게 있었다.
+2. **P3 추출 정규식**: v5 arc 12개 중 5개("가득 말고 팔 할만", "한 번씩 말고 두 번씩" 등 1글자
+   토큰·띄어쓴 구)는 `_REJECTED_BRANCH_RE`가 못 잡는다(오프라인 재현 7/12 추출).
+3. **`invented_handle`은 대부분 채점 artefact**: 전부 `question` 행이고 v5 viewer handle이 주제
+   명사 합성어(채밀칼날·훈연기연기·태엽감기…)라 주제 발화가 roster 부분일치에 걸렸다. blind
+   저작 결함이며 가드 범위 밖이다.
+4. **decoy**: "A가 아니라 B" 부정 교정문이 금지 패턴에 걸린 사례가 다수 — P4는 풀이 비어
+   드롭하지 못했고 채점기는 부정 문맥을 구분하지 않는다.
+
+**동결 유지**: §1~§5의 게이트 정의·threshold·seed는 불변. hard gate 완화 0, campaign 0,
+adoption 0. **다음 라운드(주입 후 메시지/`context_note`를 계층 입력에 전달, runtime이 브리핑
+마커를 붙임, P3 정규식 확장, live 경로 통합 테스트, 새 blind v6 — handle은 주제 어휘와 분리)는
+사용자 결정 사항이며 자동으로 시작하지 않는다.**

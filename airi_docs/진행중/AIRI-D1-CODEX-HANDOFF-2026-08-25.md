@@ -1,13 +1,13 @@
 # AIRI D1 실행 인계 문서 (2026-08-25)
 
-> **2026-08-25 13:05 KST 최신 — D1 matrix 완주, comparator `winner=null`. 실행 단계는
-> 끝났고 이 문서는 결과·진단 기록으로 넘어간다.** 48-report matrix는 12:38:14 KST에
-> exit 0으로 완주했고(48/48 전 증거), goal의 `no_winner` 경로대로 **3×500 campaign은
-> 실행하지 않았다**. 실패 root `D:\AIRI-Models\airi-d1-blind-matrix-20260825\`는 그대로
-> 보존한다. blind v4는 소비됐고 재사용·재실행 금지다. 진단 원문은
-> `AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md` **§6**, row 단위 근거는
-> WORKING-STATE 2026-08-25 13:05 receipt에 있다. **다음 라운드는 사용자 결정 사항이며
-> 자동으로 시작하지 않는다.**
+> **2026-08-25 21:22 KST 최신 — d1v5 재측정 완료, `winner=null`, 다음은 사용자 결정.** 계측
+> 수리(M1/M2) 뒤 blind v5로 4-arm 48-report를 정확히 한 번 재실행했다. 48/48 완주, 계측 정상
+> (`service_error` 0, memory_probe 36/40, `unknown_identity_safe` 학습 arm 1.0), 점수 0.34~0.37.
+> comparator는 v4 하드코딩 verifier에 막혀 launcher가 exit 1로 끝났고, verifier를 v5까지 받도록
+> 고친 뒤 동일 인자로 오프라인 재실행해 verdict를 발행했다(`summary.json` 미생성). **근본 원인:
+> 운영(live-broadcast) 경로에서 결정론 계층이 주입 전 메시지만 받아 브리핑·후원 note를 보지
+> 못한다** — P3 폴백 62~65/80, P5 미발동, P4 풀 비어 있음. 상세는 contract **§7**, WORKING
+> `21:22` receipt. campaign 0, 자동 후속 라운드 0, adoption 0.
 
 ## 0. 최종 상태 (관측값)
 

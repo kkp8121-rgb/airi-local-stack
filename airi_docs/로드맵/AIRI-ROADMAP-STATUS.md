@@ -7,6 +7,16 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
+> **2026-08-25 21:22 KST M3 — d1v5 재측정 `no_winner`, 결정론 계층 배선 결함 확정:** blind v5로
+> 4-arm 48-report를 재실행해 계측이 실제로 작동함을 확인했다(`service_error` 0, memory_probe
+> 36/40, `unknown_identity_safe` 학습 arm 1.0, 점수 0.34~0.37 — D1 0.11의 3배). 그러나
+> `winner=null`: **live-broadcast 경로에서 결정론 계층(P3/P4/P5)이 주입 전 메시지만 받아 브리핑·
+> 후원 note를 보지 못한다**(P3 폴백 62~65/80, P5 미발동). 그 밖에 P3 정규식 공백(1글자 토큰),
+> v5 handle의 주제 명사 충돌(채점 artefact), 부정 교정문 decoy. comparator의 v4 하드코딩
+> verifier도 v5까지 받도록 수정. 병렬 branch(legacy F5/F6·게이트 evidence 바인딩·P2-4b·P3-T4
+> 설계) 병합. **다음 라운드(계층 입력 배선 수정 + live 경로 통합 테스트 + blind v6)는 사용자
+> 결정.** adoption=false.
+
 > **2026-08-25 17:05 KST M2 완료 — greybox 평가 기준선 박제:** lm-eval(kobest·haerae)로
 > 일반 능력이 stock→v3→e2c2 순 단조 하락(kobest −0.90%p, haerae −1.92%p, 제안 게이트 ≤2%p
 > 안·경계)임을, llama.cpp perplexity로 v3 Q4_K_M 손실이 비율 1.0181(≤1.05)임을 처음 계측했다.

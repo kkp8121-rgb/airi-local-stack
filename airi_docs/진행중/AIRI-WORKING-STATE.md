@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 17:35:00 +09:00"
-checkpoint_id: "20260825-173500-d1v5-matrix-intent"
-matrix_note: "d1v5 48-report matrix intent 기록. detached wrapper 정확히 1회 시작 예정; blind v5 미소비"
+updated_at_kst: "2026-08-25 21:22:00 +09:00"
+checkpoint_id: "20260825-212200-d1v5-verdict-no-winner-diagnosis"
+matrix_note: "d1v5 48/48 완주, comparator verdict winner=null(오프라인 재실행으로 발행). campaign 미실행. 근본 원인: live-broadcast 경로에서 결정론 계층이 브리핑/후원 note를 못 봄. 사용자 결정 대기"
 active_trainer_note: "GPU 학습 없음. lm-eval 추론만 사용했고 종료(GPU 370 MiB). AIRI 서비스 0"
 goal_status: "active"
 authorization: "user-goal-2026-08-25-1720-m3: approve-all-three-recommendations (blind-v5-seal-then-4-arm-48-report-rematrix-with-marker-and-num_ctx-4096, enforce-lm-eval-general-capability-gate-le-2pp-vs-stock, fix-native-baseline-fixture-pin); no-gpu-training; matrix-exact-once; operational-adoption-forbidden-until-separate-user-approval. superseded: user-goal-2026-08-25-1630-m2: proceed-with-proposed-direction (review-docs-into-참조+INDEX, num_ctx-4096-prompt-budget, R2-F7-campaign-code-gate) and adopt-tools-judged-beneficial (lm-eval, llama.cpp perplexity; unsloth/DPO deferred); no-gpu-training; operational-adoption-still-separate-approval. superseded: user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "d1v5-matrix-exact-once-start"
-git_head: "e9eed2f22b56e9d6e783739a4e0246c17cff69f7"
-worktree_state: "HEAD/local main/origin-main exact e9eed2f and clean before this intent; owned ports 11435/11436/8880/9880/8890/8892 free, AIRI processes 0, GPU 392 MiB idle, 4 arm digests verified in Ollama"
+active_phase: "d1v5-no-winner-diagnosed-merge-parallel-then-await-user"
+git_head: "973a6bed6744f8887fe587fdd3abe1e42ba7c7e4"
+worktree_state: "tree를 main으로 복귀(973a6be); verifier 수정·v5 테스트·WORKING만 dirty; 병렬 branch origin/feature/parallel-offline-20260825(4 commit, 충돌 0) 병합 예정; AIRI 서비스 0, owned 포트 free"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
@@ -23,6 +23,85 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 > 기준 상태다. checkpoint를 포함한 commit 자체의 SHA를 자가 참조하지 않는다.
 
 ## 1. 권한과 현재 사실
+
+- 2026-08-25 21:22 KST **d1v5 verdict receipt — `no_winner` + 진단(사용자 결정 대기)**:
+  - **verdict 발행**: comparator가 v4 하드코딩 verifier에 막힌 원인을 `verify_d1_frozen_contract.py`
+    에 `ROOT_GENERATIONS {v4: d1, v5: d1v5}`(root별 superseded 집합 적용)로 고친 뒤(오프라인
+    테스트 51 passed, v4 commitment CLI pass 유지), launcher가 쓴 것과 **동일한 인자**로
+    `compare_d1_blind.py`를 재실행해 `comparisons\d1-blind.json`(17,339 B, sha `535190346e0e…`)을
+    발행했다: `status=pass`, `report_count=48`, `root_id` v5, **`winner=null`**, 실패 게이트 38
+    (baseline 9 / e2 8 / e2-c1 12 / e2-c2 9). `summary.json`은 launcher가 comparator 실패로
+    throw해 **미생성**이며 수동 생성하지 않는다(launcher 재실행은 OutputDir no-overwrite라 불가,
+    matrix 재실행은 금지). 48 report·health·run-contract·attestation(`a2832bca…`)·commitment
+    (`cb66b4d9…`)은 온전하고 `context_exceeded 0`, 두 플래그 48/48 true, num_ctx 4096.
+  - **점수**: baseline 0.340 / e2 0.345 / e2-c1 0.364 / **e2-c2 0.373**(D1 0.11대 → 3배, 계측
+    복구 효과), margin 0.0095(<0.02), improved axes e2-c1 4 / e2-c2 3.
+  - **계측 복구 확정**: `service_error` **0/1,132 × 4 arm**(D1 34%), `memory_probe` 36/40·36/40·
+    35/40·36/40(D1 0/40), `unknown_identity_safe` **e2·e2-c1·e2-c2 1.0(게이트 통과)**, baseline
+    0.917. topic_anchored e2-c2 0.646(≥0.55 통과, 유일).
+  - **남은 실패와 P2~P5 귀책(48 report row 단위)**:
+    1. **P3 회수 폴백이 여전히 지배적**: continuity_callback 80행 중 폴백 62~65/arm
+       (briefing_evidence=true인 행에서도 56~59). long_callback 0.02~0.06, complete_show_arc
+       0.06~0.09의 직접 원인이고 stale_transition 실패 26~28건 중 16~18건도 이 폴백이다.
+       **근본 원인(코드 추적으로 확정)**: 운영 프로토콜(`--live-broadcast-context on`)에서
+       시뮬레이터는 system 메시지를 보내지 않고 브리핑·후원 계약을 `broadcast_context`로
+       넘기며, 프록시 `live_broadcast_runtime.render_broadcast_context`가 이를
+       `airi_broadcast_context` system note로 **주입한 body**에 넣는다. 그런데
+       `build_layer_inputs(original_messages=context.original_messages)`는 **주입 전 클라이언트
+       메시지**(`request_messages(original_body)`, 8935행)를 받으므로 계층은 브리핑도 후원
+       마커도 보지 못한다. 714e196의 브리핑 마커는 시뮬레이터의 `system_content`에 붙였는데
+       live 모드에서는 그 변수가 전송되지 않아 **효과가 없었다**(`released 0/80` 전 arm). 즉
+       D1·d1v5 모두 결정론 계층은 운영 경로에서 근거 없이 동작했다. 이건 내 검증 누락이다 —
+       메시지 경로 단위 테스트만 있었고 live 경로 통합 테스트가 없었다.
+    2. **P3 추출 정규식 공백**: 마커가 닿았더라도 v5 arc 12개 중 5개는 `_REJECTED_BRANCH_RE`가
+       못 잡는다(오프라인 재현): "가득 말고 팔 할만", "한 번씩 말고 두 번씩", "끝 장 말고 첫
+       장부터" 처럼 **말고 앞뒤 토큰이 1글자**이거나 띄어쓰기된 구는 `{2,12}` 단일 토큰 요구에
+       걸린다. 7/12는 추출된다.
+    3. **P5 미발동 → donation composite 실패의 전부**: 52행 중 miss는 거의 전부
+       `shared_tokens=False`(29~39). 오프라인에서는 P5가 인용 감사문을 붙이지만 live에서는
+       1번과 같은 이유로 `donation_turn`이 false라 발동하지 않았다. 부수: 채점기 `_tokens`가
+       조사를 안 벗겨 "손질값이"≠"손질값"으로 공유 토큰을 놓친다.
+    4. **`invented_handle` 7/17/11/9는 대부분 채점 artefact**: 전부 `question` 행이고 상위
+       "핸들"은 채밀칼날·훈연기연기·태엽감기·유리덮개 등 **v5 viewer handle이 주제 명사 합성어**
+       라서 모델이 주제를 말하면 roster 부분일치에 걸린다(예: "훈연기연기는 두세로 넣고"). blind
+       v5 저작(subagent) 설계 결함이며 가드(-님 vocative)가 잡을 대상이 아니다.
+    5. **decoy 7~14/212**: "채밀 뒤가 아니라 채밀 전에" 같은 **부정 교정문**이 금지 패턴에
+       걸린 것이 다수 — P4는 풀에 결정이 없어(1번) 문장을 드롭하지 못했고, 채점기는 부정
+       문맥을 구분하지 않는다.
+  - **결론**: 계측 복구로 처음 실제 측정이 이뤄졌고, 게이트 중 `unknown_identity_safe`는 학습
+    arm에서 닫혔다. 남은 게이트는 대부분 **결정론 계층이 운영 경로에서 근거를 못 받는 배선
+    결함(1)**에 귀결되며, 이는 코드 수정(주입 후 메시지/`context_note`를 계층 입력에 전달 +
+    runtime이 마커를 붙임)과 **새 blind(v6)** 재측정이 필요한 다음 라운드다. hard gate 완화 0,
+    campaign 0(no_winner), 자동 후속 라운드 0, adoption 0. **다음은 사용자 결정.**
+  - 병렬 branch 부수 효과: 3895921 이후 report(e2 arm부터 36개)는 `model_digest`/`max_tokens`
+    키를 추가로 가지며 baseline 12개는 없다. comparator·launcher 검사는 고정 키만 보므로 판정
+    영향 0. verdict JSON의 `report_count 48`로 확인.
+
+- 2026-08-25 21:18 KST **d1v5 matrix 종료 receipt — 48/48 완주, comparator 단계 실패(exit 1)**:
+  wrapper PID 28296이 21:15:1x KST 종료, `launcher.exit-code.txt=1`, stderr 560 B. 48 run은
+  전부 정상 완료(reports 48, health 48, run-contract 48, attestation·commitment·policy·sealed
+  manifest·model manifest evidence 존재), 마지막 run `transport_failures 0`. 실패 지점은 **post-run
+  comparator**: `compare_d1_blind.py`가 `{"status":"fail","reason":"frozen policy/commitment shape
+  rejected: commitment"}`를 출력하고 launcher가 "did not publish a valid verdict"로 throw.
+  `comparisons/d1-blind.json`·`summary.json` 미생성. owned 포트 4개 free(서비스 정리 정상).
+  **원인 판단**: comparator가 commitment 검증에 v4 root를 하드코딩한 `verify_d1_frozen_contract.py`
+  를 사용한다 — 내가 v5 commitment 테스트에서 "v4 verifier는 v5를 거부한다"고 고정까지 해 놓고
+  comparator가 그 verifier를 호출한다는 사실을 확인하지 않은 **내 검증 누락**이다(preflight는
+  comparator를 실행하지 않는다). **blind v5는 소비됐고 matrix 재실행은 하지 않는다.** 48 report는
+  온전하므로 verifier를 v5 root(동일 policy)까지 받도록 고친 뒤 launcher가 쓴 것과 동일한 인자로
+  comparator만 오프라인 재실행해 verdict를 발행한다. `summary.json`은 launcher 산출물이라
+  수동 생성하지 않고 부재를 기록한다. 이 bullet은 heartbeat 슬롯을 receipt로 전환한 것이다.
+
+- 2026-08-25 17:37 KST **d1v5 matrix start receipt**: 17:35:52 KST detached wrapper **PID 28296**
+  로 정확히 한 번 시작했다. exact command `"C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe"
+  -NoProfile -File D:\AIRI-Models\airi-d1v5-blind-matrix-20260825\launch-d1v5-matrix.ps1`, 시작
+  5초 후 PID live·command line 일치 확인. `launcher-start-receipt.json`(schema
+  `airi.d1-matrix-launch-receipt.v1`, repo_head `973a6be…`, wrapper sha `64c96fa3…`, model
+  manifest sha `050ae10f…`, sealed sha `d9c07fea…`)을 root에 남겼다. 시작 직전 이중 실행 가드
+  한 줄이 PowerShell 문법 오류로 무시됐으나 root가 비어 있음은 직전 관측으로 확인했고
+  Start-Process는 1회만 호출됐다(receipt의 PID 1개). 12분 heartbeat + 종료/이상 즉시 알림
+  Monitor 가동. 다음: 첫 3 report에서 두 플래그 before/after true와 perfect-rate 분모 nonzero
+  조기 확인, 이후 완주까지 read-only. blind v5 소비 중(재실행 금지).
 
 - 2026-08-25 17:35 KST **d1v5 48-report matrix intent (exact-once)**: 봉인·배선 receipt commit
   `e9eed2f` push 후 preflight 조건을 재관측했다 — owned 포트 6개 free, AIRI 프로세스 0, GPU
