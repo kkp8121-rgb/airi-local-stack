@@ -9,6 +9,9 @@
 
 ## 2026-08-25 D1 launcher 프로파일 구현·offline PASS
 
+- 09:45 KST 첫 3 report 조기 attestation 문서 배치를 commit `516acf2`로 고정했다.
+  wrapper는 live, reports/health 4/48, stderr 0 B이며 local main 한 commit ahead다. commit
+  receipt를 같은 두 문서로 고정한 뒤 두 commit을 origin/main에 한 번 push한다.
 - 09:42 KST exact-once matrix는 wrapper PID 7832 live, reports 4/48, stderr 0 B,
   exit receipt absent다. 첫 3 report를 동결 comparator derivation으로 재계산해 적용 가능한
   분모 identity 9/donation 18/decoy 18이 모두 nonzero이고, health 3개 모두 guard와
