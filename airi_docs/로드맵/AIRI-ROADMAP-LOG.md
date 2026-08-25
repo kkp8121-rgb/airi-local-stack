@@ -9,6 +9,11 @@
 
 ## 2026-08-25 D1 launcher 프로파일 구현·offline PASS
 
+- 09:27 KST detached wrapper를 external root에 고정했다(1,190 B, SHA
+  `0da4ef4c...8c6e`, AST PASS). exact repo launcher args, manifest SHA `050ae10f...e330`,
+  blind v4, no-overwrite exit-code receipt를 결속한다. run/log/exit/start receipt는 모두
+  absent다. WORKING의 exact-once matrix intent를 commit/push한 뒤에만 hidden
+  Start-Process로 한 번 시작한다.
 - 09:26 KST external D1 model manifest(767 B, SHA `050ae10f...e330`)를 no-overwrite
   생성하고 `-MatrixProfile d1 -PreflightOnly` exit 0을 확인했다: 48/48 unique key,
   4 arms, seed sets 3×4, d1-blind, OutputDir 미생성. blind v4 응답 생성 0·미소비.

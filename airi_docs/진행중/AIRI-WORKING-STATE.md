@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 09:26:00 +09:00"
-checkpoint_id: "20260825-092600-d1-preflight-receipt-wrapper-intent"
-matrix_note: "D1 PreflightOnly PASS(48 unique). detached wrapper 생성 intent; matrix 미실행, blind v4 미소비"
+updated_at_kst: "2026-08-25 09:27:00 +09:00"
+checkpoint_id: "20260825-092700-d1-matrix-detached-launch-intent"
+matrix_note: "D1 PreflightOnly PASS. detached wrapper 0da4ef4c 검증 완료; matrix exact-once launch intent, 아직 미실행/미소비"
 active_trainer_note: "D1은 GPU 학습 없음. trainer/runner/AIRI matrix PID 0, 11435/12393/12394 listener 0"
 goal_status: "active"
 authorization: "user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "d1-matrix-detached-wrapper-preparation"
+active_phase: "d1-matrix-detached-launch-intent"
 git_head: "e57d5712f8bbf80fa2e6029866991dee925de426"
 worktree_state: "HEAD/local main/origin-main exact e57d571 and clean before this checkpoint; D1 matrix root/manifest/run absent; related listener 0; four Ollama tag/digest pins exact"
 active_trainer_count: 0
@@ -23,6 +23,22 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 > 기준 상태다. checkpoint를 포함한 commit 자체의 SHA를 자가 참조하지 않는다.
 
 ## 1. 권한과 현재 사실
+
+- 2026-08-25 09:27 KST **D1 48-report matrix detached launch intent (exact-once)**:
+  preflight receipt docs `8b0de33`가 origin/main에 push돼 HEAD exact·clean이다. external
+  wrapper `launch-d1-matrix.ps1`은 1,190 B SHA
+  `0da4ef4cb4301e52d1ac597744fe1cd07e41285f37637f37d0fdc780b8eb8c6e`, AST pass다.
+  wrapper는 repo launcher를 MatrixProfile d1, output `...\run`, manifest SHA
+  `050ae10f...e330`, blind v4로 호출하고 no-overwrite `launcher.exit-code.txt`를 쓴다.
+  run/stdout/stderr/exit/start-receipt는 전부 absent, related listener 0이다. 이 intent를
+  WORKING/ROADMAP-LOG로 commit/push한 뒤 `Start-Process powershell.exe -NoProfile -File
+  <wrapper>`를 WorkingDirectory repo, WindowStyle Hidden, stdout/stderr redirection,
+  PassThru로 **정확히 한 번** 호출하고 PID·시작시각·입력 SHA를 no-overwrite
+  `launcher-start-receipt.json`에 쓴다. 시작 직후 exact PID/command/output 생성과 env
+  부모 복원 불변을 receipt로 기록한다. 14분 heartbeat, 첫 3 report에서 rows/각 perfect
+  분모 nonzero와 health before/after 두 플래그 true를 조기 확인한다. 완료 조건은 wrapper
+  exit 0, exit-code receipt 0, 48/48 reports/evidence, summary/verdict schema pass, owned
+  listener/PID 0. 실패·중단 시 root 보존, blind v4 소비 처리, 같은 명령 반복 금지다.
 
 - 2026-08-25 09:26 KST **D1 PreflightOnly receipt + detached wrapper intent**: external
   root를 no-overwrite 생성하고 4-arm model manifest 767 B SHA
