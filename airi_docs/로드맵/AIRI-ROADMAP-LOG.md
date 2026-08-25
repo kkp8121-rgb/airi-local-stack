@@ -9,6 +9,10 @@
 
 ## 2026-08-26 M4 — d1v6 no_winner 종결·사용자용 roadmap dashboard 공용 skill
 
+- 03:54 KST exact 13-path primary commit `c7500a3`(`docs: add evidence-backed roadmap
+  dashboard`)을 만들었다. commit 직후 local main은 origin/main보다 1 ahead, worktree/stage/
+  untracked 0, wrapper/owned listener 0이다. receipt 문서 commit까지 로컬에서 닫은 뒤 사용자에게
+  fresh push 승인을 요청하며 승인 전 push는 0이다.
 - 03:49 KST M4-10 final verification을 마쳤다. handoff §5 exact pinned 명령은 pinned venv의
   `httpx` 부재로 continuity-v4 collection이 중단됐고, WindowsApps Python으로 해당 8 tests를
   OK 확인했다. pinned 나머지는 문서에 고정된 기존 behavior-v2 2 failure만 재현하면서

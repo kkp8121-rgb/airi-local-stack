@@ -29,8 +29,8 @@
   문서에 고정된 기존 behavior-v2 2 failure만 재현했고, interpreter/known-failure를 분리한
   affected clean run 739 passed/9 skipped/297 subtests와 proxy/runtime 403 OK,
   deterministic/guard 52 passed+10 subtests, checkpoint·continuity·dashboard·skill validator·
-  diff-check가 PASS했다. 다음은 exact 13-path stage·commit이다. push는 직전 별도 사용자 승인을
-  받아야 하며 `adoption_authorized=false`다.
+  diff-check가 PASS했다. exact 13-path primary commit은 `c7500a3`로 완료됐다. receipt commit 뒤
+  push는 직전 별도 사용자 승인을 받아야 하며 `adoption_authorized=false`다.
 
 ## 0. 인계 시점 상태 (관측값)
 

@@ -1,6 +1,6 @@
 # AIRI 다음 세션 안내
 
-> **2026-08-26 03:49 KST 최우선 — M4 d1v6 `no_winner`, dashboard skill·마감 검증 완료:**
+> **2026-08-26 03:54 KST 최우선 — M4 d1v6 `no_winner`, dashboard primary commit 완료:**
 > exact-once d1v6 matrix는 exit 0, report·health·run-contract·packet 48/48, duplicate/missing 0,
 > 두 flag 48/48 attest, context/service error 0, owned PID/listener 0으로 끝났다. verdict는
 > `winner=null`(실패 gate 29개)이라 campaign·자동 후속·운영 채택은 0이다. P5 donation과 P4
@@ -8,8 +8,8 @@
 > checklist 55행 중 31개 상태를 정정하고 12행을 분리해 전체 77행을 정규화했으며, 공통 계약
 > 하나를 참조하는 Codex·Claude `airi-roadmap-dashboard` project skill과 invariant test를
 > 검증했다. handoff §5는 문서에 고정된 기존 환경/behavior-v2 실패만 재현했고 M4 affected
-> clean run과 checkpoint·continuity·dashboard·skill validator는 PASS했다. 현재 M4-10은
-> exact 13-path commit 단계다. **push는 직전 별도
+> clean run과 checkpoint·continuity·dashboard·skill validator는 PASS했다. exact 13-path
+> primary commit은 `c7500a3`다. 현재 M4-10은 receipt commit 뒤 **push 직전 별도
 > 사용자 승인이 필요**하고 `adoption_authorized=false`다. 단일 진입점은 M4 handoff다.
 
 > **2026-08-25 22:55 KST 최우선 — M4 blind v6 봉인·계약·preflight·precommit PASS:** live 배선과
