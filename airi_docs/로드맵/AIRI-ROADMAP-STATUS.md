@@ -7,7 +7,13 @@
 > 변할 때만 고친다. v2 원문(트랙 상세 이력 포함)은
 > `아카이브/AIRI-ROADMAP-STATUS-v2-SNAPSHOT-2026-08-19.md`에 동결 보존.
 
-> **2026-08-25 17:20 KST M2 배치 A — 계측 근본 원인 수리·F7 게이트·검토 문서 편입:**
+> **2026-08-25 17:05 KST M2 완료 — greybox 평가 기준선 박제:** lm-eval(kobest·haerae)로
+> 일반 능력이 stock→v3→e2c2 순 단조 하락(kobest −0.90%p, haerae −1.92%p, 제안 게이트 ≤2%p
+> 안·경계)임을, llama.cpp perplexity로 v3 Q4_K_M 손실이 비율 1.0181(≤1.05)임을 처음 계측했다.
+> 증거 `완료/AIRI-M2-GREYBOX-EVAL-2026-08-25.md`. 남은 사용자 결정: 새 blind v5로 4-arm 재측정,
+> 일반 능력 게이트 강제, native_baseline 픽스처 핀 수리. adoption=false 유지.
+
+> **2026-08-25 16:24 KST M2 배치 A — 계측 근본 원인 수리·F7 게이트·검토 문서 편입:**
 > 프록시 400 `exceed_context_size_error`의 고정비는 GGUF 내장 KT 프리앰블 ≈514토큰(Ollama가
 > Modelfile TEMPLATE를 무시, GPU PC 패키징 태그 재검증: user 1건 `prompt_eval_count` 514)이라
 > `num_ctx` 기본값을 2048→**4096**으로 올렸다(프록시 `NUM_CTX` + 세 런처, 태그 재패키징 0,

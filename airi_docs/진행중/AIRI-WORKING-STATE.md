@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 17:20:00 +09:00"
-checkpoint_id: "20260825-172000-m2-batch-a-receipt"
-matrix_note: "D1 종결. M2 배치 A(num_ctx 4096, F7 게이트, 문서 편입) 검증 완료·commit 대기; 배치 B(lm-eval·perplexity) 다음"
-active_trainer_note: "D1 GPU 학습 없음. matrix 종료·소유 서비스 정리 완료; 잔여 AIRI 프로세스 0"
-goal_status: "active"
+updated_at_kst: "2026-08-25 17:05:00 +09:00"
+checkpoint_id: "20260825-170500-m2-batch-b-receipt-goal-complete"
+matrix_note: "D1 종결. M2 배치 A(num_ctx 4096·F7 게이트·문서 편입) push, 배치 B(lm-eval·perplexity 기준선) 완료. 재측정용 새 blind·게이트 강제·adoption은 별도 사용자 결정"
+active_trainer_note: "GPU 학습 없음. lm-eval 추론만 사용했고 종료(GPU 370 MiB). AIRI 서비스 0"
+goal_status: "complete-awaiting-user"
 authorization: "user-goal-2026-08-25-1630-m2: proceed-with-proposed-direction (review-docs-into-참조+INDEX, num_ctx-4096-prompt-budget, R2-F7-campaign-code-gate) and adopt-tools-judged-beneficial (lm-eval, llama.cpp perplexity; unsloth/DPO deferred); no-gpu-training; operational-adoption-still-separate-approval. superseded: user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "m2-batch-a-done-batch-b-tooling"
-git_head: "c312530581aa5ba5dbc10137ec2388dafe28d743"
-worktree_state: "HEAD/local main/origin-main exact c312530 and clean at 2026-08-25 13:18 KST before this receipt; matrix ended (exit 0), AIRI processes 0"
+active_phase: "m2-complete-awaiting-user"
+git_head: "50041f1"
+worktree_state: "HEAD/local main/origin-main exact 50041f1 and clean at 2026-08-25 16:26 KST (batch A: 6450a96 docs import, dd327cb num_ctx 4096, 19e558f F7 gate, 50041f1 receipt); no AIRI services running"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
@@ -24,7 +24,43 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 
 ## 1. 권한과 현재 사실
 
-- 2026-08-25 17:20 KST **M2 배치 A receipt (검증 완료, commit/push 직전)**: intent 항목
+- 2026-08-25 17:05 KST **M2 배치 B receipt — goal 완료**: greybox 평가 툴 2종 도입·측정
+  완료. 증거 문서 `완료/AIRI-M2-GREYBOX-EVAL-2026-08-25.md`(명령·exit·SHA 전부 수록), INDEX
+  완료 절 등록.
+  - **llama-perplexity**(핀 b10375, CPU, ctx 2048, 24 chunk): v3 `airi-bf16.gguf` PPL
+    **4.2542 ± 0.068**, `airi-q4_k_m.gguf` **4.3310 ± 0.070**, **비율 1.0181**(제안 기준
+    ≤1.05 안). 텍스트는 v3 assistant 발화(학습 데이터, 비율만 의미), blind 미사용.
+  - **lm-eval 0.4.12**(kobest+haerae 전량, 0-shot, bf16, batch 16, seed 42, 모델당 ~7분,
+    exit 0×3): kobest stock 0.6838 / v3 0.6786(−0.53%p) / e2c2 0.6749(−0.90%p); haerae
+    0.7195 / 0.7076(−1.19%p) / 0.7003(−1.92%p). 누적 병합마다 **단조 하락**, 크기는 제안
+    게이트 ≤2%p 안이지만 e2c2 haerae는 경계. `kobest_wic`는 세 모델 동일(변별력 0).
+    results JSON sha `f58250c9…`/`4a5f0fc9…`/`a93df885…`, 요약 `lmeval-summary.json`
+    `70b9d126…`. 게이트 값은 제안만 하고 강제하지 않았다.
+  - 도입 안 함: Unsloth(핀 비호환)·TRL DPO(쌍 데이터 없음).
+  - **goal 결산**: 제안 3건(문서 편입 `6450a96`, num_ctx 4096+예산 관측 `dd327cb`, F7 게이트
+    `19e558f`) + 이로운 툴 2종 도입·기준선 박제 완료. 경계 준수: GPU 학습 0, blind 재사용 0,
+    matrix 재실행 0, 태그 재패키징 0, 외부 provider 0, adoption 0. GPU 370 MiB(유휴), AIRI
+    서비스 0, owned 포트 free. **남은 결정(사용자)**: ① 재측정용 새 blind(v5) 봉인·4-arm
+    matrix 재실행 여부(프롬프트 마커·num_ctx 변경으로 과거 blind와 비교 불가), ② 일반 능력
+    게이트(≤2%p) 강제 여부, ③ `test_airi_native_baseline` 픽스처 핀 불일치(기존 CI 실패) 처리.
+
+- 2026-08-25 16:27 KST **M2 배치 B intent — greybox 평가 툴 2종 도입**: 배치 A는
+  `6450a96`·`dd327cb`·`19e558f`·`50041f1` 네 commit으로 push됐고 HEAD/local/origin exact,
+  worktree clean이다. (정정: 위 17:20 receipt의 native_baseline 실패 원인 추정을 "줄바꿈"에서
+  "커밋된 blob SHA 자체가 핀과 불일치"로 고쳤다.)
+  - 산출물 root: `D:\AIRI-Modelsiri-m2-greybox-eval-20260825\` (신규, Git 미포함).
+  - **lm-evaluation-harness**: `D:\AIRI-Modelsenv-lmeval`(uv, cpython 3.12, `lm_eval` +
+    torch CUDA) 별도 venv. 대상은 stock `midm-2.0-mini-instruct-hf`와 v3 `merged-hf`, 그리고
+    최신 학습본 `airi-e2-c2-merged-20260824\merged-hf`. 태스크 `kobest`·`haerae`·`kmmlu`를
+    동일 seed 42·`--limit`(런타임 실측 후 고정)·bf16으로 측정. 게이트 값은 확정하지 않고
+    기준선만 박제한다. 학습 0, 가중치 수정 0.
+  - **llama.cpp `llama-perplexity`**(핀 b10375, `D:\AIRI-Models\llama-b10375-bin-win-cpu-x64`,
+    CPU): v3 `package-q4iri-bf16.gguf` vs `airi-q4_k_m.gguf`를 같은 텍스트로 측정해 Q4/bf16
+    비율을 기록. 텍스트는 blind가 아닌 v3 chat jsonl의 assistant 발화(학습 데이터라 절대값이
+    아니라 **비율**만 의미) — blind v1~v4 미사용.
+  - 긴 명령은 background로 돌리고 로그를 root에 남긴다. GPU 사용은 lm-eval 추론뿐이다.
+
+- 2026-08-25 16:24 KST **M2 배치 A receipt (검증 완료, commit/push 직전)**: intent 항목
   1~5를 마쳤다. 변경 파일: `airi_docs/참조/AIRI-CLAUDE-REVIEW-2026-08-25.md`·
   `AIRI-FINETUNE-TOOLING-SURVEY-2026-08-25.md`(신규, 편입 메모 머리글), INDEX 참조 절,
   `ollama-proxy/ollama_proxy.py`(NUM_CTX 4096, `CONTEXT_EXCEEDED_MARKER`,
@@ -41,13 +77,13 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
   - 검증(이번 세션 실측): proxy 381 OK, 캠페인 계약 6 OK, eval+루트+latency 585 passed/
     5 skipped(+381 subtests), checkpoint PASS, work-continuity PASS, diff-check 0.
   - **기존 실패 기록**: `eval/test_airi_native_baseline.py::test_pinned_fixture_has_sixteen_cases`
-    는 변경 전 HEAD(stash 대조)에서도 실패 — 픽스처 raw SHA 핀 불일치(작업 트리 CRLF vs LF
-    핀 추정). CI matrix 등록 파일이라 별도 배치 과제로 남긴다. 이 배치에서 고치지 않았다.
+    는 변경 전 HEAD(stash 대조)에서도 실패 — 커밋된 픽스처 blob SHA `95309e10…` ≠ 핀 `f3fd3d21…`(HEAD blob과
+    작업 트리 동일, 줄바꿈 문제 아님). CI matrix 등록 파일이라 별도 배치 과제로 남긴다. 이 배치에서 고치지 않았다.
   - 경계: GPU 학습 0, blind 재사용 0, matrix 재실행 0, 태그 재패키징 0, 외부 provider 0,
     adoption 0. `num_ctx` 변경은 런처/프록시 기본값이며 실제 서비스는 이 세션에서 기동하지
     않았다(F7 검사도 서비스 기동 전 거부 경로만 실행).
 
-- 2026-08-25 16:40 KST **M2 goal intent (사용자 `/goal`: "제안 방향대로 진행하고 도입해서
+- 2026-08-25 16:05 KST **M2 goal intent (사용자 `/goal`: "제안 방향대로 진행하고 도입해서
   이롭다 판단되는 툴은 도입해서 작업해")**: 검토 문서 2건 대조 결과를 근거로 아래 배치를
   순서대로 수행한다. 착수 전 read-only 관측: HEAD/local/origin `714e196` exact, worktree
   clean, owned 포트 6개 free, GPU 818 MiB/8192 MiB 사용(유휴), 상시 `ollama serve`만 live.
@@ -83,7 +119,7 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
   변경 0(num_ctx는 런처/프록시 기본값이며 태그 재패키징 없음), 외부 provider 기본 ON 0,
   adoption 0. 각 배치 전후 intent/receipt, ROADMAP-LOG, 검증 후 commit/push.
 
-- 2026-08-25 15:45 KST **P3 브리핑 마커 receipt (사용자 승인안 (a) 구현 완료)**:
+- 2026-08-25 14:48 KST **P3 브리핑 마커 receipt (사용자 승인안 (a) 구현 완료)**:
   P3/P4 증거 풀이 브리핑을 볼 수 있게 하는 opt-in 마커를 넣었다. 후원 마커
   (`DONATION_CONTINUATION_MARKER`)와 **같은 방식**이라 새 개념을 만들지 않는다.
 
@@ -120,7 +156,7 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
   `num_ctx 2048` 핀과 얽혀 **사용자 결정 대기 중**이다. GPU 0, blind 재사용 0,
   matrix 재실행 0, threshold 변경 0, adoption 0.
 
-- 2026-08-25 15:20 KST **프록시 오류 근본 원인 확정 receipt — Ollama 400
+- 2026-08-25 14:43 KST **프록시 오류 근본 원인 확정 receipt — Ollama 400
   `exceed_context_size_error`**: 재현 실행으로 실제 메시지를 회수했다. 세 blind
   라운드 내내 전 arm 턴의 1/3을 차지하던 `RuntimeError`의 정체다.
 
@@ -177,7 +213,7 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
   **경계 준수**: GPU 학습 0, blind 재사용 0, matrix 재실행 0, comparator 재실행 0,
   게이트·threshold·seed·fixture 변경 0, 운영 모델·태그 변경 0, adoption 0.
 
-- 2026-08-25 14:55 KST **프록시 오류 재현 실행 intent (사용자 승인)**: 사용자가
+- 2026-08-25 14:30 KST **프록시 오류 재현 실행 intent (사용자 승인)**: 사용자가
   두 결정을 내렸다 — (a) P3 근거 통로는 **프록시 자체 브리핑 마커 도입**으로 닫고,
   (b) 프록시 오류 실제 메시지 회수를 위한 **짧은 재현 실행을 지금 수행**한다.
   이 checkpoint는 (b)의 intent다.
@@ -194,7 +230,7 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
   GPU 학습 0, comparator 재실행 0, 운영 채택 0. 실행 후 스택은 정지하고 owned 포트를
   다시 비운다. 프록시 stdout은 기동 시 덮어쓰므로 실행 직후 즉시 회수한다.
 
-- 2026-08-25 14:40 KST **M1 계측 복구 receipt (부분 완료 + 근본 원인 확정)**:
+- 2026-08-25 13:10 KST **M1 계측 복구 receipt (부분 완료 + 근본 원인 확정)**:
   오프라인 회귀 전량 통과. 코드 3개·테스트 3개를 고쳤고, 남은 한 축은 동결 계약과
   얽혀 있어 사용자 판단으로 넘긴다.
 
@@ -255,7 +291,7 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
   게이트 정의·threshold·seed·fixture 변경 0, 운영 모델·태그 변경 0, 외부 provider 기본
   ON 0, adoption 0. 재측정용 새 blind는 별도 승인 사항이며 시작하지 않았다.
 
-- 2026-08-25 13:45 KST **M1 계측 복구 intent (사용자 지시)**: D1 종결 뒤 사용자가
+- 2026-08-25 13:00 KST **M1 계측 복구 intent (사용자 지시)**: D1 종결 뒤 사용자가
   "계측 2건(프록시 오류 근본 원인, P3 발동 범위)을 고치자"고 지시했다. 착수 전
   read-only 조사에서 **프록시 오류의 발생 조건을 특정**했다.
 

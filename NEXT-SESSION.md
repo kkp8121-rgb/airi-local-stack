@@ -1,6 +1,13 @@
 # AIRI 다음 세션 안내
 
-> **2026-08-25 17:20 KST 최우선 — M2 배치 A 완료(`num_ctx` 4096 · F7 코드 게이트 · 검토 문서
+> **2026-08-25 17:05 KST 최우선 — M2 goal 완료, 다음은 사용자 결정 3건:** ① 프롬프트 마커·
+> `num_ctx` 4096으로 프롬프트가 바뀌어 과거 blind와 비교가 끊겼으므로 **새 blind v5 봉인 →
+> 4-arm 48-report 재측정** 여부(GPU 학습 불필요, ~3.5h). ② lm-eval 일반 능력 게이트(≤2%p)
+> 강제 여부 — 기준선은 `완료/AIRI-M2-GREYBOX-EVAL-2026-08-25.md`. ③ CI matrix에 있는
+> `eval/test_airi_native_baseline.py` 픽스처 핀 불일치(변경 전부터 실패) 수리. 어느 것도
+> 승인 없이 시작하지 않는다.
+
+> **2026-08-25 16:24 KST 최우선 — M2 배치 A 완료(`num_ctx` 4096 · F7 코드 게이트 · 검토 문서
 > 편입), 배치 B(lm-eval·perplexity greybox) 진행:** M1에서 확정한 프록시 400
 > `exceed_context_size_error`의 고정비 원인이 GGUF 내장 KT 프리앰블(≈514토큰, GPU PC
 > 패키징 태그에서 재검증)임을 `참조/AIRI-CLAUDE-REVIEW-2026-08-25.md` §5로 확인하고

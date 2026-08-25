@@ -7,9 +7,20 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-25 M2 배치 B — lm-eval · llama.cpp perplexity greybox 기준선
+
+- 17:05 KST 서베이가 지목한 두 평가 축을 처음 계측했다. lm-eval 0.4.12(kobest+haerae,
+  0-shot, bf16, batch 16, seed 42, 모델당 ~7분, exit 0×3): stock 0.6838/0.7195 → v3
+  −0.53/−1.19%p → e2c2 −0.90/−1.92%p, 누적 병합마다 단조 하락이지만 제안 게이트 ≤2%p 안
+  (e2c2 haerae는 경계). llama-perplexity(b10375 CPU, ctx 2048, 24 chunk): v3 bf16 4.2542 vs
+  Q4_K_M 4.3310, 비율 1.0181 ≤ 1.05. 증거 `완료/AIRI-M2-GREYBOX-EVAL-2026-08-25.md`(명령·
+  exit·SHA), 산출물 `D:\AIRI-Models\airi-m2-greybox-eval-20260825\`(Git 미포함). 함정 기록:
+  PowerShell 5.1 NativeCommandError·cmd.exe 리다이렉트 경로 hang → Git Bash로 대체.
+  Unsloth·DPO 미도입. 게이트 강제·새 blind·adoption은 사용자 결정으로 남긴다. goal 완료.
+
 ## 2026-08-25 M2 배치 A — num_ctx 4096 · F7 게이트 · 검토 문서 편입
 
-- 17:20 KST 사용자 `/goal`("제안 방향대로 진행, 이로운 툴 도입")로 배치 A를 마쳤다.
+- 16:24 KST 사용자 `/goal`("제안 방향대로 진행, 이로운 툴 도입")로 배치 A를 마쳤다.
   (1) 검토 PC 문서 2건을 `참조/`에 편입(머리글에 시점 고정·§5 GPU PC 재검증·§3/§9 시효
   만료 명기), INDEX 등록. (2) `num_ctx` 2048→4096: `ollama_proxy.py NUM_CTX`,
   `start-airi-local-stack.ps1` fallback, `start-local-ollama-proxy.ps1`,
@@ -33,7 +44,7 @@
 
 ## 2026-08-25 M1 계측 복구 (D1 진단 후속)
 
-- 15:45 KST 사용자 승인안대로 P3 브리핑 마커를 구현했다. 계층에
+- 14:48 KST 사용자 승인안대로 P3 브리핑 마커를 구현했다. 계층에
   `BRIEFING_EVIDENCE_MARKER = "[턴 근거 메모]"` + `system_briefing_evidence()`를 두고
   `build_layer_inputs`가 마커 뒤 내용만 증거 풀에 넣는다(계약 산문 제외는 불변).
   시뮬레이터가 브리핑 앞에 마커를 붙이고, 문자열은 후원 마커 선례대로 하드코딩 +
@@ -42,7 +53,7 @@
   223 passed/1 skipped, proxy 380 OK, live_broadcast_runtime 20 OK, checkpoint PASS,
   diff-check 0. 프롬프트 예산 강제는 사용자 결정 대기.
 
-- 15:20 KST 재현 실행으로 프록시 오류 근본 원인을 확정했다: Ollama **400
+- 14:43 KST 재현 실행으로 프록시 오류 근본 원인을 확정했다: Ollama **400
   `exceed_context_size_error`** — `n_prompt_tokens` min 2,552 / p50 2,721 / max 2,827
   vs `n_ctx` 2,048(+504~+779 초과). 원인은 프록시에 프롬프트 예산 **강제**가 없다는
   것이다(`PromptBudgetTelemetry`는 관측 전용). 부수 발견: 같은 클래스의 `terminal()`이
@@ -52,7 +63,7 @@
   3안(num_ctx 상향 / 400 재시도 / 전송 전 절단)은 동결 `num_ctx 2048` 핀과 얽혀
   사용자 결정으로 남겼다.
 
-- 14:40 KST 사용자 지시("계측 2건을 고치자")로 세 곳을 고쳤다. (1) 프록시 두 오류
+- 13:10 KST 사용자 지시("계측 2건을 고치자")로 세 곳을 고쳤다. (1) 프록시 두 오류
   핸들러가 `local_error_detail()`로 예외 메시지를 bounded 기록하고, 무기록이던 memory
   경로도 `stage=memory_recall` 이벤트를 낸다. (2) 시뮬레이터에 `service_error` row
   플래그와 `summary.service_error` 지표, 프록시 상수 AST 바이트 대조 테스트를 넣어
@@ -253,7 +264,7 @@
 
 ## 2026-08-24 E2-C2 goal 접수 + 레시피 설계 동결
 
-- 17:20 KST (클로드 PC, Fable 감독) 사용자 `/goal`(E2-C2 재설계 + 신규 blind + guard=on
+- 16:24 KST (클로드 PC, Fable 감독) 사용자 `/goal`(E2-C2 재설계 + 신규 blind + guard=on
   36-report matrix + winner 시 3×500 campaign, GPU 무제한) 접수. read-only 조사(scout 3:
   trainer/dataset/blind·matrix 도구) + E2-C1 verdict JSON 실측으로 설계를 확정하고
   `진행중/AIRI-E2-C2-FROZEN-CONTRACT-2026-08-24.md`를 신규 작성했다. 레시피: 1536

@@ -167,6 +167,14 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
 
 ## 완료 — 유효한 증거 기록 (최신순)
 
+### 2026-08-25 M2 greybox 평가
+
+- `AIRI-M2-GREYBOX-EVAL-2026-08-25.md` — lm-evaluation-harness(kobest·haerae 0-shot)와
+  llama.cpp perplexity를 처음 도입해 **일반 능력 기준선**(stock 0.6838/0.7195 → v3
+  −0.53/−1.19%p → e2c2 −0.90/−1.92%p, 단조 하락·제안 게이트 ≤2%p 안)과 **v3 Q4_K_M
+  양자화 손실**(PPL 4.3310 vs bf16 4.2542, 비율 1.0181 ≤ 1.05)을 박제. 명령·exit·SHA 포함.
+  게이트 강제는 사용자 결정.
+
 ### 2026-08-20 배치 산출 (17커밋)
 
 - `AIRI-BRIEFING-EVIDENCE-SIGNAL-2026-08-20.md` — 디렉터→프록시 브리핑 근거
