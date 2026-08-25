@@ -94,6 +94,35 @@ GENERATIONS: dict[str, dict[str, Any]] = {
             '374f470837506f07133dd9634efc88904dc065175dcd182097d2c5fcdbb60956',
         }),
     },
+    # D1 re-measurement (M3, 2026-08-25): same four arms, gates, thresholds and
+    # comparator as d1, but the prompt changed (briefing evidence marker,
+    # num_ctx 4096) so blind v4 — consumed by the 48-report D1 matrix — cannot
+    # be reused.  v3 and v4 are both superseded here.
+    'd1v5': {
+        'sealed_schema': 'airi.d1-blind-sealed-manifest.v1',
+        'receipt_schema': 'airi.d1-blind-validation-receipt.v1',
+        'root_prefix': 'airi-d1-blind-freeze-',
+        'arms': ('baseline', 'e2', 'e2-c1', 'e2-c2'),
+        'extra_superseded_root_ids': ('airi-e2-c2-blind-freeze-20260824-v3',
+                                      'airi-d1-blind-freeze-20260825-v4'),
+        'extra_superseded_hashes': frozenset({
+            # v3 (consumed by the E2-C2 matrix)
+            '99945ebb2cbffd1b831e73ec10e29271eb9b3c1daac3bb3a5d959ce1e2a65b61',
+            '7dc54f119f1b87443677047aa853544c17bf1724318246871d1a0d32e496c86f',
+            'ed50352d2bce3570d938aca4c752ce98b16f426cb484dbf61bbe50c95e300acd',
+            '4df78907c6b8606acb9501b4a9538813b0777c110740a902e07701da73a89b1c',
+            '5175b4e005eedf973b41e27021d90b4ceb68324bcba1be77e225f9eccc2e17e9',
+            '374f470837506f07133dd9634efc88904dc065175dcd182097d2c5fcdbb60956',
+            # v4 (consumed by the D1 matrix) — raw and canonical, from
+            # fixtures/commitments/airi_d1_blind_commitment.json
+            'c210b7df96324f137b448066a6a8a7346a0b36edc0a3e03f491f992d37823420',
+            '9879c919f98420f4fb88523b8093dd3aa09ff2011e4a54fbca5a1d9c1c076e2d',
+            '82e5eaab37e07d18c2630d50b59c5263a969259b6a39089778e8120c904d8ab8',
+            '5057f5c723b0a38265fa3a89626056f2b6ef64175c55774724699dc99a9ac320',
+            '64a5df12e52c8f49d4e66d75ced74b686084aabc59d8bb3482e62a6726c14dd1',
+            '4e30d9986a78f2802fe24ce87f0de12bfaba784e4ffbf21b539a14e112912d80',
+        }),
+    },
 }
 
 

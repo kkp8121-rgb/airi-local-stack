@@ -186,6 +186,7 @@ jobs:
               ollama-proxy/training/tests/test_broadcast_reference_and_pilot_data.py
               ollama-proxy/training/tests/test_aggregate_broadcast_patterns.py
               ollama-proxy/training/tests/test_broadcast_response_quality_gate.py
+              ollama-proxy/training/tests/test_verify_general_capability_gate.py
               ollama-proxy/training/tests/test_build_behavior_review_form.py
               ollama-proxy/training/tests/test_behavior_review_pipeline.py
               ollama-proxy/training/tests/test_export_behavior_affect_dataset.py
