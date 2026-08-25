@@ -7,17 +7,20 @@
 > `NEXT-SESSION.md`를 읽고 `git status`/HEAD/PID/산출물 SHA를 read-only로 대조한 뒤에
 > 감시를 재개한다. 설계 계약 원문은 `AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md`이고
 > 이 문서는 그 계약의 **실행 상태와 남은 단계**만 다룬다.
+> 이관 본문 commit `c74b2481a79c3faa1d503e6e08d46d4bcd555b2a`는 origin/main에
+> push됐고, 10:29:23 KST post-push에 HEAD/local/origin exact와 PID 7832 live를
+> 재확인했다.
 
 ## 0. 인계 시점 상태 (관측값)
 
 | 항목 | 값 |
 |---|---|
-| 관측 시각 | `2026-08-25T10:27:00.9700198+09:00` |
-| HEAD = origin/main | `d5bab18f00450c63bc2131ee246f0c8b1f73e76e` (이관 문서 commit 전 기준) |
-| worktree | 기존 WORKING/ROADMAP-LOG receipt diff만 dirty; 사용자 코드 변경 0 |
+| 관측 시각 | `2026-08-25T10:29:23.9276509+09:00` |
+| HEAD = origin/main | `c74b2481a79c3faa1d503e6e08d46d4bcd555b2a` (이관 본문 push receipt) |
+| worktree | clean (이 receipt 작성 전 기준); 사용자 코드 변경 0 |
 | detached wrapper | PID `7832` live |
 | exact command | `"C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -File D:\AIRI-Models\airi-d1-blind-matrix-20260825\launch-d1-matrix.ps1` |
-| matrix 진행 | reports `15/48`, health `15/48`, stdout `75,211 B`, stderr `0 B`, exit receipt absent |
+| matrix 진행 | reports `15/48`, health `15/48`, stdout `75,213 B`, stderr `0 B`, exit receipt absent |
 | Codex monitor | `/root/monitor_d1_matrix`만 `interrupted`; wrapper·launcher·서비스 제어 0 |
 | GPU | idle — **D1은 GPU 학습이 전혀 없다** |
 | goal | `user-goal-2026-08-25-0454-d1` (WORKING-STATE frontmatter `authorization` 참조) |

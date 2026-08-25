@@ -9,6 +9,10 @@
 
 ## 2026-08-25 D1 실행 감독 Claude 이관
 
+- 10:30 KST 다섯 이관 문서만 검증해 commit `c74b248`로 origin/main에 push했다.
+  10:29:23 post-push HEAD/local/origin exact·worktree clean, wrapper PID 7832 exact
+  command live, reports/health 15/48, stdout 75,213 B, stderr 0 B, exit receipt absent다.
+  Claude 단일 진입점은 D1 handoff이며 Codex는 receipt publication 뒤 종료한다.
 - 10:27 KST 최신 사용자 지시로 matrix 자체는 유지하고 감독·후속 verdict 분기만
   Claude Code로 이관한다. wrapper PID 7832 exact command live, reports/health 15/48,
   stdout 75,211 B, stderr 0 B, exit receipt absent다. Codex monitor subagent만

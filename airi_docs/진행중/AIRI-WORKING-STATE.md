@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 10:27:00 +09:00"
-checkpoint_id: "20260825-102700-d1-claude-handoff-doc-update-intent"
+updated_at_kst: "2026-08-25 10:30:00 +09:00"
+checkpoint_id: "20260825-103000-d1-claude-supervision-transfer-receipt"
 matrix_note: "D1 48-report matrix exact-once detached 실행 유지. wrapper PID 7832 live, reports/health 15/48; 감독만 Claude로 이관"
 active_trainer_note: "D1 GPU 학습 없음. Codex monitor subagent interrupted; wrapper PID 7832는 그대로 live·제어 금지"
 goal_status: "active"
 authorization: "user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "d1-supervision-transfer-to-claude"
-git_head: "d5bab18f00450c63bc2131ee246f0c8b1f73e76e"
-worktree_state: "HEAD/local main/origin-main exact d5bab18; 기존 WORKING/ROADMAP-LOG receipt diff에 이관 문서 갱신 예정; wrapper PID 7832 live, exact command verified, reports/health 15/48, stdout 75,211 B, stderr 0 B, exit receipt absent"
+active_phase: "d1-supervision-transferred-to-claude"
+git_head: "c74b2481a79c3faa1d503e6e08d46d4bcd555b2a"
+worktree_state: "HEAD/local main/origin-main exact c74b248 and clean before this receipt; wrapper PID 7832 live, exact command verified, reports/health 15/48, stdout 75,213 B, stderr 0 B, exit receipt absent"
 active_trainer_count: 0
 reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix final receipt (Claude PC, Fable supervisor). Matrix completed cleanly (detached launcher exit 0, monitoring loop kills by user did not affect it): 36/36 reports, comparator status=pass, winner=null. Scores baseline=0.217883/e2=0.224945/e2-c1=0.244070; improved_additive_axes_vs_e2=4/5; invented_handle violations 28/40/53 (worsens with training) drove 13 failed hard/legacy/perfect-rate gates. adoption_authorized=false, campaign blocked. User accepted next plan: (1) read e2-c1 invented-handle transcripts from this now-scored blind for root-cause classification, (2) design a deterministic runtime guard rejecting un-rostered Korean handles, (3) if gaps remain, E2-C2 with revisited training dose/LR and a fresh blind. This checkpoint records docs (frozen contract SS11, handoff -6, ROADMAP-STATUS banner/checklist, ROADMAP-LOG) and asks the user for a fresh /goal covering the diagnosis+guard phase. All AIRI/GPU processes idle, no listeners beyond Ollama 11434."
 ---
@@ -23,6 +23,19 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 > 기준 상태다. checkpoint를 포함한 commit 자체의 SHA를 자가 참조하지 않는다.
 
 ## 1. 권한과 현재 사실
+
+- 2026-08-25 10:30 KST **D1 실행 감독 Claude 이관 receipt**: 다섯 이관 문서만
+  work-continuity PASS·diff-check 0·cached diff-check 0 후 commit
+  `c74b2481a79c3faa1d503e6e08d46d4bcd555b2a`(`docs: hand off D1 matrix
+  supervision`)로 고정하고 `git push origin main` exit 0,
+  `d5bab18..c74b248 main -> main`을 확인했다. 10:29:23 KST post-push 관측에서
+  HEAD/local main/origin-main exact·worktree clean, wrapper PID 7832와 exact command
+  불변 live, reports/health 15/48, stdout 75,213 B, stderr 0 B, exit receipt absent다.
+  Codex monitor는 interrupted이고 matrix·서비스 제어 0, blind v4 재사용 0이다. Claude의
+  단일 진입점은 `AIRI-D1-CODEX-HANDOFF-2026-08-25.md`; 다음 행동은 PID 7832를 건드리지
+  않고 완주를 read-only 감시한 뒤 comparator verdict 분기를 수행하는 것이다. Codex는
+  이 receipt 문서 commit/push와 wrapper 생존 재확인 뒤 matrix 감시·verdict·campaign을
+  더 수행하지 않고 종료한다.
 
 - 2026-08-25 10:27 KST **Claude 이관 다섯 문서 갱신 intent**: monitor 종료 receipt
   뒤 재관측은 wrapper PID 7832 live, exact command 불변, reports/health 15/48, stdout
