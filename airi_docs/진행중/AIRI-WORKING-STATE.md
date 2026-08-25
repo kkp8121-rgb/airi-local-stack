@@ -1,12 +1,12 @@
 ---
 schema_version: 1
-updated_at_kst: "2026-08-25 13:20:00 +09:00"
-checkpoint_id: "20260825-132000-d1-closure-push-receipt"
-matrix_note: "D1 48-report matrix 완주. wrapper PID 7832 exit 0, reports/health/run-contract/packets/runtime 48/48, comparator winner=null(no_winner). campaign 미실행, 진단 후 사용자 지시 대기"
+updated_at_kst: "2026-08-25 14:40:00 +09:00"
+checkpoint_id: "20260825-144000-m1-instrumentation-repair-receipt"
+matrix_note: "D1 matrix 종결(48/48, winner=null). 신규 M1 계측 복구 작업 착수; matrix 재실행 0"
 active_trainer_note: "D1 GPU 학습 없음. matrix 종료·소유 서비스 정리 완료; 잔여 AIRI 프로세스 0"
 goal_status: "active"
 authorization: "user-goal-2026-08-25-0454-d1: no-gpu-training-inference-only; scope: (1) deterministic-runtime-layer-for-4-gates (invented_handle-full-coverage-incl-87%-common-noun, donation-composite, stale_transition_clean, decoy_fact_use; gate-definitions-and-thresholds-immutable, default-off-flags, off-path-byte-identical-regression-required), (2) offline-regression-then-commit-push, (3) new-retained-blind-v4-x3-author-validate-seal (seal-tooling-reuse; v1/v2/v3-reuse-forbidden), (4) 48-report-4-arm-matrix-baseline-e2-e2c1-e2c2-with-deterministic-layer-on (comparator-policy-extended-to-4-arms-no-threshold-relaxation), (5) gates-closed-then-3x500-campaign-with-top-score-arm / not-closed-then-preserve-diagnose-report-await-user; forbidden: gpu-retraining-or-new-candidate-training, blind-v1-v2-v3-reuse, hard-gate-relaxation, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-126-promotion; operational-adoption-forbidden-until-separate-user-approval; per-step intent/receipt + per-batch LOG + commit/push-after-verification. superseded: user-goal-2026-08-24-1700-e2c2: gpu-unlimited; scope: (1) e2-c2-recipe-redesign-microsteps-lr-correction-replay-ratio-per-frozen-contract-s11-undertraining, (2) new-retained-blind-x3-author-offline-validate-seal (stream-only, hangul-ratio, correction-proper-noun-collision-0; v1/v2 reuse forbidden), (3) bounded-smoke-then-durable-train-then-safe-merge-then-package, (4) 36-report-matrix-baseline-e2-e2c2-with-AIRI_HANDLE_GROUNDING_GUARD-on, (5) winner-then-3x500-campaign / no-winner-then-preserve-diagnose-report-await-user (no auto E2-C3); forbidden: blind-v1-v2-reuse, hard-gate-relaxation, same-data-epoch-only-E3, operational-model-tag-change, external-provider-extraction-greybox-default-on, t05-speaker-126-operational-promotion; operational-adoption-forbidden-regardless-of-campaign-until-separate-user-approval; per-step intent/receipt + per-batch ROADMAP-LOG + commit/push-after-verification required"
-active_phase: "d1-no-winner-diagnosed-awaiting-user"
+active_phase: "m1-instrumentation-repair-partial"
 git_head: "c312530581aa5ba5dbc10137ec2388dafe28d743"
 worktree_state: "HEAD/local main/origin-main exact c312530 and clean at 2026-08-25 13:18 KST before this receipt; matrix ended (exit 0), AIRI processes 0"
 active_trainer_count: 0
@@ -23,6 +23,108 @@ reconciliation_receipt: "2026-08-24 15:14 KST E2-C1 blind v2 36-report matrix fi
 > 기준 상태다. checkpoint를 포함한 commit 자체의 SHA를 자가 참조하지 않는다.
 
 ## 1. 권한과 현재 사실
+
+- 2026-08-25 14:40 KST **M1 계측 복구 receipt (부분 완료 + 근본 원인 확정)**:
+  오프라인 회귀 전량 통과. 코드 3개·테스트 3개를 고쳤고, 남은 한 축은 동결 계약과
+  얽혀 있어 사용자 판단으로 넘긴다.
+
+  **(1) 프록시 오류 관측 가능성 — 완료.** `ollama_proxy.py`의 두 오류 핸들러가
+  이제 예외 메시지를 남긴다. 신규 `local_error_detail()`(공백 정규화 + 300자 상한 +
+  말줄임)을 두고, 스트리밍 핸들러의 `local_chat` 이벤트에 `error` 필드를 더했으며,
+  아무 기록도 남기지 않던 memory 경로의 `except Exception:`은 같은 이벤트 모양에
+  `"stage": "memory_recall"`을 붙여 방출하게 했다. 신규 테스트 3(상한·1줄화·빈 메시지
+  보존). **이것이 이번 라운드 근본 원인 미확정의 직접 원인이었다** — 26개 raise 지점이
+  같은 `RuntimeError` 이름을 공유하는데 이름만 기록하고 있었다.
+
+  **(2) 평가 사각 — 완료.** `broadcast_sim.score_turn`에 `service_error_pool`
+  인자(기본 `()`)와 row 플래그 `service_error`, `summarize_turns`에
+  `summary.service_error` 지표를 추가했다. `run_broadcast_sim.py`에 프록시 실패 문구
+  3종을 담은 `SERVICE_ERROR_POOL`을 두고 두 `score_turn` 호출에 배선했다. 신규 테스트
+  4: 프록시 소스에서 AST로 3개 상수를 뽑아 바이트 대조, 침묵 폴백 풀과 교집합 0 확인,
+  플래그 독립성(오류 턴은 `service_error=1`·`is_fallback=0`), 풀 미전달 시 항상 False.
+  기존 지표·게이트 정의·threshold·report schema version 변경 0(키 추가만).
+
+  **(3) P3 발동 범위 — 부분 완료.** 신규 `is_recall_probe()`가 회수형 질문을
+  **probe**(사용자가 값을 안 준 질문)와 **confirmation**(사용자가 답을 이미 말한
+  확인)으로 가른다. 폴백은 이제 probe에만 발동한다. "근거 없으면 추측 금지" 원칙은
+  그대로 두고 발동 대상만 좁혔다(완화 0). D1 실제 폴백 턴 **209개를 수리된 분류기로
+  재판정**한 결과 40개(19.1%)가 통과로 바뀐다 — 여기에는 애초에 회수형이 아니었던
+  `question` 23행이 전부 포함된다.
+
+  **(4) 남은 161행의 근본 원인 — 확정했다.** 재판정에서 `continuity_callback`
+  176행 중 161행은 여전히 probe다. 이건 분류기 문제가 아니었다. D1 산출물로 다음
+  사슬을 확인했다:
+  - seed→callback 턴 거리는 192행 전부 **38~66턴**(p50 54)이고 8턴 history 창 안에
+    있는 것은 **0건(0.0%)** 이다. 정의상 long callback이므로 당연하다.
+  - 그 결정문이 턴에 도달하는 유일한 통로는 브리핑이다. 그런데 시뮬레이터는
+    브리핑을 **system 메시지에 이어붙인다**(`run_broadcast_sim.py`
+    `system_content += "\n\n" + briefing_text`).
+  - `build_layer_inputs`는 **system 내용 전체를 P3/P4 증거 풀에서 의도적으로 제외**
+    한다(계약 산문의 "…지 말고"가 방송 결정으로 오인되는 것을 막으려는 설계).
+  - 결과: P3는 그 턴이 실제로 받은 근거를 **구조적으로 볼 수 없고**, 매번 "근거 없음"
+    으로 판정해 모델의 정답까지 폴백으로 덮는다. `long_callback`·
+    `complete_show_arc`가 전 arm 0.0이 된 기전이 이것이다.
+
+  **열린 결정 사항(사용자)**: 이 마지막 축을 닫으려면 브리핑 부분만 P3/P4 풀에
+  들여보내야 하는데, 그러려면 "system 내용 중 무엇이 증거이고 무엇이 계약 산문인가"를
+  가르는 기준이 필요하다. 시뮬레이터의 브리핑 머리글 문자열로 가르는 방법은
+  **채택하지 않았다** — 계층 docstring이 "평가 픽스처의 검사 패턴을 절대 보지 않는다"
+  고 못박고 있어 프록시가 시뮬레이터 문자열을 아는 순간 그 불변식이 깨진다. 프록시
+  자체의 브리핑 마커를 새로 정의할지, 아니면 P3가 근거를 못 볼 때는 초안을 덮지 않도록
+  바꿀지는 동결 계약(§2 P3)을 건드리는 결정이라 임의로 정하지 않는다.
+
+  **검증(전부 이번 세션 실측)**: broadcast_sim + layer + guard 219 passed/1 skipped
+  (+42 subtests), proxy `test_ollama_proxy` **380 OK**(기존 377 + 신규 3),
+  `test_memory_e2e`/`test_input_screening`(19)/`test_output_moderation`(34)/
+  `test_epistemic_confidence`(11)/`test_evaluation_api`(5) 전부 OK,
+  latency-monitor + 루트 2종 40 passed(+15 subtests), `test-current-checkpoint.ps1`
+  **PASS**, `git diff --check` 0. 신규 테스트 파일은 없으므로 CI matrix 갱신은
+  불필요하다(기존 파일 수정만).
+
+  **경계 준수**: GPU 학습 0, blind v1~v4 재사용 0, 새 blind 봉인 0, matrix 재실행 0,
+  게이트 정의·threshold·seed·fixture 변경 0, 운영 모델·태그 변경 0, 외부 provider 기본
+  ON 0, adoption 0. 재측정용 새 blind는 별도 승인 사항이며 시작하지 않았다.
+
+- 2026-08-25 13:45 KST **M1 계측 복구 intent (사용자 지시)**: D1 종결 뒤 사용자가
+  "계측 2건(프록시 오류 근본 원인, P3 발동 범위)을 고치자"고 지시했다. 착수 전
+  read-only 조사에서 **프록시 오류의 발생 조건을 특정**했다.
+
+  - 마지막 run(e2-c2/factual/seed 20260824)의 프록시 stdout이 살아 있었다
+    (`ollama-proxy/ollama-proxy.out.log`, 91,801 B, 12:38 최종 기록). 프록시는 매
+    기동마다 이 로그를 덮어쓰므로 48 run 중 마지막 1건만 남아 있다.
+  - 그 안에 `{"event":"local_chat","status":"error","error_type":"RuntimeError"}`가
+    **34건**, `chat_request` 107건이다(31.8%). blind 리포트에서 관측한 33.9~35.3%와
+    일치한다. `err.log`에는 FastAPI DeprecationWarning과 uvicorn 기동 로그뿐이고
+    traceback은 없다.
+  - **조건 상관이 명확하다**: 실패 34건은 **전부** `message_count_out == 6`
+    (준비된 프롬프트 최대치)이고 `message_count_in`은 33건이 17이다. 반대로
+    `message_count_out < 6`인 6건은 **실패 0건**이다. 즉 세션 히스토리 창이 포화된
+    뒤에만 실패하며, 포화 요청의 33.7%가 실패한다. health의
+    `prompt_budget.last_prompt_eval_count=2047 / num_ctx=2048 /
+    last_utilization=0.999512`와 방향이 같다.
+  - **근본 원인은 아직 확정할 수 없다.** 예외 핸들러(`ollama_proxy.py` ~8505)가
+    `type(exc).__name__`만 기록하고 메시지·traceback을 버리기 때문이다. 같은 이름의
+    후보가 코드에 26곳 있고, 이 경로 안의 유력 후보만 해도
+    `RuntimeError("Ollama returned {status}: {body}")`(~7722)와
+    `RuntimeError("incomplete upstream NDJSON stream")`(~8250) 둘이다. 두 번째
+    핸들러(~9336)는 아예 `except Exception: pass` 형태라 이벤트조차 남기지 않는다.
+  - 평가 쪽 사각도 확인했다: `run_broadcast_sim.py`의 `FALLBACK_POOL`은 프록시의
+    **침묵 폴백**만 세고 `LOCAL_ERROR_DIALOGUE`는 세지 않는다. 그래서 세 라운드 내내
+    `summary.fallback`이 0/108을 보고했다.
+
+  **계획(M1)**: (1) 프록시 두 오류 핸들러가 예외 메시지를 bounded 형태로 남기도록
+  관측 가능성을 먼저 복구하고, (2) 시뮬레이터가 이 오류 응답을 별도 카운트해
+  리포트에 노출하게 하며(게이트 정의·threshold 불변, 기존 지표 불변), (3) P3
+  `answer_recall_question`의 분류기를 좁혀 `continuity_callback`류 턴을 회수 probe로
+  오분류하지 않게 한다. **P3의 "근거 없으면 안전 폴백(추측 금지)" 원칙 자체는 유지**
+  하고 발동 범위만 좁힌다 — 폴백 제거는 추측 재유입이라 보수적 기본값을 택한다.
+  (4) 오프라인 회귀 전량 통과 후 문서·commit/push, (5) 그다음에야 짧은 재현 실행으로
+  실제 RuntimeError 메시지를 포착해 근본 원인을 확정한다.
+
+  **경계**: GPU 학습 0, blind v1~v4 재사용 0, 새 blind 봉인 0, matrix 재실행 0,
+  hard gate/threshold/seed/fixture 변경 0, 운영 모델·태그 변경 0, 외부 provider 기본
+  ON 0, adoption 0. 재측정용 새 blind(v5)가 필요해지면 별도 사용자 승인 사항이며
+  이번 배치에서 시작하지 않는다.
 
 - 2026-08-25 13:20 KST **D1 종결 문서 push receipt**: `test-airi-work-continuity.ps1`
   PASS(exit 0), staged/unstaged `git diff --check` 0 후 이 작업의 문서 여섯 경로만

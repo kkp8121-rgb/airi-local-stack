@@ -2363,6 +2363,12 @@ SEARCH_FALLBACK_PREFIX = "검색이 안 돼서 아는 만큼만 말할게."
 SEARCH_UNAVAILABLE_DIALOGUE = "검색 연결이 잠시 안 돼. 다시 한 번 말해줘."
 UPSTREAM_TIMEOUT_DIALOGUE = "답이 너무 늦어서 잠깐 멈췄어. 다시 말해줘."
 LOCAL_ERROR_DIALOGUE = "답을 만들다가 문제가 생겼어. 다시 말해줘."
+# The local-chat error handlers used to record only ``type(exc).__name__``.
+# A blind matrix then spent 48 runs emitting this dialogue on a third of its
+# turns without leaving a single line that says which RuntimeError it was.
+# Bound the detail so an upstream body cannot flood the log or carry a whole
+# prompt back into it, but never drop it entirely.
+LOCAL_ERROR_DETAIL_LIMIT = 300
 UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE = "답이 늦어져서 잠깐 멈췄어."
 # A rejected draft must not become total silence.  The user cannot tell an
 # intentionally withheld answer apart from a broken pipeline, and the turn is
@@ -2389,6 +2395,18 @@ GROUNDING_SILENCE_FALLBACK_POOL = (
     "아, 잠깐 헷갈렸어.",
     "그건 좀 있다가 다시 말해 줄게.",
 )
+
+
+def local_error_detail(exc: BaseException) -> str:
+    """One-line, bounded rendering of a swallowed local-chat exception.
+
+    ``type(exc).__name__`` alone cannot tell an upstream HTTP error apart from
+    a truncated NDJSON stream, and both raise ``RuntimeError`` on this path.
+    """
+    detail = " ".join(str(exc).split())
+    if len(detail) > LOCAL_ERROR_DETAIL_LIMIT:
+        detail = detail[:LOCAL_ERROR_DETAIL_LIMIT] + "…"
+    return detail
 
 
 def configured_silence_fallback_pool(value: object) -> bool:
@@ -8508,6 +8526,7 @@ async def stream_local_with_ack(
                     "event": "local_chat",
                     "status": "error",
                     "error_type": type(exc).__name__,
+                    "error": local_error_detail(exc),
                 }
             ),
             flush=True,
@@ -9331,9 +9350,24 @@ async def proxy(path: str, request: Request):
                             request_headers,
                             prepared_body,
                         )
-                    except Exception:
+                    except Exception as exc:
                         local_failed = True
                         dialogue = LOCAL_ERROR_DIALOGUE
+                        # This branch used to swallow the exception whole, so a
+                        # memory-recall turn that failed here left no trace at
+                        # all.  Same event shape as the streaming handler.
+                        print(
+                            json.dumps(
+                                {
+                                    "event": "local_chat",
+                                    "status": "error",
+                                    "stage": "memory_recall",
+                                    "error_type": type(exc).__name__,
+                                    "error": local_error_detail(exc),
+                                }
+                            ),
+                            flush=True,
+                        )
                     dialogue, moderation = prepare_openai_sse_dialogue(dialogue)
                     completed_memory_text = dialogue
                     emotion = "neutral"

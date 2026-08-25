@@ -22,7 +22,10 @@ Parts (see AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md):
   "…하기로 했지?", "기억나?") is answered deterministically by extracting the
   decided option from this turn's evidence pool ("S는 A 말고 B…" → B,
   "내 X는 Y야" → Y).  When the pool holds no matching decision the model draft
-  is replaced by a safe don't-remember fallback rather than a guess.
+  is replaced by a safe don't-remember fallback rather than a guess — but only
+  for a *probe* that asks for a value the user did not supply
+  (``is_recall_probe``).  A confirmation ("우리 X는 Y로 하기로 했지?") carries
+  its own answer and is left to the model.
 - P4 ``suppress_rejected_branch``: for every "A 말고/아니라 B" decision visible
   in the pool, response sentences that repeat the rejected A-branch are
   dropped; when the current user message itself carries such a proposal and
@@ -69,6 +72,12 @@ _RECALL_QUESTION_RES = (
     re.compile(r"(?:하|가|긋|걸|찍|흔들|넣|당기|덮|지키|잠그|올리|채우|막|깎|돌리|보내|두)?기로\s*했(?:었)?(?:지|어|나|는데)"),
     re.compile(r"어떻게\s*(?:하|했)(?:기로)?\s*했"),
     re.compile(r"(?:어디|언제|누구|몇)\s*(?:에서|에|로)?\s*.{0,10}(?:한다고|라고)\s*했"),
+)
+
+# The unknown a recall *probe* asks for.  A recall question without any of
+# these supplies its own answer and is a confirmation — see is_recall_probe.
+_INTERROGATIVE_RE = re.compile(
+    r"뭐였|뭐라|뭐랬|무슨|무엇|어떻게|어떤|어디|언제|누구|누가|몇|얼마|왜|기억\s*(?:나|해|하니|나니)"
 )
 
 # "S는 … A 말고/아니라 B …" — capture the phrase right before 말고/아니라 (the
@@ -192,6 +201,27 @@ def guard_session_past_tokens(
 def is_recall_question(user_text: str) -> bool:
     text = user_text or ""
     return any(pattern.search(text) for pattern in _RECALL_QUESTION_RES)
+
+
+def is_recall_probe(user_text: str) -> bool:
+    """A recall question that asks for a value the user did not supply.
+
+    ``is_recall_question`` matches two different turn shapes.  A *probe*
+    ("내 좌석 번호 기억나?", "불씨는 어떻게 하기로 했지?") asks for something
+    only the assistant can supply, so answering it without evidence is a
+    guess.  A *confirmation* ("우리 불씨는 잔불로 두기로 했지?") already
+    carries its own answer, so there is nothing to invent and replacing the
+    draft only destroys a correct reply.
+
+    The D1 matrix paid for conflating them: 176 of 320 continuity callbacks —
+    all confirmation-shaped — were replaced by the don't-remember fallback,
+    and ``long_callback``/``complete_show_arc`` scored exactly 0.0 on all four
+    arms.  Only probes reach the fallback now.
+    """
+    text = user_text or ""
+    if not is_recall_question(text):
+        return False
+    return bool(_INTERROGATIVE_RE.search(text))
 
 
 def _question_tokens(user_text: str) -> set[str]:
@@ -397,7 +427,9 @@ def apply_deterministic_utterance_layer(
     if recall_answer is not None:
         signal["recall"] = "answered"
         text = recall_answer
-    elif is_recall_question(user_text):
+    elif is_recall_probe(user_text):
+        # No pool decision matched a question that asked for a value the user
+        # did not supply.  Answering anyway would be a guess.
         signal["recall"] = "fallback"
         text = _RECALL_FALLBACK
 

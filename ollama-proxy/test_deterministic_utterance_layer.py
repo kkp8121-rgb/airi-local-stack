@@ -182,6 +182,52 @@ class LayerCompositionTests(unittest.TestCase):
         self.assertEqual(text, dul._RECALL_FALLBACK)
         self.assertEqual(signal["recall"], "fallback")
 
+    def test_confirmation_shaped_recall_leaves_the_draft_alone(self) -> None:
+        # D1 회귀 재현: continuity_callback 프롬프트("… 두기로 했지?")는 회수형
+        # 정규식에 걸리지만 사용자가 답을 이미 말했으므로 지어낼 것이 없다.
+        # 수리 전에는 이런 턴까지 폴백으로 대체돼 320행 중 176행(55%)이 날아갔고
+        # long_callback·complete_show_arc가 전 arm 0.0이 됐다.
+        question = "우리 불씨는 잔불로 두기로 했지?"
+        self.assertTrue(dul.is_recall_question(question))
+        self.assertFalse(dul.is_recall_probe(question))
+        text, signal = dul.apply_deterministic_utterance_layer(
+            "불씨는 잔불로 두기로 했지! 그대로 가자.",
+            user_text=question, prompt_text="불씨 얘기", pool_text="",
+            past_tokens=frozenset(), donation_turn=False)
+        self.assertNotEqual(text, dul._RECALL_FALLBACK)
+        self.assertIn("잔불", text)
+
+    def test_probe_shaped_recall_without_evidence_still_uses_the_fallback(self) -> None:
+        # 완화가 아니다: 사용자가 값을 주지 않은 질문은 여전히 추측 금지 대상이다.
+        question = "우리 불씨는 어떻게 하기로 했지?"
+        self.assertTrue(dul.is_recall_probe(question))
+        text, signal = dul.apply_deterministic_utterance_layer(
+            "그건 자정무렵 물양동이로 덮기로 했잖아!",
+            user_text=question, prompt_text="불씨 얘기", pool_text="",
+            past_tokens=frozenset(), donation_turn=False)
+        self.assertEqual(text, dul._RECALL_FALLBACK)
+        self.assertEqual(signal["recall"], "fallback")
+
+    def test_probe_classifier_covers_the_interrogative_families(self) -> None:
+        for probe in ("내 좌석 번호 기억나?", "표식 뭐였지?", "등불은 무슨 빛으로 걸기로 했지?",
+                      "물살은 어떻게 몰기로 했었지?", "우리 몇 번에 두기로 했지?"):
+            with self.subTest(probe=probe):
+                self.assertTrue(dul.is_recall_probe(probe), probe)
+        for confirmation in ("우리 불씨는 잔불로 두기로 했지?", "표식은 밤색끈으로 하기로 했지?"):
+            with self.subTest(confirmation=confirmation):
+                self.assertTrue(dul.is_recall_question(confirmation), confirmation)
+                self.assertFalse(dul.is_recall_probe(confirmation), confirmation)
+
+    def test_pool_evidence_still_wins_over_a_confirmation_draft(self) -> None:
+        # 풀에 실제 결정문이 있으면 P3 결정론 응답이 우선한다(기존 계약 불변).
+        text, signal = dul.apply_deterministic_utterance_layer(
+            "등불 신호는 붉은빛으로 걸기로 했지!",
+            user_text="등불 신호는 무슨 빛으로 걸기로 했지?",
+            prompt_text=POOL, pool_text=POOL,
+            past_tokens=frozenset(), donation_turn=False)
+        self.assertEqual(signal["recall"], "answered")
+        self.assertIn("초록빛", text)
+
     def test_plain_turn_with_no_findings_returns_input_and_no_signal(self) -> None:
         text, signal = dul.apply_deterministic_utterance_layer(
             "등불 예쁘게 걸어 보자!",

@@ -1069,6 +1069,31 @@ class EchoFilterProxyContractTests(unittest.TestCase):
         self.assertEqual(len(live_pool), 6, live_pool)
         self.assertEqual(set(live_pool), set(runner.FALLBACK_POOL))
 
+    def _proxy_constant(self, name: str) -> str:
+        for node in ast.walk(self._proxy_tree()):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == name:
+                        return ast.literal_eval(node.value)
+        raise AssertionError(f"{name} 을 프록시 소스에서 못 찾았다")
+
+    def test_runner_service_error_pool_matches_the_live_failure_dialogues(self) -> None:
+        # 파이프라인 실패 안내 3종은 침묵 폴백과 달리 "모델 발화가 없었다"는 뜻이다.
+        # 러너가 프록시와 바이트로 같은 문구를 세야 service_error 율이 의미를 갖는다.
+        # 이 대조가 없으면 D1 라운드처럼 전 arm 턴의 1/3이 오류인데도 리포트는
+        # fallback 0/108 만 보고한다.
+        live = tuple(self._proxy_constant(name) for name in (
+            "LOCAL_ERROR_DIALOGUE",
+            "UPSTREAM_TIMEOUT_DIALOGUE",
+            "UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE",
+        ))
+        self.assertEqual(set(live), set(runner.SERVICE_ERROR_POOL))
+        # 침묵 폴백과 겹치면 두 지표가 서로를 오염시킨다.
+        self.assertFalse(set(runner.SERVICE_ERROR_POOL) & set(runner.FALLBACK_POOL))
+        for line in runner.SERVICE_ERROR_POOL:
+            with self.subTest(line=line):
+                self.assertTrue(line.startswith(runner.DEGENERATE_ECHO_PREFIXES), line)
+
 
 class ScoringTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -1084,6 +1109,27 @@ class ScoringTests(unittest.TestCase):
         return sim.score_turn(self.pick(msg, **extra), body, beat=self.beat,
                               fallback_pool=("음, 잠깐만.",), roster_handles=self.roster,
                               drift_terms=sorted(sim.offtopic_terms(self.fixture)))
+
+    def test_service_error_is_flagged_separately_from_the_silence_fallback(self) -> None:
+        # 프록시 오류 응답은 침묵 폴백이 아니다. 두 플래그가 서로 독립이어야
+        # "폴백률 0인데 실측 오류율 34%" 같은 사각이 다시 생기지 않는다.
+        error_line = runner.SERVICE_ERROR_POOL[0]
+        row = sim.score_turn(self.pick(message(text="이름 뜻이 뭐야?", kind="question")),
+                             error_line, beat=self.beat, fallback_pool=("음, 잠깐만.",),
+                             roster_handles=self.roster,
+                             service_error_pool=runner.SERVICE_ERROR_POOL,
+                             drift_terms=sorted(sim.offtopic_terms(self.fixture)))
+        self.assertTrue(row["service_error"])
+        self.assertFalse(row["is_fallback"])
+        summary = sim.summarize_turns([row])
+        self.assertEqual(summary["service_error"], {"hits": 1, "of": 1, "rate": 1.0})
+        self.assertEqual(summary["fallback"], {"hits": 0, "of": 1, "rate": 0.0})
+
+    def test_service_error_defaults_off_when_no_pool_is_supplied(self) -> None:
+        # 풀을 안 넘긴 호출(기존 코드 경로)은 플래그가 항상 False여야 한다.
+        row = self.score(message(text="이름 뜻이 뭐야?", kind="question"),
+                         runner.SERVICE_ERROR_POOL[0])
+        self.assertFalse(row["service_error"])
 
     def test_silence_fallback_is_flagged_and_not_counted_as_topical(self) -> None:
         row = self.score(message(text="이름 뜻이 뭐야?", kind="question"), "음, 잠깐만.")

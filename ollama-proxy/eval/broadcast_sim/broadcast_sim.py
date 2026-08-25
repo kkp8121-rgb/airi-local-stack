@@ -570,6 +570,7 @@ def score_turn(
     beat: dict[str, Any],
     fallback_pool: Sequence[str],
     roster_handles: Sequence[str],
+    service_error_pool: Sequence[str] = (),
     drift_terms: Sequence[str] = (),
     briefing_fact_tokens: Sequence[str] | None = None,
 ) -> dict[str, Any]:
@@ -591,6 +592,13 @@ def score_turn(
         "chars": len(text),
         "empty": not text,
         "is_fallback": text in set(fallback_pool),
+        # A pipeline failure is not a silence fallback.  `fallback_pool` holds
+        # only the proxy's deliberate "let me think" lines, so three blind
+        # rounds reported `fallback` 0/108 while a third of every arm's turns
+        # were actually the proxy's error dialogue.  Count it separately: an
+        # error turn cannot be scored for anything, and a metric whose
+        # denominator is mostly errors is not a measurement.
+        "service_error": text in set(service_error_pool),
         "anchor_hit": [anchor for anchor in anchors if anchor in text],
         "shared_tokens": sorted(shared),
         # 두 축을 따로 본다. `topic_anchored` 는 "방송 주제에 붙어 있나"라는
@@ -677,6 +685,7 @@ def summarize_turns(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
         "turns": len(rows),
         "empty": sum(1 for row in rows if row["empty"]),
         "fallback": rate(rows, "is_fallback"),
+        "service_error": rate(rows, "service_error"),
         "topic_anchored": rate(rows, "topic_anchored"),
         "drift_turns": sum(1 for row in rows if row["drift"]),
         "addressee": rate([row for row in rows if row.get("addressee_ok") is not None], "addressee_ok"),

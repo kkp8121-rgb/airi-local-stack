@@ -60,6 +60,14 @@ FALLBACK_POOL = (
     "아, 잠깐 헷갈렸어.",
     "그건 좀 있다가 다시 말해 줄게.",
 )
+# ollama_proxy 의 파이프라인 실패 안내 문구와 바이트로 같아야 오류율이 의미를
+# 갖는다. 침묵 폴백(FALLBACK_POOL)과 달리 이 응답은 모델 발화가 아예 없었다는
+# 뜻이라 어떤 축으로도 채점할 수 없다.
+SERVICE_ERROR_POOL = (
+    "답을 만들다가 문제가 생겼어. 다시 말해줘.",
+    "답이 너무 늦어서 잠깐 멈췄어. 다시 말해줘.",
+    "답이 늦어져서 잠깐 멈췄어.",
+)
 DEFAULT_BASE_URL = "http://127.0.0.1:11435/v1"
 DEFAULT_MODEL = "midm-airi:2.0-mini"
 DEFAULT_HISTORY_TURNS = 8
@@ -579,6 +587,7 @@ def run_arm(
         register = ab.score_response(body)
         row = sim.score_turn(pick, body, beat=beat, fallback_pool=FALLBACK_POOL,
                              roster_handles=roster, drift_terms=drift_terms,
+                             service_error_pool=SERVICE_ERROR_POOL,
                              briefing_fact_tokens=fact_tokens)
         row.update({
             "beat": beat["id"],
@@ -658,6 +667,7 @@ def rescore_report(payload: dict[str, Any], fixture_path: Path | None = None) ->
             fact_tokens = sorted(token_pool)
         row = sim.score_turn(pick, bodies[turn_index], beat=beat, fallback_pool=FALLBACK_POOL,
                              roster_handles=roster, drift_terms=drift_terms,
+                             service_error_pool=SERVICE_ERROR_POOL,
                              briefing_fact_tokens=fact_tokens)
         carried = previous.get(turn_index, {})
         row.update({key: carried[key] for key in

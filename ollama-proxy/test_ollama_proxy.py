@@ -2229,6 +2229,33 @@ class TraceReceiptLedgerTests(unittest.TestCase):
         self.assertFalse(ollama_proxy.is_allowed_origin("https://example.com"))
 
 
+class LocalErrorDetailTests(unittest.TestCase):
+    """The local-chat handlers must say *which* error they swallowed.
+
+    A 48-run blind matrix emitted LOCAL_ERROR_DIALOGUE on ~34% of its turns
+    and left only ``error_type: RuntimeError`` behind — 26 distinct raise
+    sites share that name, so the round could not be diagnosed at all.
+    """
+
+    def test_detail_is_one_line_and_bounded(self) -> None:
+        detail = ollama_proxy.local_error_detail(
+            RuntimeError("Ollama returned 500:\n" + "가" * 900)
+        )
+        self.assertLessEqual(len(detail), ollama_proxy.LOCAL_ERROR_DETAIL_LIMIT + 1)
+        self.assertNotIn("\n", detail)
+        self.assertTrue(detail.startswith("Ollama returned 500:"))
+        self.assertTrue(detail.endswith("…"))
+
+    def test_short_detail_is_preserved_verbatim(self) -> None:
+        self.assertEqual(
+            ollama_proxy.local_error_detail(RuntimeError("incomplete upstream NDJSON stream")),
+            "incomplete upstream NDJSON stream",
+        )
+
+    def test_detail_survives_an_empty_message(self) -> None:
+        self.assertEqual(ollama_proxy.local_error_detail(RuntimeError()), "")
+
+
 class UpstreamResilienceTests(unittest.TestCase):
     def test_upstream_timeout_is_bounded(self) -> None:
         self.assertIsNotNone(ollama_proxy.UPSTREAM_TIMEOUT.connect)

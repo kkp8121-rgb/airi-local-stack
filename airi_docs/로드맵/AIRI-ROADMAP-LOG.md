@@ -7,6 +7,26 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-25 M1 계측 복구 (D1 진단 후속)
+
+- 14:40 KST 사용자 지시("계측 2건을 고치자")로 세 곳을 고쳤다. (1) 프록시 두 오류
+  핸들러가 `local_error_detail()`로 예외 메시지를 bounded 기록하고, 무기록이던 memory
+  경로도 `stage=memory_recall` 이벤트를 낸다. (2) 시뮬레이터에 `service_error` row
+  플래그와 `summary.service_error` 지표, 프록시 상수 AST 바이트 대조 테스트를 넣어
+  "폴백 0인데 실측 오류율 34%" 사각을 닫았다. (3) P3에 `is_recall_probe()`를 넣어
+  확인형 회수 질문을 폴백 대상에서 제외했다 — D1 실제 폴백 209턴 재판정에서 40턴
+  (19.1%, 회수형이 아니던 `question` 23행 전부 포함)이 통과로 바뀐다.
+- 같은 재판정에서 남은 `continuity_callback` 161행의 근본 원인을 확정했다:
+  seed→callback 거리가 192행 전부 38~66턴이라 8턴 history 창 밖이고, 결정문은
+  브리핑으로만 도달하는데 시뮬레이터가 브리핑을 system 메시지에 이어붙이는 반면
+  `build_layer_inputs`는 system 전체를 P3/P4 풀에서 제외한다. 즉 P3는 그 턴이 받은
+  근거를 구조적으로 못 본다. 브리핑만 풀에 들여보내는 기준은 동결 계약 §2 P3를
+  건드리므로 사용자 결정으로 남겼다.
+- 검증: broadcast_sim+layer+guard 219 passed/1 skipped(+42 subtests), proxy 380 OK,
+  fastapi 의존 5개 suite 전부 OK, latency-monitor+루트 40 passed(+15 subtests),
+  `test-current-checkpoint.ps1` PASS, `git diff --check` 0. GPU 0, matrix 재실행 0,
+  blind 재사용 0, threshold 변경 0.
+
 ## 2026-08-25 D1 48-report matrix 완주 → `no_winner` 종결·진단
 
 - 13:05 KST 채점 후 blind v4 원문을 열람해 실패 축을 row 단위로 분류했다. 진단
