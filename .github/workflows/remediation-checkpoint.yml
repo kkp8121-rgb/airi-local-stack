@@ -104,6 +104,7 @@ jobs:
               ollama-proxy/test_memory_runtime.py ollama-proxy/test_viewer_memory.py
               ollama-proxy/test_deterministic_utterance_layer.py
               ollama-proxy/test_handle_grounding_guard.py
+              ollama-proxy/test_foreground_context.py
           - shard: ollama-proxy-api
             tests: >-
               ollama-proxy/test_ollama_proxy.py ollama-proxy/test_output_moderation.py ollama-proxy/test_input_screening.py

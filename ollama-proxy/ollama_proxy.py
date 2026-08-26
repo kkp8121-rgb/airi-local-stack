@@ -34,7 +34,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from latency_trace import elapsed_ms, emit_latency_event, request_id
-from foreground_context import project_foreground_context
+from foreground_context import FEEDBACK_HYGIENE_MODE, filter_journal_recall, project_foreground_context
 from airi_memory import ACTIVE_CARD_MESSAGE_NAME
 from continuity_ledger import (
     CONTINUITY_LEDGER_MESSAGE_NAME,
@@ -7004,7 +7004,7 @@ def render_broadcast_runtime_training_context(
         user_display_name=user_display_name,
         character_display_name=character_display_name,
         memory_block=memory_block,
-        journal_messages=journal_messages,
+        journal_messages=filter_journal_recall(journal_messages),
     )
     localized = inject_response_mode(
         json.dumps(assembled, ensure_ascii=False).encode("utf-8"),
@@ -7176,6 +7176,7 @@ async def health() -> dict[str, object]:
         "memory_claim_guard": MEMORY_CLAIM_GUARD_ENABLED,
         "handle_grounding_guard": handle_grounding_guard.HANDLE_GROUNDING_GUARD_ENABLED,
         "deterministic_utterance_layer": deterministic_utterance_layer.DETERMINISTIC_UTTERANCE_LAYER_ENABLED,
+        "feedback_hygiene": FEEDBACK_HYGIENE_MODE,
         "chat_model": chat_model_telemetry.health(),
         "system_prompt_overridden": False,
         "active_character_card_merge": True,

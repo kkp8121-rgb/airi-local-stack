@@ -5,6 +5,7 @@ shape of adjacent turns, rather than from named topics or application state.
 """
 from __future__ import annotations
 
+import os
 import re
 from typing import Any, Iterable
 
@@ -83,7 +84,65 @@ def _short_direct_answer(current: str, prior_assistant: dict[str, Any]) -> bool:
     return bool(words) and len(words) <= 5 and "?" in _text(prior_assistant)
 
 
-def project_foreground_context(messages: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+def parse_feedback_hygiene(value: object) -> str:
+    """``off`` (default) | ``journal`` | ``on`` (journal + foreground)."""
+    text = str(value or "").strip().lower()
+    if text in {"1", "true", "yes", "on"}:
+        return "on"
+    if text == "journal":
+        return "journal"
+    return "off"
+
+
+# Self-feedback hygiene.  Measured on real chat replay (2026-08-26, run 04 vs
+# 05): with the same model, input and sampling, re-showing AIRI its own
+# previous turn moved "음" openers 1 -> 48 and "?" endings 20 -> 78.  Off by
+# default; the projection below is byte-identical unless the mode is "on".
+FEEDBACK_HYGIENE_MODE = parse_feedback_hygiene(os.environ.get("AIRI_FEEDBACK_HYGIENE", ""))
+
+
+def _opener(text: str) -> tuple[str, ...]:
+    return tuple(token.lower() for token in _TOKEN_RE.findall(text)[:2])
+
+
+def _previous_assistant(dialogue: list[dict[str, Any]], before: int) -> dict[str, Any] | None:
+    for index in range(before - 1, -1, -1):
+        if dialogue[index].get("role") == "assistant":
+            return dialogue[index]
+    return None
+
+
+def _self_feedback(assistant: dict[str, Any], older_assistant: dict[str, Any] | None) -> bool:
+    """Whether re-showing this AIRI turn would feed its own degraded shape back.
+
+    A turn that ends by asking back, or that reuses the opener of the AIRI turn
+    before it, is the shape the model has already started to lock onto.
+    """
+    text = _text(assistant).strip()
+    if text.endswith("?"):
+        return True
+    opener = _opener(text)
+    return bool(opener) and older_assistant is not None and opener == _opener(_text(older_assistant))
+
+
+def filter_journal_recall(
+    messages: Iterable[dict[str, Any]] | None, *, hygiene: str | None = None,
+) -> Iterable[dict[str, Any]] | None:
+    """Drop AIRI's own rows from journal recall when hygiene is not ``off``.
+
+    Returns the caller's object untouched (same identity) when the mode is
+    ``off`` or there is nothing to filter.
+    """
+    mode = FEEDBACK_HYGIENE_MODE if hygiene is None else parse_feedback_hygiene(hygiene)
+    if mode == "off" or messages is None:
+        return messages
+    return [message for message in messages
+            if not (isinstance(message, dict) and message.get("role") == "assistant")]
+
+
+def project_foreground_context(
+    messages: Iterable[dict[str, Any]], *, hygiene: str | None = None,
+) -> list[dict[str, Any]]:
     """Return at most two bridged exchanges plus the current user message.
 
     Returned entries are the caller's original objects and are never modified.
@@ -98,13 +157,26 @@ def project_foreground_context(messages: Iterable[dict[str, Any]]) -> list[dict[
     current = dialogue[current_index]
     # Only a structurally complete adjacent U/A pair can be foregrounded.
     exchanges: list[list[dict[str, Any]]] = []
+    positions: list[int] = []
     cursor = current_index - 1
     while cursor >= 1 and len(exchanges) < 2:
         assistant, user = dialogue[cursor], dialogue[cursor - 1]
         if assistant.get("role") != "assistant" or user.get("role") != "user":
             break
         exchanges.append([user, assistant])
+        positions.append(cursor)
         cursor -= 2
+
+    mode = FEEDBACK_HYGIENE_MODE if hygiene is None else parse_feedback_hygiene(hygiene)
+    if mode == "on":
+        # The chain is only as trustworthy as its newest link: once an AIRI
+        # turn is unsafe to re-show, nothing older is bridged through it.
+        clean: list[list[dict[str, Any]]] = []
+        for exchange, position in zip(exchanges, positions):
+            if _self_feedback(exchange[1], _previous_assistant(dialogue, position)):
+                break
+            clean.append(exchange)
+        exchanges = clean
 
     kept: list[list[dict[str, Any]]] = []
     if exchanges and (_continues(_text(current), exchanges[0]) or _short_direct_answer(_text(current), exchanges[0][1])):
