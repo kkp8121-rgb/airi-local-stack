@@ -349,6 +349,36 @@ class SummarizeRatingsTest(unittest.TestCase):
         self.assertEqual(agreement["flag_disagreement_rate"]["invented_name"], 0.0)
         self.assertEqual(summary["commented_ratings"], 1)
 
+    def test_composite_and_baseline_delta(self) -> None:
+        code, _stdout, _err = self.summarize()
+        self.assertEqual(code, 0)
+        summary = json.loads(self.summary_path.read_text(encoding="utf-8"))
+        # 방송다움 3.75 · 맥락 3.75 · 반응 3.75 → 3축 합성 3.75 (말투·사실성은 제외)
+        self.assertEqual(summary["composite_3axis"], 3.75)
+        self.assertNotIn("baseline_delta", summary)
+
+        baseline_path = self.root / "baseline.json"
+        baseline = dict(summary)
+        baseline["per_axis"] = {
+            axis: dict(stats, mean=stats["mean"] - 1.0) for axis, stats in summary["per_axis"].items()
+        }
+        baseline["flag_rates"] = dict(summary["flag_rates"], critical_failure=0.75)
+        baseline.pop("composite_3axis")
+        baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
+        markdown_path = self.root / "summary.md"
+        code, _stdout, _err = self.summarize("--baseline", str(baseline_path), "--markdown", str(markdown_path))
+        self.assertEqual(code, 0)
+        summary = json.loads(self.summary_path.read_text(encoding="utf-8"))
+        delta = summary["baseline_delta"]
+        self.assertEqual(delta["per_axis_mean"]["broadcast_likeness"], 1.0)
+        self.assertEqual(delta["composite_3axis"], {"baseline": 2.75, "current": 3.75, "delta": 1.0})
+        self.assertEqual(delta["flag_rates"]["critical_failure"], -0.5)
+        self.assertIn("2.75 → 3.75 (+1.0)", markdown_path.read_text(encoding="utf-8"))
+
+        code, _stdout, err = self.summarize("--baseline", str(self.root / "missing.json"))
+        self.assertEqual(code, 1)
+        self.assertIn("baseline", err)
+
     def test_summary_never_contains_dialogue_or_comments(self) -> None:
         markdown_path = self.root / "summary.md"
         code, _stdout, _err = self.summarize("--markdown", str(markdown_path))

@@ -29,6 +29,8 @@ FLAG_KEYS: tuple[str, ...] = (
     "polite_violation",
 )
 GOOD_SCORE = 4
+# 돌파 판정 지표(타계책 2026-08-26 §1): 방송다움·맥락·반응 3축 평균. 말투·사실성은 하한만 둔다.
+COMPOSITE_AXES: tuple[str, ...] = AXIS_KEYS[:3]
 
 
 class SchemaError(ValueError):
@@ -165,12 +167,46 @@ def summarize(payloads: list[dict]) -> dict:
         "n_unique_turns": len(unique_turns),
         "n_sessions": len({session_id for session_id, _turn_no in unique_turns}),
         "per_axis": per_axis,
+        "composite_3axis": round(
+            statistics.fmean(per_axis[axis]["mean"] for axis in COMPOSITE_AXES), 4
+        ),
         "all_axes_at_least_4_share": round(all_good / len(records), 4),
         "flag_rates": flag_rates,
         "commented_ratings": sum(
             1 for _rater, turn in records if str(turn.get("comment", "")).strip()
         ),
         "agreement": agreement(records),
+    }
+
+
+def compare_to_baseline(summary: dict, baseline: dict) -> dict:
+    """같은 입력 세트의 이전 요약 대비 숫자 차이만 계산한다(현재 − 기준선)."""
+    for key in ("per_axis", "flag_rates"):
+        if not isinstance(baseline.get(key), dict):
+            raise SchemaError(f"baseline summary is missing {key!r}")
+    per_axis = {
+        axis: round(summary["per_axis"][axis]["mean"] - baseline["per_axis"][axis]["mean"], 4)
+        for axis in AXIS_KEYS
+        if axis in baseline["per_axis"]
+    }
+    baseline_composite = baseline.get("composite_3axis")
+    if baseline_composite is None:
+        baseline_composite = round(
+            statistics.fmean(baseline["per_axis"][axis]["mean"] for axis in COMPOSITE_AXES), 4
+        )
+    return {
+        "baseline_n_ratings": baseline.get("n_ratings"),
+        "per_axis_mean": per_axis,
+        "composite_3axis": {
+            "baseline": baseline_composite,
+            "current": summary["composite_3axis"],
+            "delta": round(summary["composite_3axis"] - baseline_composite, 4),
+        },
+        "flag_rates": {
+            flag: round(summary["flag_rates"][flag] - baseline["flag_rates"][flag], 4)
+            for flag in FLAG_KEYS
+            if flag in baseline["flag_rates"]
+        },
     }
 
 
@@ -182,6 +218,7 @@ def render_markdown(summary: dict) -> str:
         f"- 평가 레코드 {summary['n_ratings']}건 / 고유 turn {summary['n_unique_turns']}개 "
         f"/ 세션 {summary['n_sessions']}개",
         f"- 전 축 4점 이상 비율: {summary['all_axes_at_least_4_share']}",
+        f"- 3축 합성(방송다움·맥락·반응): {summary['composite_3axis']}",
         "",
         "| 축 | 평균 | 중앙값 | 최소 |",
         "| --- | --- | --- | --- |",
@@ -197,6 +234,23 @@ def render_markdown(summary: dict) -> str:
         lines.append(f"- {axis} 평균 절대차: {diff}")
     for flag, rate in agree["flag_disagreement_rate"].items():
         lines.append(f"- {flag} 불일치율: {rate}")
+    delta = summary.get("baseline_delta")
+    if delta:
+        composite = delta["composite_3axis"]
+        lines += [
+            "",
+            "## 기준선 대비 (현재 − 기준선)",
+            "",
+            f"- 3축 합성: {composite['baseline']} → {composite['current']} ({composite['delta']:+})",
+            "",
+            "| 축 | 평균 차이 |",
+            "| --- | --- |",
+        ]
+        for axis, diff in delta["per_axis_mean"].items():
+            lines.append(f"| {axis} | {diff:+} |")
+        lines += ["", "| 플래그 | 비율 차이 |", "| --- | --- |"]
+        for flag, diff in delta["flag_rates"].items():
+            lines.append(f"| {flag} | {diff:+} |")
     return "\n".join(lines) + "\n"
 
 
@@ -210,6 +264,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--output", required=True, help="요약 JSON 출력 경로.")
     parser.add_argument("--markdown", default=None, help="사람이 읽을 요약 Markdown 출력 경로.")
+    parser.add_argument(
+        "--baseline",
+        default=None,
+        help="같은 입력 세트의 이전 요약 JSON. 지정하면 축 평균·3축 합성·플래그 비율 차이를 함께 쓴다.",
+    )
     return parser
 
 
@@ -218,6 +277,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         payloads = [load_ratings(Path(path)) for path in args.ratings]
         summary = summarize(payloads)
+        if args.baseline:
+            try:
+                baseline = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise SchemaError(f"unreadable baseline summary: {exc}") from exc
+            if not isinstance(baseline, dict):
+                raise SchemaError("baseline summary must be an object")
+            summary["baseline_delta"] = compare_to_baseline(summary, baseline)
     except SchemaError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
