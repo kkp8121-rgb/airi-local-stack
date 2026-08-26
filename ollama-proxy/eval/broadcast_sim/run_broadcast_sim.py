@@ -598,6 +598,13 @@ def run_arm(
         if briefing == "on":
             for item in sim.select_viewer_lines(fixture, stream, pick):
                 token_pool |= sim._tokens(item["text"])
+            # 디렉터가 조립한 브리핑(build_turn_briefing_with_evidence)은 "방금
+            # 흐름"·"직전 후원" 줄에서 roster handle을 저자로 직접 이름 붙인다.
+            # 그 handle은 이 턴이 실제로 받은 근거인데도 위 select_viewer_lines
+            # 만으로는 안 잡혀, 모델이 브리핑이 방금 알려준 이름을 그대로
+            # 이어 부르면 invented_handles로 오판됐다 — 판정 입력 범위를 이
+            # 턴에 실제로 실렸던 브리핑 본문까지 넓힌다. 게이트 정의는 그대로.
+            token_pool |= {handle for handle in roster if handle and handle in briefing_text}
         # 프록시가 AIRI_HANDLE_GROUNDING_GUARD=on 으로 떠 있을 때만 채워지는
         # 신호다. 디렉터의 손수 조립 브리핑은 이미 briefing_fact_tokens로
         # 반영되지만, 라이브 memory 검색이 실제로 회수한 시청자 handle은

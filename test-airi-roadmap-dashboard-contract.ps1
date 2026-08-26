@@ -193,7 +193,19 @@ foreach ($artifactToken in @('report', 'health', 'run-contract', 'packet', 'dupl
 Assert-ContainsPattern $contract '(?s)heartbeat.{0,600}14' 'dual-document heartbeat ceiling'
 
 $dashboardHeading = ConvertFrom-Base64Utf8 'IyMg7IKs7Jqp7J6Q7JqpIO2YhOyerCDsp4Ttlokg64yA7Iuc67O065Oc'
-$goalHeading = ConvertFrom-Base64Utf8 'IyMjIO2YhOyerCDso7zsmpQg7J6R7JeFIOuLqOqzhChNNCkg7LK07YGs66as7Iqk7Yq4'
+# "### 현재 주요 작업 단계(M<n>) 체크리스트" — the milestone number is read from the roadmap
+# itself so the contract follows each milestone rollover without a test edit.
+$goalHeadingPrefix = ConvertFrom-Base64Utf8 'IyMjIO2YhOyerCDso7zsmpQg7J6R7JeFIOuLqOqzhCg='
+$goalHeadingSuffix = ConvertFrom-Base64Utf8 'KSDssrTtgazrpqzsiqTtirg='
+$goalHeadingMatch = [regex]::Match(
+    $roadmap,
+    '(?m)^' + [regex]::Escape($goalHeadingPrefix) + '(?<milestone>M\d+)' + [regex]::Escape($goalHeadingSuffix) + '\s*$'
+)
+if (-not $goalHeadingMatch.Success) {
+    throw 'Current milestone checklist heading is missing or malformed.'
+}
+$milestone = $goalHeadingMatch.Groups['milestone'].Value
+$goalHeading = $goalHeadingMatch.Value.TrimEnd()
 $statusHeading = ConvertFrom-Base64Utf8 'IyMjIOyDge2DnCDtkZzspIDqs7wg6rOE7IKwIOq4sOykgA=='
 $blockedCause = ConvertFrom-Base64Utf8 '7LCo64uoIOybkOyduDo='
 $blockedResume = ConvertFrom-Base64Utf8 '7J6s6rCcIOyhsOqxtDo='
@@ -205,7 +217,7 @@ if ($dashboardIndex -lt 0 -or $dashboardIndex -ne $firstSection) {
 $goalStart = $roadmap.IndexOf($goalHeading, [System.StringComparison]::Ordinal)
 $goalEnd = $roadmap.IndexOf($statusHeading, [System.StringComparison]::Ordinal)
 if ($goalStart -lt 0 -or $goalEnd -le $goalStart) {
-    throw 'Current M4 checklist boundary is missing or malformed.'
+    throw "Current $milestone checklist boundary is missing or malformed."
 }
 $goalChecklist = $roadmap.Substring($goalStart, $goalEnd - $goalStart)
 $goalMatches = Get-ChecklistMatches -Text $goalChecklist
@@ -251,9 +263,10 @@ $goalCounts = Get-StateCounts -Matches $goalMatches
 $goalActive = $goalMatches.Count - $goalCounts['S'] - $goalCounts['N/A']
 $goalTerminal = $goalCounts['x'] + $goalCounts['F']
 $goalProgress = $goalTerminal + (0.5 * $goalCounts['P']) + (0.5 * $goalCounts['~'])
-Assert-DisplayedMetric -Text $roadmap -Label (ConvertFrom-Base64Utf8 'TTQg7KCV7IOBIOyZhOujjOycqA==') -Numerator $goalCounts['x'] -Denominator $goalActive
-Assert-DisplayedMetric -Text $roadmap -Label (ConvertFrom-Base64Utf8 'TTQg7LKY66asIOyiheujjOycqA==') -Numerator $goalTerminal -Denominator $goalActive
-Assert-DisplayedMetric -Text $roadmap -Label (ConvertFrom-Base64Utf8 'TTQg7KeE7ZaJIOyngOyImA==') -Numerator $goalProgress -Denominator $goalActive
+# "<M> 정상 완료율" / "<M> 처리 종료율" / "<M> 진행 지수"
+Assert-DisplayedMetric -Text $roadmap -Label ($milestone + (ConvertFrom-Base64Utf8 'IOygleyDgSDsmYTro4zsnKg=')) -Numerator $goalCounts['x'] -Denominator $goalActive
+Assert-DisplayedMetric -Text $roadmap -Label ($milestone + (ConvertFrom-Base64Utf8 'IOyymOumrCDsooXro4zsnKg=')) -Numerator $goalTerminal -Denominator $goalActive
+Assert-DisplayedMetric -Text $roadmap -Label ($milestone + (ConvertFrom-Base64Utf8 'IOynhO2WiSDsp4DsiJg=')) -Numerator $goalProgress -Denominator $goalActive
 
 $allCounts = Get-StateCounts -Matches $allMatches
 $allActive = $allMatches.Count - $allCounts['S'] - $allCounts['N/A']

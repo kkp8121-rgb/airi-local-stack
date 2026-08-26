@@ -7565,6 +7565,38 @@ class ImmediateAckMetadataTests(unittest.TestCase):
         self.assertIn("등불값", content)
         self.assertIn("고마워", content)
 
+    def test_content_free_fallback_is_replaced_by_the_proposal_ack(self) -> None:
+        # 근거 침묵 폴백은 내용이 없는 청취 문장이므로, 이번 턴 제안에 대한
+        # 결정론 확인 문장이 앞에 붙는 대신 그 문장을 대체한다.
+        proposal = "활자함을 아래칸 말고 윗칸부터 열자고 했습니다"
+        inputs = {
+            "user_text": proposal,
+            "prompt_text": proposal,
+            "pool_text": proposal,
+            "past_tokens": frozenset(),
+            "donation_turn": False,
+            "content_free": True,
+        }
+        with mock.patch.object(
+                ollama_proxy.deterministic_utterance_layer,
+                "DETERMINISTIC_UTTERANCE_LAYER_ENABLED", True):
+            content, moderation = ollama_proxy.prepare_openai_sse_dialogue(
+                ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+                deterministic_inputs=inputs,
+            )
+        self.assertEqual(content, "좋아, 활자함은 윗칸으로 갈게!")
+        self.assertTrue(moderation["deterministic_layer"]["proposal_ack_added"])
+
+    def test_content_free_fallback_is_untouched_with_the_layer_off(self) -> None:
+        self.assertFalse(
+            ollama_proxy.deterministic_utterance_layer.DETERMINISTIC_UTTERANCE_LAYER_ENABLED)
+        content, moderation = ollama_proxy.prepare_openai_sse_dialogue(
+            ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE,
+            deterministic_inputs=None,
+        )
+        self.assertEqual(content, ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE)
+        self.assertIsNone(moderation)
+
     def test_immediate_ack_mode_parses_conservatively(self) -> None:
         for raw, expected in ((None, "audible"), ("", "audible"), ("MARKER", "marker"),
                               (" off ", "off"), ("audible", "audible"), ("banana", "audible")):

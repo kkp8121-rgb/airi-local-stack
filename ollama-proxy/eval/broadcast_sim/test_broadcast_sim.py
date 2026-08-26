@@ -989,6 +989,52 @@ class DeterministicActHistoryIsolationTests(unittest.TestCase):
         self.assertGreater(len(donation_entry["airi"]), len(self.donor) + 5)
 
 
+class BriefingTokenPoolIncludesBriefedHandlesTests(unittest.TestCase):
+    """디렉터 브리핑이 그 턴에 실제로 준 시청자 handle 인데도 채점 근거 풀에는
+    빠져, 모델이 브리핑이 방금 알려준 이름을 그대로 이어 부르면 invented_handles
+    로 오판되던 결함(handle_grounding.memory_pool 만 챙기고 briefing_text 자체는
+    안 챙겼다).
+    """
+
+    def setUp(self) -> None:
+        self.fixture = sim.load_fixture()
+        self.stream = sim.generate_stream(self.fixture, seed=20260818)
+        picks = sim.plan_pickups(self.stream, self.fixture)
+        # 이 seed 의 첫 턴(turn_index=1) 은 select_viewer_lines 가 비어 있다
+        # (첫 발언이라 과거 발언이 없다) — 그래서 브리핑 자체가 준 handle 만
+        # 근거 풀에 들어오는지를 다른 경로와 섞이지 않고 볼 수 있다.
+        self.pick = next(pick for pick in picks if not sim.select_viewer_lines(
+            self.fixture, self.stream, pick))
+        self.assertEqual(self.pick["turn_index"], 1, "고정 seed 실측 전제가 깨졌다")
+
+    def _run(self, body: str) -> dict[str, Any]:
+        transport = _FakeTransport()
+        transport.stream_chat = mock.Mock(return_value=(body, 5.0, 10.0, {"status_code": 200}))
+        result = runner.run_arm(
+            transport, self.fixture, self.stream, [self.pick],
+            model="test-model", contract="on", protocol="operational",
+            author_format="runtime", history_turns=8, max_tokens=32, timeout=1.0,
+            pre_session_seeds=False, briefing="on", acts="off",
+        )
+        return result["rows"][0]
+
+    def test_a_handle_the_briefing_just_named_is_not_flagged_as_invented(self) -> None:
+        handle = "별빛수집가"
+        briefing_text = f'- 방금 흐름: {handle} "비 얘기 시작했어"'
+        with mock.patch.object(
+                runner.sim, "build_turn_briefing_with_evidence",
+                return_value=(briefing_text, True)):
+            row = self._run(f"{handle}가 비 이야기를 이어 받았어.")
+        self.assertEqual(row["invented_handles"], [])
+        self.assertTrue(any(token.startswith(handle) for token in row["fact_tokens_used"]),
+                        row["fact_tokens_used"])
+
+    def test_a_handle_absent_from_viewer_lines_briefing_and_memory_pool_is_still_flagged(self) -> None:
+        handle = "새벽두시"
+        row = self._run(f"{handle}가 요즘 잘 지내는지 궁금하다.")
+        self.assertEqual(row["invented_handles"], [handle])
+
+
 class RescoreReportTests(unittest.TestCase):
     """rescore_report(): 모델 재호출 없이 채점만 다시 돈다.
 

@@ -25,7 +25,10 @@ Parts (see AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md):
   is replaced by a safe don't-remember fallback rather than a guess — but only
   for a *probe* that asks for a value the user did not supply
   (``is_recall_probe``).  A confirmation ("우리 X는 Y로 하기로 했지?") carries
-  its own answer and is left to the model.
+  its own answer and is left to the model.  ``echo_grounded_fact`` covers the
+  gap between the two: a question whose answer sits verbatim in this turn's
+  evidence is answered by echoing that sentence in 반말, but only when the
+  draft failed to use it.
 - P4 ``suppress_rejected_branch``: for every "A 말고/아니라 B" decision visible
   in the pool, response sentences that repeat the rejected A-branch are
   dropped; when the current user message itself carries such a proposal and
@@ -77,13 +80,17 @@ _RECALL_QUESTION_RES = (
 # The unknown a recall *probe* asks for.  A recall question without any of
 # these supplies its own answer and is a confirmation — see is_recall_probe.
 _INTERROGATIVE_RE = re.compile(
-    r"뭐였|뭐라|뭐랬|무슨|무엇|어떻게|어떤|어디|언제|누구|누가|몇|얼마|왜|기억\s*(?:나|해|하니|나니)"
+    r"뭐였|뭐라|뭐랬|무슨|무엇|어떻게|어떤|어느|어디|언제|누구|누가|몇|얼마|왜|기억\s*(?:나|해|하니|나니)"
 )
 
-# "S는 … A 말고/아니라 B …" — capture the phrase right before 말고/아니라 (the
-# rejected branch) and the phrase right after (the affirmed branch).
+# "S는/S를 … A 말고/아니라 B …" — capture the phrase right before 말고/아니라
+# (the rejected branch) and the phrase right after (the affirmed branch).
+# The subject needs at least two characters: with one allowed, "검은 잉크 말고
+# 남색 잉크로" was read as subject "검" + rejected "잉크" and acknowledged as
+# "좋아, 검은 남색 잉크로 갈게!".  Object marking is accepted too, because a
+# proposal often names its subject as the object ("활자함을 … 열자고 했습니다").
 _REJECTED_BRANCH_RE = re.compile(
-    r"(?:(?P<subject>[가-힣0-9a-z]{1,12})(?:은|는)\s+)?"
+    r"(?:(?P<subject>[가-힣0-9a-z]{2,12})(?:은|는|을|를)\s+)?"
     r"(?P<rejected>[가-힣0-9a-z]{1,12}(?:\s+[가-힣0-9a-z]{1,12})?)\s*"
     r"(?:말고|(?:이|가)?\s*아니라)\s*"
     r"(?P<affirmed>[가-힣0-9a-z]{1,12}(?:\s+[가-힣0-9a-z]{1,12})?)"
@@ -247,8 +254,12 @@ def find_rejected_branches(pool_text: str) -> list[dict[str, str]]:
         for match in _REJECTED_BRANCH_RE.finditer(line):
             rejected = match.group("rejected")
             affirmed_parts = match.group("affirmed").split()
-            if len(affirmed_parts) == 2 and _TRAILING_DECISION_VERB_RE.fullmatch(
-                    affirmed_parts[-1]):
+            # "…부터 열자고 했습니다" quotes the decision verb; it is not part of
+            # the affirmed option and reads as "윗칸 열자고로 갈게" if kept.
+            if len(affirmed_parts) == 2 and (
+                _TRAILING_DECISION_VERB_RE.fullmatch(affirmed_parts[-1])
+                or affirmed_parts[-1].endswith("자고")
+            ):
                 affirmed_parts.pop()
             affirmed = _JOSA_STRIP_RE.sub("", " ".join(affirmed_parts))
             subject = match.group("subject") or ""
@@ -297,8 +308,129 @@ def answer_recall_question(user_text: str, pool_text: str) -> str | None:
     return None
 
 
+# Predicate endings stripped before comparing a question with an evidence
+# sentence: the same fact is asked in "…놓았나요?" and stated in "…놓았습니다."
+_PREDICATE_ENDINGS = tuple(sorted(
+    (
+        "었습니다", "았습니다", "했습니다", "습니다", "입니다",
+        "었나요", "았나요", "했나요", "나요",
+        "었어요", "았어요", "어요", "아요", "예요", "에요",
+        "었어", "았어", "했어", "었지", "았지", "했지",
+    ),
+    key=len,
+    reverse=True,
+))
+
+# Polite → 반말 rewrite applied at sentence end only.
+_BANMAL_ENDINGS = tuple(sorted(
+    (
+        ("했습니다", "했어"), ("었습니다", "었어"), ("았습니다", "았어"),
+        ("했어요", "했어"), ("합니다", "해"), ("습니다", "어"), ("입니다", "이야"),
+        ("네요", "네"), ("어요", "어"), ("아요", "아"), ("예요", "야"), ("에요", "야"),
+        ("죠", "지"),
+    ),
+    key=lambda pair: len(pair[0]),
+    reverse=True,
+))
+
+_QUOTED_SPAN_RE = re.compile(r"\"([^\"\n]+)\"|“([^”\n]+)”")
+_SENTENCE_END_PUNCTUATION = ".!?…"
+_MIN_EVIDENCE_SENTENCE_LENGTH = 6
+_MIN_EVIDENCE_OVERLAP = 2
+
+
+def _content_stems(text: str) -> set[str]:
+    """Content stems of one utterance: no josa, no stopwords, no interrogatives."""
+    stems: set[str] = set()
+    for run in _HANGUL_RUN_RE.findall(text or ""):
+        piece = _JOSA_STRIP_RE.sub("", run)
+        if not piece or piece in _COMMON_STOPWORDS or _INTERROGATIVE_RE.search(piece):
+            continue
+        for ending in _PREDICATE_ENDINGS:
+            if piece.endswith(ending):
+                piece = piece[: -len(ending)]
+                break
+        if piece and piece not in _COMMON_STOPWORDS:
+            stems.add(piece)
+    return stems
+
+
+def _evidence_sentences(pool_text: str) -> list[str]:
+    """Statement-shaped sentences the pool can be quoted from.
+
+    A briefing line carries its evidence inside quotes and its author outside
+    them ('- 방금 흐름: 오린 "…"'), so a quoted line contributes only what was
+    quoted; the label never becomes speakable text.
+    """
+    sentences: list[str] = []
+    for line in (pool_text or "").splitlines():
+        quoted = [
+            group
+            for match in _QUOTED_SPAN_RE.finditer(line)
+            for group in match.groups()
+            if group
+        ]
+        for candidate in quoted or split_sentences(line):
+            sentence = candidate.strip()
+            if len(sentence) < _MIN_EVIDENCE_SENTENCE_LENGTH:
+                continue
+            if _INTERROGATIVE_RE.search(sentence):
+                continue
+            sentences.append(sentence)
+    return sentences
+
+
+def _to_banmal(sentence: str) -> str:
+    body = sentence.strip()
+    tail = ""
+    while body and body[-1] in _SENTENCE_END_PUNCTUATION:
+        tail = body[-1] + tail
+        body = body[:-1].rstrip()
+    for polite, casual in _BANMAL_ENDINGS:
+        if body.endswith(polite):
+            body = body[: -len(polite)] + casual
+            break
+    return body + (tail if tail else ".")
+
+
+def echo_grounded_fact(
+    user_text: str, pool_text: str, *, draft: str | None = None,
+) -> str | None:
+    """P3 evidence echo: answer a question by quoting the evidence this turn holds.
+
+    ``answer_recall_question`` only reads two decision shapes.  A plain
+    question whose answer is sitting verbatim in the pool ("오늘 측우통은
+    어디에 놓았나요?" against "…북쪽 난간 가까이에 놓았습니다.") fell through it
+    into the don't-remember fallback even though the turn was given the fact.
+    This echoes that one sentence in 반말 instead — never a guess, only text
+    the pool already contains.
+
+    ``draft`` is the model's own candidate: when it already uses the evidence,
+    the model did not fail and its wording is kept.
+    """
+    if not _INTERROGATIVE_RE.search(user_text or ""):
+        return None
+    if find_rejected_branches(user_text or ""):
+        return None
+    question_stems = _content_stems(user_text)
+    if len(question_stems) < _MIN_EVIDENCE_OVERLAP:
+        return None
+    best_sentence = ""
+    best_overlap = 0
+    for sentence in _evidence_sentences(pool_text):
+        overlap = len(_content_stems(sentence) & question_stems)
+        if overlap >= _MIN_EVIDENCE_OVERLAP and overlap > best_overlap:
+            best_sentence = sentence
+            best_overlap = overlap
+    if not best_sentence:
+        return None
+    if draft and (_content_stems(best_sentence) - question_stems) & _content_stems(draft):
+        return None
+    return _to_banmal(best_sentence)
+
+
 def suppress_rejected_branch(
-    text: str, *, pool_text: str, user_text: str,
+    text: str, *, pool_text: str, user_text: str, content_free: bool = False,
 ) -> tuple[str, list[str], bool]:
     """P4: drop sentences repeating a rejected branch; ack a live proposal."""
     decisions = find_rejected_branches(pool_text)
@@ -331,7 +463,12 @@ def suppress_rejected_branch(
         subject = proposal["subject"]
         if subject and subject not in result:
             lead = f"좋아, {subject}{'은' if _final_jongseong(subject) else '는'} {_with_ro(proposal['affirmed'])} 갈게!"
-            result = f"{lead} {result}".strip() if result else lead
+            # A content-free listening line ("음, 잠깐만.") says nothing to keep,
+            # so the acknowledgement replaces it instead of trailing it.
+            if content_free:
+                result = lead
+            else:
+                result = f"{lead} {result}".strip() if result else lead
             ack_added = True
     if not result:
         result = _RECALL_FALLBACK
@@ -456,8 +593,14 @@ def apply_deterministic_utterance_layer(
     pool_text: str,
     past_tokens: frozenset[str] | set[str],
     donation_turn: bool,
+    content_free: bool = False,
 ) -> tuple[str, dict[str, object] | None]:
-    """Apply P3 → P4 → P2 → P5 to one complete public dialogue candidate."""
+    """Apply P3 → P4 → P2 → P5 to one complete public dialogue candidate.
+
+    ``content_free`` marks a candidate that carries no claim of its own (the
+    proxy's grounding-silence listening line).  There is nothing to preserve in
+    it, so a live-proposal acknowledgement replaces it rather than trailing it.
+    """
     if not content:
         return content, None
     signal: dict[str, object] = {}
@@ -467,20 +610,33 @@ def apply_deterministic_utterance_layer(
     if recall_answer is not None:
         signal["recall"] = "answered"
         text = recall_answer
-    elif is_recall_probe(user_text):
-        # No pool decision matched a question that asked for a value the user
-        # did not supply.  Answering anyway would be a guess.
-        signal["recall"] = "fallback"
-        text = _RECALL_FALLBACK
+    else:
+        echoed = echo_grounded_fact(user_text, pool_text, draft=text)
+        if echoed is not None:
+            signal["recall"] = "echoed"
+            text = echoed
+        elif is_recall_probe(user_text):
+            # No pool decision matched a question that asked for a value the
+            # user did not supply.  Answering anyway would be a guess.
+            signal["recall"] = "fallback"
+            text = _RECALL_FALLBACK
 
-    if signal.get("recall") != "answered":
+    # Every recall branch above already produced a complete, evidence-bound
+    # line; re-running P4 on it wrapped the fallback in an acknowledgement and
+    # re-running P2 rewrote its own words ("한 번만" → "한 그거").
+    if signal.get("recall") is None:
         text, dropped, ack_added = suppress_rejected_branch(
             text, pool_text=pool_text, user_text=user_text,
+            content_free=content_free,
         )
         if dropped:
             signal["rejected_branch_dropped"] = sorted(set(dropped))
         if ack_added:
             signal["proposal_ack_added"] = True
+        if text == _RECALL_FALLBACK and dropped:
+            # Every sentence was a rejected branch, so what survives is the
+            # safe recall line and not model content: P2 must leave it alone.
+            signal["recall"] = "fallback"
 
     if signal.get("recall") is None:
         text, replaced = guard_session_past_tokens(

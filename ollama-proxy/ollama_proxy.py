@@ -8383,11 +8383,19 @@ async def stream_local_with_ack(
             )
             grounding_silence_fallback_used = True
         if dialogue and not public_dialogue_emitted:
+            # The silence fallback is a content-free listening line, so the
+            # deterministic layer may replace it with this turn's proposal
+            # acknowledgement instead of prepending one.  With the layer off
+            # (_deterministic_inputs is None) the payload is unchanged.
             dialogue, moderation = prepare_openai_sse_dialogue(
                 dialogue,
                 grounding_context=_grounding_context,
                 memory_grounding_pool=_memory_grounding_pool,
-                deterministic_inputs=_deterministic_inputs,
+                deterministic_inputs=(
+                    {**_deterministic_inputs, "content_free": True}
+                    if _deterministic_inputs and grounding_silence_fallback_used
+                    else _deterministic_inputs
+                ),
             )
             emitted_substantive = True
             emit_substantive_content(context.trace_id, context.request_started)

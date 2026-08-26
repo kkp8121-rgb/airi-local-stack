@@ -11,6 +11,11 @@ POOL = "\n".join([
     "물살몰이는 긁어내지 말고 그물로 몰아 두자",
 ])
 
+ECHO_POOL = "\n".join([
+    "- 이 시청자의 이전 말: \"오늘 측우통은 북쪽 난간 가까이에 놓았습니다.\"",
+    "- 방금 흐름: 오린 \"잉크롤러는 두 번만 굴리기로 했습니다.\"",
+])
+
 
 class RecallQuestionTests(unittest.TestCase):
     def test_decision_recall_extracts_the_affirmed_branch(self) -> None:
@@ -31,6 +36,11 @@ class RecallQuestionTests(unittest.TestCase):
     def test_present_tense_question_is_not_a_recall_question(self) -> None:
         self.assertFalse(dul.is_recall_question("표식은 어디에 달아?"))
         self.assertIsNone(dul.answer_recall_question("표식은 어디에 달아?", POOL))
+
+    def test_eoneu_question_is_a_recall_probe(self) -> None:
+        probe = "활자함은 어느 칸부터 열기로 했나요?"
+        self.assertTrue(dul.is_recall_question(probe))
+        self.assertTrue(dul.is_recall_probe(probe))
 
     def test_recall_question_without_pool_evidence_returns_none(self) -> None:
         self.assertTrue(dul.is_recall_question("내 좌석 번호 기억나?"))
@@ -55,6 +65,33 @@ class RejectedBranchTests(unittest.TestCase):
                 decision = dul.find_rejected_branches(line)[0]
                 self.assertEqual(decision["rejected"], rejected)
                 self.assertEqual(decision["affirmed"], affirmed)
+
+    def test_object_marked_subject_is_extracted(self) -> None:
+        decision = dul.find_rejected_branches(
+            "활자함을 아래칸 말고 윗칸부터 열자고 했습니다")[0]
+        self.assertEqual(decision["subject"], "활자함")
+        self.assertEqual(decision["rejected"], "아래칸")
+        self.assertEqual(decision["affirmed"], "윗칸")
+
+    def test_one_character_subject_is_never_extracted(self) -> None:
+        decision = dul.find_rejected_branches("검은 잉크 말고 남색 잉크로 찍자")[0]
+        self.assertEqual(decision["subject"], "")
+        self.assertEqual(decision["rejected"], "검은 잉크")
+        self.assertEqual(decision["affirmed"], "남색 잉크")
+
+    def test_object_marked_subject_wins_over_a_one_character_prefix(self) -> None:
+        decision = dul.find_rejected_branches(
+            "인수장을 검은 잉크 말고 남색 잉크로 찍자")[0]
+        self.assertEqual(decision["subject"], "인수장")
+        self.assertEqual(decision["rejected"], "검은 잉크")
+        self.assertEqual(decision["affirmed"], "남색 잉크")
+
+    def test_hortative_quotation_verb_is_dropped_from_the_affirmed_branch(self) -> None:
+        proposal = "활자함을 아래칸 말고 윗칸부터 열자고 했습니다"
+        result, _dropped, ack = dul.suppress_rejected_branch(
+            "알겠어.", pool_text=proposal, user_text=proposal)
+        self.assertTrue(ack)
+        self.assertEqual(result, "좋아, 활자함은 윗칸으로 갈게! 알겠어.")
 
     def test_sentences_repeating_a_rejected_branch_are_dropped(self) -> None:
         text = "붉은빛으로 걸면 예쁘겠다. 초록빛 준비는 끝났어."
@@ -173,6 +210,37 @@ class DonationEngagementTests(unittest.TestCase):
         self.assertEqual(text, "등불값 보태줘서 최고야!")
 
 
+class EvidenceEchoTests(unittest.TestCase):
+    def test_quoted_evidence_answers_an_interrogative_question(self) -> None:
+        echo = dul.echo_grounded_fact("오늘 측우통은 어디에 놓았나요?", ECHO_POOL)
+        self.assertEqual(echo, "오늘 측우통은 북쪽 난간 가까이에 놓았어.")
+
+    def test_evidence_echo_converts_polite_endings_to_banmal(self) -> None:
+        pool = "- 이전 말: \"관측지에는 적운 높이를 세 줄로 표시합니다.\""
+        echo = dul.echo_grounded_fact("관측지에는 적운 높이를 몇 줄로 표시하나요?", pool)
+        self.assertEqual(echo, "관측지에는 적운 높이를 세 줄로 표시해.")
+
+    def test_draft_that_already_used_the_evidence_is_kept(self) -> None:
+        self.assertIsNone(dul.echo_grounded_fact(
+            "오늘 측우통은 어디에 놓았나요?", ECHO_POOL,
+            draft="오늘 측우통은 북쪽 난간 가까이에 두었어."))
+
+    def test_single_stem_overlap_is_not_enough_for_an_echo(self) -> None:
+        self.assertIsNone(dul.echo_grounded_fact("측우통은 어떤가요?", ECHO_POOL))
+
+    def test_statement_without_an_interrogative_never_echoes(self) -> None:
+        self.assertIsNone(dul.echo_grounded_fact("오늘 측우통 잘 놓았어요.", ECHO_POOL))
+
+    def test_live_proposal_question_never_echoes(self) -> None:
+        self.assertIsNone(dul.echo_grounded_fact(
+            "측우통은 남쪽 말고 북쪽 난간으로 하자. 어디가 좋나요?", ECHO_POOL))
+
+    def test_author_label_never_leaks_into_the_echo(self) -> None:
+        echo = dul.echo_grounded_fact("잉크롤러는 몇 번 굴리기로 했나요?", ECHO_POOL)
+        self.assertEqual(echo, "잉크롤러는 두 번만 굴리기로 했어.")
+        self.assertNotIn("오린", echo)
+
+
 class LayerCompositionTests(unittest.TestCase):
     def test_layer_inputs_are_none_when_the_flag_is_off(self) -> None:
         self.assertFalse(dul.DETERMINISTIC_UTTERANCE_LAYER_ENABLED)
@@ -223,6 +291,65 @@ class LayerCompositionTests(unittest.TestCase):
             past_tokens=frozenset(), donation_turn=False)
         self.assertEqual(text, dul._RECALL_FALLBACK)
         self.assertEqual(signal["recall"], "fallback")
+
+    def test_layer_marks_an_echoed_recall_and_skips_the_later_parts(self) -> None:
+        text, signal = dul.apply_deterministic_utterance_layer(
+            "확인된 정보 없이 단정하긴 어려워. 원하는 조건을 말해주면 일반적인 선택지를 같이 골라볼게.",
+            user_text="오늘 측우통은 어디에 놓았나요?",
+            prompt_text=ECHO_POOL, pool_text=ECHO_POOL,
+            past_tokens=frozenset({"번만"}), donation_turn=False)
+        self.assertEqual(text, "오늘 측우통은 북쪽 난간 가까이에 놓았어.")
+        self.assertEqual(signal["recall"], "echoed")
+
+    def test_probe_fallback_still_fires_when_the_echo_finds_nothing(self) -> None:
+        text, signal = dul.apply_deterministic_utterance_layer(
+            "아마 그랬을걸?", user_text="내 좌석 번호 기억나?",
+            prompt_text=ECHO_POOL, pool_text=ECHO_POOL,
+            past_tokens=frozenset(), donation_turn=False)
+        self.assertEqual(text, dul._RECALL_FALLBACK)
+        self.assertEqual(signal["recall"], "fallback")
+
+    def test_all_dropped_fallback_is_not_reworded_by_the_past_token_guard(self) -> None:
+        # P4가 전 문장을 떨어뜨려 안전문으로 대체된 결과는 회수 결과이므로
+        # P2가 다시 훑으면 안 된다("한 번만" → "한 그거" 손상).
+        text, signal = dul.apply_deterministic_utterance_layer(
+            "붉은빛이 최고야.",
+            user_text="등불 준비 어때?",
+            prompt_text=POOL, pool_text=POOL,
+            past_tokens=frozenset({"번만"}), donation_turn=False)
+        self.assertEqual(text, dul._RECALL_FALLBACK)
+        self.assertNotIn("한 그거", text)
+        self.assertEqual(signal["recall"], "fallback")
+
+    def test_live_proposal_ack_never_wraps_the_dont_remember_fallback(self) -> None:
+        text, signal = dul.apply_deterministic_utterance_layer(
+            "아마 세 번이었을걸?",
+            user_text="덧문은 왼쪽 말고 오른쪽으로 하자. 내 좌석 번호 뭐였지?",
+            prompt_text="등불신호는 붉은빛 말고 초록빛으로 걸자",
+            pool_text="등불신호는 붉은빛 말고 초록빛으로 걸자",
+            past_tokens=frozenset(), donation_turn=False)
+        self.assertEqual(text, dul._RECALL_FALLBACK)
+        self.assertEqual(signal["recall"], "fallback")
+        self.assertNotIn("proposal_ack_added", signal)
+
+    def test_content_free_line_is_replaced_by_the_proposal_ack(self) -> None:
+        proposal = "활자함을 아래칸 말고 윗칸부터 열자고 했습니다"
+        text, signal = dul.apply_deterministic_utterance_layer(
+            "음… 뭐라고 하지?",
+            user_text=proposal, prompt_text=proposal, pool_text=proposal,
+            past_tokens=frozenset(), donation_turn=False, content_free=True)
+        self.assertEqual(text, "좋아, 활자함은 윗칸으로 갈게!")
+        self.assertTrue(signal["proposal_ack_added"])
+
+    def test_content_free_flag_is_inert_without_a_live_proposal(self) -> None:
+        for content_free in (False, True):
+            with self.subTest(content_free=content_free):
+                text, signal = dul.apply_deterministic_utterance_layer(
+                    "음, 잠깐만.", user_text="등불 준비 어때?", prompt_text=POOL,
+                    pool_text=POOL, past_tokens=frozenset(), donation_turn=False,
+                    content_free=content_free)
+                self.assertEqual(text, "음, 잠깐만.")
+                self.assertIsNone(signal)
 
     def test_probe_classifier_covers_the_interrogative_families(self) -> None:
         for probe in ("내 좌석 번호 기억나?", "표식 뭐였지?", "등불은 무슨 빛으로 걸기로 했지?",
