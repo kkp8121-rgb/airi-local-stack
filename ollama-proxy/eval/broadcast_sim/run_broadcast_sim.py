@@ -101,6 +101,12 @@ DONATION_CONTINUATION_CONTRACT = (
 DONATION_ECHO_THANKS = "후원 고마워!"
 
 
+TRANSCRIPT_WINDOW_MS = 45_000
+TRANSCRIPT_MAX_CHARS = 400
+TRANSCRIPT_CUE_USER = "[방송] 진행 멘트"
+TRANSCRIPT_ROW_KEYS = ("start_ms", "end_ms", "text")
+
+
 def build_system_content(fixture: dict[str, Any], beat: dict[str, Any], contract: str) -> str:
     """A/B 러너의 시스템 문구에 고정 주제 블록을 덧붙인다."""
     base = apply_broadcast_contract(ab.build_system_content(), contract == "on")
@@ -485,6 +491,8 @@ def run_arm(
     health_url: str | None = None,
     live_broadcast: dict[str, str] | None = None,
     tolerate_screened: bool = False,
+    replay_transcript: Sequence[dict[str, Any]] | None = None,
+    transcript_window_ms: int = TRANSCRIPT_WINDOW_MS,
 ) -> dict[str, Any]:
     roster = [viewer["handle"] for viewer in fixture["viewers"]]
     drift_terms = sorted(sim.offtopic_terms(fixture))
@@ -578,6 +586,16 @@ def run_arm(
         for past_user, past_assistant in kept:
             messages.extend(({"role": "user", "content": past_user},
                              {"role": "assistant", "content": past_assistant}))
+        own_recent_speech = ""
+        if replay_transcript and message.get("offset_ms") is not None:
+            # S6 (2026-08-26): replayed chat reacts to what the streamer just
+            # said on screen.  Supply that speech as AIRI's own most recent
+            # line, paired with a neutral cue, so the reaction has a referent.
+            own_recent_speech = transcript_window_text(
+                replay_transcript, int(message["offset_ms"]), transcript_window_ms)
+            if own_recent_speech:
+                messages.extend(({"role": "user", "content": TRANSCRIPT_CUE_USER},
+                                 {"role": "assistant", "content": own_recent_speech}))
         messages.append({"role": "user", "content": user_content})
 
         live_trace_id = None
@@ -689,12 +707,14 @@ def run_arm(
             "live_action_id": live_action_id,
             "live_trace_id": live_trace_id,
             "live_receipt_bound": live_receipt_bound,
+            "own_speech_chars": len(own_recent_speech),
         })
         rows.append(row)
         transcript.append({
             "stage": "turn", "turn_index": pick["turn_index"], "minute": message["minute"],
             "beat": beat["id"], "kind": pick["effective_kind"], "author": message["author"],
             "chat": message["text"], "user_sent": user_content, "airi": body, "raw": raw,
+            "own_recent_speech": own_recent_speech,
             "deterministic_act": deterministic_act,
             "backlog_size": pick["backlog_size"], "backlog_ids": pick["backlog_ids"],
         })
@@ -853,6 +873,42 @@ def looks_like_question(text: str) -> bool:
     return len(stripped) >= 2 and stripped.endswith("까") and _has_rieul_final(stripped[-2])
 
 
+def load_transcript_segments(path: Path) -> list[dict[str, Any]]:
+    """Read streamer speech segments (absolute VOD ms) produced by local STT."""
+    segments: list[dict[str, Any]] = []
+    with path.open(encoding="utf-8") as handle:
+        for line_no, line in enumerate(handle, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise SystemExit(f"transcript row {line_no} is not JSON: {exc}") from exc
+            if not isinstance(record, dict) or any(key not in record for key in TRANSCRIPT_ROW_KEYS):
+                raise SystemExit(f"transcript row {line_no} must have {TRANSCRIPT_ROW_KEYS}")
+            start, end = record["start_ms"], record["end_ms"]
+            if type(start) is not int or type(end) is not int or start < 0 or end < start:
+                raise SystemExit(f"transcript row {line_no} has invalid start_ms/end_ms")
+            text = str(record["text"]).strip()
+            if text:
+                segments.append({"start_ms": start, "end_ms": end, "text": text})
+    segments.sort(key=lambda seg: (seg["end_ms"], seg["start_ms"]))
+    return segments
+
+
+def transcript_window_text(
+    segments: Sequence[dict[str, Any]], offset_ms: int, window_ms: int = TRANSCRIPT_WINDOW_MS,
+) -> str:
+    """Speech that ended within ``window_ms`` before the chat, newest last."""
+    chosen = [seg["text"] for seg in segments
+              if seg["end_ms"] <= offset_ms and seg["end_ms"] >= offset_ms - window_ms]
+    text = " ".join(chosen)
+    if len(text) > TRANSCRIPT_MAX_CHARS:
+        text = "…" + text[-TRANSCRIPT_MAX_CHARS:]
+    return text
+
+
 def replay_donation_amount(label: object) -> int | None:
     """Chzzk 의 평문 숫자 ``amount_label`` 만 금액으로 읽는다(그 외는 None).
 
@@ -980,6 +1036,7 @@ def build_replay_stream(
             "text": text,
             "minute": t_ms // 60_000,
             "t_ms": t_ms,
+            "offset_ms": int(row["offset_ms"]),
             "id": f"m{index:04d}",
         }
         if row["kind"] == "donation":
@@ -1050,6 +1107,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                         help="재생 구간 시작 (원본 offset_ms 기준, 포함)")
     parser.add_argument("--replay-end-ms", type=int, default=None,
                         help="재생 구간 끝 (원본 offset_ms 기준, 포함)")
+    parser.add_argument("--replay-transcript", type=Path, default=None,
+                        help="스트리머 발화 STT JSONL(start_ms/end_ms/text, VOD 절대 ms). 픽업 직전 구간을 AIRI 자신의 직전 발화로 공급한다 (--replay-chat 필수)")
+    parser.add_argument("--replay-transcript-window-ms", type=int, default=TRANSCRIPT_WINDOW_MS,
+                        help="픽업 시각 이전 몇 ms의 발화를 공급할지 (기본 45000)")
     parser.add_argument("--replay-max-messages", type=int, default=None,
                         help="재생할 최대 메시지 수 (구간을 자른 뒤 앞에서부터)")
     parser.add_argument("--stream-only", action="store_true", help="모델 호출 없이 스트림/픽업만 낸다")
@@ -1085,6 +1146,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     fixture = sim.load_fixture(args.fixture) if args.fixture else sim.load_fixture()
+    replay_transcript: list[dict[str, Any]] | None = None
+    if args.replay_transcript is not None and not args.replay_chat:
+        raise SystemExit("--replay-transcript requires --replay-chat")
     if args.replay_chat:
         replay_rows = load_replay_rows(
             args.replay_chat, start_ms=args.replay_start_ms, end_ms=args.replay_end_ms,
@@ -1092,6 +1156,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         fixture = build_replay_fixture(fixture, replay_rows)
         stream = build_replay_stream(fixture, replay_rows, path=args.replay_chat, seed=args.seed)
+        if args.replay_transcript is not None:
+            replay_transcript = load_transcript_segments(args.replay_transcript)
+            stream["replay_transcript"] = {
+                "path_sha256": hashlib.sha256(args.replay_transcript.read_bytes()).hexdigest(),
+                "segments": len(replay_transcript),
+                "window_ms": int(args.replay_transcript_window_ms),
+            }
     else:
         stream = sim.generate_stream(fixture, seed=args.seed)
     picks = sim.plan_pickups(stream, fixture, max_turns=args.max_turns)
@@ -1192,6 +1263,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             health_url=proxy_health_url(args.base_url),
             live_broadcast=live_broadcast,
             tolerate_screened=bool(args.replay_chat),
+            replay_transcript=replay_transcript,
+            transcript_window_ms=int(args.replay_transcript_window_ms),
         )
     except BaseException as exc:
         primary_error = exc
@@ -1239,6 +1312,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "fixture_sha256": stream["fixture_sha256"],
         "stream_messages": len(stream["messages"]),
         "replay": stream.get("replay"),
+        "replay_transcript": stream.get("replay_transcript"),
         "history_turns": args.history_turns,
         **result,
     }

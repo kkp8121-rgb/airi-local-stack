@@ -1788,5 +1788,54 @@ class DonationRitualIsNotConversationTests(unittest.TestCase):
         self.assertEqual(assistant, ["응, 1번째 대답이야.", "응, 3번째 대답이야."])
 
 
+class ReplayTranscriptTests(unittest.TestCase):
+    SEGMENTS = [
+        {"start_ms": 1_000, "end_ms": 4_000, "text": "오늘은 트래커 달고 춤 연습할 거야"},
+        {"start_ms": 5_000, "end_ms": 9_000, "text": "장갑은 손가락 트래킹 때문에 껴"},
+        {"start_ms": 60_000, "end_ms": 63_000, "text": "이제 링피트 켤게"},
+    ]
+
+    def test_window_keeps_only_speech_that_ended_just_before_the_chat(self) -> None:
+        self.assertEqual(
+            runner.transcript_window_text(self.SEGMENTS, 10_000, 45_000),
+            "오늘은 트래커 달고 춤 연습할 거야 장갑은 손가락 트래킹 때문에 껴")
+        self.assertEqual(runner.transcript_window_text(self.SEGMENTS, 62_000, 45_000), "")
+        self.assertEqual(runner.transcript_window_text(self.SEGMENTS, 70_000, 45_000), "이제 링피트 켤게")
+
+    def test_window_is_capped_to_the_newest_chars(self) -> None:
+        long = [{"start_ms": 0, "end_ms": 1_000, "text": "가" * 500}, {"start_ms": 1_000, "end_ms": 2_000, "text": "끝"}]
+        text = runner.transcript_window_text(long, 3_000, 45_000)
+        self.assertTrue(text.startswith("…") and text.endswith("끝"))
+        self.assertLessEqual(len(text), runner.TRANSCRIPT_MAX_CHARS + 1)
+
+    def test_loader_validates_rows_and_sorts_by_end(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "t.jsonl"
+            path.write_text(
+                json.dumps({"start_ms": 5000, "end_ms": 9000, "text": "둘"}) + "\n"
+                + json.dumps({"start_ms": 1000, "end_ms": 4000, "text": "하나"}) + "\n"
+                + json.dumps({"start_ms": 9000, "end_ms": 9500, "text": "  "}) + "\n",
+                encoding="utf-8")
+            segments = runner.load_transcript_segments(path)
+            self.assertEqual([seg["text"] for seg in segments], ["하나", "둘"])
+            path.write_text(json.dumps({"start_ms": 5, "end_ms": 1, "text": "x"}) + "\n", encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                runner.load_transcript_segments(path)
+
+    def test_replay_messages_keep_the_absolute_offset(self) -> None:
+        rows = [
+            {"source": "chzzk", "video_ref": "v", "offset_ms": 15_000, "author": "a", "kind": "chat", "text": "안녕"},
+            {"source": "chzzk", "video_ref": "v", "offset_ms": 75_000, "author": "b", "kind": "chat", "text": "둥하"},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "chat.jsonl"
+            path.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows), encoding="utf-8")
+            base = sim.load_fixture(HERE.parent / "human_review" / "real_chat_fixture.json")
+            fixture = runner.build_replay_fixture(base, rows)
+            stream = runner.build_replay_stream(fixture, rows, path=path, seed=1)
+        self.assertEqual([m["offset_ms"] for m in stream["messages"]], [15_000, 75_000])
+        self.assertEqual([m["t_ms"] for m in stream["messages"]], [0, 60_000])
+
+
 if __name__ == "__main__":
     unittest.main()
