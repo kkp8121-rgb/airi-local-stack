@@ -1,8 +1,12 @@
 # AIRI Codex GPU 인수인계 — broadcast continuity v4
 
-갱신: 2026-08-26 11:45 KST (파일명은 과거 GPU SSoT 식별자로 유지)
+> **현재 live goal_status=active:** M7 S3 평가 채택과 S2 `[F]` 실패를 보존했다. S4 고정 07 replay r1~r3는 exit 0·99턴으로 완료됐고 대표 r2 `rating-sheet.html`의 사람 JSON을 기다린다. health-after는 각 S4 `requests=99`, `skipped=30`, `batched=0`, replay/GPU PID 0, Ollama 11434만 확인됐다. S4 채택·운영 flag 반영·commit/push는 사람 JSON 뒤에도 별도 결정이다.
 
-현재 상태: **M5 활성(`goal_status=active`) — 사용자 결정 C로 피벗.** 2026-08-26 M5 step 1~3(d1v6
+> **2026-08-27 00:29 KST 현재:** S4 default-off 구현과 `/v1/chat/completions`·`/api/chat` stream/non-stream red/green 회귀, unittest 409개, broadcast_sim 99개, py_compile, diff-check 및 roadmap/work-continuity 계약을 통과했다. 실험에서만 `AIRI_S4_PICKUP_BATCH=on`, `AIRI_S4_MIN_CONTENT_TOKENS=2`를 사용해 새 `20260826-replay-07-s4-r1..r3`를 순차 실행했으며, 표시 전용 q_end 5/13/22의 중앙값 대표는 r2다. 사람 JSON 전에는 자동 채점·S4 채택·S5·GPU·운영 활성화·commit/push를 하지 않는다.
+
+갱신: 2026-08-27 00:29 KST (파일명은 과거 GPU SSoT 식별자로 유지)
+
+이전 상태 스냅샷: **M5 활성(`goal_status=active`) — 사용자 결정 C로 피벗.** 2026-08-26 M5 step 1~3(d1v6
 진단·결정론 수리·검증)은 완료됐고, blind v7 재측정 이후는 공회전으로 판정돼 중단·대체됐다. 현재 진입점은 `AIRI-REALITY-CHECK-AND-FINETUNE-REVIEW-2026-08-26.md`(실태·파인튜닝 중단)과
 `AIRI-REAL-DIALOGUE-HUMAN-EVAL-CONTRACT-2026-08-26.md`(유일한 채택 게이트)이며, M6는 사용자 4건 승인으로 진행 중이다. 이 문서의 E1/E2/E2-C1/E2-C2 GPU
 계약과 결과는 검증된 이력으로 보존하지만 다음 세션 진입점은 아니다. M4(live 결정론 배선·
@@ -34,6 +38,10 @@ milestone `2e61842`와 receipt `3dba3ca`는 origin/main에 push됐고 직후 loc
 
 기계 판독 계약: `goal_status=active`;
 `execution_order=P0_A>P0_B>E2_LAUNCH>E2_PROVENANCE>PACKAGE>T3_36>CAMPAIGN_3X500>USER_DECISION`
+
+> **2026-08-27 00:05 KST S4 intent checkpoint:** S2 `[F]` 실패와 S3 `[x]` 채택을 기준으로 S4 픽업 스킵·배치 구현 및 고정 07 replay `s4-r1..r3` 순차 실행을 시작한다. 실험에만 `AIRI_S4_PICKUP_BATCH=on`, `AIRI_S4_MIN_CONTENT_TOKENS=2`를 쓰고, default-off/off-path identity·모델/NumCtx/input pin을 유지한다. 대표 rating-sheet 후 사람 JSON을 기다리며 자동 채점·S5·GPU·운영 활성화·commit/push는 하지 않는다.
+
+> **2026-08-27 00:25 KST S4 receipt:** r1/r2/r3 모두 exit 0·99턴이며 empty/service_error/invented_handle/polite_violation은 각각 0이다. health-after S4 telemetry는 회차별 `requests=99`, `skipped=30`, `batched=0`; q_end 5/13/22에 따라 대표는 r2다. 외부 root마다 필수 runtime/health/report/packet/runner/review/rating-sheet를 검증했다. 사람 채점 JSON이 생길 때까지 S4 판정·운영 반영·S5·GPU·commit/push를 보류한다.
 
 현재 권한: **2026-08-24 09:47 KST 사용자 `/goal`(클로드 PC, Fable 감독)로 GPU 제한 없음**이
 명시됐다. E2-C1 bounded smoke → durable 본 학습 step 0 → merge/package → 36 reports → gate

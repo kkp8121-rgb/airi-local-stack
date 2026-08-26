@@ -107,7 +107,7 @@ jobs:
               ollama-proxy/test_foreground_context.py
           - shard: ollama-proxy-api
             tests: >-
-              ollama-proxy/test_ollama_proxy.py ollama-proxy/test_output_moderation.py ollama-proxy/test_input_screening.py
+              ollama-proxy/test_ollama_proxy.py ollama-proxy/test_pickup_batch.py ollama-proxy/test_output_moderation.py ollama-proxy/test_input_screening.py
               ollama-proxy/test_provider_usage.py ollama-proxy/test_broadcast_contract.py
               ollama-proxy/test_broadcast_reply_act.py ollama-proxy/test_broadcast_correction_target.py
               ollama-proxy/test_epistemic_confidence.py

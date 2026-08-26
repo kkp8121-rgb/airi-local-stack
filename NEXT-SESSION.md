@@ -1,5 +1,9 @@
 # AIRI 다음 세션 안내
 
+> **2026-08-27 00:29 KST 현재:** S4 default-off 구현·회귀와 고정 07 replay r1~r3를 완료했습니다. 세 회차 모두 exit 0·99턴·empty 0·service_error 0·invented_handle 0·polite_violation 0이며 `skipped=30`, `batched=0`; q_end 5/13/22의 중앙값 대표는 r2입니다. 대표 시트 `D:\AIRI-Models\airi-human-eval\20260826-replay-07-s4-r2\rating-sheet.html`의 사람 JSON을 기다립니다. `goal_status=active`, `adoption_authorized=false`, 모든 운영 flag OFF, S5·GPU·commit/push 금지.
+
+> **현재 live goal_status=active:** M7 S3 평가 채택과 S2 `[F]` 실패를 보존했다. S4 replay r1~r3는 완료됐고 대표 r2 사람 JSON을 기다린다. replay/GPU PID 0, Ollama 11434만 남아 있으며 S4 채택·운영 반영·commit/push는 대기한다.
+
 > **2026-08-26 17:25 KST 최우선 — M7 S0·S1 완료(`진행중/AIRI-M7-S0-S1-RECEIPT-2026-08-26.md`): 복제 3회 기준 되먹임 고리 3채널 차단 시 붕괴 0/3(off 3/4).
 > **정정(2026-08-26 17:32):** 문구 고정은 2/3에 남고(비트 큐 되풀이), 참고 채점 06b-r3 3축 1.59 < 기준선 1.76 — 개선 없음. 되먹임은 증폭기,
 > 원인은 맥락 빈곤 입력. **사람 채점 확정(2026-08-26 17:54): 06b-r3 3축 1.90(+0.14), filler 55.6%, 치명 1 — S1 단독 기각, flag off 유지.**
@@ -37,6 +41,10 @@
 > 다음: 사용자가 비공개 테스트 방송 또는 직접 채팅 50~100턴을 캡처 → export → 채점 → 기준선(M6-6/7).
 > 파인튜닝·합성 blind 매트릭스·운영 채택·push는 별도 승인 전 시작 금지. `goal_status=active`,
 > `adoption_authorized=false`.
+
+> **2026-08-27 00:05 KST S4 intent:** S2 `[F]`와 S3 `[x]`를 보존한 채 S4 픽업 스킵·배치 실험을 진행한다. 구현은 `AIRI_S4_PICKUP_BATCH`·`AIRI_S4_MIN_CONTENT_TOKENS` default-off/미설정 경로 byte identity를 유지하고, 실험에서만 `on/min2`를 사용한다. 고정 07 입력·모델 digest·NumCtx 4096으로 `20260826-replay-07-s4-r1..r3`를 순차 실행한 뒤 대표 rating-sheet에서 멈춘다. 자동 사람 점수·S5·GPU·운영 반영·commit/push는 하지 않는다.
+
+> **2026-08-27 00:25 KST S4 receipt:** 세 회차가 모두 exit 0·99턴·empty 0·service_error 0·invented_handle 0·polite_violation 0으로 끝났고, health-after는 각 `requests=99`, `skipped=30`, `batched=0`이었다. q_end 표시 시그니처 5/13/22의 중앙값 대표는 r2이며, 필수 runtime/health/report/packet/runner/review/rating-sheet 산출물을 모두 확인했다. 대표 시트: `D:\AIRI-Models\airi-human-eval\20260826-replay-07-s4-r2\rating-sheet.html`. 사람 JSON 전에는 S4 채택·운영 반영·S5·GPU·commit/push를 하지 않는다.
 
 > **2026-08-26 11:29 KST — M5 피벗(사용자 결정 C), 실태 문서 진입점(피벗 기록):
 > `airi_docs/진행중/AIRI-REALITY-CHECK-AND-FINETUNE-REVIEW-2026-08-26.md`:** 사용자가 5라운드 blind 대화를

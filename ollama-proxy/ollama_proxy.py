@@ -88,6 +88,25 @@ from output_moderation import OutputModerationRuntime, load_moderation_policy
 from epistemic_confidence import build_runtime as build_epistemic_confidence_runtime
 from broadcast_contract import apply_broadcast_contract, broadcast_contract_enabled
 from memory_claim_guard import guard_memory_claim
+from broadcast_examples import (
+    BROADCAST_EXAMPLES_MESSAGE_NAME,
+    broadcast_examples_enabled,
+    inject_broadcast_examples,
+)
+from opener_resample import (
+    OPENER_RESAMPLE_TEMPERATURE,
+    apply_resample_overrides,
+    extract_seed,
+    opener_resample_enabled,
+    previous_assistant_text,
+    resample_overrides,
+)
+from pickup_batch import (
+    PickupBatchDecision,
+    min_content_tokens,
+    pickup_batch_decision,
+    pickup_batch_enabled,
+)
 import deterministic_utterance_layer
 import handle_grounding_guard
 from live_broadcast_runtime import LiveBroadcastRuntime, BroadcastControlError
@@ -451,6 +470,61 @@ class BriefingEvidenceTelemetry:
 
 
 briefing_evidence_telemetry = BriefingEvidenceTelemetry()
+
+
+class OpenerResampleTelemetry:
+    """Content-free counter for the opt-in S2 decoding retry."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._retry_count = 0
+
+    def retry(self) -> None:
+        with self._lock:
+            self._retry_count += 1
+
+    def health(self) -> dict[str, object]:
+        with self._lock:
+            retry_count = self._retry_count
+        return {
+            "enabled": opener_resample_enabled(),
+            "retry_count": retry_count,
+        }
+
+
+opener_resample_telemetry = OpenerResampleTelemetry()
+
+
+class PickupBatchTelemetry:
+    """Content-free counters for the opt-in S4 pickup policy."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._requests = 0
+        self._batched = 0
+        self._skipped = 0
+
+    def observe(self, decision: PickupBatchDecision, *, skipped: bool = False) -> None:
+        with self._lock:
+            self._requests += 1
+            if decision.eligible:
+                self._batched += 1
+            if skipped:
+                self._skipped += 1
+
+    def health(self) -> dict[str, object]:
+        with self._lock:
+            return {
+                "enabled": pickup_batch_enabled(),
+                "min_content_tokens": min_content_tokens(),
+                "batch_min_repeats": 3,
+                "requests": self._requests,
+                "batched": self._batched,
+                "skipped": self._skipped,
+            }
+
+
+pickup_batch_telemetry = PickupBatchTelemetry()
 
 
 class MemoryJournalTelemetry:
@@ -2380,6 +2454,9 @@ SEARCH_FALLBACK_PREFIX = "검색이 안 돼서 아는 만큼만 말할게."
 SEARCH_UNAVAILABLE_DIALOGUE = "검색 연결이 잠시 안 돼. 다시 한 번 말해줘."
 UPSTREAM_TIMEOUT_DIALOGUE = "답이 너무 늦어서 잠깐 멈췄어. 다시 말해줘."
 LOCAL_ERROR_DIALOGUE = "답을 만들다가 문제가 생겼어. 다시 말해줘."
+# S4 emits a short code-owned line so the live receipt remains substantive
+# when a low-content chat is intentionally not picked up.
+PICKUP_SKIP_DIALOGUE = "잠깐 보고 있을게."
 # The local-chat error handlers used to record only ``type(exc).__name__``.
 # A blind matrix then spent 48 runs emitting this dialogue on a third of its
 # turns without leaving a single line that says which RuntimeError it was.
@@ -5493,6 +5570,27 @@ def request_messages(body: bytes) -> list[dict[str, object]]:
     return [dict(message) for message in messages if isinstance(message, dict)]
 
 
+def completed_pickup_user_tail(messages: list[dict[str, object]]) -> list[str]:
+    """Return the current user turn plus its completed adjacent user turns."""
+    user_texts = [
+        message["content"]
+        for message in messages
+        if message.get("role") == "user" and isinstance(message.get("content"), str)
+    ]
+    if not user_texts:
+        return []
+    successes = user_turn_successes(messages)
+    tail = [user_texts[-1]]
+    for text, succeeded in zip(
+        reversed(user_texts[:-1]), reversed(successes[:-1])
+    ):
+        if not succeeded:
+            break
+        tail.append(text)
+    tail.reverse()
+    return tail
+
+
 def strip_caller_system_messages_for_live_broadcast(body: bytes) -> bytes:
     """Remove all caller system messages after a live capability is claimed.
 
@@ -5846,7 +5944,11 @@ def inject_response_mode(body: bytes, user_text: str) -> bytes:
         if _MEAL_CHOICE_QUESTION_RE.search(user_text):
             combined_note += "\n" + MEAL_CHOICE_RESPONSE_CONTRACT
     if broadcast_context and isinstance(payload, dict):
-        return inject_broadcast_response_contract(payload, combined_note)
+        localized = inject_broadcast_response_contract(payload, combined_note)
+        localized, _ = inject_broadcast_examples(
+            localized, authenticated_live_broadcast=True,
+        )
+        return localized
     return inject_request_local_system_note(body, combined_note)
 
 
@@ -6832,6 +6934,7 @@ def apply_ollama_sampling_defaults(payload: dict[str, object]) -> None:
 def native_chat_stream_body(
     prepared_body: bytes, *, apply_sampling_defaults: bool = True,
     num_ctx: int | None = None, num_gpu: int | None = None,
+    sampling_overrides: dict[str, object] | None = None,
 ) -> bytes:
     """Translate the final OpenAI-shaped local hop to Ollama's native API."""
     payload = json.loads(prepared_body)
@@ -6851,6 +6954,8 @@ def native_chat_stream_body(
                 break
     options["num_ctx"] = NUM_CTX if num_ctx is None else num_ctx
     options["num_gpu"] = NUM_GPU if num_gpu is None else num_gpu
+    if sampling_overrides:
+        options.update(sampling_overrides)
     native_messages = []
     for message in payload.get("messages", []):
         if not isinstance(message, dict):
@@ -6861,6 +6966,7 @@ def native_chat_stream_body(
             REPLY_ACT_MESSAGE_NAME,
             ACTIVE_CARD_MESSAGE_NAME,
             CONTINUITY_LEDGER_MESSAGE_NAME, 'airi_broadcast_arc', 'airi_broadcast_affect', 'airi_broadcast_context',
+            BROADCAST_EXAMPLES_MESSAGE_NAME,
         }:
             native_messages.append({key: value for key, value in message.items() if key != "name"})
         else:
@@ -7038,6 +7144,15 @@ def render_broadcast_runtime_training_context(
     style_content = final_messages[style_indexes[0]].get("content")
     if not isinstance(style_content, str) or style_content.count(BROADCAST_RESPONSE_STYLE_CONTRACT) != 1:
         raise ValueError("broadcast response style is invalid")
+    example_indexes = [index for index, message in named
+                       if message["name"] == BROADCAST_EXAMPLES_MESSAGE_NAME]
+    if (
+        len(example_indexes) != int(broadcast_examples_enabled())
+        or not all(index < final_user for index in example_indexes)
+        or (example_indexes and example_indexes[0] <= style_indexes[0])
+        or (example_indexes and broadcast_indexes and example_indexes[0] <= broadcast_indexes[-1])
+    ):
+        raise ValueError("broadcast response examples are invalid")
 
     native = native_chat_stream_body(
         localized,
@@ -7047,7 +7162,10 @@ def render_broadcast_runtime_training_context(
     )
     native_payload = json.loads(native)
     native_messages = native_payload.get("messages")
-    reserved_names = _LIVE_BROADCAST_SYSTEM_MESSAGE_NAMES | {REQUEST_LOCAL_SYSTEM_MESSAGE_NAME}
+    reserved_names = _LIVE_BROADCAST_SYSTEM_MESSAGE_NAMES | {
+        REQUEST_LOCAL_SYSTEM_MESSAGE_NAME,
+        BROADCAST_EXAMPLES_MESSAGE_NAME,
+    }
     if (
         not isinstance(native_messages, list)
         or not native_messages
@@ -7078,6 +7196,7 @@ def native_chat_residency_body(
                         REPLY_ACT_MESSAGE_NAME,
                         ACTIVE_CARD_MESSAGE_NAME,
                         CONTINUITY_LEDGER_MESSAGE_NAME, 'airi_broadcast_arc', 'airi_broadcast_affect', 'airi_broadcast_context',
+                        BROADCAST_EXAMPLES_MESSAGE_NAME,
                     }
                 )
             }
@@ -7183,6 +7302,8 @@ async def health() -> dict[str, object]:
         "system_prompt_mode": "merge",
         "session_header": session_header_telemetry.health(),
         "briefing_evidence": briefing_evidence_telemetry.health(),
+        "opener_resample": opener_resample_telemetry.health(),
+        "pickup_batch": pickup_batch_telemetry.health(),
         "journal_completion": memory_journal_telemetry.health(),
         "proactive_output": proactive_output_telemetry.health(),
         "topic_board": topic_board_runtime.health(),
@@ -7766,6 +7887,11 @@ async def stream_local_with_ack(
         # for a corrective retry; the native conversion deliberately
         # strips that private name before sending it to Ollama.
         prepared_openai_body = prepared_body
+        try:
+            prepared_payload = json.loads(prepared_openai_body)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            prepared_payload = {}
+        prior_assistant_text = previous_assistant_text(context.original_messages)
         native_body = native_chat_stream_body(
             prepared_openai_body,
             apply_sampling_defaults=not context.synthetic_evaluation_turn,
@@ -7893,6 +8019,8 @@ async def stream_local_with_ack(
         grounding_selected = 0
         empty_dialogue_retry_used = False
         empty_dialogue_retry_passed = False
+        opener_resample_used = False
+        opener_resample_held = False
         # This watchdog is intentionally armed only after actual
         # non-whitespace upstream character progress.  It therefore
         # preserves the generous httpx read timeout for cold loads.
@@ -8019,18 +8147,27 @@ async def stream_local_with_ack(
                         ) == early_candidate
                     )
                     if early_candidate_is_safe:
-                        public_dialogue_emitted, moderation = prepare_openai_sse_dialogue(
-                            early_candidate,
-                            grounding_context=_grounding_context,
-                            memory_grounding_pool=_memory_grounding_pool,
-                            deterministic_inputs=_deterministic_inputs,
+                        early_opener_overrides = resample_overrides(
+                            prior_assistant_text, early_candidate, prepared_payload,
                         )
-                        emitted_substantive = True
-                        emit_substantive_content(context.trace_id, context.request_started)
-                        yield openai_sse_delta(
-                            context.completion_id, context.model, public_dialogue_emitted,
-                            public_moderation=moderation,
-                        )
+                        if early_opener_overrides:
+                            # The first sentence is still reversible: hold it
+                            # until the terminal draft decides whether S2 must
+                            # spend its single decoding retry.
+                            opener_resample_held = True
+                        else:
+                            public_dialogue_emitted, moderation = prepare_openai_sse_dialogue(
+                                early_candidate,
+                                grounding_context=_grounding_context,
+                                memory_grounding_pool=_memory_grounding_pool,
+                                deterministic_inputs=_deterministic_inputs,
+                            )
+                            emitted_substantive = True
+                            emit_substantive_content(context.trace_id, context.request_started)
+                            yield openai_sse_delta(
+                                context.completion_id, context.model, public_dialogue_emitted,
+                                public_moderation=moderation,
+                            )
                 if event.get("done"):
                     terminal = True
                     terminal_event = event
@@ -8108,10 +8245,20 @@ async def stream_local_with_ack(
             and not boundary.truncation_failed
             and not boundary.register_normalization_failed
         )
+        opener_overrides = resample_overrides(
+            prior_assistant_text, boundary.output.strip(), prepared_payload,
+        )
+        opener_retry = bool(
+            opener_overrides
+            and not public_dialogue_emitted
+            and not language_retry
+            and not grounding_retry
+            and not empty_dialogue_retry
+        )
         if (
             not raw_progress_timeout
             and not context.proactive_turn
-            and (language_retry or grounding_retry or empty_dialogue_retry)
+            and (language_retry or grounding_retry or empty_dialogue_retry or opener_retry)
         ):
             initial_boundary = boundary
             initial_terminal = terminal
@@ -8122,6 +8269,9 @@ async def stream_local_with_ack(
             await upstream_response.aclose()
             grounding_retry_used = grounding_retry
             empty_dialogue_retry_used = empty_dialogue_retry
+            opener_resample_used = opener_retry
+            if opener_retry:
+                opener_resample_telemetry.retry()
             retry_prepared_body = (
                 build_grounding_correction_body(
                     prepared_openai_body, boundary.output, context.last_user_text,
@@ -8134,11 +8284,12 @@ async def stream_local_with_ack(
                         "직전 응답에는 실제로 말할 대사가 없었다. 제어 표현이나 설명을 쓰지 말고, 사용자의 현재 말에 직접 이어지는 자연스러운 한국어 반말 한 문장만 답해."
                     ),
                     replace=True,
-                )
+                ) if not opener_retry else prepared_openai_body
             )
             retry_body = native_chat_stream_body(
                 retry_prepared_body,
                 apply_sampling_defaults=not context.synthetic_evaluation_turn,
+                sampling_overrides=opener_overrides if opener_retry else None,
             )
             prompt_budget_telemetry.prepared_native(retry_body)
             upstream_response = await context.upstream_client.send(
@@ -8587,6 +8738,8 @@ async def stream_local_with_ack(
                 "empty_dialogue_retry_used": 1,
                 "empty_dialogue_retry_passed": int(empty_dialogue_retry_passed),
             })
+        if opener_resample_used:
+            end_meta["opener_resample_used"] = 1
         if grounded_observation_fallback_used:
             end_meta["grounded_observation_fallback_used"] = 1
         if grounded_question_fallback_used:
@@ -9156,6 +9309,52 @@ async def proxy(path: str, request: Request):
             action="epistemic_confidence",
             emotion_reason=epistemic_verdict.reason,
         )
+    if (
+        broadcast_notes is not None
+        and not proactive_turn
+        and not nonmutating_turn
+        and last_user_text
+    ):
+        s4_decision = pickup_batch_decision(
+            completed_pickup_user_tail(original_messages)
+        )
+        minimum_content_tokens = min_content_tokens()
+        pickup_skipped = (
+            s4_decision.enabled
+            and minimum_content_tokens > 0
+            and s4_decision.content_tokens < minimum_content_tokens
+        )
+        pickup_batch_telemetry.observe(s4_decision, skipped=pickup_skipped)
+        if s4_decision.eligible:
+            return pre_model_fallback_response(
+                path,
+                requested_stream=requested_stream,
+                body=body,
+                fallback=s4_decision.line or PICKUP_SKIP_DIALOGUE,
+                trace_id=trace_id,
+                request_started=request_started,
+                original_messages=original_messages,
+                memory_session_id=memory_session_id,
+                user_text=last_user_text,
+                response_header=("X-AIRI-Pickup-Action", "batched_chat"),
+                action="batched_chat",
+                emotion_reason="pickup_batch",
+            )
+        if pickup_skipped:
+            return pre_model_fallback_response(
+                path,
+                requested_stream=requested_stream,
+                body=body,
+                fallback=PICKUP_SKIP_DIALOGUE,
+                trace_id=trace_id,
+                request_started=request_started,
+                original_messages=original_messages,
+                memory_session_id=memory_session_id,
+                user_text=last_user_text,
+                response_header=("X-AIRI-Pickup-Action", "pickup_skip"),
+                action="pickup_skip",
+                emotion_reason="pickup_threshold",
+            )
     # Local proactive speech is always Korean-first even though it deliberately
     # has no user utterance from which to infer a language preference.
     response_language = (
@@ -10059,7 +10258,47 @@ async def proxy(path: str, request: Request):
                 original_messages,
                 boundary.feed(content, final=True),
             )
-            if boundary.language_blocked and not sanitized:
+            opener_resample_used = False
+            opener_overrides = resample_overrides(
+                previous_assistant_text(original_messages), sanitized, body,
+            )
+            if opener_overrides and not boundary.language_blocked and not proactive_turn:
+                opener_resample_used = True
+                opener_resample_telemetry.retry()
+                retry_body = apply_resample_overrides(body, opener_overrides)
+                retry_response = await client.send(
+                    client.build_request(
+                        request.method, f"{UPSTREAM}/{path}",
+                        params=request.query_params, headers=request_headers,
+                        content=retry_body,
+                    ),
+                    stream=True,
+                )
+                try:
+                    retry_response_payload = json.loads(await retry_response.aread())
+                finally:
+                    await retry_response.aclose()
+                if isinstance(retry_response_payload, dict):
+                    retry_choices = retry_response_payload.get("choices")
+                    retry_message = (
+                        retry_choices[0].get("message")
+                        if isinstance(retry_choices, list)
+                        and retry_choices
+                        and isinstance(retry_choices[0], dict)
+                        else None
+                    )
+                    if isinstance(retry_message, dict):
+                        response_payload = retry_response_payload
+                        message = retry_message
+                        boundary = IncrementalAiriOutputBoundary(
+                            require_korean=user_prefers_korean,
+                            max_sentences=response_sentence_limit(last_user_text),
+                        )
+                        sanitized = enforce_tool_truth(
+                            original_messages,
+                            boundary.feed(message_content(message), final=True),
+                        )
+            if boundary.language_blocked and not sanitized and not opener_resample_used:
                 retry_body = inject_request_local_system_note(
                     body,
                     "직전 응답은 한국어 문장 안에 일반 알파벳 단어가 있어 보낼 수 없었다. "
@@ -10108,6 +10347,7 @@ async def proxy(path: str, request: Request):
                     "end",
                     trace_id,
                     duration_ms=elapsed_ms(request_started),
+                    meta={"opener_resample_used": int(opener_resample_used)},
                 )
                 return Response(
                     content=to_openai_sse(response_payload, sanitized),
@@ -10139,6 +10379,7 @@ async def proxy(path: str, request: Request):
                 "end",
                 trace_id,
                 duration_ms=elapsed_ms(request_started),
+                meta={"opener_resample_used": int(opener_resample_used)},
             )
             return Response(
                 content=json.dumps(response_payload, ensure_ascii=False).encode("utf-8"),
@@ -10180,6 +10421,7 @@ async def proxy(path: str, request: Request):
             terminal_item: dict[str, object] | None = None
             cancelled = False
             emitted_content = False
+            opener_resample_used = False
 
             def native_row(source: dict[str, object], content: str, *, done: bool) -> bytes:
                 # The native NDJSON contract has no field for a moderation
@@ -10225,18 +10467,21 @@ async def proxy(path: str, request: Request):
                             break
                     if terminal_item is not None or boundary.closed_early:
                         break
-                if boundary.language_blocked and not emitted_content:
+                opener_overrides = resample_overrides(
+                    previous_assistant_text(original_messages),
+                    boundary.output.strip(),
+                    body,
+                )
+                if opener_overrides and not boundary.language_blocked and not proactive_turn:
+                    opener_resample_used = True
+                    opener_resample_telemetry.retry()
                     await upstream_response.aclose()
                     if terminal_item is not None:
-                        # The rejected first attempt still reached a native
+                        # The first attempt still reached a native
                         # terminal row. Preserve it before the retry replaces
                         # terminal_item so attempt counters remain honest.
                         prompt_budget_telemetry.terminal(terminal_item, NUM_CTX)
-                    retry_body = inject_request_local_system_note(
-                        body,
-                        "직전 응답은 한국어 문장 안에 일반 알파벳 단어가 있어 보낼 수 없었다. "
-                        "이번에는 필요한 고유명사도 한글로 풀어 쓰고, 영문자를 한 글자도 쓰지 말고 자연스러운 한국어 반말 한 문장으로 다시 답해.",
-                    )
+                    retry_body = apply_resample_overrides(body, opener_overrides)
                     prompt_budget_telemetry.prepared_native(retry_body)
                     retry_response = await client.send(
                         client.build_request(request.method, f"{UPSTREAM}/{path}",
@@ -10272,6 +10517,57 @@ async def proxy(path: str, request: Request):
                         if not isinstance(retry_item, dict):
                             raise RuntimeError("invalid upstream NDJSON item")
                         retry_clean = boundary.feed(message_content(retry_item.get("message")))
+                        if retry_item.get("done"):
+                            terminal_item = retry_item
+                if boundary.language_blocked and not emitted_content:
+                    boundary.output = ""
+                if boundary.language_blocked and not emitted_content and not opener_resample_used:
+                    await upstream_response.aclose()
+                    if terminal_item is not None:
+                        # The rejected first attempt still reached a native
+                        # terminal row. Preserve it before the retry replaces
+                        # terminal_item so attempt counters remain honest.
+                        prompt_budget_telemetry.terminal(terminal_item, NUM_CTX)
+                    retry_body = inject_request_local_system_note(
+                        body,
+                        "직전 응답은 한국어 문장 안에 일반 알파벳 단어가 있어 보낼 수 없었다. "
+                        "이번에는 필요한 고유명사도 한글로 풀어 쓰고, 영문자를 한 글자도 쓰지 말고 자연스러운 한국어 반말 한 문장으로 다시 답해.",
+                    )
+                    prompt_budget_telemetry.prepared_native(retry_body)
+                    retry_response = await client.send(
+                        client.build_request(request.method, f"{UPSTREAM}/{path}",
+                            params=request.query_params, headers=request_headers, content=retry_body),
+                        stream=True,
+                    )
+                    upstream_response = retry_response
+                    retry_decoder = codecs.getincrementaldecoder("utf-8")("strict")
+                    retry_pending = ""
+                    pending = ""
+                    boundary = IncrementalAiriOutputBoundary(
+                        require_korean=user_prefers_korean,
+                        max_sentences=response_sentence_limit(last_user_text),
+                    )
+                    terminal_item = None
+                    async for retry_chunk in upstream_response.aiter_raw():
+                        retry_pending += retry_decoder.decode(retry_chunk)
+                        while "\n" in retry_pending:
+                            retry_line, retry_pending = retry_pending.split("\n", 1)
+                            if not retry_line.strip():
+                                continue
+                            retry_item = json.loads(retry_line)
+                            if not isinstance(retry_item, dict):
+                                raise RuntimeError("invalid upstream NDJSON item")
+                            boundary.feed(message_content(retry_item.get("message")))
+                            if retry_item.get("done"):
+                                terminal_item = retry_item
+                                break
+                        if terminal_item is not None or boundary.closed_early:
+                            break
+                    if terminal_item is None and not boundary.closed_early and retry_pending.strip():
+                        retry_item = json.loads(retry_pending + retry_decoder.decode(b"", final=True))
+                        if not isinstance(retry_item, dict):
+                            raise RuntimeError("invalid upstream NDJSON item")
+                        boundary.feed(message_content(retry_item.get("message")))
                         if retry_item.get("done"):
                             terminal_item = retry_item
                     if boundary.language_blocked and not emitted_content:
@@ -10350,7 +10646,39 @@ async def proxy(path: str, request: Request):
                 original_messages,
                 boundary.feed(message_content(native_payload.get("message")), final=True),
             )
-            if not plain and not proactive_turn:
+            opener_resample_used = False
+            opener_overrides = resample_overrides(
+                previous_assistant_text(original_messages), plain, body,
+            )
+            if opener_overrides and not boundary.language_blocked and not proactive_turn:
+                opener_resample_used = True
+                opener_resample_telemetry.retry()
+                retry_body = apply_resample_overrides(body, opener_overrides)
+                prompt_budget_telemetry.prepared_native(retry_body)
+                retry_response = await client.send(
+                    client.build_request(request.method, f"{UPSTREAM}/{path}",
+                        params=request.query_params, headers=request_headers, content=retry_body),
+                    stream=True,
+                )
+                try:
+                    retry_payload = json.loads(await retry_response.aread())
+                finally:
+                    await retry_response.aclose()
+                if isinstance(retry_payload, dict):
+                    if retry_payload.get("done"):
+                        prompt_budget_telemetry.terminal(retry_payload, NUM_CTX)
+                    native_payload = retry_payload
+                    boundary = IncrementalAiriOutputBoundary(
+                        require_korean=user_prefers_korean,
+                        max_sentences=response_sentence_limit(last_user_text),
+                    )
+                    plain = enforce_tool_truth(
+                        original_messages,
+                        boundary.feed(message_content(native_payload.get("message")), final=True),
+                    )
+                if boundary.language_blocked and not plain:
+                    plain = ""
+            if not plain and not proactive_turn and not opener_resample_used:
                 language_retry = boundary.language_blocked
                 retry_body = inject_request_local_system_note(
                     body,

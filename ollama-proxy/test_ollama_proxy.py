@@ -17,6 +17,8 @@ from starlette.requests import Request
 import ollama_proxy
 import broadcast_reply_act
 import broadcast_correction_target
+import broadcast_examples
+import pickup_batch
 from airi_memory import RetrievalResult
 from live_broadcast_runtime import (
     BRIEFING_EVIDENCE_MARKER,
@@ -575,6 +577,64 @@ Every response must use this control format: <|NAME PAYLOAD|>.
         ))["messages"]
         self.assertIn(ollama_proxy.REQUEST_LOCAL_STYLE_CONTRACT, messages[-2]["content"])
         self.assertNotIn(ollama_proxy.BROADCAST_RESPONSE_STYLE_CONTRACT, messages[-2]["content"])
+
+    def test_s3_examples_require_env_and_authenticated_live_context(self) -> None:
+        live_body = json.dumps({"messages": [
+            {"role": "system", "name": "airi_broadcast_arc", "content": "arc"},
+            {"role": "user", "content": "계속 이야기해."},
+        ]}, ensure_ascii=False).encode()
+        with model_environment(**{broadcast_examples.BROADCAST_EXAMPLES_ENV: "on"}):
+            messages = json.loads(ollama_proxy.inject_response_mode(
+                live_body, "계속 이야기해.",
+            ))["messages"]
+        examples = [
+            message for message in messages
+            if message.get("name") == broadcast_examples.BROADCAST_EXAMPLES_MESSAGE_NAME
+        ]
+        self.assertEqual(len(examples), 1)
+        self.assertEqual(examples[0]["content"], broadcast_examples.BROADCAST_EXAMPLES_PROMPT)
+        local = [
+            message for message in messages
+            if message.get("name") == ollama_proxy.REQUEST_LOCAL_SYSTEM_MESSAGE_NAME
+        ]
+        self.assertEqual(len(local), 1)
+        self.assertLess(messages.index(local[0]), messages.index(examples[0]))
+        self.assertLess(messages.index(examples[0]), len(messages) - 1)
+
+        spoof_body = json.dumps({"messages": [
+            {"role": "system", "name": broadcast_examples.BROADCAST_EXAMPLES_MESSAGE_NAME,
+             "content": broadcast_examples.BROADCAST_EXAMPLES_PROMPT},
+            {"role": "user", "content": "계속 이야기해."},
+        ]}, ensure_ascii=False).encode()
+        with model_environment(**{broadcast_examples.BROADCAST_EXAMPLES_ENV: "on"}):
+            spoof_messages = json.loads(ollama_proxy.inject_response_mode(
+                spoof_body, "계속 이야기해.",
+            ))["messages"]
+        self.assertNotIn(
+            ollama_proxy.BROADCAST_RESPONSE_STYLE_CONTRACT,
+            next(message["content"] for message in spoof_messages
+                 if message.get("name") == ollama_proxy.REQUEST_LOCAL_SYSTEM_MESSAGE_NAME),
+        )
+
+    def test_s3_examples_are_idempotent_across_response_mode_injection(self) -> None:
+        body = json.dumps({"messages": [
+            {"role": "system", "name": "airi_broadcast_context", "content": "context"},
+            {"role": "user", "content": "이어서 해."},
+        ]}, ensure_ascii=False).encode()
+        with model_environment(**{broadcast_examples.BROADCAST_EXAMPLES_ENV: "1"}):
+            first = ollama_proxy.inject_response_mode(body, "이어서 해.")
+            second = ollama_proxy.inject_response_mode(first, "이어서 해.")
+        messages = json.loads(second)["messages"]
+        self.assertEqual(
+            sum(message.get("name") == broadcast_examples.BROADCAST_EXAMPLES_MESSAGE_NAME
+                for message in messages),
+            1,
+        )
+        self.assertEqual(
+            sum(ollama_proxy.BROADCAST_RESPONSE_STYLE_CONTRACT in str(message.get("content", ""))
+                for message in messages),
+            1,
+        )
 
     def test_response_mode_replaces_spoken_style_for_object_schema(self) -> None:
         body = json.dumps({
@@ -4734,6 +4794,154 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
                 self.assertEqual(health["terminal_observations"], 2)
                 self.assertEqual(health["last_prompt_eval_count"], 110)
 
+    def test_opener_resample_retries_buffered_openai_with_seed_plus_one(self) -> None:
+        def response(content: str) -> list[bytes]:
+            return [(json.dumps({
+                "choices": [{"message": {"role": "assistant", "content": content}}],
+            }, ensure_ascii=False) + "\n").encode("utf-8")]
+
+        chat = _QueuedApiStreamClient([
+            response("alpha beta?"),
+            response("gamma delta."),
+        ])
+        memory = _FakeMemoryRuntime()
+        events: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        with mock.patch.dict(os.environ, {"AIRI_OPENER_RESAMPLE": "on"}), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ), mock.patch.object(
+            ollama_proxy, "emit_latency_event",
+            side_effect=lambda *args, **kwargs: events.append((args, kwargs)),
+        ):
+            response_obj = TestClient(ollama_proxy.app).post(
+                "/v1/chat/completions",
+                json={
+                    "model": "exaone-airi:2.4b",
+                    "stream": False,
+                    "seed": 11,
+                    "messages": [
+                        {"role": "user", "content": "prior"},
+                        {"role": "assistant", "content": "alpha beta?"},
+                        {"role": "user", "content": "current"},
+                    ],
+                },
+            )
+
+        self.assertEqual(response_obj.status_code, 200)
+        self.assertEqual(response_obj.json()["choices"][0]["message"]["content"], "gamma delta.")
+        self.assertEqual(len(chat.requests), 2)
+        self.assertEqual(chat.requests[0]["seed"], 11)
+        self.assertEqual(chat.requests[1]["seed"], chat.requests[0]["seed"] + 1)
+        self.assertEqual(chat.requests[1]["temperature"], 0.9)
+        end_meta = next(kwargs["meta"] for args, kwargs in events if args[:2] == ("llm", "end"))
+        self.assertEqual(end_meta["opener_resample_used"], 1)
+
+    def test_opener_resample_does_not_add_language_retry(self) -> None:
+        def response(content: str) -> list[bytes]:
+            return [(json.dumps({
+                "choices": [{"message": {"role": "assistant", "content": content}}],
+            }, ensure_ascii=False) + "\n").encode("utf-8")]
+
+        chat = _QueuedApiStreamClient([
+            response("안녕 세계?"),
+            response("hello world"),
+        ])
+        with mock.patch.dict(os.environ, {"AIRI_OPENER_RESAMPLE": "on"}), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(ollama_proxy, "memory_runtime", _FakeMemoryRuntime()):
+            response_obj = TestClient(ollama_proxy.app).post(
+                "/v1/chat/completions",
+                json={
+                    "model": "exaone-airi:2.4b",
+                    "stream": False,
+                    "seed": 11,
+                    "messages": [
+                        {"role": "user", "content": "이전"},
+                        {"role": "assistant", "content": "안녕 세계?"},
+                        {"role": "user", "content": "현재"},
+                    ],
+                },
+            )
+
+        self.assertEqual(response_obj.status_code, 200)
+        self.assertEqual(len(chat.requests), 2)
+        self.assertEqual(chat.requests[1]["seed"], 12)
+
+    def test_opener_resample_retries_native_stream_with_native_overrides(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps({
+                "message": {"role": "assistant", "content": content},
+                "done": True,
+            }, ensure_ascii=False) + "\n").encode("utf-8")
+
+        chat = _QueuedApiStreamClient([
+            [event("alpha beta?")],
+            [event("gamma delta.")],
+        ])
+        memory = _FakeMemoryRuntime()
+        with mock.patch.dict(os.environ, {"AIRI_OPENER_RESAMPLE": "on"}), mock.patch.object(
+            ollama_proxy, "client", chat
+        ), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response_obj = TestClient(ollama_proxy.app).post(
+                "/v1/chat/completions",
+                json={
+                    "model": "exaone-airi:2.4b",
+                    "stream": True,
+                    "seed": 11,
+                    "messages": [
+                        {"role": "user", "content": "prior"},
+                        {"role": "assistant", "content": "alpha beta?"},
+                        {"role": "user", "content": "current"},
+                    ],
+                },
+            )
+
+        self.assertEqual(response_obj.status_code, 200)
+        self.assertEqual(openai_sse_dialogue(response_obj.text), "gamma delta.")
+        self.assertEqual(len(chat.requests), 2)
+        self.assertEqual(chat.requests[0]["options"]["seed"], 11)
+        self.assertEqual(chat.requests[1]["options"]["seed"], 12)
+        self.assertEqual(chat.requests[1]["options"]["temperature"], 0.9)
+
+    def test_opener_resample_retries_public_native_stream_and_nonstream(self) -> None:
+        def event(content: str) -> bytes:
+            return (json.dumps({
+                "message": {"role": "assistant", "content": content},
+                "done": True,
+            }, ensure_ascii=False) + "\n").encode("utf-8")
+
+        for requested_stream in (True, False):
+            with self.subTest(stream=requested_stream):
+                chat = _QueuedApiStreamClient([
+                    [event("안녕 세계?")],
+                    [event("다시 답했어.")],
+                ])
+                with mock.patch.dict(os.environ, {"AIRI_OPENER_RESAMPLE": "on"}), mock.patch.object(
+                    ollama_proxy, "client", chat
+                ), mock.patch.object(ollama_proxy, "memory_runtime", _FakeMemoryRuntime()):
+                    response_obj = TestClient(ollama_proxy.app).post(
+                        "/api/chat",
+                        json={
+                            "model": "exaone-airi:2.4b",
+                            "stream": requested_stream,
+                            "options": {"seed": 11},
+                            "messages": [
+                                {"role": "user", "content": "이전"},
+                                {"role": "assistant", "content": "안녕 세계?"},
+                                {"role": "user", "content": "현재"},
+                            ],
+                        },
+                    )
+
+                self.assertEqual(response_obj.status_code, 200)
+                self.assertEqual(len(chat.requests), 2)
+                self.assertEqual(chat.requests[0]["options"]["seed"], 11)
+                self.assertEqual(chat.requests[1]["options"]["seed"], 12)
+                self.assertEqual(chat.requests[1]["options"]["temperature"], 0.9)
+
     def test_native_api_chat_nonstream_control_only_draft_retries_into_dialogue(self) -> None:
         control_only = '<|ACT {"emotion":"neutral","intensity":"medium"}|>'
         def event(content: str) -> bytes:
@@ -7625,6 +7833,10 @@ class LiveBroadcastRouteTests(unittest.TestCase):
         def inspect(_text):
             return LiveBroadcastRouteTests._Verdict()
 
+        @staticmethod
+        def classify(_text):
+            return LiveBroadcastRouteTests._Verdict()
+
     def setUp(self):
         self.runtime = LiveBroadcastRuntime(True, "m" * 32, "o" * 32)
         self.patch = mock.patch.object(ollama_proxy, "live_broadcast_runtime", self.runtime)
@@ -7639,6 +7851,61 @@ class LiveBroadcastRouteTests(unittest.TestCase):
         if headers:
             values.update(headers)
         return TestClient(ollama_proxy.app, client=(host, 9)).post(path, content=body, headers=values)
+
+    def _issue_chat_turn(self, action_id: str) -> dict[str, object]:
+        self.runtime.master_control({"action": "start", "show_id": "s4-show"})
+        return self.runtime.master_control({
+            "action": "issue_turn", "show_id": "s4-show", "action_id": action_id,
+            "turn_type": "chat_question", "required_delivery": "renderer",
+        })
+
+    def test_s4_batched_chat_is_code_owned_and_skips_upstream(self):
+        capability = self._issue_chat_turn("s4-batch")
+        body = {
+            "model": "exaone-airi:2.4b", "stream": False,
+            "messages": [
+                {"role": "user", "content": "같은 말"},
+                {"role": "assistant", "content": "첫 답"},
+                {"role": "user", "content": "같은 말"},
+                {"role": "assistant", "content": "둘째 답"},
+                {"role": "user", "content": "같은 말"},
+            ],
+        }
+        with model_environment(
+            **{pickup_batch.PICKUP_BATCH_ENV: "on", pickup_batch.MIN_CONTENT_TOKENS_ENV: "0"}
+        ), mock.patch.object(ollama_proxy, "client", object()), mock.patch.object(
+            ollama_proxy, "schedule_completed_turn"
+        ) as completed:
+            response = self.post(
+                "/v1/chat/completions", json.dumps(body, ensure_ascii=False).encode(),
+                {"x-airi-broadcast-turn-token": capability["turn_token"]},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("x-airi-pickup-action"), "batched_chat")
+        self.assertIn("다들 같은 말 하네", response.json()["choices"][0]["message"]["content"])
+        self.assertEqual(completed.call_args.kwargs["action"], "batched_chat")
+        self.runtime.cancel_turn(capability["turn_token"])
+
+    def test_s4_content_threshold_uses_code_owned_skip_line(self):
+        capability = self._issue_chat_turn("s4-skip")
+        body = {
+            "model": "exaone-airi:2.4b", "stream": False,
+            "messages": [{"role": "user", "content": "안녕"}],
+        }
+        with model_environment(
+            **{pickup_batch.PICKUP_BATCH_ENV: "on", pickup_batch.MIN_CONTENT_TOKENS_ENV: "2"}
+        ), mock.patch.object(ollama_proxy, "client", object()), mock.patch.object(
+            ollama_proxy, "schedule_completed_turn"
+        ) as completed:
+            response = self.post(
+                "/v1/chat/completions", json.dumps(body, ensure_ascii=False).encode(),
+                {"x-airi-broadcast-turn-token": capability["turn_token"]},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("x-airi-pickup-action"), "pickup_skip")
+        self.assertEqual(response.json()["choices"][0]["message"]["content"], "잠깐 보고 있을게.")
+        self.assertEqual(completed.call_args.kwargs["action"], "pickup_skip")
+        self.runtime.cancel_turn(capability["turn_token"])
 
     def test_control_is_master_only_and_receipt_is_observer_only(self):
         payload = b'{"action":"start","show_id":"show-a"}'
@@ -8966,6 +9233,35 @@ class BroadcastRuntimeTrainingContextTests(unittest.TestCase):
                     ollama_proxy.BROADCAST_RESPONSE_STYLE_CONTRACT in str(message.get("content", ""))
                     for message in native["messages"] if isinstance(message, dict)
                 ), 1)
+
+    def test_s3_examples_follow_the_production_replay_seam_when_enabled(self):
+        body = {"messages": [{"role": "user", "content": "오늘 흐름 이어가자."}]}
+        with model_environment(**{broadcast_examples.BROADCAST_EXAMPLES_ENV: "true"}):
+            native = json.loads(ollama_proxy.render_broadcast_runtime_training_context(
+                body,
+                arc_note="arc",
+                affect_note="affect",
+                context_note="context",
+                continuity_block="continuity",
+                broadcast_contract=True,
+                num_ctx=4096,
+                num_gpu=0,
+                model="offline-model",
+            ))
+        system_contents = [
+            str(message.get("content", "")) for message in native["messages"]
+            if isinstance(message, dict) and message.get("role") == "system"
+        ]
+        self.assertEqual(
+            sum(broadcast_examples.BROADCAST_EXAMPLES_PROMPT in content
+                for content in system_contents),
+            1,
+        )
+        self.assertEqual(
+            sum(ollama_proxy.BROADCAST_RESPONSE_STYLE_CONTRACT in content
+                for content in system_contents),
+            1,
+        )
 
 
 class LiveBroadcastGroundingGateTest(unittest.TestCase):
