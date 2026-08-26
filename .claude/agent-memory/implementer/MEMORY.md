@@ -2,3 +2,4 @@
 - [Report blocked runs, don't retry](feedback-report-blocked-runs-do-not-retry.md) — a refusal caused by a live training run is a finding, not something to work around.
 - [Re-read before applying an approved edit](feedback-recheck-file-before-applying-approved-edit.md) — the supervisor may have already made it while approving.
 - [pytest lives in the pinned venv, not the default python](project-pytest-not-installed.md) — read the current handoff's interpreter section before concluding pytest is unavailable.
+- [Check CRLF with Python, not grep](project-crlf-check-grep-is-broken.md) — `grep -c $'\r'` gives backwards answers in this Git Bash.

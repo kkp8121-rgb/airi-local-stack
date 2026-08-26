@@ -59,3 +59,24 @@ python -m pytest -q ollama-proxy\eval\human_review
 `test_human_review_tools.py` 는 오프라인·결정적이며 임시 SQLite 로 `airi_memory.py` 의 DDL 을 그대로
 재현한다. **이 테스트 파일은 `.github/workflows/remediation-checkpoint.yml` 의 Python 샤드 매트릭스에
 아직 추가되지 않았다.** 샤드 목록에 추가해야 CI 에서 실제로 돈다(추가는 supervisor 가 한다).
+
+## 4. 공개 채팅 리플레이 가져오기
+
+`import_public_chat.py` 는 공개 라이브 방송의 채팅 리플레이(Chzzk VOD, yt-dlp YouTube 라이브 채팅)를
+저장소 밖 원본 파일에서 읽어 가명화된 시청자 메시지 JSONL 로 바꾼다. 표준 라이브러리만 쓰고, 다른
+eval 모듈을 import 하지 않는다.
+
+```powershell
+python ollama-proxy\eval\human_review\import_public_chat.py chzzk-fetch --video-no 123456 --output D:\airi-public-chat\raw-chzzk.json
+
+python ollama-proxy\eval\human_review\import_public_chat.py normalize --format chzzk --input D:\airi-public-chat\raw-chzzk.json --output D:\airi-public-chat\chzzk.jsonl --hmac-key-file D:\airi-public-chat\hmac.key
+
+python ollama-proxy\eval\human_review\import_public_chat.py normalize --format youtube --input D:\airi-public-chat\raw-youtube.jsonl --output D:\airi-public-chat\youtube.jsonl --hmac-key-file D:\airi-public-chat\hmac.key --video-id <영상 id>
+```
+
+`chzzk-fetch` 는 Chzzk VOD 채팅 API 를 `nextPlayerMessageTime` 커서로 페이지네이션해 원본 JSON 을
+그대로 저장한다. `normalize` 는 원본(Chzzk/YouTube)을 정제해 닉네임, 원본 유저 id, 채널 id 를 절대
+남기지 않고 `author` 필드에 HMAC-SHA256 가명(키는 `--hmac-key-file` 에 없으면 새로 만들고, 있으면
+그대로 재사용해 같은 사람은 항상 같은 가명이 되게 한다)만 남긴다. `--video-id` 는 원본에 영상 id 가
+없는 YouTube 형식에서 필수다. 원본 캡처와 출력, HMAC 키는 실제 대화와 같은 이유로 저장소 트리 밖에
+두는 것이 기본이며, 저장소 안 경로는 `--allow-repo-path` 를 줘야만 쓴다.

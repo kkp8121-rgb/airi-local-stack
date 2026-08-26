@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import copy
+import hashlib
 import importlib.util
 import json
 import os
@@ -1301,6 +1302,272 @@ class ScoringTests(unittest.TestCase):
         )
         self.assertTrue(any(token.startswith("달빛우체국") for token in row["fact_tokens_used"]))
         self.assertEqual(row["invented_handles"], [])
+
+
+REAL_CHAT_FIXTURE = HERE.parent / "human_review" / "real_chat_fixture.json"
+# 파일에 적힌 순서 그대로다 — 일부러 시간순이 아니고, 같은 offset 도 섞여 있다.
+REPLAY_RAW_ROWS = (
+    (5_000, "가명001", "chat", "안녕!", ""),
+    (3_000, "가명002", "chat", "방송 오늘 몇 시까지 하나요", ""),
+    (5_000, "가명003", "chat", "ㅋㅋㅋ", ""),
+    (30_000, "가명001", "chat", "그거 진짜 웃겼어", ""),
+    (61_000, "가명002", "donation", "화이팅!", "1,000원"),
+    (95_000, "가명004", "chat", "밥은 먹었어?", ""),
+    (130_000, "가명001", "chat", "게임 뭐 할 거야", ""),
+    (200_000, "가명003", "chat", "이거 어때", ""),
+    (400_000, "가명002", "chat", "졸리다", ""),
+    (900_000, "가명004", "donation", "고생 많아", "5,000원"),
+    (1_500_000, "가명001", "chat", "다음 방송 언제", ""),
+    (2_400_000, "가명003", "chat", "잘 봤어", ""),
+)
+
+
+def replay_rows(raw: tuple = REPLAY_RAW_ROWS) -> list[dict[str, Any]]:
+    rows = []
+    for offset, author, kind, text, amount in raw:
+        row: dict[str, Any] = {"source": "youtube-live", "video_ref": "vid-0001",
+                               "offset_ms": offset, "author": author, "kind": kind, "text": text}
+        if amount:
+            row["amount_label"] = amount
+        rows.append(row)
+    return rows
+
+
+def write_replay(directory: Path, rows: list[dict[str, Any]] | None = None) -> Path:
+    path = Path(directory) / "capture.jsonl"
+    body = "".join(json.dumps(row, ensure_ascii=False) + "\n"
+                   for row in (replay_rows() if rows is None else rows))
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
+class _ReplayTransport(_FakeTransport):
+    """_FakeTransport 확장 — main() 이 요구하는 close() 와 전송 본문을 갖춘다."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.messages: list[list[dict[str, str]]] = []
+        self.closed = False
+
+    def stream_chat(self, *, model, messages, max_tokens, timeout):
+        super().stream_chat(model=model, messages=messages, max_tokens=max_tokens, timeout=timeout)
+        self.messages.append(messages)
+        return f"응, {len(self.messages)}번째 대답이야.", 5.0, 10.0, {"status_code": 200}
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class ReplayFixtureTests(unittest.TestCase):
+    def test_real_chat_fixture_validates_and_carries_no_dialogue(self) -> None:
+        fixture = sim.load_fixture(REAL_CHAT_FIXTURE)
+        self.assertIs(fixture["synthetic_only"], True)
+        self.assertEqual(fixture["rates"]["broadcast_minutes"], 60)
+        self.assertEqual(fixture["topic"]["beats"][-1]["end_minute"], 60)
+        self.assertEqual(len(fixture["topic"]["beats"]), 4)
+        self.assertEqual(fixture["donations"], [])
+        self.assertEqual(fixture["memory_probes"], [])
+        self.assertNotIn("continuity_arcs", fixture)
+        self.assertIn("offtopic_chatter", fixture["archetypes"])
+        # 로스터는 자리표시자뿐이다 — 실제 가명은 replay 시점에만 들어온다.
+        self.assertEqual([viewer["archetype"] for viewer in fixture["viewers"]],
+                         ["replay", "replay"])
+
+
+class ReplayStreamTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.fixture = sim.load_fixture(REAL_CHAT_FIXTURE)
+
+    def build(self, raw: tuple = REPLAY_RAW_ROWS, **kwargs):
+        with tempfile.TemporaryDirectory() as directory:
+            path = write_replay(Path(directory), replay_rows(raw))
+            rows = runner.load_replay_rows(path, **kwargs)
+            fixture = runner.build_replay_fixture(self.fixture, rows)
+            stream = runner.build_replay_stream(fixture, rows, path=path, seed=7)
+        return fixture, stream
+
+    def test_messages_are_ordered_and_rebased_to_the_first_offset(self) -> None:
+        _fixture, stream = self.build()
+        self.assertEqual([item["id"] for item in stream["messages"]],
+                         [f"m{index:04d}" for index in range(12)])
+        self.assertEqual([item["t_ms"] for item in stream["messages"]],
+                         [0, 2_000, 2_000, 27_000, 58_000, 92_000, 127_000, 197_000,
+                          397_000, 897_000, 1_497_000, 2_397_000])
+        self.assertEqual([item["minute"] for item in stream["messages"]],
+                         [0, 0, 0, 0, 0, 1, 2, 3, 6, 14, 24, 39])
+        # 같은 offset 은 파일에 적힌 순서를 유지한다.
+        self.assertEqual([item["text"] for item in stream["messages"][:3]],
+                         ["방송 오늘 몇 시까지 하나요", "안녕!", "ㅋㅋㅋ"])
+        self.assertEqual(stream["broadcast_minutes"], 40)
+        self.assertEqual(stream["schema_version"], sim.STREAM_SCHEMA_VERSION)
+
+    def test_kinds_come_from_the_row_then_the_question_heuristic(self) -> None:
+        _fixture, stream = self.build()
+        self.assertEqual([item["kind"] for item in stream["messages"]],
+                         ["question", "reaction", "reaction", "reaction", "donation",
+                          "question", "reaction", "question", "reaction", "donation",
+                          "question", "reaction"])
+        self.assertTrue(all(item["archetype"] == "replay" for item in stream["messages"]))
+
+    def test_question_heuristic_reads_endings_as_well_as_the_mark(self) -> None:
+        for text in ("밥은 먹었어?", "이거 어때", "다음 방송 언제", "몇 시까지 하나요",
+                     "이거 될까", "지금 뭐임", "누구"):
+            self.assertTrue(runner.looks_like_question(text), text)
+        for text in ("안녕!", "ㅋㅋㅋ", "왜냐하면 그랬어", "잘 봤어", "그러니까", ""):
+            self.assertFalse(runner.looks_like_question(text), text)
+
+    def test_donation_rows_keep_the_ritual_scorable(self) -> None:
+        _fixture, stream = self.build()
+        donations = [item for item in stream["messages"] if item["kind"] == "donation"]
+        self.assertEqual([item["amount_label"] for item in donations], ["1,000원", "5,000원"])
+        self.assertEqual([item["donation_index"] for item in donations], [0, 1])
+        self.assertEqual(donations[0]["checks"],
+                         {"required_any": ["고마워", "감사"], "forbidden": []})
+        row = sim.score_turn(
+            {"turn_index": 1, "message": donations[0], "effective_kind": "donation"},
+            "가명002, 고마워!", beat=self.fixture["topic"]["beats"][0],
+            fallback_pool=(), roster_handles=("가명002",))
+        self.assertTrue(row["addressee_ok"])
+
+    def test_replay_block_records_provenance_without_any_dialogue(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = write_replay(Path(directory))
+            rows = runner.load_replay_rows(path)
+            fixture = runner.build_replay_fixture(self.fixture, rows)
+            stream = runner.build_replay_stream(fixture, rows, path=path, seed=7)
+            expected = hashlib.sha256(path.read_bytes()).hexdigest()
+        self.assertEqual(stream["replay"],
+                         {"path_sha256": expected, "message_count": 12, "source": "youtube-live"})
+        self.assertEqual(stream["fixture_sha256"], sim.sha256_of(fixture))
+
+    def test_roster_merges_every_pseudonym_and_keeps_the_placeholders(self) -> None:
+        fixture, _stream = self.build()
+        handles = [viewer["handle"] for viewer in fixture["viewers"]]
+        self.assertEqual(handles[:2], [viewer["handle"] for viewer in self.fixture["viewers"]])
+        # 파일 순서가 아니라 재생 순서(첫 등장)를 따른다 — 가명002 가 가장 이르다.
+        self.assertEqual(handles[2:], ["가명002", "가명001", "가명003", "가명004"])
+        self.assertTrue(all(viewer["archetype"] == "replay" for viewer in fixture["viewers"]))
+        # 원본 픽스처는 손대지 않는다.
+        self.assertEqual(len(self.fixture["viewers"]), 2)
+
+    def test_span_beyond_the_fixture_stretches_the_last_beat(self) -> None:
+        raw = REPLAY_RAW_ROWS[:-1] + ((4_233_000, "가명003", "chat", "잘 봤어", ""),)
+        fixture, stream = self.build(raw)
+        self.assertEqual(stream["broadcast_minutes"], 71)
+        self.assertEqual(fixture["rates"]["broadcast_minutes"], 71)
+        self.assertEqual(fixture["topic"]["beats"][-1]["end_minute"], 71)
+        self.assertEqual(fixture["topic"]["beats"][-1]["start_minute"], 45)
+        self.assertEqual(self.fixture["rates"]["broadcast_minutes"], 60)
+
+    def test_a_capture_ending_on_a_minute_boundary_still_gets_picked_up(self) -> None:
+        raw = ((0, "가명001", "chat", "안녕!", ""), (60_000, "가명002", "chat", "잘 봤어", ""))
+        fixture, stream = self.build(raw)
+        # ceil 만 쓰면 60분 경계 메시지가 마지막 창(t_ms < window_end) 밖으로 떨어진다.
+        self.assertEqual(stream["broadcast_minutes"], 2)
+        picks = sim.plan_pickups(stream, fixture)
+        self.assertIn("m0001", [pick["message"]["id"] for pick in picks])
+
+    def test_window_and_cap_options_cut_the_capture(self) -> None:
+        _fixture, stream = self.build(start_ms=61_000, end_ms=400_000)
+        self.assertEqual([item["t_ms"] for item in stream["messages"]],
+                         [0, 34_000, 69_000, 139_000, 339_000])
+        self.assertEqual(stream["messages"][0]["kind"], "donation")
+        _fixture, capped = self.build(max_messages=3)
+        self.assertEqual(len(capped["messages"]), 3)
+        self.assertEqual(capped["replay"]["message_count"], 3)
+
+    def test_malformed_rows_fail_closed(self) -> None:
+        broken = [
+            [{**replay_rows()[0], "kind": "superchat"}],
+            [{key: value for key, value in replay_rows()[0].items() if key != "video_ref"}],
+            [{**replay_rows()[0], "offset_ms": -1}],
+            [{**replay_rows()[0], "offset_ms": "3000"}],
+            [{**replay_rows()[0], "text": "   "}],
+            [{**replay_rows()[0], "author": ""}],
+            [],
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            for index, rows in enumerate(broken):
+                with self.subTest(case=index):
+                    path = Path(directory) / f"broken{index}.jsonl"
+                    path.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n"
+                                            for row in rows), encoding="utf-8")
+                    with self.assertRaises(SystemExit):
+                        runner.load_replay_rows(path)
+            path = Path(directory) / "notjson.jsonl"
+            path.write_text("{oops\n", encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                runner.load_replay_rows(path)
+
+
+class ReplayPickupAndRunTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.path = write_replay(Path(self.directory.name))
+        rows = runner.load_replay_rows(self.path)
+        self.fixture = runner.build_replay_fixture(sim.load_fixture(REAL_CHAT_FIXTURE), rows)
+        self.stream = runner.build_replay_stream(self.fixture, rows, path=self.path, seed=7)
+        self.picks = sim.plan_pickups(self.stream, self.fixture)
+
+    def test_pickups_run_on_the_replayed_stream(self) -> None:
+        self.assertTrue(self.picks)
+        self.assertTrue(all(pick["effective_kind"] in sim.KINDS for pick in self.picks))
+        self.assertEqual([pick["turn_index"] for pick in self.picks],
+                         list(range(1, len(self.picks) + 1)))
+        self.assertIn("donation", {pick["effective_kind"] for pick in self.picks})
+        texts = {item["text"] for item in self.stream["messages"]}
+        self.assertTrue(all(pick["message"]["text"] in texts for pick in self.picks))
+
+    def test_run_arm_answers_the_real_chat_with_the_real_pseudonyms(self) -> None:
+        transport = _ReplayTransport()
+        result = runner.run_arm(
+            transport, self.fixture, self.stream, self.picks[:6],
+            model="test-model", contract="on", protocol="operational",
+            author_format="runtime", history_turns=8, max_tokens=32, timeout=1.0,
+            pre_session_seeds=False, briefing="on", acts="on", briefing_evidence="off",
+        )
+        turns = [entry for entry in result["transcript"] if entry["stage"] == "turn"]
+        self.assertEqual(len(turns), 6)
+        pseudonyms = {row["author"] for row in replay_rows()}
+        self.assertTrue({entry["author"] for entry in turns} <= pseudonyms)
+        self.assertEqual([entry["chat"] for entry in turns],
+                         [pick["message"]["text"] for pick in self.picks[:6]])
+        self.assertTrue(all(entry["user_sent"].endswith(entry["chat"]) for entry in turns))
+        self.assertEqual(result["summary"]["turns"], 6)
+        self.assertEqual(result["summary"]["transport_failures"], 0)
+
+    def test_main_writes_a_report_bound_to_the_capture(self) -> None:
+        transport = _ReplayTransport()
+        report_path = Path(self.directory.name) / "report.json"
+        packet_path = Path(self.directory.name) / "packet.md"
+        with mock.patch.object(runner.ab, "HttpTransport", return_value=transport):
+            code = runner.main([
+                "--fixture", str(REAL_CHAT_FIXTURE), "--replay-chat", str(self.path),
+                "--max-turns", "3", "--report", str(report_path), "--packet", str(packet_path),
+            ])
+        self.assertEqual(code, 0)
+        self.assertTrue(transport.closed)
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        self.assertEqual(report["stream_messages"], 12)
+        self.assertEqual(report["replay"]["message_count"], 12)
+        self.assertEqual(report["replay"]["source"], "youtube-live")
+        self.assertEqual(report["topic_title"], "AIRI 저스트 채팅 — 시청자와 수다")
+        turns = [entry for entry in report["transcript"] if entry["stage"] == "turn"]
+        self.assertEqual(len(turns), 3)
+        self.assertIn(turns[0]["chat"], {row["text"] for row in replay_rows()})
+        self.assertIn(turns[0]["chat"], packet_path.read_text(encoding="utf-8"))
+
+    def test_replay_requires_a_fixture_and_a_scored_run(self) -> None:
+        cases = [
+            ["--replay-chat", str(self.path)],
+            ["--fixture", str(REAL_CHAT_FIXTURE), "--replay-chat", str(self.path), "--stream-only"],
+            ["--fixture", str(REAL_CHAT_FIXTURE), "--replay-chat", str(self.path),
+             "--rescore", str(self.path)],
+        ]
+        for argv in cases:
+            with self.subTest(argv=argv), self.assertRaises(SystemExit):
+                runner.main(argv)
 
 
 if __name__ == "__main__":

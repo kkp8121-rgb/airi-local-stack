@@ -9,12 +9,19 @@ Two input formats are supported on purpose. `runtime` sends exactly what
 so any nickname in a reply is invented rather than recalled. `named` prefixes the
 handle as a greybox probe of what a name-carrying client would change. Default is
 `runtime`, because that is the path that actually exists.
+
+`--replay-chat` swaps the generated crowd for a pseudonymized capture of real
+viewer chat: same stream shape, same pickup rules, same scoring — only the
+messages come from a file instead of the fixture's templates, so the answers can
+be handed to a human rater instead of a lexical heuristic.
 """
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
+import math
 import os
 import re
 import secrets
@@ -748,6 +755,191 @@ def render_packet(payload: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+# ---------------------------------------------------------------------------
+# 실제 채팅 재생 (--replay-chat)
+# ---------------------------------------------------------------------------
+# 가명화된 실제 시청자 채팅을 템플릿 생성 스트림 대신 흘려보낸다. 스트림의 모양은
+# broadcast_sim.generate_stream 이 만드는 것과 바이트 수준으로 같은 계약이어야
+# 픽업·브리핑·채점이 손대지 않고 그대로 돈다 — 여기서는 난수도 아키타입 템플릿도
+# 쓰지 않고 파일에 적힌 순서와 시각만 따른다.
+REPLAY_ARCHETYPE = "replay"
+REPLAY_ROW_KEYS = ("source", "video_ref", "offset_ms", "author", "kind", "text")
+REPLAY_ROW_KINDS = ("chat", "donation")
+# 후원 의례 채점(score_turn 의 addressee_*)이 재생에서도 성립하도록, 후원 행에는
+# 픽스처 후원과 같은 모양의 검사를 붙인다.
+REPLAY_DONATION_REQUIRED_ANY = ("고마워", "감사")
+# 물음표 없이도 질문인 한국어 종결. 있는 그대로의 시청자 채팅은 문장부호를 자주
+# 뺀다 — 물음표만 보면 대부분의 질문이 reaction 으로 떨어진다.
+REPLAY_QUESTION_TAIL_RE = re.compile(
+    r"(나요|가요|까요|을까|어때|뭐야|뭐임|뭐냐|왜|어디|언제|누구|몇)\s*[?？]?$"
+)
+_HANGUL_BASE = 0xAC00
+_HANGUL_SYLLABLES = 11_172
+_HANGUL_FINAL_RIEUL = 8
+
+
+def _has_rieul_final(char: str) -> bool:
+    """True for a composed Hangul syllable whose final consonant is ㄹ."""
+    code = ord(char) - _HANGUL_BASE
+    return 0 <= code < _HANGUL_SYLLABLES and code % 28 == _HANGUL_FINAL_RIEUL
+
+
+def looks_like_question(text: str) -> bool:
+    """Conservative question heuristic for a capture that carries no labels."""
+    stripped = (text or "").strip()
+    if not stripped:
+        return False
+    if stripped.endswith(("?", "？")):
+        return True
+    if REPLAY_QUESTION_TAIL_RE.search(stripped) is not None:
+        return True
+    # "될까/할까" 같은 의문형은 조합형 한글에 자모 "ㄹ까" 로 적히지 않는다 —
+    # 앞 음절의 종성을 직접 본다("그러니까" 처럼 종성이 없는 꼴은 제외된다).
+    return len(stripped) >= 2 and stripped.endswith("까") and _has_rieul_final(stripped[-2])
+
+
+def load_replay_rows(
+    path: Path,
+    *,
+    start_ms: int | None = None,
+    end_ms: int | None = None,
+    max_messages: int | None = None,
+) -> list[dict[str, Any]]:
+    """Read the pseudonymized capture, failing closed on anything malformed.
+
+    The window bounds are read against the *original* offsets, so a cut can be
+    described with the timestamps the capture itself carries; rebasing happens
+    afterwards in ``build_replay_stream``.
+    """
+    rows: list[dict[str, Any]] = []
+    for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            record = json.loads(stripped)
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"replay row {line_no} is not JSON: {exc}") from exc
+        if not isinstance(record, dict):
+            raise SystemExit(f"replay row {line_no} is not an object")
+        missing = [key for key in REPLAY_ROW_KEYS if key not in record]
+        if missing:
+            raise SystemExit(f"replay row {line_no} is missing {missing}")
+        if record["kind"] not in REPLAY_ROW_KINDS:
+            raise SystemExit(f"replay row {line_no} has an unknown kind: {record['kind']!r}")
+        if type(record["offset_ms"]) is not int or record["offset_ms"] < 0:
+            raise SystemExit(f"replay row {line_no} offset_ms must be a non-negative integer")
+        if not str(record["author"]).strip() or not str(record["text"]).strip():
+            raise SystemExit(f"replay row {line_no} needs both a pseudonym and text")
+        rows.append(record)
+    # 같은 offset 을 가진 행은 파일에 적힌 순서를 유지한다(안정 정렬).
+    rows.sort(key=lambda row: int(row["offset_ms"]))
+    if start_ms is not None:
+        rows = [row for row in rows if int(row["offset_ms"]) >= start_ms]
+    if end_ms is not None:
+        rows = [row for row in rows if int(row["offset_ms"]) <= end_ms]
+    if max_messages is not None:
+        rows = rows[:max_messages]
+    if not rows:
+        raise SystemExit("replay window contains no messages")
+    return rows
+
+
+def replay_span_minutes(rows: Sequence[dict[str, Any]]) -> int:
+    """Broadcast minutes the rebased capture spans — always covering the last row."""
+    span_ms = int(rows[-1]["offset_ms"]) - int(rows[0]["offset_ms"])
+    minutes = max(1, math.ceil(span_ms / 60_000))
+    if span_ms >= minutes * 60_000:
+        # 마지막 메시지가 정확히 분 경계에 있으면 plan_pickups 의 마지막 창
+        # (t_ms < window_end)이 그 메시지를 보지 못한다 — 한 분을 더 준다.
+        minutes += 1
+    return minutes
+
+
+def replay_viewers(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One roster entry per pseudonym, in first-appearance order."""
+    handles: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        handle = str(row["author"])
+        if handle not in seen:
+            seen.add(handle)
+            handles.append(handle)
+    return [{"handle": handle, "archetype": REPLAY_ARCHETYPE, "weight": 1} for handle in handles]
+
+
+def build_replay_fixture(
+    fixture: dict[str, Any], rows: Sequence[dict[str, Any]],
+) -> dict[str, Any]:
+    """A copy of the fixture that knows this capture's roster and its real span.
+
+    ``score_turn`` reads the roster to tell a recalled handle from an invented
+    one, and a fixture committed to the repository must not carry pseudonyms
+    from a real stream — so the roster is assembled here at run time and then
+    validated exactly like a fixture read from disk.
+    """
+    merged = copy.deepcopy(fixture)
+    existing = {viewer["handle"] for viewer in merged["viewers"]}
+    merged["viewers"] = list(merged["viewers"]) + [
+        viewer for viewer in replay_viewers(rows) if viewer["handle"] not in existing
+    ]
+    minutes = replay_span_minutes(rows)
+    if minutes > int(merged["rates"]["broadcast_minutes"]):
+        merged["rates"]["broadcast_minutes"] = minutes
+        merged["topic"]["beats"][-1]["end_minute"] = minutes
+    return sim.validate_fixture(merged)
+
+
+def build_replay_stream(
+    fixture: dict[str, Any],
+    rows: Sequence[dict[str, Any]],
+    *,
+    path: Path,
+    seed: int,
+) -> dict[str, Any]:
+    """Assemble the stream the runner consumes, without generating any chat."""
+    base_ms = int(rows[0]["offset_ms"])
+    donation_index = 0
+    messages: list[dict[str, Any]] = []
+    for index, row in enumerate(rows):
+        t_ms = int(row["offset_ms"]) - base_ms
+        text = str(row["text"])
+        message: dict[str, Any] = {
+            "author": str(row["author"]),
+            "archetype": REPLAY_ARCHETYPE,
+            "kind": "reaction",
+            "text": text,
+            "minute": t_ms // 60_000,
+            "t_ms": t_ms,
+            "id": f"m{index:04d}",
+        }
+        if row["kind"] == "donation":
+            message.update({
+                "kind": "donation",
+                "amount_label": str(row.get("amount_label") or ""),
+                "checks": {"required_any": list(REPLAY_DONATION_REQUIRED_ANY), "forbidden": []},
+                "donation_index": donation_index,
+            })
+            donation_index += 1
+        elif looks_like_question(text):
+            message["kind"] = "question"
+        messages.append(message)
+    return {
+        "schema_version": sim.STREAM_SCHEMA_VERSION,
+        "seed": seed,
+        "fixture_sha256": sim.sha256_of(fixture),
+        "topic_title": fixture["topic"]["title"],
+        "broadcast_minutes": replay_span_minutes(rows),
+        "messages": messages,
+        # 원문은 리포트에도 저장소에도 남기지 않는다 — 출처·규모·파일 해시만 남긴다.
+        "replay": {
+            "path_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "message_count": len(messages),
+            "source": ",".join(sorted({str(row["source"]) for row in rows})),
+        },
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="100-viewer first-broadcast simulation")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
@@ -771,6 +963,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                         help="P2 결정론 발화 (thank 렌더러·여론 오프너·기억 가드)")
     parser.add_argument("--briefing-evidence", choices=("off", "on"), default="off",
                         help="브리핑에 회상 재료가 실린 턴에 근거 신호 헤더 부착 (기본 off = 기존과 동일)")
+    parser.add_argument("--replay-chat", type=Path, default=None,
+                        help="가명화된 실제 채팅 JSONL 을 템플릿 생성 채팅 대신 재생한다 (--fixture 필수)")
+    parser.add_argument("--replay-start-ms", type=int, default=None,
+                        help="재생 구간 시작 (원본 offset_ms 기준, 포함)")
+    parser.add_argument("--replay-end-ms", type=int, default=None,
+                        help="재생 구간 끝 (원본 offset_ms 기준, 포함)")
+    parser.add_argument("--replay-max-messages", type=int, default=None,
+                        help="재생할 최대 메시지 수 (구간을 자른 뒤 앞에서부터)")
     parser.add_argument("--stream-only", action="store_true", help="모델 호출 없이 스트림/픽업만 낸다")
     parser.add_argument("--rescore", type=Path, help="기존 리포트를 모델 호출 없이 재채점한다")
     parser.add_argument("--report", type=Path)
@@ -786,6 +986,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise SystemExit("live broadcast context requires configured capability tokens")
     if args.live_broadcast_context == "on" and (args.stream_only or args.rescore):
         raise SystemExit("live broadcast context requires scored live chat turns")
+    if args.replay_chat and (args.stream_only or args.rescore):
+        # 재생은 사람이 읽을 응답을 얻으려고 도는 것이고, 재채점은 결정론 스트림을
+        # seed 로 되살리는 경로다 — 둘은 같은 실행에서 성립하지 않는다.
+        raise SystemExit("replay chat requires a scored run (not --stream-only/--rescore)")
+    if args.replay_chat and not args.fixture:
+        raise SystemExit("replay chat requires an explicit --fixture")
 
     if args.rescore:
         payload = rescore_report(json.loads(args.rescore.read_text(encoding="utf-8")),
@@ -798,7 +1004,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     fixture = sim.load_fixture(args.fixture) if args.fixture else sim.load_fixture()
-    stream = sim.generate_stream(fixture, seed=args.seed)
+    if args.replay_chat:
+        replay_rows = load_replay_rows(
+            args.replay_chat, start_ms=args.replay_start_ms, end_ms=args.replay_end_ms,
+            max_messages=args.replay_max_messages,
+        )
+        fixture = build_replay_fixture(fixture, replay_rows)
+        stream = build_replay_stream(fixture, replay_rows, path=args.replay_chat, seed=args.seed)
+    else:
+        stream = sim.generate_stream(fixture, seed=args.seed)
     picks = sim.plan_pickups(stream, fixture, max_turns=args.max_turns)
 
     if args.stream_only:
@@ -942,6 +1156,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "seed": args.seed,
         "fixture_sha256": stream["fixture_sha256"],
         "stream_messages": len(stream["messages"]),
+        "replay": stream.get("replay"),
         "history_turns": args.history_turns,
         **result,
     }

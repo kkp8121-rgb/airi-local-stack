@@ -1,0 +1,88 @@
+{
+  "schema_version": "airi.broadcast-sim-fixture.v1",
+  "synthetic_only": true,
+  "note": "실제 시청자 채팅(가명화 JSONL)을 run_broadcast_sim.py --replay-chat 으로 재생하기 위한 최소 픽스처다. 이 파일 자체에는 실제 대화가 한 줄도 없고, 시청자 로스터는 replay 시점에 가명 목록으로 런타임에서 채워 넣는다. 자리표시 시청자 둘은 validate_fixture 의 최소 로스터(2명) 요건 때문에만 존재한다. replay 구간이 60분을 넘으면 러너가 마지막 beat 의 end_minute 과 rates.broadcast_minutes 를 런타임에서 늘린다.",
+  "topic": {
+    "title": "AIRI 저스트 채팅 — 시청자와 수다",
+    "signature_greeting": "왔네! 오늘은 그냥 편하게 수다나 떨자.",
+    "beats": [
+      {
+        "id": "opening",
+        "label": "오프닝",
+        "start_minute": 0,
+        "end_minute": 15,
+        "airi_cue": "이제 막 방송 켰어. 올라오는 채팅 보면서 가볍게 인사하고 근황부터 풀어.",
+        "anchors": ["채팅", "오늘", "이야기", "근황"]
+      },
+      {
+        "id": "warmup",
+        "label": "채팅 받기",
+        "start_minute": 15,
+        "end_minute": 30,
+        "airi_cue": "채팅이 붙기 시작했어. 올라온 얘기를 하나씩 받아서 이어 말해.",
+        "anchors": ["채팅", "오늘", "이야기", "근황"]
+      },
+      {
+        "id": "middle",
+        "label": "중반 수다",
+        "start_minute": 30,
+        "end_minute": 45,
+        "airi_cue": "중반이야. 흐름을 유지하면서 아까 나온 이야기랑 연결해서 말해.",
+        "anchors": ["채팅", "오늘", "이야기", "근황"]
+      },
+      {
+        "id": "closing",
+        "label": "마무리",
+        "start_minute": 45,
+        "end_minute": 60,
+        "airi_cue": "마무리 구간이야. 남은 채팅을 정리하고 다음 방송 이야기로 자연스럽게 넘겨.",
+        "anchors": ["채팅", "오늘", "이야기", "근황"]
+      }
+    ]
+  },
+  "rates": {
+    "broadcast_minutes": 60,
+    "window_seconds": 5,
+    "turn_cooldown_seconds": 18,
+    "active_viewers_min": 1,
+    "active_viewers_max": 2,
+    "active_churn_per_minute": 0,
+    "messages_per_minute_min": 3,
+    "messages_per_minute_max": 5,
+    "offtopic_ratio": 0.0,
+    "opinion_wave_size": 3,
+    "opinion_aggregate_threshold": 3,
+    "pending_stale_seconds": 95
+  },
+  "pickup_priority": ["donation", "question", "reaction", "offtopic"],
+  "archetypes": {
+    "replay": {
+      "kind": "question",
+      "templates": ["오늘 뭐 해?"]
+    },
+    "offtopic_chatter": {
+      "kind": "offtopic",
+      "templates": ["배고프다 뭐 먹지", "밖에 눈 온다", "졸리다 자야지"]
+    }
+  },
+  "briefing": {
+    "max_viewer_lines": 2,
+    "max_recent_picks": 2,
+    "max_line_chars": 44,
+    "recent_donation_window_ms": 120000,
+    "min_echo_response_chars": 8,
+    "relevant_line_directive": "- 이 시청자가 아까 \"{line}\"라고 했어. 지금 그 얘기를 묻는 거니까 그 내용을 그대로 써서 답해."
+  },
+  "aggregation_openers": [
+    "오, {주제} 얘기 다들 하네.",
+    "{주제} 궁금한 사람 많네.",
+    "{주제} 얘기가 한꺼번에 올라왔어."
+  ],
+  "memory_guard_fallback": "음… 그건 확실하게 기억 안 나. 다시 알려줄래?",
+  "donations": [],
+  "memory_probes": [],
+  "viewers": [
+    {"handle": "리플레이자리표시하나", "archetype": "replay", "weight": 1},
+    {"handle": "리플레이자리표시둘", "archetype": "replay", "weight": 1}
+  ]
+}
