@@ -10,6 +10,7 @@
 ## 2026-08-26 M7 — 타계책 실행 (되먹임 고리 차단·1변수 실험)
 
 - 2026-08-26 21:32 KST 문서·push receipt. `d331ef8`(`docs: record M7 run 07 human rating`)을 `git push origin main` exit 0으로 `afe7a96..d331ef8` push; post-push HEAD = origin/main. dashboard·work-continuity 계약 PASS. 운영 flag·GPU 학습·다음 실험 없음.
+- 2026-08-26 21:40 KST 상태 대조 정정. local HEAD = origin/main = `cf00644`, worktree clean. 21:32 receipt의 pending-documentation 표기는 stale였으며, 코드·서비스·실험 상태 변화 없음.
 - 2026-08-26 21:30 KST run 07-r2 사람 채점 receipt(Codex 확인). `ratings-codex-viewer.json` 99/99턴·SHA256 `B46B12DEDD2E81E34AA77803FF54DB5348CE5BA98622BFE400676B40C0632791`: run 04 대비 방송다움 +0.6465·맥락 +1.4848·반응 +0.9091이지만 3축 합성 2.77<3.0, critical 1/99, filler 22/99(22.22%; 기준 ≤5%)로 돌파·07 평가 기본 채택 실패. `ratings-claude-preliminary.json`은 JSON 문법 오류로 비교 근거 제외. 운영 flag·GPU 학습·다음 실험을 실행하지 않고, S3 예시 또는 긍정 에코 대응 중 다음 1변수의 사용자 결정을 대기.
 - 2026-08-26 21:09 KST Codex 인계. push `a642150..a54d8dd`(가드·전사 옵션·S6 문서). `진행중/AIRI-CODEX-HANDOFF-2026-08-26-M7.md` 작성 — 진입점·증명 7건·다음 작업
   (07-r2 채점 → 07 구성 채택 판정 → 1변수)·재현 명령·sha·금지. 도구 사본 `D:/AIRI-Models/airi-eval-tools/20260826/`. 대기: 07-r2 사람 채점.
