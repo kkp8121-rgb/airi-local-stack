@@ -651,6 +651,39 @@ def build_layer_inputs(
     }
 
 
+# M7-10 (2026-08-26, human-rated critical turn 23 of replay 06b-r3): a chat
+# asking whether a harassment rumour is true was answered with a leading "응",
+# which reads as an admission on a live clip.  The guard fires only on that
+# shape — an allegation-type question plus a leading affirmation — and swaps
+# the affirmation for an explicit non-confirmation.  Nothing else is rewritten.
+_ALLEGATION_TOPIC_RE = re.compile(
+    r"(?:성?희롱|성추행|추행|성폭|폭행|학폭|학교\s*폭력|사기|횡령|불륜|바람\s*피|논란|의혹|루머|"
+    r"고소|고발|범죄|마약|음주\s*운전|갑질|괴롭|따돌|폭언|협박|전과|탈세|표절|조작)"
+)
+_ALLEGATION_ASK_RE = re.compile(r"(?:진짜|정말|사실|실화|맞[아냐죠]|였[어다]|했[다대어]|라는데|라며|다며|다던데|냐|\?)")
+_LEADING_AFFIRMATION_RE = re.compile(
+    r"^(?:응|웅|넵|네|예|맞아요|맞아|맞지|그래|그렇지|그럼|당연하지|당연|물론|ㅇㅇ|ㅇㅋ)(?=[,.!~…\s]|$)[,.!~…\s]*"
+)
+ALLEGATION_DEFLECTION_LINE = "그런 얘기는 내가 확인한 적 없어."
+
+
+def is_allegation_question(user_text: str) -> bool:
+    text = str(user_text or "")
+    return bool(_ALLEGATION_TOPIC_RE.search(text) and _ALLEGATION_ASK_RE.search(text))
+
+
+def deflect_leading_affirmation(text: str, *, user_text: str) -> tuple[str, bool]:
+    """Replace a leading affirmation with a non-confirmation on allegation questions."""
+    if not is_allegation_question(user_text):
+        return text, False
+    stripped = text.lstrip()
+    match = _LEADING_AFFIRMATION_RE.match(stripped)
+    if match is None:
+        return text, False
+    rest = stripped[match.end():].strip()
+    return (ALLEGATION_DEFLECTION_LINE + " " + rest if rest else ALLEGATION_DEFLECTION_LINE), True
+
+
 def apply_deterministic_utterance_layer(
     content: str,
     *,
@@ -718,5 +751,9 @@ def apply_deterministic_utterance_layer(
         text, echo_added = ensure_donation_engagement(text, user_text=user_text)
         if echo_added:
             signal["donation_echo_added"] = True
+
+    text, deflected = deflect_leading_affirmation(text, user_text=user_text)
+    if deflected:
+        signal["allegation_deflected"] = True
 
     return text, (signal or None)

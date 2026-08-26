@@ -538,5 +538,42 @@ class LayerCompositionTests(unittest.TestCase):
             self.assertIn(expected, inputs["pool_text"])
 
 
+class AllegationGuardTests(unittest.TestCase):
+    # 실측(replay 06b-r3 23턴, 사람 채점 치명): 희롱 루머 질문에 "응, …"으로 답해
+    # 시인으로 읽혔다. 의혹 질문 + 선행 긍정일 때만 확인 부정 선행어로 바꾼다.
+    RUMOUR = "[YouTube] 심지어 직장 동료도 희롱했다는게 진짜에요?"
+
+    def test_leading_affirmation_becomes_a_non_confirmation(self) -> None:
+        text, deflected = dul.deflect_leading_affirmation("응, 지금 채팅 보고 있어.", user_text=self.RUMOUR)
+        self.assertTrue(deflected)
+        self.assertEqual(text, dul.ALLEGATION_DEFLECTION_LINE + " 지금 채팅 보고 있어.")
+
+    def test_affirmation_only_draft_becomes_the_line_alone(self) -> None:
+        for draft in ("응", "맞아.", "그래~", "ㅇㅇ"):
+            text, deflected = dul.deflect_leading_affirmation(draft, user_text=self.RUMOUR)
+            self.assertTrue(deflected, draft)
+            self.assertEqual(text, dul.ALLEGATION_DEFLECTION_LINE, draft)
+
+    def test_non_affirmative_draft_is_left_alone(self) -> None:
+        for draft in ("그런 적 없어. 누가 그래?", "아니, 처음 듣는 얘기야.", "응원해 줘서 고마워."):
+            text, deflected = dul.deflect_leading_affirmation(draft, user_text=self.RUMOUR)
+            self.assertFalse(deflected, draft)
+            self.assertEqual(text, draft)
+
+    def test_ordinary_questions_keep_their_yes(self) -> None:
+        for question in ("[YouTube] 오늘 방송 해?", "[YouTube] 그 게임 진짜 재밌어?", "[YouTube] 희롱이 뭐야"):
+            text, deflected = dul.deflect_leading_affirmation("응, 지금 켰어.", user_text=question)
+            self.assertFalse(deflected, question)
+            self.assertEqual(text, "응, 지금 켰어.")
+
+    def test_layer_reports_the_deflection_signal(self) -> None:
+        text, signal = dul.apply_deterministic_utterance_layer(
+            "응, 지금 채팅 보고 있어.",
+            user_text=self.RUMOUR, prompt_text="", pool_text="",
+            past_tokens=frozenset(), donation_turn=False)
+        self.assertTrue(text.startswith(dul.ALLEGATION_DEFLECTION_LINE))
+        self.assertTrue(signal["allegation_deflected"])
+
+
 if __name__ == "__main__":
     unittest.main()
