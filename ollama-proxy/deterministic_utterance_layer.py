@@ -35,8 +35,11 @@ Parts (see AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md):
   the surviving text no longer names its subject, a deterministic
   acknowledgement of subject+B is prepended.
 - P5 ``ensure_donation_engagement``: on a donation-continuation turn whose
-  draft shares no content token with the donation message, a deterministic
-  thanks line quoting the message is appended.
+  draft never thanks the viewer, one fixed neutral thanks line is appended.
+  The layer never repeats any part of the donation message, and when that
+  message trips a conservative unsafe-content screen
+  (``strip_unsafe_donation_echo``) draft sentences that parrot it are dropped
+  first, so nothing said to AIRI is read back on air.
 
 All behavior sits behind ``AIRI_DETERMINISTIC_UTTERANCE_LAYER`` (default off).
 With the flag off every entry point returns its input unchanged.  Pure
@@ -475,22 +478,85 @@ def suppress_rejected_branch(
     return result, dropped, ack_added
 
 
+DONATION_THANKS_LINE = "후원 고마워!"
+_THANKS_TOKEN_RE = re.compile(r"고마워|고맙|감사")
+_DONATION_PREFIXES = ("[YouTube]", "[후원]")
+# A draft sentence sharing this many consecutive characters with an unsafe
+# donation message is parroting it, not composing.
+_MIN_DONATION_ECHO_SPAN = 6
+
+# Conservative unsafe-content screen for the donation message.  It decides only
+# whether AIRI may repeat any of the viewer's own words — never whether the
+# viewer may speak, and never a block.  A false positive costs one dropped
+# draft sentence plus the neutral thanks line, while a false negative reads
+# sexual, harassing, or racist text back on air, so the list leans toward
+# catching.  Bare "년"/"벗" are excluded because they are ordinary words
+# (작년, 벗어나다); only their slur and undressing forms are listed.
+_UNSAFE_DONATION_RE = re.compile(
+    # 성적 표현
+    "가슴|신음|섹스|섹시|야한|야동|자위|성희롱|만지|팬티|속옷"
+    r"|벗겨|벗기|옷\s*벗|벗어\s*(?:줘|봐|보)"
+    # 인종·차별
+    "|흑인|백인|인종|장애인"
+    # 욕설
+    "|병신|씨발|시발|좆|새끼|(?:개|미친|썅)년|년아"
+)
+
+
+def _donation_message_body(user_text: str) -> str:
+    body = (user_text or "").strip()
+    for prefix in _DONATION_PREFIXES:
+        if body.startswith(prefix):
+            body = body[len(prefix):].strip()
+    return body
+
+
+def _repeats_donation_span(sentence: str, compact_message: str) -> bool:
+    compact = re.sub(r"\s+", "", sentence)
+    span = _MIN_DONATION_ECHO_SPAN
+    if len(compact) < span or len(compact_message) < span:
+        return False
+    return any(
+        compact_message[start:start + span] in compact
+        for start in range(len(compact_message) - span + 1)
+    )
+
+
+def strip_unsafe_donation_echo(text: str, *, user_text: str) -> tuple[str, int]:
+    """P5 screen: drop draft sentences that parrot an unsafe donation message.
+
+    Human rating of a real-chat replay found the old quoting P5 reading
+    harassing donation text back on air verbatim.  Nothing the layer adds can
+    quote the message any more, but the model's own draft can still parrot it,
+    so when the message trips ``_UNSAFE_DONATION_RE`` every sentence sharing a
+    ``_MIN_DONATION_ECHO_SPAN``-character run with it is removed.  Whitespace
+    is ignored on both sides so a respaced repeat is still caught.  Returns the
+    surviving text (possibly empty) and how many sentences were dropped.
+    """
+    message = _donation_message_body(user_text)
+    if not text or not message or not _UNSAFE_DONATION_RE.search(message):
+        return text, 0
+    compact_message = re.sub(r"\s+", "", message)
+    kept: list[str] = []
+    stripped = 0
+    for sentence in split_sentences(text):
+        if _repeats_donation_span(sentence, compact_message):
+            stripped += 1
+        else:
+            kept.append(sentence)
+    if not stripped:
+        return text, 0
+    return " ".join(kept).strip(), stripped
+
+
 def ensure_donation_engagement(text: str, *, user_text: str) -> tuple[str, bool]:
-    """P5: guarantee token overlap with, and thanks for, the donation message."""
-    message_tokens = _content_tokens(user_text)
-    if not message_tokens:
+    """P5: thank the donation without ever repeating what it said."""
+    if not _donation_message_body(user_text):
         return text, False
-    if _content_tokens(text) & message_tokens:
+    text, _stripped = strip_unsafe_donation_echo(text, user_text=user_text)
+    if text and _THANKS_TOKEN_RE.search(text):
         return text, False
-    clip = (user_text or "").strip()
-    for prefix in ("[YouTube]", "[후원]"):
-        if clip.startswith(prefix):
-            clip = clip[len(prefix):].strip()
-    clip = clip[:40].strip()
-    if not clip:
-        return text, False
-    addition = f"'{clip}' 이렇게 보내 줘서 진짜 고마워!"
-    combined = f"{text} {addition}".strip() if text else addition
+    combined = f"{text} {DONATION_THANKS_LINE}".strip() if text else DONATION_THANKS_LINE
     return combined, True
 
 
@@ -646,6 +712,9 @@ def apply_deterministic_utterance_layer(
             signal["past_only_replaced"] = sorted(set(replaced))
 
     if donation_turn:
+        text, stripped = strip_unsafe_donation_echo(text, user_text=user_text)
+        if stripped:
+            signal["donation_unsafe_stripped"] = stripped
         text, echo_added = ensure_donation_engagement(text, user_text=user_text)
         if echo_added:
             signal["donation_echo_added"] = True

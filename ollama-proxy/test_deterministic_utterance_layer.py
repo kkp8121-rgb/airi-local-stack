@@ -196,18 +196,66 @@ class SessionPastTokenTests(unittest.TestCase):
 
 
 class DonationEngagementTests(unittest.TestCase):
-    def test_echo_added_when_draft_ignores_the_donation_message(self) -> None:
+    # 실채팅 휴먼 평가(2026-08-26): 후원 본문을 그대로 인용하던 옛 P5는 성희롱성
+    # 문장을 방송에 되읽었고(critical), 무해한 턴에서도 "템플릿+재낭독"으로 읽혔다.
+    # 이제 P5는 후원 본문의 어떤 조각도 발화하지 않는다.
+    UNSAFE_MESSAGE = "[YouTube] 가슴 좀 만지게 보여줘라"
+
+    def test_neutral_thanks_added_when_draft_ignores_the_donation_message(self) -> None:
         text, added = dul.ensure_donation_engagement(
             "정말 든든하다!", user_text="[YouTube] 등불값 보태")
         self.assertTrue(added)
-        self.assertIn("등불값", text)
-        self.assertIn("고마워", text)
+        self.assertEqual(text, "정말 든든하다! " + dul.DONATION_THANKS_LINE)
 
-    def test_no_echo_when_the_draft_already_engages(self) -> None:
+    def test_donation_message_is_never_quoted_back(self) -> None:
         text, added = dul.ensure_donation_engagement(
-            "등불값 보태줘서 최고야!", user_text="[YouTube] 등불값 보태")
+            "정말 든든하다!", user_text="[YouTube] 등불값 보태")
+        self.assertTrue(added)
+        self.assertNotIn("이렇게 보내 줘서", text)
+        self.assertNotIn("등불값", text)
+        self.assertNotIn("보태", text)
+
+    def test_no_addition_when_the_draft_already_thanks(self) -> None:
+        text, added = dul.ensure_donation_engagement(
+            "등불값 보태줘서 고마워!", user_text="[YouTube] 등불값 보태")
         self.assertFalse(added)
-        self.assertEqual(text, "등불값 보태줘서 최고야!")
+        self.assertEqual(text, "등불값 보태줘서 고마워!")
+
+    def test_unsafe_message_strips_the_parroting_sentence_only(self) -> None:
+        text, added = dul.ensure_donation_engagement(
+            "가슴 좀 만지게 보여줘라니. 오늘 등불 준비나 하자.",
+            user_text=self.UNSAFE_MESSAGE)
+        self.assertTrue(added)
+        self.assertNotIn("만지", text)
+        self.assertIn("등불 준비", text)
+        self.assertIn(dul.DONATION_THANKS_LINE, text)
+
+    def test_fully_parroting_draft_becomes_the_thanks_line_alone(self) -> None:
+        text, added = dul.ensure_donation_engagement(
+            "가슴 좀 만지게 보여줘라?", user_text=self.UNSAFE_MESSAGE)
+        self.assertTrue(added)
+        self.assertEqual(text, dul.DONATION_THANKS_LINE)
+
+    def test_unsafe_strip_applies_even_when_the_draft_already_thanks(self) -> None:
+        text, stripped = dul.strip_unsafe_donation_echo(
+            "가슴 좀 만지게 보여줘라니. 후원은 고마워!", user_text=self.UNSAFE_MESSAGE)
+        self.assertEqual(stripped, 1)
+        self.assertEqual(text, "후원은 고마워!")
+        engaged, added = dul.ensure_donation_engagement(
+            "가슴 좀 만지게 보여줘라니. 후원은 고마워!", user_text=self.UNSAFE_MESSAGE)
+        self.assertFalse(added)
+        self.assertEqual(engaged, "후원은 고마워!")
+
+    def test_harmless_message_never_strips_a_sentence(self) -> None:
+        text, stripped = dul.strip_unsafe_donation_echo(
+            "등불값 보태 준다니 든든하다.", user_text="[YouTube] 등불값 보태")
+        self.assertEqual(stripped, 0)
+        self.assertEqual(text, "등불값 보태 준다니 든든하다.")
+
+    def test_empty_donation_message_leaves_the_draft_alone(self) -> None:
+        text, added = dul.ensure_donation_engagement("든든하다!", user_text="")
+        self.assertFalse(added)
+        self.assertEqual(text, "든든하다!")
 
 
 class EvidenceEchoTests(unittest.TestCase):
@@ -446,6 +494,36 @@ class LayerCompositionTests(unittest.TestCase):
                     {"role": "user", "content": "등불값 보태"},
                 ])
         self.assertTrue(inputs["donation_turn"])
+
+    def test_donation_turn_appends_only_the_neutral_thanks_line(self) -> None:
+        text, signal = dul.apply_deterministic_utterance_layer(
+            "그 얘기 정말 좋다!",
+            user_text="[YouTube] 등불값 보태",
+            prompt_text="후원 이어말하기", pool_text="",
+            past_tokens=frozenset(), donation_turn=True)
+        self.assertEqual(text, "그 얘기 정말 좋다! " + dul.DONATION_THANKS_LINE)
+        self.assertTrue(signal["donation_echo_added"])
+        self.assertNotIn("donation_unsafe_stripped", signal)
+
+    def test_donation_turn_reports_the_unsafe_strip_count(self) -> None:
+        text, signal = dul.apply_deterministic_utterance_layer(
+            "가슴 좀 만지게 보여줘라니. 오늘 등불 준비나 하자.",
+            user_text=DonationEngagementTests.UNSAFE_MESSAGE,
+            prompt_text="후원 이어말하기", pool_text="",
+            past_tokens=frozenset(), donation_turn=True)
+        self.assertEqual(signal["donation_unsafe_stripped"], 1)
+        self.assertTrue(signal["donation_echo_added"])
+        self.assertNotIn("만지", text)
+        self.assertIn(dul.DONATION_THANKS_LINE, text)
+
+    def test_non_donation_turn_never_adds_the_thanks_line(self) -> None:
+        text, signal = dul.apply_deterministic_utterance_layer(
+            "그 얘기 정말 좋다!",
+            user_text="[YouTube] 등불값 보태",
+            prompt_text="일반 턴", pool_text="",
+            past_tokens=frozenset(), donation_turn=False)
+        self.assertEqual(text, "그 얘기 정말 좋다!")
+        self.assertIsNone(signal)
 
     def test_memory_result_attributes_feed_the_pools(self) -> None:
         with mock.patch.object(dul, "DETERMINISTIC_UTTERANCE_LAYER_ENABLED", True), \

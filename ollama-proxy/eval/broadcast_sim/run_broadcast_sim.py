@@ -95,6 +95,10 @@ DONATION_CONTINUATION_CONTRACT = (
     "이름이나 감사를 반복하지 말고, 현재 후원 메시지의 내용에 대한 본답변만 이어서 말해. "
     "입력과 방송 맥락에 있는 사실을 받아 자기 판단과 이유를 자연스럽게 밝힌 뒤 방송 흐름으로 돌아와."
 )
+# 프록시 결정론 계층(P5)이 후원 턴 본문 끝에 붙이는 고정 감사 문장. 실제 발화에는
+# 남기고, 되먹임 사본에서만 떼어낸다 — 감사 문구가 히스토리에 쌓이면 모델이 이후
+# 질문에도 감사로 답한다(사람 평가 run 04 실측: 이어진 질문 23건이 "고마워.").
+DONATION_ECHO_THANKS = "후원 고마워!"
 
 
 def build_system_content(fixture: dict[str, Any], beat: dict[str, Any], contract: str) -> str:
@@ -451,6 +455,16 @@ def run_live_capability_turn(
         time.sleep(0.05)
 
 
+def strip_donation_ritual(body: str, opener: str) -> str:
+    """의례를 뺀, 모델이 실제로 이어 말한 본문만 남긴다(되먹임 사본 전용)."""
+    text = body or ""
+    if opener and text.startswith(opener):
+        text = text[len(opener):]
+    if text.rstrip().endswith(DONATION_ECHO_THANKS):
+        text = text.rstrip()[: -len(DONATION_ECHO_THANKS)]
+    return text.strip()
+
+
 def run_arm(
     transport: Any,
     fixture: dict[str, Any],
@@ -684,16 +698,16 @@ def run_arm(
             "deterministic_act": deterministic_act,
             "backlog_size": pick["backlog_size"], "backlog_ids": pick["backlog_ids"],
         })
-        # Task 13: 렌더러가 부른 이름이 되먹여지면 이후 모델 턴이 그 이름을 재호명한다
-        # (Task 9 실측 19턴 중 16건). 실제 발화(트랜스크립트·채점)는 그대로 두고,
-        # 히스토리·브리핑으로 되먹이는 사본만 이름 없는 A4.2 v1 문구로 치환한다.
-        if deterministic_act == "thank_renderer":
-            continuation = body[len(donation_opener):].strip() if body.startswith(donation_opener) else body
-            fed_response = f"{thank_renderer._TEMPLATES['thank']} {continuation}".strip()
+        # Task 13 → run 04: 의례는 대화가 아니다. 렌더러 호명을 되먹이면 이후 턴이
+        # 그 이름을 재호명했고(Task 9 실측 19턴 중 16건), 감사 문구까지 되먹이자
+        # 모델이 뒤이은 질문 23건에 "고마워."로 답했다(사람 평가 run 04). 실제
+        # 발화(트랜스크립트·채점)는 그대로 두고, 후원 턴은 히스토리에 아예 넣지
+        # 않으며 브리핑 "방금 흐름"에는 모델이 이어 말한 본문만 남긴다.
+        if deterministic_act == "thank_renderer" or body.rstrip().endswith(DONATION_ECHO_THANKS):
+            answered_picks.append({**pick, "response": strip_donation_ritual(body, donation_opener)})
         else:
-            fed_response = body
-        history.append((user_content, fed_response))
-        answered_picks.append({**pick, "response": fed_response})
+            history.append((user_content, body))
+            answered_picks.append({**pick, "response": body})
 
     transcript.append({"stage": "scripted_closing", "airi": "오늘 여기까지야. 와줘서 고마워, 다음에 또 보자!"})
     summary = sim.summarize_turns(rows)
@@ -803,6 +817,12 @@ REPLAY_ROW_KINDS = ("chat", "donation")
 # 후원 의례 채점(score_turn 의 addressee_*)이 재생에서도 성립하도록, 후원 행에는
 # 픽스처 후원과 같은 모양의 검사를 붙인다.
 REPLAY_DONATION_REQUIRED_ANY = ("고마워", "감사")
+# 이 금액(원) 미만의 후원은 평범한 채팅으로 받는다 — 의례를 돌리지 않는다. 실제
+# 채팅 재생 run 04 에서 치즈 한 건 한 건이 전부 "donation" 으로 들어와 99턴 중
+# 35턴이 호명+감사 의례가 됐고, 대부분은 농담을 실은 1,000원짜리였다(사람 평가:
+# "템플릿 오발동"). 금액을 읽을 수 없는 라벨도 같은 이유로 소액 취급한다 —
+# 의례는 확실히 큰 후원일 때만 나가야 한다.
+REPLAY_DONATION_RITUAL_MIN_AMOUNT = 5000
 # 물음표 없이도 질문인 한국어 종결. 있는 그대로의 시청자 채팅은 문장부호를 자주
 # 뺀다 — 물음표만 보면 대부분의 질문이 reaction 으로 떨어진다.
 REPLAY_QUESTION_TAIL_RE = re.compile(
@@ -831,6 +851,18 @@ def looks_like_question(text: str) -> bool:
     # "될까/할까" 같은 의문형은 조합형 한글에 자모 "ㄹ까" 로 적히지 않는다 —
     # 앞 음절의 종성을 직접 본다("그러니까" 처럼 종성이 없는 꼴은 제외된다).
     return len(stripped) >= 2 and stripped.endswith("까") and _has_rieul_final(stripped[-2])
+
+
+def replay_donation_amount(label: object) -> int | None:
+    """Chzzk 의 평문 숫자 ``amount_label`` 만 금액으로 읽는다(그 외는 None).
+
+    YouTube 의 "₩5,000" 이나 "5,000원" 처럼 통화·구분자가 섞인 라벨은 캡처마다
+    표기가 달라 신뢰할 수 없으므로 파싱하지 않는다.
+    """
+    text = str(label or "").strip()
+    if not text or not text.isascii() or not text.isdigit():
+        return None
+    return int(text)
 
 
 def load_replay_rows(
@@ -935,6 +967,8 @@ def build_replay_stream(
     """Assemble the stream the runner consumes, without generating any chat."""
     base_ms = int(rows[0]["offset_ms"])
     donation_index = 0
+    donation_ritual = 0
+    donation_small = 0
     messages: list[dict[str, Any]] = []
     for index, row in enumerate(rows):
         t_ms = int(row["offset_ms"]) - base_ms
@@ -949,13 +983,23 @@ def build_replay_stream(
             "id": f"m{index:04d}",
         }
         if row["kind"] == "donation":
-            message.update({
-                "kind": "donation",
-                "amount_label": str(row.get("amount_label") or ""),
-                "checks": {"required_any": list(REPLAY_DONATION_REQUIRED_ANY), "forbidden": []},
-                "donation_index": donation_index,
-            })
-            donation_index += 1
+            label = str(row.get("amount_label") or "")
+            amount = replay_donation_amount(label)
+            if amount is not None and amount >= REPLAY_DONATION_RITUAL_MIN_AMOUNT:
+                message.update({
+                    "kind": "donation",
+                    "amount_label": label,
+                    "checks": {"required_any": list(REPLAY_DONATION_REQUIRED_ANY), "forbidden": []},
+                    "donation_index": donation_index,
+                })
+                donation_index += 1
+                donation_ritual += 1
+            else:
+                # 소액 치즈는 평범한 채팅으로 받되, 팁을 실었다는 사실은 남긴다.
+                message.update({"donation_small": True, "amount_label": label})
+                if looks_like_question(text):
+                    message["kind"] = "question"
+                donation_small += 1
         elif looks_like_question(text):
             message["kind"] = "question"
         messages.append(message)
@@ -971,6 +1015,8 @@ def build_replay_stream(
             "path_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
             "message_count": len(messages),
             "source": ",".join(sorted({str(row["source"]) for row in rows})),
+            "donation_ritual": donation_ritual,
+            "donation_small": donation_small,
         },
     }
 

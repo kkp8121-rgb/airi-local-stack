@@ -299,6 +299,45 @@ class PseudonymTest(unittest.TestCase):
         self.assertNotEqual(a, b)
         self.assertNotEqual(a, c)
 
+    def test_unknown_nickname_style_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            importer.hash_author(b"k" * 32, "chzzk", "u1hash", style="real")
+
+
+class KoreanNicknameTest(unittest.TestCase):
+    KEY = b"k" * 32
+
+    def test_word_pool_is_large_distinct_and_two_syllable_hangul(self) -> None:
+        pool = importer.KOREAN_NICKNAME_WORDS
+        self.assertGreaterEqual(len(pool), 40)
+        self.assertEqual(len(set(pool)), len(pool))
+        for word in pool:
+            self.assertRegex(word, r"^[가-힣]{2}$")
+
+    def test_nickname_is_stable_for_the_same_key_source_and_user(self) -> None:
+        first = importer.hash_author(self.KEY, "chzzk", "u1hash", style="korean")
+        second = importer.hash_author(self.KEY, "chzzk", "u1hash", style="korean")
+        self.assertEqual(first, second)
+
+    def test_nickname_shape_stays_short_and_readable(self) -> None:
+        for user in ("u1hash", "u2hash", "u3hash", "UC_user1", "UC_user2"):
+            nickname = importer.hash_author(self.KEY, "chzzk", user, style="korean")
+            with self.subTest(user=user):
+                self.assertRegex(nickname, r"^[가-힣]{4}[0-9]{2}$")
+                self.assertLessEqual(len(nickname), 8)
+
+    def test_nickname_differs_across_users_sources_and_keys(self) -> None:
+        base = importer.hash_author(self.KEY, "chzzk", "u1hash", style="korean")
+        self.assertNotEqual(base, importer.hash_author(self.KEY, "chzzk", "u2hash", style="korean"))
+        self.assertNotEqual(base, importer.hash_author(self.KEY, "youtube", "u1hash", style="korean"))
+        self.assertNotEqual(base, importer.hash_author(b"j" * 32, "chzzk", "u1hash", style="korean"))
+
+    def test_nickname_never_reuses_the_hash_style_value(self) -> None:
+        hashed = importer.hash_author(self.KEY, "chzzk", "u1hash")
+        korean = importer.hash_author(self.KEY, "chzzk", "u1hash", style="korean")
+        self.assertTrue(hashed.startswith("v"))
+        self.assertNotIn(hashed[1:], korean)
+
 
 class NormalizeCliTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -382,6 +421,34 @@ class NormalizeCliTest(unittest.TestCase):
         first_authors = [row["author"] for row in read_jsonl(first_output)]
         second_authors = [row["author"] for row in read_jsonl(second_output)]
         self.assertEqual(first_authors, second_authors)
+
+    def test_korean_nickname_style_is_opt_in_and_stable(self) -> None:
+        input_path = self._write_chzzk_input()
+        default_output = self.root / "default.jsonl"
+        korean_output = self.root / "korean.jsonl"
+        again_output = self.root / "korean-again.jsonl"
+        base = [
+            "normalize", "--format", "chzzk", "--input", str(input_path),
+            "--hmac-key-file", str(self.key_file),
+        ]
+        self.assertEqual(run_main(base + ["--output", str(default_output)])[0], 0)
+        self.assertEqual(
+            run_main(base + ["--output", str(korean_output), "--nickname-style", "korean"])[0], 0)
+        self.assertEqual(
+            run_main(base + ["--output", str(again_output), "--nickname-style", "korean"])[0], 0)
+
+        default_authors = [row["author"] for row in read_jsonl(default_output)]
+        korean_authors = [row["author"] for row in read_jsonl(korean_output)]
+        self.assertTrue(all(author.startswith("v") for author in default_authors))
+        for author in korean_authors:
+            self.assertRegex(author, r"^[가-힣]{4}[0-9]{2}$")
+        self.assertEqual(len(set(korean_authors)), len(set(default_authors)))
+        # 같은 키로 다시 돌리면 같은 가명이 나온다.
+        self.assertEqual(korean_authors, [row["author"] for row in read_jsonl(again_output)])
+        # 실제 닉네임·원본 id 는 여기서도 절대 나오지 않는다.
+        raw_text = korean_output.read_text(encoding="utf-8")
+        for forbidden in ("닉네임1", "닉네임3", "u1hash", "u3hash", "userIdHash", "nickname"):
+            self.assertNotIn(forbidden, raw_text)
 
     def test_never_prints_the_hmac_key(self) -> None:
         input_path = self._write_chzzk_input()

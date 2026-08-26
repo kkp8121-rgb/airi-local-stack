@@ -25,6 +25,18 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 CHZZK_KEEP_TYPE_CODES = (1, 10)
 CHZZK_DONATION_TYPE_CODE = 10
 
+NICKNAME_STYLES = ("hash", "korean")
+# `--nickname-style korean` 전용 가명 단어 풀. 평가지에서 사람이 시청자를 구분해
+# 읽기 좋으라고만 쓴다 — 실제 닉네임과는 아무 관계가 없고, 고르는 값은 전부
+# HMAC 다이제스트에서 나온다.
+KOREAN_NICKNAME_WORDS = (
+    "하늘", "별빛", "물결", "감자", "초코", "구름", "바람", "노을", "새벽", "달빛",
+    "봄비", "여울", "가람", "미르", "솔잎", "이슬", "단비", "누리", "아침", "저녁",
+    "모래", "은하", "우주", "토끼", "고래", "수달", "참새", "딸기", "포도", "사과",
+    "호박", "당근", "버섯", "만두", "국수", "라면", "김밥", "떡국", "팥죽", "보름",
+    "파도", "안개", "서리", "눈꽃",
+)
+
 EMOTE_TOKEN_RE = re.compile(r"\{:[^{}:]*:\}")
 WHITESPACE_RE = re.compile(r"\s+")
 URL_RE = re.compile(r"(?:https?://|www\.)\S+", re.IGNORECASE)
@@ -60,10 +72,27 @@ def hash_video_ref(video_id_raw: str) -> str:
     return hashlib.sha256(video_id_raw.encode("utf-8")).hexdigest()[:12]
 
 
-def hash_author(hmac_key: bytes, source: str, user_id_raw: str) -> str:
+def korean_nickname(digest: str) -> str:
+    """같은 다이제스트면 항상 같은, 2음절 두 단어 + 2자리 접미사 가명 닉네임(≤ 8자).
+
+    원본 닉네임에서 오는 값은 하나도 없다 — HMAC 다이제스트에서만 고른다.
+    """
+    pool = KOREAN_NICKNAME_WORDS
+    value = int(digest[:12], 16)
+    first = pool[value % len(pool)]
+    second = pool[(value // len(pool)) % len(pool)]
+    suffix = (value // (len(pool) ** 2)) % 100
+    return f"{first}{second}{suffix:02d}"
+
+
+def hash_author(hmac_key: bytes, source: str, user_id_raw: str, style: str = "hash") -> str:
     """(source, 원본 유저 id)를 HMAC-SHA256 으로 가명화한다. 원문 id 는 절대 저장하지 않는다."""
+    if style not in NICKNAME_STYLES:
+        raise ValueError(f"unknown nickname style: {style!r}")
     message = f"{source}:{user_id_raw}".encode("utf-8")
     digest = hmac.new(hmac_key, message, hashlib.sha256).hexdigest()
+    if style == "korean":
+        return korean_nickname(digest)
     return "v" + digest[:8]
 
 
@@ -293,6 +322,7 @@ def normalize_messages(
     max_chars: int,
     drop_links: bool,
     dedupe_window: int,
+    nickname_style: str = "hash",
 ) -> tuple[list[dict], dict[str, int]]:
     """정제·필터링·가명화를 거쳐 최종 행을 만든다. 대화 원문/원본 id 는 로그에 남기지 않는다."""
     stats = {"empty": 0, "length": 0, "link": 0, "no_hangul": 0, "duplicate": 0}
@@ -314,7 +344,7 @@ def normalize_messages(
             stats["no_hangul"] += 1
             continue
 
-        author = hash_author(hmac_key, source, record.user_id_raw)
+        author = hash_author(hmac_key, source, record.user_id_raw, style=nickname_style)
         dedupe_key = (author, text)
         if dedupe_key in seen:
             stats["duplicate"] += 1
@@ -360,6 +390,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--video-id",
         default=None,
         help="video_ref 계산에 쓸 영상 식별자. --format youtube 는 필수, chzzk 는 원본 videoNo 를 덮어쓴다.",
+    )
+    normalize_parser.add_argument(
+        "--nickname-style",
+        choices=list(NICKNAME_STYLES),
+        default="hash",
+        help="author 가명 표기. hash=v+16진수 8자리(기본), korean=평가자가 읽기 쉬운 한국어 가명.",
     )
     normalize_parser.add_argument("--min-chars", type=int, default=2)
     normalize_parser.add_argument("--max-chars", type=int, default=160)
@@ -459,6 +495,7 @@ def _run_normalize(args: argparse.Namespace) -> int:
         max_chars=args.max_chars,
         drop_links=args.drop_links,
         dedupe_window=args.dedupe_window,
+        nickname_style=args.nickname_style,
     )
     rows.sort(key=lambda row: row["offset_ms"])
 

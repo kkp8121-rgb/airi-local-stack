@@ -57,8 +57,8 @@ python -m pytest -q ollama-proxy\eval\human_review
 ```
 
 `test_human_review_tools.py` 는 오프라인·결정적이며 임시 SQLite 로 `airi_memory.py` 의 DDL 을 그대로
-재현한다. **이 테스트 파일은 `.github/workflows/remediation-checkpoint.yml` 의 Python 샤드 매트릭스에
-아직 추가되지 않았다.** 샤드 목록에 추가해야 CI 에서 실제로 돈다(추가는 supervisor 가 한다).
+재현한다. 이 디렉터리의 테스트 파일 3개는 `.github/workflows/remediation-checkpoint.yml` 의
+`ollama-proxy-evaluations` 샤드에 등록돼 있다(새 테스트 파일을 추가하면 같은 샤드에 넣어야 CI 에서 돈다).
 
 ## 4. 공개 채팅 리플레이 가져오기
 
@@ -80,3 +80,19 @@ python ollama-proxy\eval\human_review\import_public_chat.py normalize --format y
 그대로 재사용해 같은 사람은 항상 같은 가명이 되게 한다)만 남긴다. `--video-id` 는 원본에 영상 id 가
 없는 YouTube 형식에서 필수다. 원본 캡처와 출력, HMAC 키는 실제 대화와 같은 이유로 저장소 트리 밖에
 두는 것이 기본이며, 저장소 안 경로는 `--allow-repo-path` 를 줘야만 쓴다.
+
+### 가명 닉네임 표기 (`--nickname-style`)
+
+`normalize` 는 `--nickname-style {hash,korean}` 로 `author` 표기를 고른다. 기본값 `hash` 는 지금까지와
+같은 `v` + 16진수 8자리(`v36d8e423`)다. `korean` 은 **같은 HMAC 다이제스트에서** 2음절 한국어 단어
+두 개와 2자리 접미사를 뽑아 `솔잎토끼19` 같은 8자 이하 가명을 만든다.
+
+```powershell
+python ollama-proxy\eval\human_review\import_public_chat.py normalize --format chzzk --input D:\airi-public-chat\raw-chzzk.json --output D:\airi-public-chat\chzzk.jsonl --hmac-key-file D:\airi-public-chat\hmac.key --nickname-style korean
+```
+
+`korean` 은 **평가자 가독성만을 위한 것**이다. 원본 닉네임에서 오는 값은 하나도 없고(단어는 고정 풀,
+선택은 전부 다이제스트), 같은 키·같은 사람이면 실행을 몇 번 반복해도 같은 가명이 나온다는 점도
+`hash` 와 같다. 다만 표기 공간이 좁아(단어 44개 × 44개 × 접미사 100) 시청자가 수백 명이면 서로 다른
+사람이 같은 가명을 받을 확률이 `hash` 보다 눈에 띄게 높다. 가명 하나가 곧 한 사람이어야 하는 분석
+(재생 로스터, 발언 이력)에는 기본값 `hash` 를 쓴다.

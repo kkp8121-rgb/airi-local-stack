@@ -1158,6 +1158,21 @@ class EchoFilterProxyContractTests(unittest.TestCase):
         self.assertIsNotNone(marker, "BRIEFING_EVIDENCE_MARKER 를 계층 소스에서 못 찾았다")
         self.assertEqual(marker, runner.BRIEFING_EVIDENCE_BLOCK_MARKER)
 
+    def test_runner_donation_thanks_matches_the_layer_constant(self) -> None:
+        # 계층(P5)이 후원 본문 끝에 붙이는 감사 문장과 바이트로 같아야 되먹임
+        # 사본에서 그 문장을 떼어낼 수 있다. 어긋나면 의례가 다시 히스토리·브리핑
+        # 으로 새어 들어간다(사람 평가 run 04 의 "고마워." 붕괴).
+        layer = HERE.parent.parent / "deterministic_utterance_layer.py"
+        tree = ast.parse(layer.read_text(encoding="utf-8"))
+        thanks = None
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "DONATION_THANKS_LINE":
+                        thanks = ast.literal_eval(node.value)
+        self.assertIsNotNone(thanks, "DONATION_THANKS_LINE 을 계층 소스에서 못 찾았다")
+        self.assertEqual(thanks, runner.DONATION_ECHO_THANKS)
+
     def _proxy_constant(self, name: str) -> str:
         for node in ast.walk(self._proxy_tree()):
             if isinstance(node, ast.Assign):
@@ -1311,12 +1326,12 @@ REPLAY_RAW_ROWS = (
     (3_000, "가명002", "chat", "방송 오늘 몇 시까지 하나요", ""),
     (5_000, "가명003", "chat", "ㅋㅋㅋ", ""),
     (30_000, "가명001", "chat", "그거 진짜 웃겼어", ""),
-    (61_000, "가명002", "donation", "화이팅!", "1,000원"),
+    (61_000, "가명002", "donation", "화이팅!", "1000"),
     (95_000, "가명004", "chat", "밥은 먹었어?", ""),
     (130_000, "가명001", "chat", "게임 뭐 할 거야", ""),
     (200_000, "가명003", "chat", "이거 어때", ""),
     (400_000, "가명002", "chat", "졸리다", ""),
-    (900_000, "가명004", "donation", "고생 많아", "5,000원"),
+    (900_000, "가명004", "donation", "고생 많아", "5000"),
     (1_500_000, "가명001", "chat", "다음 방송 언제", ""),
     (2_400_000, "가명003", "chat", "잘 봤어", ""),
 )
@@ -1403,8 +1418,9 @@ class ReplayStreamTests(unittest.TestCase):
 
     def test_kinds_come_from_the_row_then_the_question_heuristic(self) -> None:
         _fixture, stream = self.build()
+        # m0004 는 1,000원짜리 소액 치즈다 — 의례 대신 평범한 채팅으로 받는다.
         self.assertEqual([item["kind"] for item in stream["messages"]],
-                         ["question", "reaction", "reaction", "reaction", "donation",
+                         ["question", "reaction", "reaction", "reaction", "reaction",
                           "question", "reaction", "question", "reaction", "donation",
                           "question", "reaction"])
         self.assertTrue(all(item["archetype"] == "replay" for item in stream["messages"]))
@@ -1419,15 +1435,60 @@ class ReplayStreamTests(unittest.TestCase):
     def test_donation_rows_keep_the_ritual_scorable(self) -> None:
         _fixture, stream = self.build()
         donations = [item for item in stream["messages"] if item["kind"] == "donation"]
-        self.assertEqual([item["amount_label"] for item in donations], ["1,000원", "5,000원"])
-        self.assertEqual([item["donation_index"] for item in donations], [0, 1])
+        self.assertEqual([item["amount_label"] for item in donations], ["5000"])
+        self.assertEqual([item["donation_index"] for item in donations], [0])
+        self.assertNotIn("donation_small", donations[0])
         self.assertEqual(donations[0]["checks"],
                          {"required_any": ["고마워", "감사"], "forbidden": []})
         row = sim.score_turn(
             {"turn_index": 1, "message": donations[0], "effective_kind": "donation"},
-            "가명002, 고마워!", beat=self.fixture["topic"]["beats"][0],
-            fallback_pool=(), roster_handles=("가명002",))
+            "가명004, 고마워!", beat=self.fixture["topic"]["beats"][0],
+            fallback_pool=(), roster_handles=("가명004",))
         self.assertTrue(row["addressee_ok"])
+
+    def test_small_cheese_is_answered_as_ordinary_chat(self) -> None:
+        raw = (
+            (0, "가명001", "donation", "밥은 먹었어?", "1000"),
+            (1_000, "가명002", "donation", "화이팅!", "4999"),
+            (2_000, "가명003", "donation", "고생 많아", "5000"),
+            (3_000, "가명004", "donation", "이거 어때", "20000"),
+        )
+        _fixture, stream = self.build(raw)
+        messages = stream["messages"]
+        self.assertEqual(runner.REPLAY_DONATION_RITUAL_MIN_AMOUNT, 5000)
+        # 소액은 기존 휴리스틱대로 question/reaction 이 되고, 의례 검사는 붙지 않는다.
+        self.assertEqual([item["kind"] for item in messages],
+                         ["question", "reaction", "donation", "donation"])
+        self.assertTrue(all(item["donation_small"] for item in messages[:2]))
+        self.assertTrue(all("checks" not in item for item in messages[:2]))
+        self.assertTrue(all("donation_index" not in item for item in messages[:2]))
+        # 팁을 실었다는 사실 자체는 남는다 — 트랜스크립트가 금액을 잃지 않는다.
+        self.assertEqual([item["amount_label"] for item in messages],
+                         ["1000", "4999", "5000", "20000"])
+        self.assertTrue(all("donation_small" not in item for item in messages[2:]))
+        self.assertEqual([item["donation_index"] for item in messages[2:]], [0, 1])
+        self.assertEqual(stream["replay"]["donation_ritual"], 2)
+        self.assertEqual(stream["replay"]["donation_small"], 2)
+
+    def test_unparseable_amount_labels_are_treated_as_small(self) -> None:
+        raw = (
+            (0, "가명001", "donation", "화이팅!", "5,000원"),
+            (1_000, "가명002", "donation", "고생 많아", ""),
+            (2_000, "가명003", "donation", "잘 봤어", "₩20,000"),
+        )
+        _fixture, stream = self.build(raw)
+        self.assertEqual([item["kind"] for item in stream["messages"]], ["reaction"] * 3)
+        self.assertTrue(all(item["donation_small"] for item in stream["messages"]))
+        self.assertEqual(stream["replay"]["donation_ritual"], 0)
+        self.assertEqual(stream["replay"]["donation_small"], 3)
+
+    def test_amount_label_is_read_only_as_a_plain_ascii_integer(self) -> None:
+        self.assertEqual(runner.replay_donation_amount("5000"), 5000)
+        self.assertEqual(runner.replay_donation_amount(" 5000 "), 5000)
+        self.assertEqual(runner.replay_donation_amount("0"), 0)
+        for label in ("5,000원", "₩5,000", "", "  ", "5000원", "-5000", "5000.0", "٥٠٠٠"):
+            with self.subTest(label=label):
+                self.assertIsNone(runner.replay_donation_amount(label))
 
     def test_replay_block_records_provenance_without_any_dialogue(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -1437,7 +1498,8 @@ class ReplayStreamTests(unittest.TestCase):
             stream = runner.build_replay_stream(fixture, rows, path=path, seed=7)
             expected = hashlib.sha256(path.read_bytes()).hexdigest()
         self.assertEqual(stream["replay"],
-                         {"path_sha256": expected, "message_count": 12, "source": "youtube-live"})
+                         {"path_sha256": expected, "message_count": 12, "source": "youtube-live",
+                          "donation_ritual": 1, "donation_small": 1})
         self.assertEqual(stream["fixture_sha256"], sim.sha256_of(fixture))
 
     def test_roster_merges_every_pseudonym_and_keeps_the_placeholders(self) -> None:
@@ -1471,7 +1533,8 @@ class ReplayStreamTests(unittest.TestCase):
         _fixture, stream = self.build(start_ms=61_000, end_ms=400_000)
         self.assertEqual([item["t_ms"] for item in stream["messages"]],
                          [0, 34_000, 69_000, 139_000, 339_000])
-        self.assertEqual(stream["messages"][0]["kind"], "donation")
+        self.assertEqual(stream["messages"][0]["kind"], "reaction")
+        self.assertTrue(stream["messages"][0]["donation_small"])
         _fixture, capped = self.build(max_messages=3)
         self.assertEqual(len(capped["messages"]), 3)
         self.assertEqual(capped["replay"]["message_count"], 3)
@@ -1607,6 +1670,20 @@ class ReplayPickupAndRunTests(unittest.TestCase):
              self.assertRaisesRegex(RuntimeError, "category=profanity"):
             runner.run_arm(transport, self.fixture, self.stream, self.picks[:3], **kwargs)
 
+    def test_donation_amount_tiering_survives_the_whole_replay_run(self) -> None:
+        transport = _ReplayTransport()
+        result = runner.run_arm(
+            transport, self.fixture, self.stream, self.picks,
+            model="test-model", contract="on", protocol="operational",
+            author_format="runtime", history_turns=8, max_tokens=32, timeout=1.0,
+            pre_session_seeds=False, briefing="on", acts="on", briefing_evidence="off",
+        )
+        acts = [row["deterministic_act"] for row in result["rows"]]
+        # 1,000원 치즈에는 의례가 없고, 5,000원에만 렌더러가 붙는다.
+        self.assertEqual(acts.count("thank_renderer"), 1)
+        self.assertEqual(self.stream["replay"]["donation_ritual"], 1)
+        self.assertEqual(self.stream["replay"]["donation_small"], 1)
+
     def test_replay_requires_a_fixture_and_a_scored_run(self) -> None:
         cases = [
             ["--replay-chat", str(self.path)],
@@ -1617,6 +1694,98 @@ class ReplayPickupAndRunTests(unittest.TestCase):
         for argv in cases:
             with self.subTest(argv=argv), self.assertRaises(SystemExit):
                 runner.main(argv)
+
+
+class _ThanksEchoTransport(_ReplayTransport):
+    """지정한 호출에서만 프록시 P5 감사 문장으로 끝나는 본문을 돌려준다."""
+
+    def __init__(self, thanks_on_call: int) -> None:
+        super().__init__()
+        self.thanks_on_call = thanks_on_call
+
+    def stream_chat(self, *, model, messages, max_tokens, timeout):
+        text, ttft, complete, meta = super().stream_chat(
+            model=model, messages=messages, max_tokens=max_tokens, timeout=timeout)
+        if len(self.messages) == self.thanks_on_call:
+            return f"그 얘기 재밌겠다. {runner.DONATION_ECHO_THANKS}", ttft, complete, meta
+        return text, ttft, complete, meta
+
+
+class DonationRitualIsNotConversationTests(unittest.TestCase):
+    """사람 평가 run 04: 의례(호명 opener + 프록시 감사 문장)를 히스토리와 브리핑에
+    되먹이자 모델이 이후 질문 23건에 "고마워."로 답했다. 의례 턴은 히스토리에 아예
+    넣지 않고, "방금 흐름"에는 모델이 이어 말한 본문만 남는지 고정한다.
+    """
+
+    RAW = (
+        (0, "가명001", "chat", "안녕!", ""),
+        (30_000, "가명002", "donation", "오늘 방송 재밌다", "20000"),
+        (90_000, "가명003", "chat", "게임 뭐 할 거야", ""),
+        (150_000, "가명001", "chat", "다음 방송 언제", ""),
+    )
+    # 5초 창·20초 쿨다운 계산상 후원은 두 번째 픽업이다(그 다음 턴을 봐야 되먹임이 보인다).
+    RITUAL_TURN = 2
+
+    def setUp(self) -> None:
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.path = write_replay(Path(directory.name), replay_rows(self.RAW))
+        rows = runner.load_replay_rows(self.path)
+        self.fixture = runner.build_replay_fixture(sim.load_fixture(REAL_CHAT_FIXTURE), rows)
+        self.stream = runner.build_replay_stream(self.fixture, rows, path=self.path, seed=7)
+        self.picks = sim.plan_pickups(self.stream, self.fixture)
+        self.assertEqual([pick["effective_kind"] for pick in self.picks],
+                         ["reaction", "donation", "reaction", "question"])
+
+    def _run(self, transport, acts: str = "on") -> dict[str, Any]:
+        return runner.run_arm(
+            transport, self.fixture, self.stream, self.picks,
+            model="test-model", contract="on", protocol="operational",
+            author_format="runtime", history_turns=8, max_tokens=32, timeout=1.0,
+            pre_session_seeds=False, briefing="on", acts=acts, briefing_evidence="off",
+        )
+
+    def test_the_ritual_turn_never_enters_the_history_window(self) -> None:
+        transport = _ReplayTransport()
+        result = self._run(transport)
+        opener = runner.thank_renderer.render_thank_callout_text("가명002", 0)
+        spoken = next(entry for entry in result["transcript"]
+                      if entry.get("stage") == "turn" and entry["kind"] == "donation")
+        # 실제 발화와 채점은 그대로다.
+        self.assertTrue(spoken["airi"].startswith(opener))
+        self.assertEqual(spoken["deterministic_act"], "thank_renderer")
+        self.assertTrue(result["rows"][self.RITUAL_TURN - 1]["addressee_ok"])
+        # 다음 턴 요청에는 의례가 assistant 턴으로도 브리핑으로도 실리지 않는다.
+        next_messages = transport.messages[self.RITUAL_TURN]
+        assistant = [m["content"] for m in next_messages if m["role"] == "assistant"]
+        self.assertEqual(assistant, ["응, 1번째 대답이야."])
+        self.assertFalse(any(opener in m["content"] for m in next_messages))
+        # 브리핑 "방금 흐름" 에는 모델이 이어 말한 본문만 남는다.
+        system_content = next_messages[0]["content"]
+        self.assertIn("응, 2번째 대답이야.", system_content)
+        self.assertNotIn(opener, system_content)
+
+    def test_the_proxy_thanks_line_is_stripped_from_the_briefing_echo(self) -> None:
+        transport = _ThanksEchoTransport(self.RITUAL_TURN)
+        self._run(transport)
+        system_content = transport.messages[self.RITUAL_TURN][0]["content"]
+        self.assertIn("그 얘기 재밌겠다.", system_content)
+        self.assertNotIn(runner.DONATION_ECHO_THANKS, system_content)
+
+    def test_a_donation_echo_without_the_renderer_is_still_kept_out_of_history(self) -> None:
+        transport = _ThanksEchoTransport(self.RITUAL_TURN)
+        self._run(transport, acts="off")
+        next_messages = transport.messages[self.RITUAL_TURN]
+        assistant = [m["content"] for m in next_messages if m["role"] == "assistant"]
+        self.assertEqual(assistant, ["응, 1번째 대답이야."])
+        self.assertNotIn(runner.DONATION_ECHO_THANKS, next_messages[0]["content"])
+
+    def test_ordinary_turns_still_feed_the_history(self) -> None:
+        transport = _ReplayTransport()
+        self._run(transport)
+        last_messages = transport.messages[-1]
+        assistant = [m["content"] for m in last_messages if m["role"] == "assistant"]
+        self.assertEqual(assistant, ["응, 1번째 대답이야.", "응, 3번째 대답이야."])
 
 
 if __name__ == "__main__":

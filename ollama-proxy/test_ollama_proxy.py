@@ -7562,8 +7562,9 @@ class ImmediateAckMetadataTests(unittest.TestCase):
                 {"role": "user", "content": "[YouTube] 등불값 보태"},
             ])
         content = openai_sse_content(response.text)
-        self.assertIn("등불값", content)
-        self.assertIn("고마워", content)
+        # The donation message is never quoted back; only the neutral thanks line is added.
+        self.assertNotIn("등불값", content)
+        self.assertIn("후원 고마워!", content)
 
     def test_content_free_fallback_is_replaced_by_the_proposal_ack(self) -> None:
         # 근거 침묵 폴백은 내용이 없는 청취 문장이므로, 이번 턴 제안에 대한
@@ -7920,7 +7921,7 @@ class LiveBroadcastRouteTests(unittest.TestCase):
         finally:
             self.runtime.cancel_turn(capability['turn_token'])
 
-    def test_live_broadcast_donation_contract_triggers_deterministic_quote(self):
+    def test_live_broadcast_donation_contract_triggers_neutral_thanks(self):
         self.runtime.master_control({'action': 'start', 'show_id': 'show-live-donation'})
         capability = self.runtime.master_control({
             'action': 'issue_turn',
@@ -7972,10 +7973,10 @@ class LiveBroadcastRouteTests(unittest.TestCase):
                     },
                 )
             self.assertEqual(response.status_code, 200)
-            self.assertIn(
-                "'등불값 보태' 이렇게 보내 줘서 진짜 고마워!",
-                openai_sse_dialogue(response.text),
-            )
+            dialogue = openai_sse_dialogue(response.text)
+            self.assertIn("후원 고마워!", dialogue)
+            self.assertNotIn("이렇게 보내 줘서", dialogue)
+            self.assertNotIn("등불값", dialogue)
         finally:
             self.runtime.cancel_turn(capability['turn_token'])
 
