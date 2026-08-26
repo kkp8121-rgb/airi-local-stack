@@ -1,6 +1,6 @@
 # AIRI 다음 세션 안내
 
-> **2026-08-27 00:29 KST 현재:** S4 default-off 구현·회귀와 고정 07 replay r1~r3를 완료했습니다. 세 회차 모두 exit 0·99턴·empty 0·service_error 0·invented_handle 0·polite_violation 0이며 `skipped=30`, `batched=0`; q_end 5/13/22의 중앙값 대표는 r2입니다. 대표 시트 `D:\AIRI-Models\airi-human-eval\20260826-replay-07-s4-r2\rating-sheet.html`의 사람 JSON을 기다립니다. `goal_status=active`, `adoption_authorized=false`, 모든 운영 flag OFF, S5·GPU·commit/push 금지.
+> **2026-08-27 00:47 KST 현재:** S4 default-off 구현·회귀와 고정 07 replay r1~r3를 완료해 문서·코드·테스트·CI 등록 14개 파일을 `46015dbe0a1a2fdde960112c1bf7ba79a28e6a3b`로 커밋하고 `origin/main`에 push했습니다. local/origin/remote main은 일치하고 worktree는 clean입니다. 세 회차는 exit 0·99턴·오류 0, `skipped=30`, `batched=0`; q_end 5/13/22의 중앙값 대표는 r2이며 사람 JSON을 기다립니다. `goal_status=active`, `adoption_authorized=false`, 운영 flag OFF, S5·GPU 금지.
 
 > **현재 live goal_status=active:** M7 S3 평가 채택과 S2 `[F]` 실패를 보존했다. S4 replay r1~r3는 완료됐고 대표 r2 사람 JSON을 기다린다. replay/GPU PID 0, Ollama 11434만 남아 있으며 S4 채택·운영 반영·commit/push는 대기한다.
 

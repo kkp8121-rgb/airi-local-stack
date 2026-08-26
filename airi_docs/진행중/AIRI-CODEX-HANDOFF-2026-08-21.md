@@ -1,6 +1,6 @@
 # AIRI Codex GPU 인수인계 — broadcast continuity v4
 
-> **현재 live goal_status=active:** M7 S3 평가 채택과 S2 `[F]` 실패를 보존했다. S4 고정 07 replay r1~r3는 exit 0·99턴으로 완료됐고 대표 r2 `rating-sheet.html`의 사람 JSON을 기다린다. health-after는 각 S4 `requests=99`, `skipped=30`, `batched=0`, replay/GPU PID 0, Ollama 11434만 확인됐다. S4 채택·운영 flag 반영·commit/push는 사람 JSON 뒤에도 별도 결정이다.
+> **현재 live goal_status=active:** M7 S3 평가 채택과 S2 `[F]` 실패를 보존했다. S4 고정 07 replay r1~r3는 exit 0·99턴으로 완료됐고 대표 r2 `rating-sheet.html`의 사람 JSON을 기다린다. S4 구현·테스트·문서 14개 파일은 `46015dbe0a1a2fdde960112c1bf7ba79a28e6a3b`로 `origin/main`에 push됐으며 local/origin/remote SHA가 일치하고 worktree는 clean이다. health-after는 각 S4 `requests=99`, `skipped=30`, `batched=0`, replay/GPU PID 0, Ollama 11434만 확인됐다. S4 채택·운영 flag 반영·S5·GPU는 별도 결정이다.
 
 > **2026-08-27 00:29 KST 현재:** S4 default-off 구현과 `/v1/chat/completions`·`/api/chat` stream/non-stream red/green 회귀, unittest 409개, broadcast_sim 99개, py_compile, diff-check 및 roadmap/work-continuity 계약을 통과했다. 실험에서만 `AIRI_S4_PICKUP_BATCH=on`, `AIRI_S4_MIN_CONTENT_TOKENS=2`를 사용해 새 `20260826-replay-07-s4-r1..r3`를 순차 실행했으며, 표시 전용 q_end 5/13/22의 중앙값 대표는 r2다. 사람 JSON 전에는 자동 채점·S4 채택·S5·GPU·운영 활성화·commit/push를 하지 않는다.
 

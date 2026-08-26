@@ -7,6 +7,8 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+- 2026-08-27 00:47 KST push receipt. 사용자 요청에 따라 S2/S3/S4 구현·테스트·CI 등록과 M7 문서를 포함한 14개 파일을 `46015dbe0a1a2fdde960112c1bf7ba79a28e6a3b` (`feat: add S4 pickup batching controls`)로 커밋하고 `origin/main`에 push했다. local/origin/remote main SHA가 모두 일치하고 worktree는 clean이다. 운영 flag·GPU·파인튜닝·모델 변경은 없으며 S4 r2 사람 채점 JSON은 계속 대기한다.
+
 - 2026-08-27 00:29 KST M7-6 S4 final receipt. 고정 07 입력·스트리머 전사·model digest `92a9ba2e…6485f`·NumCtx 4096·45초 window를 유지해 새 외부 경로 `20260826-replay-07-s4-r1..r3`를 순차 실행했다. 세 회차 모두 exit 0·99턴·empty 0·service_error 0·invented_handle 0·polite_violation 0이며 health-after S4 telemetry는 각 `enabled=true`, `min_content_tokens=2`, `requests=99`, `skipped=30`, `batched=0`이다. 표시 전용 q_end 시그니처 5/13/22로 사전 등록 중앙값 대표는 r2다. 각 root에 runtime/health/report/packet/runner/review/rating-sheet를 생성·검증했고 report SHA는 r1 `F0FA6200708C5D4FA14F4592E15CC9CBB8F3A897E63689E698EBF1EA8366C232`, r2 `798378C65DB7B446563F566554050AAADC349C22EE107567AAAE480FF48F9403`, r3 `8383E8FA34E7551C19898259C4009A54EF72BB443A2C3F2E2F1C722A2951E7B1`이다. 고정 표본에 배치 eligible 턴은 선택되지 않았으며 자동 품질 판정은 하지 않는다. 대표 r2 사람 JSON·S4 채택·운영 반영·S5·GPU 학습·commit/push는 대기한다.
 
 - 2026-08-26 23:48 KST M7-4 S2 human-rating receipt. 외부 `20260826-replay-07-s2-r2/airi-human-rating.json`을 Python JSON 검증과 `summarize_ratings.py`로 확인했다. 99/99턴·1명 평가·SHA256 `29925C9DFA97C66C5A535A363FB8E6C616519A433CF97A0BE5D6C05E9C729F19`, 방송다움 2.5758·맥락 2.2525·반응 1.8586·말투 4.9798·사실성 4.7778, 3축 합성 2.2290·5축 평균 3.2889·critical 0·filler 76.77%·invented_name 0·polite 0이다. 3축 ≥3.0 및 filler ≤25% 게이트를 모두 만족하지 못해 S2는 `[F]` 종료·평가 미채택으로 기록한다. S4 실행·운영 반영·GPU 학습·commit/push는 별도 사용자 결정 대기다.

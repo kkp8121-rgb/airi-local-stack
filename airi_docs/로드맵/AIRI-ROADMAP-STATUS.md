@@ -12,7 +12,7 @@
 - 왜 하는가: run 04→05가 같은 모델·입력·샘플링에서 "음" 오프너 1→48, "?" 종결 20→78로 간 것은 런타임이
   모델에게 자기 열화 출력을 되먹인 결과이고, 그 고리는 운영 proxy에도 있다. 고리를 끊기 전의 측정은 모델이
   아니라 고리를 재므로, 먼저 고리를 통제하고 그 위에서 한 변수씩 사람 채점으로 판정한다. 파인튜닝은 2주 금지.
-- 현재 진행: **M7 7/11 정상 완료 + S2 `[F]` 종료·평가 미채택 + S4 `[P]` replay 완료·사람 채점 대기 — S0·S1·사람 채점·M7-10 가드·S6 입력 정합·run 07-r2 사람 판정·S3 평가 채택·S2 판정** — 2026-08-27 00:29 KST 기준
+- 현재 진행: **M7 7/11 정상 완료 + S2 `[F]` 종료·평가 미채택 + S4 `[P]` replay 완료·사람 채점 대기 — S0·S1·사람 채점·M7-10 가드·S6 입력 정합·run 07-r2 사람 판정·S3 평가 채택·S2 판정** — 2026-08-27 00:47 KST 기준
 - 정지 사유: S3 대표 r2 사람 채점은 3축 합성 3.0976·critical 0·filler 14.14%로 동결 게이트를 통과했다. S2 r2 사람 채점은 99/99턴·3축 2.2290·critical 0·filler 76.77%로 3축 기준 3.0 미달과 filler 기준 25% 초과가 확인되어 평가를 채택하지 않는다. S4 replay는 세 회차 exit 0·99턴·empty/service_error/invented_handle/polite_violation 0, `skipped=30`, `batched=0`이며 자동 채점은 하지 않는다. 대표 r2 사람 JSON 전에는 S4 채택·운영 flag 반영·S5·GPU·commit·push를 대기한다.
 - 완료 조건: 각 단계는 같은 99턴 입력에서 복제 ≥2·사람 채점 1회로 사전 예측과 대조해 닫는다. M7 전체는
   3축 합성(방송다움·맥락·반응) ≥ 3.0·critical 0·무의미 대꾸 ≤ 25%를 사람 채점으로 넘거나, S5까지 마친 뒤
@@ -27,9 +27,9 @@
 - M7 진행 지수: **8.5/11 (77.3%)** — `([x] + [F] + 0.5×[P] + 0.5×[~]) / 활성 항목 전체`
 - 전체 로드맵 정상 완료율: **67/97 (69.1%)**
 - 전체 로드맵 처리 종료율: **74/97 (76.3%)**
-- 전체 로드맵 진행 지수: **77.0/97 (79.4%)** — 110개 행 중 `[S]` 10개와 `[N/A]` 3개를 분모에서 제외; 2026-08-27 00:29 KST 기준
-- 마지막 실제 상태 대조: **2026-08-27 00:29 KST** — local HEAD `2e98737` = origin/main, worktree는 workflow·NEXT·현재 state/roadmap 문서 4개·proxy 코드/테스트 2개 modified + S2·S3·S4 모듈/테스트 6개 untracked,
-  replay/GPU PID 0, Ollama listener `127.0.0.1:11434`, S2/S3/S4 r1~r3 report/health/review/rating-sheet는 저장소 밖에 유지
+- 전체 로드맵 진행 지수: **77.0/97 (79.4%)** — 110개 행 중 `[S]` 10개와 `[N/A]` 3개를 분모에서 제외; 2026-08-27 00:47 KST 기준
+- 마지막 실제 상태 대조: **2026-08-27 00:47 KST** — local HEAD `46015db` = origin/main = remote main, worktree clean, push receipt `feat: add S4 pickup batching controls`,
+  replay/GPU PID 0, AIRI listener 없음, Ollama listener `127.0.0.1:11434`, S2/S3/S4 r1~r3 report/health/review/rating-sheet는 저장소 밖에 유지
 
 ### 현재 주요 작업 단계(M7) 체크리스트
 
