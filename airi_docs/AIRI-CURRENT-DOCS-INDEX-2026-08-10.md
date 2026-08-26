@@ -51,6 +51,7 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
 
 ## 진행중 — 현행 계약
 
+- `AIRI-M7-S0-S1-RECEIPT-2026-08-26.md` — M7 S0·S1 receipt: 복제 노이즈(n=1 무효), 되먹임 3채널 차단 시 붕괴 0/3, 채점 대상 06b-r3.
 - `AIRI-BREAKTHROUGH-PLAN-2026-08-26.md` — **현재 진입점(2026-08-26 타계책).** 이분법 대신 되먹임 고리·재료 수용·측정 규율; S0~S5 순서, 돌파 정의, 금지 목록.
 - `AIRI-REAL-CHAT-REPLAY-RUN05-2026-08-26.md` — 후보 A+B 적용 run 05 결과와 남은 모델 고유 결함(되묻기 붕괴), 다음 축 후보 D/E/F.
 - `AIRI-REAL-CHAT-REPLAY-RUN04-2026-08-26.md` — 첫 실제 채팅 재생 결과(run 04, 99턴)와 Claude 1차 참고 채점, 결함 패턴, 다음 후보.
