@@ -1,6 +1,12 @@
 # AIRI Documentation Index
 
-최종 현행화 2026-08-26 10:10 KST (M4 완료·Claude POST-M4 이관 — live 결정론 입력 배선,
+최종 현행화 2026-08-26 11:45 KST (M6 — 사용자 4건 승인: 실제 대화 사람 채점을 유일한 채택 게이트로
+(`진행중/AIRI-REAL-DIALOGUE-HUMAN-EVAL-CONTRACT-2026-08-26.md`), grounding 침묵 수리, step 2 commit `a9583c3`, 문서 다이어트·로드맵 v4.
+WORKING 이력은 `아카이브/AIRI-WORKING-STATE-HISTORY-2026-08-22-TO-2026-08-25.md`).
+직전 현행화 2026-08-26 11:29 KST (M5 피벗 — 사용자 결정 C로 blind v7·matrix·campaign 중단. 실태 파악과
+파인튜닝 중단 권고는 `진행중/AIRI-REALITY-CHECK-AND-FINETUNE-REVIEW-2026-08-26.md`가 단일 진입점. step 1~3
+진단·수리·검증은 로컬에 유효).
+직전 현행화 2026-08-26 10:10 KST (M4 완료·Claude POST-M4 이관 — live 결정론 입력 배선,
 fresh blind v6 봉인과 exact-once 48-report 재측정, `winner=null` 진단, 사용자용 roadmap
 dashboard와 Codex/Claude 공용 skill 검증 완료. M4 정상 완료율 9/9. 다음 단일 진입점은
 `진행중/AIRI-CLAUDE-HANDOFF-2026-08-26-POST-M4.md`; M5는 사용자가 문서의 Goal 명령을
@@ -45,7 +51,12 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
 
 ## 진행중 — 현행 계약
 
-- `AIRI-CLAUDE-HANDOFF-2026-08-26-POST-M4.md` — **Claude 다음 단일 진입점.** M4 9/9
+- `AIRI-REAL-DIALOGUE-HUMAN-EVAL-CONTRACT-2026-08-26.md` — **현재 채택 게이트 계약(2026-08-26).** 실제 대화 50~100턴
+  export→사람 채점 HTML→content-free 요약, 5축 rubric·플래그, 판정 규칙 제안값, 개인정보 경계.
+- `AIRI-REALITY-CHECK-AND-FINETUNE-REVIEW-2026-08-26.md` — **실태·파인튜닝 검토(2026-08-26 피벗).** 08-19 이후
+  실태(commit 156·GPU 후보 4/채택 0·blind 6라운드 216 report 전부 no_winner·운영 모델 stock·실제
+  데이터 0·사람 검수 0), 공회전 원인, 남은 실제 가치, 파인튜닝 중단 권고와 재개 조건, 사용자 결정 큐.
+- `AIRI-CLAUDE-HANDOFF-2026-08-26-POST-M4.md` — (이력) M5 진입점이었다; step 4 이후 대체. M4 9/9
   완료 증거, d1v6 48/48·exit 0·`winner=null`, P4/P5 폐쇄와 P2/P3/말투 잔여 귀책,
   consumed blind v1~v6·운영 채택 금지 경계를 요약한다. 사용자가 실제 제출할 때만 권한이
   생기는 M5 Goal 명령(잔여 결정론 게이트 분리 수리 → fresh blind v7 → exact-once matrix →

@@ -1,12 +1,14 @@
 # AIRI Codex GPU 인수인계 — broadcast continuity v4
 
-갱신: 2026-08-26 10:10 KST (파일명은 과거 GPU SSoT 식별자로 유지)
+갱신: 2026-08-26 11:45 KST (파일명은 과거 GPU SSoT 식별자로 유지)
 
-현재 상태: **M4 완료(`goal_status=complete`)**. 이 문서의 E1/E2/E2-C1/E2-C2 GPU 계약과
-결과는 검증된 이력으로 보존하지만 다음 세션 진입점은 아니다. live 결정론 배선·blind v6
-48-report 재측정은 `AIRI-CODEX-HANDOFF-2026-08-25-M4.md`에서 종료됐고, 다음 Claude 단일
-진입점은 `AIRI-CLAUDE-HANDOFF-2026-08-26-POST-M4.md`다. M5는 사용자가 그 문서의 Goal
-명령을 실제로 제출한 뒤에만 활성화된다. GPU 재학습·운영 채택은 자동 승인되지 않는다.
+현재 상태: **M5 활성(`goal_status=active`) — 사용자 결정 C로 피벗.** 2026-08-26 M5 step 1~3(d1v6
+진단·결정론 수리·검증)은 완료됐고, blind v7 재측정 이후는 공회전으로 판정돼 중단·대체됐다. 현재 진입점은 `AIRI-REALITY-CHECK-AND-FINETUNE-REVIEW-2026-08-26.md`(실태·파인튜닝 중단)과
+`AIRI-REAL-DIALOGUE-HUMAN-EVAL-CONTRACT-2026-08-26.md`(유일한 채택 게이트)이며, M6는 사용자 4건 승인으로 진행 중이다. 이 문서의 E1/E2/E2-C1/E2-C2 GPU
+계약과 결과는 검증된 이력으로 보존하지만 다음 세션 진입점은 아니다. M4(live 결정론 배선·
+blind v6 48-report 재측정)는 `AIRI-CODEX-HANDOFF-2026-08-25-M4.md`에서 `no_winner`로 종료됐고
+현재 단일 진입점은 위 Claude handoff, 가변 live state는 `AIRI-WORKING-STATE.md`다. M5에서도
+GPU 재학습·운영 채택은 금지이며 push는 매번 별도 사용자 승인이 필요하다.
 
 상태: **E2-C1 NO_WINNER 진단 완료, 핸들 GROUNDING 가드+채점기 신호 SHIPPED
 (2026-08-24 16:33) — 아래 -7 참조. E2-C1 학습 계약 자체는 불변, GPU 재학습(E2-C2)은
@@ -30,7 +32,7 @@ milestone `2e61842`와 receipt `3dba3ca`는 origin/main에 push됐고 직후 loc
 
 운영 채택: **금지** (`adoption_authorized=false`, `t3_status=pending`)
 
-기계 판독 계약: `goal_status=complete`;
+기계 판독 계약: `goal_status=active`;
 `execution_order=P0_A>P0_B>E2_LAUNCH>E2_PROVENANCE>PACKAGE>T3_36>CAMPAIGN_3X500>USER_DECISION`
 
 현재 권한: **2026-08-24 09:47 KST 사용자 `/goal`(클로드 PC, Fable 감독)로 GPU 제한 없음**이

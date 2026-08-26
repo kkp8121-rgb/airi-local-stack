@@ -190,7 +190,7 @@ Assert-ContainsPattern $contract '(?m)^- [^\r\n]+=\s*`\(\[x\] \+ \[F\]\) /' 'ter
 foreach ($artifactToken in @('report', 'health', 'run-contract', 'packet', 'duplicate', 'missing')) {
     Assert-ContainsPattern $contract ([regex]::Escape($artifactToken)) "heartbeat token $artifactToken"
 }
-Assert-ContainsPattern $contract '(?s)heartbeat.{0,600}14' 'dual-document heartbeat ceiling'
+Assert-ContainsPattern $contract '(?s)heartbeat.{0,600}30' 'dual-document heartbeat ceiling'
 
 $dashboardHeading = ConvertFrom-Base64Utf8 'IyMg7IKs7Jqp7J6Q7JqpIO2YhOyerCDsp4Ttlokg64yA7Iuc67O065Oc'
 # "### 현재 주요 작업 단계(M<n>) 체크리스트" — the milestone number is read from the roadmap

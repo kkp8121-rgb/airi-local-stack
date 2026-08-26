@@ -44,8 +44,8 @@ Never commit `.env` files, credentials, model weights, personal audio, logs, SQL
   `airi_docs/진행중/AIRI-WORKING-STATE.md`를 **전체 읽고**, 실제 goal status,
   `git status`, PID/command line, 관련 산출물·SHA를 read-only로 대조한다.
   compact된 채팅 요약만 믿고 이어서 실행하지 않는다.
-- active goal에서는 live state를 마지막 기록 후 **최대 60분** 안에 갱신한다.
-  GPU 학습, merge/package, T3, 장시간 campaign 중에는 상한을 **15분**으로 줄인다.
+- active goal에서는 live state를 마지막 기록 후 **최대 120분** 안에 갱신한다.
+  GPU 학습, merge/package, T3, 장시간 campaign 중에는 상한을 **30분**으로 줄인다.
   체크리스트 완료·실패, 10분 이상 명령의 직전/직후, 프로세스 시작·중단,
   checkpoint·해시·권한·blocker 변경, pause/resume/종료 때는 시간과 무관하게 즉시 갱신한다.
 - 장기·상태 변경 명령은 live state에 `intent checkpoint`를 먼저 쓰고, 종료 후

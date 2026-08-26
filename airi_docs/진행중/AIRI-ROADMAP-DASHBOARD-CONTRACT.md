@@ -83,7 +83,7 @@ blind·matrix·verdict·campaign과 P1~P5 같은 용어는 현재 authoritative 
 ## 4. 장시간 heartbeat
 
 현재 Goal 또는 handoff가 더 짧은 상한을 요구하지 않는 한 matrix·campaign 등 장시간 작업은
-최대 14분마다 다음 두 문서를 같은 관측값과 시각으로 갱신한다.
+최대 30분마다 다음 두 문서를 같은 관측값과 시각으로 갱신한다(2026-08-26 사용자 승인으로 14분에서 완화).
 
 - `airi_docs/진행중/AIRI-WORKING-STATE.md`
 - `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md`

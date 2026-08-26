@@ -1,6 +1,42 @@
 # AIRI 다음 세션 안내
 
-> **2026-08-26 10:10 KST 최우선 — M4 완료, 다음 세션은 Claude POST-M4 handoff:**
+> **2026-08-26 11:45 KST 최우선 — M6 활성(사용자 4건 승인), 채택 게이트는 실제 대화 사람 채점 하나:**
+> 진입점 `airi_docs/진행중/AIRI-REALITY-CHECK-AND-FINETUNE-REVIEW-2026-08-26.md`(실태) + `AIRI-REAL-DIALOGUE-HUMAN-EVAL-CONTRACT-2026-08-26.md`(평가 계약).
+> 완료(로컬 commit, push 미승인): `a9583c3` step 2 수리, `cdbb6eb` grounding 게이트 live-broadcast 완화
+> (unittest 414 OK), `776b462` `ollama-proxy/eval/human_review/` export·채점 HTML·요약 도구(16 passed, CI
+> 등록). 문서 다이어트(WORKING 235행, heartbeat 120/30분), 로드맵 v4(M6 8행 중 5 완료).
+> 다음: 사용자가 비공개 테스트 방송 또는 직접 채팅 50~100턴을 캡처 → export → 채점 → 기준선(M6-6/7).
+> 파인튜닝·합성 blind 매트릭스·운영 채택·push는 별도 승인 전 시작 금지. `goal_status=active`,
+> `adoption_authorized=false`.
+
+> **2026-08-26 11:29 KST — M5 피벗(사용자 결정 C), 실태 문서 진입점(피벗 기록):
+> `airi_docs/진행중/AIRI-REALITY-CHECK-AND-FINETUNE-REVIEW-2026-08-26.md`:** 사용자가 5라운드 blind 대화를
+> HTML 뷰어로 확인한 뒤 합성 fixture 매트릭스 루프를 공회전으로 판정하고 v7 저작·matrix·campaign을
+> 중단시켰다. 실태: 08-19 이후 commit 156, GPU 후보 4(채택 0), blind 6라운드 216 report 전부
+> no_winner(대부분 계측·저작 결함), 운영 모델은 stock Mi:dm 2.0 Mini Q4, 실제 시청자 데이터 0, 사람
+> 검수 0, 학습 데이터 100% 합성, greybox 단조 하락. **파인튜닝은 중단 권고**(재개 조건: 실제 대화
+> 코퍼스·사람 채점 평가·결정론으로 못 닫는 행동 실측·일반 능력 게이트). 다음은 사용자 결정 큐 —
+> 실제 대화 로그·사람 채점 세트 확보, `needs_grounding_retry` 평서문 침묵 수리 승인, 검증된 step 2
+> 코드 commit 여부. POST-M4 handoff §4 Goal의 step 4~7은 대체됐다. `goal_status=active`,
+> `adoption_authorized=false`, matrix·campaign·GPU·commit·push 0.
+
+> **2026-08-26 11:20 KST — M5 활성, step 2 수리 구현(피벗 전 기록):**
+> 사용자가 `AIRI-CLAUDE-HANDOFF-2026-08-26-POST-M4.md` §4의 Goal 명령을 Claude에 제출했다.
+> 시작 대조는 HEAD/local/origin/remote `d7c6283` exact·clean, d1v6 48/48·exit 0·no_winner(29
+> gate)·listener 0이다. step 1 진단(M5-1 `[x]`)은 공통 polite 43행 = sealed v6
+> `aggregation_openers` 존댓말 저작 artefact, invented 5 = `모아` 동사 substring 충돌 2 + briefing
+> author 라벨 grader pool 불일치 3, transition required miss 89 = proxy grounding 침묵 폴백 72/모델
+> 15/`어느` 2, probe miss 32 = P3 미발동 29(회피 문구 15·추측 15)/폴백 2/근거 부재 1로 분류했다.
+> step 2(M5-2 `[~]`)는 계층(`_REJECTED_BRANCH_RE` 주어 2~12자·목적격, recall 결과 보호, `자고`
+> 동사, `어느`, content-free 폴백 대체 ack, P3 evidence-echo)과 harness grader pool(briefing
+> handle 합산)을 red/green으로 구현했고 pre-fix `d7c6283` worktree에서 새 테스트 18+1+1 FAIL,
+> 수정 tree에서 계층/guard/runtime 90 passed, broadcast_sim+launcher 251 passed, proxy/runtime
+> unittest 405 OK, affect/training은 알려진 behavior-v2 2건만 실패(494 passed)다. 다음은 M5-3
+> 검증 receipt → M5-4 blind v7 저작·seal(반말 opener·seal lint, seed_checks는 공개 fixture 관례).
+> matrix·campaign·GPU·adoption 0, commit/push 0(`adoption_authorized=false`). 단일 진입점은 위
+> Claude handoff이며 live state는 `airi_docs/진행중/AIRI-WORKING-STATE.md`다.
+
+> **2026-08-26 10:10 KST — M4 완료, 다음 세션은 Claude POST-M4 handoff:**
 > exact-once d1v6 matrix는 exit 0, report·health·run-contract·packet 48/48, duplicate/missing 0,
 > 두 flag 48/48 attest, context/service error 0, owned PID/listener 0으로 끝났다. verdict는
 > `winner=null`(실패 gate 29개)이라 campaign·자동 후속·운영 채택은 0이다. P5 donation과 P4

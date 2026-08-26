@@ -7,6 +7,62 @@
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
 
+## 2026-08-26 M6 — 실제 대화 사람 채점 체계·배관 수리 (사용자 4건 승인)
+
+- 2026-08-26 11:53 KST M6-2·M6-3 종료. grounding 게이트 live-broadcast 완화 `cdbb6eb`(HEAD worktree red 1 fail·
+  6 error → unittest 414 OK, 일반 채팅 불변), 실제 대화 human_review 도구 `776b462`(export·채점 HTML·요약,
+  16 passed, CI shard 등록, 채점 HTML headless 렌더링 확인). 로컬 HEAD는 origin/main보다 3 ahead, push
+  미승인. 다음은 사용자 실제 세션 캡처(M6-6)와 채점 기준선(M6-7).
+- 2026-08-26 11:45 KST 사용자가 실태 문서 §5 결정 큐 4건(실제 대화 데이터·사람 채점, grounding 침묵 수리,
+  step 2 코드 commit, 문서 다이어트)을 모두 승인하고 로드맵·체크리스트 전면 개편을 요청했다.
+  commit `a9583c3`(step 2 수리 9경로, 로컬·push 미승인). 문서 다이어트: WORKING 6,785→235행, 이력은
+  `아카이브/AIRI-WORKING-STATE-HISTORY-2026-08-22-TO-2026-08-25.md`; heartbeat 상한 60/15→120/30분, matrix 14→30분(AGENTS·CLAUDE·
+  대시보드 계약·두 계약 테스트 동기화). 로드맵 v4: 사람 채점 유일 게이트(`진행중/AIRI-REAL-DIALOGUE-HUMAN-EVAL-CONTRACT-2026-08-26.md`),
+  M6 8행 신설, M5 이력화, 파인튜닝 트랙 `[B]`(재개 조건), 인간 검수 100건 `[S]`, 결정 큐 11~16.
+  진행 중: grounding 게이트 live-broadcast 완화(red/green)와 `ollama-proxy/eval/human_review/`
+  export·채점 HTML·요약 도구. 사용자 몫: 실제 세션 50~100턴 캡처. matrix·campaign·GPU·adoption·push 0.
+
+## 2026-08-26 M5 — d1v6 잔여 게이트 진단·수리 → 사용자 결정 C로 피벗(공회전 중단)
+
+- 2026-08-26 11:29 KST 사용자 결정 C — 공회전 중단·피벗. 뷰어로 5라운드 대화를 본 사용자가 "방송 같지
+  않다"고 판단해 step 4(blind v7 저작·seal·matrix·campaign)를 즉시 중단시켰다. subagent 2개 TaskStop,
+  검증 전 seal 도구 편집 `git checkout` 되돌림, v7 staging 미생성, pre-fix worktree 제거. 실태 파악
+  문서 `AIRI-REALITY-CHECK-AND-FINETUNE-REVIEW-2026-08-26.md`(08-19 이후 commit 156·WORKING 항목 152·GPU 후보 4/채택 0·
+  blind 6라운드 216 report 전부 no_winner·운영 모델 stock Mi:dm Q4·실제 시청자 데이터 0·사람 검수 0·
+  greybox 단조 하락)와 파인튜닝 중단 권고(재개 조건 4개)를 작성했고, WORKING/ROADMAP/NEXT/두
+  handoff/INDEX/D1 §10을 피벗 상태로 동기화했다. M5 체크리스트는 M5-4~8 `[S]`, M5-9 `[x]`, M5-10
+  `[~]`, M5-11 `[D]`다. step 1~3 결과는 유효(로컬). matrix·campaign·GPU·adoption·commit·push 0.
+- 11:20 KST M5 step 1 receipt·step 2 red/green·step 3 검증. step 1 원인 분류(polite 43행/arm =
+  sealed v6 `aggregation_openers` 존댓말 저작 artefact; invented 5 = `모아` 동사 substring 2 +
+  briefing author 라벨 grader pool 불일치 3; transition required miss 89 = grounding 침묵 폴백
+  72/모델 15/`어느` 2; probe miss 32 = P3 미발동 29/폴백 2/근거 부재 1; 계층 결함 3종)를 report
+  집계·코드로 재대조해 D1 contract §10에 기록했다. step 2는 계층(`_REJECTED_BRANCH_RE` 주어
+  2~12자·목적격, recall 결과 보호, `자고` 결정 동사, `어느`, content-free 침묵 폴백 대체 ack,
+  P3 evidence-echo)·proxy 침묵 폴백 emission 한 곳·harness grader pool(briefing handle 합산)을
+  red/green으로 구현했다: pre-fix `d7c6283` worktree에서 새 테스트 계층 18 FAIL, proxy
+  TypeError, harness 1 FAIL; 수정 tree pinned pytest 계층/guard/runtime 90 passed, broadcast_sim+
+  launcher 251 passed, affect/training 494 passed(알려진 behavior-v2 2건만 실패, continuity_v4
+  WindowsApps 8 OK), proxy/runtime unittest 405 OK, patch/checkpoint/continuity/dashboard 계약
+  PASS, diff-check clean. 구현 subagent가 4개 파일을 CRLF로 바꾼 것을 LF로 복원했고, 저장소
+  추적 `.claude/agent-memory/implementer`에 남긴 "pytest 미설치" memory를 pinned venv 경로로
+  정정했다. M5 활성화에 맞춰 `AIRI-CODEX-HANDOFF-2026-08-21.md` 기계 판독 계약을
+  `goal_status=active`로, NEXT-SESSION 최상단을 M5로 동기화했다. 사용자 요청으로 5라운드
+  blind 결과 HTML 뷰어(`D:\AIRI-Models\airi-blind-review-html\d1v6-review.html`, 저장소 외)를
+  만들었다. matrix·campaign·GPU·adoption·commit/push는 0이다.
+- 10:40 KST 사용자가 POST-M4 handoff §4의 Goal 명령을 Claude에 제출해 M5가 활성화됐다.
+  시작 프로토콜 대조는 HEAD/local/origin/remote main exact `d7c6283`, clean·단일 worktree,
+  handoff origin/main 도달 가능, d1v6 exit 0·네 산출물 각 48·summary/comparison pass·winner
+  null·failed gate 29·adoption false, owned 포트 6개 listener 0, AIRI PID 0으로 불일치 0이다.
+  step 1은 채점된 d1v6 report를 read-only 진단 입력으로만 써서 축별 실패 row를 추출했다:
+  4 arm 공통 polite 43행은 전부 `kind=opinion`·`deterministic_act=wave_opener`(simulator opener
+  템플릿이 요/니다 종결), invented_handle 5행 중 baseline 2행은 roster handle `모아`와 동사
+  활용("모아볼게/모아둘게") substring 충돌, e2-c2 3행은 현재 턴 근거에 없는 roster 이름
+  사용, probe miss 32행·transition required miss 89행은 P3 축이다. 원인 분류는 read-only
+  subagent 2개에 위임해 코드·report 재대조 뒤에만 채택한다. 이 배치의 write는 WORKING/
+  ROADMAP-STATUS M5 전환, 이 로그, 대시보드 계약 테스트의 milestone 라벨 일반화(`M4` 고정
+  base64 → 로드맵 제목에서 `M\d+` 파싱)뿐이다. matrix·campaign·서비스·GPU·blind 재사용·
+  adoption은 0이고 commit/push는 아직 없다.
+
 ## 2026-08-26 M4 — d1v6 no_winner 종결·사용자용 roadmap dashboard 공용 skill
 
 - 10:10 KST 사용자가 final push와 전체 문서 동기화, 다음 작업의 Claude 이관을 명시적으로

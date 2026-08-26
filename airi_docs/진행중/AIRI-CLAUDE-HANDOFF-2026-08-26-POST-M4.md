@@ -1,6 +1,11 @@
 # AIRI Claude 인수인계 — M4 종료와 다음 결정론 계층 라운드 준비 (2026-08-26)
 
-> **Claude Code의 다음 단일 진입점이다.** 먼저 `AGENTS.md` →
+> **2026-08-26 11:29 KST 대체 고지:** 사용자가 §4 Goal을 제출해 M5가 시작됐고 step 1~3(진단·수리·검증)은
+> 완료됐으나, 사용자 결정 (C)로 step 4 이후(blind v7 저작·seal·matrix·campaign)는 **공회전으로 판정돼
+> 중단·대체**됐다. 현재 단일 진입점은 `AIRI-REALITY-CHECK-AND-FINETUNE-REVIEW-2026-08-26.md`이며 이 문서의 §4·§5는
+> 이력으로만 남는다.
+
+> **(이력) Claude Code의 단일 진입점이었다.** 먼저 `AGENTS.md` →
 > `airi_docs/진행중/AIRI-WORKING-STATE.md` 전체 → **이 문서** →
 > `airi_docs/진행중/AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md` §8·§9 →
 > `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md` → `NEXT-SESSION.md` 순서로 읽는다.

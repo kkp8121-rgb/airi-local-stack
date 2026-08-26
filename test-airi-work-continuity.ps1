@@ -125,8 +125,8 @@ Assert-ContainsPattern $liveState 'intent checkpoint' 'pre-command intent checkp
 Assert-ContainsPattern $liveState 'receipt checkpoint' 'post-command receipt checkpoint'
 
 Assert-ContainsPattern $agents 'AIRI-WORKING-STATE\.md' 'AGENTS live-state read rule'
-Assert-ContainsPattern $agents '(?s)active goal.*60.*heartbeat' 'AGENTS heartbeat ceiling'
-Assert-ContainsPattern $agents '(?s)GPU.*15' 'AGENTS active-compute heartbeat ceiling'
+Assert-ContainsPattern $agents '(?s)active goal.*120.*heartbeat' 'AGENTS heartbeat ceiling'
+Assert-ContainsPattern $agents '(?s)GPU.*30' 'AGENTS active-compute heartbeat ceiling'
 Assert-ContainsPattern $agents 'intent checkpoint' 'AGENTS pre-command checkpoint rule'
 Assert-ContainsPattern $agents 'compact' 'AGENTS post-compact distrust rule'
 Assert-ContainsPattern $agents 'interrupted-awaiting-quota-reset' 'quota exhaustion recovery state'

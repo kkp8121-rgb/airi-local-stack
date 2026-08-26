@@ -250,3 +250,55 @@ M4는 §8의 `no_winner` 분기까지 계약대로 종료한다(`goal_status=com
 닫혔고 P2 잔여 호명·P3 required recall·공통 polite opinion gate가 남았다는 §8 진단을 그대로
 전달한다. 문서 안의 M5 Goal 명령은 사용자가 Claude에 실제 제출할 때만 새 실행 권한이 된다.
 그전에는 새 blind, matrix, campaign, GPU 학습, 운영 채택을 시작하지 않는다.
+
+## 10. M5 step 1~2 — d1v6 잔여 게이트 분리 진단과 최소 결정론 수리 (2026-08-26 11:20, 결과-후 절)
+
+M5 Goal(사용자 제출)에 따라 채점된 d1v6 report 48개를 read-only 진단 입력으로만 사용해 §8의
+잔여 축을 겹치지 않는 원인으로 분류했고, 위임 결과는 report 집계와 코드로 재대조한 것만 채택했다.
+
+**step 1 원인 분류(arm 합산)**
+
+| 축 | 원인 | 수 | 귀책 위치 |
+|---|---|---:|---|
+| polite 43행/arm 공통 | sealed v6 `aggregation_openers` 9개가 전부 존댓말(v4·v5·공개 fixture는 반말); harness가 모델 호출 뒤 붙임 | 172 | fixture 저작 artefact, `run_broadcast_sim.py:529-592` |
+| polite baseline 추가 | 모델 발화 "…살핍니다" | 2 | 모델 |
+| invented_handle | roster `모아`가 동사 "모아볼게/모아둘게"의 substring(`broadcast_sim.py:622` `handle in text`) | 2 | 채점 artefact·저작 |
+| invented_handle | 직전 8턴 발언자가 briefing `방금 흐름:`/`직전 후원:` author 라벨로 프롬프트에 있었으나 grader pool·proxy memory_pool 신호 어디에도 없음 | 3 | `run_broadcast_sim.py:597-611` |
+| transition required miss | proxy grounding 침묵 폴백이 seed 발화를 대체(continuity_seed 139/320, memory_seed 66/160) | 72 | `needs_grounding_retry`(`ollama_proxy.py:4665`)가 초안을 사용자 문장 어휘 겹침만으로 판정 |
+| transition required miss | 모델 자유 발화(거부 어휘를 쓰지 않아 P4 미개입) | 15 | 모델 |
+| transition required miss | `어느`가 `_INTERROGATIVE_RE`에 없어 probe로 인식되지 않음 | 2 | 계층 |
+| probe miss | 근거가 pool에 있는데 P3가 한 번도 안 뜸: proxy 회피 문구 "확인된 정보 없이…" 15 + 모델 추측 14 | 29 | `_RECALL_QUESTION_RES`/`_POSSESSIVE_FACT_RE`가 "X은 어디에 놓았나요?"/"X은 Y에 놓았습니다" 문형을 못 잡음 |
+| probe miss | 침묵 폴백 2, 근거 부재 1 | 3 | — |
+| 계층 자체 결함 | P2가 `_RECALL_FALLBACK`의 "한 번만"→"한 그거" 훼손 37행; P4 ack가 1글자 주어 `검`을 잡아 "좋아, 검은 남색 잉크로 갈게!" 16행; 닫힌 결정 동사 목록으로 "열자고로" 비문 56행 | — | `deterministic_utterance_layer.py` |
+
+**step 2 최소 수리(flag ON 경로만; OFF 경로는 `build_layer_inputs`가 None을 돌려 byte 동일)**
+
+1. `_REJECTED_BRANCH_RE` 주어 `{2,12}`·`(?:은|는|을|를)`: 목적격 제안("활자함을 … 열자고 했습니다")에서 주어를 얻고 1글자 오검출을 없앤다.
+2. recall 결과 보호: P4는 `signal["recall"] is None`일 때만 실행하고, P4가 모든 문장을 떨어뜨려 `_RECALL_FALLBACK`을 돌려주면 `recall="fallback"`으로 표시해 P2가 건드리지 않는다.
+3. `find_rejected_branches`: affirmed 두 번째 어절이 "…자고"(인용 결정 동사)면 제거한다(기존 닫힌 목록은 유지).
+4. `_INTERROGATIVE_RE`에 `어느`.
+5. `apply_deterministic_utterance_layer(..., content_free=False)`: proxy 침묵 폴백 상수처럼 내용 없는 후보에 살아 있는 "A 말고 B" 제안 ack가 붙을 때는 앞에 붙이지 않고 **대체**한다. `ollama_proxy.py` `stream_local_with_ack`의 침묵 폴백 emission 한 곳에서만 `grounding_silence_fallback_used`일 때 `content_free=True`를 넘긴다(같은 호출이 회피 문구·timeout 라인도 처리하므로 그 둘은 제외).
+6. P3 2단계 `echo_grounded_fact(user_text, pool_text, draft)`: 의문사 질문이고 살아 있는 제안이 아니며, pool의 평서 문장(briefing 인용부만, author 라벨 제외)과 내용 어간 ≥2개가 겹치고, 초안이 그 문장의 고유 어간을 하나도 쓰지 않았을 때만 그 문장을 반말 종결로 되읽는다(`recall="echoed"`, 이후 P2/P4 생략). `answer_recall_question` 뒤·`is_recall_probe` 폴백 앞에 놓인다.
+7. harness grader pool: `run_broadcast_sim.py`가 이번 턴 `briefing_text` 안 roster handle을 `token_pool`에 합산한다(2026-08-24 memory_pool·2026-08-25 history 확장과 같은 "판정 입력 범위" 정정, gate 정의 불변).
+
+**손대지 않은 것**: `needs_grounding_retry` 게이트(flag 무관 production 동작, 사용자 승인 문구) —
+seed 침묵 72행 중 "A 말고 B" 제안이 있는 턴만 5번 ack로 대체되고 제안 없는 seed 침묵은 남는다.
+gate·threshold·metric·seed·fixture 정의, P4 억제·P5 echo 강도, blind v1~v6는 불변이다. 계층은 여전히
+fixture 검사 패턴을 모른다(v6 seed required `"기로"`에 맞춘 문구는 넣지 않았다).
+
+**red/green 증거**: pre-fix `d7c6283` detached worktree에 새 테스트만 복사해 계층 18 failed/36
+passed, proxy 새 테스트 `TypeError(content_free)`, harness 새 테스트 `['별빛수집가'] != []` 실패;
+수정 tree에서 pinned pytest(`venv-midm-broadcast-qlora-py312`, 3.12.13/pytest 9.1.1) 계층·guard·
+runtime 90 passed+12 subtests, broadcast_sim+launcher 계약 251 passed/1 skipped, affect/training
+494 passed/8 skipped(알려진 behavior-v2 2건만 실패, continuity_v4는 WindowsApps 3.14 unittest 8 OK),
+WindowsApps 3.14 unittest proxy/runtime 405 OK(+2), patch-manifest·current-checkpoint·work-continuity·
+dashboard 계약 PASS, `git diff --check` clean.
+
+**v7 저작에 넘기는 결정(사용자 보고 완료)**: `aggregation_openers`·`memory_guard_fallback`은 반말로
+저작하고 seal-time register lint를 추가한다; handle은 흔한 동사 어절(`모아`류) 충돌 lint를 추가한다;
+`seed_checks`는 v6의 `"기로"` 리터럴이 아니라 공개 fixture 관례(결정 내용 토큰)를 따른다.
+
+**2026-08-26 11:29 추가 — 사용자 결정 C:** 위 "v7 저작에 넘기는 결정"은 실행하지 않는다. 사용자가 뷰어로
+5라운드 대화를 확인한 뒤 합성 fixture 매트릭스를 공회전으로 판정해 v7 저작·seal·matrix·campaign을 중단했다.
+이 계약의 P2~P5·evidence-echo 코드와 step 2 회귀는 유효하며, 합성 blind 매트릭스는 이후 채택 게이트가
+아닌 회귀 도구로만 쓴다. 실태와 파인튜닝 검토는 `AIRI-REALITY-CHECK-AND-FINETUNE-REVIEW-2026-08-26.md` 참조.
