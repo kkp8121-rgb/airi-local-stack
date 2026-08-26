@@ -327,6 +327,23 @@ def _temporary_headers(transport: Any, values: dict[str, str]):
     return _Headers()
 
 
+class LiveInputScreened(RuntimeError):
+    """The proxy's input screening consumed this turn before any capability claim.
+
+    A synthetic fixture never carries screenable input, so the matrix treats
+    this as fatal.  Replayed real chat does (profanity, privacy), and there the
+    block is the production outcome: the message is consumed without an
+    answer and the show goes on.
+    """
+
+    def __init__(self, category: str) -> None:
+        super().__init__(
+            "live broadcast fixture input was rejected before capability claim "
+            f"(category={category})"
+        )
+        self.category = category
+
+
 def run_live_capability_turn(
     transport: Any, live_broadcast: dict[str, str], *, model: str,
     messages: list[dict[str, str]], user_content: str, max_tokens: int,
@@ -366,10 +383,7 @@ def run_live_capability_turn(
         and transport_meta.get("input_screened") == "blocked"
     ):
         category = str(transport_meta.get("input_screen_category") or "unknown")
-        raise RuntimeError(
-            "live broadcast fixture input was rejected before capability claim "
-            f"(category={category})"
-        )
+        raise LiveInputScreened(category)
     # The public OpenAI stream opens with one renderer-owned ACT marker.
     # Durable memory stores the remaining public dialogue. Remove only that
     # attested prefix: scoring may discard additional ACT-like strings, but a
@@ -456,6 +470,7 @@ def run_arm(
     briefing_evidence: str = "off",
     health_url: str | None = None,
     live_broadcast: dict[str, str] | None = None,
+    tolerate_screened: bool = False,
 ) -> dict[str, Any]:
     roster = [viewer["handle"] for viewer in fixture["viewers"]]
     drift_terms = sorted(sim.offtopic_terms(fixture))
@@ -467,6 +482,7 @@ def run_arm(
     answered_picks: list[dict[str, Any]] = []
     wave_counter = 0
     failures = 0
+    screened = 0
     # 해제(release) 관측성: 이 arm 이 근거 헤더를 실제로 쓸 때만 기준값을 잡는다.
     last_bypass_total: int | None = None
     if health_url and briefing_evidence == "on":
@@ -567,6 +583,20 @@ def run_arm(
                         fixture, beat, briefing_text, bool(donation_opener),
                     ),
                 )
+            except LiveInputScreened as exc:
+                if not tolerate_screened:
+                    raise RuntimeError(
+                        f"live turn failed (turn_index={pick['turn_index']}, turn_type={live_type}): {exc}"
+                    ) from exc
+                # 실제 채팅 재생: 스크리닝 차단은 운영 결과 그 자체다. 답 없이 소비된
+                # 턴으로 기록하고 다음 픽업으로 간다.
+                screened += 1
+                transcript.append({
+                    "stage": "screened", "turn_index": pick["turn_index"], "minute": message["minute"],
+                    "beat": beat["id"], "kind": pick["effective_kind"], "author": message["author"],
+                    "chat": message["text"], "category": exc.category,
+                })
+                continue
             except RuntimeError as exc:
                 journal_state = read_journal_failure_state(transport, health_url) if health_url else {}
                 suffix = f", journal_state={json.dumps(journal_state, sort_keys=True)}" if journal_state else ""
@@ -675,6 +705,7 @@ def run_arm(
         "of": len(release_observed),
     }
     summary["transport_failures"] = failures
+    summary["screened_inputs"] = screened
     return {"summary": summary, "rows": rows, "transcript": transcript}
 
 
@@ -747,6 +778,10 @@ def render_packet(payload: dict[str, Any]) -> str:
             lines += ["## 클로징 (대본)", "", f"**AIRI**: {entry['airi']}", ""]
         elif entry["stage"] == "pre_session":
             lines += [f"- (이전 세션) **시청자**: {entry['user']}", f"  **AIRI**: {entry['airi']}", ""]
+        elif entry["stage"] == "screened":
+            lines += [f"### T{entry['turn_index']:02d} · {entry['minute']}분 · {entry['beat']} · "
+                      f"{entry['kind']} · 입력 스크리닝 차단({entry['category']})", "",
+                      f"**{entry['author']}**: {entry['chat']}", "", "**AIRI**: (차단 — 응답 없음)", ""]
         else:
             head = (f"### T{entry['turn_index']:02d} · {entry['minute']}분 · {entry['beat']} · "
                     f"{entry['kind']} · 대기 {entry['backlog_size']}건")
@@ -1110,6 +1145,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             briefing_evidence=args.briefing_evidence,
             health_url=proxy_health_url(args.base_url),
             live_broadcast=live_broadcast,
+            tolerate_screened=bool(args.replay_chat),
         )
     except BaseException as exc:
         primary_error = exc

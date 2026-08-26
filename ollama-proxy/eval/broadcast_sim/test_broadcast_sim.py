@@ -1558,6 +1558,55 @@ class ReplayPickupAndRunTests(unittest.TestCase):
         self.assertIn(turns[0]["chat"], {row["text"] for row in replay_rows()})
         self.assertIn(turns[0]["chat"], packet_path.read_text(encoding="utf-8"))
 
+    def test_screened_input_is_recorded_and_skipped_only_in_replay(self) -> None:
+        transport = _LiveTransport()
+        original = transport.stream_chat
+        calls = {"n": 0}
+
+        def stream_chat(**kwargs):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                return ("blocked answer", 5.0, 10.0, {
+                    "status_code": 200, "streaming": True, "terminal": True,
+                    "immediate_ack": "false", "input_screened": "blocked",
+                    "input_screen_category": "profanity",
+                })
+            return original(**kwargs)
+
+        transport.stream_chat = stream_chat
+        live = {"base_url": "http://example/v1", "master_token": "m" * 32,
+                "observer_token": "o" * 32, "show_id": "show"}
+        kwargs = dict(
+            model="test-model", contract="on", protocol="operational",
+            author_format="runtime", history_turns=8, max_tokens=32, timeout=1.0,
+            pre_session_seeds=False, briefing="on", acts="on", briefing_evidence="off",
+            live_broadcast=live,
+        )
+        with mock.patch.object(runner.time, "sleep", return_value=None):
+            result = runner.run_arm(transport, self.fixture, self.stream, self.picks[:3],
+                                    tolerate_screened=True, **kwargs)
+        stages = [entry["stage"] for entry in result["transcript"]
+                  if entry["stage"] in ("turn", "screened")]
+        self.assertEqual(stages, ["turn", "screened", "turn"])
+        screened = next(entry for entry in result["transcript"] if entry["stage"] == "screened")
+        self.assertEqual(screened["category"], "profanity")
+        self.assertEqual(screened["chat"], self.picks[1]["message"]["text"])
+        self.assertEqual(result["summary"]["screened_inputs"], 1)
+        self.assertEqual(result["summary"]["turns"], 2)
+        packet = runner.render_packet({**result, "seed": 1, "model": "test-model", "topic_title": "t",
+                                       "memory_arm": "on", "contract": "on", "author_format": "runtime",
+                                       "protocol": "operational", "briefing": "on", "acts": "on",
+                                       "briefing_evidence": "off", "live_broadcast_context": "off",
+                                       "history_turns": 8, "max_tokens": 32, "session_id": "s",
+                                       "stream_messages": 3, "fixture_sha256": "0" * 64})
+        self.assertIn("입력 스크리닝 차단(profanity)", packet)
+        self.assertIn(screened["chat"], packet)
+        # A synthetic fixture matrix keeps the block fatal.
+        calls["n"] = 0
+        with mock.patch.object(runner.time, "sleep", return_value=None), \
+             self.assertRaisesRegex(RuntimeError, "category=profanity"):
+            runner.run_arm(transport, self.fixture, self.stream, self.picks[:3], **kwargs)
+
     def test_replay_requires_a_fixture_and_a_scored_run(self) -> None:
         cases = [
             ["--replay-chat", str(self.path)],
