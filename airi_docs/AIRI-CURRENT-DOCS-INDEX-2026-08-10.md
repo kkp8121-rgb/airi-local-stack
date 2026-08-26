@@ -51,6 +51,7 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
 
 ## 진행중 — 현행 계약
 
+- `AIRI-REAL-CHAT-REPLAY-RUN05-2026-08-26.md` — 후보 A+B 적용 run 05 결과와 남은 모델 고유 결함(되묻기 붕괴), 다음 축 후보 D/E/F.
 - `AIRI-REAL-CHAT-REPLAY-RUN04-2026-08-26.md` — 첫 실제 채팅 재생 결과(run 04, 99턴)와 Claude 1차 참고 채점, 결함 패턴, 다음 후보.
 - `AIRI-REAL-DIALOGUE-HUMAN-EVAL-CONTRACT-2026-08-26.md` — **현재 채택 게이트 계약(2026-08-26).** 실제 대화 50~100턴
   export→사람 채점 HTML→content-free 요약, 5축 rubric·플래그, 판정 규칙 제안값, 개인정보 경계.

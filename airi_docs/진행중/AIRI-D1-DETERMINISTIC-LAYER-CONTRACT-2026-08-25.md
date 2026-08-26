@@ -302,3 +302,22 @@ dashboard 계약 PASS, `git diff --check` clean.
 5라운드 대화를 확인한 뒤 합성 fixture 매트릭스를 공회전으로 판정해 v7 저작·seal·matrix·campaign을 중단했다.
 이 계약의 P2~P5·evidence-echo 코드와 step 2 회귀는 유효하며, 합성 blind 매트릭스는 이후 채택 게이트가
 아닌 회귀 도구로만 쓴다. 실태와 파인튜닝 검토는 `AIRI-REALITY-CHECK-AND-FINETUNE-REVIEW-2026-08-26.md` 참조.
+
+## 11. P5·되먹임 계약 변경 — 사람 채점 run 04 결과 반영 (2026-08-26 15:05, commit `beb0559`)
+
+실제 채팅 재생 run 04의 사람 채점(기준선: 방송다움 1.87·맥락 1.58·반응 1.83·말투 3.60·사실성 2.75, 치명 7.1%,
+무의미 대꾸 45.5%)에서 후원 경로가 최대 결함으로 확인돼 사용자 승인(A+B) 아래 다음을 바꿨다. 합성 blind
+매트릭스는 회귀 도구이므로 §3의 donation composite(shared_tokens) 수치가 낮아지는 것은 허용하며, 판정은
+`AIRI-REAL-DIALOGUE-HUMAN-EVAL-CONTRACT-2026-08-26.md` §4만 따른다.
+
+1. **P5 `ensure_donation_engagement`**: 후원 본문을 어떤 형태로도 인용하지 않는다. 초안에 감사 토큰(고마워|고맙|감사)이
+   없을 때만 고정 중립 문장 `DONATION_THANKS_LINE = "후원 고마워!"`를 한 번 붙인다.
+2. **`strip_unsafe_donation_echo`**: 후원 본문이 보수적 화면 `_UNSAFE_DONATION_RE`(성적·인종/차별·욕설, 시청자 차단이
+   아니라 AIRI가 따라 말하지 않기 위한 것)에 걸리면, 본문과 6자 이상 연속 일치하는 초안 문장을 제거한다(공백 무시).
+   전부 제거되면 중립 감사 문장만 남는다. 신호 `donation_unsafe_stripped: <n>`. 실제 후원 524건 실측 적중 4.4%.
+3. **재생 러너 되먹임 위생(B)**: `thank_renderer` 의례 턴과 P5 감사 문장이 붙은 턴은 history 창에 넣지 않고, briefing
+   `방금 흐름` echo에는 모델 continuation만 싣는다(의례 텍스트가 history를 채우면 모델이 이후 질문에 "고마워."로 답한
+   run 04 실측 23턴). 합성 fixture 경로에도 적용되므로 이전 합성 run과 턴 단위 비교는 불가.
+4. **재생 전용 후원 티어**: `REPLAY_DONATION_RITUAL_MIN_AMOUNT = 5000` 미만 또는 금액 미상 치즈는 일반 채팅으로 답한다
+   (`donation_small` 표시). 합성 fixture의 후원은 그대로 의례를 탄다.
+5. 고정 의례 렌더러(`must_act_realization.py`, 2026-08-18 사용자 승인 템플릿·오라클)는 바꾸지 않았다.
