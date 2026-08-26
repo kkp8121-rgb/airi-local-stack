@@ -3247,6 +3247,33 @@ def has_exactly_one_complete_sentence(text: str) -> bool:
     )
 
 
+# The broadcast style contract asks for two to four sentences, so the
+# grounding gate counts them instead of demanding the single sentence the
+# ordinary 1:1 chat contract asks for.
+LIVE_BROADCAST_GROUNDING_MAX_SENTENCES = 4
+
+
+def complete_sentence_count(text: str) -> int:
+    """Return how many complete sentences ``text`` holds, 0 when it trails off.
+
+    The rejected shapes are exactly the ones
+    ``has_exactly_one_complete_sentence`` rejects: text that ends mid-clause,
+    unbalanced quotes, and text that runs past its last terminator.
+    """
+    clean = unicodedata.normalize("NFKC", text).strip()
+    if _INCOMPLETE_PUNCTUATION_END_RE.search(clean):
+        return 0
+    outside_quotes = _outside_balanced_grounding_quotes(clean)
+    if outside_quotes is None:
+        return 0
+    matches = list(_SENTENCE_END_RE.finditer(outside_quotes))
+    if not matches or matches[-1].end() != len(outside_quotes):
+        return 0
+    if not outside_quotes[:matches[0].start()].strip():
+        return 0
+    return len(matches)
+
+
 def grounding_candidate_introduces_unseen_token(
     user_text: str, candidate: str,
 ) -> bool:
@@ -3639,7 +3666,16 @@ _GROUNDING_NORMALIZER_SUFFIXES = frozenset(
 ) | frozenset(_GROUNDING_COPULAR_SUFFIXES) | frozenset(_GROUNDING_VERBAL_SUFFIXES)
 
 
-def grounding_candidate_truncates_user_token(user_text: str, candidate: str) -> bool:
+# ``열자고 했어`` quotes the propositive ``열자`` the user just said, so a
+# candidate that answers with ``열자`` repeats that wording instead of mangling
+# it.  The ``신사고`` -> ``신사`` shape this rule targets never carries a
+# quotative tail, so tolerating one on air stays narrow.
+_GROUNDING_QUOTATIVE_TAIL_RE = re.compile(r"(?:자|다|라|냐|마)고$")
+
+
+def grounding_candidate_truncates_user_token(
+    user_text: str, candidate: str, *, allow_quotative: bool = False,
+) -> bool:
     """Detect a user anchor silently shortened into a different word.
 
     ``신사고`` answered with ``신사`` is not a new reaction, it is the same noun
@@ -3655,6 +3691,11 @@ def grounding_candidate_truncates_user_token(user_text: str, candidate: str) -> 
             user_token != token
             and user_token.startswith(token)
             and user_token[len(token):] not in _GROUNDING_NORMALIZER_SUFFIXES
+            and not (
+                allow_quotative
+                and user_token[len(token):] == "고"
+                and _GROUNDING_QUOTATIVE_TAIL_RE.search(user_token)
+            )
             for user_token in user_tokens
         )
         for token in grounding_tokens(candidate)
@@ -3681,7 +3722,9 @@ def grounding_candidate_fabricates(user_text: str, candidate: str) -> bool:
     )
 
 
-def grounding_candidate_distorts_user_facts(user_text: str, candidate: str) -> bool:
+def grounding_candidate_distorts_user_facts(
+    user_text: str, candidate: str, *, live_broadcast: bool = False,
+) -> bool:
     """Return the signals that a candidate changed a fact the user supplied.
 
     Unlike ``grounding_candidate_fabricates`` these compare the candidate
@@ -3698,7 +3741,9 @@ def grounding_candidate_distorts_user_facts(user_text: str, candidate: str) -> b
         grounding_candidate_flips_user_polarity(user_text, clean)
         or grounding_candidate_reverses_explicit_mood(user_text, clean)
         or grounding_candidate_confirms_second_person_action(user_text, clean)
-        or grounding_candidate_truncates_user_token(user_text, clean)
+        or grounding_candidate_truncates_user_token(
+            user_text, clean, allow_quotative=live_broadcast
+        )
         or grounding_candidate_alters_latin_case(user_text, clean)
     )
 
@@ -3906,7 +3951,9 @@ def grounding_candidate_asserts_new_facts(user_text: str, candidate: str) -> boo
     return grounding_candidate_asserts_new_measurable_facts(user, draft)
 
 
-def grounding_balanced_candidate_is_acceptable(user_text: str, candidate: str) -> bool:
+def grounding_balanced_candidate_is_acceptable(
+    user_text: str, candidate: str, *, live_broadcast: bool = False,
+) -> bool:
     """Accept a fact-preserving reaction that is not a copy of the user's line.
 
     A full-surface match remains a sufficient condition (fast accept), but it is
@@ -3917,10 +3964,22 @@ def grounding_balanced_candidate_is_acceptable(user_text: str, candidate: str) -
     clean = candidate.strip()
     if grounding_open_question_turn(user_text):
         return grounding_question_candidate_is_acceptable(user_text, clean)
-    if not clean or not has_exactly_one_complete_sentence(clean):
-        return False
-    if not has_exactly_one_complete_sentence(user_text):
-        return False
+    if live_broadcast:
+        # A broadcast draft that obeys the style contract is never one
+        # sentence, so the ordinary chat shape rule would reject every
+        # contract-conformant reaction and hand the turn to the silence
+        # fallback.  Only a draft that trails off or runs past the contract
+        # is refused here; every invention signal below still reads the
+        # whole candidate, so a fabricated second sentence is still caught.
+        if not clean or not (
+            1 <= complete_sentence_count(clean) <= LIVE_BROADCAST_GROUNDING_MAX_SENTENCES
+        ):
+            return False
+    else:
+        if not clean or not has_exactly_one_complete_sentence(clean):
+            return False
+        if not has_exactly_one_complete_sentence(user_text):
+            return False
     if not has_unambiguous_declarative_terminal(user_text):
         return False
     if not re.search(r"[.!?。！？]$", clean) and not _COMPLETE_UNPUNCTUATED_KOREAN_RE.search(clean):
@@ -3960,12 +4019,20 @@ def grounding_balanced_candidate_is_acceptable(user_text: str, candidate: str) -
         # Same proposition, different structure. Nothing was contributed, so
         # the difference can only be a reversal of what the user said.
         return False
-    if grounding_candidate_distorts_user_facts(user_text, clean):
+    if grounding_candidate_distorts_user_facts(
+        user_text, clean, live_broadcast=live_broadcast
+    ):
         return False
     if grounding_is_generic_echo(user_text, clean):
         return False
-    if grounding_overlap(user_text, clean) >= grounding_relaxed_required_overlap(user_text):
+    required_overlap = 1 if live_broadcast else grounding_relaxed_required_overlap(user_text)
+    if grounding_overlap(user_text, clean) >= required_overlap:
         return True
+    if live_broadcast:
+        # On air the reaction must still hold on to something the viewer
+        # actually said.  An anchorless line is the one shape the relaxed
+        # gate keeps sending back for a correction.
+        return False
     # No shared anchor at all.  That is the ordinary shape of the one direct
     # reaction the style contract asks for, so it is admitted as long as it
     # states no fact of its own.
@@ -4041,7 +4108,9 @@ def grounding_retry_is_factual_improvement(
     return initial_has_other_violation
 
 
-def grounding_candidate_is_safe_fallback(user_text: str, candidate: str) -> bool:
+def grounding_candidate_is_safe_fallback(
+    user_text: str, candidate: str, *, live_broadcast: bool = False,
+) -> bool:
     """Apply the configured policy to a draft the strict correction rejected."""
     if grounding_second_person_action_turn(user_text):
         return grounding_second_person_action_candidate_is_acceptable(
@@ -4050,7 +4119,9 @@ def grounding_candidate_is_safe_fallback(user_text: str, candidate: str) -> bool
     if grounding_open_question_turn(user_text):
         return grounding_question_candidate_is_acceptable(user_text, candidate)
     if grounding_mode_is_balanced():
-        return grounding_balanced_candidate_is_acceptable(user_text, candidate.strip())
+        return grounding_balanced_candidate_is_acceptable(
+            user_text, candidate.strip(), live_broadcast=live_broadcast
+        )
     return grounding_candidate_is_strict_safe_fallback(user_text, candidate)
 
 
@@ -4664,7 +4735,7 @@ def grounded_conversational_fallback(user_text: str) -> str:
 
 def needs_grounding_retry(
     user_text: str, candidate: str, *, proactive: bool = False,
-    synthetic_evaluation: bool = False,
+    synthetic_evaluation: bool = False, live_broadcast: bool = False,
 ) -> bool:
     """Select zero-grounded and structurally generic one-token drafts."""
     # ``off`` adopts the first draft as written. Every retry costs one serial
@@ -4699,7 +4770,9 @@ def needs_grounding_retry(
         # the correction response.  Deriving retry eligibility from individual
         # heuristics drifted from that policy: some fabricated anchored drafts
         # skipped correction while some rejected restatements did not retry.
-        return not grounding_balanced_candidate_is_acceptable(user_text, candidate)
+        return not grounding_balanced_candidate_is_acceptable(
+            user_text, candidate, live_broadcast=live_broadcast
+        )
     required_overlap = grounding_required_overlap(user_text)
     if grounding_overlap(user_text, candidate) < required_overlap:
         return True
@@ -4764,6 +4837,14 @@ def has_live_broadcast_context(payload: object) -> bool:
         # Caller content is never broadcast authority, even if it mimics a
         # server-rendered heading.
     return False
+
+
+def body_has_live_broadcast_context(body: bytes | str) -> bool:
+    """Answer the broadcast question for an already rendered request body."""
+    try:
+        return has_live_broadcast_context(json.loads(body))
+    except Exception:
+        return False
 
 
 def inject_broadcast_response_contract(payload: dict[str, object], note: str) -> bytes:
@@ -7494,6 +7575,9 @@ class LocalStreamRequestContext:
     synthetic_evaluation_turn: bool
     quality_probe_turn: bool
     topic_board_runtime: object
+    # True exactly when this request carries the broadcast style contract, so
+    # the grounding gate judges the draft by the shape that contract asked for.
+    live_broadcast_turn: bool = False
 
 
 async def stream_local_with_ack(
@@ -8011,6 +8095,7 @@ async def stream_local_with_ack(
         grounding_retry = needs_grounding_retry(
             context.last_user_text, boundary.output, proactive=context.proactive_turn,
             synthetic_evaluation=context.synthetic_evaluation_turn,
+            live_broadcast=context.live_broadcast_turn,
         )
         empty_dialogue_retry = bool(
             not context.proactive_turn
@@ -8192,7 +8277,8 @@ async def stream_local_with_ack(
                     grounding_selected = GROUNDING_SELECTED_RETRY_STRICT
                 elif (
                     grounding_candidate_is_safe_fallback(
-                        context.last_user_text, retry_candidate
+                        context.last_user_text, retry_candidate,
+                        live_broadcast=context.live_broadcast_turn,
                     )
                     and enforce_tool_truth(context.original_messages, retry_candidate)
                     == retry_candidate
@@ -8204,7 +8290,8 @@ async def stream_local_with_ack(
                     grounding_selected = GROUNDING_SELECTED_RETRY_SAFE
                 elif (
                     grounding_candidate_is_safe_fallback(
-                        context.last_user_text, initial_boundary.output
+                        context.last_user_text, initial_boundary.output,
+                        live_broadcast=context.live_broadcast_turn,
                     )
                     and enforce_tool_truth(
                         context.original_messages, initial_boundary.output.strip()
@@ -8238,7 +8325,8 @@ async def stream_local_with_ack(
                     terminal_event = initial_terminal_event
             elif grounding_retry_used and (
                 grounding_candidate_is_safe_fallback(
-                    context.last_user_text, initial_boundary.output
+                    context.last_user_text, initial_boundary.output,
+                    live_broadcast=context.live_broadcast_turn,
                 )
                 and enforce_tool_truth(
                     context.original_messages, initial_boundary.output.strip()
@@ -9730,6 +9818,7 @@ async def proxy(path: str, request: Request):
             live_context_note=live_context_note,
             synthetic_evaluation_turn=synthetic_evaluation_turn,
             quality_probe_turn=quality_probe_turn, topic_board_runtime=topic_board_runtime,
+            live_broadcast_turn=body_has_live_broadcast_context(body),
         )
 
         return StreamingResponse(

@@ -8967,5 +8967,137 @@ class BroadcastRuntimeTrainingContextTests(unittest.TestCase):
                 ), 1)
 
 
+class LiveBroadcastGroundingGateTest(unittest.TestCase):
+    """On air a grounded 2~4 sentence draft must not be answered with silence."""
+
+    TYPE_CASE_USER = "활자함을 아래칸 말고 윗칸부터 열자고 했습니다."
+    TYPE_CASE_DRAFT = "그래, 윗칸부터 열자. 분류표대로 차근차근 가 보자."
+    GAUGE_USER = "오늘 측우통은 북쪽 난간 가까이에 놓았습니다."
+    GAUGE_DRAFT = "북쪽 난간이면 바람 받기 좋겠다. 오늘 눈금은 거기서 읽어 보자."
+
+    def test_live_broadcast_keeps_a_two_sentence_grounded_draft(self) -> None:
+        self.assertFalse(ollama_proxy.needs_grounding_retry(
+            self.TYPE_CASE_USER, self.TYPE_CASE_DRAFT, live_broadcast=True,
+        ))
+
+    def test_ordinary_chat_still_retries_the_same_draft(self) -> None:
+        self.assertTrue(ollama_proxy.needs_grounding_retry(
+            self.TYPE_CASE_USER, self.TYPE_CASE_DRAFT,
+        ))
+
+    def test_live_broadcast_keeps_a_grounded_placement_reaction(self) -> None:
+        self.assertFalse(ollama_proxy.needs_grounding_retry(
+            self.GAUGE_USER, self.GAUGE_DRAFT, live_broadcast=True,
+        ))
+        self.assertTrue(ollama_proxy.needs_grounding_retry(
+            self.GAUGE_USER, self.GAUGE_DRAFT,
+        ))
+
+    def test_live_broadcast_still_retries_a_fabricated_measurable_fact(self) -> None:
+        self.assertTrue(ollama_proxy.needs_grounding_retry(
+            self.TYPE_CASE_USER,
+            "윗칸에는 납활자가 300개 들어 있었지. 그걸 먼저 세자.",
+            live_broadcast=True,
+        ))
+
+    def test_live_broadcast_still_retries_an_anchorless_draft(self) -> None:
+        self.assertTrue(ollama_proxy.needs_grounding_retry(
+            self.TYPE_CASE_USER, "오늘 날씨 좋다. 다들 반가워.", live_broadcast=True,
+        ))
+
+    def test_live_broadcast_still_retries_more_than_four_sentences(self) -> None:
+        overlong = (
+            "그래, 윗칸부터 열자. 분류표대로 가 보자. 천천히 살피자. "
+            "하나씩 맞춰 보자. 그다음에 정리하자."
+        )
+        self.assertEqual(ollama_proxy.complete_sentence_count(overlong), 5)
+        self.assertTrue(ollama_proxy.needs_grounding_retry(
+            self.TYPE_CASE_USER, overlong, live_broadcast=True,
+        ))
+
+    def test_live_broadcast_safe_fallback_keeps_the_grounded_draft(self) -> None:
+        self.assertTrue(ollama_proxy.grounding_candidate_is_safe_fallback(
+            self.TYPE_CASE_USER, self.TYPE_CASE_DRAFT, live_broadcast=True,
+        ))
+        self.assertFalse(ollama_proxy.grounding_candidate_is_safe_fallback(
+            self.TYPE_CASE_USER, self.TYPE_CASE_DRAFT,
+        ))
+
+    @staticmethod
+    def _terminal_draft(draft: str) -> bytes:
+        return (json.dumps(
+            {"message": {"role": "assistant", "content": draft}, "done": True},
+            ensure_ascii=False,
+        ) + "\n").encode("utf-8")
+
+    class _ReadyScreen:
+        enabled = True
+
+        class _Verdict:
+            allowed = True
+            category = "allowed"
+            rule = "allow"
+
+        @staticmethod
+        def health():
+            return {"ready": True}
+
+        @classmethod
+        def inspect(cls, _text):
+            return cls._Verdict()
+
+    def _live_broadcast_stream(self, draft: str):
+        """Drive one authenticated broadcast turn through the real route."""
+        runtime = LiveBroadcastRuntime(True, "m" * 32, "o" * 32)
+        runtime.master_control({"action": "start", "show_id": "show-grounding"})
+        capability = runtime.master_control({
+            "action": "issue_turn", "show_id": "show-grounding",
+            "action_id": "turn-grounding", "turn_type": "chat_question",
+            "required_delivery": "renderer",
+        })
+        chat = _QueuedApiStreamClient([[self._terminal_draft(draft)]])
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), \
+                mock.patch.object(ollama_proxy, "memory_runtime", memory), \
+                mock.patch.object(ollama_proxy, "live_broadcast_runtime", runtime), \
+                mock.patch.object(
+                    ollama_proxy, "input_screening_runtime", self._ReadyScreen()
+                ), \
+                mock.patch.object(
+                    ollama_proxy, "broadcast_contract_enabled", lambda: True
+                ):
+            response = TestClient(ollama_proxy.app, client=("127.0.0.1", 9)).post(
+                "/v1/chat/completions",
+                headers={"x-airi-broadcast-turn-token": capability["turn_token"]},
+                json={
+                    "model": "exaone-airi:2.4b",
+                    "stream": True,
+                    "messages": [{"role": "user", "content": self.TYPE_CASE_USER}],
+                },
+            )
+        return response, chat
+
+    def test_live_broadcast_stream_speaks_the_grounded_draft(self) -> None:
+        response, chat = self._live_broadcast_stream(self.TYPE_CASE_DRAFT)
+        dialogue = openai_sse_dialogue(response.text)
+        self.assertEqual(dialogue, self.TYPE_CASE_DRAFT)
+        self.assertNotIn(dialogue, ollama_proxy.GROUNDING_SILENCE_FALLBACK_POOL)
+        self.assertEqual(len(chat.requests), 1)
+
+    def test_stream_without_broadcast_context_keeps_the_old_path(self) -> None:
+        draft = self._terminal_draft(self.TYPE_CASE_DRAFT)
+        chat = _QueuedApiStreamClient([[draft], [draft]])
+        memory = _FakeMemoryRuntime()
+        with mock.patch.object(ollama_proxy, "client", chat), mock.patch.object(
+            ollama_proxy, "memory_runtime", memory
+        ):
+            response = post_stream(self.TYPE_CASE_USER)
+
+        self.assertNotEqual(
+            openai_sse_dialogue(response.text), self.TYPE_CASE_DRAFT
+        )
+        self.assertEqual(len(chat.requests), 2)
+
+
 if __name__ == "__main__":
     unittest.main()
