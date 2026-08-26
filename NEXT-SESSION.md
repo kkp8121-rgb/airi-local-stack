@@ -1,6 +1,6 @@
 # AIRI 다음 세션 안내
 
-> **2026-08-26 04:00 KST 최우선 — M4 d1v6 `no_winner`, dashboard local commit 묶음 완료:**
+> **2026-08-26 10:10 KST 최우선 — M4 완료, 다음 세션은 Claude POST-M4 handoff:**
 > exact-once d1v6 matrix는 exit 0, report·health·run-contract·packet 48/48, duplicate/missing 0,
 > 두 flag 48/48 attest, context/service error 0, owned PID/listener 0으로 끝났다. verdict는
 > `winner=null`(실패 gate 29개)이라 campaign·자동 후속·운영 채택은 0이다. P5 donation과 P4
@@ -9,9 +9,13 @@
 > 하나를 참조하는 Codex·Claude `airi-roadmap-dashboard` project skill과 invariant test를
 > 검증했다. handoff §5는 문서에 고정된 기존 환경/behavior-v2 실패만 재현했고 M4 affected
 > clean run과 checkpoint·continuity·dashboard·skill validator는 PASS했다. exact 13-path
-> primary commit `c7500a3`와 receipt commit `8463e80`이 로컬에 있고 마지막 실제 기계 상태는
-> 이 final sync checkpoint를 포함한 local commit으로 닫는다. M4-10은 **push 직전 별도 사용자 승인이 필요**하고
-> `adoption_authorized=false`다. 단일 진입점은 M4 handoff다.
+> primary commit `c7500a3`, receipt `8463e80`, final sync `09de314`와 이 Claude 이관 배치를
+> 사용자가 승인한 한 번의 final push로 게시한다. M4는 `goal_status=complete`, 정상 완료율
+> 9/9다. 다음 단일 진입점은
+> `airi_docs/진행중/AIRI-CLAUDE-HANDOFF-2026-08-26-POST-M4.md`이며, Claude는 파일이
+> `origin/main`에서 도달 가능한지와 final HEAD/local/origin/remote exact·clean을 먼저 확인한다.
+> M5는 사용자가 그 문서의 Goal 명령을 Claude에 실제로 제출한 뒤에만 시작한다.
+> `adoption_authorized=false`다.
 
 > **2026-08-25 22:55 KST 최우선 — M4 blind v6 봉인·계약·preflight·precommit PASS:** live 배선과
 > P3 정규식 수리, pre-fix 실패 증명, 새 v6 저작/독립 충돌 감사/no-overwrite 봉인, body-free

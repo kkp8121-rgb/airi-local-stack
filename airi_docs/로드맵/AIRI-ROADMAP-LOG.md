@@ -9,6 +9,15 @@
 
 ## 2026-08-26 M4 — d1v6 no_winner 종결·사용자용 roadmap dashboard 공용 skill
 
+- 10:10 KST 사용자가 final push와 전체 문서 동기화, 다음 작업의 Claude 이관을 명시적으로
+  승인했다. 재대조는 publication parent HEAD/local `09de314`, origin/remote `30fe352`, ahead 3,
+  pre-doc-batch clean, d1v6 네 산출물 48/48·duplicate/missing 0·exit 0·no_winner, 관련
+  process/listener 0이다. M4-10을 `[x]`로 닫아 M4 정상 완료율을 9/9로 올리고 전체 로드맵은
+  `[x]45/[D]8`, 정상 45/72(62.5%)·처리 종료 51/72(70.8%)·진행 53.5/72(74.3%)로 갱신했다.
+  신규 `AIRI-CLAUDE-HANDOFF-2026-08-26-POST-M4.md`는 M4 증거와 P2/P3/말투 잔여 귀책,
+  사용자 제출 전에는 권한이 없는 M5 Goal 명령을 한 곳에 둔다. 현재 milestone docs와 handoff를
+  검증·exact commit한 뒤 사용자 승인된 한 번의 push로 게시하고 post-push refs/clean/PID를
+  확인한다. adoption·GPU 학습·blind 재사용·자동 후속 실행은 0이다.
 - 04:00 KST receipt commit `8463e80`까지 완료된 실제 상태를 재대조했다. HEAD/local main은
   `8463e80`, origin/remote main은 `30fe352`, ahead 2, sync 직전 clean이며 d1v6 네 산출물 집합은
   각 48개·고유 union/intersection 48/48·duplicate/missing 0, exit 0, 관련 process/listener 0을

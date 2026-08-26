@@ -238,3 +238,15 @@ summary와 comparator는 `status=pass`, `adoption_authorized=false`다.
 
 **동결 유지**: hard gate·threshold·metric·seed·fixture 정의를 변경하지 않는다. GPU/새 후보 학습,
 campaign, 운영 채택, 자동 후속 라운드는 0이다. 후속 측정이나 운영 채택은 별도 사용자 결정 사항이다.
+
+## 9. M4 종료와 Claude 이관 (2026-08-26 10:10, 결과-후 절)
+
+사용자가 M4 final push와 현행 문서 전체 동기화, 다음 작업의 Claude 이관을 명시적으로 승인했다.
+M4는 §8의 `no_winner` 분기까지 계약대로 종료한다(`goal_status=complete`). winner 조건이
+성립하지 않아 campaign은 실행 대상이 아니며, 최고 점수 e2-c2를 retained/adopted model로
+승격하지 않는다.
+
+다음 단일 진입점은 `AIRI-CLAUDE-HANDOFF-2026-08-26-POST-M4.md`다. 이 문서는 P4/P5가
+닫혔고 P2 잔여 호명·P3 required recall·공통 polite opinion gate가 남았다는 §8 진단을 그대로
+전달한다. 문서 안의 M5 Goal 명령은 사용자가 Claude에 실제 제출할 때만 새 실행 권한이 된다.
+그전에는 새 blind, matrix, campaign, GPU 학습, 운영 채택을 시작하지 않는다.

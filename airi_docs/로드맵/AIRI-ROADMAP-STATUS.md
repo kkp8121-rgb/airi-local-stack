@@ -5,27 +5,31 @@
 > 이 절이 현재 Goal의 권위 있는 사용자용 요약이다. 수치는 로그 문구 하나가 아니라
 > 고유 run key의 report·health·run-contract·packet 교집합과 실제 PID/listener를 대조해 갱신한다.
 
-- 현재 목표: 결정론 계층을 실제 방송 경로에서 검증하고 새 비공개 평가로 재측정하기 (M4)
-- 현재 하는 일: 최종 기계 상태까지 동기화한 로컬 commit 묶음의 push 승인 대기 (M4-10)
+- 현재 목표: 결정론 계층 운영 경로 검증과 blind v6 재측정 마감 (M4, `goal_status=complete`)
+- 현재 하는 일: M4 완료 기록과 Claude 다음 단일 진입점 게시 (M4-10)
 - 왜 하는가: 실제 방송 경로에서도 회상·거부된 선택 억제·후원 이어말하기가 안정적으로
   작동하는지 4개 모델 설정과 3개 평가 fixture로 확인하기 위해서다.
-- 현재 진행: **primary commit `c7500a3`, receipt commit `8463e80`, 이 최종 동기화 checkpoint를
-  포함한 로컬 commit 묶음 준비 완료 — push 승인 대기** — 2026-08-26 04:00 KST 기준
-- 정지 사유: push 직전 별도 사용자 승인이 필요하다. 장시간 campaign은 no_winner라 실행 대상이 아니다.
+- 현재 진행: **M4 9/9 완료 — d1v6 no_winner 종결, 검증된 문서와 Claude handoff를 사용자 승인
+  아래 최종 게시** — 2026-08-26 10:10 KST 기준
+- 정지 사유: M4에는 없음. 장시간 campaign은 no_winner라 실행 대상이 아니며 M5는 사용자가
+  Claude에 새 Goal 명령을 실제로 제출하기 전까지 시작하지 않는다.
 - 완료 조건: M4 handoff §5와 work-continuity를 포함한 전체 검증 PASS, 정확한 stage·commit,
   별도 사용자 push 승인 뒤 HEAD/local/origin 일치와 clean·PID/listener 0을 확인한다.
-- 다음 작업: 사용자에게 정확한 push 승인을 요청하고, 승인받으면 `origin/main`에 한 번 push한 뒤 최종 상태를 대조한다.
-- 다음 결정: 검증된 로컬 commit 묶음을 `origin/main`에 한 번 push할지 사용자 승인이 필요하다. 운영 채택과 후속 평가는 별도 결정이다.
-- M4 정상 완료율: **8/9 (88.9%)** — `[x] / 활성 항목 전체`
-- M4 처리 종료율: **8/9 (88.9%)** — `([x] + [F]) / 활성 항목 전체`
-- M4 진행 지수: **8/9 (88.9%)** — `([x] + [F] + 0.5×[P] + 0.5×[~]) / 활성 항목 전체`
-- 전체 로드맵 정상 완료율: **44/72 (61.1%)** — `[x] / 활성 항목 전체`
-- 전체 로드맵 처리 종료율: **50/72 (69.4%)** — `([x] + [F]) / 활성 항목 전체`
-- 전체 로드맵 진행 지수: **52.5/72 (72.9%)** — 77개 행 중 `[S]` 2개와 `[N/A]` 3개를 분모에서 제외;
-  2026-08-26 04:00 KST 증거 감사 기준
-- 마지막 실제 상태 대조: **2026-08-26 03:59 KST** — exit 0, report/health/run-contract/packet
+- 다음 작업: Claude 세션에서 새 handoff의 Goal 명령을 사용자 메시지로 제출하고, Claude가 먼저
+  final remote SHA·clean·d1v6 terminal receipt를 읽기 전용으로 대조한다.
+- 다음 결정: M5의 P2 잔여 호명·P3 필수 회수·공통 말투 게이트 수리와 fresh blind v7 재측정을
+  시작할지는 새 Claude Goal 제출로 확정한다. 운영 채택은 계속 별도 결정이다.
+- M4 정상 완료율: **9/9 (100.0%)** — `[x] / 활성 항목 전체`
+- M4 처리 종료율: **9/9 (100.0%)** — `([x] + [F]) / 활성 항목 전체`
+- M4 진행 지수: **9/9 (100.0%)** — `([x] + [F] + 0.5×[P] + 0.5×[~]) / 활성 항목 전체`
+- 전체 로드맵 정상 완료율: **45/72 (62.5%)** — `[x] / 활성 항목 전체`
+- 전체 로드맵 처리 종료율: **51/72 (70.8%)** — `([x] + [F]) / 활성 항목 전체`
+- 전체 로드맵 진행 지수: **53.5/72 (74.3%)** — 77개 행 중 `[S]` 2개와 `[N/A]` 3개를 분모에서 제외;
+  2026-08-26 10:10 KST 증거 감사 기준
+- 마지막 실제 상태 대조: **2026-08-26 10:07 KST** — exit 0, report/health/run-contract/packet
   고유 교집합 48/48, duplicate 0, incomplete 0, 두 flag 48/48 before·after, context/service error 0,
-  wrapper·owned PID/listener 0, HEAD/local `8463e80`, origin/remote `30fe352`, clean·ahead 2
+  wrapper·owned PID/listener 0, publication parent HEAD/local `09de314`, origin/remote `30fe352`,
+  pre-doc-batch clean·ahead 3
 
 ### 현재 주요 작업 단계(M4) 체크리스트
 
@@ -38,7 +42,8 @@
 - [x] 비교 결과 판정과 실패 축 진단 (M4-7) — no_winner, failed gate 29개 P2~P5 귀책 기록
 - [N/A] winner일 때만 장시간 방송 campaign 실행 (M4-8) — no_winner 분기가 선택되어 실행 대상 아님
 - [x] 사용자용 로드맵 대시보드 공용 스킬 만들기 (M4-9) — 공통 계약·두 진입점·불변식 검증 PASS
-- [D] 문서·전체 검증·정확한 commit/push 마감 (M4-10) — commit 완료; push 직전 별도 사용자 승인 필요
+- [x] 문서·전체 검증·정확한 commit/push 마감 (M4-10) — 사용자 승인, Claude handoff 포함
+  final publication transaction과 post-push exact 검증으로 마감
 
 ### 상태 표준과 계산 기준
 
@@ -51,8 +56,8 @@
   처리 종료에는 포함한다. 위 비율은 현재 M4의 10개 분리 행을 기준으로 계산했다.
 - 전체 로드맵의 과거 raw checkbox 55행을 코드·테스트·receipt·commit·사용자 결정과 대조했다.
   이 중 노후 상태 31개를 정정하고 복합 항목 분리로 12행을 추가했다. 전체 77행의 상태별 개수는
-  `[x]` 44, `[~]` 0, `[Q]` 1, `[P]` 5,
-  `[B]` 7, `[D]` 9, `[F]` 6, `[S]` 2, `[N/A]` 3이며 `[ ]`·`[?]`는 없다.
+  `[x]` 45, `[~]` 0, `[Q]` 1, `[P]` 5,
+  `[B]` 7, `[D]` 8, `[F]` 6, `[S]` 2, `[N/A]` 3이며 `[ ]`·`[?]`는 없다.
 
 ### 짧은 용어집
 

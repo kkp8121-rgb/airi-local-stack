@@ -1,6 +1,11 @@
 # AIRI Documentation Index
 
-최종 현행화 2026-08-24 16:33 KST (클로드 PC — E2-C1 36-report blind matrix no_winner 진단
+최종 현행화 2026-08-26 10:10 KST (M4 완료·Claude POST-M4 이관 — live 결정론 입력 배선,
+fresh blind v6 봉인과 exact-once 48-report 재측정, `winner=null` 진단, 사용자용 roadmap
+dashboard와 Codex/Claude 공용 skill 검증 완료. M4 정상 완료율 9/9. 다음 단일 진입점은
+`진행중/AIRI-CLAUDE-HANDOFF-2026-08-26-POST-M4.md`; M5는 사용자가 문서의 Goal 명령을
+Claude에 실제 제출한 뒤에만 시작하며 운영 채택은 별도 승인).
+직전 현행화 2026-08-24 16:33 KST (클로드 PC — E2-C1 36-report blind matrix no_winner 진단
 완료 + 핸들 grounding 가드/채점기 신호 SHIPPED. invented_handle 53건 중 89%가 실제
 memory 회수 오분류였고 그중 13%만 vocative 형태 — 가드는 그 13%만, 채점기 신호가 나머지
 87%를 처리. 게이트 정의 불변, 입력 범위만 확장. commit `a0020dd`+docs 3개로
@@ -40,12 +45,21 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
 
 ## 진행중 — 현행 계약
 
-- `AIRI-CODEX-HANDOFF-2026-08-25-M4.md` — **Codex 단일 진입점(M4).** d1v5 `no_winner`
+- `AIRI-CLAUDE-HANDOFF-2026-08-26-POST-M4.md` — **Claude 다음 단일 진입점.** M4 9/9
+  완료 증거, d1v6 48/48·exit 0·`winner=null`, P4/P5 폐쇄와 P2/P3/말투 잔여 귀책,
+  consumed blind v1~v6·운영 채택 금지 경계를 요약한다. 사용자가 실제 제출할 때만 권한이
+  생기는 M5 Goal 명령(잔여 결정론 게이트 분리 수리 → fresh blind v7 → exact-once matrix →
+  winner-only campaign)을 포함한다.
+- `AIRI-CODEX-HANDOFF-2026-08-25-M4.md` — **M4 완료 실행·결과 기록.** d1v5 `no_winner`
   진단으로 확정된 결함(결정론 계층이 live-broadcast 경로에서 주입 전 메시지만 받아 브리핑·후원
   note를 못 봄 — `ollama_proxy.py:7612`/`:8935`/`:8977`, `live_broadcast_runtime.py:98-125`)을
   코드 위치와 함께 정리하고, M4 작업 계약(계층 입력 배선 수정 → live 경로 통합 테스트 → P3
   정규식 확장 → blind v6 저작·봉인(handle-주제 어휘 충돌 검사) → matrix exact-once → verdict
   분기), 환경 함정, 검증 명령, 금지선을 담는다.
+- `AIRI-ROADMAP-DASHBOARD-CONTRACT.md` — Codex와 Claude가 함께 따르는 사용자용 roadmap
+  dashboard 단일 원본. 상태 기호·완료율·14분 heartbeat·증거 대조·권한 경계를 정의하며
+  `.agents/skills/airi-roadmap-dashboard/SKILL.md`와
+  `.claude/skills/airi-roadmap-dashboard/SKILL.md`가 같은 파일을 참조한다.
 - `AIRI-PARALLEL-HANDOFF-2026-08-25.md` — 병렬 오프라인 세션(branch
   `feature/parallel-offline-20260825`, 2026-08-25 21:2x 병합 `9ccf870`)의 인계 기록: legacy T3
   comparator R2 F5/F6(seed 하한·교락 필드 exact 비교, sim payload에 `model_digest`/`max_tokens`),
@@ -68,7 +82,7 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
   핸들 grounding 가드/채점기 신호 구현·SHIPPED(commit `a0020dd`+docs →
   `59d1836`). 다음 gate는 이 진단 근거로 재설계한 E2-C2를 새 retained blind로
   실행하는 것(v1/v2 재사용 금지).
-- `AIRI-CODEX-HANDOFF-2026-08-21.md` — **현행 코덱스(GPU) 인계 단일 SSoT.**
+- `AIRI-CODEX-HANDOFF-2026-08-21.md` — **과거 코덱스(GPU) 인계 SSoT.**
   최신(§-7, 2026-08-24 16:33): E2-C1 36-report blind matrix `winner=null`(§-6)의
   invented_handle 53건 진단 완료(89%가 실제 memory 회수 오분류, 그중 13%만 vocative
   형태) + 핸들 grounding 가드(`AIRI_HANDLE_GROUNDING_GUARD`, 기본 off)·채점기 신호

@@ -7,7 +7,12 @@
 > 실행 중 PID, owned 포트를 **read-only로 대조**하고 나서야 실행한다. 채팅 요약을 믿지 않는다.
 > 작성: Claude main 세션(airi-d6), 2026-08-25 21:39 KST, HEAD `91792a1`.
 
-## -1. M4 진행 상태 (2026-08-26 04:00 KST)
+> **M4는 2026-08-26 완료됐다(`goal_status=complete`).** 이 문서는 M4 실행·결과 기록으로
+> 보존한다. 다음 Claude 세션의 단일 진입점은
+> `AIRI-CLAUDE-HANDOFF-2026-08-26-POST-M4.md`다. 새 M5는 사용자가 그 문서의 Goal 명령을
+> 실제로 제출하기 전에는 시작하지 않는다.
+
+## -1. M4 진행 상태 (2026-08-26 10:10 KST)
 
 - §3.1~§3.4 완료·origin/main 반영: live `context_note` 배선, server-owned briefing marker,
   donation P5, pre-fix `07ad82f` 2 FAIL → 수정 후 2 PASS, flag OFF exact, P3 v5 arc 12/12,
@@ -29,16 +34,17 @@
   문서에 고정된 기존 behavior-v2 2 failure만 재현했고, interpreter/known-failure를 분리한
   affected clean run 739 passed/9 skipped/297 subtests와 proxy/runtime 403 OK,
   deterministic/guard 52 passed+10 subtests, checkpoint·continuity·dashboard·skill validator·
-  diff-check가 PASS했다. exact 13-path primary commit `c7500a3`와 receipt commit `8463e80`이
-  로컬에 있고, 마지막 실제 기계 상태는 이 동기화 checkpoint를 포함한 final local commit으로
-  닫는다. 다음 상태 변경인 push는 직전 별도 사용자 승인을 받아야 한다. `adoption_authorized=false`다.
+  diff-check가 PASS했다. exact 13-path primary commit `c7500a3`, receipt commit `8463e80`,
+  final sync `09de314`를 만들었고 사용자가 final push와 Claude 이관을 명시적으로 승인했다.
+  현재 문서·신규 Claude handoff를 exact commit한 뒤 한 번 push하고 post-push refs·clean·PID를
+  대조하는 publication transaction으로 M4-10을 닫는다. `adoption_authorized=false`다.
 
 ## 0. 인계 시점 상태 (관측값)
 
 | 항목 | 값 |
 |---|---|
-| HEAD = local main | `8463e80` (`docs: record M4 dashboard receipt`), origin/remote `30fe352`, ahead 2 — final sync 직전 관측 |
-| worktree | final sync 직전 clean. 현재는 이 milestone 문서 묶음만 exact commit 전 수정 |
+| publication parent HEAD = local main | `09de314` (`docs: synchronize M4 push gate`), origin/remote `30fe352`, ahead 3 — handoff docs 직전 관측 |
+| worktree | publication basis는 handoff docs 직전 clean. 현행 milestone 문서와 신규 Claude handoff만 exact final commit/push에 포함하며 최종 reader가 actual clean을 재확인 |
 | 실행 중 프로세스 | d1v6 wrapper·owned process/listener 0. owned 포트 11435/11436/8880/9880/8890/8892 free |
 | GPU | RTX 3060 Ti 8GB 유휴. **M4는 GPU 학습이 없다** (추론 matrix만) |
 | 마지막 verdict | d1v6 `D:\AIRI-Models\airi-d1v6-blind-matrix-20260825\run\comparisons\d1-blind.json` — `winner=null`, 실패 29 게이트 |
