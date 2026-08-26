@@ -9,6 +9,14 @@
 
 ## 2026-08-26 M6 — 실제 대화 사람 채점 체계·배관 수리 (사용자 4건 승인)
 
+- 2026-08-26 12:35 KST M6-6 종료·M6-7 1차. 사용자 지시로 공개 저챗 채팅을 직접 확보: 유튜브 재업로드에는 채팅 리플레이가
+  없어(원본 라이브만 소량) 치지직 VOD 채팅 API로 4편 26,436건 수집(저장소 밖), `import_public_chat.py`로 16,340건
+  HMAC 가명화, `run_broadcast_sim.py --replay-chat`(commit `6dd8b22`)으로 운영 구성 스택에 재생. run 01(러너 httpx)·
+  02·03(실제 채팅의 입력 스크리닝 차단을 러너가 치명 처리) 실패 뒤 `f408eb7`로 재생 모드 `screened` 처리. run 04:
+  99턴 응답 + 차단 1, service_error 0, polite 0, invented 0. Claude 1차 참고 채점(사람 채점 아님): 방송다움 1.89·맥락
+  1.85·반응 1.99·말투 4.03·사실성 3.99, 무의미 대꾸 44%, 치명 3%. 패턴: "고마워." 붕괴 23턴(후원 감사 history
+  되먹임), P5 echo 축자 인용, 따라 말하기, 원 방송 맥락 의존 — `진행중/AIRI-REAL-CHAT-REPLAY-RUN04-2026-08-26.md`.
+  사용자 최종 채점 시트와 요약 도구는 준비됨. push 미승인(로컬 +2).
 - 2026-08-26 11:53 KST M6-2·M6-3 종료. grounding 게이트 live-broadcast 완화 `cdbb6eb`(HEAD worktree red 1 fail·
   6 error → unittest 414 OK, 일반 채팅 불변), 실제 대화 human_review 도구 `776b462`(export·채점 HTML·요약,
   16 passed, CI shard 등록, 채점 HTML headless 렌더링 확인). 로컬 HEAD는 origin/main보다 3 ahead, push

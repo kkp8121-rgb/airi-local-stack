@@ -6,14 +6,17 @@
 
 ## 1. 입력 — 실제 대화만
 
-- 대상: (a) 비공개 테스트 방송 1회 이상, 또는 (b) 사용자가 AIRI 로컬 스택과 직접 나눈 채팅 세션.
-  합성 fixture·템플릿 시청자·시뮬레이터 출력은 입력이 아니다.
+- 대상: (a) 비공개 테스트 방송 1회 이상, (b) 사용자가 AIRI 로컬 스택과 직접 나눈 채팅 세션, 또는
+  (c) 2026-08-26 사용자 지시로 추가 — 공개 저스트 채팅 방송(치지직/유튜브 원본 라이브 아카이브)의 채팅
+  리플레이를 가명화해 로컬 스택에 재생한 세션. (c)는 시청자 발화는 실제이지만 원 방송 맥락에 묶인 메시지가
+  섞이므로 채점 시 "원 방송 맥락 의존" 코멘트로 구분한다. 합성 fixture·템플릿 시청자 출력은 입력이 아니다.
 - 최소 규모: **50턴**, 목표 100턴(user/assistant 쌍 기준). 여러 세션을 합쳐도 된다.
 - 출처: 프록시 memory DB의 `conversation_message` journal(세션·턴·역할·본문). 스택은
   `start-airi-local-stack.ps1 -MemoryDbPath <경로>`로 DB 위치를 지정하며, 비워 두면 기본 경로
   `ollama-proxy/runtime/airi-memory.sqlite3`(프록시 env `AIRI_MEMORY_DB`)를 쓴다. 상세는
   `ollama-proxy/eval/human_review/README.md`.
-- 개인정보: 실제 시청자 표시명·채널 ID·계정 정보는 저장소에 넣지 않는다. export JSONL과 채점
+- 개인정보: 실제 시청자 표시명·채널 ID·userIdHash·계정 정보는 저장소·문서·프롬프트에 넣지 않는다. 공개 채팅은
+  `import_public_chat.py`가 HMAC 가명(`v`+8자)으로 바꾼 뒤에만 재생하며 원본 JSON은 저장소 밖에 둔다. export JSONL과 채점
   결과 JSON은 `D:\AIRI-Models\airi-human-eval\<날짜>\` 같은 저장소 밖 경로에만 둔다. 요약
   (`summarize_ratings.py`) 출력만 content-free이므로 문서에 인용할 수 있다.
 

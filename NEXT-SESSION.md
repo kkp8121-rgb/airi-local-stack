@@ -1,6 +1,14 @@
 # AIRI 다음 세션 안내
 
-> **2026-08-26 11:45 KST 최우선 — M6 활성(사용자 4건 승인), 채택 게이트는 실제 대화 사람 채점 하나:**
+> **2026-08-26 12:35 KST 최우선 — 실제 채팅 재생 run 04 완료, 사용자 최종 채점 대기:** 공개 치지직 저챗 채팅을
+> 가명화해 운영 구성 스택에 99턴 재생했다(`진행중/AIRI-REAL-CHAT-REPLAY-RUN04-2026-08-26.md`). Claude 1차
+> 참고 채점은 방송다움 1.89·맥락 1.85·반응 1.99·말투 4.03·사실성 3.99, 무의미 대꾸 44%. 핵심 결함: 후원
+> 감사 문형 되먹임으로 모델이 "고마워."로 붕괴(23턴), P5 echo의 후원 본문 축자 인용(부적절 문장 포함), 따라
+> 말하기. 다음: 사용자가 `D:\AIRI-Models\airi-human-eval\20260826-replay-04\rating-sheet.html`로 최종 채점 →
+> `summarize_ratings.py` → 기준선(M6-7) → 첫 개선 후보 결정(M6-8, 후보: 감사 되먹임 제거/echo 요약형/되묻기 억제).
+> 로컬 HEAD는 origin/main보다 2 commit 앞(`6dd8b22`, `f408eb7`) + 문서 배치; push 별도 승인.
+
+> **2026-08-26 11:45 KST — M6 활성(사용자 4건 승인), 채택 게이트는 실제 대화 사람 채점 하나:**
 > 진입점 `airi_docs/진행중/AIRI-REALITY-CHECK-AND-FINETUNE-REVIEW-2026-08-26.md`(실태) + `AIRI-REAL-DIALOGUE-HUMAN-EVAL-CONTRACT-2026-08-26.md`(평가 계약).
 > 완료(로컬 commit, push 미승인): `a9583c3` step 2 수리, `cdbb6eb` grounding 게이트 live-broadcast 완화
 > (unittest 414 OK), `776b462` `ollama-proxy/eval/human_review/` export·채점 HTML·요약 도구(16 passed, CI
