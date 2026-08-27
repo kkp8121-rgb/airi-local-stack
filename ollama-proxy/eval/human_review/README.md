@@ -113,6 +113,36 @@ python ollama-proxy\eval\human_review\calibrate_ratings.py merge --ai ai-a.json 
 - **채점자에게 AI 점수를 먼저 보여주지 않는다.** 앵커링 편향으로 검증 자체가 오염된다. `select` 가
   만드는 부분 평가지에는 AI 점수가 들어가지 않는다.
 
+## 5. 스트리머 응답 정답지 (`pair_streamer_response.py`)
+
+공개 VOD 의 **채팅 + 스트리머 발화**로 "실제 스트리머가 무엇에 반응했는가" 를 만든다. 쓰임은 셋이다 —
+픽업 정책의 정답지, 흔들리지 않는 채점 기준점, 맥락 주입용 트랜스크립트. 상세와 실측은
+`진행중/AIRI-EVAL-INPUT-CONTEXT-AUDIT-2026-08-27.md` §4-3·§8.
+
+```powershell
+# 오디오 (yt-dlp 는 chzzk:video 가 KeyError('sourceURL') 로 깨져 있어 이 경로를 쓴다)
+python ollama-proxy\eval\human_review\import_public_chat.py chzzk-audio --video-no <no> --output <밖>\audio.m4a
+ffmpeg -i <밖>\audio.m4a -vn -ac 1 -ar 16000 -c:a pcm_s16le <밖>\audio.wav
+python stt\transcribe_vod.py --input <밖>\audio.wav --output <밖>\transcript.jsonl
+# 정답지
+python ollama-proxy\eval\human_review\pair_streamer_response.py `
+    --chat <밖>\chat.jsonl --transcript <밖>\transcript.jsonl --output <밖>\pairs.jsonl
+```
+
+**시간만으로 짝지으면 안 된다** — 채팅이 초당 3건인데 스트리머는 극히 일부만 읽는다. 스트리머가
+채팅을 읽을 때 그 채팅의 고유 어휘를 그대로 쓰는 것을 신호로 쓴다. 그리고 **방향을 반드시 가른다**:
+시청자가 스트리머 말을 따라한 경우가 훨씬 흔하므로, 채팅 직전 발화에 이미 나온 어휘는 응답 근거가
+될 수 없다. 조사·어미로 분절이 갈리는 것(`충실한편` vs `충실한`)까지 접두 매칭으로 잡는다 — 실측에서
+이 필터를 촘촘히 한 것만으로 후보 70 → 57건, 에코 제외 123 → 364건이 됐다.
+
+`transcribe_vod.py` 는 모델·beam 을 `stt/openai_stt_server.py` 와 같은 값으로 핀한다(테스트로 고정).
+회차마다 다른 설정으로 받아쓰면 트랜스크립트끼리 비교가 성립하지 않는다. GPU 없이 돌며 실측은
+32분 오디오에 654초(2.94배속)였다. 대기화면 구간에서 VAD 가 통째로 뭉개는 일이 있어(실측 296초)
+30초 초과 세그먼트는 짝짓기에서 제외한다.
+
+산출물은 전부 **저장소 밖**이다. 오디오는 계약 §1 문구에 없는 입력이므로 **로컬 평가 한정**이며,
+학습 정답으로는 쓰지 않는다.
+
 ## 테스트와 CI
 
 ```powershell
@@ -120,8 +150,9 @@ python -m pytest -q ollama-proxy\eval\human_review
 ```
 
 `test_human_review_tools.py` 는 오프라인·결정적이며 임시 SQLite 로 `airi_memory.py` 의 DDL 을 그대로
-재현한다. 이 디렉터리의 테스트 파일 4개는 `.github/workflows/remediation-checkpoint.yml` 의
+재현한다. 이 디렉터리의 테스트 파일 5개는 `.github/workflows/remediation-checkpoint.yml` 의
 `ollama-proxy-evaluations` 샤드에 등록돼 있다(새 테스트 파일을 추가하면 같은 샤드에 넣어야 CI 에서 돈다).
+`stt/` 는 디렉터리 단위 샤드라 새 파일이 자동으로 포함된다.
 
 ## 4. 공개 채팅 리플레이 가져오기
 

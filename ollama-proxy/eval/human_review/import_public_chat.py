@@ -213,6 +213,73 @@ def fetch_chzzk_chats(
 
 
 # ---------------------------------------------------------------------------
+# Chzzk VOD 오디오 (스트리머 발화 STT 용)
+# ---------------------------------------------------------------------------
+
+CHZZK_HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://chzzk.naver.com/"}
+AUDIO_MIME = "audio/mp4"
+
+
+def _http_get_json(url: str) -> dict:
+    """테스트는 이 함수만 갈아 끼운다(네트워크 금지)."""
+    request = Request(url, headers=CHZZK_HEADERS)
+    with urlopen(request, timeout=20) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def resolve_chzzk_audio_url(video_no: int, fetch_json=None) -> tuple[str, float]:
+    """VOD 의 오디오 전용 트랙 URL 과 길이(초)를 낸다.
+
+    yt-dlp 의 chzzk:video 추출기는 2026-08-27 기준 이 매니페스트에서
+    ``KeyError('sourceURL')`` 로 깨진다 — 오디오 representation 의
+    ``segmentList.initialization.sourceURL`` 이 null 이기 때문이다. 실제 주소는
+    ``otherAttributes.m3u`` 에 서명 토큰과 함께 들어 있고, CMAF 구조라 모든 세그먼트가
+    **같은 .m4a 파일의 바이트 범위**다. 그래서 플레이리스트를 따라갈 필요 없이 그 파일
+    하나만 받으면 된다. (세그먼트 상대경로에는 토큰이 붙지 않아 ffmpeg 이 400 을 받는다.)
+    """
+    if fetch_json is None:
+        fetch_json = _http_get_json
+    meta = fetch_json(f"https://api.chzzk.naver.com/service/v2/videos/{int(video_no)}")
+    content = (meta or {}).get("content") or {}
+    video_id, in_key = content.get("videoId"), content.get("inKey")
+    if not video_id or not in_key:
+        raise ValueError("videoId/inKey 를 얻지 못했다(비공개이거나 성인 인증이 필요한 VOD)")
+    playback = fetch_json(
+        f"https://apis.naver.com/neonplayer/vodplay/v2/playback/{video_id}?key={in_key}")
+    for period in (playback or {}).get("period") or []:
+        for adaptation in period.get("adaptationSet") or []:
+            if adaptation.get("mimeType") != AUDIO_MIME:
+                continue
+            for representation in adaptation.get("representation") or []:
+                playlist = (representation.get("otherAttributes") or {}).get("m3u")
+                if not playlist:
+                    continue
+                head, _, query = playlist.partition("?")
+                directory = head.rsplit("/", 1)[0]
+                name = f"{representation.get('id')}.m4a"
+                url = f"{directory}/{name}" + (f"?{query}" if query else "")
+                return url, float(content.get("duration") or 0)
+    raise ValueError("오디오 전용 트랙을 찾지 못했다")
+
+
+def download_chzzk_audio(video_no: int, destination: Path, fetch_json=None, opener=None) -> int:
+    """오디오 트랙을 통째로 내려받는다. 반환값은 바이트 수."""
+    url, _duration = resolve_chzzk_audio_url(video_no, fetch_json=fetch_json)
+    if opener is None:
+        def opener(target):  # pragma: no cover - 네트워크 경로
+            return urlopen(Request(target, headers=CHZZK_HEADERS), timeout=900)
+    written = 0
+    with opener(url) as response, destination.open("wb") as handle:
+        while True:
+            block = response.read(1 << 20)
+            if not block:
+                break
+            handle.write(block)
+            written += len(block)
+    return written
+
+
+# ---------------------------------------------------------------------------
 # yt-dlp YouTube 라이브 채팅 리플레이
 # ---------------------------------------------------------------------------
 
@@ -429,6 +496,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="저장소 트리 안으로 쓰는 것을 명시적으로 허용한다(권장하지 않음).",
     )
 
+    audio_parser = subparsers.add_parser(
+        "chzzk-audio",
+        help="Chzzk VOD 오디오 트랙을 받는다(스트리머 발화 STT 용). yt-dlp 우회 경로.",
+    )
+    audio_parser.add_argument("--video-no", type=int, required=True)
+    audio_parser.add_argument("--output", required=True, help="오디오 출력 경로(저장소 밖).")
+    audio_parser.add_argument(
+        "--allow-repo-path",
+        action="store_true",
+        help="저장소 트리 안으로 쓰는 것을 명시적으로 허용한다(권장하지 않음).",
+    )
+
     return parser
 
 
@@ -455,6 +534,22 @@ def _run_chzzk_fetch(args: argparse.Namespace) -> int:
         json.dump(raw, handle, ensure_ascii=False)
 
     print(f"video_no={args.video_no} chats={len(raw['videoChats'])} output={output_path}")
+    return 0
+
+
+def _run_chzzk_audio(args: argparse.Namespace) -> int:
+    output_path = Path(args.output)
+    if _refuse_if_inside_repo(output_path, args.allow_repo_path, "a raw audio capture"):
+        return 1
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        written = download_chzzk_audio(args.video_no, output_path)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"video_no={args.video_no} bytes={written} output={output_path}")
     return 0
 
 
@@ -533,6 +628,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "chzzk-fetch":
         return _run_chzzk_fetch(args)
+    if args.command == "chzzk-audio":
+        return _run_chzzk_audio(args)
     return _run_normalize(args)
 
 

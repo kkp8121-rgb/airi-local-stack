@@ -548,6 +548,86 @@ class NormalizeCliTest(unittest.TestCase):
         self.assertEqual(len(read_jsonl(output_path)), 2)
 
 
+def audio_playback(*, m3u: str | None, mime: str = "audio/mp4") -> dict:
+    """실제 Chzzk playback 응답의 모양만 최소로 재현한다."""
+    representation = {"id": "aud-1", "otherAttributes": {}}
+    if m3u is not None:
+        representation["otherAttributes"]["m3u"] = m3u
+    return {"period": [{"adaptationSet": [
+        {"mimeType": "video/mp4", "representation": [{"id": "vid-1", "otherAttributes": {}}]},
+        {"mimeType": mime, "representation": [representation]},
+    ]}]}
+
+
+class ChzzkAudioTest(unittest.TestCase):
+    SIGNED = "https://cdn.example/base/dir/media.m3u8?_lsu_sa_=TOKEN"
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.addCleanup(self.tmp.cleanup)
+
+    def fake_json(self, playback: dict, duration: float = 120.0):
+        def fetch(url: str) -> dict:
+            if "/service/v2/videos/" in url:
+                return {"content": {"videoId": "VID", "inKey": "KEY", "duration": duration}}
+            self.assertIn("playback/VID?key=KEY", url)
+            return playback
+        return fetch
+
+    def test_resolved_url_keeps_the_signing_token_on_the_segment_file(self) -> None:
+        # 서명 토큰은 플레이리스트 URL 에만 붙는다.  세그먼트 상대경로에 옮겨 붙이지 않으면
+        # 실제로 400 이 난다(2026-08-27 실측).
+        url, duration = resolve_url(self.fake_json(audio_playback(m3u=self.SIGNED)))
+        self.assertEqual(url, "https://cdn.example/base/dir/aud-1.m4a?_lsu_sa_=TOKEN")
+        self.assertEqual(duration, 120.0)
+
+    def test_video_track_is_not_mistaken_for_audio(self) -> None:
+        playback = audio_playback(m3u=self.SIGNED, mime="video/mp4")
+        with self.assertRaises(ValueError):
+            resolve_url(self.fake_json(playback))
+
+    def test_missing_playlist_attribute_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            resolve_url(self.fake_json(audio_playback(m3u=None)))
+
+    def test_private_video_without_keys_is_rejected(self) -> None:
+        def fetch(_url: str) -> dict:
+            return {"content": {}}
+        with self.assertRaises(ValueError):
+            importer.resolve_chzzk_audio_url(1, fetch_json=fetch)
+
+    def test_download_streams_to_disk_and_refuses_repo_paths(self) -> None:
+        payload = b"\x00\x01" * 4096
+
+        class FakeResponse(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        destination = self.root / "audio.m4a"
+        written = importer.download_chzzk_audio(
+            7, destination,
+            fetch_json=self.fake_json(audio_playback(m3u=self.SIGNED)),
+            opener=lambda _url: FakeResponse(payload),
+        )
+        self.assertEqual(written, len(payload))
+        self.assertEqual(destination.read_bytes(), payload)
+
+    def test_cli_refuses_to_write_inside_the_repo(self) -> None:
+        inside = Path(importer.REPO_ROOT) / "should-not-exist.m4a"
+        code, _out, err = run_main(["chzzk-audio", "--video-no", "7", "--output", str(inside)])
+        self.assertEqual(code, 1)
+        self.assertIn("refusing to write", err)
+        self.assertFalse(inside.exists())
+
+
+def resolve_url(fetch_json):
+    return importer.resolve_chzzk_audio_url(1, fetch_json=fetch_json)
+
+
 class ChzzkFetchTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
