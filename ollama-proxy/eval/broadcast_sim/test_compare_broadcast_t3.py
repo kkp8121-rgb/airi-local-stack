@@ -166,7 +166,7 @@ class ComparatorTests(unittest.TestCase):
         self.assertEqual(result['status'], 'pass')
         self.assertEqual(result['phase'], 'all')
         self.assertEqual(result['fixtures_compared'], ['fixture.json'])
-        self.assertEqual(result['seeds_by_fixture'], {'fixture.json': [7]})
+        self.assertEqual(result['seeds_by_fixture'], {'fixture.json': sorted(SEEDS)})
 
     def test_phase_filter_is_recorded_instead_of_all(self):
         self.passing_pair()
@@ -175,7 +175,7 @@ class ComparatorTests(unittest.TestCase):
         self.assertEqual(result['status'], 'pass')
         self.assertEqual(result['phase'], 'final_blind')
         self.assertEqual(result['fixtures_compared'], ['fixture.json'])
-        self.assertEqual(result['seeds_by_fixture'], {'fixture.json': [7]})
+        self.assertEqual(result['seeds_by_fixture'], {'fixture.json': sorted(SEEDS)})
 
 
 if __name__ == '__main__':
