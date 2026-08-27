@@ -1,7 +1,7 @@
 {
   "suite_id": "airi_ko_input_safety_b3d",
   "schema_version": 2,
-  "policy_sha256": "64a7d9bdb152aeb458bfa2a5a43b31c2d25d5e085c5e070d6b8ebc28dfe9525d",
+  "policy_sha256": "ba2d49bdfae99bc25a022514971fa60aceb99d19799e09324d0ca9d1d2227b55",
   "cases": [
     {
       "id": "b3d_001",
