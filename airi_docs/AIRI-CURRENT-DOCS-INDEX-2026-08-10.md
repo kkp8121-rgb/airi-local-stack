@@ -1,5 +1,10 @@
 # AIRI Documentation Index
 
+최종 현행화 2026-08-27 10:38 KST (M7 S4 후속 모니터링 중단·Claude 인계). S2 `[F]`, S3 `[x]`,
+S4 `[P]`이며 S4 대표 r2 사람 채점 JSON을 기다린다. 새 단일 진입점은
+`진행중/AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md`다. 이번 문서 배치의 commit/push는
+사용자가 명시 승인했으며 운영 flag·S5·GPU·파인튜닝은 금지한다.
+
 최종 현행화 2026-08-26 11:45 KST (M6 — 사용자 4건 승인: 실제 대화 사람 채점을 유일한 채택 게이트로
 (`진행중/AIRI-REAL-DIALOGUE-HUMAN-EVAL-CONTRACT-2026-08-26.md`), grounding 침묵 수리, step 2 commit `a9583c3`, 문서 다이어트·로드맵 v4.
 WORKING 이력은 `아카이브/AIRI-WORKING-STATE-HISTORY-2026-08-22-TO-2026-08-25.md`).
@@ -51,7 +56,8 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
 
 ## 진행중 — 현행 계약
 
-- `AIRI-CODEX-HANDOFF-2026-08-26-M7.md` — **현재 단일 진입점(2026-08-26 Codex 인계).** M7 증명 7건, 다음 작업 순서, 재현 명령·sha, 금지 목록.
+- `AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md` — **현재 단일 진입점(2026-08-27 Claude 인계).** S2/S3/S4 상태, S4 대표 평가표 대기, JSON 도착 시 검증 순서와 금지 경계를 기록한다.
+- `AIRI-CODEX-HANDOFF-2026-08-26-M7.md` — (이력) M7 증명 7건, replay 재현 명령·sha, 금지 목록.
 - `AIRI-M7-S0-S1-RECEIPT-2026-08-26.md` — M7 S0·S1 receipt: 복제 노이즈(n=1 무효), 되먹임 3채널 차단 시 붕괴 0/3, 채점 대상 06b-r3.
 - `AIRI-BREAKTHROUGH-PLAN-2026-08-26.md` — **현재 진입점(2026-08-26 타계책).** 이분법 대신 되먹임 고리·재료 수용·측정 규율; S0~S5 순서, 돌파 정의, 금지 목록.
 - `AIRI-REAL-CHAT-REPLAY-RUN05-2026-08-26.md` — 후보 A+B 적용 run 05 결과와 남은 모델 고유 결함(되묻기 붕괴), 다음 축 후보 D/E/F.

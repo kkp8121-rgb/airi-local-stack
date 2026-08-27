@@ -1,11 +1,15 @@
 # AIRI 로드맵 갱신 로그 (최신이 위)
 
+- 2026-08-27 10:38 KST Claude handoff stop intent. 실제 local/origin/remote SHA `cfb7fd41819cbfad5536ab3aa55e1d8f631c49c7`, replay/GPU 관련 프로세스 0, Ollama `127.0.0.1:11434`만 확인했다. S2 `[F]`, S3 `[x]`, S4 `[P]`와 S4 r1/r2/r3 외부 root·대표 r2 rating-sheet를 재대조했고 S4 사람 JSON은 없다. 사용자 요청으로 모니터링을 중단하고 `진행중/AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md`를 작성해 이번 문서 배치를 commit/push한다. JSON 전 자동 점수·replay 재실행·S5·GPU·파인튜닝·운영 활성화는 하지 않는다.
+
 > 2026-08-19 로드맵 v3 개편 때 `AIRI-ROADMAP-STATUS.md`에서 분리했다.
 > **매 배치(커밋)마다 이 파일 맨 위에 한 줄 이상 기록한다** — 상태 변화가
 > 없어도 남긴다. 클로드·코덱스 공통 의무이며, 이 기록이 없으면 배치가
 > 완결되지 않은 것으로 본다. (구 규칙과 동일, 기록 위치만 이 파일로 변경)
 > 본문 링크 경로는 각 항목의 작성 시점 기준이다 — 2026-08-19 정리로 일부
 > 문서가 `아카이브/`·`완료/`로 이동했으니 이름으로 검색할 것.
+
+- 2026-08-27 01:29 KST follow-up wait receipt. 실제 local/origin/remote SHA `cfb7fd41819cbfad5536ab3aa55e1d8f631c49c7`와 S2 `[F]`·S3 `[x]`·S4 `[P]`, 세 S4 외부 root 및 대표 r2 rating-sheet를 재대조했다. 사람 JSON은 없으므로 자동 점수·replay 재실행·S5·GPU·파인튜닝·push를 하지 않는다. 이 상태 문서 정정만 다음 명시적 push 승인 전까지 로컬 dirty로 둔다.
 
 - 2026-08-27 00:47 KST push receipt. 사용자 요청에 따라 S2/S3/S4 구현·테스트·CI 등록과 M7 문서를 포함한 14개 파일을 `46015dbe0a1a2fdde960112c1bf7ba79a28e6a3b` (`feat: add S4 pickup batching controls`)로 커밋하고 `origin/main`에 push했다. local/origin/remote main SHA가 모두 일치하고 worktree는 clean이다. 운영 flag·GPU·파인튜닝·모델 변경은 없으며 S4 r2 사람 채점 JSON은 계속 대기한다.
 

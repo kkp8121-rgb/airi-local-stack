@@ -1,8 +1,8 @@
 # AIRI 다음 세션 안내
 
-> **2026-08-27 00:47 KST 현재:** S4 default-off 구현·회귀와 고정 07 replay r1~r3를 완료해 문서·코드·테스트·CI 등록 14개 파일을 `46015dbe0a1a2fdde960112c1bf7ba79a28e6a3b`로 커밋하고 `origin/main`에 push했습니다. local/origin/remote main은 일치하고 worktree는 clean입니다. 세 회차는 exit 0·99턴·오류 0, `skipped=30`, `batched=0`; q_end 5/13/22의 중앙값 대표는 r2이며 사람 JSON을 기다립니다. `goal_status=active`, `adoption_authorized=false`, 운영 flag OFF, S5·GPU 금지.
+> **2026-08-27 10:38 KST 현재:** 사용자의 중단 요청에 따라 모니터링을 멈추고 `airi_docs/진행중/AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md`를 Claude 단일 진입점으로 작성합니다. 인계 전 HEAD `cfb7fd41819cbfad5536ab3aa55e1d8f631c49c7`은 local/origin/remote와 일치했고, 이번 문서 배치의 commit/push가 명시 승인됐습니다. S4 r1~r3는 exit 0·99턴·오류 0, `skipped=30`, `batched=0`; q_end 5/13/22의 대표는 r2이며 S4 사람 JSON을 기다립니다. JSON이 없으므로 자동 점수·replay 재실행·S5를 하지 않습니다. `goal_status=paused`, `adoption_authorized=false`, 운영 flag OFF, GPU·파인튜닝 금지.
 
-> **현재 live goal_status=active:** M7 S3 평가 채택과 S2 `[F]` 실패를 보존했다. S4 replay r1~r3는 완료됐고 대표 r2 사람 JSON을 기다린다. replay/GPU PID 0, Ollama 11434만 남아 있으며 S4 채택·운영 반영·commit/push는 대기한다.
+> **현재 live goal_status=paused:** M7 S3 평가 채택과 S2 `[F]` 실패를 보존했다. S4 replay r1~r3는 완료됐고 대표 r2 사람 JSON을 기다린다. replay/GPU PID 0, Ollama 11434만 남아 있으며 S4 채택·운영 반영은 대기한다. 이번 push 이후에는 새 사용자 goal 전까지 추가 모니터링을 하지 않는다.
 
 > **2026-08-26 17:25 KST 최우선 — M7 S0·S1 완료(`진행중/AIRI-M7-S0-S1-RECEIPT-2026-08-26.md`): 복제 3회 기준 되먹임 고리 3채널 차단 시 붕괴 0/3(off 3/4).
 > **정정(2026-08-26 17:32):** 문구 고정은 2/3에 남고(비트 큐 되풀이), 참고 채점 06b-r3 3축 1.59 < 기준선 1.76 — 개선 없음. 되먹임은 증폭기,
