@@ -7,6 +7,39 @@
 > 기계 판독 계약: `goal_status=paused`; `adoption_authorized=false`; 운영 flag OFF; GPU 학습·
 > 파인튜닝(2026-09-09까지) 금지 — 전부 보존됨.
 
+## 0-A. 기계 상태 — 파일을 찾아 헤매지 말 것
+
+**필요한 것은 전부 저장소 안에 있다. `git pull` 이면 끝난다.** 클로드 PC 의 외부 경로를 뒤질 필요
+없다(초판 인계문이 그렇게 읽혀 실제로 탐색에 시간이 쓰였다 — 이 절이 그 정정이다).
+
+| 자산 | 위치 | 비고 |
+|---|---|---|
+| 지식 배치 144건 | `ollama-proxy/eval/knowledge_batches/` | **재생성하지 말 것.** 각자 만들면 코퍼스가 갈라져 측정 비교가 깨진다 |
+| 가명화 채팅 5,243건 | `ollama-proxy/eval/vod_capture_2026-08-27/chat.jsonl` | 계약 §1 명시적 예외(사용자 결정). 해당 README 참조 |
+| STT 트랜스크립트 500세그먼트 | 같은 폴더 `transcript.jsonl` | `--replay-transcript` 형식 그대로 |
+| 스트리머 응답 정답지 57쌍 | 같은 폴더 `streamer-response-pairs.jsonl` | 픽업 정답지 겸 채점 기준점 |
+| 고정 회수 질의 6종 | `ollama-proxy/eval/knowledge_probe_queries.txt` | 전부 실측 실패 지점 |
+| 수집·STT·짝짓기 도구 | `import_public_chat.py chzzk-audio` · `stt/transcribe_vod.py` · `pair_streamer_response.py` | |
+
+**저장소에 없는 것(의도적)**: 가명화 키 `hmac.key`(있으면 가명 복원 가능) · 가명화 이전 원본
+14.5MB(`userIdHash` 포함) · 오디오 m4a 90MB / wav 58MB(원 저작물). 이것들은 없어도 위 자산으로
+작업이 된다.
+
+### 첫 실행 (지식 적재)
+
+```powershell
+git pull
+python ollama-proxy\knowledge_batch.py lint --input ollama-proxy\eval\knowledge_batches\*.jsonl
+# 배치를 runtime 안 절대경로로 복사한 뒤 (runtime_path 가 상대경로를 CWD 기준으로 풀어 거부한다)
+python ollama-proxy\knowledge_ingest.py --input <절대경로>\kb-game-001.jsonl --apply
+python ollama-proxy\knowledge_ingest.py --input <절대경로>\kb-meme-001.jsonl --apply
+python ollama-proxy\knowledge_ingest.py --input <절대경로>\kb-culture-001.jsonl --apply
+python ollama-proxy\knowledge_batch.py probe `
+    --queries ollama-proxy\eval\knowledge_probe_queries.txt --min-hit-rate 0.9
+```
+
+기대값: `documents=144~145`, 회수율 **6/6**. 클로드 PC 실측과 같은 수치가 나와야 한다.
+
 ## 0. 한 줄
 
 **M7 의 "3축 ≥ 3.0 채택" 판정이 근거를 잃었다.** 그 게이트는 지금 쓰는 평가 입력에서 **도달
@@ -74,23 +107,29 @@ greybox(`fixture.pickup_policy="scored"`)로 이식하고 가중치는 원본 �
 → **픽업 트랙은 종료한다.** 구조를 통째로 바꿔 얻은 것이 1건이고, 완벽히 고쳐도 목표가 "남의
 커뮤니티 인사에 잘 답하기" 가 된다. 점수제는 기본 OFF 로 남아 있으니 입력이 바뀌면 다시 재면 된다.
 
-## 2. 새로 확보한 자산 (저장소 밖)
+## 2. 새로 확보한 자산 (전부 저장소 안 — §0-A)
 
 원래 replay 원본 1,500건은 클로드 PC 에 없어(`path_sha256` pin 만) 공개 VOD 1편을 직접 수집했다.
 치지직 `talk` 97분, 여성 버튜버, 팔로워 25만 — 2026-08-15 에 지정된 관찰 대상 중 1인.
 
-| 자산 | 규모 |
-|---|---|
-| 가명화 채팅 | **5,243건 · 고유 화자 356명** (기존 1,500건의 3.5배) |
-| VOD 오디오 | 90MB · 97분 |
-| STT 트랜스크립트 | 500세그먼트 · 7,718자 (32분, CPU 2.94배속) |
-| **스트리머 응답 정답지** | **57쌍** (에코 364건 제외) |
+| 자산 | 규모 | 위치 |
+|---|---|---|
+| 가명화 채팅 | **5,243건 · 고유 화자 356명** (기존 1,500건의 3.5배) | `eval/vod_capture_2026-08-27/chat.jsonl` |
+| STT 트랜스크립트 | 500세그먼트 · 7,718자 (32분, CPU 2.94배속) | 같은 폴더 `transcript.jsonl` |
+| **스트리머 응답 정답지** | **57쌍** (에코 364건 제외) | 같은 폴더 `streamer-response-pairs.jsonl` |
+| VOD 오디오 | 90MB · 97분 | **저장소에 없음**(원 저작물). 필요하면 `chzzk-audio` 로 재취득 |
 
 트랜스크립트는 `--replay-transcript` 형식(`start_ms`/`end_ms`/`text`)이라 맥락 주입에 바로 쓸 수 있다.
+재현 파라미터(VOD 번호·수집 옵션·필터 손실률)는 해당 폴더 README 에 있다.
 
 **범위 제한(사용자 결정)**: 오디오는 계약 §1 문구에 없다. **로컬 평가 한정**이며 용도는 ①맥락 주입
 ②채점 기준점 ③픽업 정답지 셋. **학습 정답으로는 쓰지 않는다** — 타인 페르소나 학습은 캐릭터 헌법과
 충돌하고 권리 문제도 별개다.
+
+**계약 §1 예외**: 채팅·트랜스크립트·정답지를 저장소에 둔 것은 2026-08-27 사용자 결정이다. 저장소가
+private 이고, 시청자 표시명·채널 ID·userIdHash 가 없으며(`author` 는 HMAC 가명뿐), 반입 전 실측에서
+가명 0건·실제 채팅 문장 인용 0건을 확인했다. **가명화 키·가명화 이전 원본·오디오는 넣지 않는다.**
+채점 결과·export JSONL·SQLite 는 여전히 저장소 밖이다.
 
 ## 3. 코드화된 것
 
@@ -123,9 +162,14 @@ lint(144/144 유효) → ingest → probe. **회수율 6/6 (100%)**, `--min-hit-
 결투 치명상 사망). 이제 시청자의 틀린 전제에 대해 **폴백도 맞장구도 아닌 정정**이 가능하다 —
 실측 실패 유형 "지어냄 8건" 이 겨냥하던 지점이다.
 
-**DB·배치 JSONL 은 전부 저장소 밖**(`C:\tmp\airi-public-chat\kb\`). 코덱스 PC 에서 쓰려면 배치
-JSONL 을 옮겨 `knowledge_ingest.py --apply` 로 재적재하면 된다(경로는 반드시 절대경로, runtime-dir
-안).
+**배치 JSONL 은 저장소 안에 있다 — `ollama-proxy/eval/knowledge_batches/`(§0-A 참조).**
+**재생성하지 말 것** — 각자 만들면 두 PC 의 지식 코퍼스가 갈라져 그 위에서 잰 측정끼리 비교가
+성립하지 않고, 토큰도 크게 쓴다.
+
+> 초기 계약 문구는 "산출물은 전부 저장소 밖" 이었으나 지식 레코드에는 과한 조항이었다. 계약 §1 이
+> 막는 것은 시청자 식별 정보와 대화 원문이고 지식 레코드는 둘 다 아니다. 반입 전 실측(144건):
+> 가명 0건, 실제 채팅 문장(8자 이상 2,092건 대조) 인용 0건, 368KB. **채점 결과·export JSONL·
+> SQLite 는 여전히 저장소 밖이다.** 상세 = `ollama-proxy/eval/knowledge_batches/README.md`.
 
 **절차 사고 1건(재발 방지).** 생성 에이전트의 완료 보고 전에 산출 파일을 적재했는데, 그 뒤에도
 파일이 계속 채워졌다. **레코드 수는 41/55/48 로 내내 같았고 본문만 바뀌었다**(밈 중앙 450→747자,

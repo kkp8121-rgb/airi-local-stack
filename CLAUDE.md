@@ -23,7 +23,10 @@ SHAs) **read-only**:
 1. `AGENTS.md`
 2. `airi_docs/진행중/AIRI-WORKING-STATE.md` — the mutable live SSoT (YAML frontmatter carries
    `goal_status`, `git_head`, `worktree_state`, `active_trainer_count`, last receipt)
-3. the current handoff named by that file (currently `airi_docs/진행중/AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md`; the older Codex handoff remains a compatibility contract)
+3. the current handoff: **`airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-08-27.md`** — start at its
+   section 0-A, which lists where every asset actually lives so you do not go looking for files.
+   (`AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md` is superseded: the M7 numbers it hands over rest on an
+   absolute gate that later measurement showed to be unreachable on that input.)
 4. `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md`
 5. `NEXT-SESSION.md`
 
