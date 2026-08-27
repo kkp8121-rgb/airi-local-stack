@@ -50,6 +50,52 @@ python ollama-proxy\eval\human_review\summarize_ratings.py --ratings r1.json --r
 축별 평균 절대차와 플래그 불일치율, turn/세션 개수를 담는다. 대화 텍스트와 코멘트 원문은 요약에
 절대 들어가지 않는다(코멘트는 개수만 센다).
 
+## 3.5 보정 채점 — 사람 노력을 30% 로 줄이기
+
+99턴 전수 채점은 오래 걸린다. `calibrate_ratings.py` 는 AI 채점을 사람 부분 채점으로 눈금 보정해
+전수 채점에 준하는 추정치를 만든다.
+
+**AI 채점 단독은 게이트에 쓸 수 없다.** 2026-08-27 실측: 사람 채점 198턴을 앵커로 준 채점자 2종
+(codex/claude, 페르소나 "치지직 실시간 스트리밍 시청자")이 사람 3.0976 회차를 각각 1.98/2.11 로 매겨
+**PASS 를 FAIL 로 뒤집었다**. 무캘리브레이션 예비 채점은 더 나빠서 회차마다 편향 부호가 뒤집히고
+(+0.15/−0.31) filler 오차 21pp 에 치명 실패를 놓쳤다(3/7, 0/1). filler 를 결정론 규칙으로 재현하려는
+시도도 최선 규칙이 평균 오차 15.4pp 로 실패했다.
+
+쓸 수 있는 이유는 따로 있다. 두 AI 채점자는 **서로 0.09~0.13 안에서 일치**했다(턴 단위 ±1 이내
+88.9~96.0%). 즉 오차는 무작위가 아니라 앵커 평균 쪽으로 수축하는 **체계적 편향**이고, 그건 사람
+표본으로 교정된다. 사람 k턴만 쓰는 것 대비 p95 오차가 15~48% 줄었고, 층화 추출이 무작위보다 6~22%
+더 좋았다.
+
+```powershell
+# 1) 사람이 채점할 30턴을 AI 점수 구간을 가로지르게 층화 선정 (난수 없음 — 재현 가능)
+python ollama-proxy\eval\human_review\calibrate_ratings.py select --ai ai-a.json ai-b.json `
+    --input review.jsonl --output subset.jsonl --k 30
+# 2) 그 30턴만 담긴 평가지를 만들어 사람이 채점한다
+python ollama-proxy\eval\human_review\build_rating_sheet.py --input subset.jsonl --output partial.html
+# 3) 사람 부분 채점 + AI 채점 → 보정 전수 채점 + 불확실성
+python ollama-proxy\eval\human_review\calibrate_ratings.py merge --ai ai-a.json ai-b.json `
+    --human human-partial.json --output calibrated.json --markdown calibrated.md
+```
+
+출력 JSON 은 `summarize_ratings.py` 가 그대로 받는 정수 스키마이고, 소수점 추정치와 95% 구간은
+`calibration` 블록에 따로 남는다. **구간이 기준선(3축 3.0)을 가로지르면 확정하지 않고 전수 채점한다.**
+
+실측 검증(사람 30턴, 실데이터 end-to-end):
+
+| 회차 | 보정 추정 (95% 구간) | 사람 전수 참값 | 판정 |
+| --- | --- | --- | --- |
+| 07-s3-r2 | 3.2860 [3.096, 3.476] | 3.0976 | PASS — 일치 |
+| 07-s2-r2 | 2.1389 [1.969, 2.309] | 2.2290 | FAIL — 일치 |
+
+한계 두 가지를 알고 써야 한다. **filler 추정 오차는 최대 19pp** 라 어떤 회차의 filler 가 25% 근처면
+그 기준만은 전수 채점해야 한다. **critical 은 보정 대상이 아니다** — 합집합으로 모으므로 과잉 검출이
+나오고(실측 사람 0건에 AI 1건), 사람이 그 후보 턴만 직접 확인해야 한다. 놓치는 것보다 안전한 방향을
+택한 결과다.
+
+기준선 자체의 한계도 기록해 둔다. 99턴 3축 합성의 표준오차는 0.08~0.10 이라, **3.0976 같은 값은
+전수 채점을 해도 3.0 과 통계적으로 구별되지 않는다**(+1.10σ, 95% 구간이 3.0 을 가로지름). 다른
+회차는 −7.6σ~−14.5σ 로 확고했다.
+
 ## 테스트와 CI
 
 ```powershell
@@ -57,7 +103,7 @@ python -m pytest -q ollama-proxy\eval\human_review
 ```
 
 `test_human_review_tools.py` 는 오프라인·결정적이며 임시 SQLite 로 `airi_memory.py` 의 DDL 을 그대로
-재현한다. 이 디렉터리의 테스트 파일 3개는 `.github/workflows/remediation-checkpoint.yml` 의
+재현한다. 이 디렉터리의 테스트 파일 4개는 `.github/workflows/remediation-checkpoint.yml` 의
 `ollama-proxy-evaluations` 샤드에 등록돼 있다(새 테스트 파일을 추가하면 같은 샤드에 넣어야 CI 에서 돈다).
 
 ## 4. 공개 채팅 리플레이 가져오기
