@@ -65,6 +65,25 @@ class LintTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("[실패]", out)
 
+    def test_case_only_duplicate_alias_names_the_offender(self):
+        # knowledge_store 는 casefold 로 중복을 본다.  실측에서 `저스트채팅(Just Chatting)`
+        # 류가 lint 를 통과하고 ingest 에서야 거부됐다.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_jsonl(Path(tmp), "kb-001.jsonl",
+                               [record("치지직", aliases=("CHZZK", "chzzk"))])
+            code, out = run(["lint", "--input", str(path)])
+        self.assertEqual(code, 1)
+        self.assertIn("chzzk", out)
+        self.assertIn("대소문자", out)
+
+    def test_whitespace_only_duplicate_alias_is_caught(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_jsonl(Path(tmp), "kb-001.jsonl",
+                               [record("암베사", aliases=("암베사", "암베사 "))])
+            code, out = run(["lint", "--input", str(path)])
+        self.assertEqual(code, 1)
+        self.assertIn("앞뒤 공백", out)
+
     def test_thin_alias_and_long_content_are_warnings_not_failures(self):
         # 회수율을 떨어뜨리지만 적재 자체는 막지 않는다.
         with tempfile.TemporaryDirectory() as tmp:

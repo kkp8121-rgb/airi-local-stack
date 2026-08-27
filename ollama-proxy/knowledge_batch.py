@@ -63,6 +63,14 @@ def lint_file(path: Path) -> dict:
 
     valid, titles, lengths, chunk_counts, thin_alias, long_content = [], Counter(), [], [], [], []
     for index, record in enumerate(raw, start=1):
+        # validate_record 가 내는 메시지는 어느 alias 가 문제인지 말해주지 않는다.  대소문자만
+        # 다른 별칭(`저스트채팅(Just Chatting)` 류)이 실제로 여기서 걸렸으므로, 거부 전에
+        # 무엇이 겹쳤는지 먼저 짚는다 — lint 의 존재 이유가 ingest 의 거부를 미리 알리는 것이다.
+        for alias, count in Counter(str(item).strip().casefold()
+                                    for item in (record.get("aliases") or [])).items():
+            if count > 1:
+                problems.append(f"레코드 {index}: alias {alias!r} 가 {count}회 — "
+                                "중복 판정은 대소문자·앞뒤 공백을 무시한다")
         try:
             cleaned = validate_record(record)
         except KnowledgeInputError as exc:
