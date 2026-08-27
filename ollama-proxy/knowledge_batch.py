@@ -18,6 +18,7 @@ import json
 import re
 import statistics
 import sys
+import time
 from collections import Counter
 from pathlib import Path
 from typing import Sequence
@@ -52,10 +53,20 @@ def load_lines(path: Path) -> list[dict]:
     return records
 
 
+STILL_WRITING_SECONDS = 120
+
+
 def lint_file(path: Path) -> dict:
     size = path.stat().st_size
     raw = load_lines(path)
     problems: list[str] = []
+    # 생성이 끝나지 않은 배치를 적재하면 미완성 본문이 그대로 들어간다.  실측(2026-08-27):
+    # 레코드 수는 41/55/48 로 같은데 본문이 계속 채워져, 먼저 적재한 판의 content 중앙값이
+    # 450자였다가 최종본에서 741자가 됐다.  **개수로는 알 수 없다.**
+    # 막는 것이 아니라 알린다 — 방금 쓴 배치를 바로 검증하는 것이 정상 사용이기도 하고,
+    # 진짜 방지책은 도구가 아니라 "생성이 끝났다는 신호를 받고 나서 만진다" 는 절차다.
+    age = time.time() - path.stat().st_mtime
+    recently_written = age < STILL_WRITING_SECONDS
     if size > MAX_INPUT_BYTES:
         problems.append(f"파일 크기 {size:,}B 가 상한 {MAX_INPUT_BYTES:,}B 초과 — 배치를 쪼갤 것")
     if len(raw) > MAX_RECORDS:
@@ -88,6 +99,7 @@ def lint_file(path: Path) -> dict:
     duplicates = sorted(title for title, count in titles.items() if count > 1)
     return {
         "path": path, "bytes": size, "records": len(raw), "valid": len(valid),
+        "recently_written": recently_written, "age_seconds": age,
         "problems": problems, "duplicates": duplicates, "thin_alias": thin_alias,
         "long_content": long_content, "lengths": lengths, "chunk_counts": chunk_counts,
         "titles": set(titles),
@@ -132,6 +144,9 @@ def cmd_lint(args) -> int:
         lengths, chunks = report["lengths"], report["chunk_counts"]
         print(f"\n=== {report['path'].name} ===")
         print(f"  레코드 {report['records']}건 중 유효 {report['valid']}건 · {report['bytes']:,}B")
+        if report["recently_written"]:
+            print(f"  [경고] {report['age_seconds']:.0f}초 전에 수정됨 — 생성이 끝났는지 확인할 것."
+                  " 미완성 배치는 레코드 수가 같아도 본문이 덜 차 있다")
         if lengths:
             print(f"  content 길이  중앙 {statistics.median(lengths):,.0f}자 · "
                   f"최대 {max(lengths):,}자 · 총 {sum(lengths):,}자")

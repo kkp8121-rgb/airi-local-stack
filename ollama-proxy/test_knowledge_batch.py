@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import sys
 import tempfile
+import time
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -64,6 +66,26 @@ class LintTests(unittest.TestCase):
             code, out = run(["lint", "--input", str(path)])
         self.assertEqual(code, 1)
         self.assertIn("[실패]", out)
+
+    def test_recently_written_batch_is_warned_about_but_not_blocked(self):
+        # 미완성 배치를 적재하면 본문이 덜 찬 채로 들어간다.  실측에서 레코드 수는 41/55/48
+        # 로 그대로인데 content 중앙값이 450자 → 741자로 바뀌었다 — 개수로는 알 수 없다.
+        # 다만 방금 쓴 배치를 바로 검증하는 것도 정상 사용이므로 막지는 않는다.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_jsonl(Path(tmp), "kb-001.jsonl", [record("암베사")])
+            code, out = run(["lint", "--input", str(path)])
+        self.assertEqual(code, 0)
+        self.assertIn("생성이 끝났는지", out)
+        self.assertIn("적재 가능", out)
+
+    def test_settled_batch_has_no_freshness_warning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_jsonl(Path(tmp), "kb-001.jsonl", [record("암베사")])
+            old = time.time() - batch.STILL_WRITING_SECONDS - 60
+            os.utime(path, (old, old))
+            code, out = run(["lint", "--input", str(path)])
+        self.assertEqual(code, 0)
+        self.assertNotIn("생성이 끝났는지", out)
 
     def test_case_only_duplicate_alias_names_the_offender(self):
         # knowledge_store 는 casefold 로 중복을 본다.  실측에서 `저스트채팅(Just Chatting)`
