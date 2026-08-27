@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import statistics
 import sys
 from collections import Counter
@@ -24,6 +25,9 @@ from typing import Sequence
 from knowledge_store import (
     CHUNK_CHARS, KnowledgeInputError, KnowledgeStore, chunk_text, runtime_path, validate_record,
 )
+# 검색이 실제로 쓰는 토크나이저와 불용어를 그대로 빌린다.  다른 토크나이저로 후보를 뽑으면
+# 적재한 제목이 회수 시 질의어와 어긋난다.
+from knowledge_store import _QUERY_STOP_TERMS, _tokens  # noqa: E402
 
 # knowledge_ingest.py 와 같은 상한.  두 곳이 어긋나면 lint 가 통과시킨 배치를 ingest 가 거부한다.
 MAX_INPUT_BYTES = 2_000_000
@@ -176,6 +180,74 @@ def cmd_probe(args) -> int:
     return 0
 
 
+# 가명("v" + 16진수 8자)은 시청자 식별자다.  지식 후보가 아니고 저장소로 새어서도 안 된다.
+_PSEUDONYM = re.compile(r"v[0-9a-f]{8}", re.I)
+# "[YouTube] 둥하" 처럼 채널 프리픽스가 붙는다.  실측에서 youtube 가 297회로 후보 1위였다.
+_SOURCE_PREFIX = re.compile(r"^\s*\[[^\]]{1,20}\]\s*")
+# 검색용 불용어는 의도적으로 얇아서(조사·1자 위주) 일반 어휘가 그대로 후보로 올라온다.
+# 지식 문서가 될 수 없는 말만 최소한으로 거른다.
+_COMMON_TERMS = frozenset("""
+그럼 그래 그래서 그러면 그런데 근데 우리 오늘 내일 어제 지금 누구 누가 뭐냐 뭐야 무슨 어디 언제
+다른 다른가 저거 이거 그거 여기 저기 거기 이제 아직 진짜 완전 너무 조금 많이 다시 계속 그냥
+보면 봤어 봐요 되나 되나요 아님 가능 하는 한다 했어 이런 저런 그런 이렇게 저렇게 그렇게
+사람 생각 얘기 이야기 방송 채팅 시청자 자기 자신 정도 때문 이번 다음 처음 마지막
+""".split())
+
+
+def cmd_terms(args) -> int:
+    """실제 시청자 발화에서 지식 후보 어휘를 뽑는다.
+
+    867,024 문서를 다 적재할 수는 없다.  무관한 문서가 많을수록 BM25 회수 품질도 떨어진다.
+    선별 기준은 추측이 아니라 **실제로 시청자가 친 말**이어야 한다.
+    """
+    counts: Counter[str] = Counter()
+    turns = 0
+    # 같은 고정 채팅을 여러 회차 리플레이하므로, 중복을 안 지우면 한 메시지가 회차 수만큼
+    # 곱해져 빈도가 의미를 잃는다(실측: 14개 review 에서 count 가 14에 몰렸다).
+    # 그래서 **서로 다른 시청자 메시지**를 한 번씩만 센다.
+    seen: set[str] = set()
+    for path in args.review:
+        for line in Path(path).read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            turns += 1
+            key = record.get("user_hash") or record.get("user", "")
+            if key in seen:
+                continue
+            seen.add(key)
+            spoken = _SOURCE_PREFIX.sub("", record.get("user", ""))
+            for term in _tokens(spoken):
+                if len(term) < 2 or term in _QUERY_STOP_TERMS or term in _COMMON_TERMS:
+                    continue
+                if _PSEUDONYM.fullmatch(term):
+                    continue
+                counts[term] += 1
+
+    # 토크나이저가 조사를 뗀 형태와 원형을 함께 낸다(검색에서는 의도된 동작).  후보 목록에서는
+    # 같은 횟수로 붙어 나오는 접두 쌍이 중복이므로, 시청자가 실제로 친 긴 쪽만 남긴다.
+    ordered = sorted(counts, key=len)
+    redundant = {
+        short for index, short in enumerate(ordered)
+        for longer in ordered[index + 1:]
+        if longer.startswith(short) and counts[longer] == counts[short]
+    }
+    ranked = [(term, count) for term, count in counts.most_common()
+              if count >= args.min_count and term not in redundant]
+    if args.output:
+        Path(args.output).write_text("\n".join(term for term, _c in ranked) + "\n",
+                                     encoding="utf-8")
+    print(f"시청자 발화 {turns}턴 → 서로 다른 메시지 {len(seen)}건에서 "
+          f"후보 어휘 {len(counts)}종 추출 (등장 {args.min_count}건 이상 {len(ranked)}종)")
+    print("후보 목록은 큐레이션 전제다 — 지식 문서가 될 수 없는 말이 섞여 있다.")
+    print(f"\n{'어휘':<20}{'메시지':>6}")
+    for term, count in ranked[:args.top]:
+        print(f"{term:<20}{count:>5}")
+    if args.output:
+        print(f"\n→ {args.output}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="지식 배치 사전 검증과 회수율 실측.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -195,6 +267,13 @@ def build_parser() -> argparse.ArgumentParser:
     probe.add_argument("--min-hit-rate", type=float, default=None,
                        help="이 회수율 미만이면 exit 1 (예: 0.9)")
     probe.set_defaults(func=cmd_probe)
+
+    terms = sub.add_parser("terms", help="실제 시청자 발화에서 지식 후보 어휘를 뽑는다.")
+    terms.add_argument("--review", nargs="+", required=True, help="review JSONL (저장소 밖).")
+    terms.add_argument("--output", default=None, help="후보 어휘 목록 출력 경로.")
+    terms.add_argument("--min-count", type=int, default=2, help="이 횟수 이상 등장한 어휘만.")
+    terms.add_argument("--top", type=int, default=40, help="화면에 보여줄 상위 개수.")
+    terms.set_defaults(func=cmd_terms)
     return parser
 
 

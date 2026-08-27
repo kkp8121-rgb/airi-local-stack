@@ -167,6 +167,55 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual(code, 2)
 
 
+class TermsTests(unittest.TestCase):
+    def _review(self, directory: Path, name: str, rows) -> Path:
+        path = directory / name
+        path.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n",
+                        encoding="utf-8")
+        return path
+
+    def test_source_prefix_is_not_a_knowledge_term(self):
+        # "[YouTube] 둥하" 의 채널 프리픽스가 실측에서 후보 1위(297회)였다.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._review(Path(tmp), "review.jsonl", [
+                {"user_hash": "h1", "user": "[YouTube] 암베사 어때"},
+            ])
+            _code, out = run(["terms", "--review", str(path), "--min-count", "1"])
+        self.assertIn("암베사", out)
+        self.assertNotIn("YouTube", out)
+        self.assertNotIn("youtube", out)
+
+    def test_repeated_replays_are_counted_once(self):
+        # 같은 고정 채팅을 여러 회차 리플레이해도 메시지 하나는 한 번만 세야 한다.
+        with tempfile.TemporaryDirectory() as tmp:
+            rows = [{"user_hash": "h1", "user": "암베사 어때"}]
+            first = self._review(Path(tmp), "a.jsonl", rows)
+            second = self._review(Path(tmp), "b.jsonl", rows)
+            _code, out = run(["terms", "--review", str(first), str(second), "--min-count", "1"])
+        self.assertIn("서로 다른 메시지 1건", out)
+
+    def test_common_words_and_pseudonyms_are_dropped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._review(Path(tmp), "review.jsonl", [
+                {"user_hash": "h1", "user": "그럼 오늘 v1a2b3c4d 암베사"},
+            ])
+            _code, out = run(["terms", "--review", str(path), "--min-count", "1"])
+        self.assertIn("암베사", out)
+        for dropped in ("그럼", "오늘", "v1a2b3c4d"):
+            self.assertNotIn(dropped, out)
+
+    def test_output_file_lists_terms_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._review(Path(tmp), "review.jsonl", [
+                {"user_hash": "h1", "user": "링피트 재밌어"},
+            ])
+            out_path = Path(tmp) / "terms.txt"
+            code, _out = run(["terms", "--review", str(path), "--min-count", "1",
+                              "--output", str(out_path)])
+            self.assertEqual(code, 0)
+            self.assertIn("링피트", out_path.read_text(encoding="utf-8").split())
+
+
 class BudgetTests(unittest.TestCase):
     def test_defaults_match_the_retrieval_budget(self):
         # 이 값이 어긋나면 probe 가 방송과 다른 예산으로 재게 된다.
