@@ -163,6 +163,7 @@ def calibrate(ai: dict[int, dict], human: dict[int, dict]) -> dict:
 
     filler = sum(1 for t in turns if t["flags"]["silence_or_filler"]) / total
     critical = sum(1 for t in turns if t["flags"]["critical_failure"])
+    axis_means = {axis: statistics.fmean(exact[t][axis] for t in exact) for axis in AXIS_KEYS}
     return {
         "schema_version": SCHEMA_VERSION,
         "rater": "calibrated",
@@ -175,6 +176,7 @@ def calibrate(ai: dict[int, dict], human: dict[int, dict]) -> dict:
             "composite_interval_95": [round(estimate - 1.96 * standard_error, 4),
                                       round(estimate + 1.96 * standard_error, 4)],
             "residual_sd": round(residual_sd, 4),
+            "axis_means": {axis: round(value, 4) for axis, value in axis_means.items()},
             "filler_rate": round(filler, 4),
             "critical_count": critical,
             "human_turns": sampled,
@@ -183,7 +185,14 @@ def calibrate(ai: dict[int, dict], human: dict[int, dict]) -> dict:
     }
 
 
-def report_lines(result: dict, gate_composite: float, gate_filler: float) -> list[str]:
+def report_lines(result: dict, gate_composite: float, gate_filler: float,
+                 gate_style: float, gate_factuality: float) -> list[str]:
+    """돌파 정의 5개 기준을 전부 낸다.
+
+    계약 §4(AIRI-REAL-DIALOGUE-HUMAN-EVAL-CONTRACT-2026-08-26)의 돌파 정의는
+    3축 합성 >= 3.0, critical 0, silence_or_filler <= 25%, 말투 >= 3.5,
+    사실성 >= 기준선 이다. 일부만 보면 통과 판정이 잘못 나온다.
+    """
     meta = result["calibration"]
     low, high = meta["composite_interval_95"]
     if low >= gate_composite:
@@ -192,7 +201,19 @@ def report_lines(result: dict, gate_composite: float, gate_filler: float) -> lis
         band = "기준선 아래 — 확정 가능"
     else:
         band = "구간이 기준선을 가로지름 — 판정 보류, 전수 채점 필요"
-    return [
+    axis = meta["axis_means"]
+    checks = (
+        (f"3축 합성 >= {gate_composite:.2f}", meta["composite_estimate"] >= gate_composite,
+         f"{meta['composite_estimate']:.4f}"),
+        ("critical = 0", meta["critical_count"] == 0, f"{meta['critical_count']}건"),
+        (f"filler <= {gate_filler:.0%}", meta["filler_rate"] <= gate_filler,
+         f"{meta['filler_rate']:.2%}"),
+        (f"말투 >= {gate_style:.2f}", axis["style_rules"] >= gate_style,
+         f"{axis['style_rules']:.4f}"),
+        (f"사실성 >= {gate_factuality:.2f}", axis["factuality"] >= gate_factuality,
+         f"{axis['factuality']:.4f}"),
+    )
+    lines = [
         "# 보정 채점 요약",
         "",
         f"- 전체 {meta['turns_total']}턴 중 사람 {meta['turns_human']}턴"
@@ -200,13 +221,21 @@ def report_lines(result: dict, gate_composite: float, gate_filler: float) -> lis
         f"- 3축 합성 추정 **{meta['composite_estimate']:.4f}**"
         f" ± {1.96 * meta['composite_standard_error']:.4f} (95%)",
         f"- 95% 구간 [{low:.4f}, {high:.4f}] · 기준선 {gate_composite:.2f} → **{band}**",
-        f"- filler {meta['filler_rate']:.2%} (기준 {gate_filler:.0%})"
-        f" · critical {meta['critical_count']}건",
         f"- 축별 오프셋 " + ", ".join(f"{a}={v:+.2f}" for a, v in meta["axis_offsets"].items()),
+        "",
+        "## 돌파 정의 5개 기준 (계약 §4)",
+        "",
+    ]
+    lines += [f"- [{'O' if ok else 'X'}] {name} — {detail}" for name, ok, detail in checks]
+    lines += [
+        "",
+        f"→ 5개 기준 종합 **{'전부 충족' if all(c[1] for c in checks) else '미충족 있음'}**",
         "",
         "AI 채점 단독은 게이트 판정을 뒤집은 실적이 있다. 이 추정치는 사람 표본으로",
         "눈금을 맞춘 값이며, 구간이 기준선을 가로지르면 확정하지 말고 전수 채점한다.",
+        "filler 와 critical 은 보정으로 닫히지 않으니 계약대로 사람이 확인한다.",
     ]
+    return lines
 
 
 def cmd_select(args) -> int:
@@ -226,7 +255,8 @@ def cmd_merge(args) -> int:
     ai = ensemble([load_rating(Path(p)) for p in args.ai])
     result = calibrate(ai, load_rating(Path(args.human)))
     Path(args.output).write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
-    lines = report_lines(result, args.gate_composite, args.gate_filler)
+    lines = report_lines(result, args.gate_composite, args.gate_filler,
+                         args.gate_style, args.gate_factuality)
     if args.markdown:
         Path(args.markdown).write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
@@ -251,8 +281,12 @@ def build_parser() -> argparse.ArgumentParser:
     merge.add_argument("--human", required=True, help="사람이 부분 채점한 JSON.")
     merge.add_argument("--output", required=True, help="보정 채점 JSON 출력 경로.")
     merge.add_argument("--markdown", default=None, help="사람이 읽을 요약 Markdown 출력 경로.")
+    # 기본값은 계약 §4 돌파 정의와 run 04 확정 기준선(사실성 2.75)을 그대로 옮긴 것이다.
     merge.add_argument("--gate-composite", type=float, default=3.0, help="3축 합성 기준선.")
     merge.add_argument("--gate-filler", type=float, default=0.25, help="filler 비율 기준선.")
+    merge.add_argument("--gate-style", type=float, default=3.5, help="말투 규칙 기준선.")
+    merge.add_argument("--gate-factuality", type=float, default=2.75,
+                       help="사실성 기준선 (run 04 확정 기준선).")
     merge.set_defaults(func=cmd_merge)
     return parser
 

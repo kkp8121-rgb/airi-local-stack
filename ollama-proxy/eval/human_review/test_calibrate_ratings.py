@@ -158,23 +158,50 @@ class CalibrateTests(unittest.TestCase):
 
 
 class ReportTests(unittest.TestCase):
-    def _result(self, estimate: float, error: float) -> dict:
+    GATE = (3.0, 0.25, 3.5, 2.75)
+
+    def _result(self, estimate: float, error: float, *, style: float = 4.0,
+                factuality: float = 3.5, filler: float = 0.1, critical: int = 0) -> dict:
+        means = {axis: 3.0 for axis in calibrator.AXIS_KEYS}
+        means["style_rules"], means["factuality"] = style, factuality
         return {"calibration": {
             "turns_total": 99, "turns_human": 30, "turns_calibrated": 69, "human_effort": 0.303,
             "axis_offsets": {axis: 0.0 for axis in calibrator.AXIS_KEYS},
             "composite_estimate": estimate, "composite_standard_error": error,
             "composite_interval_95": [estimate - 1.96 * error, estimate + 1.96 * error],
-            "residual_sd": 0.5, "filler_rate": 0.1, "critical_count": 0, "human_turns": []}}
+            "residual_sd": 0.5, "axis_means": means, "filler_rate": filler,
+            "critical_count": critical, "human_turns": []}}
+
+    def report(self, result: dict) -> str:
+        return "\n".join(calibrator.report_lines(result, *self.GATE))
 
     def test_interval_crossing_the_gate_is_reported_as_undecided(self):
-        text = "\n".join(calibrator.report_lines(self._result(3.05, 0.09), 3.0, 0.25))
-        self.assertIn("판정 보류", text)
+        self.assertIn("판정 보류", self.report(self._result(3.05, 0.09)))
 
     def test_interval_clear_of_the_gate_is_reported_as_decidable(self):
         for estimate in (3.6, 2.0):
-            text = "\n".join(calibrator.report_lines(self._result(estimate, 0.09), 3.0, 0.25))
+            text = self.report(self._result(estimate, 0.09))
             self.assertIn("확정 가능", text)
             self.assertNotIn("판정 보류", text)
+
+    def test_all_five_breakthrough_criteria_are_reported(self):
+        # 계약 §4 는 3축·critical·filler 뿐 아니라 말투·사실성까지 요구한다.
+        text = self.report(self._result(3.6, 0.05))
+        for name in ("3축 합성", "critical", "filler", "말투", "사실성"):
+            self.assertIn(name, text)
+        self.assertIn("전부 충족", text)
+
+    def test_style_or_factuality_alone_can_fail_the_gate(self):
+        # 3축·critical·filler 를 다 통과해도 말투/사실성이 미달이면 통과가 아니다.
+        for kwargs in ({"style": 3.4}, {"factuality": 2.7}):
+            text = self.report(self._result(3.6, 0.05, **kwargs))
+            self.assertIn("미충족 있음", text)
+            self.assertNotIn("전부 충족", text)
+
+    def test_critical_or_filler_alone_can_fail_the_gate(self):
+        for kwargs in ({"critical": 1}, {"filler": 0.26}):
+            text = self.report(self._result(3.6, 0.05, **kwargs))
+            self.assertIn("미충족 있음", text)
 
 
 if __name__ == "__main__":
