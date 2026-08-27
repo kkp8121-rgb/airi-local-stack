@@ -1,5 +1,15 @@
 # AIRI 다음 세션 안내
 
+> **2026-08-27 17:xx KST 최우선 — 코덱스 단일 진입점: `진행중/AIRI-CODEX-HANDOFF-2026-08-27.md`.**
+> **M7 의 "3축 ≥ 3.0 채택" 판정이 근거를 잃었다.** 그 게이트는 지금 평가 입력에서 **도달 불가능**
+> 하다 — 사용자가 직접 채점한 198턴에서 `context_retention` 평균 1.54·4점 이상 0건이고, 3.0 을
+> 넘으려면 나머지 두 축이 평균 3.73(실측 1.98의 1.9배)이어야 한다. **S3 `[x]` 는 PASS 도 FAIL 도
+> 아닌 측정 불가**이며 S2 `[F]`·기준선 1.7576 도 같은 입력 위의 값이다. **회차 간 비교는 유효하고
+> 무효인 것은 절대 판정 하나다.** 추가 정정: s2-r2·s3-r2 는 사람 전수 채점이 아니라 **AI 채점 +
+> 사용자 승인**이다(기준선 run 04·06b-r3 는 직접 채점 — 서로 다른 자). 픽업 처방(`reaction` 승격)도
+> 실측 기각됐다(적중률 7.0% → **0.0%**). S3-r2 사람 재채점은 사용자 결정으로 **취소**. 상세 =
+> `진행중/AIRI-EVAL-INPUT-CONTEXT-AUDIT-2026-08-27.md`.
+
 > **2026-08-27 10:42 KST 현재:** 사용자의 중단 요청에 따라 모니터링을 멈추고 `airi_docs/진행중/AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md`를 Claude 단일 진입점으로 push했습니다. handoff commit `338e582ef1dff48ca2a114c1b79a5bdb5d027a39`는 local/origin/remote와 일치하며 worktree는 clean입니다. S4 r1~r3는 exit 0·99턴·오류 0, `skipped=30`, `batched=0`; q_end 5/13/22의 대표는 r2이며 S4 사람 JSON을 기다립니다. JSON이 없으므로 자동 점수·replay 재실행·S5를 하지 않습니다. `goal_status=paused`, `adoption_authorized=false`, 운영 flag OFF, GPU·파인튜닝 금지.
 
 > **현재 live goal_status=paused:** M7 S3 평가 채택과 S2 `[F]` 실패를 보존했다. S4 replay r1~r3는 완료됐고 대표 r2 사람 JSON을 기다린다. replay/GPU PID 0, Ollama 11434만 남아 있으며 S4 채택·운영 반영은 대기한다. 이번 push 이후에는 새 사용자 goal 전까지 추가 모니터링을 하지 않는다.
