@@ -1,0 +1,20 @@
+# 지식 회수율 고정 질의 세트
+#
+# 전부 2026-08-26 실제 방송 채팅 리플레이에서 AIRI 가 실패한 지점이다.
+# 당시 지식 계층은 enabled=True 인데 documents=0 이었다 — 찾아볼 데가 없었다.
+# 적재 후 이 질의들이 히트하지 않으면 title·aliases 설계를 고쳐야 한다.
+#
+#   python ollama-proxy\knowledge_batch.py probe --queries ollama-proxy\eval\knowledge_probe_queries.txt --min-hit-rate 0.9
+#
+# 게임·콘텐츠 — run 04 turn 46 에서 폴백("고마워.")으로 응답
+암베사
+# 밈·방송문화 — s3-r2 turn 19 에서 되물음("매도월드컵?")
+매도 월드컵
+# 게임 — run 04 turn 37 에서 후원 템플릿 오발동
+버니가든2
+# 기초 슬랭 — run 04 turn 62 에서 챗봇식 되물음, 방송다움 붕괴
+머함
+# 밈 — run 04 turn 2~7 에서 4연속 같은 패턴으로 응답
+둥하
+# 슬랭 — run 04 turn 33 에서 에코 반문
+ㄱㄴㅇ

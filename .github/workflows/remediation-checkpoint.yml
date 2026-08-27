@@ -98,7 +98,8 @@ jobs:
             tests: >-
               ollama-proxy/test_collect_topic_candidates.py ollama-proxy/test_create_wikimedia_source_policy.py
               ollama-proxy/test_evaluation_api.py ollama-proxy/test_evaluation_store.py
-              ollama-proxy/test_knowledge_store.py ollama-proxy/test_memory_benchmark.py
+              ollama-proxy/test_knowledge_store.py ollama-proxy/test_knowledge_batch.py
+              ollama-proxy/test_memory_benchmark.py
               ollama-proxy/test_memory_e2e.py ollama-proxy/test_memory_extraction_provider.py
               ollama-proxy/test_memory_claim_guard.py ollama-proxy/test_memory_taxonomy.py
               ollama-proxy/test_memory_runtime.py ollama-proxy/test_viewer_memory.py
