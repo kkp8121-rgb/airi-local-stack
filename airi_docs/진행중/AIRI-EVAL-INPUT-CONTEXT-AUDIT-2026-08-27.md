@@ -108,19 +108,79 @@ S4 는 `AIRI_S4_MIN_CONTENT_TOKENS=2` 로 **저내용 메시지 스킵을 더 �
 6건(3%). 리액션이 0 인 것은 코퍼스의 성질이 아니라 우선순위의 귀결이다. 화제 묶음도 238종 중
 209종이 2건짜리라 일반어를 걸러내면 실질 20~30종뿐이다. **재구성은 원본 1,500건에서 해야 한다.**
 
-## 5. 고칠 지점은 fixture 설정이다
+## 4-3. 실제 스트리머와 대조한 결과 — 처방이 틀렸다 (2026-08-27 추가)
 
-새 문항 세트를 백지에서 쓸 필요가 없다. 원본 1,500건을 그대로 쓰되 아래를 조정하면 된다.
+§4 는 "`reaction` 이 6/7 이라 후속 발화가 못 뽑힌다" 로 끝났고, 처방으로 우선순위 승격을 제시했다.
+**실측으로 그 처방이 기각됐다.**
 
-| 노브 | 현재 | 방향 |
-|---|---|---|
-| `pickup_priority` | `reaction` 6/7 | 후속 발화 kind 를 상위로 (장문 fixture 의 `continuity_callback` 이 선례) |
-| `pending_stale_seconds` | 120 (=6턴) | 늘려서 후속 발화가 순번을 받게 |
-| `turn_cooldown_seconds` | 20 | 줄여서 backlog 폭증 완화 |
-| 화자 구성 | 실제 VOD 시청자 전원 | 소수 단골이 반복 등장하도록 선별 |
+공개 VOD 1편(치지직 `talk`, 97분)의 채팅과 스트리머 발화를 수집해, **실제 스트리머가 반응한 채팅**을
+정답지로 만들었다(수집·STT·짝짓기 도구는 §8). 정답지 57건.
 
-원본 1,500건은 **클로드 PC 에 없다.** `path_sha256` 으로 pin 만 남아 있고 실체는 코덱스 PC(`D:\`)
-에 있다. 설정 조정안은 원본 없이도 쓸 수 있지만, 실제 재구성과 검증에는 원본이 필요하다.
+**스트리머는 질문에만 답하지 않는다.**
+
+| kind | 반응받은 57건 중 | 전체 채팅 중 | |
+|---|---|---|---|
+| reaction | **46건 (80.7%)** | 88.9% | 약간 과소 선택 |
+| question | 11건 (19.3%) | 11.1% | **1.7배** 과대 선택 |
+
+질문 선호는 있지만 1.7배뿐이고 반응의 80% 는 질문이 아니다. 현행 정책은 픽업 77건 중 **75건을
+질문**으로 채운다 — 실제와 전혀 다른 분포다.
+
+**어떤 설정도 정답을 맞히지 못한다.**
+
+| 변형 | 픽업 | 정답 적중 | 적중률 | kind 분포 |
+|---|---|---|---|---|
+| A 현행 | 77 | 4 | **7.0%** | question 75 · reaction 2 |
+| B `reaction` 승격 | 77 | **0** | **0.0%** | reaction 77 |
+| C `turn_cooldown` 10s | 128 | 3 | 5.3% | question 125 · reaction 3 |
+| D `pending_stale` 300s | 77 | 2 | 3.5% | question 75 · reaction 2 |
+
+**제안했던 B 가 최악이다.** 이유는 `choose_pickup` 이 **엄격한 순위 + 선착순**이기 때문이다 —
+"우선순위 kind 가 이기고, 같은 kind 안에서는 가장 오래된 것이 이긴다".
+
+- 질문 우선 → 질문 581건이 늘 대기 중이라 리액션은 영원히 순번이 안 온다
+- 리액션 우선 → 리액션 4,662건 중 **가장 오래된 것**부터 뽑는다 → 백로그 맨 뒤의 낡은 채팅만 읽는다
+
+둘 다 "지금 반응할 가치가 있는 채팅" 과 무관하다. **순위의 순서가 아니라 순위+선착순이라는 구조가
+문제다.** 설정 노브로는 닫히지 않는다.
+
+**답은 이미 레포 안에 있다.** `chat_replay` 의 `offline_fixed_5s_response_sampler_v1` 은 점수제다 —
+`donation 100 · question 80 · correction_marker 12 · emphasis 8 · laughter_run 5` 에 직전 픽업 대비
+novelty 보너스와 overlap 페널티를 더하고, **20점 미만이면 그 창은 no_reply** 로 넘긴다. 질문을
+선호하되 절대적이지 않고 "반응할 게 없으면 안 한다" 는 선택지가 있다. 실측된 1.7배 선호·80%
+비질문 분포에 훨씬 가까운 구조다. `broadcast_sim` 에만 이 메커니즘이 없다.
+
+**한계.** 적중률 7% 를 절대 성능으로 읽으면 안 된다. 정답지 57건은 **하한**이다 — 어휘를 겹치지
+않고 답한 경우("응 맞아")는 탐지되지 않으므로 실제 반응은 더 많다. 정책 간 **상대 비교**로만 유효하다.
+
+## 5. 고칠 지점 — 설정이 아니라 선택 메커니즘
+
+§4-3 실측으로 방향이 바뀌었다. 설정 노브 조정으로는 닫히지 않는다.
+
+| 대상 | 판정 |
+|---|---|
+| `pickup_priority` 순서 | **기각** — 승격이 적중률을 7%→0% 로 떨어뜨렸다 |
+| `turn_cooldown_seconds` / `pending_stale_seconds` | **효과 없음** — 5.3% / 3.5% 로 현행보다 나쁘다 |
+| **선택 메커니즘(순위+선착순 → 점수제)** | **여기가 진짜 지점** |
+| 화자 구성 | 소수 단골이 반복 등장하도록 선별 — 여전히 유효 |
+
+`broadcast_sim` 에 `chat_replay` 의 점수제 샘플러에 준하는 선택기를 넣는 것이 다음 작업이다.
+그때 **이 정답지가 그대로 회귀 기준**이 된다 — 추측으로 가중치를 정할 필요가 없다.
+
+## 6. 새로 확보한 자산 (저장소 밖)
+
+원래 replay 원본 1,500건은 클로드 PC 에 없다(`path_sha256` pin 만 있고 실체는 코덱스 PC). 대신
+공개 VOD 1편을 직접 수집해 **더 큰 자산**을 만들었다.
+
+| 자산 | 규모 |
+|---|---|
+| 원본 채팅 JSON | 11,974건 |
+| 가명화 채팅 JSONL | **5,243건 · 고유 화자 356명** (기존 1,500건의 3.5배) |
+| VOD 오디오 | 90MB · 97분 |
+| STT 트랜스크립트 | **500세그먼트 · 7,718자** (32분 구간, CPU 2.94배속) |
+| **스트리머 응답 정답지** | **57쌍** (에코 364건 제외 후) |
+
+`--replay-transcript` 형식(`start_ms`/`end_ms`/`text`)이라 맥락 주입에 바로 투입 가능하다.
 
 새 문항 세트가 갖춰야 할 것(사용자 결정 2026-08-27: **실제 채팅 재구성**):
 
@@ -137,6 +197,52 @@ S4 는 `AIRI_S4_MIN_CONTENT_TOKENS=2` 로 **저내용 메시지 스킵을 더 �
 계약 §1 은 "합성 fixture·템플릿 시청자 출력은 입력이 아니다" 로 못박고 있다. 실제 발화를
 **재배치·선별**하는 재구성은 합성이 아니지만, 원 순서를 바꾸는 이상 조항의 해석이 필요하다.
 `AIRI-EVAL-CONTRACT-AMENDMENT-PROPOSAL-2026-08-27.md` 에 문항 조항을 함께 넣어야 한다.
+
+## 8. 수집·STT·짝짓기 경로 (도구화 완료)
+
+**yt-dlp 는 쓸 수 없다.** 최신 버전(2026.08.19)에서도 chzzk:video 추출기가
+`KeyError('sourceURL')` 로 깨진다 — 오디오 representation 의
+`segmentList.initialization.sourceURL` 이 null 이기 때문이다. 우회 경로를
+`import_public_chat.py chzzk-audio` 로 코드화했다.
+
+```
+api.chzzk.naver.com/service/v2/videos/{no}      → videoId + inKey
+apis.naver.com/neonplayer/vodplay/v2/playback   → 매니페스트
+  audio/mp4 representation → otherAttributes.m3u  (서명 토큰 포함)
+  CMAF 라 모든 세그먼트가 같은 .m4a 의 바이트 범위 → 그 파일 하나만 받으면 끝
+```
+
+세그먼트 상대경로에는 서명 토큰이 붙지 않아 ffmpeg 이 400 을 받는다. 토큰을 파일 URL 로 옮겨
+붙이는 것이 핵심이고, 그 계약을 테스트로 고정했다.
+
+```powershell
+# 1) 채팅 (--max-pages 기본 60 = 12,000건 상한)
+python ollama-proxy\eval\human_review\import_public_chat.py chzzk-fetch --video-no <no> --output <밖>\raw.json
+python ollama-proxy\eval\human_review\import_public_chat.py normalize --format chzzk --input <밖>\raw.json --output <밖>\chat.jsonl --hmac-key-file <밖>\hmac.key
+# 2) 오디오 → STT
+python ollama-proxy\eval\human_review\import_public_chat.py chzzk-audio --video-no <no> --output <밖>\audio.m4a
+ffmpeg -i <밖>\audio.m4a -vn -ac 1 -ar 16000 -c:a pcm_s16le <밖>\audio.wav
+python stt\transcribe_vod.py --input <밖>\audio.wav --output <밖>\transcript.jsonl
+# 3) 스트리머 응답 정답지
+python ollama-proxy\eval\human_review\pair_streamer_response.py --chat <밖>\chat.jsonl --transcript <밖>\transcript.jsonl --output <밖>\pairs.jsonl
+```
+
+**짝짓기의 핵심은 방향 판정이다.** 시간만으로 짝지으면 안 된다(채팅이 초당 3건). 스트리머가
+채팅을 읽을 때 그 채팅의 고유 어휘를 그대로 쓰는 것을 신호로 쓰되, **시청자가 스트리머 말을
+따라한 경우**를 반드시 걸러야 한다. 조사·어미로 분절이 갈리는 것까지 접두 매칭으로 잡아야 하며
+(`충실한편` vs `충실한`), 실측에서 이 필터를 촘촘히 한 것만으로 후보가 70 → 57건으로 정제되고
+에코 제외가 123 → 364건으로 늘었다.
+
+**STT 주의.** 모델·beam 은 `stt/openai_stt_server.py` 와 같은 값으로 핀한다(테스트로 고정) —
+회차마다 다른 설정으로 받아쓰면 트랜스크립트끼리 비교가 성립하지 않는다. 대기화면·BGM 구간에서
+VAD 가 통째로 뭉개는 일이 있다(실측 1건, 296초). 짝짓기는 30초 초과 세그먼트를 제외한다.
+
+## 9. 라이선스·범위
+
+공개 VOD 채팅 리플레이는 계약 §1(c) 가 승인한 입력이다(2026-08-26 사용자 지시). **오디오는 문구에
+없다.** 2026-08-27 사용자 결정으로 **로컬 평가 한정**으로 수집했고, 용도는 ①맥락 주입 ②채점
+기준점 ③픽업 정답지 세 가지다. **학습 정답으로는 쓰지 않는다** — 타인 페르소나 학습은 캐릭터
+헌법과 충돌하고 권리 문제도 별개로 생긴다. 산출물은 전부 저장소 밖에 둔다.
 
 ## 7. 다음 한 변수
 
