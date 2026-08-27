@@ -1,5 +1,7 @@
 # AIRI 로드맵 갱신 로그 (최신이 위)
 
+- 2026-08-27 10:42 KST Claude handoff post-push receipt. 사용자 명시 승인으로 `docs: hand off M7 S4 to Claude` commit `338e582ef1dff48ca2a114c1b79a5bdb5d027a39`를 `origin/main`에 push했다(exit 0). local/origin/remote SHA가 일치하고 worktree는 clean이며, replay/GPU 프로세스 0·Ollama `127.0.0.1:11434`만 남았다. S2 `[F]`·S3 `[x]`·S4 `[P]`와 S4 사람 JSON 부재를 보존하고 모니터링을 중단한다.
+
 - 2026-08-27 10:38 KST Claude handoff stop intent. 실제 local/origin/remote SHA `cfb7fd41819cbfad5536ab3aa55e1d8f631c49c7`, replay/GPU 관련 프로세스 0, Ollama `127.0.0.1:11434`만 확인했다. S2 `[F]`, S3 `[x]`, S4 `[P]`와 S4 r1/r2/r3 외부 root·대표 r2 rating-sheet를 재대조했고 S4 사람 JSON은 없다. 사용자 요청으로 모니터링을 중단하고 `진행중/AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md`를 작성해 이번 문서 배치를 commit/push한다. JSON 전 자동 점수·replay 재실행·S5·GPU·파인튜닝·운영 활성화는 하지 않는다.
 
 > 2026-08-19 로드맵 v3 개편 때 `AIRI-ROADMAP-STATUS.md`에서 분리했다.

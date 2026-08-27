@@ -28,7 +28,7 @@
 - 전체 로드맵 정상 완료율: **67/97 (69.1%)**
 - 전체 로드맵 처리 종료율: **74/97 (76.3%)**
 - 전체 로드맵 진행 지수: **77.0/97 (79.4%)** — 110개 행 중 `[S]` 10개와 `[N/A]` 3개를 분모에서 제외; 2026-08-27 01:29 KST 기준
-- 마지막 실제 상태 대조: **2026-08-27 10:38 KST** — local HEAD `cfb7fd4` = origin/main = remote main at reconciliation; 이번 문서·Claude handoff 배치는 사용자 승인 push 대상, replay/GPU PID 0, AIRI listener 없음,
+- 마지막 실제 상태 대조: **2026-08-27 10:42 KST** — Claude handoff push `338e582`는 local/origin/remote main에 도달했고 worktree는 clean at post-push verification; replay/GPU PID 0, AIRI listener 없음,
   Ollama listener `127.0.0.1:11434`, S2/S3/S4 r1~r3 report/health/review/rating-sheet는 저장소 밖에 유지
 
 ### 현재 주요 작업 단계(M7) 체크리스트

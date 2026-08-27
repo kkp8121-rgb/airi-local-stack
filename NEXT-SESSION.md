@@ -1,6 +1,6 @@
 # AIRI 다음 세션 안내
 
-> **2026-08-27 10:38 KST 현재:** 사용자의 중단 요청에 따라 모니터링을 멈추고 `airi_docs/진행중/AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md`를 Claude 단일 진입점으로 작성합니다. 인계 전 HEAD `cfb7fd41819cbfad5536ab3aa55e1d8f631c49c7`은 local/origin/remote와 일치했고, 이번 문서 배치의 commit/push가 명시 승인됐습니다. S4 r1~r3는 exit 0·99턴·오류 0, `skipped=30`, `batched=0`; q_end 5/13/22의 대표는 r2이며 S4 사람 JSON을 기다립니다. JSON이 없으므로 자동 점수·replay 재실행·S5를 하지 않습니다. `goal_status=paused`, `adoption_authorized=false`, 운영 flag OFF, GPU·파인튜닝 금지.
+> **2026-08-27 10:42 KST 현재:** 사용자의 중단 요청에 따라 모니터링을 멈추고 `airi_docs/진행중/AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md`를 Claude 단일 진입점으로 push했습니다. handoff commit `338e582ef1dff48ca2a114c1b79a5bdb5d027a39`는 local/origin/remote와 일치하며 worktree는 clean입니다. S4 r1~r3는 exit 0·99턴·오류 0, `skipped=30`, `batched=0`; q_end 5/13/22의 대표는 r2이며 S4 사람 JSON을 기다립니다. JSON이 없으므로 자동 점수·replay 재실행·S5를 하지 않습니다. `goal_status=paused`, `adoption_authorized=false`, 운영 flag OFF, GPU·파인튜닝 금지.
 
 > **현재 live goal_status=paused:** M7 S3 평가 채택과 S2 `[F]` 실패를 보존했다. S4 replay r1~r3는 완료됐고 대표 r2 사람 JSON을 기다린다. replay/GPU PID 0, Ollama 11434만 남아 있으며 S4 채택·운영 반영은 대기한다. 이번 push 이후에는 새 사용자 goal 전까지 추가 모니터링을 하지 않는다.
 

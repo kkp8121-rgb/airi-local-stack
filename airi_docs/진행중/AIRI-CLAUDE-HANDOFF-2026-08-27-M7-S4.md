@@ -28,7 +28,8 @@
   (각 root의 runtime/health/report/packet/runner/review/rating-sheet를 보존)
 - 인계 작성 전 관측 HEAD: `cfb7fd41819cbfad5536ab3aa55e1d8f631c49c7`;
   local/origin/remote main이 일치했습니다. 이 handoff 배치는 사용자의 명시 승인으로
-  commit/push합니다. Claude는 시작할 때 실제 SHA를 다시 읽으십시오.
+  commit/push했고, push된 handoff commit은 `338e582ef1dff48ca2a114c1b79a5bdb5d027a39`입니다.
+  Claude는 시작할 때 실제 SHA를 다시 읽으십시오.
 - 저장소에는 실제 채팅 원문·코멘트·개인 오디오를 기록하지 않습니다.
 
 ## 3. 대기 중인 유일한 다음 변수
