@@ -212,11 +212,15 @@ def cmd_terms(args) -> int:
                 continue
             record = json.loads(line)
             turns += 1
-            key = record.get("user_hash") or record.get("user", "")
+            # 두 형식을 모두 받는다: review JSONL 은 시청자 발화가 `user`, 가명화 채팅
+            # JSONL(import_public_chat 산출)은 `text` 다.  한쪽만 보면 다른 쪽에서 조용히
+            # 0건이 나온다(실측: 채팅 5,243건이 "서로 다른 메시지 1건" 으로 뭉개졌다).
+            spoken_raw = record.get("user") or record.get("text") or ""
+            key = record.get("user_hash") or spoken_raw
             if key in seen:
                 continue
             seen.add(key)
-            spoken = _SOURCE_PREFIX.sub("", record.get("user", ""))
+            spoken = _SOURCE_PREFIX.sub("", spoken_raw)
             for term in _tokens(spoken):
                 if len(term) < 2 or term in _QUERY_STOP_TERMS or term in _COMMON_TERMS:
                     continue

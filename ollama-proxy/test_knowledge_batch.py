@@ -204,6 +204,21 @@ class TermsTests(unittest.TestCase):
         for dropped in ("그럼", "오늘", "v1a2b3c4d"):
             self.assertNotIn(dropped, out)
 
+    def test_pseudonymised_chat_format_is_accepted(self):
+        # import_public_chat 산출물은 발화가 `text` 이고 user_hash 가 없다.  `user` 만 보면
+        # 전부 빈 문자열로 뭉개져 조용히 0건이 나온다(실측 5,243건 → "메시지 1건").
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._review(Path(tmp), "chat.jsonl", [
+                {"source": "chzzk", "offset_ms": 1000, "author": "vaaaaaaaa",
+                 "kind": "chat", "text": "암베사 어때"},
+                {"source": "chzzk", "offset_ms": 2000, "author": "vbbbbbbbb",
+                 "kind": "chat", "text": "링피트 재밌어"},
+            ])
+            _code, out = run(["terms", "--review", str(path), "--min-count", "1"])
+        self.assertIn("서로 다른 메시지 2건", out)
+        self.assertIn("암베사", out)
+        self.assertIn("링피트", out)
+
     def test_output_file_lists_terms_only(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = self._review(Path(tmp), "review.jsonl", [

@@ -297,6 +297,75 @@ def choose_pickup(pending: Sequence[dict[str, Any]], priority: Sequence[str], th
     return best[2] if best else None
 
 
+# --- 점수제 픽업 (기본 OFF) ------------------------------------------------
+#
+# 왜 필요한가. 위의 순위 픽업은 "우선순위 kind 가 이기고, 같은 kind 안에서는 가장 오래된 것이
+# 이긴다" 이다.  실제 스트리머가 무엇에 반응했는지를 정답지로 만들어 대조한 결과(2026-08-27,
+# 공개 VOD 1편 · 정답 57건) 이 구조가 실측과 어긋난다.
+#
+#   - 스트리머가 반응한 57건 중 80.7% 가 question 이 아니다(질문 선호는 1.7배뿐).
+#     현행 정책은 픽업 77건 중 75건을 질문으로 채운다.
+#   - `reaction` 을 우선순위 상위로 올리면 적중률이 7.0% → 0.0% 로 **더 나빠진다**.
+#     4,662건 백로그에서 "가장 오래된 것" 부터 읽기 때문이다.
+#
+# 즉 우선순위의 순서가 아니라 **순위 + 선착순 + 백로그 이월**이라는 구조가 문제다.
+# `eval/chat_replay` 의 `offline_fixed_5s_response_sampler_v1` 은 같은 문제를 다르게 푼다 —
+# 창마다 그 창의 후보끼리만 겨루고, 최소 점수에 못 미치면 그 창은 그냥 넘긴다.
+# 가중치는 그쪽 값을 그대로 옮긴다(정답지에 맞춰 조정하지 않는다 — 57건은 하한이라 과적합한다).
+PICKUP_POLICIES = ("priority", "scored")
+SCORE_DONATION = 100
+SCORE_QUESTION = 80
+SCORE_KIND_BONUS = {"memory_probe": 95, "memory_seed": 90, "opinion": 85}
+SCORE_EMPHASIS = 8
+SCORE_LAUGHTER = 5
+SCORE_NOVELTY_STEP = 2
+SCORE_NOVELTY_CAP = 4
+SCORE_MINIMUM = 20
+_EMPHASIS_RE = re.compile(r"[!?！？]{2,}|[ㄷㅅㅎ]{3,}|\.\.\.")
+_LAUGHTER_RE = re.compile(r"[ㅋㅎ]{2,}")
+_SCORE_TERM_RE = re.compile(r"[\w가-힣]{2,32}")
+
+
+def score_terms(text: str) -> frozenset[str]:
+    """점수 계산용 표면 어휘. chat_replay._sampler_terms 와 같은 규칙."""
+    return frozenset(_SCORE_TERM_RE.findall((text or "").casefold()))
+
+
+def pickup_score(message: dict[str, Any], kind: str, recent_terms: frozenset[str] | None) -> int:
+    """한 메시지의 응답 가치 점수. 높을수록 먼저 읽는다."""
+    if kind == "donation":
+        return SCORE_DONATION
+    if kind in SCORE_KIND_BONUS:
+        return SCORE_KIND_BONUS[kind]
+    if kind == "question":
+        return SCORE_QUESTION
+    text = message.get("text", "")
+    score = (SCORE_EMPHASIS * bool(_EMPHASIS_RE.search(text))
+             + SCORE_LAUGHTER * bool(_LAUGHTER_RE.search(text)))
+    terms = score_terms(text)
+    if recent_terms is not None and terms:
+        # 직전에 읽은 것과 겹치면 깎고 새로우면 준다 — 같은 화제를 연달아 읽지 않게.
+        novelty = min(len(terms - recent_terms), SCORE_NOVELTY_CAP)
+        overlap = min(len(terms & recent_terms), SCORE_NOVELTY_CAP)
+        score += (novelty - overlap) * SCORE_NOVELTY_STEP
+    return score
+
+
+def choose_pickup_scored(candidates: Sequence[dict[str, Any]], threshold: int,
+                         recent_terms: frozenset[str] | None) -> dict[str, Any] | None:
+    """점수 최고를 고르되, 최소 점수에 못 미치면 이 창은 넘긴다(무응답)."""
+    best: tuple[int, int, dict[str, Any]] | None = None
+    for message in candidates:
+        kind = effective_kind(message, candidates, threshold)
+        score = pickup_score(message, kind, recent_terms)
+        if score < SCORE_MINIMUM:
+            continue
+        key = (score, -message["t_ms"])
+        if best is None or key > (best[0], best[1]):
+            best = (score, -message["t_ms"], message)
+    return best[2] if best else None
+
+
 def plan_pickups(stream: dict[str, Any], fixture: dict[str, Any], *, max_turns: int | None = None) -> list[dict[str, Any]]:
     """Walk the stream in fixed windows and decide what AIRI reads out, and when.
 
@@ -304,11 +373,15 @@ def plan_pickups(stream: dict[str, Any], fixture: dict[str, Any], *, max_turns: 
     is what creates a real backlog: messages keep arriving while AIRI is talking.
     """
     rates = fixture["rates"]
-    window_ms = int(rates["window_seconds"]) * 1000
+    window_seconds = int(rates["window_seconds"])
+    window_ms = window_seconds * 1000
     cooldown_ms = int(rates["turn_cooldown_seconds"]) * 1000
     stale_ms = int(rates["pending_stale_seconds"]) * 1000
     threshold = int(rates["opinion_aggregate_threshold"])
     priority = list(fixture.get("pickup_priority") or KINDS)
+    policy = str(fixture.get("pickup_policy") or "priority")
+    if policy not in PICKUP_POLICIES:
+        raise BroadcastSimError(f"unknown pickup policy: {policy!r}")
     total_ms = int(stream["broadcast_minutes"]) * 60_000
 
     messages = list(stream["messages"])
@@ -317,6 +390,7 @@ def plan_pickups(stream: dict[str, Any], fixture: dict[str, Any], *, max_turns: 
     picks: list[dict[str, Any]] = []
     busy_until = 0
     dropped_stale = 0
+    recent_terms: frozenset[str] | None = None
 
     for window_start in range(0, total_ms, window_ms):
         window_end = window_start + window_ms
@@ -328,9 +402,20 @@ def plan_pickups(stream: dict[str, Any], fixture: dict[str, Any], *, max_turns: 
         pending = fresh
         if window_start < busy_until or not pending:
             continue
-        chosen = choose_pickup(pending, priority, threshold)
+        if policy == "scored":
+            # 후보를 최근 도착분으로 좁히는 것이 핵심이다.  백로그 전체를 후보로 두면
+            # 질문(80점)이 늘 하나는 남아 있어 점수제로 바꿔도 결과가 그대로다(실측: 7.0%
+            # → 7.0%, 질문 비율은 오히려 97%→100%).  chat_replay 샘플러가 섞이는 이유는
+            # 가중치가 아니라 창마다 그 창의 후보끼리만 겨루고 이월하지 않기 때문이다.
+            candidate_ms = int(rates.get("pickup_candidate_seconds", window_seconds)) * 1000
+            candidates = [item for item in pending
+                          if window_end - item["t_ms"] <= max(candidate_ms, window_ms)]
+            chosen = choose_pickup_scored(candidates, threshold, recent_terms)
+        else:
+            chosen = choose_pickup(pending, priority, threshold)
         if chosen is None:
             continue
+        recent_terms = score_terms(chosen.get("text", ""))
         kind = effective_kind(chosen, pending, threshold)
         backlog = [item for item in pending if item["id"] != chosen["id"]]
         wave_size = sum(1 for item in pending if chosen.get("tag") and item.get("tag") == chosen.get("tag"))

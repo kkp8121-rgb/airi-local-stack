@@ -189,6 +189,55 @@ class PickupTests(unittest.TestCase):
         self.assertEqual(choose := sim.choose_pickup(pending, self.priority, self.threshold), pending[2])
         self.assertEqual(choose["id"], "c")
 
+    def test_scored_policy_prefers_donation_then_question(self) -> None:
+        pending = [message(id="react", t_ms=10, kind="reaction", text="ㅋㅋㅋ 대박"),
+                   message(id="ask", t_ms=20, kind="question", text="이거 뭐야?"),
+                   message(id="cheese", t_ms=30, kind="donation", text="후원")]
+        chosen = sim.choose_pickup_scored(pending, self.threshold, None)
+        self.assertEqual(chosen["id"], "cheese")
+        chosen = sim.choose_pickup_scored(pending[:2], self.threshold, None)
+        self.assertEqual(chosen["id"], "ask")
+
+    def test_scored_policy_declines_a_window_with_nothing_worth_reading(self) -> None:
+        # 순위 정책은 항상 무언가를 고른다. 점수제는 "지금은 읽을 게 없다" 를 낼 수 있다.
+        pending = [message(id="flat", t_ms=10, kind="reaction", text="응")]
+        self.assertIsNone(sim.choose_pickup_scored(pending, self.threshold, None))
+        self.assertIsNotNone(sim.choose_pickup(pending, self.priority, self.threshold))
+
+    def test_scored_policy_penalises_repeating_the_last_topic(self) -> None:
+        recent = sim.score_terms("스트랩실 사탕 얘기")
+        same = message(id="same", t_ms=10, kind="reaction", text="스트랩실 사탕 진짜 ㅋㅋㅋ")
+        fresh = message(id="fresh", t_ms=20, kind="reaction", text="링피트 재밌겠다 ㅋㅋㅋ")
+        self.assertGreater(sim.pickup_score(fresh, "reaction", recent),
+                           sim.pickup_score(same, "reaction", recent))
+
+    def test_unknown_pickup_policy_is_rejected(self) -> None:
+        fixture = copy.deepcopy(self.fixture)
+        fixture["pickup_policy"] = "nope"
+        stream = sim.generate_stream(fixture, seed=7)
+        with self.assertRaises(sim.BroadcastSimError):
+            sim.plan_pickups(stream, fixture)
+
+    def test_default_policy_leaves_picks_unchanged(self) -> None:
+        # 기본 경로는 바이트 불변이어야 한다 — greybox 규약.
+        stream = sim.generate_stream(self.fixture, seed=7)
+        explicit = copy.deepcopy(self.fixture)
+        explicit["pickup_policy"] = "priority"
+        self.assertEqual([pick["message"]["id"] for pick in sim.plan_pickups(stream, self.fixture)],
+                         [pick["message"]["id"] for pick in sim.plan_pickups(stream, explicit)])
+
+    def test_candidate_window_bounds_how_far_back_scoring_looks(self) -> None:
+        # 백로그를 그대로 후보로 두면 점수제로 바꿔도 결과가 안 바뀐다(실측 7.0% → 7.0%).
+        fixture = copy.deepcopy(self.fixture)
+        fixture["pickup_policy"] = "scored"
+        fixture["rates"]["pickup_candidate_seconds"] = 5
+        stream = sim.generate_stream(fixture, seed=7)
+        narrow = sim.plan_pickups(stream, fixture)
+        fixture["rates"]["pickup_candidate_seconds"] = 600
+        wide = sim.plan_pickups(stream, fixture)
+        self.assertNotEqual([pick["message"]["id"] for pick in narrow],
+                            [pick["message"]["id"] for pick in wide])
+
     def test_oldest_wins_inside_one_kind(self) -> None:
         pending = [message(id="new", t_ms=90, kind="question"), message(id="old", t_ms=10, kind="question")]
         self.assertEqual(sim.choose_pickup(pending, self.priority, self.threshold)["id"], "old")
