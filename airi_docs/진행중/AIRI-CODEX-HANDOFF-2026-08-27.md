@@ -1,10 +1,22 @@
 # AIRI 코덱스 인수인계 — 2026-08-27 클로드 PC 배치 (단일 진입점)
 
+> **2026-08-28 10:11 KST 대체됨:** 현재 단일 진입점은
+> `airi_docs/진행중/AIRI-CLAUDE-HANDOFF-2026-08-28-VOD-STORYLINE.md`다. 이 문서의 자산
+> 위치·M7 판정 무효화 근거는 계속 유효하지만, 실행 상태와 다음 작업은 새 인계문을 따른다.
+> 최신 완주 회차는 run-78, run-79는 옵션 누락으로 무효, run-80은 인계 전환으로 19/32에서
+> 중단됐으며 품질 통과 연속 횟수는 0/3이다.
+
+> **2026-08-28 01:32 KST 최신 self-test receipt:** 사용자 goal resume 후 repository VOD 8막 storyline을 고정하고 run-15~20을 외부 root에 보존했다. 모든 회차는 32/32·8/8·32 staged audience authors·금지 시그니처 0·empty/service error 0이었다. run-20의 repeat/high-overlap/source-experience/irrelevant markers는 모두 0이지만, 새 사건·callback/next-hook·emotion 전수 조건은 실패했고 T1에서 `[오늘 방송]` 내부 표식이 노출됐다. 따라서 품질 통과나 “리제 급 반응”으로 선언하지 않는다. run-10·16·20의 응답 형식 수정이 해결하지 못해 추가 즉흥 수정은 중단했으며, 다음 진입은 새 접근을 설계한 뒤다. 지식 DB는 `C:\Projects\airi\ollama-proxy\runtime\airi-knowledge.sqlite3`, `/health`는 `documents=153, chunks=296`, memory/knowledge enabled·ready, live capability/운영 flag OFF다. 외부 결과는 `D:\AIRI-Models\airi-human-eval\20260828-vod-storyline-run-15`~`run-20`에 있다.
+
+> **2026-08-28 00:25 KST 최신 receipt:** VOD 기반 8막 줄거리 카드와 장면별 맥락 채팅 32턴을 만들고 run-06을 완료했다. 구조 기준은 8/8 장면·4턴/장면·순서 유지·금지 시그니처 0·빈 응답/서비스 오류 0이다. 결과는 사용자 직접 채점용 외부 HTML `D:\AIRI-Models\airi-human-eval\20260828-vod-storyline-run-06\vod-storyline-review.html`에 있으며, `context_retention` 0~4 채점 전에는 통과·채택·게이트 변경으로 해석하지 않는다. 다음 행동은 사용자가 32턴을 직접 채점하는 것이다. 실행 시 사용한 지식 DB는 `documents=153, chunks=296`, memory/knowledge는 ON·ready였고 운영 flag는 OFF다.
+
+> **2026-08-27 23:45~23:46 KST VOD 시뮬레이션 무효화:** 이전 실행은 `츕츕` 변형 3건이 정제기를 통과했고, 더 근본적으로 고정 fixture의 generic beat와 pickup 직전 45초 STT만 사용해 방송 시작부터 끝까지의 줄거리를 연출하지 못했다. 77턴 실행은 기술적으로 exit 0이었으나 의도한 VOD 방송 테스트의 결과로 사용하지 않는다. 다음은 전체 STT 시간축에서 순서 있는 장면/줄거리를 만들고, 정제된 다중 시청자 채팅을 장면별로 동기화하며, AIRI를 방송인으로 명시하는 연출 계약을 먼저 확정하는 것이다. 현재 외부 report/packet/review는 진단용 보존물이며 채택·회차 선정·게이트 판정에 사용하지 않는다.
+
 > **먼저 읽을 것.** `AGENTS.md` → `진행중/AIRI-WORKING-STATE.md` 전체 → **이 문서** →
 > `진행중/AIRI-EVAL-INPUT-CONTEXT-AUDIT-2026-08-27.md`(가장 중요) → `로드맵/AIRI-ROADMAP-STATUS.md`
 > → `NEXT-SESSION.md`. 문서와 기계 상태가 다르면 실행하지 말고 관측값으로 문서부터 정정한다.
 >
-> 기계 판독 계약: `goal_status=paused`; `adoption_authorized=false`; 운영 flag OFF; GPU 학습·
+> 기계 판독 계약: `goal_status=active` (추가 튜닝은 fresh approach 전 일시정지); `adoption_authorized=false`; 운영 flag OFF; GPU 학습·
 > 파인튜닝(2026-09-09까지) 금지 — 전부 보존됨.
 
 ## 0-A. 기계 상태 — 파일을 찾아 헤매지 말 것
@@ -38,15 +50,28 @@ python ollama-proxy\knowledge_batch.py probe `
     --queries ollama-proxy\eval\knowledge_probe_queries.txt --min-hit-rate 0.9
 ```
 
-기대값: `documents=144~145`, 회수율 **6/6**. 클로드 PC 실측과 같은 수치가 나와야 한다.
+기대값: 기존 runtime `documents=9`에 배치 144건을 추가한 **최대 `documents=153`**이다. title 충돌은 `inserted`가 아니라 `updated`로 기록한다. 회수율은 **6/6**이어야 하며, 범위를 벗어나면 원인 규명 전 다음 단계로 넘어가지 않는다.
+
+> **2026-08-27 22:34 KST Codex post-pull 관측:** `git pull --ff-only origin main`으로 `53befcb`까지 동기화했고, 이 저장소의 배치 lint는 144/144로 통과했다. 당시 Codex runtime의 기존 `airi-knowledge.sqlite3`는 read-only `documents=9, chunks=9`였고 새 144건은 아직 적재 전이었다. 기존 문서와 배치의 제목 충돌을 고려한 기대 상한은 **`documents=153`**이며, 이전 범위 표기는 폐기한다. 다음 실행은 세 JSONL을 runtime 안 절대경로로 순서대로 적재·probe하는 것이며, `goal_status=paused`, 운영 flag OFF, GPU·파인튜닝 금지, push 별도 승인을 유지한다.
+
+> **2026-08-27 22:40 KST DB 경계 결정:** 기존 9건과 새 144건의 제목 중복은 0건이다. 기존 `airi-knowledge.sqlite3`는 보존하고, 새 배치는 runtime 내부의 `airi-knowledge-m7-real-dialogue-20260827.sqlite3`에 적재해 평가 코퍼스를 분리한다.
+
+> **2026-08-27 22:41 KST 지식 적재 receipt:** 세 배치를 새 평가 DB에 `41+55+48`건 적재했고 `documents=144, chunks=287`을 확인했다. 고정 6종 probe는 `6/6 (100%)`로 `--min-hit-rate 0.9`를 통과했다. 기존 9건 DB는 변경하지 않았다. 다음은 계약 §1(b) 사용자↔AIRI 직접 50턴+이다.
+
+> **2026-08-27 22:43 KST 사용자 정정:** 위 22:41 receipt의 별도 평가 DB 선택은 최종 대상이 아니다. 기존 `airi-knowledge.sqlite3`의 9건에서 시작해 세 배치를 하나씩 적용한다. 최대 문서 수는 153건이며 배치별 `inserted/updated/duplicate`와 `/health` 지식 문서 수를 대조한다. 실제 세션은 memory ON·knowledge ON으로 시작하고, 채점 전 비채택·다음 회차 적용 선언을 기록한 뒤 사용자가 직접 채점한다.
+
+> **2026-08-27 22:45 KST 지식 적재 receipt:** 기존 DB에 game `41/0/0`, meme `55/0/0`, culture `48/0/0` (`inserted/updated/duplicate`)을 순서대로 적용했다. 최종 `documents=153, chunks=296`, 고정 probe `6/6 (100%)`이며 기대 상한 153건 안이다. 다음은 memory ON·knowledge ON 스택의 `/health`에서 knowledge DB 수를 대조하는 단계다.
+
+> **2026-08-27 22:47 KST 실제 대화 스택 intent:** 신규 외부 memory root `D:\AIRI-Models\airi-human-eval\20260827-real-dialogue-codex`를 사용하고, memory/knowledge를 모두 ON으로 기동한다. `KnowledgeDbPath`는 적재된 기존 runtime DB로 고정하며 `/health` knowledge documents=153 확인 전에는 직접 대화를 시작하지 않는다. 채점 전 비채택 선언·사용자 직접 채점·측정 항목(화자 수/전체 턴·재발화율·AIRI 답 이어받기·context_retention 4점 이상)을 유지한다.
 
 ## 0. 한 줄
+
+> **2026-08-27 22:51 KST stack health receipt:** `/health`에서 memory/knowledge가 모두 enabled·ready이고 knowledge `documents=153, chunks=296`으로 적재 DB와 일치했다. 외부 memory DB는 `conversation_message=0`이다. proxy 11435, latency 8892, TTS 8880이 listening 중이며 STT는 OFF다. 이제 사용자께서 AIRI에 직접 1턴을 보내면 된다. 이번 세션은 채택 판정 대상이 아니다.
 
 **M7 의 "3축 ≥ 3.0 채택" 판정이 근거를 잃었다.** 그 게이트는 지금 쓰는 평가 입력에서 **도달
 불가능**하기 때문이다. 개별 실험의 회차 간 비교는 유효하고, 무효인 것은 절대 판정 하나다.
 
-그리고 **지식 계층이 채워졌다** — 프로젝트 내내 `documents=0` 이던 자리가 `documents=145,
-chunks=289` 이고 실측 실패 질의 6종이 전부 회수된다(§4). 다음은 **계약 §1(b) 진짜 대화 세션**이다.
+그리고 **지식 계층이 채워졌다** — 이번 실행의 authoritative runtime DB는 `documents=153, chunks=296`이고 실측 실패 질의 6종이 전부 회수된다(§4). 다음은 완료된 VOD 방송 시뮬레이션의 AIRI 반응을 외부 review에서 직접 검토하는 것이다.
 
 ## 1. 반드시 알아야 할 정정 3건
 
@@ -145,7 +170,7 @@ private 이고, 시청자 표시명·채널 ID·userIdHash 가 없으며(`author
 
 ## 4. 지식 적재 — 완료 (2026-08-27)
 
-**아침에 `documents=0` 이던 자리가 `documents=145, chunks=289` 다.** 서브에이전트 3종 병렬 생성 →
+**아침에 `documents=0` 이던 자리는 기존 DB에 세 배치를 적용해 `documents=153, chunks=296`이 되었다.** 서브에이전트 3종 병렬 생성 →
 lint(144/144 유효) → ingest → probe. **회수율 6/6 (100%)**, `--min-hit-rate 0.9` 게이트 통과.
 
 | 배치 | 건수 | content 중앙 | 청크 |
@@ -178,7 +203,9 @@ lint(144/144 유효) → ingest → probe. **회수율 6/6 (100%)**, `--min-hit-
 부수로, 생성 에이전트가 세션 scratchpad 의 이전 분석 파일(실제 채팅 토큰 포함)을 발견해 근거로
 썼다 — **서브에이전트에는 작업 디렉터리를 격리해 줄 것.**
 
-## 5. 다음 작업 (권고 순서)
+## 5. 다음 작업 (최신 receipt 기준)
+
+> **최신 대체 지시(2026-08-27 23:46 KST):** 아래의 이전 직접 50턴 경로와 단순 replay 실행은 사용자의 최신 정정으로 대체되었다. 다음 행동은 VOD 전체 줄거리 연출 계약과 `츕츕` 변형을 포함한 방송 시그니처 필터를 먼저 설계·검토하는 것이다. 기존 77턴 report/review HTML은 설계 결함을 확인하는 진단용이며, 품질·채택·회차 판정에는 사용하지 않는다.
 
 1. **계약 §1(b) 진짜 대화 세션.** 오늘 내내 "입력 재구성" 을 논의했지만 계약이 이미 답을 갖고
    있다 — (c) 리플레이는 (a)·(b) 가 없어서 넣은 대체재이고, 남의 관계는 재생해도 옮겨오지 않는다.
@@ -192,7 +219,9 @@ lint(144/144 유효) → ingest → probe. **회수율 6/6 (100%)**, `--min-hit-
 
 **픽업 트랙은 종료했다(§1-3).** 재개하지 말 것.
 
-## 6. 사용자 대기 중인 것
+## 6. 사용자 대기 중인 것 (최신 상태)
+
+> 현재 대기 항목은 VOD 전체 줄거리 기반 연출 설계의 사용자 검토다. 설계 승인 전에는 정정된 시뮬레이션을 재실행하지 않으며, 기존 77턴 반응 검토는 무효 실행의 진단 범위로만 본다. 다음 평가 회차나 게이트 변경은 별도 사용자 승인 후에만 진행한다. 기존 아래 목록 중 직접 50턴 및 그에 종속된 문장은 이전 계획 이력이다.
 
 - **계약 §1(b) 대화 세션** — 사용자와 AIRI 가 직접 50턴 이상. 스택 기동이 필요하므로 코덱스 PC
   또는 사용자 쪽 작업이다.

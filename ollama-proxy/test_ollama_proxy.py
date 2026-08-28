@@ -625,6 +625,23 @@ Every response must use this control format: <|NAME PAYLOAD|>.
         ))["messages"]
         self.assertEqual(messages[-2]["content"], ollama_proxy.BROADCAST_RESPONSE_STYLE_CONTRACT)
 
+    def test_response_mode_override_uses_expanded_contract_for_local_evaluation(self) -> None:
+        body = json.dumps({"messages": [
+            {"role": "system", "content": "evaluation storyline"},
+            {"role": "user", "content": "다음 장면으로 넘어가자."},
+        ]}, ensure_ascii=False).encode()
+
+        messages = json.loads(ollama_proxy.inject_response_mode(
+            body, "다음 장면으로 넘어가자.", broadcast_context_override=True,
+        ))["messages"]
+        self.assertEqual(messages[-2]["content"], ollama_proxy.BROADCAST_RESPONSE_STYLE_CONTRACT)
+        self.assertIn("평소의 한 문장 선호를 적용하지 말고", messages[-2]["content"])
+
+        normal = json.loads(ollama_proxy.inject_response_mode(
+            body, "다음 장면으로 넘어가자.", broadcast_context_override=False,
+        ))["messages"]
+        self.assertIn(ollama_proxy.REQUEST_LOCAL_STYLE_CONTRACT, normal[-2]["content"])
+
     def test_response_mode_does_not_infer_broadcast_from_user_text(self) -> None:
         body = json.dumps({"messages": [
             {"role": "user", "content": "방송 보면서 말하는 중이야."},

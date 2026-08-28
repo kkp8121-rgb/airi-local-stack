@@ -4912,7 +4912,11 @@ BROADCAST_RESPONSE_STYLE_CONTRACT = (
     "이번 응답 문체: 자연스러운 한국 방송 반말. 보통 2~4문장 60~180자, "
     "단순 인사·확인은 1~2문장 25~90자. 입력·승인 맥락을 먼저 직접 받아서 "
     "사실·판단·이유 중 필요한 것을 말하고, 자기주도 다음 흐름으로 자연스럽게 복귀해. "
-    "강제 질문·보고 요구·사용자 말에 없는 사실·감정·실행 약속은 만들지 마."
+    "강제 질문·보고 요구·사용자 말에 없는 사실·감정·실행 약속은 만들지 마. "
+    "방송 줄거리 맥락이 있으면 평소의 한 문장 선호를 적용하지 말고 정확히 3문장으로 답해: "
+    "1문장은 시청자 말에 바로 반응하고, "
+    "2문장은 현재 사건과 앞선 단서를 감정과 함께 이어 말하고, 3문장은 다음 사건의 단서를 남겨. "
+    "대괄호 표식·제목·내부 라벨은 출력하지 마."
 )
 
 BROADCAST_OPEN_QUESTION_STYLE_CONTRACT = (
@@ -5943,7 +5947,9 @@ def inject_structured_output_contract(body: bytes) -> bytes:
         return body
 
 
-def inject_response_mode(body: bytes, user_text: str) -> bytes:
+def inject_response_mode(
+    body: bytes, user_text: str, *, broadcast_context_override: bool | None = None,
+) -> bytes:
     try:
         payload = json.loads(body)
         output_format = payload.get("format") if isinstance(payload, dict) else None
@@ -5954,7 +5960,11 @@ def inject_response_mode(body: bytes, user_text: str) -> bytes:
         return inject_structured_output_contract(body)
     note = response_mode_note(user_text)
     open_question = grounding_open_question_turn(user_text)
-    broadcast_context = has_live_broadcast_context(payload)
+    broadcast_context = (
+        has_live_broadcast_context(payload)
+        if broadcast_context_override is None
+        else broadcast_context_override
+    )
     if broadcast_context:
         combined_note = BROADCAST_RESPONSE_STYLE_CONTRACT
         if open_question:
@@ -7839,6 +7849,7 @@ async def stream_local_with_ack(
             prepared_body = inject_response_mode(
                 await prepare_knowledge_body(context.body, context.memory_question, trace_id=context.trace_id),
                 context.memory_question,
+                broadcast_context_override=context.synthetic_evaluation_turn,
             )
             _memory_result = None
         else:
@@ -10071,7 +10082,9 @@ async def proxy(path: str, request: Request):
             live_context_note=live_context_note,
             synthetic_evaluation_turn=synthetic_evaluation_turn,
             quality_probe_turn=quality_probe_turn, topic_board_runtime=topic_board_runtime,
-            live_broadcast_turn=body_has_live_broadcast_context(body),
+            live_broadcast_turn=(
+                body_has_live_broadcast_context(body) or synthetic_evaluation_turn
+            ),
         )
 
         return StreamingResponse(
@@ -10225,6 +10238,7 @@ async def proxy(path: str, request: Request):
             body = inject_response_mode(
                 await prepare_knowledge_body(body, memory_question, trace_id=trace_id),
                 memory_question,
+                broadcast_context_override=synthetic_evaluation_turn,
             )
             _memory_result = None
         else:

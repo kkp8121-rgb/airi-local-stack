@@ -1,5 +1,37 @@
 # AIRI 다음 세션 안내
 
+> **2026-08-28 10:21 KST Claude PC 인계:** 단일 진입점은
+> `airi_docs/진행중/AIRI-CLAUDE-HANDOFF-2026-08-28-VOD-STORYLINE.md`다. VOD 8막·장면별
+> 시청자 입력 32턴·금지 시그니처 제거·구조 측정 하네스는 준비됐지만 “리제 급 반응” 품질 통과는
+> 아직 **0/3회**다. 최신 유효 완주 run-78은 반복·고중복·무관 지식 0을 유지했지만 감정 다양성 및
+> 수동 검토에서 실패했다. run-79는 slotwise 옵션 누락으로 무효, run-80은 사용자 인계 전환으로
+> 19/32에서 중단되어 report가 없다. 다른 PC에서는 Git pull 후 지식 DB를 실측·probe하고, 현재
+> `fictional-health-story-boundary` 변경을 fresh run으로 처음부터 검증한다. adoption false, 운영 flag
+> OFF, GPU/파인튜닝·replay·pickup·S5 금지를 유지한다. 게시 전 변경 검증은 storyline 8/8·proxy
+> 411/411·broadcast rehearsal 85/85·broadcast_sim 105/105와 문서 계약·diff-check가 통과했다.
+> 종합 checkpoint는 기준 HEAD부터 존재한 CI workflow 누락 2건을 보고하고 실패했으며 상세는
+> 인계문에 기록했다.
+
+> **2026-08-28 01:32 KST 최신 상태:** 사용자가 재개한 VOD storyline 자가 테스트는 run-15~20까지 완료됐고, 각 회차 transcript/report/review HTML은 `D:\AIRI-Models\airi-human-eval\20260828-vod-storyline-run-15`~`run-20`에 보존됐다. run-20은 구조 기준 `32/32·8/8·서명 0·오류 0`, 반복·고중복·출처 경험 도용·무관 지식 표식 `0`이지만 품질 기준은 실패했다(새 사건·callback/next-hook·emotion 전수 미달, T1 내부 표식 노출, 단문/질문 종결). 추가 즉흥 prompt 수정은 중단했으며 다음 세션은 새 접근을 설계한 뒤에만 재개한다. 지식 DB `153/296`, memory/knowledge ON·ready, live capability/운영 flag OFF, adoption false, GPU·파인튜닝 금지, commit/push 금지는 유지한다.
+
+> **2026-08-28 00:25 KST 최신 상태:** VOD-derived 8막 줄거리와 장면별 맥락 채팅 32턴 run-06이 완료됐다. 구조 기준은 통과했지만 품질 기준은 아직 사용자 직접 채점 전이다. `D:\AIRI-Models\airi-human-eval\20260828-vod-storyline-run-06\vod-storyline-review.html`을 열어 각 턴의 `context_retention`을 0~4로 직접 기록한다. AI 채점·채택 판정·다음 게이트 변경은 하지 않는다. 결과 확인 전 추가 실행은 시작하지 않는다.
+
+> **2026-08-27 23:46 KST VOD 시뮬레이션 무효화:** 이전 77턴 실행은 `츕츕` 변형 3건이 통과했고, 고정 fixture의 generic beat와 pickup 직전 45초 STT만 사용해 VOD 전체 줄거리를 연출하지 못했다. report/packet/review는 진단용 보존물이며 유효한 품질·채택 근거가 아니다. 다음은 전체 STT 시간축 기반 장면/줄거리 구성, 장면별 정제 채팅 동기화, AIRI 방송인 역할을 명시하는 설계 검토다. 정정 실행·다음 회차·게이트 변경은 사용자 승인 전 시작하지 않는다.
+
+> **2026-08-27 22:51 KST stack health receipt:** memory/knowledge enabled·ready, `/health` knowledge `documents=153, chunks=296`으로 DB와 일치, 외부 memory `conversation_message=0`을 확인했다. proxy/latency/TTS listening, STT OFF. 다음은 사용자 직접 AIRI 대화 50턴+이며, 이번 결과는 채택 판정에 사용하지 않는다.
+
+> **2026-08-27 22:34 KST Codex post-pull receipt:** 원격 `53befcb`로 fast-forward 완료. §0-A가 지정한 저장소 내 자산을 확인했으며 지식 배치 41/55/48건은 lint 144/144 통과, VOD는 chat 5,243·STT 500·정답쌍 57행이다. 현재 runtime DB는 과거 `documents=9, chunks=9`이고 새 배치는 아직 적재 전이다. 다음은 runtime 내부 절대경로 복사 → 세 배치 적재 → 고정 6종 probe이며, 기존 `goal_status=paused`·운영 flag OFF·GPU/파인튜닝 금지·push 별도 승인을 유지한다.
+
+> **2026-08-27 22:40 KST 적재 DB 경계:** 기존 9건과 배치 144건의 제목 중복은 0건이다. 기존 DB는 보존하고 `ollama-proxy/runtime/airi-knowledge-m7-real-dialogue-20260827.sqlite3`를 평가용으로 새로 만들어 적재한다.
+
+> **2026-08-27 22:41 KST 지식 적재 receipt:** 세 배치를 새 평가 DB에 `41+55+48`건 적재해 `documents=144, chunks=287`을 확인했고 고정 6종 probe는 `6/6 (100%)` 통과했다. 기존 9건 DB는 보존했다. 다음은 계약 §1(b) 사용자↔AIRI 직접 50턴+이다.
+
+> **2026-08-27 22:43 KST 사용자 정정:** 최종 대상은 기존 runtime DB `documents=9, chunks=9`이며, 새 배치 144건을 세 번에 나눠 적용한다. 기대 상한은 153건이고 각 `inserted/updated/duplicate`를 기록한다. 이후 memory·knowledge ON 스택을 올려 `/health` 지식 문서 수를 DB와 대조한다. 채점 전 비채택·다음 회차 적용 선언을 기록하고 사용자가 직접 채점한다.
+
+> **2026-08-27 22:45 KST 지식 적재 receipt:** game/meme/culture 배치 결과는 각각 `41/0/0`, `55/0/0`, `48/0/0` (`inserted/updated/duplicate`)이다. 기존 DB 최종 `documents=153, chunks=296`, 고정 probe `6/6 (100%)`로 상한 153건 안이다. 다음은 memory·knowledge ON 스택 `/health` 대조 후 계약 §1(b) 직접 대화 50턴+이다.
+
+> **2026-08-27 22:47 KST 실제 대화 스택 intent:** 신규 외부 memory DB로 memory·knowledge ON 스택을 기동하고 `KnowledgeDbPath`를 기존 적재 DB로 고정한다. `/health` knowledge documents=153 일치 확인 전에는 직접 대화를 시작하지 않는다. 채점 전 비채택·다음 회차 적용 선언을 기록하고 사용자가 직접 채점한다.
+
 > **2026-08-27 19:xx KST 추가 — 지식 계층이 채워졌다.** 프로젝트 내내 `documents=0` 이던 자리가
 > **`documents=145, chunks=289`** 이고, 아침에 실패했던 고정 질의 6종(암베사·매도 월드컵·버니가든2
 > ·머함·둥하·ㄱㄴㅇ)이 **전부 회수된다**(`--min-hit-rate 0.9` 통과). 픽업 점수제 이식은 개선이

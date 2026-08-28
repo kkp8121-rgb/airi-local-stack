@@ -532,7 +532,8 @@ class DryRunTransport:
         }
 
     def stream_chat(
-        self, *, model: str, messages: list[dict[str, str]], max_tokens: int, timeout: float
+        self, *, model: str, messages: list[dict[str, str]], max_tokens: int, timeout: float,
+        response_format: object | None = None,
     ) -> tuple[str, float | None, float, dict[str, Any]]:
         self.calls += 1
         started = time.perf_counter()
@@ -617,11 +618,13 @@ class HttpTransport:
         }
 
     def stream_chat(
-        self, *, model: str, messages: list[dict[str, str]], max_tokens: int, timeout: float
+        self, *, model: str, messages: list[dict[str, str]], max_tokens: int, timeout: float,
+        response_format: object | None = None,
     ) -> tuple[str, float | None, float, dict[str, Any]]:
         if self.streaming_enabled:
             text, ttft, elapsed, meta = self._streaming_call(
-                model=model, messages=messages, max_tokens=max_tokens, timeout=timeout
+                model=model, messages=messages, max_tokens=max_tokens, timeout=timeout,
+                response_format=response_format,
             )
             if (
                 self.stream_mode == "auto"
@@ -643,13 +646,18 @@ class HttpTransport:
                     file=sys.stderr,
                 )
                 return self._plain_call(
-                    model=model, messages=messages, max_tokens=max_tokens, timeout=timeout
+                    model=model, messages=messages, max_tokens=max_tokens, timeout=timeout,
+                    response_format=response_format,
                 )
             return text, ttft, elapsed, meta
-        return self._plain_call(model=model, messages=messages, max_tokens=max_tokens, timeout=timeout)
+        return self._plain_call(
+            model=model, messages=messages, max_tokens=max_tokens, timeout=timeout,
+            response_format=response_format,
+        )
 
     def _streaming_call(
-        self, *, model: str, messages: list[dict[str, str]], max_tokens: int, timeout: float
+        self, *, model: str, messages: list[dict[str, str]], max_tokens: int, timeout: float,
+        response_format: object | None = None,
     ) -> tuple[str, float | None, float, dict[str, Any]]:
         payload: dict[str, Any] = {
             "model": model,
@@ -657,6 +665,8 @@ class HttpTransport:
             "stream": True,
             "max_tokens": max_tokens,
         }
+        if response_format is not None:
+            payload["format"] = response_format
         started = time.perf_counter()
         first_at: float | None = None
         chunks: list[str] = []
@@ -704,10 +714,13 @@ class HttpTransport:
         return "".join(chunks), first_at, (time.perf_counter() - started) * 1000.0, meta
 
     def _plain_call(
-        self, *, model: str, messages: list[dict[str, str]], max_tokens: int, timeout: float
+        self, *, model: str, messages: list[dict[str, str]], max_tokens: int, timeout: float,
+        response_format: object | None = None,
     ) -> tuple[str, float | None, float, dict[str, Any]]:
         """비스트리밍 요청. stream 필드를 아예 넣지 않는다(서버 호환 최대화)."""
         payload: dict[str, Any] = {"model": model, "messages": messages, "max_tokens": max_tokens}
+        if response_format is not None:
+            payload["format"] = response_format
         started = time.perf_counter()
         meta: dict[str, Any] = {"transport": "http", "streaming": False}
         response = self.client.post(self.url, json=payload, timeout=timeout)
@@ -744,12 +757,16 @@ def call_once(
     messages: list[dict[str, str]],
     max_tokens: int,
     timeout: float,
+    response_format: object | None = None,
 ) -> dict[str, Any]:
     record: dict[str, Any] = {"model": model, "started_at": now_iso()}
     try:
-        text, ttft, elapsed, meta = transport.stream_chat(
-            model=model, messages=messages, max_tokens=max_tokens, timeout=timeout
-        )
+        call_kwargs = {
+            "model": model, "messages": messages, "max_tokens": max_tokens, "timeout": timeout,
+        }
+        if response_format is not None:
+            call_kwargs["response_format"] = response_format
+        text, ttft, elapsed, meta = transport.stream_chat(**call_kwargs)
         stream_complete = meta.get("streaming") is not True or meta.get("terminal") is True
         record.update(
             {

@@ -1,5 +1,34 @@
 # AIRI 로드맵 v4 — 실제 대화 사람 채점 중심 (2026-08-26 재개편; v3 2026-08-19)
 
+> **2026-08-28 10:21 KST 최신 인계 상태:** VOD 8막 storyline 자가 테스트는 최신 유효 완주
+> run-78까지 진행됐고, 유효 품질 통과 연속 횟수는 **0/3**이다. run-78은 32/32·8/8·1536
+> slot 후보, 반복·고중복·무관 지식 표식 0이지만 자동 감정 다양성과 수동 품질 검토에서 실패했다.
+> run-79는 slotwise 옵션 누락으로 무효, run-80은 인계 전환으로 19/32에서 중단되어 terminal
+> report가 없다. 사용자 요청으로 Goal은 Claude PC 인계를 위해 paused로 전환한다. 새 단일 진입점은
+> `진행중/AIRI-CLAUDE-HANDOFF-2026-08-28-VOD-STORYLINE.md`다. 구조 테스트 통과와 품질 통과를
+> 분리하며, adoption false·운영 flag OFF·GPU/파인튜닝·replay·pickup·S5 금지를 유지한다. 게시 전
+> 변경 검증은 storyline 8/8·proxy 411/411·broadcast rehearsal 85/85·broadcast_sim 105/105와
+> 문서 계약·diff-check가 통과했다. 종합 checkpoint는 기준 HEAD부터 있던 CI workflow 누락 2건을
+> 보고하고 실패했으며, 상세는 새 인계문에 보존했다.
+
+> **2026-08-28 01:32 KST 최신 VOD storyline self-test receipt:** 지식 DB `documents=153, chunks=296`과 memory/knowledge ON·ready health를 유지한 채 run-15~20을 별도 외부 산출물로 보존했다. 모든 회차가 `32/32`, `8/8` 순서, 32명 staged audience, 금지 시그니처 0, 빈 응답/서비스 오류 0이었다. run-20은 repeat/high-overlap/source-claim/irrelevant-marker가 모두 0이었지만 새 사건·이전 단서/다음 고리·감정 변화의 전 장면 품질 조건과 내부 표식 비노출 조건을 충족하지 못했다. run-20 이후 동일 응답 형식 문제의 즉흥 수정은 중단하고, 추가 튜닝은 새 접근을 먼저 정한 뒤 재개한다. 이는 채택·게이트 판정이 아니며 `adoption_authorized=false`, 운영 flag OFF, GPU/파인튜닝 금지, push 별도 승인을 유지한다. 외부 결과 root는 `D:\AIRI-Models\airi-human-eval\20260828-vod-storyline-run-15`부터 `run-20`이다.
+
+> **2026-08-28 00:25 KST 최신 receipt:** VOD 캡처의 저장된 31.64분 STT를 8막 줄거리로 구조화하고, 장면마다 맥락 연결형 시청자 모방 채팅 4개씩을 배치해 run-06 32턴을 완료했다. 8/8 장면·순서·금지 시그니처 0·빈 응답/서비스 오류 0으로 입력/전송 기준은 통과했지만, 품질 기준 `context_retention`은 사용자 직접 채점 전이며 formal adoption/gate 판정은 하지 않는다. 직접 검토 HTML: `D:\AIRI-Models\airi-human-eval\20260828-vod-storyline-run-06\vod-storyline-review.html`. 다음은 사용자 직접 32턴 채점이다.
+
+> **2026-08-27 23:46 KST M7 VOD 시뮬레이션 설계 결함 receipt:** 이전 77턴 실행은 `츕츕` 변형 3건이 입력에 남았고, 고정 fixture의 generic beat와 pickup 직전 45초 STT만 사용해 VOD 시작부터 끝까지의 줄거리를 연출하지 못했다. 기술적 exit 0은 보존하지만 의도한 방송 연출 품질의 근거로 채택하지 않는다. 다음은 전체 STT 시간축에서 장면/줄거리를 구성하고, 장면별 정제 채팅과 AIRI 방송인 역할을 명시하는 설계 검토다. adoption_authorized=false·운영 flag OFF·GPU/파인튜닝 금지·push 별도 승인은 유지한다.
+
+> **2026-08-27 22:34 KST Codex post-pull 상태 receipt:** 원격 `53befcb`로 fast-forward했고 저장소 내 권위 자산을 확인했다. 지식 배치 41/55/48건은 UTF-8 lint 144/144로 통과했으며 VOD 캡처는 chat 5,243·transcript 500·응답쌍 57행이다. 현재 runtime DB는 과거 상태 `documents=9, chunks=9`이고 새 배치는 아직 적재 전이다. 다음은 runtime 내부 절대경로 복사 → 세 배치 적재 → 고정 6종 probe이며, `goal_status=paused`·adoption_authorized=false·운영 flag OFF·GPU/파인튜닝 금지·push 별도 승인을 유지한다.
+
+> **2026-08-27 22:40 KST 적재 경계:** 기존 runtime DB의 9건과 새 144건은 제목 중복이 없으므로 기존 DB는 보존하고 `ollama-proxy/runtime/airi-knowledge-m7-real-dialogue-20260827.sqlite3`에 평가 배치를 적재한다.
+
+> **2026-08-27 22:41 KST 지식 적재 receipt:** 세 배치를 새 평가 DB에 `41+55+48`건 적용해 `documents=144, chunks=287`을 확인했고, 고정 6종 probe는 `6/6 (100%)`로 통과했다. 기존 9건 runtime DB는 보존했다.
+
+> **2026-08-27 22:43 KST 사용자 정정·다음 intent:** 최종 적재 대상은 기존 runtime DB(`documents=9, chunks=9`)다. 세 배치를 순서대로 적용하며 각 `inserted/updated/duplicate`를 기록한다. 기대 상한은 153건이고 범위 밖이면 원인을 규명하기 전 중단한다. 완료 후 memory ON·knowledge ON 스택의 `/health` 문서 수가 DB와 일치하는지 확인하고, 채점 전 비채택·다음 회차 적용 선언을 기록한다.
+
+> **2026-08-27 22:45 KST 지식 적재 receipt:** game `41/0/0`, meme `55/0/0`, culture `48/0/0` (`inserted/updated/duplicate`)을 기존 DB에 순서대로 적용했다. 최종 `documents=153, chunks=296`, 고정 probe `6/6 (100%)`로 기대 상한 153건 안이다. 다음은 memory ON·knowledge ON 스택 `/health` 대조다.
+
+> **2026-08-27 22:47 KST 실제 대화 스택 intent:** 신규 외부 memory DB를 사용해 memory ON·knowledge ON 스택을 기동한다. `KnowledgeDbPath`는 기존 적재 DB로 고정하고 `/health` knowledge documents=153 일치 확인 전에는 1턴도 시작하지 않는다. 채점 전 비채택·다음 회차 적용 선언과 사용자 직접 채점 방식을 유지한다.
+
 > **2026-08-27 19:xx KST 진척 — 지식 계층이 채워졌다.** 프로젝트 내내 `documents=0` 이던 자리가
 > **`documents=145, chunks=289`** 이고 실측 실패 질의 6종이 전부 회수된다. 픽업 점수제 이식은 개선
 > 없음으로 **트랙 종료**. 다음은 **계약 §1(b) 진짜 대화 세션 50턴+**. 상세 =
@@ -18,36 +47,45 @@
 
 ## 사용자용 현재 진행 대시보드
 
+> **2026-08-27 22:51 KST stack health receipt:** `/health` memory/knowledge enabled·ready, knowledge `documents=153, chunks=296`으로 DB와 일치, 신규 외부 memory `conversation_message=0`을 확인했다. proxy/latency/TTS가 listening 중이고 STT는 OFF다. 직접 대화 1턴 대기 상태다.
+
 > 이 절이 현재 Goal의 권위 있는 사용자용 요약이다. 수치는 로그 문구 하나가 아니라 실제
 > 산출물·PID·receipt를 대조해 갱신한다. 채택 게이트는 **실제 대화 사람 채점**
 > (`진행중/AIRI-REAL-DIALOGUE-HUMAN-EVAL-CONTRACT-2026-08-26.md`) 하나뿐이며, 2026-08-26 타계책(`진행중/AIRI-BREAKTHROUGH-PLAN-2026-08-26.md`)에 따라
 > 한 run에 한 변수만 바꾸고 복제로 노이즈를 잰다.
 
-- 현재 목표: 사용자 중단 요청에 따라 M7 후속을 일시정지하고 Claude에 인계 (`goal_status=paused`)
-- 현재 하는 일: S4 픽업 스킵·배치 구현을 default-off로 검증하고, 실험 flag `on/min2`로 고정 07 replay 3회와 대표 r2 rating-sheet를 완료했으며 사람 채점 JSON을 대기 중
-- 왜 하는가: run 04→05가 같은 모델·입력·샘플링에서 "음" 오프너 1→48, "?" 종결 20→78로 간 것은 런타임이
-  모델에게 자기 열화 출력을 되먹인 결과이고, 그 고리는 운영 proxy에도 있다. 고리를 끊기 전의 측정은 모델이
-  아니라 고리를 재므로, 먼저 고리를 통제하고 그 위에서 한 변수씩 사람 채점으로 판정한다. 파인튜닝은 2주 금지.
-- 현재 진행: **M7 7/11 정상 완료 + S2 `[F]` 종료·평가 미채택 + S4 `[P]` replay 완료·사람 채점 대기 — S0·S1·사람 채점·M7-10 가드·S6 입력 정합·run 07-r2 사람 판정·S3 평가 채택·S2 판정** — 2026-08-27 10:38 KST 기준
-- 정지 사유: S3 대표 r2 사람 채점은 3축 합성 3.0976·critical 0·filler 14.14%로 동결 게이트를 통과했다. S2 r2 사람 채점은 99/99턴·3축 2.2290·critical 0·filler 76.77%로 3축 기준 3.0 미달과 filler 기준 25% 초과가 확인되어 평가를 채택하지 않는다. S4 replay는 세 회차 exit 0·99턴·empty/service_error/invented_handle/polite_violation 0, `skipped=30`, `batched=0`이며 자동 채점은 하지 않는다. 대표 r2 사람 JSON 전에는 S4 채택·운영 flag 반영·S5·GPU를 대기한다. 사용자의 중단 요청으로 현재 goal은 paused이며, 이번 문서 배치의 commit/push만 수행한다.
-- 완료 조건: 각 단계는 같은 99턴 입력에서 복제 ≥2·사람 채점 1회로 사전 예측과 대조해 닫는다. M7 전체는
-  3축 합성(방송다움·맥락·반응) ≥ 3.0·critical 0·무의미 대꾸 ≤ 25%를 사람 채점으로 넘거나, S5까지 마친 뒤
-  "용량 병목"이 실측돼 파인튜닝 재진입 조건 충족 여부를 판정할 때 닫는다.
-- 다음 작업: Claude가 인계 후 실제 상태를 재대조하고, S4 대표 r2 `rating-sheet.html`에 사람 채점 JSON이 나타날 때까지 대기한다. `AIRI_BROADCAST_EXAMPLES`, S2 운영 기본값, S4 기본값은 모두 OFF로 유지한다.
-- 다음 결정: S4 사람 JSON이 도착하면 동결 게이트로 채택 여부만 판정하고, 운영 반영은 별도로 결정한다. GPU 학습·파인튜닝(2026-09-09까지 금지)은 계속 금지한다.
+- 현재 목표: VOD 유래 고정 8막에서 AIRI 반응 품질을 3회 연속 검증하는 Goal을 다른 PC Claude에 인계 (`goal_status=paused`)
+- 현재 하는 일: 최신 유효 완주 run-78, 무효 run-79, 중단 run-80과 현재 코드 경계를 문서화하고 모든 repository 작업물을 검증·commit·push한다.
+- 왜 하는가: 단순 replay는 여러 시청자의 관계 맥락을 만들지 못하므로, VOD에서 관찰한 방송 줄거리를 고정해
+  AIRI가 시청자 발화를 받아 이전 복선을 회수하고 다음 사건으로 전진시키는지를 직접 검증해야 한다.
+- 현재 진행: 고정 VOD 8막·32턴·금지 시그니처 0·외부 회차 보존·구조 측정 하네스는 완료했다. 자동 구조 게이트 통과 회차가 있었지만 수동 품질 검토를 통과한 회차는 없으며 연속 품질 통과는 **0/3**이다.
+- 정지 사유: 사용자가 다른 PC Claude로 작업을 넘기고 모든 repository 작업물을 push하도록 요청했다. run-80은 19/32에서 안전하게 중단했고, 현재 프롬프트 경계 변경은 완주 검증 전 상태다.
+- 완료 조건: 같은 고정 32턴 전체 시나리오에서 모든 장면이 시청자 입력을 구체적으로 받아 줄거리를 전진시키고, 이전 사건과 다음 고리를 연결하며, 반복·무관 지식·금지 시그니처·원방송 경험 도용이 0인 품질 회차를 수동 검토 포함 **3회 연속** 확보한다.
+- 다음 작업: 새 PC에서 저장소와 runtime DB를 read-only 대조하고 고정 probe 6/6을 확인한 뒤, 현재 `fictional-health-story-boundary` 변경을 fresh external run으로 처음부터 검증한다. run-79/80을 재사용하거나 이어 쓰지 않는다.
+- 다음 결정: 3회 연속 품질 통과 전에는 “리제 급 반응”·채택·운영 반영을 선언하지 않는다. GPU 학습·파인튜닝(2026-09-09까지 금지)은 계속 금지한다.
 
-> **2026-08-27 00:05 KST S4 intent checkpoint:** 위 결정 대기 상태를 갱신하여 S4 구현·오프라인 검증·고정 07 replay 3회를 자율 진행한다. 실험 flag만 `on/min2`이고 기본값과 off-path byte identity는 유지한다. `S2 [F]`·`S3 [x]`는 보존하며, 사람 rating JSON 전에는 S4 채택·운영 반영·S5·GPU·commit/push를 하지 않는다.
-  GPU 학습·파인튜닝(2026-09-09까지 금지)·push는 별도.
-- M7 정상 완료율: **7/11 (63.6%)** — `[x] / 활성 항목 전체`
-- M7 처리 종료율: **8/11 (72.7%)** — `([x] + [F]) / 활성 항목 전체`
-- M7 진행 지수: **8.5/11 (77.3%)** — `([x] + [F] + 0.5×[P] + 0.5×[~]) / 활성 항목 전체`
-- 전체 로드맵 정상 완료율: **67/97 (69.1%)**
-- 전체 로드맵 처리 종료율: **74/97 (76.3%)**
-- 전체 로드맵 진행 지수: **77.0/97 (79.4%)** — 110개 행 중 `[S]` 10개와 `[N/A]` 3개를 분모에서 제외; 2026-08-27 01:29 KST 기준
-- 마지막 실제 상태 대조: **2026-08-27 10:42 KST** — Claude handoff push `338e582`는 local/origin/remote main에 도달했고 worktree는 clean at post-push verification; replay/GPU PID 0, AIRI listener 없음,
-  Ollama listener `127.0.0.1:11434`, S2/S3/S4 r1~r3 report/health/review/rating-sheet는 저장소 밖에 유지
+> 현재 인계 불변식: `adoption_authorized=false`, 운영 flag OFF, GPU 학습·파인튜닝은
+> 2026-09-09까지 금지이며 다음 PC의 commit/push도 별도 사용자 승인이 필요하다.
+- M7 정상 완료율: **9/16 (56.3%)** — 현행 VOD Goal 5행과 기존 M7 실험 11행의 `[x] / 활성 항목 전체`
+- M7 처리 종료율: **10/16 (62.5%)** — `([x] + [F]) / 활성 항목 전체`
+- M7 진행 지수: **11.5/16 (71.9%)** — `([x] + [F] + 0.5×[P] + 0.5×[~]) / 활성 항목 전체`
+- M7 기존 체크리스트 정상 완료율: **6/11 (54.5%)** — S3 절대 판정 강등 반영
+- M7 기존 체크리스트 처리 종료율: **7/11 (63.6%)**
+- M7 기존 체크리스트 진행 지수: **8/11 (72.7%)** — S3·S4 `[P]` 반영
+- 전체 로드맵 정상 완료율: **69/102 (67.6%)**
+- 전체 로드맵 처리 종료율: **76/102 (74.5%)**
+- 전체 로드맵 진행 지수: **80.0/102 (78.4%)** — 115개 행 중 `[S]` 10개와 `[N/A]` 3개를 분모에서 제외; 2026-08-28 10:21 KST 기준
+- 마지막 실제 상태 대조: **2026-08-28 10:21 KST** — pre-publication local/origin/remote main `53befcb` exact, `/health` memory/knowledge enabled·ready 및 knowledge `153/296`, model digest pinned, 운영 관련 실험 flag OFF, proxy/latency/TTS/GPT-SoVITS/Ollama listener 정상, `run_vod_storyline` PID 0. run-80은 19/32 중단이며 terminal report가 없다.
 
 ### 현재 주요 작업 단계(M7) 체크리스트
+
+- [x] 저장소 VOD 자산·지식 배치 확인, runtime 지식 `153/296` 및 고정 probe `6/6`
+- [x] 고정 8막·32턴 장면 입력과 방송 사적 약속어 제거 계약
+- [x] 외부 회차별 transcript/report/HTML 보존 및 구조·반복·맥락·감정·금지 지표 하네스
+- [P] AIRI 반응 품질 자가 테스트 — 최신 유효 완주 run-78, 수동 포함 품질 통과 **0/3**
+- [Q] Claude PC 재개 — runtime DB 대조 후 현재 미검증 변경을 fresh run으로 처음부터 실행
+
+### 기존 M7 실험 체크리스트
 
 - [x] S0 복제 측정 — run 05 구성 3회 재생으로 시그니처 평균·SD, 픽업 결정성 확인, `summarize --baseline` (M7-1) — 2026-08-26 16:59
   `05r1..r3` exit 0: "?" 종결 78/71/15/84·"음" 48/56/1/89(SD ≈30/99, n=1 비교 무효), 픽업 99 id 동일, seed로도 생성 비재현; `f748cae` 3축 합성·`--baseline`
@@ -64,7 +102,7 @@
   (`진행중/AIRI-M7-S0-S1-RECEIPT-2026-08-26.md` §5)
 - [x] run 07-r2 사람 채점 (M7-11) — `ratings-codex-viewer.json` 99/99턴, run 04 대비 방송다움 +0.6465·맥락 +1.4848·반응 +0.9091이나 3축 합성 2.77<3.0, critical 1, filler 22.22%(기준 ≤5%)로 돌파·07 평가 기본 채택 실패; 다음 1변수는 사용자 결정
 - [F] S2 오프너 중복 재샘플 — 초안 첫 2어절이 직전과 같고 둘 다 '?'면 seed+1·temperature 0.9로 1회 재샘플 (M7-4) — default-off 구현·`/v1/chat/completions`와 `/api/chat` stream/non-stream red/green 회귀 및 07 replay 3회 완료; r2 사람 채점 99/99턴에서 3축 2.2290·critical 0·filler 76.77%로 돌파 게이트 실패·평가 미채택
-- [~] S3 예시 4쌍 — **2026-08-27 `[x]`→`[~]` 강등: 채택 근거 상실(측정 불가)**. 3축 3.0976 은 ①사람 전수 채점이 아니라 AI 채점 + 사용자 승인이고 ②그 값의 1/3 을 차지하는 맥락 유지 축이 입력 구조상 측정 불가이며 ③절대 기준선 3.0 자체가 이 입력에서 도달 불가능하다. 구현·회귀·replay 는 그대로 유효하고 회차 간 비교도 유효하다 — 무효인 것은 "3.0 을 넘었으니 채택" 이라는 절대 판정이다. 상세 = `진행중/AIRI-EVAL-INPUT-CONTEXT-AUDIT-2026-08-27.md` §10. 이하는 원 기록: 규칙 문장 대신 반말 U/A 예시를 live-broadcast 요청에만 flag 삽입 (M7-5) — seam·회귀·07 구성 3회 replay(exit 0)·중앙값 대표 r2 사람 채점 완료; 3축 3.0976·critical 0·filler 14.14%로 평가 게이트 통과. 운영 기본값 OFF (S2 뒤)
+- [P] S3 예시 4쌍 — **2026-08-27 `[x]`→`[P]` 강등: 구현·회귀·회차 간 비교는 보존하지만 절대 채택 판정은 측정 불가**. 3축 3.0976 은 ①사람 전수 채점이 아니라 AI 채점 + 사용자 승인이고 ②그 값의 1/3 을 차지하는 맥락 유지 축이 입력 구조상 측정 불가이며 ③절대 기준선 3.0 자체가 이 입력에서 도달 불가능하다. `[~]`는 실제 실행 중에만 쓰므로 인계 정지 상태에서는 `[P]`가 맞다. 상세 = `진행중/AIRI-EVAL-INPUT-CONTEXT-AUDIT-2026-08-27.md` §10. 운영 기본값 OFF.
 - [P] S4 픽업 스킵·배치 — 내용 토큰 임계와 합창 batched_chat (M7-6) — 구현·계약·07 replay r1..r3 완료, q_end 중앙값 대표 r2 사람 JSON 대기; 세 회차 `skipped=30`, `batched=0`, 자동 품질 판정 없음
 - [ ] S5 모델 축 1회 진단 — qwen3:8b, TTS 미기동·전량 GPU·think off·같은 샘플링·seed 2개, 채택 아님 (M7-7) — 06b 구성 위에서
 - [x] 민감 루머 질문 "응" 선행 시인 금지 가드 (M7-10) — 2026-08-26 19:10 사용자 승인, `f48b1ed` `deflect_leading_affirmation`(계층 마지막 단계,
@@ -83,8 +121,9 @@
   처리 종료에는 포함한다. 위 비율은 현재 M7의 11개 분리 행을 기준으로 계산했다.
 - 전체 로드맵의 과거 raw checkbox 55행을 코드·테스트·receipt·commit·사용자 결정과 대조했다.
   이 중 노후 상태 31개를 정정하고 복합 항목 분리로 12행을 추가했으며, 2026-08-26 M5 활성화로
-  M5 11행·M6 11행·M7 11행을 더해 전체 110행이 됐다(2026-08-26 v4·타계책). 상태별 개수는 `[x]` 67, `[~]` 0, `[Q]` 1, `[ ]` 1, `[P]` 7,
-  `[B]` 10, `[D]` 5, `[F]` 6, `[S]` 10, `[N/A]` 3이며 `[?]`는 없다.
+  M5 11행·M6 11행·M7 11행과 현행 VOD Goal 5행을 포함해 전체 115행이다. 2026-08-28
+  실제 파싱 기준 상태별 개수는 `[x]` 69, `[~]` 0, `[Q]` 2, `[ ]` 1, `[P]` 8,
+  `[B]` 10, `[D]` 5, `[F]` 7, `[S]` 10, `[N/A]` 3이며 `[?]`는 없다.
 
 ### 직전 단계(M6) 체크리스트 — 2026-08-26 16:55 KST 타계책 확정으로 종결
 
