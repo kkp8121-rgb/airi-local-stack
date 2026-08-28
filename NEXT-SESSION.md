@@ -10,7 +10,8 @@
 > OFF, GPU/파인튜닝·replay·pickup·S5 금지를 유지한다. 게시 전 변경 검증은 storyline 8/8·proxy
 > 411/411·broadcast rehearsal 85/85·broadcast_sim 105/105와 문서 계약·diff-check가 통과했다.
 > 종합 checkpoint는 기준 HEAD부터 존재한 CI workflow 누락 2건을 보고하고 실패했으며 상세는
-> 인계문에 기록했다.
+> 인계문에 기록했다. VOD storyline 구현·테스트·현행 문서 배치 commit은
+> `b5abd7843b2198861ca885d565c831c9deb548ef`이다.
 
 > **2026-08-28 01:32 KST 최신 상태:** 사용자가 재개한 VOD storyline 자가 테스트는 run-15~20까지 완료됐고, 각 회차 transcript/report/review HTML은 `D:\AIRI-Models\airi-human-eval\20260828-vod-storyline-run-15`~`run-20`에 보존됐다. run-20은 구조 기준 `32/32·8/8·서명 0·오류 0`, 반복·고중복·출처 경험 도용·무관 지식 표식 `0`이지만 품질 기준은 실패했다(새 사건·callback/next-hook·emotion 전수 미달, T1 내부 표식 노출, 단문/질문 종결). 추가 즉흥 prompt 수정은 중단했으며 다음 세션은 새 접근을 설계한 뒤에만 재개한다. 지식 DB `153/296`, memory/knowledge ON·ready, live capability/운영 flag OFF, adoption false, GPU·파인튜닝 금지, commit/push 금지는 유지한다.
 

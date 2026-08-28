@@ -75,7 +75,7 @@
 - 전체 로드맵 정상 완료율: **69/102 (67.6%)**
 - 전체 로드맵 처리 종료율: **76/102 (74.5%)**
 - 전체 로드맵 진행 지수: **80.0/102 (78.4%)** — 115개 행 중 `[S]` 10개와 `[N/A]` 3개를 분모에서 제외; 2026-08-28 10:21 KST 기준
-- 마지막 실제 상태 대조: **2026-08-28 10:21 KST** — pre-publication local/origin/remote main `53befcb` exact, `/health` memory/knowledge enabled·ready 및 knowledge `153/296`, model digest pinned, 운영 관련 실험 flag OFF, proxy/latency/TTS/GPT-SoVITS/Ollama listener 정상, `run_vod_storyline` PID 0. run-80은 19/32 중단이며 terminal report가 없다.
+- 마지막 실제 상태 대조: **2026-08-28 10:24 KST** — 구현 배치 local main `b5abd7843b2198861ca885d565c831c9deb548ef`, pre-push origin/remote main `53befcb26ec213f02f8c3195d1777d05cbfaccea`; `/health` memory/knowledge enabled·ready 및 knowledge `153/296`, model digest pinned, 운영 관련 실험 flag OFF, proxy/latency/TTS/GPT-SoVITS/Ollama listener 정상, `run_vod_storyline` PID 0. run-80은 19/32 중단이며 terminal report가 없다.
 
 ### 현재 주요 작업 단계(M7) 체크리스트
 
