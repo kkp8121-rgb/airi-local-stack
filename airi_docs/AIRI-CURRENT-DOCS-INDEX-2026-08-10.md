@@ -1,6 +1,17 @@
 # AIRI Documentation Index
 
-최종 현행화 2026-08-27 10:38 KST (M7 S4 후속 모니터링 중단·Claude 인계). S2 `[F]`, S3 `[x]`,
+최종 현행화 2026-09-01 15:40 KST (M8 Stage 1·2 소진, GPU PC 인계). 새 단일 진입점은
+`진행중/AIRI-GPU-PC-HANDOFF-2026-09-01-STAGE3.md`다. 수동 품질 통과 0/3이며 남은 단계는
+CUDA가 필요한 Stage 3(Mi:dm 교정 파인튜닝)뿐이다. 미커밋 12건이 남아 있어 승인된 push가
+선행 조건이다. 운영 flag OFF·adoption false·모델 태그 유지는 그대로다.
+
+직전 현행화 2026-08-28 15:30 KST (검토 PC — VOD storyline validator 튜닝 트랙 사용자 결정
+종료). run-81/82 완주·수동 실패, 채점기 부풀림 실증, 유효 품질 통과 0/3. 단일 근거 문서는
+`진행중/AIRI-VOD-STORYLINE-CEILING-EVIDENCE-2026-08-28.md`, 인계문
+`진행중/AIRI-CLAUDE-HANDOFF-2026-08-28-VOD-STORYLINE.md`는 종결 주석 부착. 다음은 대안 기법
+리서치 후 결정 큐 24의 사용자 선택이며 운영 flag·S5·GPU·파인튜닝 금지는 유지된다.
+
+직전 현행화 2026-08-27 10:38 KST (M7 S4 후속 모니터링 중단·Claude 인계). S2 `[F]`, S3 `[x]`,
 S4 `[P]`이며 S4 대표 r2 사람 채점 JSON을 기다린다. 새 단일 진입점은
 `진행중/AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md`다. 이번 문서 배치의 commit/push는
 사용자가 명시 승인했으며 운영 flag·S5·GPU·파인튜닝은 금지한다.
@@ -56,7 +67,11 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
 
 ## 진행중 — 현행 계약
 
-- `AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md` — **현재 단일 진입점(2026-08-27 Claude 인계).** S2/S3/S4 상태, S4 대표 평가표 대기, JSON 도착 시 검증 순서와 금지 경계를 기록한다.
+- `AIRI-GPU-PC-HANDOFF-2026-09-01-STAGE3.md` — **현재 단일 진입점(2026-09-01, GPU PC).** Stage 1·2 소진 사실, 폐기된 접근 4종(재시도 금지), 채점기 부풀림 경고, Stage 3 처방(Small Model Learnability Gap), 평가 환경 재현 함정(PowerShell 5.1·8초 마감·digest 불일치), 재사용 자산, 판정 프로토콜, 미커밋 12건, 금지선, 제출용 Goal.
+- `AIRI-METHOD-RESEARCH-2026-08-28.md` — 대안 기법 리서치(논문·GitHub/HF, 링크 포함)와 권고 경로.
+- `AIRI-VOD-STORYLINE-CEILING-EVIDENCE-2026-08-28.md` — **한계 실증 근거 문서(2026-08-28).** VOD storyline validator 튜닝 트랙 종료의 측정 기반·채점기 부풀림 실증·결함 분류·소형 모델 한계 판단·남은 선택지 4종·살아남는 자산.
+- `AIRI-CLAUDE-HANDOFF-2026-08-28-VOD-STORYLINE.md` — (종결 주석 부착) 2026-08-28 인계문. "첫 실행"은 run-81/82로 이행 완료, §4 재개 명령은 더 이상 실행하지 않는다.
+- `AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md` — (대체됨) 2026-08-27 Claude 인계. S2/S3/S4 상태, S4 대표 평가표 대기, JSON 도착 시 검증 순서와 금지 경계를 기록한다.
 - `AIRI-CODEX-HANDOFF-2026-08-26-M7.md` — (이력) M7 증명 7건, replay 재현 명령·sha, 금지 목록.
 - `AIRI-M7-S0-S1-RECEIPT-2026-08-26.md` — M7 S0·S1 receipt: 복제 노이즈(n=1 무효), 되먹임 3채널 차단 시 붕괴 0/3, 채점 대상 06b-r3.
 - `AIRI-BREAKTHROUGH-PLAN-2026-08-26.md` — **현재 진입점(2026-08-26 타계책).** 이분법 대신 되먹임 고리·재료 수용·측정 규율; S0~S5 순서, 돌파 정의, 금지 목록.

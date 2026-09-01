@@ -1,6 +1,42 @@
 # AIRI 다음 세션 안내
 
-> **2026-08-28 10:21 KST Claude PC 인계:** 단일 진입점은
+> **2026-09-01 15:40 KST — Stage 1·2 소진, GPU PC 인계. 단일 진입점은
+> `airi_docs/진행중/AIRI-GPU-PC-HANDOFF-2026-09-01-STAGE3.md`.**
+> M8 Stage 1(추론 시점 4레버)과 Stage 2(서빙 계층 토큰 억제)를 모두 소진했고 **수동 품질
+> 통과는 0/3**이다. 닫힌 것: beat 낭독 10/96→0/96, 세계관 붕괴 1→0, 질문 종결 `?`
+> 11턴→**0턴**(구조적). 닫히지 않은 것: 암묵 자기 경험·조언 프레이밍·역할 전도·beat 모순·
+> 반복. 결론은 **서빙 계층을 완전히 통제해도 형식만 닫히고 의미는 닫히지 않는다**이며,
+> 남은 단계는 학습(Stage 3)뿐인데 검토 PC에 **CUDA가 없어 물리적으로 실행 불가**다.
+> 자동 `quality_pass`는 채점기 부풀림 때문에 판정자가 아니다 — 판정은 32턴 수동 7항목.
+> **미커밋 12건이 남아 있으므로 승인된 push 전에는 GPU PC에서 pull하지 말 것.**
+> 재사용 자산: 고정 32턴 시나리오, run-89 형태 러너, `llama_server_shim.py`(+18 테스트),
+> 실측 534토큰 차단 집합, 지식 배치 144건(재생성 금지).
+
+> **2026-08-28 16:10 KST 검토 PC — M8 개설(이력):**
+> 사용자 결정으로 전 실험 게이트 해제 + **모델 변경은 가장 마지막**(Mi:dm 한국어 능력).
+> M8 순서: Stage 1 추론 시점 레버(1a CRANE식 출력 격리→1b 스토리 캐릭터 프레이밍→1c 정제
+> 예시→1d depth injection, 하나씩 시험·조합 누적, 최선 조합 재현 2회로 3연속 판정) →
+> Stage 2 llama-server(logit_bias·최소 GBNF) → Stage 3 Mi:dm 교정 파인튜닝(GPU PC) →
+> Stage 4 모델 축 진단(최후순위). 판정 = 자동 바닥 지표 + 32턴 수동 7항목, 검증기 적층
+> 재개 금지. 체크리스트·관측 프로토콜은 `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md` M8 절,
+> 근거는 `진행중/` 한계 실증·대안 기법 리서치 2종. 다음 실행 = M8-1.
+
+> **2026-08-28 15:30 KST 검토 PC — validator 튜닝 트랙 종료(사용자 결정), M8로 이행:**
+> 검토 PC가 인계를 이행했다: pull `5f4bd8e` 일치, 지식 DB 0→`144/287` 적재·probe 6/6
+> (Codex PC 153과의 차 9건은 기존 문서분으로 규명), digest fail-closed는 신형 Ollama
+> manifest 직렬화 차이(가중치 byte-identical)로 규명해 명시 핀으로 기동, 런처는
+> PowerShell 5.1 필수(pwsh7 Int64 함정). run-81(`fictional-health-story-boundary`)과
+> run-82(`beat-verbatim-recitation-reject`)를 turn 1부터 완주 — 겨눈 결함은 닫혔지만
+> (beat 낭독 10/96→0/96) 수동 검토는 두 번 다 실패했고, **자동 quality_pass 이력이 채점기
+> 부풀림(beat 복창 가점) 위의 값**이었음이 실증됐다. 사용자 결정 "지금 즉시 중단·정리"로
+> run-83은 약 12/32 중단(무근거), 유효 품질 통과 **0/3**으로 트랙 종료. 단일 근거 문서는
+> `airi_docs/진행중/AIRI-VOD-STORYLINE-CEILING-EVIDENCE-2026-08-28.md`(결함 분류·한계 판단·
+> 남은 선택지 4종). 현재는 사용자 Goal로 대안 기법(few-shot·제약 디코딩·steering·RP 특화
+> 모델) 광범위 리서치 진행 중이며, 다음 회차는 결정 큐 24의 사용자 선택 뒤에만 시작한다.
+> worktree dirty는 검증된 validator 2건 + 문서 배치(commit/push 별도 승인 대기).
+> adoption false·운영 flag OFF·GPU/파인튜닝(2026-09-09까지)·replay/pickup/S5 금지 유지.
+
+> **2026-08-28 10:21 KST Claude PC 인계(이행 완료 — 위 15:30 항목이 대체):** 단일 진입점은
 > `airi_docs/진행중/AIRI-CLAUDE-HANDOFF-2026-08-28-VOD-STORYLINE.md`다. VOD 8막·장면별
 > 시청자 입력 32턴·금지 시그니처 제거·구조 측정 하네스는 준비됐지만 “리제 급 반응” 품질 통과는
 > 아직 **0/3회**다. 최신 유효 완주 run-78은 반복·고중복·무관 지식 0을 유지했지만 감정 다양성 및
