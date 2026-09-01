@@ -365,3 +365,100 @@ def test_story_mode_is_wired_into_the_runner_and_its_retry_cue():
     assert storyline.build_story_cue(beat, "꿈 얘기 더 해줘") in retry
     assert "직전 출력은 검증에 실패했다" in retry
     assert "시청자에게 조언하거나" in retry
+
+
+def test_spine_mode_leaves_only_the_viewer_reaction_slot_to_the_model():
+    # M8-9: Stage 3 closed the alignment defects but not the comprehension
+    # defects, and the two plot-carrying slots are exactly where comprehension
+    # failed. Spine mode hands those to authored text and keeps the one slot
+    # the trained model does well.
+    assert storyline.SPINE_FIELDS == ("event_callback_emotion", "next_hook")
+    assert storyline.SPINE_GENERATED_FIELDS == ("viewer_reaction",)
+    assert set(storyline.SPINE_FIELDS) | set(storyline.SPINE_GENERATED_FIELDS) == set(
+        storyline.SLOTWISE_FIELDS
+    )
+    args = storyline.parser().parse_args([
+        "--rewrite-format", "spine", "--spine", "spine.json",
+        "--report", "report.json", "--review-html", "review.html",
+    ])
+    assert args.rewrite_format == "spine"
+    assert args.spine == Path("spine.json")
+
+
+def test_repository_spine_covers_every_turn_and_passes_the_slot_contract():
+    story = storyline.load_storyline(HERE / "vod_storyline_20260827.json")
+    beats = [beat for scene in story["scenes"] for beat in scene["turn_beats"][:4]]
+    spine = storyline.load_spine(HERE / "vod_storyline_20260827_spine.json", beats)
+    assert sorted(spine) == list(range(1, 33))
+    for index, values in spine.items():
+        for field in storyline.SPINE_FIELDS:
+            # A spine line the model itself would have been rejected for is not
+            # a fair substitute, so it is held to the same surface contract.
+            assert storyline.parse_slot_output(values[field], beats[index - 1])
+
+
+def test_spine_loader_rejects_a_line_that_breaks_the_slot_contract(tmp_path):
+    story = storyline.load_storyline(HERE / "vod_storyline_20260827.json")
+    beats = [beat for scene in story["scenes"] for beat in scene["turn_beats"][:4]]
+    import json
+    rows = []
+    for index in range(1, 33):
+        rows.append({
+            "turn_index": index,
+            "event_callback_emotion": "그 사람은 조용히 문을 닫았어.",
+            # Advice register: the runner rejects this from the model, so the
+            # loader must reject it from the spine too.
+            "next_hook": "그럴 땐 병원부터 가보는 게 좋아.",
+        })
+    path = tmp_path / "spine.json"
+    path.write_text(json.dumps({"turns": rows}, ensure_ascii=False), encoding="utf-8")
+    try:
+        storyline.load_spine(path, beats)
+    except SystemExit as exc:
+        assert "fails the slot contract" in str(exc)
+    else:
+        raise AssertionError("spine loader accepted an out-of-story line")
+
+
+def test_spine_flag_and_format_must_be_used_together():
+    parser = storyline.parser()
+    only_flag = parser.parse_args([
+        "--spine", "spine.json",
+        "--report", "report.json", "--review-html", "review.html",
+    ])
+    assert only_flag.rewrite_format == "spoken" and only_flag.spine == Path("spine.json")
+    only_format = parser.parse_args([
+        "--rewrite-format", "spine",
+        "--report", "report.json", "--review-html", "review.html",
+    ])
+    assert only_format.spine is None
+
+
+def test_spine_mode_leaves_the_generated_cue_untouched():
+    # All three cue interventions against the M8-9 residual were discarded by
+    # measurement, so the spine must change what the slot is COMPOSED WITH, not
+    # what it is TOLD. The cue for the generated slot has to stay byte-identical
+    # to the slotwise carrier, and the spine text must never reach the prompt.
+    beat = {"new_event": "x", "callback": "y", "emotion": "불안", "next_hook": "w"}
+    tail = ("그 사람은 이불깃을 움켜쥐었어.", "그리고 목 위쪽이 당겨왔어.")
+    plain = storyline.build_slotwise_cue("viewer_reaction", beat)
+    aware = storyline.build_slotwise_cue("viewer_reaction", beat, following=tail)
+    assert aware == plain
+    for sentence in tail:
+        assert sentence not in aware
+    retry_plain = storyline.build_slotwise_retry_cue("viewer_reaction", beat)
+    retry_aware = storyline.build_slotwise_retry_cue("viewer_reaction", beat, following=tail)
+    assert retry_aware == retry_plain
+
+
+def test_slot_parser_rejects_reciting_the_spine_it_was_shown():
+    # Measured on the spine-aware run: showing the spine made the model copy it
+    # on 9 of 32 turns, up to a 50-character contiguous run, so the same rule
+    # and threshold that closed beat recitation now covers the spine text.
+    beat = {"new_event": "x", "callback": "y", "emotion": "z", "next_hook": "w"}
+    spine = ("그 사람은 불안을 삼키듯 이불깃을 움켜쥐었어.",)
+    assert storyline.parse_slot_output(spine[0], beat) == spine[0]
+    assert storyline.parse_slot_output(spine[0], beat, spine) == ""
+    # A short shared phrase is a named entity, not recitation, and stays legal.
+    short = "이불깃이 축축했어."
+    assert storyline.parse_slot_output(short, beat, spine) == short

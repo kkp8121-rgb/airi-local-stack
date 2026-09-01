@@ -1,6 +1,23 @@
 # AIRI 로드맵 v4 — 실제 대화 사람 채점 중심 (2026-08-26 재개편; v3 2026-08-19)
 
-> **2026-08-28 16:10 KST 최신 — M8(스택·기술 한계 돌파) 개설, 전 실험 게이트 해제:**
+> **2026-08-30 13:30 KST 저장공간 정리 완료 receipt:** 경로·참조·수량·바이트 불변식을
+> 삭제 직전에 재검증한 뒤 3,992개 대상을 영구 삭제했고 실패는 0개다. 정리 명령이 직접 측정한
+> 회수량은 C: **124.164 GiB**, D: **101.256 GiB**, 합계 **225.420 GiB**이며 최종 여유 공간은
+> C: **170.950 GiB**, D: **327.343 GiB**다. 활성 `midm-airi:2.0-mini` manifest SHA와 네 blob,
+> KURE-v1·STT·GPT-SoVITS·참조 음성·memory/knowledge DB, Mi:dm/Kanana 원본, venv, 실제 채팅·사람
+> 평가·report/manifest는 보존했다. 지정한 미채택 weight·checkpoint·orphan·cache·log/tmp는 0개
+> 남았다. work-continuity/dashboard와 주요 오프라인 회귀는 통과했다. 종합 checkpoint의 기존 독립
+> 결함 세 종류(durability terminal timing, CI matrix 누락 3건, input-safety policy hash mismatch)는
+> 이 저장공간 작업에서 수정하지 않았다. 서비스·운영 모델·DB·개인 데이터·commit/push 변경은 없다.
+
+> **2026-08-30 13:02 KST 저장공간 정리 intent:** 사용자가 AIRI 관련 미사용 모델·캐시·임시
+> 산출물의 영구 삭제를 요청했다. 실제 대조 결과 HEAD/local/origin은 `5f4bd8e`로 일치하고
+> 사전 worktree는 clean이며 AIRI/Ollama 프로세스와 소유 포트 listener는 0개다. C: 여유 공간은
+> 8.54 GiB로 부족하다. 기존 VOD storyline Goal은 재개하지 않고, 현재 설정이 참조하는 LLM·TTS·
+> STT·GPT-SoVITS 자산과 DB·개인 오디오·원본 평가 데이터는 보존한다. 정확한 경로·용량·참조를
+> 확인한 미사용 모델·캐시·tmp만 삭제하고, 삭제 전후 용량과 기본 검증을 receipt로 남긴다.
+
+> **2026-08-28 16:10 KST — M8(스택·기술 한계 돌파) 개설, 전 실험 게이트 해제:**
 > 사용자 결정 두 건을 반영했다: ①"모든 금지를 해제시키고 할 수 있는 건 다 해보자" —
 > S5·모델 축·파인튜닝 승인 게이트 해제(단, 검토 PC는 CUDA 부재로 파인튜닝 물리 불가;
 > 원문/키의 저장소 반입 금지와 push 매회 승인은 유지) ②"모델 변경은 가장 마지막" —

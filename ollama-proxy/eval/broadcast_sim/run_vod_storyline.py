@@ -71,6 +71,18 @@ SLOTWISE_FIELDS = (
     "event_callback_emotion",
     "next_hook",
 )
+# M8-9 deterministic spine. Stage 3 closed the alignment defects (advice,
+# honorifics, question endings, demo dependence, role inversion, borrowed
+# experience) but left the comprehension defects untouched: beat contradiction,
+# fabrication against the storyline, subject inversion and one idea repeated
+# across three sentences. Those are exactly the two slots that must carry the
+# plot forward, so the spine speaks them from authored lines and the model is
+# left with the one slot it now does well.
+SPINE_FIELDS = (
+    "event_callback_emotion",
+    "next_hook",
+)
+SPINE_GENERATED_FIELDS = ("viewer_reaction",)
 SLOT_MAX_TOKENS = 96
 SLOT_CANDIDATE_COUNT = 16
 # A slot may name the beat's entities, but reciting a long contiguous span of the
@@ -214,6 +226,39 @@ def sanitize_rows(rows: Iterable[dict[str, Any]]) -> tuple[list[dict[str, Any]],
             1 for row in kept if signature_reason(str(row.get("text", "")))
         ),
     }
+
+
+def load_spine(path: Path, beats: list[dict[str, Any]]) -> dict[int, dict[str, str]]:
+    """Load and fail-closed verify the deterministic spine against its beats.
+
+    The spine is fixed text, so it is held to the same surface contract the
+    model output is: every line must survive parse_slot_output for its own beat.
+    A spine that could not be spoken by the model is not a fair substitute.
+    """
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"invalid spine JSON: {path}") from exc
+    rows = payload.get("turns") if isinstance(payload, dict) else None
+    if not isinstance(rows, list) or len(rows) != len(beats):
+        raise SystemExit(f"spine must contain exactly {len(beats)} turns")
+    spine: dict[int, dict[str, str]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            raise SystemExit("spine turn is not an object")
+        index = row.get("turn_index")
+        if not isinstance(index, int) or not 1 <= index <= len(beats) or index in spine:
+            raise SystemExit("spine turn_index must be unique and within the storyline")
+        values: dict[str, str] = {}
+        for field in SPINE_FIELDS:
+            text = row.get(field)
+            if not isinstance(text, str) or not text.strip():
+                raise SystemExit(f"spine turn {index} is missing {field}")
+            if not parse_slot_output(text, beats[index - 1]):
+                raise SystemExit(f"spine turn {index} {field} fails the slot contract")
+            values[field] = text
+        spine[index] = values
+    return spine
 
 
 def load_storyline(path: Path) -> dict[str, Any]:
@@ -579,7 +624,8 @@ def build_structured_rewrite_cue(beat: dict[str, Any], draft: str) -> str:
     )
 
 
-def build_slotwise_cue(field: str, beat: dict[str, Any], viewer_text: str = "") -> str:
+def build_slotwise_cue(field: str, beat: dict[str, Any], viewer_text: str = "",
+                       following: tuple[str, ...] = ()) -> str:
     instructions = {
         "viewer_reaction": (
             "시청자 채팅의 구체적인 핵심을 바로 받아치는 한 문장"
@@ -609,6 +655,18 @@ def build_slotwise_cue(field: str, beat: dict[str, Any], viewer_text: str = "") 
         f"출력 예시(소재는 무시하고 형식·말투만 따라라): {SLOT_FORMAT_DEMOS[field]}\n"
         if field in SLOT_FORMAT_DEMOS else ""
     )
+    # Three cue interventions were tried against the M8-9 residual and all three
+    # were discarded by measurement. Showing the spine text produced verbatim
+    # copying on 9 of 32 turns (runs up to 50 characters); adding the recitation
+    # guard closed the copying but the same content returned as paraphrase on
+    # roughly as many turns; narrowing the slot's job by instruction alone left
+    # borrowed experience unchanged and raised contradictions from 2 turns to 4.
+    # That is the third reproduction of the standing pattern, after the M8-3 demo
+    # leakage and the M8-4 depth injection: material or instruction added to this
+    # cue makes a 2.3B model worse. The cue is therefore left exactly as the
+    # slotwise carrier had it, and `following` survives only to feed the spine
+    # recitation guard in parse_slot_output.
+    following_line = ""
     return (
         "[방송 대사 슬롯 생성]\n"
         "이 호출은 최종 대사 전체가 아니라 아래 한 슬롯만 생성한다. "
@@ -631,6 +689,7 @@ def build_slotwise_cue(field: str, beat: dict[str, Any], viewer_text: str = "") 
         + emotion_instruction
         + viewer_reference
         + demo_line
+        + following_line
         + f"다음 고리: {beat['next_hook']}"
         + (
             f"\n마지막 확인: 이 한 문장에는 새 사건과 회수할 단서를 연결하고, 감정 핵심어 "
@@ -641,11 +700,12 @@ def build_slotwise_cue(field: str, beat: dict[str, Any], viewer_text: str = "") 
     )
 
 
-def build_slotwise_retry_cue(field: str, beat: dict[str, Any], viewer_text: str = "") -> str:
+def build_slotwise_retry_cue(field: str, beat: dict[str, Any], viewer_text: str = "",
+                             following: tuple[str, ...] = ()) -> str:
     # Any depth reminder must stay last, so lift it off before the retry notes
     # and re-append it. Guard on a non-empty reminder: slicing by -0 would
     # otherwise wipe the whole cue.
-    base = build_slotwise_cue(field, beat, viewer_text)
+    base = build_slotwise_cue(field, beat, viewer_text, following)
     if SLOT_DEPTH_REMINDER and base.endswith(SLOT_DEPTH_REMINDER):
         base = base[: -len(SLOT_DEPTH_REMINDER)]
     return (
@@ -724,7 +784,8 @@ def recites_beat(body: str, beat: dict[str, Any] | None) -> bool:
     )
 
 
-def parse_slot_output(raw: str, beat: dict[str, Any] | None = None) -> str:
+def parse_slot_output(raw: str, beat: dict[str, Any] | None = None,
+                      spine_lines: tuple[str, ...] = ()) -> str:
     body, _ = ab.split_operational_protocol(raw)
     body = normalized_text(body)
     if (
@@ -735,6 +796,14 @@ def parse_slot_output(raw: str, beat: dict[str, Any] | None = None) -> str:
         or SOURCE_EXPERIENCE_RE.search(body)
         or OUT_OF_STORY_VOICE_RE.search(body)
         or recites_beat(body, beat)
+        # Showing the generated slot the spine text made a 2.3B model copy it:
+        # 4 verbatim and 4 near-verbatim of 32 turns, up to a 50-character run.
+        # The spine is director text now, so it inherits the recitation rule that
+        # closed beat recitation, at the same measured 14-character threshold.
+        or any(
+            longest_common_run(body, line) >= BEAT_RECITATION_MIN_CHARS
+            for line in spine_lines
+        )
     ):
         return ""
     if STAGING_META_RE.search(body):
@@ -846,6 +915,17 @@ def write_review_html(report: dict[str, Any], path: Path) -> None:
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
     story = load_storyline(args.storyline)
+    spine: dict[int, dict[str, str]] = {}
+    if args.rewrite_format == "spine":
+        if args.spine is None:
+            raise SystemExit("--rewrite-format spine requires --spine")
+        spine = load_spine(args.spine, [
+            beat
+            for scene in story["scenes"]
+            for beat in scene["turn_beats"][:args.per_scene_turns]
+        ])
+    elif args.spine is not None:
+        raise SystemExit("--spine is only valid with --rewrite-format spine")
     source_rows = read_jsonl(args.chat)
     sanitized_rows, sanitation = sanitize_rows(source_rows)
     if args.sanitized_chat is not None:
@@ -932,15 +1012,26 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             rewrite_output: dict[str, Any] | None = None
             if args.rewrite_passes and record.get("ok") and draft_body.strip():
                 beat = scene["turn_beats"][scene_seen[scene["id"]] - 1]
-                if args.rewrite_format == "slotwise":
+                if args.rewrite_format in ("slotwise", "spine"):
                     slot_calls: list[dict[str, Any]] = []
                     slot_values: dict[str, str] = {}
-                    for field in SLOTWISE_FIELDS:
+                    if args.rewrite_format == "spine":
+                        slot_values.update(spine[turn_index])
+                    generated_fields = (
+                        SPINE_GENERATED_FIELDS if args.rewrite_format == "spine"
+                        else SLOTWISE_FIELDS
+                    )
+                    following = (
+                        tuple(slot_values[name] for name in SPINE_FIELDS)
+                        if args.rewrite_format == "spine" else ()
+                    )
+                    for field in generated_fields:
                         valid_slot_indexes: list[int] = []
                         for attempt in range(1, SLOT_CANDIDATE_COUNT + 1):
                             slot_messages = [{"role": "system", "content": (
-                                build_slotwise_cue(field, beat)
-                                if attempt == 1 else build_slotwise_retry_cue(field, beat)
+                                build_slotwise_cue(field, beat, following=following)
+                                if attempt == 1
+                                else build_slotwise_retry_cue(field, beat, following=following)
                             )}]
                             slot_messages.append({
                                 "role": "user",
@@ -957,7 +1048,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                                 max_tokens=min(args.max_tokens, SLOT_MAX_TOKENS), timeout=args.timeout,
                             )
                             slot_raw = str(slot_record.get("response") or "")
-                            slot_body = parse_slot_output(slot_raw, beat)
+                            slot_body = parse_slot_output(slot_raw, beat, following)
                             slot_record["slot"] = field
                             slot_record["attempt"] = attempt
                             slot_record["response_body"] = slot_body
@@ -1151,6 +1242,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "story_id": story["story_id"],
         "story_title": story["title"],
         "storyline_sha256": hashlib.sha256(args.storyline.read_bytes()).hexdigest(),
+        "spine_sha256": (
+            hashlib.sha256(args.spine.read_bytes()).hexdigest() if args.spine is not None else None
+        ),
         "chat_source_sha256": hashlib.sha256(args.chat.read_bytes()).hexdigest(),
         "model": args.model,
         "session_id": session_id,
@@ -1194,8 +1288,14 @@ def parser() -> argparse.ArgumentParser:
         help="same-model isolated rewrite pass per successful turn (evaluation only)",
     )
     value.add_argument(
-        "--rewrite-format", choices=("spoken", "structured", "slotwise", "story"), default="spoken",
-        help="format for the optional rewrite pass; story fences only the final line behind a delimiter",
+        "--rewrite-format", choices=("spoken", "structured", "slotwise", "story", "spine"),
+        default="spoken",
+        help="format for the optional rewrite pass; story fences only the final line behind a "
+             "delimiter, spine speaks the two plot slots from authored lines",
+    )
+    value.add_argument(
+        "--spine", type=Path, default=None,
+        help="authored deterministic spine sidecar; required by and exclusive to --rewrite-format spine",
     )
     value.add_argument("--timeout", type=float, default=90.0)
     value.add_argument("--tuning-cause", default="unspecified")
