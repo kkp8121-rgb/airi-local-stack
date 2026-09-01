@@ -73,6 +73,88 @@ SLOTWISE_FIELDS = (
 )
 SLOT_MAX_TOKENS = 96
 SLOT_CANDIDATE_COUNT = 16
+# A slot may name the beat's entities, but reciting a long contiguous span of the
+# director text is internal staging spoken aloud. It also inflates
+# slot_candidate_score, which ranks candidates by overlap with that same text.
+# 14 non-space characters was measured against run-81: it rejects the observed
+# recitations while keeping named entities such as "히나와 마시로의 코스프레".
+BEAT_RECITATION_MIN_CHARS = 14
+BEAT_RECITATION_FIELDS = ("new_event", "callback", "emotion", "next_hook")
+# Leaving the in-story broadcast voice: advising or instructing the viewer,
+# turning a story beat into medical guidance, asking the viewer to supply the
+# story, or explaining the scene away as a film set. Measured against run-82,
+# this matches 10 of 96 selected slots — exactly the turns manual review
+# rejected — but only 22 of 877 valid candidates, and no slot loses its whole
+# candidate pool, so composition cannot starve.
+OUT_OF_STORY_VOICE_RE = re.compile(
+    r"(?:하|받아보|가보|쉬|참|조심하|줄이|확인해|해보|시작해|물어보|말해|들려)"
+    r"(?:는|시)?\s*(?:게|것이|편이)\s*(?:좋|낫|안전|현명)"
+    r"|좋을\s*것\s*같아"
+    r"|[가-힣]지\s*(?:마|말아)(?![가-힣])"
+    r"|더\s*열심히"
+    r"|(?:말해|들려|알려|보여)\s*(?:줘|주라|주세요)"
+    r"|촬영\s*중|특수\s*?효과|조명\s*때문"
+)
+# Internal staging spoken aloud: slot names, director-card labels and meta
+# commentary about the broadcast itself. Shared by every rewrite parser so the
+# story mode inherits exactly the slotwise rejection surface.
+STAGING_META_RE = re.compile(
+    r"(?:viewer_reaction|event_callback_emotion|next_hook|슬롯 생성|메타 발언|"
+    r"(?:현재|다음|이번)\s*(?:사건|장면|줄거리|슬롯|턴|영상|사연|꿈)|"
+    r"현재\s*(?:상황|시점)|사건\s*진행\s*:|"
+    r"(?:새로운\s*)?사건\s*(?:으로\s*)?연결|연결해야|전개해야|진행해야|"
+    r"시청자님?\s*(?:께서|가|이)|시청자\s*채팅|사용자\s*(?:가|이)|현재|방송의\s|"
+    r"화자|그녀\s*(?:는|가|의)|"
+    r"방송\s*(?:소품|중|에서)|다음\s*방송|"
+    r"(?:사건|장면|줄거리|상황)\s*(?:이|가|은|는|을|를|으로|에서|에|의)|"
+    r"지금까지의\s*(?:내용|대화)\s*(?:을|를)?\s*(?:기반으로|바탕으로)|"
+    r"네가\s*(?:방금|지금까지)\s*말한\s*(?:내용|것)|환자(?:가|는)|당신|"
+    r"드러납니다|드러내야|표현하고|분위기를\s*조성|다음\s*상황\s*:|"
+    r"다음\s*이벤트|방금\s*들어온\s*채팅|그건\s*좀\s*있다가\s*다시\s*말해|"
+    r"나중에\s*다시\s*(?:얘기|말해)|더\s*자세히\s*(?:설명|말해)\s*(?:해|줄)|"
+    r"유튜브|youtube|채널|구독|콘텐츠|다음\s*회차|계속\s*(?:진행|봐)|"
+    r"방송\s*(?:을|이)?\s*(?:이어|진행)|좋은\s*콘텐츠|잠깐\s*생각해\s*볼게)",
+    re.IGNORECASE,
+)
+# CRANE (arXiv 2502.09061): leave the reasoning span unconstrained and fence
+# only the final answer behind a delimiter, instead of constraining every token
+# of a short slot. The larger budget is for that free reasoning span.
+STORY_DELIMITER = ">>>"
+STORY_MAX_TOKENS = 320
+# M8-3 (run-88): one register demo per slot on non-storyline material. Each
+# demo must pass parse_slot_output itself; the event demo narrates with the
+# 그 사람 subject to counter the implicit self-experience growth seen in run-87.
+# M8-4 (run-90) DISCARDED: appending this depth-injection/anti-impersonation
+# reminder as the last line of every slot cue made things worse, not better —
+# demo leakage 2 -> 7 fragment hits, 그 사람 subject 10 -> 8, question endings
+# 4 -> 7, and the automatic new-event signal fell from true to false. More
+# trailing instruction dilutes a 2.3B model's attention and pushes it toward
+# copying surface patterns. Kept as an empty string so the contract stays
+# explicit rather than silently deleted.
+SLOT_DEPTH_REMINDER = ""
+SLOT_FORMAT_DEMOS = {
+    # run-88: the viewer_reaction demo was measured harmful (advice register
+    # 2 -> 7 turns, honorific leak 2 -> 4) and is removed; the event and
+    # next_hook demos hit their targets (그 사람 subject 3 -> 6, question
+    # endings 10 -> 7) and are kept.
+    "event_callback_emotion": (
+        "새벽 두 시가 되니까 손님이 뚝 끊겼는데, 아까부터 들리던 라디오 소리까지 멎어서 "
+        "그 사람은 등골이 서늘해졌어."
+    ),
+    "next_hook": "그때 문에 달린 종이 혼자 딸랑 울렸어.",
+}
+# run-85: 58/64 story calls emitted no delimiter — the 2.3B model does not
+# follow the two-phase format from instructions alone. One demonstration
+# teaches it (arXiv 2402.09954; 2303.08119 shows more demos hurt). The demo
+# deliberately uses non-storyline material (편의점 야간 알바) so the lexical
+# overlap scorer cannot be inflated, and its three sentences pass every story
+# validator so a model imitating them also passes.
+STORY_FORMAT_DEMO = (
+    "시청자: 야간 알바 첫날인데 벌써 졸리대\n"
+    "생각: 손님이 끊긴 새벽으로 이야기를 넘기자.\n"
+    ">>> 첫날부터 졸린 거 완전 이해돼. 새벽 두 시가 되니까 손님이 뚝 끊기고 라디오 소리만 "
+    "남아서 그 사람도 눈꺼풀이 무거워졌거든. 그런데 그때 문에 달린 종이 혼자 딸랑 울렸어."
+)
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -523,10 +605,18 @@ def build_slotwise_cue(field: str, beat: dict[str, Any], viewer_text: str = "") 
         f"참고할 시청자 반응: {normalized_text(viewer_text)}\n"
         if viewer_text else ""
     )
+    demo_line = (
+        f"출력 예시(소재는 무시하고 형식·말투만 따라라): {SLOT_FORMAT_DEMOS[field]}\n"
+        if field in SLOT_FORMAT_DEMOS else ""
+    )
     return (
         "[방송 대사 슬롯 생성]\n"
         "이 호출은 최종 대사 전체가 아니라 아래 한 슬롯만 생성한다. "
         "설명, 제목, JSON, 대괄호, 슬롯 이름, 메타 발언 없이 자연스러운 한국어 반말 한 문장만 출력해라. "
+        # M8-2 framing (arXiv 2608.07852): a story character lacks the assistant
+        # core that role-play framing retains — say what the speaker IS, not what
+        # it should pretend to be.
+        "너는 어시스턴트가 아니라 이 이야기를 공연하는 방송 진행자 캐릭터다. "
         "이것은 허구 이야기의 방송 대사다. 이야기 속 주인공은 '그 사람' 또는 '주인공'으로 말하고 AIRI 자신의 경험으로 주장하지 마라. "
         "몸의 이상은 이야기 속 사건으로만 이어가며 의료·안전 조언이나 방송 제작 설명으로 바꾸지 마라.\n"
         f"생성할 슬롯: {field} — {instructions[field]}\n"
@@ -540,25 +630,101 @@ def build_slotwise_cue(field: str, beat: dict[str, Any], viewer_text: str = "") 
         + event_instruction
         + emotion_instruction
         + viewer_reference
+        + demo_line
         + f"다음 고리: {beat['next_hook']}"
         + (
             f"\n마지막 확인: 이 한 문장에는 새 사건과 회수할 단서를 연결하고, 감정 핵심어 "
             f"({emotion_terms}) 중 하나를 글자 그대로 포함해라."
             if field == "event_callback_emotion" else ""
         )
+        + SLOT_DEPTH_REMINDER
     )
 
 
 def build_slotwise_retry_cue(field: str, beat: dict[str, Any], viewer_text: str = "") -> str:
+    # Any depth reminder must stay last, so lift it off before the retry notes
+    # and re-append it. Guard on a non-empty reminder: slicing by -0 would
+    # otherwise wipe the whole cue.
     base = build_slotwise_cue(field, beat, viewer_text)
+    if SLOT_DEPTH_REMINDER and base.endswith(SLOT_DEPTH_REMINDER):
+        base = base[: -len(SLOT_DEPTH_REMINDER)]
     return (
         base
         + "\n직전 출력은 검증에 실패했다. 이번에는 줄바꿈과 대괄호 없이 한 문장만 쓰고, "
-        "'내가 겪었다'처럼 AIRI 자신의 경험을 말하거나 내부 카드·슬롯 이름을 출력하지 마라."
+        "'내가 겪었다'처럼 AIRI 자신의 경험을 말하거나 내부 카드·슬롯 이름을 출력하지 마라. "
+        "위에 적힌 새 사건·회수할 단서·감정 변화·다음 고리 문구를 그대로 옮겨 말하지 말고 "
+        "네 방송 대사로 바꿔 말해라. "
+        "시청자에게 조언하거나 지시하지 말고, 시청자에게 이야기를 대신 들려 달라고 요구하지 말며, "
+        "장면을 촬영이나 효과로 설명하지 말고 이야기 안에서 네가 직접 진행해라."
+        + SLOT_DEPTH_REMINDER
     )
 
 
-def parse_slot_output(raw: str) -> str:
+def build_story_cue(beat: dict[str, Any], viewer_text: str = "") -> str:
+    viewer_reference = (
+        f"참고할 시청자 반응: {normalized_text(viewer_text)}\n"
+        if viewer_text else ""
+    )
+    return (
+        "[방송 대사 생성]\n"
+        "이것은 허구 이야기의 방송 대사다. 이야기 속 주인공은 '그 사람' 또는 '주인공'으로 말하고 "
+        "AIRI 자신의 경험으로 주장하지 마라. 몸의 이상은 이야기 속 사건으로만 이어가며 "
+        "의료·안전 조언이나 방송 제작 설명으로 바꾸지 마라.\n"
+        f"새 사건: {beat['new_event']}\n"
+        f"회수할 단서: {beat['callback']}\n"
+        f"감정 변화: {beat['emotion']}\n"
+        f"다음 고리: {beat['next_hook']}\n"
+        + viewer_reference
+        + "먼저 어떻게 이어갈지 한두 문장으로 자유롭게 생각을 써라. "
+        f"그 다음 마지막 줄에 '{STORY_DELIMITER}'를 쓰고, 그 뒤에 최종 방송 대사만 정확히 세 문장으로 써라. "
+        "첫 문장은 시청자 채팅의 구체적인 핵심을 받아치고, 둘째 문장은 새 사건과 앞선 단서를 감정 변화와 함께 "
+        "연결하고, 셋째 문장은 다음 고리로 넘어가라. "
+        f"반말로 쓰고, 대괄호·라벨·슬롯 이름·메타 발언은 '{STORY_DELIMITER}' 뒤에 넣지 마라.\n"
+        "출력 형식 예시(소재는 무시하고 형식만 따라라):\n"
+        f"{STORY_FORMAT_DEMO}"
+    )
+
+
+def build_story_retry_cue(beat: dict[str, Any], viewer_text: str = "") -> str:
+    base = build_story_cue(beat, viewer_text)
+    return (
+        base
+        + f"\n직전 출력은 검증에 실패했다. 생각은 '{STORY_DELIMITER}' 앞에만 쓰고, "
+        f"'{STORY_DELIMITER}' 뒤에는 세 문장 대사만 써라. "
+        "위 문구를 그대로 옮겨 말하지 말고, 시청자에게 조언하거나 지시하지 말며, "
+        "AIRI 자신의 경험으로 주장하지 마라."
+    )
+
+
+def longest_common_run(left: str, right: str) -> int:
+    """Longest contiguous character run shared by both strings, ignoring spaces."""
+    first = re.sub(r"\s+", "", left)
+    second = re.sub(r"\s+", "", right)
+    if not first or not second:
+        return 0
+    best = 0
+    previous = [0] * (len(second) + 1)
+    for index, character in enumerate(first, 1):
+        current = [0] * (len(second) + 1)
+        for other_index, other in enumerate(second, 1):
+            if character == other:
+                current[other_index] = previous[other_index - 1] + 1
+                if current[other_index] > best:
+                    best = current[other_index]
+        previous = current
+    return best
+
+
+def recites_beat(body: str, beat: dict[str, Any] | None) -> bool:
+    if not beat:
+        return False
+    return any(
+        longest_common_run(body, str(beat.get(field) or "")) >= BEAT_RECITATION_MIN_CHARS
+        for field in BEAT_RECITATION_FIELDS
+    )
+
+
+def parse_slot_output(raw: str, beat: dict[str, Any] | None = None) -> str:
     body, _ = ab.split_operational_protocol(raw)
     body = normalized_text(body)
     if (
@@ -567,31 +733,40 @@ def parse_slot_output(raw: str) -> str:
         or "]" in body
         or ab.CONTROL_LEAK.search(body)
         or SOURCE_EXPERIENCE_RE.search(body)
+        or OUT_OF_STORY_VOICE_RE.search(body)
+        or recites_beat(body, beat)
     ):
         return ""
-    if re.search(
-        r"(?:viewer_reaction|event_callback_emotion|next_hook|슬롯 생성|메타 발언|"
-        r"(?:현재|다음|이번)\s*(?:사건|장면|줄거리|슬롯|턴|영상|사연|꿈)|"
-        r"현재\s*(?:상황|시점)|사건\s*진행\s*:|"
-        r"(?:새로운\s*)?사건\s*(?:으로\s*)?연결|연결해야|전개해야|진행해야|"
-        r"시청자님?\s*(?:께서|가|이)|시청자\s*채팅|사용자\s*(?:가|이)|현재|방송의\s|"
-        r"화자|그녀\s*(?:는|가|의)|"
-        r"방송\s*(?:소품|중|에서)|다음\s*방송|"
-        r"(?:사건|장면|줄거리|상황)\s*(?:이|가|은|는|을|를|으로|에서|에|의)|"
-        r"지금까지의\s*(?:내용|대화)\s*(?:을|를)?\s*(?:기반으로|바탕으로)|"
-        r"네가\s*(?:방금|지금까지)\s*말한\s*(?:내용|것)|환자(?:가|는)|당신|"
-        r"드러납니다|드러내야|표현하고|분위기를\s*조성|다음\s*상황\s*:|"
-        r"다음\s*이벤트|방금\s*들어온\s*채팅|그건\s*좀\s*있다가\s*다시\s*말해|"
-        r"나중에\s*다시\s*(?:얘기|말해)|더\s*자세히\s*(?:설명|말해)\s*(?:해|줄)|"
-        r"유튜브|youtube|채널|구독|콘텐츠|다음\s*회차|계속\s*(?:진행|봐)|"
-        r"방송\s*(?:을|이)?\s*(?:이어|진행)|좋은\s*콘텐츠|잠깐\s*생각해\s*볼게)",
-        body,
-        re.IGNORECASE,
-    ):
+    if STAGING_META_RE.search(body):
         return ""
     if len(re.findall(r"[.!?。！？](?=\s|$)", body)) > 1:
         return ""
     if re.search(r"(?:^|\s)(?:1[.)]|2[.)]|3[.)]|[-*•])\s", body):
+        return ""
+    return body
+
+
+def parse_story_output(raw: str, beat: dict[str, Any] | None = None) -> str:
+    """Keep only what follows the last delimiter — the reasoning span is free."""
+    body, _ = ab.split_operational_protocol(raw)
+    if STORY_DELIMITER not in body:
+        return ""
+    body = normalized_text(body.rsplit(STORY_DELIMITER, 1)[1])
+    if (
+        not body
+        or "[" in body
+        or "]" in body
+        or ab.CONTROL_LEAK.search(body)
+        or SOURCE_EXPERIENCE_RE.search(body)
+        or OUT_OF_STORY_VOICE_RE.search(body)
+        or STAGING_META_RE.search(body)
+        or recites_beat(body, beat)
+    ):
+        return ""
+    if re.search(r"(?:^|\s)(?:1[.)]|2[.)]|3[.)]|[-*•])\s", body):
+        return ""
+    sentences = len(re.findall(r"[.!?。！？](?=\s|$)", body))
+    if sentences < 2 or sentences > 4:
         return ""
     return body
 
@@ -782,7 +957,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                                 max_tokens=min(args.max_tokens, SLOT_MAX_TOKENS), timeout=args.timeout,
                             )
                             slot_raw = str(slot_record.get("response") or "")
-                            slot_body = parse_slot_output(slot_raw)
+                            slot_body = parse_slot_output(slot_raw, beat)
                             slot_record["slot"] = field
                             slot_record["attempt"] = attempt
                             slot_record["response_body"] = slot_body
@@ -827,6 +1002,51 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                             sum(float(call.get("complete_ms") or 0) for call in slot_calls), 1,
                         ),
                         "failure": None if rewrite_output is not None else "slot_validation_failed",
+                    }
+                elif args.rewrite_format == "story":
+                    story_calls: list[dict[str, Any]] = []
+                    rewrite_body = ""
+                    for attempt in range(1, 3):
+                        story_messages = [
+                            {"role": "system", "content": (
+                                build_story_cue(beat, message["text"])
+                                if attempt == 1
+                                else build_story_retry_cue(beat, message["text"])
+                            )},
+                            {"role": "user", "content": message["text"]},
+                        ]
+                        story_record = ab.call_once(
+                            transport, model=args.model, messages=story_messages,
+                            max_tokens=STORY_MAX_TOKENS, timeout=args.timeout,
+                        )
+                        story_body = parse_story_output(
+                            str(story_record.get("response") or ""), beat,
+                        )
+                        story_record["attempt"] = attempt
+                        story_record["response_body"] = story_body
+                        story_record["parse_ok"] = bool(story_body)
+                        story_calls.append(story_record)
+                        if story_record.get("ok") and story_body:
+                            rewrite_body = story_body
+                            break
+                    rewrite_output = (
+                        {"final": rewrite_body, "attempts": len(story_calls)}
+                        if rewrite_body else None
+                    )
+                    rewrite_raw = json.dumps({"story": story_calls}, ensure_ascii=False)
+                    rewrite_record = {
+                        "ok": rewrite_output is not None,
+                        "response": rewrite_raw,
+                        "response_body": rewrite_body,
+                        "story_calls": story_calls,
+                        "ttft_ms": next(
+                            (call.get("ttft_ms") for call in story_calls if call.get("ttft_ms") is not None),
+                            None,
+                        ),
+                        "complete_ms": round(
+                            sum(float(call.get("complete_ms") or 0) for call in story_calls), 1,
+                        ),
+                        "failure": None if rewrite_output is not None else "story_validation_failed",
                     }
                 else:
                     rewrite_messages = [
@@ -881,7 +1101,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     "format": args.rewrite_format,
                     "used": rewrite_used,
                     "ok": None if rewrite_record is None else bool(rewrite_record.get("ok")),
-                    "parse_ok": rewrite_output is not None if args.rewrite_format in ("structured", "slotwise") else None,
+                    "parse_ok": rewrite_output is not None if args.rewrite_format in ("structured", "slotwise", "story") else None,
                     "failure": None if rewrite_record is None else rewrite_record.get("failure"),
                 },
                 "ok": bool(final_record.get("ok")),
@@ -974,8 +1194,8 @@ def parser() -> argparse.ArgumentParser:
         help="same-model isolated rewrite pass per successful turn (evaluation only)",
     )
     value.add_argument(
-        "--rewrite-format", choices=("spoken", "structured", "slotwise"), default="spoken",
-        help="format for the optional rewrite pass",
+        "--rewrite-format", choices=("spoken", "structured", "slotwise", "story"), default="spoken",
+        help="format for the optional rewrite pass; story fences only the final line behind a delimiter",
     )
     value.add_argument("--timeout", type=float, default=90.0)
     value.add_argument("--tuning-cause", default="unspecified")
