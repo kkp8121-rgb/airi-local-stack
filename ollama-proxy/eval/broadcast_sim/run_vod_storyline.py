@@ -916,16 +916,16 @@ def write_review_html(report: dict[str, Any], path: Path) -> None:
 def run(args: argparse.Namespace) -> dict[str, Any]:
     story = load_storyline(args.storyline)
     spine: dict[int, dict[str, str]] = {}
-    if args.rewrite_format == "spine":
+    if args.rewrite_format in ("spine", "spine-optional"):
         if args.spine is None:
-            raise SystemExit("--rewrite-format spine requires --spine")
+            raise SystemExit("--rewrite-format spine/spine-optional requires --spine")
         spine = load_spine(args.spine, [
             beat
             for scene in story["scenes"]
             for beat in scene["turn_beats"][:args.per_scene_turns]
         ])
     elif args.spine is not None:
-        raise SystemExit("--spine is only valid with --rewrite-format spine")
+        raise SystemExit("--spine is only valid with --rewrite-format spine or spine-optional")
     source_rows = read_jsonl(args.chat)
     sanitized_rows, sanitation = sanitize_rows(source_rows)
     if args.sanitized_chat is not None:
@@ -1012,18 +1012,18 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             rewrite_output: dict[str, Any] | None = None
             if args.rewrite_passes and record.get("ok") and draft_body.strip():
                 beat = scene["turn_beats"][scene_seen[scene["id"]] - 1]
-                if args.rewrite_format in ("slotwise", "spine"):
+                if args.rewrite_format in ("slotwise", "spine", "spine-optional"):
                     slot_calls: list[dict[str, Any]] = []
                     slot_values: dict[str, str] = {}
-                    if args.rewrite_format == "spine":
+                    if args.rewrite_format in ("spine", "spine-optional"):
                         slot_values.update(spine[turn_index])
                     generated_fields = (
-                        SPINE_GENERATED_FIELDS if args.rewrite_format == "spine"
+                        SPINE_GENERATED_FIELDS if args.rewrite_format in ("spine", "spine-optional")
                         else SLOTWISE_FIELDS
                     )
                     following = (
                         tuple(slot_values[name] for name in SPINE_FIELDS)
-                        if args.rewrite_format == "spine" else ()
+                        if args.rewrite_format in ("spine", "spine-optional") else ()
                     )
                     for field in generated_fields:
                         valid_slot_indexes: list[int] = []
@@ -1071,9 +1071,23 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                             )
                             slot_calls[selected_index]["selected"] = True
                             slot_values[field] = slot_calls[selected_index]["response_body"]
-                    rewrite_output = slot_values if len(slot_values) == len(SLOTWISE_FIELDS) else None
+                    # spine-optional (M8-10 experiment): every configuration that let the
+                    # model speak one free sentence bought item 1 and spent one of items
+                    # 4, 5 or 6. A broadcaster does not answer every chat, so when the
+                    # reaction slot has no valid candidate the turn is composed from the
+                    # two spine sentences instead of failing; reaction_kept records which.
+                    optional_reaction = args.rewrite_format == "spine-optional"
+                    if optional_reaction:
+                        composed_fields = [f for f in SLOTWISE_FIELDS if f in slot_values]
+                        rewrite_output = (
+                            dict(slot_values)
+                            if all(f in slot_values for f in SPINE_FIELDS) else None
+                        )
+                    else:
+                        composed_fields = list(SLOTWISE_FIELDS)
+                        rewrite_output = slot_values if len(slot_values) == len(SLOTWISE_FIELDS) else None
                     rewrite_body = (
-                        " ".join(slot_values[field] for field in SLOTWISE_FIELDS)
+                        " ".join(slot_values[field] for field in composed_fields)
                         if rewrite_output is not None else ""
                     )
                     rewrite_raw = json.dumps(
@@ -1093,6 +1107,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                             sum(float(call.get("complete_ms") or 0) for call in slot_calls), 1,
                         ),
                         "failure": None if rewrite_output is not None else "slot_validation_failed",
+                        "reaction_kept": (
+                            ("viewer_reaction" in slot_values) if optional_reaction else None
+                        ),
                     }
                 elif args.rewrite_format == "story":
                     story_calls: list[dict[str, Any]] = []
@@ -1194,6 +1211,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     "ok": None if rewrite_record is None else bool(rewrite_record.get("ok")),
                     "parse_ok": rewrite_output is not None if args.rewrite_format in ("structured", "slotwise", "story") else None,
                     "failure": None if rewrite_record is None else rewrite_record.get("failure"),
+                    # spine-optional only; None for every other format. The first
+                    # spine-optional run measured survival indirectly because this
+                    # projection dropped the field — it now carries it explicitly.
+                    "reaction_kept": None if rewrite_record is None else rewrite_record.get("reaction_kept"),
                 },
                 "ok": bool(final_record.get("ok")),
                 "failure": final_record.get("failure"),
@@ -1288,10 +1309,12 @@ def parser() -> argparse.ArgumentParser:
         help="same-model isolated rewrite pass per successful turn (evaluation only)",
     )
     value.add_argument(
-        "--rewrite-format", choices=("spoken", "structured", "slotwise", "story", "spine"),
+        "--rewrite-format",
+        choices=("spoken", "structured", "slotwise", "story", "spine", "spine-optional"),
         default="spoken",
         help="format for the optional rewrite pass; story fences only the final line behind a "
-             "delimiter, spine speaks the two plot slots from authored lines",
+             "delimiter, spine speaks the two plot slots from authored lines, spine-optional "
+             "additionally drops the generated reaction when no candidate validates",
     )
     value.add_argument(
         "--spine", type=Path, default=None,

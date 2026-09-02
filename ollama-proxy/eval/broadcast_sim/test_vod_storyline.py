@@ -462,3 +462,16 @@ def test_slot_parser_rejects_reciting_the_spine_it_was_shown():
     # A short shared phrase is a named entity, not recitation, and stays legal.
     short = "이불깃이 축축했어."
     assert storyline.parse_slot_output(short, beat, spine) == short
+
+def test_spine_optional_mode_is_wired_and_requires_the_spine():
+    # M8-10 experiment: the reaction slot may be dropped when nothing validates,
+    # so the turn composes from the spine alone instead of failing. The flag
+    # surface is the only thing unit-testable offline; the composition rule is
+    # measured through reaction_kept in the report.
+    args = storyline.parser().parse_args([
+        "--rewrite-format", "spine-optional", "--spine", "spine.json",
+        "--report", "report.json", "--review-html", "review.html",
+    ])
+    assert args.rewrite_format == "spine-optional"
+    assert args.spine == Path("spine.json")
+    assert storyline.SPINE_GENERATED_FIELDS == ("viewer_reaction",)
