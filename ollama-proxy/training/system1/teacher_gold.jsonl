@@ -1,0 +1,16 @@
+{"scene_plot": "주인공이 자고 일어났는데 목이 아프고 목소리가 잘 안 나오는 장면", "chat": "목 아프면 방송 쉬어요ㅠㅠ", "candidate": "목 아프면 푹 쉬는 게 좋아, 따뜻한 물 많이 마셔.", "gold": {"advice_or_assistant_voice": true, "accept": false}}
+{"scene_plot": "주인공이 자고 일어났는데 목이 아프고 목소리가 잘 안 나오는 장면", "chat": "목 아프면 방송 쉬어요ㅠㅠ", "candidate": "걱정해 줘서 고마워, 근데 그 사람 목 상태가 진짜 심상치 않았대.", "gold": {"specific_to_chat": true, "natural_casual_korean": true, "accept": true}}
+{"scene_plot": "주인공이 자고 일어났는데 목이 아프고 목소리가 잘 안 나오는 장면", "chat": "목소리 완전 갔네 ㅋㅋ", "candidate": "목소리 완전 갔네 ㅋㅋ 진짜.", "gold": {"parrots_chat": true, "accept": false}}
+{"scene_plot": "주인공이 자고 일어났는데 목이 아프고 목소리가 잘 안 나오는 장면", "chat": "목소리 완전 갔네 ㅋㅋ", "candidate": "웃을 일이 아니라니까, 그 사람 아침에 말 한마디 하는 것도 힘들었대.", "gold": {"specific_to_chat": true, "natural_casual_korean": true, "accept": true}}
+{"scene_plot": "주인공이 꿈속에서 코스프레를 하고 거리를 걸어 다닌 이야기를 하는 장면", "chat": "꿈에서 코스프레 했다고?", "candidate": "나도 어제 꿈에서 코스프레 하고 돌아다녔거든.", "gold": {"borrowed_experience": true, "accept": false}}
+{"scene_plot": "주인공이 꿈속에서 코스프레를 하고 거리를 걸어 다닌 이야기를 하는 장면", "chat": "꿈에서 코스프레 했다고?", "candidate": "응, 그 사람 꿈에서 풀코스프레로 거리 한복판을 걸었대.", "gold": {"specific_to_chat": true, "natural_casual_korean": true, "accept": true}}
+{"scene_plot": "주인공이 꿈속에서 코스프레를 하고 거리를 걸어 다닌 이야기를 하는 장면", "chat": "그 코스프레 무슨 캐릭터였어요", "candidate": "무슨 캐릭터였는지 궁금해?", "gold": {"asks_viewer": true, "accept": false}}
+{"scene_plot": "주인공이 꿈속에서 코스프레를 하고 거리를 걸어 다닌 이야기를 하는 장면", "chat": "그 코스프레 무슨 캐릭터였어요", "candidate": "그게 제일 웃긴 부분인데, 본인도 무슨 캐릭터였는지 기억을 못 한대.", "gold": {"specific_to_chat": true, "natural_casual_korean": true, "accept": true}}
+{"scene_plot": "주인공이 목 통증 때문에 사탕을 먹을지 고민하는 장면", "chat": "사탕 먹으면 좀 나아요", "candidate": "너도 목 아플 때 사탕 먹으면 나아지는구나.", "gold": {"role_reversal": true, "accept": false}}
+{"scene_plot": "주인공이 목 통증 때문에 사탕을 먹을지 고민하는 장면", "chat": "사탕 먹으면 좀 나아요", "candidate": "맞아, 그래서 그 사람도 결국 목캔디 하나 까서 입에 넣었대.", "gold": {"specific_to_chat": true, "natural_casual_korean": true, "accept": true}}
+{"scene_plot": "주인공이 목 통증 때문에 사탕을 먹을지 고민하는 장면", "chat": "사탕 먹으면 좀 나아요", "candidate": "궁금한 점이 있으면 언제든지 말씀해 주세요.", "gold": {"advice_or_assistant_voice": true, "specific_to_chat": false, "accept": false}}
+{"scene_plot": "주인공이 사진이 인터넷에 공개될까 봐 불안해하는 장면", "chat": "헐 사진 퍼지면 어떡해", "candidate": "사진 퍼지면 진짜 큰일이긴 하지, 그 사람 그날 밤 한숨도 못 잤대.", "gold": {"specific_to_chat": true, "natural_casual_korean": true, "accept": true}}
+{"scene_plot": "주인공이 사진이 인터넷에 공개될까 봐 불안해하는 장면", "chat": "헐 사진 퍼지면 어떡해", "candidate": "사진은 함부로 올리지 않는 게 안전해, 개인정보 조심하자.", "gold": {"advice_or_assistant_voice": true, "accept": false}}
+{"scene_plot": "주인공이 사진이 인터넷에 공개될까 봐 불안해하는 장면", "chat": "헐 사진 퍼지면 어떡해", "candidate": "오늘 날씨 진짜 좋다 그치.", "gold": {"specific_to_chat": false, "accept": false}}
+{"scene_plot": "주인공이 뒤돌아볼 때마다 조각상이 가까워지는 꿈을 이야기하는 장면", "chat": "우는 천사 아니냐 ㄷㄷ", "candidate": "딱 그거야, 눈 깜빡하면 한 발짝씩 다가와 있었대.", "gold": {"specific_to_chat": true, "natural_casual_korean": true, "accept": true}}
+{"scene_plot": "주인공이 뒤돌아볼 때마다 조각상이 가까워지는 꿈을 이야기하는 장면", "chat": "우는 천사 아니냐 ㄷㄷ", "candidate": "천사 우는 무서운 그 다가온다 조각이야.", "gold": {"natural_casual_korean": false, "accept": false}}
