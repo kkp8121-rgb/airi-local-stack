@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "spine_id": "vod-storyline-20260923-v21-spine",
+  "storyline": "vod_storyline_20260923_v2.json",
+  "note": "v2.1 1인칭 스파인(사용자 블라인드 검토 반영): 말하듯 짧게(이야기 문장 55자 이내, 다음 고리 35자 이내), 이야기 문장은 그 턴의 정해진 시청자 채팅을 받아 이어진다. 1인칭 슬롯 계약(parse_slot_output, framing=first_person)을 통과한다.",
+  "turns": [
+    {
+      "turn_index": 1,
+      "scene_id": "act-01-dream-hook",
+      "event_callback_emotion": "제목 그거 내 꿈 앞부분이야, 나 개꿈 꾸고 왔어 개꿈!",
+      "next_hook": "근데 그게 다가 아니거든."
+    },
+    {
+      "turn_index": 2,
+      "scene_id": "act-01-dream-hook",
+      "event_callback_emotion": "아니 그 한 줄은 진짜 극초반이야, 뒤가 훨씬 길다니까!",
+      "next_hook": "게다가 개꿈치고 은근 진지한 꿈이었어."
+    },
+    {
+      "turn_index": 3,
+      "scene_id": "act-01-dream-hook",
+      "event_callback_emotion": "맛보기 맞아, 본편은 나름 시리어스해, 약간 추격전 같달까.",
+      "next_hook": "아 그 전에, 나 오늘 다녀온 데가 하나 있어."
+    },
+    {
+      "turn_index": 4,
+      "scene_id": "act-01-dream-hook",
+      "event_callback_emotion": "한창 몰입했을 텐데 미안, 일단 나 방송 전에 병원 다녀왔어.",
+      "next_hook": "왜 갔냐면, 어제 녹음하다가 좀 이상했거든."
+    },
+    {
+      "turn_index": 5,
+      "scene_id": "act-02-throat-pain",
+      "event_callback_emotion": "결말은 좀 아껴 둘게, 어제 녹음하다 목이 아팠는데 덜 쓰면 낫겠지 하고 넘겼어.",
+      "next_hook": "연휴라 방송 쉬는 날이 많아 다행인데, 병원은 급하게 갔어."
+    },
+    {
+      "turn_index": 6,
+      "scene_id": "act-02-throat-pain",
+      "event_callback_emotion": "서두른 건 목 위쪽이 아파서야, 내가 모르는 통증이라 딱 위기다 싶었거든.",
+      "next_hook": "사실 어제 아픈 와중에 어이없는 짓을 하나 했어."
+    },
+    {
+      "turn_index": 7,
+      "scene_id": "act-02-throat-pain",
+      "event_callback_emotion": "뭐 했냐면, 물만 마셔도 아렸는데 어차피 아플 거면 맛있게 잊자고 마라탕 먹었어.",
+      "next_hook": "진짜 잊었는데 자고 나니까 침만 삼켜도 귀 안쪽까지 아프더라."
+    },
+    {
+      "turn_index": 8,
+      "scene_id": "act-02-throat-pain",
+      "event_callback_emotion": "진짜 아파서 눈곱만 떼고 병원 갔더니, 구내염 통증이 신경 타고 왼쪽 귀까지 온 거래.",
+      "next_hook": "귀 자체는 멀쩡하대서 한숨 돌렸는데, 입안은 아직 아려."
+    },
+    {
+      "turn_index": 9,
+      "scene_id": "act-03-voice-warning",
+      "event_callback_emotion": "귀 자체는 문제없대, 입안은 물만 마셔도 아린데 약 먹고 그냥 적응 중이야.",
+      "next_hook": "근데 입안 말고 목 쪽도 요즘 좀 찜찜했거든."
+    },
+    {
+      "turn_index": 10,
+      "scene_id": "act-03-voice-warning",
+      "event_callback_emotion": "아 그게 요즘은 방송할수록 목이 더 안 풀리길래, 구내염 보러 간 김에 성대도 봐 달라고 했어.",
+      "next_hook": "근데 선생님이 성대 들여다보더니 뜻밖의 단어를 꺼내시더라."
+    },
+    {
+      "turn_index": 11,
+      "scene_id": "act-03-voice-warning",
+      "event_callback_emotion": "그 단어가 미세결절이었어, 한동안 목 아끼고 고음 피하라는데 아직 결절은 아니니 옐로카드지 뭐.",
+      "next_hook": "사실 요즘 목을 좀 혹사하긴 했어."
+    },
+    {
+      "turn_index": 12,
+      "scene_id": "act-03-voice-warning",
+      "event_callback_emotion": "찔리네, 큰 행사 끝나고도 목을 계속 썼고 방송에서 한두 시간씩 울고도 떠들어서 그런가 봐.",
+      "next_hook": "옐로카드까지 받았으니 약국에서 하나 더 사 온 게 있어."
+    },
+    {
+      "turn_index": 13,
+      "scene_id": "act-04-lozenge-care",
+      "event_callback_emotion": "그니까, 경고 받은 김에 약국에서 레몬 목캔디 샀는데 처음 먹어 보니 다행히 그냥 사탕 맛이야.",
+      "next_hook": "근데 성분 이름 읽다 혀 꼬였는데 맨 끝에 술 얘기가 있어."
+    },
+    {
+      "turn_index": 14,
+      "scene_id": "act-04-lozenge-care",
+      "event_callback_emotion": "아 그게, 매일 세 잔 이상 마시면 약사랑 상의하라는데 난 하루 세 병이라 뜨끔했지.",
+      "next_hook": "근데 안 달아서 딱 내 입맛인데, 맛있는 이유가 또 있어."
+    },
+    {
+      "turn_index": 15,
+      "scene_id": "act-04-lozenge-care",
+      "event_callback_emotion": "허세 인정, 요즘 배도라지랑 프로폴리스 사탕 그 애매한 맛만 먹다 보니 이게 맛있나 봐.",
+      "next_hook": "아 맞다, 아까 하다 만 꿈 얘기 마저 해야지."
+    },
+    {
+      "turn_index": 16,
+      "scene_id": "act-04-lozenge-care",
+      "event_callback_emotion": "그 꿈 사실 어제 거야, 오늘 악몽은 12시쯤 깨서 안 적어도 기억날 줄 알고 잤다가 싹 날렸어.",
+      "next_hook": "뭐였는지 한 조각이라도 건져 보려고 기억 더듬는 중이야."
+    },
+    {
+      "turn_index": 17,
+      "scene_id": "act-05-lost-dream",
+      "event_callback_emotion": "그니까 힌트는커녕 소재 한 톨도 안 떠오르고, 목캔디로 가래만 좀 가라앉은 느낌이야.",
+      "next_hook": "장담은 망했으니까, 대신 아직 기억나는 그저께 꿈으로 갈게."
+    },
+    {
+      "turn_index": 18,
+      "scene_id": "act-05-lost-dream",
+      "event_callback_emotion": "오케이, 아까 그 개꿈 어제 아니고 그저께 거였는데 친구 둘이 코스프레하고 튀어나와.",
+      "next_hook": "근데 그건 앞부분뿐이고, 어이없게 꿈속에서 깨면서 시작해."
+    },
+    {
+      "turn_index": 19,
+      "scene_id": "act-05-lost-dream",
+      "event_callback_emotion": "아 그게, 눈 떠 보니 늘 자던 내 침대라서 꿈인 줄 감쪽같이 몰랐어.",
+      "next_hook": "늦잠 자서 뭉그적대는데, 방문 밖에 누가 지나다니는 거야."
+    },
+    {
+      "turn_index": 20,
+      "scene_id": "act-05-lost-dream",
+      "event_callback_emotion": "응 진짜로, 빼꼼 열린 문틈으로 누가 서랍장 거울을 보면서 왔다 갔다 하더라.",
+      "next_hook": "누군지 몰라 갸웃하는데, 그 사람이 방으로 쑥 들어왔어."
+    },
+    {
+      "turn_index": 21,
+      "scene_id": "act-06-cosplay-dream",
+      "event_callback_emotion": "누군가 했더니 풀세팅한 친구였는데, 화장이 영 별로라 침대에 앉은 채 고쳐 줬어.",
+      "next_hook": "친구가 고맙다고 나가는데, 문틈으로 누가 또 지나가더라."
+    },
+    {
+      "turn_index": 22,
+      "scene_id": "act-06-cosplay-dream",
+      "event_callback_emotion": "고쳐 줬지, 근데 나가 보니 둘이 오늘 그날이잖아 해서 약속 까먹은 줄 알았어.",
+      "next_hook": "둘 다 만화 행사 갈 준비 끝인데, 차림이 좀 이상하더라."
+    },
+    {
+      "turn_index": 23,
+      "scene_id": "act-06-cosplay-dream",
+      "event_callback_emotion": "이상할 수밖에, 어두운 방에선 몰랐는데 둘 다 가발까지 쓴 토끼랑 여우 코스프레였어.",
+      "next_hook": "그 차림 그대로 간다더니, 나한테 너도 갈래 하더라."
+    },
+    {
+      "turn_index": 24,
+      "scene_id": "act-06-cosplay-dream",
+      "event_callback_emotion": "그 설마가 맞아, 원래 코스어는 꽁꽁 가리고 가서 갈아입는데 걔넨 집에서부터 풀코스였어.",
+      "next_hook": "그렇게 따라나섰는데, 걔네 옆에 붙어 걷자니 민망하더라."
+    },
+    {
+      "turn_index": 25,
+      "scene_id": "act-07-public-exposure",
+      "event_callback_emotion": "맞아 너무 튀어서 난 좀 떨어져 걸었는데, 정신 차려 보니 걔네 사진을 찍어 주고 있더라.",
+      "next_hook": "근데 내가 찍는 게 눈에 띄었는지 구경꾼들이 하나둘 모이더라."
+    },
+    {
+      "turn_index": 26,
+      "scene_id": "act-07-public-exposure",
+      "event_callback_emotion": "찍사까진 괜찮았는데 구경꾼들이 걔네랑 찍어도 되냐니까, 둘이 엄지 척 하고 팬미팅을 하더라.",
+      "next_hook": "감사하다고 말까지 하니까 걔네 들킬까 봐 발이 뒤로 빠지더라."
+    },
+    {
+      "turn_index": 27,
+      "scene_id": "act-07-public-exposure",
+      "event_callback_emotion": "그니까 걔네 입 열 때마다 조마조마하다가, 결국 재밌게 놀아라 하고 혼자 빠져나왔어.",
+      "next_hook": "근데 그날따라 모르는 사람들이 자꾸 나한테 다가오더라."
+    },
+    {
+      "turn_index": 28,
+      "scene_id": "act-07-public-exposure",
+      "event_callback_emotion": "자꾸 말 걸길래 왜 이러나 했는데, 멀리서 줄무늬 옷에 몸이 동그란 남자가 날 빤히 보더라.",
+      "next_hook": "도자기에 그린 얼굴 같아서 섬뜩했는데, 그땐 그냥 넘겼거든."
+    },
+    {
+      "turn_index": 29,
+      "scene_id": "act-08-weeping-angel-cliffhanger",
+      "event_callback_emotion": "근데 진짜 소름 돋는 게, 그 도자기 얼굴이 내가 안 볼 때만 다가오고 보면 딱 멈추는 거야.",
+      "next_hook": "혼자 계속 쳐다봐야 하나 싶은데, 옆에 말 걸던 사람이 보였어."
+    },
+    {
+      "turn_index": 30,
+      "scene_id": "act-08-weeping-angel-cliffhanger",
+      "event_callback_emotion": "맞아, 그래서 말 걸던 토스트집 아주머니한테 같이 봐 달랬는데 눈 떼니까 또 가까워져 있더라.",
+      "next_hook": "내 눈으로 봐야만 멈추는 거라, 바로 도망칠 데부터 찾았어."
+    },
+    {
+      "turn_index": 31,
+      "scene_id": "act-08-weeping-angel-cliffhanger",
+      "event_callback_emotion": "진짜 큰일이지, 근처에 경찰서가 없어서 아침부터 사람 많은 학교로 튀었는데 거기까지 쫓아오더라.",
+      "next_hook": "수업하는 교실 옆 복도를 막 뛰다가, 결국 놀이터로 도망쳤어."
+    },
+    {
+      "turn_index": 32,
+      "scene_id": "act-08-weeping-angel-cliffhanger",
+      "event_callback_emotion": "따돌리긴커녕, 숨 고르느라 잠깐 뒤 안 본 사이에 잡혀서 어이없게 포크레인 같은 데 실렸어.",
+      "next_hook": "날 실은 게 그 남자였는지는, 얼굴을 못 봐서 몰라."
+    }
+  ]
+}

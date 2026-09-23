@@ -129,6 +129,63 @@ STAGING_META_RE = re.compile(
     r"방송\s*(?:을|이)?\s*(?:이어|진행)|좋은\s*콘텐츠|잠깐\s*생각해\s*볼게)",
     re.IGNORECASE,
 )
+# Framing (2026-09-23): v1 tells the source broadcast as a third-person "그 사람"
+# story, while its beats and chats describe the broadcaster's own experience, so
+# the model kept turning the viewer into the patient. v2 storylines declare
+# "framing": "first_person": AIRI tells her own episode, every beat hands her the
+# situation as 육하원칙, and the first-person pronoun rules no longer apply. Only
+# the source streamer's identity stays off-limits.
+FRAMINGS = ("third_person", "first_person")
+SITUATION_FIELDS = (
+    ("who", "누가"), ("when", "언제"), ("where", "어디서"),
+    ("what", "무엇을"), ("how", "어떻게"), ("why", "왜"),
+)
+SOURCE_IDENTITY_RE = re.compile(r"리제")
+STAGING_META_FIRST_PERSON_RE = re.compile(
+    STAGING_META_RE.pattern.replace(r"방송\s*(?:소품|중|에서)", r"방송\s*소품"), re.IGNORECASE,
+)
+assert STAGING_META_FIRST_PERSON_RE.pattern != STAGING_META_RE.pattern
+# User blind review (2026-09-23, v2): rejected turns had honorific slips ("저도 알아",
+# "그쵸") and reactions that only filled the slot ("아, 그런 일이 있었구나"). First
+# person still forbids honorific self-reference and endings; a viewer_reaction that
+# is only a generic acknowledgement does not count as a reaction.
+FIRST_PERSON_HONORIFIC_RE = re.compile(
+    r"(?<![가-힣])(?:저도|저는|제가|저를|저에게|저의|저와|저한테|저희)"
+    r"|(?:요|니다|세요|십시오|습니까)[.!?~…\s]*$"
+)
+GENERIC_REACTION_RE = re.compile(
+    r"^(?:(?:아|어|오|음|헐|와|앗|엥|아하)[,.!~…\s]*)*"
+    r"(?:진짜\s*)?(?:그런\s*(?:일이|경험이)\s*있었구나|그런\s*경험이구나|그렇구나|그랬구나|그런\s*거구나"
+    r"|그쵸|그치|맞아|그러게|그렇잖아|잠깐[,\s]*나\s*정리\s*좀\s*하고"
+    r"|(?:그\s*)?[가-힣]{1,6}\s*말이구나)[.!?~…\s]*$"
+)
+# v2.1 review: an assistant refusal was spoken as a broadcast line ("그건 내가 직접 실행할 수 없어.").
+ASSISTANT_REFUSAL_RE = re.compile(
+    r"직접\s*실행할\s*수\s*없|도와\s*드릴|도움이\s*필요하|제가\s*도와|AI\s*(?:라서|이라서|로서)|언어\s*모델"
+)
+
+
+def is_generic_reaction(body: str) -> bool:
+    return bool(GENERIC_REACTION_RE.match(normalized_text(body)))
+
+
+# v21h (2026-09-23): given the previous turns as assistant messages, the 2.3B model copied its
+# own earlier reaction into a tic on almost every turn. The previous turn is therefore handed
+# over as information inside the cue, and a reaction may not reuse an earlier one.
+REACTION_REPEAT_RUN = 10
+
+
+def previous_line_block(previous_chat: str, previous_airi: str) -> str:
+    return (
+        "\n[직전 대화 — 참고만 하고 문장을 따라 하지 마라]\n"
+        f"직전 시청자 채팅: {normalized_text(previous_chat)}\n"
+        f"직전에 내가 한 말: {normalized_text(previous_airi)}\n"
+        "지금 채팅은 내 직전 말을 들은 다른 시청자의 반응이다. 그 흐름을 이어서 받아쳐라."
+    )
+
+
+def repeats_earlier_reaction(body: str, earlier: list[str]) -> bool:
+    return any(longest_common_run(body, prior) >= REACTION_REPEAT_RUN for prior in earlier)
 # CRANE (arXiv 2502.09061): leave the reasoning span unconstrained and fence
 # only the final answer behind a delimiter, instead of constraining every token
 # of a short slot. The larger budget is for that free reasoning span.
@@ -229,7 +286,9 @@ def sanitize_rows(rows: Iterable[dict[str, Any]]) -> tuple[list[dict[str, Any]],
     }
 
 
-def load_spine(path: Path, beats: list[dict[str, Any]]) -> dict[int, dict[str, str]]:
+def load_spine(
+    path: Path, beats: list[dict[str, Any]], framing: str = "third_person",
+) -> dict[int, dict[str, str]]:
     """Load and fail-closed verify the deterministic spine against its beats.
 
     The spine is fixed text, so it is held to the same surface contract the
@@ -255,7 +314,7 @@ def load_spine(path: Path, beats: list[dict[str, Any]]) -> dict[int, dict[str, s
             text = row.get(field)
             if not isinstance(text, str) or not text.strip():
                 raise SystemExit(f"spine turn {index} is missing {field}")
-            if not parse_slot_output(text, beats[index - 1]):
+            if not parse_slot_output(text, beats[index - 1], framing=framing):
                 raise SystemExit(f"spine turn {index} {field} fails the slot contract")
             values[field] = text
         spine[index] = values
@@ -291,8 +350,25 @@ def load_storyline(path: Path) -> dict[str, Any]:
             for key in ("new_event", "callback", "emotion", "next_hook"):
                 if not beat.get(key):
                     raise SystemExit(f"scene {index} turn beat {beat_index} is missing {key}")
+            if story_framing(story) == "first_person":
+                situation = beat.get("situation")
+                if not isinstance(situation, dict) or any(
+                    not str(situation.get(key) or "").strip() for key, _ in SITUATION_FIELDS
+                ):
+                    raise SystemExit(f"scene {index} turn beat {beat_index} needs a full 육하원칙 situation")
         previous_end = end
     return story
+
+
+def story_framing(story: dict[str, Any]) -> str:
+    framing = story.get("framing", "third_person")
+    if framing not in FRAMINGS:
+        raise SystemExit(f"unknown storyline framing: {framing}")
+    return framing
+
+
+def situation_lines(beat: dict[str, Any]) -> str:
+    return "".join(f"- {label}: {beat['situation'][key]}\n" for key, label in SITUATION_FIELDS)
 
 
 def content_score(text: str) -> tuple[int, int]:
@@ -387,7 +463,9 @@ def evaluate_quality(story: dict[str, Any], turns: list[dict[str, Any]]) -> dict
             "emotion_matches": emotion_matches,
             "repeated": duplicate,
             "max_prior_similarity": round(max_similarity, 3),
-            "source_experience_claim": bool(SOURCE_EXPERIENCE_RE.search(response)),
+            "source_experience_claim": bool((
+                SOURCE_IDENTITY_RE if story_framing(story) == "first_person" else SOURCE_EXPERIENCE_RE
+            ).search(response)),
             "irrelevant_knowledge_marker": bool(IRRELEVANT_KNOWLEDGE_RE.search(response)),
         })
         if response:
@@ -504,6 +582,10 @@ def build_turn_system(
     story: dict[str, Any], scene: dict[str, Any], previous_scene: dict[str, Any] | None,
     scene_turn_index: int, scene_turn_total: int, beat: dict[str, Any],
 ) -> str:
+    if story_framing(story) == "first_person":
+        return build_first_person_turn_system(
+            story, scene, previous_scene, scene_turn_index, scene_turn_total, beat,
+        )
     # The proxy already supplies the immutable AIRI prompt. Keep this caller
     # card focused on the VOD storyline state instead of duplicating that
     # prompt inside an active-character-card message.
@@ -557,14 +639,63 @@ def build_turn_system(
     )
 
 
+def build_first_person_turn_system(
+    story: dict[str, Any], scene: dict[str, Any], previous_scene: dict[str, Any] | None,
+    scene_turn_index: int, scene_turn_total: int, beat: dict[str, Any],
+) -> str:
+    prior = previous_scene["label"] if previous_scene else "방송 시작"
+    completed_arc = " → ".join(
+        item["label"] for item in story["scenes"][:story["scenes"].index(scene)]
+    ) or "아직 없음"
+    return (
+        "\n\n[오늘 방송]\n"
+        f"- 주제: {story['title']}\n"
+        f"- 지금 구간: {scene['label']}\n"
+        f"- 상황: {scene['plot']}\n"
+        f"- AIRI 진행 목표: {scene['airi_objective']}\n"
+        f"- 현재 장면 사실: {' · '.join(scene['facts'])}\n"
+        f"- 아직 풀지 않은 질문: {scene['unresolved']}\n"
+        f"- 다음 전환: {scene['transition']}\n"
+        f"- 직전 구간: {prior}\n"
+        f"- 지금까지의 막 순서: {completed_arc}\n"
+        f"- 장면 내 진행: {scene_turn_index}/{scene_turn_total}\n"
+        "[방송 진행 지시]\n"
+        "- 지금은 AIRI가 진행하는 라이브 방송이다. 각 [YouTube] 채팅은 서로 다른 시청자가 AIRI에게 보낸 것이다.\n"
+        "- 아래 상황은 AIRI 본인이 겪은 오늘 방송의 이야기다. AIRI는 자기 일을 '나'로 말한다.\n"
+        "- 시청자는 AIRI의 이야기에 반응하는 사람이다. AIRI의 일을 시청자가 겪은 일처럼 바꾸지 말고, "
+        "시청자에게 조언·지시·진료 권유를 하지 마라.\n"
+        "- 시청자 채팅을 한 구절 받아친 뒤 이번 턴 상황을 이야기하고, 정확히 3개의 완결된 반말 문장으로 말해라.\n"
+        "- 원본 방송인의 이름이나 방송 고유 표현은 쓰지 마라. 지식 검색에서 나온 무관한 뉴스·사실은 끼워 넣지 마라.\n"
+        "[이번 턴 상황 — 육하원칙]\n"
+        + situation_lines(beat)
+        + "[이번 턴 줄거리 상태]\n"
+        f"- 새로 공개할 사건: {beat['new_event']}\n"
+        f"- 반드시 회수할 단서: {beat['callback']}\n"
+        f"- 감정 변화: {beat['emotion']}\n"
+        f"- 끝에 걸어둘 다음 고리: {beat['next_hook']}"
+    )
+
+
 def user_content(text: str) -> str:
     return f"{ab.USER_PREFIX}{text}"
 
 
 def build_director_cue(
     scene: dict[str, Any], scene_turn_index: int, scene_turn_total: int,
-    beat: dict[str, Any],
+    beat: dict[str, Any], framing: str = "third_person",
 ) -> str:
+    if framing == "first_person":
+        return (
+            "[대사 직전 감독 큐]\n"
+            f"장면 {scene_turn_index}/{scene_turn_total}. 이번 턴 상황:\n"
+            + situation_lines(beat)
+            + f"반드시 회수할 단서: {beat['callback']}\n"
+            f"이번 답변의 끝에서 이어갈 방향: {beat['next_hook']}\n"
+            "출력은 정확히 3개의 완결된 한국어 반말 문장이어야 한다. 첫 문장은 시청자 채팅에 직접 반응하고, "
+            "둘째 문장은 네가 겪은 이번 턴의 일을 '나'로 말하며, 셋째 문장은 다음 고리로 이어라. "
+            "채팅을 그대로 반복하거나 한 단어로 되묻지 말고, 시청자에게 조언하지 말며, "
+            "대괄호·내부 카드 문구·메타 설명·무관한 지식·뉴스·기억을 출력하지 마라."
+        )
     return (
         "[대사 직전 감독 큐]\n"
         f"장면 {scene_turn_index}/{scene_turn_total}. 이번 턴에 새로 공개할 사건: {beat['new_event']}\n"
@@ -626,7 +757,7 @@ def build_structured_rewrite_cue(beat: dict[str, Any], draft: str) -> str:
 
 
 def build_slotwise_cue(field: str, beat: dict[str, Any], viewer_text: str = "",
-                       following: tuple[str, ...] = ()) -> str:
+                       following: tuple[str, ...] = (), framing: str = "third_person") -> str:
     instructions = {
         "viewer_reaction": (
             "시청자 채팅의 구체적인 핵심을 바로 받아치는 한 문장"
@@ -668,6 +799,32 @@ def build_slotwise_cue(field: str, beat: dict[str, Any], viewer_text: str = "",
     # slotwise carrier had it, and `following` survives only to feed the spine
     # recitation guard in parse_slot_output.
     following_line = ""
+    if framing == "first_person":
+        return (
+            "[방송 대사 슬롯 생성]\n"
+            "이 호출은 최종 대사 전체가 아니라 아래 한 슬롯만 생성한다. "
+            "설명, 제목, JSON, 대괄호, 슬롯 이름, 메타 발언 없이 자연스러운 한국어 반말 한 문장만 출력해라. "
+            "너는 어시스턴트가 아니라 지금 라이브 방송을 진행하는 방송인 AIRI다. "
+            "아래 상황은 네가 직접 겪은 일이고, 시청자 채팅은 여러 시청자가 너에게 보낸 말이다. "
+            "네 일은 '나'로 말하고, 그 일을 시청자가 겪은 일처럼 바꾸지 마라. "
+            "시청자에게 조언·지시·진료 권유를 하지 말고, 몸 이야기는 네가 겪은 일로만 말해라.\n"
+            "[이번 턴 상황 — 육하원칙]\n"
+            + situation_lines(beat)
+            + f"생성할 슬롯: {field} — {instructions[field]}\n"
+            + (
+                "채팅이 말한 구체적인 내용을 짚어 30자 안팎의 짧은 한 문장으로 받아쳐라. "
+                "'그렇구나', '그런 일이 있었구나' 같은 빈말만 하지 말고, 네 이야기는 다음 문장에서 "
+                "이어지니 여기서 미리 말하지 마라.\n"
+                if field == "viewer_reaction" else ""
+            )
+            + f"새 사건: {beat['new_event']}\n"
+            f"회수할 단서: {beat['callback']}\n"
+            f"감정 변화: {beat['emotion']}\n"
+            + event_instruction
+            + emotion_instruction
+            + viewer_reference
+            + f"다음 고리: {beat['next_hook']}"
+        )
     return (
         "[방송 대사 슬롯 생성]\n"
         "이 호출은 최종 대사 전체가 아니라 아래 한 슬롯만 생성한다. "
@@ -702,11 +859,18 @@ def build_slotwise_cue(field: str, beat: dict[str, Any], viewer_text: str = "",
 
 
 def build_slotwise_retry_cue(field: str, beat: dict[str, Any], viewer_text: str = "",
-                             following: tuple[str, ...] = ()) -> str:
+                             following: tuple[str, ...] = (), framing: str = "third_person") -> str:
     # Any depth reminder must stay last, so lift it off before the retry notes
     # and re-append it. Guard on a non-empty reminder: slicing by -0 would
     # otherwise wipe the whole cue.
-    base = build_slotwise_cue(field, beat, viewer_text, following)
+    base = build_slotwise_cue(field, beat, viewer_text, following, framing)
+    if framing == "first_person":
+        return (
+            base
+            + "\n직전 출력은 검증에 실패했다. 이번에는 줄바꿈과 대괄호 없이 한 문장만 쓰고, "
+            "내부 카드·슬롯 이름을 출력하지 마라. 위 문구를 그대로 옮겨 말하지 말고 네 방송 대사로 바꿔 말해라. "
+            "시청자에게 조언하거나 지시하지 말고, 네가 겪은 일을 시청자가 겪은 일처럼 말하지 마라."
+        )
     if SLOT_DEPTH_REMINDER and base.endswith(SLOT_DEPTH_REMINDER):
         base = base[: -len(SLOT_DEPTH_REMINDER)]
     return (
@@ -786,15 +950,18 @@ def recites_beat(body: str, beat: dict[str, Any] | None) -> bool:
 
 
 def parse_slot_output(raw: str, beat: dict[str, Any] | None = None,
-                      spine_lines: tuple[str, ...] = ()) -> str:
+                      spine_lines: tuple[str, ...] = (), framing: str = "third_person") -> str:
     body, _ = ab.split_operational_protocol(raw)
     body = normalized_text(body)
+    first_person = framing == "first_person"
     if (
         not body
         or "[" in body
         or "]" in body
         or ab.CONTROL_LEAK.search(body)
-        or SOURCE_EXPERIENCE_RE.search(body)
+        or (SOURCE_IDENTITY_RE if first_person else SOURCE_EXPERIENCE_RE).search(body)
+        or (first_person and FIRST_PERSON_HONORIFIC_RE.search(body))
+        or (first_person and ASSISTANT_REFUSAL_RE.search(body))
         or OUT_OF_STORY_VOICE_RE.search(body)
         or recites_beat(body, beat)
         # Showing the generated slot the spine text made a 2.3B model copy it:
@@ -807,7 +974,7 @@ def parse_slot_output(raw: str, beat: dict[str, Any] | None = None,
         )
     ):
         return ""
-    if STAGING_META_RE.search(body):
+    if (STAGING_META_FIRST_PERSON_RE if first_person else STAGING_META_RE).search(body):
         return ""
     if len(re.findall(r"[.!?。！？](?=\s|$)", body)) > 1:
         return ""
@@ -924,7 +1091,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             beat
             for scene in story["scenes"]
             for beat in scene["turn_beats"][:args.per_scene_turns]
-        ])
+        ], story_framing(story))
     elif args.spine is not None:
         raise SystemExit("--spine is only valid with --rewrite-format spine or spine-optional")
     source_rows = read_jsonl(args.chat)
@@ -959,6 +1126,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         raise RuntimeError("scene selector produced duplicate audience rows")
     selected.sort(key=lambda row: int(row["offset_ms"]))
 
+    framing = story_framing(story)
+    if framing == "first_person" and args.rewrite_format not in ("slotwise", "spine", "spine-optional"):
+        raise SystemExit("first_person storylines are supported with slotwise and spine formats only")
     transport = ab.HttpTransport(args.base_url, args.token, stream_mode="auto")
     judge = (
         system1_judge.System1Client(args.system1_url)
@@ -968,6 +1138,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     transport.client.headers[legacy_runner.SESSION_HEADER] = session_id
     transport.client.headers["x-airi-turn-origin"] = args.turn_origin
     history: list[tuple[str, str]] = []
+    earlier_reactions: list[str] = []
     turns: list[dict[str, Any]] = []
     previous_scene: dict[str, Any] | None = None
     scene_seen: dict[str, int] = {}
@@ -998,6 +1169,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     scene_seen[scene["id"]],
                     args.per_scene_turns,
                     scene["turn_beats"][scene_seen[scene["id"]] - 1],
+                    story_framing(story),
                 ),
             })
             sent = user_content(message["text"])
@@ -1042,10 +1214,24 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                         )
                         for attempt in range(1, budget + 1):
                             slot_messages = [{"role": "system", "content": (
-                                build_slotwise_cue(field, beat, following=following)
+                                build_slotwise_cue(field, beat, following=following, framing=framing)
                                 if attempt == 1
-                                else build_slotwise_retry_cue(field, beat, following=following)
+                                else build_slotwise_retry_cue(field, beat, following=following, framing=framing)
                             )}]
+                            # v2.1 review: the reaction was generated without the conversation, so it
+                            # could not follow chats that answer AIRI's previous line. Production sends
+                            # the history; --reaction-history-turns restores that for the reaction slot.
+                            if field == "viewer_reaction" and args.reaction_previous_line and history:
+                                previous_chat, previous_airi = history[-1]
+                                slot_messages[0]["content"] += previous_line_block(
+                                    previous_chat.removeprefix(ab.USER_PREFIX), previous_airi,
+                                )
+                            if field == "viewer_reaction" and args.reaction_history_turns > 0:
+                                for prior_user, prior_airi in history[-args.reaction_history_turns:]:
+                                    slot_messages.extend((
+                                        {"role": "user", "content": prior_user},
+                                        {"role": "assistant", "content": prior_airi},
+                                    ))
                             slot_messages.append({
                                 "role": "user",
                                 "content": (
@@ -1061,7 +1247,17 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                                 max_tokens=min(args.max_tokens, SLOT_MAX_TOKENS), timeout=args.timeout,
                             )
                             slot_raw = str(slot_record.get("response") or "")
-                            slot_body = parse_slot_output(slot_raw, beat, following)
+                            slot_body = parse_slot_output(slot_raw, beat, following, framing)
+                            if (
+                                framing == "first_person" and field == "viewer_reaction"
+                                and slot_body and is_generic_reaction(slot_body)
+                            ):
+                                slot_body = ""
+                            if (
+                                field == "viewer_reaction" and args.reaction_anti_repeat and slot_body
+                                and repeats_earlier_reaction(slot_body, earlier_reactions)
+                            ):
+                                slot_body = ""
                             slot_record["slot"] = field
                             slot_record["attempt"] = attempt
                             slot_record["response_body"] = slot_body
@@ -1105,6 +1301,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                                 )
                             slot_calls[selected_index]["selected"] = True
                             slot_values[field] = slot_calls[selected_index]["response_body"]
+                            if field == "viewer_reaction":
+                                earlier_reactions.append(slot_values[field])
                     # spine-optional (M8-10 experiment): every configuration that let the
                     # model speak one free sentence bought item 1 and spent one of items
                     # 4, 5 or 6. A broadcaster does not answer every chat, so when the
@@ -1312,8 +1510,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "change": args.tuning_change,
             "rewrite_passes": args.rewrite_passes,
             "rewrite_format": args.rewrite_format,
+            "framing": framing,
             "candidate_select": args.candidate_select,
             "candidate_budget": args.candidate_budget,
+            "reaction_history_turns": args.reaction_history_turns,
+            "reaction_previous_line": args.reaction_previous_line,
+            "reaction_anti_repeat": args.reaction_anti_repeat,
             "system1_threshold": (
                 args.system1_threshold if args.candidate_select == "system1-early-exit" else None
             ),
@@ -1342,6 +1544,18 @@ def parser() -> argparse.ArgumentParser:
     )
     value.add_argument("--per-scene-turns", type=int, default=4)
     value.add_argument("--history-turns", type=int, default=8)
+    value.add_argument(
+        "--reaction-history-turns", type=int, default=0,
+        help="previous turns (chat and AIRI line) given to the viewer_reaction slot call; 0 keeps it context-free",
+    )
+    value.add_argument(
+        "--reaction-previous-line", action="store_true",
+        help="hand the previous chat and AIRI line to the viewer_reaction cue as information",
+    )
+    value.add_argument(
+        "--reaction-anti-repeat", action="store_true",
+        help=f"reject a viewer_reaction sharing {REACTION_REPEAT_RUN}+ characters with an earlier reaction",
+    )
     value.add_argument("--max-tokens", type=int, default=220)
     value.add_argument(
         "--rewrite-passes", type=int, choices=(0, 1), default=0,

@@ -547,3 +547,190 @@ def test_candidate_budget_bounds_the_no_pass_tail_and_falls_back_to_the_best_sco
     assert report["tuning"]["candidate_budget"] == 6
     default = storyline.parser().parse_args(["--report", "r.json", "--review-html", "r.html"])
     assert default.candidate_budget == storyline.SLOT_CANDIDATE_COUNT
+
+
+FIRST_PERSON_BEAT = {
+    "situation": {
+        "who": "나(AIRI)", "when": "어제부터", "where": "집에서 녹음하던 중",
+        "what": "목이 아프기 시작했다", "how": "침 삼킬 때 따끔했다", "why": "원인은 아직 모른다",
+    },
+    "new_event": "나(AIRI)는 어제 녹음하다가 목이 아프기 시작했다",
+    "callback": "내가 방송 첫머리에 꺼낸 이상한 꿈",
+    "emotion": "당황에서 걱정으로",
+    "next_hook": "나는 오늘 병원에 다녀온 이야기를 꺼낸다",
+}
+
+
+def test_first_person_framing_allows_own_story_but_keeps_advice_and_identity_rules():
+    # v1 forced a third-person "그 사람" while its beats and chats were the
+    # broadcaster's own experience; the model then made the viewer the patient.
+    # A first_person storyline lets AIRI say "나", but advice to the viewer and
+    # the source streamer's name stay rejected.
+    beat = FIRST_PERSON_BEAT
+    own = "나 어제 녹음하다가 목이 따끔해서 좀 놀랐어."
+    assert storyline.parse_slot_output(own, beat) == ""
+    assert storyline.parse_slot_output(own, beat, framing="first_person") == own
+    on_air = "방송 중에도 목이 계속 신경 쓰였어."
+    assert storyline.parse_slot_output(on_air, beat) == ""
+    assert storyline.parse_slot_output(on_air, beat, framing="first_person") == on_air
+    assert storyline.parse_slot_output("그럼 오늘은 쉬는 게 좋아.", beat, framing="first_person") == ""
+    assert storyline.parse_slot_output("리제도 그랬대.", beat, framing="first_person") == ""
+
+
+def test_first_person_cues_hand_airi_the_whole_situation_and_drop_the_third_person_rule():
+    beat = FIRST_PERSON_BEAT
+    cue = storyline.build_slotwise_cue("viewer_reaction", beat, framing="first_person")
+    for label in ("누가: 나(AIRI)", "언제: 어제부터", "어디서: 집에서 녹음하던 중", "무엇을:", "어떻게:", "왜:"):
+        assert label in cue
+    assert "그 사람" not in cue and "주장하지 마라" not in cue
+    assert "시청자가 겪은 일처럼 바꾸지 마라" in cue
+    retry = storyline.build_slotwise_retry_cue("viewer_reaction", beat, framing="first_person")
+    assert retry.startswith(cue) and "내가 겪었다" not in retry
+    director = storyline.build_director_cue({}, 1, 4, beat, "first_person")
+    assert "누가: 나(AIRI)" in director and "조언하지 말며" in director
+
+
+def test_first_person_storyline_requires_a_full_situation(tmp_path):
+    story = json.loads((HERE / "vod_storyline_20260827.json").read_text(encoding="utf-8"))
+    story["framing"] = "first_person"
+    path = tmp_path / "story.json"
+    path.write_text(json.dumps(story, ensure_ascii=False), encoding="utf-8")
+    try:
+        storyline.load_storyline(path)
+    except SystemExit as exc:
+        assert "육하원칙" in str(exc)
+    else:
+        raise AssertionError("a first_person storyline without situations must be rejected")
+    for scene in story["scenes"]:
+        for beat in scene["turn_beats"]:
+            beat["situation"] = dict(FIRST_PERSON_BEAT["situation"])
+    path.write_text(json.dumps(story, ensure_ascii=False), encoding="utf-8")
+    loaded = storyline.load_storyline(path)
+    assert storyline.story_framing(loaded) == "first_person"
+    system = storyline.build_turn_system(
+        loaded, loaded["scenes"][1], loaded["scenes"][0], 1, 4, loaded["scenes"][1]["turn_beats"][0],
+    )
+    assert "서로 다른 시청자" in system and "누가: 나(AIRI)" in system and "'화자'의 일로" not in system
+    story["framing"] = "sideways"
+    path.write_text(json.dumps(story, ensure_ascii=False), encoding="utf-8")
+    try:
+        storyline.load_storyline(path)
+    except SystemExit as exc:
+        assert "framing" in str(exc)
+    else:
+        raise AssertionError("an unknown framing must be rejected")
+
+
+def test_repository_v2_storyline_is_first_person_with_full_situations_and_a_valid_spine():
+    # v2 (2026-09-23): AIRI's own episode, every beat names 누가/언제/어디서/무엇을/어떻게/왜,
+    # the viewer chats are authored for that situation, and the spine speaks in first person.
+    story = storyline.load_storyline(HERE / "vod_storyline_20260923_v2.json")
+    assert storyline.story_framing(story) == "first_person"
+    beats = [beat for scene in story["scenes"] for beat in scene["turn_beats"]]
+    assert len(beats) == 32
+    assert all("AIRI" in beat["situation"]["who"] for beat in beats)
+    spine = storyline.load_spine(HERE / "vod_storyline_20260923_v2_spine.json", beats, "first_person")
+    assert sorted(spine) == list(range(1, 33))
+    # v2.1 (after the user blind review): short spoken lines that pick up each turn's chat.
+    short = storyline.load_spine(HERE / "vod_storyline_20260923_v21_spine.json", beats, "first_person")
+    assert sorted(short) == list(range(1, 33))
+    assert all(len(turn["event_callback_emotion"]) <= 55 and len(turn["next_hook"]) <= 35 for turn in short.values())
+    chats = [message for scene in story["scenes"] for message in scene["audience_messages"]]
+    selected, _ = storyline.sanitize_rows(
+        [{"text": message["text"], "author": message["author"], "offset_ms": 0} for message in chats]
+    )
+    assert len(selected) == 32 == len({message["author"] for message in chats})
+    spoken = " ".join(value for turn in spine.values() for value in turn.values())
+    spoken += " ".join(message["text"] for message in chats)
+    assert not storyline.SOURCE_IDENTITY_RE.search(spoken)
+
+
+def test_first_person_rejects_honorifics_and_generic_reactions_from_the_user_review():
+    # User blind review of v2 rejected turns with "저도 알아" / "그쵸" slips and reactions
+    # that only acknowledged ("아, 그런 일이 있었구나"). These lines are taken from it.
+    beat = FIRST_PERSON_BEAT
+    for honorific in ("그쵸, 들킬까 봐 조마조마한 거 저도 알아!", "플랫폼마다 분위기가 좀 달라요."):
+        assert storyline.parse_slot_output(honorific, beat, framing="first_person") == ""
+    for generic in ("아, 그런 일이 있었구나.", "아, 그쵸!", "잠깐, 나 정리 좀 하고!", "아, 진짜 그런 경험이구나."):
+        assert storyline.is_generic_reaction(generic)
+    for real in ("맞아, 옐로카드 받으니까 목이 먼저 신호 준 거지.", "토끼랑 여우 세트는 나도 처음 봤어."):
+        assert not storyline.is_generic_reaction(real)
+        assert storyline.parse_slot_output(real, beat, framing="first_person") == real
+    cue = storyline.build_slotwise_cue("viewer_reaction", beat, framing="first_person")
+    assert "30자 안팎" in cue and "미리 말하지 마라" in cue
+    assert "30자 안팎" not in storyline.build_slotwise_cue("viewer_reaction", beat)
+
+
+def test_reaction_slot_can_see_the_recent_conversation(monkeypatch, tmp_path):
+    # v2.1 review: 7/10 turns rejected; the reaction call carried only this turn's cue and chat,
+    # while the chats answer AIRI's previous line. --reaction-history-turns passes the last turns.
+    seen = []
+
+    def fake_call_once(transport, *, model, messages, max_tokens, timeout, response_format=None):
+        if messages[0]["content"].startswith("[방송 대사 슬롯 생성]"):
+            seen.append(messages)
+            return {"ok": True, "response": "토끼랑 여우 세트는 나도 처음 봤어.", "ttft_ms": 1.0, "complete_ms": 2.0}
+        return {"ok": True, "response": "초안 대사야.", "ttft_ms": 1.0, "complete_ms": 2.0}
+
+    monkeypatch.setattr(storyline.ab, "call_once", fake_call_once)
+
+    def run(turns):
+        seen.clear()
+        args = storyline.parser().parse_args([
+            "--storyline", str(HERE / "vod_storyline_20260923_v2.json"),
+            "--rewrite-passes", "1", "--rewrite-format", "spine",
+            "--spine", str(HERE / "vod_storyline_20260923_v21_spine.json"),
+            "--candidate-select", "rule-early-exit", "--reaction-history-turns", str(turns),
+            "--report", str(tmp_path / "report.json"), "--review-html", str(tmp_path / "review.html"),
+        ])
+        return storyline.run(args)
+
+    report = run(0)
+    assert all(len(messages) == 2 for messages in seen)
+    assert report["tuning"]["reaction_history_turns"] == 0
+    report = run(2)
+    assert len(seen[0]) == 2 and len(seen[1]) == 4 and len(seen[2]) == 6 and len(seen[5]) == 6
+    third = seen[2]
+    assert [m["role"] for m in third] == ["system", "user", "assistant", "user", "assistant", "user"]
+    assert third[2]["content"] == report["turns"][0]["airi"] and third[4]["content"] == report["turns"][1]["airi"]
+    assert report["tuning"]["reaction_history_turns"] == 2
+
+
+def test_first_person_filters_cover_the_v21_review_misses():
+    assert storyline.is_generic_reaction("그렇잖아.")
+    assert storyline.is_generic_reaction("아, 그 추격전 말이구나.")
+    assert not storyline.is_generic_reaction("그렇구나, 목을 한 번도 쉬게 안 하고 방송한 게 문제였네.")
+    assert storyline.parse_slot_output("그건 내가 직접 실행할 수 없어.", FIRST_PERSON_BEAT, framing="first_person") == ""
+
+
+def test_previous_line_is_information_and_anti_repeat_blocks_the_v21h_tic(monkeypatch, tmp_path):
+    # v21h: prior turns as assistant messages made the model repeat one reaction every turn.
+    # The previous turn now goes into the cue as information, and a repeated reaction is rejected.
+    tic = "아, 그래서 내가 방송 중에 말하는 게 이해되네."
+    fresh = "토끼랑 여우 세트는 나도 처음 봤어."
+    seen = []
+
+    def fake_call_once(transport, *, model, messages, max_tokens, timeout, response_format=None):
+        if messages[0]["content"].startswith("[방송 대사 슬롯 생성]"):
+            seen.append(messages)
+            text = tic if len([m for m in seen if m[0]["content"] == messages[0]["content"]]) == 1 else fresh
+            return {"ok": True, "response": text, "ttft_ms": 1.0, "complete_ms": 2.0}
+        return {"ok": True, "response": "초안 대사야.", "ttft_ms": 1.0, "complete_ms": 2.0}
+
+    monkeypatch.setattr(storyline.ab, "call_once", fake_call_once)
+    args = storyline.parser().parse_args([
+        "--storyline", str(HERE / "vod_storyline_20260923_v2.json"),
+        "--rewrite-passes", "1", "--rewrite-format", "spine",
+        "--spine", str(HERE / "vod_storyline_20260923_v21_spine.json"),
+        "--candidate-select", "rule-early-exit", "--reaction-previous-line", "--reaction-anti-repeat",
+        "--report", str(tmp_path / "report.json"), "--review-html", str(tmp_path / "review.html"),
+    ])
+    report = storyline.run(args)
+    assert all(len(messages) == 2 for messages in seen)
+    assert "직전에 내가 한 말" not in seen[0][0]["content"]
+    second_turn = [m for m in seen if "직전에 내가 한 말" in m[0]["content"]][0]
+    assert report["turns"][0]["airi"] in second_turn[0]["content"].replace("\n", " ") or \
+        storyline.normalized_text(report["turns"][0]["airi"]) in second_turn[0]["content"]
+    reactions = [json.loads(turn["rewrite_raw"])["composed"] for turn in report["turns"]]
+    assert sum(1 for text in reactions if text.startswith(tic)) == 1
+    assert report["tuning"]["reaction_previous_line"] and report["tuning"]["reaction_anti_repeat"]
