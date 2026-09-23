@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 
@@ -475,3 +476,74 @@ def test_spine_optional_mode_is_wired_and_requires_the_spine():
     assert args.rewrite_format == "spine-optional"
     assert args.spine == Path("spine.json")
     assert storyline.SPINE_GENERATED_FIELDS == ("viewer_reaction",)
+
+
+def _run_with_fake_model(monkeypatch, tmp_path, mode, judge_scores=None, extra=()):
+    first = "그래서 어떻게 됐는데?"
+    plain = "와 그 장면 상상만 해도 소름 돋는다."
+    liked = "와 그 장면 생각만 해도 등골이 서늘해."
+    state = {"slot": 0, "slot_calls": 0}
+
+    def fake_call_once(transport, *, model, messages, max_tokens, timeout, response_format=None):
+        if messages[0]["content"].startswith("[방송 대사 슬롯 생성]"):
+            state["slot"] += 1
+            state["slot_calls"] += 1
+            text = first if state["slot"] == 1 else plain if state["slot"] == 2 else liked
+        else:
+            state["slot"] = 0
+            text = "초안 대사야."
+        return {"ok": True, "response": text, "ttft_ms": 1.0, "complete_ms": 2.0}
+
+    monkeypatch.setattr(storyline.ab, "call_once", fake_call_once)
+    if judge_scores is not None:
+        monkeypatch.setattr(
+            storyline.system1_judge.System1Client, "score",
+            lambda self, chat, candidate: (judge_scores.get(candidate, 0.1), 0.5),
+        )
+    args = storyline.parser().parse_args([
+        "--rewrite-passes", "1", "--rewrite-format", "spine",
+        "--spine", str(HERE / "vod_storyline_20260827_spine.json"),
+        "--candidate-select", mode, *extra,
+        "--report", str(tmp_path / "report.json"), "--review-html", str(tmp_path / "review.html"),
+    ])
+    report = storyline.run(args)
+    return report, state["slot_calls"], (first, plain, liked)
+
+
+def test_candidate_select_modes_only_change_how_many_reactions_are_generated(monkeypatch, tmp_path):
+    # Measured 2026-09-23: 16 of 17 calls per turn are reaction candidates and the
+    # heuristic ranks copies of the chat first. Early exit must cut the calls, never
+    # pick the rule-rejected question, and leave the default path exactly as before.
+    report, calls, (first, plain, liked) = _run_with_fake_model(monkeypatch, tmp_path, "heuristic")
+    assert calls == 32 * storyline.SLOT_CANDIDATE_COUNT
+    assert report["tuning"]["candidate_select"] == "heuristic"
+
+    report, calls, _ = _run_with_fake_model(monkeypatch, tmp_path, "rule-early-exit")
+    assert calls == 32 * 2
+    assert all(plain in turn["airi"] and first not in turn["airi"] for turn in report["turns"])
+
+    scores = {liked: 0.9, plain: 0.2, first: 0.95}
+    report, calls, _ = _run_with_fake_model(monkeypatch, tmp_path, "system1-early-exit", scores)
+    assert calls == 32 * 3
+    assert all(liked in turn["airi"] for turn in report["turns"])
+    assert report["tuning"]["system1_threshold"] == 0.5
+
+    report, calls, _ = _run_with_fake_model(monkeypatch, tmp_path, "system1-shadow", scores)
+    assert calls == 32 * storyline.SLOT_CANDIDATE_COUNT
+    slots = json.loads(report["turns"][0]["rewrite_raw"])["slots"]
+    assert all("system1_p" in slot for slot in slots if slot["parse_ok"])
+
+
+def test_candidate_budget_bounds_the_no_pass_tail_and_falls_back_to_the_best_score(monkeypatch, tmp_path):
+    # With a 0.8 threshold, turns where nothing passes generated all 16 candidates
+    # and pushed p95 above the heuristic. The budget caps that tail; the fallback then
+    # takes the highest judge score among the rule-clean candidates it did see.
+    scores = {"와 그 장면 상상만 해도 소름 돋는다.": 0.3, "와 그 장면 생각만 해도 등골이 서늘해.": 0.6}
+    report, calls, (first, plain, liked) = _run_with_fake_model(
+        monkeypatch, tmp_path, "system1-early-exit", scores, ("--candidate-budget", "6", "--system1-threshold", "0.8"),
+    )
+    assert calls == 32 * 6
+    assert all(liked in turn["airi"] for turn in report["turns"])
+    assert report["tuning"]["candidate_budget"] == 6
+    default = storyline.parser().parse_args(["--report", "r.json", "--review-html", "r.html"])
+    assert default.candidate_budget == storyline.SLOT_CANDIDATE_COUNT

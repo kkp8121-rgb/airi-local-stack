@@ -24,6 +24,7 @@ import run_broadcast_chat_ab as ab  # noqa: E402
 
 sys.path.insert(0, str(HERE.parent.parent))
 import run_broadcast_sim as legacy_runner  # noqa: E402
+import system1_judge  # noqa: E402
 
 DEFAULT_STORYLINE = HERE / "vod_storyline_20260827.json"
 DEFAULT_CHAT = HERE.parent / "vod_capture_2026-08-27" / "chat.jsonl"
@@ -959,6 +960,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     selected.sort(key=lambda row: int(row["offset_ms"]))
 
     transport = ab.HttpTransport(args.base_url, args.token, stream_mode="auto")
+    judge = (
+        system1_judge.System1Client(args.system1_url)
+        if args.candidate_select.startswith("system1") else None
+    )
     session_id = args.session_id or f"vod-storyline-{int(time.time())}"
     transport.client.headers[legacy_runner.SESSION_HEADER] = session_id
     transport.client.headers["x-airi-turn-origin"] = args.turn_origin
@@ -1027,7 +1032,15 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     )
                     for field in generated_fields:
                         valid_slot_indexes: list[int] = []
-                        for attempt in range(1, SLOT_CANDIDATE_COUNT + 1):
+                        # Only the viewer reaction is judged; plot slots keep the heuristic.
+                        select_mode = (
+                            args.candidate_select if field == "viewer_reaction" else "heuristic"
+                        )
+                        stopped_index: int | None = None
+                        budget = (
+                            args.candidate_budget if field == "viewer_reaction" else SLOT_CANDIDATE_COUNT
+                        )
+                        for attempt in range(1, budget + 1):
                             slot_messages = [{"role": "system", "content": (
                                 build_slotwise_cue(field, beat, following=following)
                                 if attempt == 1
@@ -1061,14 +1074,35 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                             slot_calls.append(slot_record)
                             if slot_record.get("ok") and slot_body:
                                 valid_slot_indexes.append(len(slot_calls) - 1)
+                                if select_mode != "heuristic":
+                                    reason = system1_judge.rule_reject_reason(
+                                        slot_body, normalized_text(message["text"]), longest_common_run,
+                                    )
+                                    slot_record["rule_reject"] = reason
+                                    if judge is not None:
+                                        probability, judge_ms = judge.score(
+                                            normalized_text(message["text"]), slot_body,
+                                        )
+                                        slot_record["system1_p"] = probability
+                                        slot_record["system1_ms"] = judge_ms
+                                    if system1_judge.stop_here(
+                                        select_mode, reason, slot_record.get("system1_p"),
+                                        args.system1_threshold,
+                                    ):
+                                        stopped_index = len(slot_calls) - 1
+                                        break
                         if valid_slot_indexes:
-                            selected_index = max(
-                                valid_slot_indexes,
-                                key=lambda index: (
-                                    slot_calls[index]["candidate_score"],
-                                    -slot_calls[index]["attempt"],
-                                ),
-                            )
+                            selected_index = stopped_index
+                            if selected_index is None and select_mode == "system1-early-exit":
+                                selected_index = system1_judge.fallback_index(slot_calls, valid_slot_indexes)
+                            if selected_index is None:
+                                selected_index = max(
+                                    valid_slot_indexes,
+                                    key=lambda index: (
+                                        slot_calls[index]["candidate_score"],
+                                        -slot_calls[index]["attempt"],
+                                    ),
+                                )
                             slot_calls[selected_index]["selected"] = True
                             slot_values[field] = slot_calls[selected_index]["response_body"]
                     # spine-optional (M8-10 experiment): every configuration that let the
@@ -1278,6 +1312,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "change": args.tuning_change,
             "rewrite_passes": args.rewrite_passes,
             "rewrite_format": args.rewrite_format,
+            "candidate_select": args.candidate_select,
+            "candidate_budget": args.candidate_budget,
+            "system1_threshold": (
+                args.system1_threshold if args.candidate_select == "system1-early-exit" else None
+            ),
         },
         "sanitation": sanitation,
         "summary": summary,
@@ -1315,6 +1354,19 @@ def parser() -> argparse.ArgumentParser:
         help="format for the optional rewrite pass; story fences only the final line behind a "
              "delimiter, spine speaks the two plot slots from authored lines, spine-optional "
              "additionally drops the generated reaction when no candidate validates",
+    )
+    value.add_argument(
+        "--candidate-select", choices=system1_judge.CANDIDATE_SELECT_MODES, default="heuristic",
+        help="how the viewer_reaction candidate is chosen: heuristic best-of-16 (default), "
+             "stop at the first rule-clean candidate, or score with the System1 judge "
+             "(shadow records scores only; early-exit stops at the first accepted one)",
+    )
+    value.add_argument("--system1-url", default=system1_judge.DEFAULT_SYSTEM1_URL)
+    value.add_argument("--system1-threshold", type=float, default=system1_judge.DEFAULT_SYSTEM1_THRESHOLD)
+    value.add_argument(
+        "--candidate-budget", type=int, choices=range(1, SLOT_CANDIDATE_COUNT + 1),
+        default=SLOT_CANDIDATE_COUNT, metavar=f"1..{SLOT_CANDIDATE_COUNT}",
+        help="upper bound on viewer_reaction candidates per turn (bounds the no-pass tail)",
     )
     value.add_argument(
         "--spine", type=Path, default=None,
