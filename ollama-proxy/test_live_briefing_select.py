@@ -1,3 +1,4 @@
+import asyncio
 import os
 import unittest
 from unittest import mock
@@ -13,6 +14,7 @@ from live_briefing_select import (
     candidate_score,
     coverage_threshold,
     say_line,
+    select_candidate,
 )
 
 CONTEXT_NOTE = (
@@ -80,6 +82,39 @@ class LiveBriefingSelectTests(unittest.TestCase):
         self.assertFalse(accept_early((False, 0.9), 0.3))
         self.assertFalse(accept_early((True, 0.29), 0.3))
         self.assertEqual(candidate_score("오늘 귀까지 아팠어요!", SAY)[0], False)
+
+    def _select(self, first: str, drafts: list[str], say: str = SAY, budget: int = 3):
+        queue = list(drafts)
+
+        async def draw():
+            text = queue.pop(0)
+            return text, {"draft": text}
+
+        return asyncio.run(select_candidate(
+            first, draw, say=say, previous_reply="", budget=budget, threshold=DEFAULT_COVERAGE,
+        ))
+
+    def test_select_keeps_the_first_covering_draft_without_the_line(self) -> None:
+        text, payload, unchosen, said = self._select(
+            "응, 훨씬 나아졌어!", ["아니, 오늘 자고 일어나니까 왼쪽 귀 안쪽까지 번져 있었어.", "셋째"],
+        )
+        self.assertEqual(text, "아니, 오늘 자고 일어나니까 왼쪽 귀 안쪽까지 번져 있었어.")
+        self.assertEqual(payload, {"draft": text})
+        self.assertEqual(unchosen, [])
+        self.assertFalse(said)
+
+    def test_select_speaks_the_line_when_every_draft_fails(self) -> None:
+        text, payload, unchosen, said = self._select("응, 훨씬 나아졌어!", ["응, 좋아졌어.", "물 마시고 있어."])
+        self.assertTrue(said)
+        self.assertEqual(text, SAY)
+        # Both drawn payloads are accounted for: one may carry the metadata, the rest are unchosen.
+        self.assertEqual(len(unchosen) + (payload is not None), 2)
+
+    def test_select_never_reads_out_a_staff_note_line(self) -> None:
+        staff_note = "오늘 자고 일어나니 통증이 왼쪽 귀 안쪽까지 번져 있었다."
+        text, _, _, said = self._select("응, 훨씬 나아졌어!", ["응, 좋아졌어.", "물 마시고 있어."], say=staff_note)
+        self.assertFalse(said)
+        self.assertNotEqual(text, staff_note)
 
 
 if __name__ == "__main__":

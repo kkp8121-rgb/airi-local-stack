@@ -3,7 +3,9 @@
 The 2.3B generator answers the viewer's literal words and drops or contradicts the showrunner's briefing
 when the chat presupposes something else.  Prompt wording does not move it, but its samples differ, so
 when the briefing carries a ``- 이번 턴에 말할 것:`` line the proxy may draw a few candidates and keep the
-first fit one that covers that line.  Nothing here reads or writes proxy state; the caller owns drawing.
+first fit one that covers that line.  When none does, the line itself is spoken if it is written the way
+AIRI talks (the user's 2026-09-24 choice over spending more draws).  Nothing here reads or writes proxy
+state; the caller owns drawing.
 """
 from __future__ import annotations
 
@@ -125,12 +127,14 @@ async def select_candidate(
     previous_reply: str,
     budget: int,
     threshold: float,
-) -> tuple[str, object | None, list[object]]:
+) -> tuple[str, object | None, list[object], bool]:
     """Draw until a fit candidate covers the say line or the budget is spent.
 
     ``first_text`` is the already generated, already bounded dialogue.  ``draw`` returns one more bounded
-    dialogue and its upstream payload.  Returns the chosen dialogue, the chosen payload (None when the
-    first draft won) and the payloads that were drawn but not chosen.
+    dialogue and its upstream payload.  Returns the dialogue to speak, the payload of the kept candidate
+    (None when the first draft was kept), the payloads drawn but not kept, and whether nothing passed so
+    the say line itself is spoken.  The say line is only spoken when it passes the same fitness rules,
+    so a staff-note briefing ("…먹었다.") is never read out; the kept candidate then carries the metadata.
     """
     texts: list[str] = [first_text]
     payloads: list[object | None] = [None]
@@ -141,11 +145,13 @@ async def select_candidate(
         payloads.append(payload)
         scores.append(candidate_score(text, say, previous_reply))
     chosen = best_index(scores)
+    said_briefing = not accept_early(scores[chosen], threshold) and not candidate_is_unfit(say, say, previous_reply)
     live_briefing_select_telemetry.record(
         draws=len(texts) - 1, early=accept_early(scores[-1], threshold), replaced=chosen != 0,
+        said_briefing=said_briefing,
     )
     unchosen = [payload for index, payload in enumerate(payloads) if index != chosen and payload is not None]
-    return texts[chosen], payloads[chosen], unchosen
+    return (say if said_briefing else texts[chosen]), payloads[chosen], unchosen, said_briefing
 
 
 class LiveBriefingSelectTelemetry:
@@ -157,13 +163,15 @@ class LiveBriefingSelectTelemetry:
         self._draws = 0
         self._early = 0
         self._replaced = 0
+        self._said_briefing = 0
 
-    def record(self, *, draws: int, early: bool, replaced: bool) -> None:
+    def record(self, *, draws: int, early: bool, replaced: bool, said_briefing: bool) -> None:
         with self._lock:
             self._turns += 1
             self._draws += draws
             self._early += int(early)
             self._replaced += int(replaced)
+            self._said_briefing += int(said_briefing)
 
     def health(self) -> dict[str, object]:
         with self._lock:
@@ -172,6 +180,7 @@ class LiveBriefingSelectTelemetry:
                 "extra_draws": self._draws,
                 "early_accepts": self._early,
                 "first_draft_replaced": self._replaced,
+                "briefing_line_spoken": self._said_briefing,
             }
         return {"candidates": candidate_budget(), "coverage": coverage_threshold(), **counts}
 

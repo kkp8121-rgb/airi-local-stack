@@ -8156,6 +8156,16 @@ class LiveBroadcastRouteTests(unittest.TestCase):
         self.assertEqual(len(chat.requests), 1)
         self.assertEqual(dialogue, "오늘은 통증이 왼쪽 귀까지 번져 있었어.")
 
+    def test_live_briefing_speaks_the_briefing_line_when_no_draft_covers_it(self):
+        for path, stream in (("/v1/chat/completions", True), ("/api/chat", True), ("/api/chat", False)):
+            with self.subTest(path=path, stream=stream):
+                chat, dialogue = self._live_briefing_chat(
+                    f"brief-said-{path.count('/')}-{int(stream)}", ["응, 훨씬 나아졌어!", "응, 좋아졌어."], stream,
+                    {"AIRI_LIVE_BRIEFING_CANDIDATES": "2", "AIRI_BROADCAST_CONTRACT": "on"}, path=path,
+                )
+                self.assertEqual(len(chat.requests), 2)
+                self.assertEqual(dialogue, "오늘은 통증이 왼쪽 귀까지 번져 있었어.")
+
     def test_s4_batched_chat_is_code_owned_and_skips_upstream(self):
         capability = self._issue_chat_turn("s4-batch")
         body = {
