@@ -8041,6 +8041,121 @@ class LiveBroadcastRouteTests(unittest.TestCase):
             "turn_type": "chat_question", "required_delivery": "renderer",
         })
 
+    def _live_briefing_chat(self, action_id: str, drafts: list[str], stream: bool, env: dict[str, str],
+                            path: str = "/api/chat", patches: tuple = ()):
+        show_id = f"{action_id}-show"
+        self.runtime.master_control({"action": "start", "show_id": show_id})
+        capability = self.runtime.master_control({
+            "action": "issue_turn", "show_id": show_id, "action_id": action_id,
+            "turn_type": "chat_question", "required_delivery": "renderer",
+            "broadcast_context": {
+                "schema_version": 1, "topic_title": "첫 방송", "segment_label": "목 이야기",
+                "situation": "인사가 끝났다.",
+                "briefing": BROADCAST_BRIEFING_HEADER + "\n- 이번 턴에 말할 것: 오늘은 통증이 왼쪽 귀까지 번져 있었어.",
+                "donation_continuation": False,
+            },
+        })
+
+        def event(content: str) -> bytes:
+            return (json.dumps({
+                "message": {"role": "assistant", "content": content}, "done": True,
+            }, ensure_ascii=False) + "\n").encode("utf-8")
+
+        chat = _QueuedApiStreamClient([[event(draft)] for draft in drafts])
+        try:
+            with contextlib.ExitStack() as stack, model_environment(**env), mock.patch.object(
+                    ollama_proxy.deterministic_utterance_layer,
+                    "DETERMINISTIC_UTTERANCE_LAYER_ENABLED", False), \
+                    mock.patch.object(ollama_proxy, "client", chat), \
+                    mock.patch.object(ollama_proxy, "memory_runtime", _FakeMemoryRuntime()):
+                for target, name, value in patches:
+                    stack.enter_context(mock.patch.object(target, name, value))
+                response = self.post(
+                    path,
+                    json.dumps({
+                        "model": "exaone-airi:2.4b", "stream": stream,
+                        "messages": [{"role": "user", "content": "[YouTube] 그래서 오늘은 좀 나아짐?"}],
+                    }, ensure_ascii=False).encode(),
+                    {"x-airi-broadcast-turn-token": capability["turn_token"],
+                     "x-airi-request-id": f"{action_id}-trace"},
+                )
+        finally:
+            self.runtime.cancel_turn(capability["turn_token"])
+        self.assertEqual(response.status_code, 200)
+        if path.endswith("chat/completions"):
+            return chat, openai_sse_dialogue(response.text)
+        rows = [json.loads(line) for line in response.text.splitlines() if line.strip()]
+        return chat, rows[-1]["message"]["content"]
+
+    def test_live_briefing_selection_is_off_by_default(self):
+        for stream in (True, False):
+            with self.subTest(stream=stream):
+                chat, dialogue = self._live_briefing_chat(
+                    f"brief-off-{int(stream)}", ["응, 훨씬 나아졌어!", "아니, 오늘은 왼쪽 귀까지 번져 있었어."], stream,
+                    {"AIRI_LIVE_BRIEFING_CANDIDATES": ""},
+                )
+                self.assertEqual(len(chat.requests), 1)
+                self.assertEqual(dialogue, "응, 훨씬 나아졌어!")
+
+    def test_live_briefing_selection_draws_until_the_briefing_is_covered(self):
+        for stream in (True, False):
+            with self.subTest(stream=stream):
+                chat, dialogue = self._live_briefing_chat(
+                    f"brief-on-{int(stream)}",
+                    ["응, 훨씬 나아졌어!", "아니, 오늘은 통증이 왼쪽 귀까지 번져 있었어.", "쓰이면 안 되는 셋째 후보야."],
+                    stream, {"AIRI_LIVE_BRIEFING_CANDIDATES": "3"},
+                )
+                self.assertEqual(len(chat.requests), 2)
+                self.assertIs(chat.requests[1]["stream"], False)
+                self.assertEqual(dialogue, "아니, 오늘은 통증이 왼쪽 귀까지 번져 있었어.")
+
+    def test_live_briefing_selection_skips_a_draft_the_boundary_empties(self):
+        # Only the buffered native path empties an answer whose first beat ends in an ellipsis.
+        chat, dialogue = self._live_briefing_chat(
+            "brief-ellipsis", ["아, 그게... 오늘은 통증이 왼쪽 귀까지 번져 있었어.", "오늘은 왼쪽 귀까지 번져 있었어."],
+            False, {"AIRI_LIVE_BRIEFING_CANDIDATES": "2"},
+        )
+        self.assertEqual(len(chat.requests), 2)
+        self.assertEqual(dialogue, "오늘은 왼쪽 귀까지 번져 있었어.")
+
+    def test_live_briefing_v1_stream_keeps_the_first_sentence_cutoff_when_off(self):
+        chat, dialogue = self._live_briefing_chat(
+            "brief-v1-off", ["응, 훨씬 나아졌어! 물 자주 마시고 있어."], True,
+            {"AIRI_LIVE_BRIEFING_CANDIDATES": "", "AIRI_BROADCAST_CONTRACT": "on"},
+            path="/v1/chat/completions",
+            patches=((ollama_proxy, "needs_grounding_retry", lambda *a, **k: False),),
+        )
+        self.assertEqual(len(chat.requests), 1)
+        self.assertEqual(dialogue, "응, 훨씬 나아졌어!")
+
+    def test_live_briefing_v1_stream_selects_and_speaks_every_sentence(self):
+        chat, dialogue = self._live_briefing_chat(
+            "brief-v1-on",
+            ["응, 훨씬 나아졌어!", "아니, 오늘은 통증이 왼쪽 귀까지 번져 있었어. 진짜 황당하지?", "쓰이면 안 되는 셋째 후보야."],
+            True, {"AIRI_LIVE_BRIEFING_CANDIDATES": "3", "AIRI_BROADCAST_CONTRACT": "on"},
+            path="/v1/chat/completions",
+        )
+        # No corrective grounding retry follows the selection.
+        self.assertEqual(len(chat.requests), 2)
+        self.assertEqual(dialogue, "아니, 오늘은 통증이 왼쪽 귀까지 번져 있었어. 진짜 황당하지?")
+
+    def test_live_briefing_v1_stream_answers_instead_of_the_memory_absence_line(self):
+        absent = ((ollama_proxy, "memory_absence_fallback_required", lambda *a, **k: True),)
+        chat, dialogue = self._live_briefing_chat(
+            "brief-v1-absent-off", ["오늘은 통증이 왼쪽 귀까지 번져 있었어."], True,
+            {"AIRI_LIVE_BRIEFING_CANDIDATES": "", "AIRI_BROADCAST_CONTRACT": "on"},
+            path="/v1/chat/completions", patches=absent,
+        )
+        self.assertEqual(len(chat.requests), 0)
+        self.assertNotIn("왼쪽 귀", dialogue)
+        chat, dialogue = self._live_briefing_chat(
+            "brief-v1-absent-on", ["오늘은 통증이 왼쪽 귀까지 번져 있었어."], True,
+            {"AIRI_LIVE_BRIEFING_CANDIDATES": "3", "AIRI_BROADCAST_CONTRACT": "on"},
+            path="/v1/chat/completions", patches=absent,
+        )
+        self.assertEqual(len(chat.requests), 1)
+        self.assertEqual(dialogue, "오늘은 통증이 왼쪽 귀까지 번져 있었어.")
+
     def test_s4_batched_chat_is_code_owned_and_skips_upstream(self):
         capability = self._issue_chat_turn("s4-batch")
         body = {

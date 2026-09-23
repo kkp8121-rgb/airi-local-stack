@@ -105,6 +105,13 @@ from opener_resample import (
     previous_assistant_text,
     resample_overrides,
 )
+from live_briefing_select import (
+    candidate_budget,
+    coverage_threshold,
+    live_briefing_select_telemetry,
+    say_line,
+    select_candidate,
+)
 from pickup_batch import (
     PickupBatchDecision,
     min_content_tokens,
@@ -7357,6 +7364,7 @@ async def health() -> dict[str, object]:
         "session_header": session_header_telemetry.health(),
         "briefing_evidence": briefing_evidence_telemetry.health(),
         "opener_resample": opener_resample_telemetry.health(),
+        "live_briefing_select": live_briefing_select_telemetry.health(),
         "pickup_batch": pickup_batch_telemetry.health(),
         "journal_completion": memory_journal_telemetry.health(),
         # A content-free count only: a rising value means some caller is
@@ -7765,12 +7773,78 @@ class LocalStreamRequestContext:
     live_broadcast_turn: bool = False
 
 
+async def draw_live_briefing_stream_candidate(
+    context: LocalStreamRequestContext, prepared_openai_body: bytes,
+) -> tuple[str, tuple[dict[str, object] | None, IncrementalAiriOutputBoundary]]:
+    """Draw one more native candidate for a live briefing turn, bounded like the public stream."""
+    boundary = IncrementalAiriOutputBoundary(
+        require_korean=context.user_prefers_korean,
+        max_sentences=response_sentence_limit(context.last_user_text),
+    )
+    body = native_chat_stream_body(
+        prepared_openai_body, apply_sampling_defaults=not context.synthetic_evaluation_turn,
+    )
+    prompt_budget_telemetry.prepared_native(body)
+    terminal_event: dict[str, object] | None = None
+
+    async def read() -> None:
+        nonlocal terminal_event
+        response = await context.upstream_client.send(
+            context.upstream_client.build_request(
+                "POST", f"{UPSTREAM}/api/chat",
+                params=context.request.query_params, headers=context.request_headers, content=body,
+            ),
+            stream=True,
+        )
+        decoder = codecs.getincrementaldecoder("utf-8")("strict")
+        pending = ""
+        try:
+            if response.status_code >= 400:
+                return
+            async for chunk in response.aiter_raw():
+                pending += decoder.decode(chunk)
+                while "\n" in pending and terminal_event is None and not boundary.closed_early:
+                    line, pending = pending.split("\n", 1)
+                    event = json.loads(line) if line.strip() else None
+                    if isinstance(event, dict):
+                        boundary.feed(message_content(event.get("message")))
+                        if event.get("done"):
+                            terminal_event = event
+                if terminal_event is not None or boundary.closed_early:
+                    return
+            event = json.loads(pending + decoder.decode(b"", final=True)) if pending.strip() else None
+            if isinstance(event, dict):
+                boundary.feed(message_content(event.get("message")))
+                if event.get("done"):
+                    terminal_event = event
+        finally:
+            await response.aclose()
+
+    try:
+        await asyncio.wait_for(read(), timeout=CORRECTIVE_RETRY_TIMEOUT_SECONDS)
+    except (asyncio.TimeoutError, httpx.HTTPError, ValueError):
+        return "", (None, boundary)
+    if terminal_event is None and not boundary.closed_early:
+        return "", (None, boundary)
+    if terminal_event is not None and not boundary.closed_early:
+        boundary.finish()
+    return enforce_tool_truth(context.original_messages, boundary.output.strip()), (terminal_event, boundary)
+
+
 async def stream_local_with_ack(
     context: LocalStreamRequestContext,
 ) -> AsyncIterator[bytes]:
     upstream_response = None
     send_task = None
     selected_topic_id: str | None = None
+    # Opt-in (AIRI_LIVE_BRIEFING_CANDIDATES): a live turn whose briefing names
+    # what to say holds its first sentence, keeps the candidate that covers
+    # the briefing, and speaks that candidate's sentences instead of the
+    # one-on-one corrective retries and canned fallbacks.
+    live_briefing_say = say_line(context.live_context_note)
+    live_briefing_budget = (
+        candidate_budget() if live_briefing_say and not context.proactive_turn else 0
+    )
     try:
         emit_latency_event(
             "llm",
@@ -7897,6 +7971,10 @@ async def stream_local_with_ack(
             # 그 자리는 폴백이 검사하는 히스토리 바깥이라 프록시에는 보이지
             # 않으므로, 신호가 있으면 선점하지 않고 모델이 답하게 둔다.
             briefing_evidence_telemetry.absence_bypass()
+            absence_required = False
+        if absence_required and live_briefing_budget:
+            # The briefing names what AIRI says this turn; a missing viewer
+            # memory is not the question being answered.
             absence_required = False
         if absence_required:
             fallback = memory_absence_dialogue(context.memory_question)
@@ -8178,7 +8256,7 @@ async def stream_local_with_ack(
                 # publish it immediately instead of waiting for the
                 # native terminal row. Unsafe candidates remain fully
                 # buffered for the existing corrective retry path.
-                if clean and not public_dialogue_emitted:
+                if clean and not public_dialogue_emitted and not live_briefing_budget:
                     early_candidate = boundary.output.strip()
                     if MEMORY_CLAIM_GUARD_ENABLED and early_candidate:
                         early_candidate, memory_claim_guarded = guard_memory_claim(
@@ -8289,6 +8367,32 @@ async def stream_local_with_ack(
         if terminal_event is not None:
             merge_ollama_terminal_metrics(ollama_metrics, terminal_event)
             prompt_budget_telemetry.terminal(terminal_event, NUM_CTX)
+        live_briefing_selected = False
+        if (
+            live_briefing_budget
+            and not raw_progress_timeout
+            and (terminal or boundary.closed_early)
+        ):
+            # Free the single generation slot; each redraw reuses the
+            # cached prompt, so it costs one decode of the answer.
+            await upstream_response.aclose()
+            _, chosen_candidate, unchosen_candidates = await select_candidate(
+                enforce_tool_truth(context.original_messages, boundary.output.strip()),
+                lambda: draw_live_briefing_stream_candidate(context, prepared_openai_body),
+                say=live_briefing_say,
+                previous_reply=prior_assistant_text,
+                budget=live_briefing_budget,
+                threshold=coverage_threshold(),
+            )
+            for unchosen_terminal, _unchosen_boundary in unchosen_candidates:
+                if unchosen_terminal is not None:
+                    prompt_budget_telemetry.terminal(unchosen_terminal, NUM_CTX)
+            if chosen_candidate is not None:
+                chosen_terminal, boundary = chosen_candidate
+                if chosen_terminal is not None:
+                    prompt_budget_telemetry.terminal(chosen_terminal, NUM_CTX)
+                    terminal, terminal_event = True, chosen_terminal
+            live_briefing_selected = True
         # Do not expose a canned "I'll say that in Korean" line.
         # Before the first public sentence, a language rejection is
         # still reversible: repeat the same native context.request once with
@@ -8319,6 +8423,11 @@ async def stream_local_with_ack(
             and not grounding_retry
             and not empty_dialogue_retry
         )
+        if live_briefing_selected:
+            # Selection already redrew against the briefing. The corrective
+            # retries steer toward echoing the viewer and end in one-on-one
+            # canned lines, which is the failure selection replaces.
+            language_retry = grounding_retry = empty_dialogue_retry = opener_retry = False
         if (
             not raw_progress_timeout
             and not context.proactive_turn
@@ -10467,6 +10576,63 @@ async def proxy(path: str, request: Request):
                 headers=response_headers,
             )
 
+    # Opt-in (AIRI_LIVE_BRIEFING_CANDIDATES): an injected live turn whose briefing
+    # names what to say may draw a few more native candidates and keep the one
+    # that covers it. Candidates are scored after the output boundary, fed the
+    # way the serving path feeds it (incrementally for streams), so a draft the
+    # boundary would empty never wins.
+    live_briefing_say = say_line(live_context_note)
+    live_briefing_budget = candidate_budget() if live_briefing_say and not proactive_turn else 0
+
+    def bounded_live_briefing_dialogue(content: str, incremental: bool) -> IncrementalAiriOutputBoundary:
+        candidate_boundary = IncrementalAiriOutputBoundary(
+            require_korean=user_prefers_korean,
+            max_sentences=response_sentence_limit(last_user_text),
+        )
+        if incremental:
+            candidate_boundary.feed(content)
+            candidate_boundary.finish()
+        else:
+            candidate_boundary.feed(content, final=True)
+        return candidate_boundary
+
+    async def draw_live_briefing_candidate(incremental: bool) -> tuple[str, dict[str, object] | None]:
+        candidate_payload = json.loads(body)
+        candidate_payload["stream"] = False
+        candidate_body = json.dumps(candidate_payload, ensure_ascii=False).encode("utf-8")
+        prompt_budget_telemetry.prepared_native(candidate_body)
+        candidate_response = await client.send(
+            client.build_request(request.method, f"{UPSTREAM}/{path}",
+                params=request.query_params, headers=request_headers, content=candidate_body),
+            stream=True,
+        )
+        try:
+            if candidate_response.status_code >= 400:
+                return "", None
+            payload = json.loads(await candidate_response.aread())
+        finally:
+            await candidate_response.aclose()
+        if not isinstance(payload, dict):
+            return "", None
+        candidate_boundary = bounded_live_briefing_dialogue(message_content(payload.get("message")), incremental)
+        return enforce_tool_truth(original_messages, candidate_boundary.output.strip()), payload
+
+    async def select_live_briefing_dialogue(
+        first_dialogue: str, incremental: bool,
+    ) -> tuple[str, dict[str, object] | None]:
+        dialogue, chosen, unchosen = await select_candidate(
+            first_dialogue,
+            lambda: draw_live_briefing_candidate(incremental),
+            say=live_briefing_say,
+            previous_reply=previous_assistant_text(original_messages),
+            budget=live_briefing_budget,
+            threshold=coverage_threshold(),
+        )
+        for payload in unchosen:
+            if payload.get("done"):
+                prompt_budget_telemetry.terminal(payload, NUM_CTX)
+        return dialogue, chosen
+
     if path.endswith("api/chat") and requested_stream and upstream_response.status_code < 400:
         async def stream_native_chat_body() -> AsyncIterator[bytes]:
             """Reframe public native chat to the same plain-output contract.
@@ -10534,6 +10700,18 @@ async def proxy(path: str, request: Request):
                             break
                     if terminal_item is not None or boundary.closed_early:
                         break
+                if live_briefing_budget and (terminal_item is not None or boundary.closed_early):
+                    boundary.finish()
+                    # Free the single generation slot before drawing again.
+                    await upstream_response.aclose()
+                    _, chosen = await select_live_briefing_dialogue(
+                        enforce_tool_truth(original_messages, boundary.output.strip()), True,
+                    )
+                    if chosen is not None:
+                        if terminal_item is not None:
+                            prompt_budget_telemetry.terminal(terminal_item, NUM_CTX)
+                        boundary = bounded_live_briefing_dialogue(message_content(chosen.get("message")), True)
+                        terminal_item = chosen
                 opener_overrides = resample_overrides(
                     previous_assistant_text(original_messages),
                     boundary.output.strip(),
@@ -10713,6 +10891,12 @@ async def proxy(path: str, request: Request):
                 original_messages,
                 boundary.feed(message_content(native_payload.get("message")), final=True),
             )
+            if live_briefing_budget:
+                plain, chosen = await select_live_briefing_dialogue(plain, False)
+                if chosen is not None:
+                    native_payload = chosen
+                    if native_payload.get("done"):
+                        prompt_budget_telemetry.terminal(native_payload, NUM_CTX)
             opener_resample_used = False
             opener_overrides = resample_overrides(
                 previous_assistant_text(original_messages), plain, body,
