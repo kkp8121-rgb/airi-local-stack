@@ -1,5 +1,17 @@
 # AIRI 로드맵 갱신 로그 (최신이 위)
 
+- 2026-09-23 14:05 KST **System1 후보 판정기 — 계획 4단계 실행 완료 (신규 PC, 로컬 미커밋).** ①측정: 운영 경로 프록시 재생성
+  0/544, 반응 후보 16개가 턴 시간의 83%, 규칙 점수가 채팅 복창에 가점. ②데이터: 변형 12개·후보 4,659개, A.X-4.0-Light 교사(AI 작성
+  골드셋 14/16). ③학습: Qwen2.5-0.5B LoRA 판정기 시험 AUC 0.851(기준선 0.775). ④비교(고정 32턴×3회): 규칙 조기 종료 반응 p50 0.4 s·
+  합격 54~56%, System1(0.6) 0.7 s·61~71%, 기존 2.2 s·23~27%. 모델 축: A.X 소폭 우위·2배 느림, Kanana 비우위. Ollama 0.34.2 템플릿
+  오염 발견. 체크리스트·완료율 변경 없음(M8 항목 아님). 근거 `진행중/AIRI-SYSTEM1-CANDIDATE-JUDGE-2026-09-23.md`.
+
+- 2026-09-23 11:20 KST **문서 현행화 — 실행 없음.** 신규 PC(RTX 5060 Ti 8 GiB, GPU PC 아님 — D:·모델·venv·지식 DB 없음)에서 세션 시작 대조 결과 local =
+  origin/main `2abe9e4`, clean, 스택·trainer 0. live state의 `git_head`(79ed8c4)·`worktree_state`·
+  `active_trainer_note`(실행 중으로 남아 있던 Gemma 회차는 09-02에 완료)·`current_handoff`와
+  본문 §2~§4(다음 실행 = M8-1로 남아 있음)를 실측값으로 정정했다. `CLAUDE.md`의 인계문 경로와
+  `NEXT-SESSION.md` 맨 위 안내도 맞췄다. 로드맵 체크리스트·완료율은 변경 없음.
+
 - 2026-09-02 16:25 KST **Stage 4 후보 4 — Gemma 4 E2B 4/7, M8-8 [F] 유지.** 사용자 요청으로 Gemma 4 E2B(Apache-2.0)를 같은 스파인 하네스·32턴·온도 0.45·cue 불변으로 태웠다. 경로 확보에 4회 시도: 라이브러리 태그, TEMPLATE 재정의 태그, 공식 text-only GGUF 기반 태그 모두 Ollama 0.32.6이 아키텍처 기준 gemma4 네이티브 RENDERER/PARSER를 붙여 프록시 형태 요청(think 필드 없음)에 thinking을 강제했고, Stage 2 평가 shim(코드 무변경) + 번들 llama-server(`--jinja --reasoning-budget 0`, enable_thinking false)로만 no-think가 됐다. 부수 실측: 번들 llama-server는 작업 디렉터리 기준으로 backend DLL을 찾아 `lib/ollama/cuda_v12`를 cwd로 띄워야 CUDA가 잡힌다(18.1→45.1 tok/s). 결과: 바닥 전부 통과(반복 0·경험 도용 0·존댓말 0·영어 0·think 누출 0·스파인 복사 0), 문장 단위 한국어는 4후보 중 가장 유창. 그러나 **32턴 중 23턴이 시청자 채팅 문장을 70% 이상 그대로 복창**하고 꼬리만 붙였다(Mi:dm+r4 0, 기준선 3, kanana 4, qwen3 9). 주체 전도(T10·T23이 시청자에게 스트리머의 사정을 되물음), 조언(T14), 비서체 되묻기(T24 "구체적으로 알려주면", T25·T32 "말하는 거지?")로 ①③⑥⑧ 실패, ②④⑤⑦ 통과 — **4/7**, Mi:dm+Stage 3 r4(5/7) 미달. 사전 등록 기대와 일치. E4B 2차는 불필요 판단: 결함이 한국어 능력이 아니라 같은 cue 아래의 복창 성질이라 크기로 풀리지 않는다. Mi:dm(MIT) 유지 근거 4후보로 확장. 종료 처리: shim·llama-server 정지(고아 0), Ollama serve 복구, 운영 태그 불변. Gemma 태그 4개·GGUF는 사용자 정리 결정 대기. adoption false, commit/push 미수행.
 
 - 2026-09-02 11:45 KST **Stage 4 모델 축 완료 — 3후보 전부 Mi:dm+Stage 3에 미달, M8-8 [F].** 온도 ablation(0.45→0.2) 폐기 후 남은 변수가 모델뿐이라 사용자 결정으로 연구·평가 전용 착수. 라이선스를 문서로 실측해 경계를 먼저 기록했다(qwen3 Apache-2.0 / kanana-nano CC-BY-NC 진단 전용 / adelie 표기 모순 불명). qwen3:4b는 thinking 스위치 4종(빈 think 프리필 2형·/no_think·think:false)이 전부 실측 실패해 Instruct-2507 빌드로 교체, top_k만 40으로 핀해 Mi:dm 회차와 샘플링 동일화. 스파인 하네스·32턴·온도 0.45 고정, 변수는 모델 하나. 결과 — adelie-7B: 환각·비일관·한국어 파손, 조언·역할 전도·1인칭 복귀(hard fail, 3배 크기가 무용). kanana-nano-2.1b: 한국어는 자연스러우나 미정렬 기준선 결함 계열(조언 8턴·존댓말·되묻기·복창) 그대로 — 동급 크기 대조군 역할 완수. qwen3-4b-instruct: think 누출 0이나 한국어 부자연·입력 복창·환각(둘리). 셋 다 ①④⑤⑥ 실패, 통과는 스파인 몫인 ②③⑦뿐. 결론: 이 트랙에서 잔여 결함을 움직인 건 Stage 3 교정 학습 하나였고, 잔여는 "소형 모델이 저작 텍스트 옆에서 자유 문장 하나를 쓰는 대가"라는 구조적 성질이다. Mi:dm(MIT) 유지 근거가 실측으로 확정. 부수: `ollama stop`의 ANSI stderr가 PS 5.1에서 종료 오류로 승격되는 함정을 cmd 경유로 수리. adoption false, 운영 태그 불변, commit/push 미수행.

@@ -23,10 +23,11 @@ SHAs) **read-only**:
 1. `AGENTS.md`
 2. `airi_docs/진행중/AIRI-WORKING-STATE.md` — the mutable live SSoT (YAML frontmatter carries
    `goal_status`, `git_head`, `worktree_state`, `active_trainer_count`, last receipt)
-3. the current handoff: **`airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-08-27.md`** — start at its
-   section 0-A, which lists where every asset actually lives so you do not go looking for files.
-   (`AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md` is superseded: the M7 numbers it hands over rest on an
-   absolute gate that later measurement showed to be unreachable on that input.)
+3. the current handoff: **`airi_docs/진행중/AIRI-GPU-PC-HANDOFF-2026-09-01-STAGE3.md`** (M8 Stage 3
+   on the GPU PC). Stage 3, M8-10 and Stage 4 ran after it; their results live in the
+   `m8_*` / `stage4_*` receipts of `AIRI-WORKING-STATE.md`, which the live state's
+   `current_handoff` field keeps current. For where every asset lives, section 0-A of
+   `AIRI-CODEX-HANDOFF-2026-08-27.md` is still valid; its M7 verdict is not.
 4. `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md`
 5. `NEXT-SESSION.md`
 

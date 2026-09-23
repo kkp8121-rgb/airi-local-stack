@@ -1,5 +1,20 @@
 # AIRI 다음 세션 안내
 
+> **2026-09-23 14:05 KST — System1 후보 판정기 계획 실행 완료(신규 PC, AIRI 앱 미설치). 결과·재현 정보는
+> `airi_docs/진행중/AIRI-SYSTEM1-CANDIDATE-JUDGE-2026-09-23.md`.** 프록시 재생성은 0/544라 지연 원인이 아니었고,
+> 평가 하네스의 후보 16개 + 복창 가점 규칙 점수가 원인이었다. 규칙 조기 종료만으로 반응 p50 2.2 s → 0.4 s,
+> 자동 판정 합격률 23~27% → 54~56%, System1(0.5B, 기준값 0.6)은 0.7 s·61~71%. 모델 교체는 A.X-4.0-Light(Apache-2.0)가
+> 소폭 우위지만 2배 느림. **Ollama 0.34.2는 Mi:dm GGUF 내장 템플릿(어시스턴트·경어체 지시 약 500토큰)을 강제한다 —
+> 운영 PC Ollama 업그레이드 전 확인 필요.** 다음 = 사용자 블라인드 검토(`C:\AIRI-Models\airi-human-eval\system1-step4\blind-review.html`).
+
+> **2026-09-23 11:20 KST — 문서 현행화(실행 없음). M8 Stage 1~4 전부 실행 완료, 다음 방향은
+> 사용자 결정 대기.** GPU PC에서 Stage 3 교정 학습과 M8-9 스파인 구조로 수동 **5/7**(Mi:dm +
+> r4)에 도달했고, M8-10 선택형 반응은 효과가 없었으며, Stage 4 모델 축 4후보(qwen3·kanana·
+> adelie·Gemma 4 E2B)는 전부 이에 미달했다(Gemma 4 E2B 4/7 — 시청자 채팅 복창 23/32).
+> 수동 3연속 통과는 **0/3**. 아래 09-01 항목의 "미커밋 12건 — pull 금지" 경고는
+> `e392a19`·`a648aa5` push로 해소됐다. 현재 local = origin/main `2abe9e4`, 스택 정지.
+> 세부 수치는 `airi_docs/진행중/AIRI-WORKING-STATE.md` frontmatter의 `m8_*`·`stage4_*` receipt.
+
 > **2026-09-01 15:40 KST — Stage 1·2 소진, GPU PC 인계. 단일 진입점은
 > `airi_docs/진행중/AIRI-GPU-PC-HANDOFF-2026-09-01-STAGE3.md`.**
 > M8 Stage 1(추론 시점 4레버)과 Stage 2(서빙 계층 토큰 억제)를 모두 소진했고 **수동 품질
