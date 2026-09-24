@@ -12,6 +12,7 @@ from live_briefing_select import (
     candidate_budget,
     candidate_is_unfit,
     candidate_score,
+    canon_say_line,
     coverage_threshold,
     say_line,
     select_candidate,
@@ -101,6 +102,41 @@ class LiveBriefingSelectTests(unittest.TestCase):
         # A viewer who talks about their own state may be answered about it.
         self.assertFalse(candidate_is_unfit("내일 면접이라니 떨리겠다! 잘할 거야.", say, "", "[YouTube] 나 내일 면접이야"))
         self.assertFalse(candidate_is_unfit("합격 축하해!", say, "", "[YouTube] 나 합격했어"))
+
+    def test_canon_line_answers_a_question_about_airis_body_or_offline_life(self) -> None:
+        for chat, word in (
+            ("[YouTube] 그럼 오늘 점심은 뭐 먹었어?", "밥"),
+            ("[YouTube] 아니 ㅋㅋ 추천 말고 아이리가 뭐 먹었냐고", "밥"),
+            ("[YouTube] 아이리 좋아하는 음식 뭐야?", "밥"),
+            ("[YouTube] 아이리 어제 잘 잤어?", "잠"),
+            ("[YouTube] 아이리 운동 좋아해?", "몸"),
+            ("[YouTube] 아이리 어디 살아?", "방송 밖"),
+            ("[YouTube] 아이리는 주말에 뭐 했어?", "방송 밖"),
+        ):
+            with self.subTest(chat=chat):
+                line = canon_say_line(chat)
+                self.assertIn(word, line)
+                self.assertFalse(candidate_is_unfit(line, line))
+        for chat in (
+            "[YouTube] 나 오늘 점심 김치찌개 먹었어", "[YouTube] 점심 뭐 먹을까?", "[YouTube] 밥 먹고 올게",
+            "[YouTube] 첫방 ㅊㅋ", "[YouTube] 다음 방송은 언제 해?", "",
+        ):
+            with self.subTest(chat=chat):
+                self.assertEqual(canon_say_line(chat), "")
+
+    def test_unfit_when_airi_claims_a_body_or_an_offline_life(self) -> None:
+        # Answers the 2.3B generator gave on 2026-09-24 (series-01 broadcast 1 and its probes).
+        for claim in (
+            "오늘 점심에는 김치찌개 먹었어.", "오늘 점심은 아직 안 먹었는데, 첫 방송부터 하고 있어!",
+            "어제는 첫 방송 준비하느라 일찍 잠들었어!", "방송 준비로 가볍게 스트레칭했어!",
+            "방송 스튜디오에서 살고 있어!", "음... 나는 다양한 음식을 좋아해!",
+            "나는 방송 밖에서 따로 살아. 여기서 너희랑 이야기하는 게 내 하루야.",
+        ):
+            with self.subTest(claim=claim):
+                self.assertTrue(candidate_is_unfit(claim, ""))
+        # A question to the viewer and a reaction to the viewer's own day are not AIRI's claims.
+        self.assertFalse(candidate_is_unfit("너는 오늘 뭐 먹었어?", ""))
+        self.assertFalse(candidate_is_unfit("너 떡볶이 먹었구나! 맛있었겠다.", ""))
 
     def test_pick_prefers_fit_then_coverage_and_keeps_draw_order_on_ties(self) -> None:
         scores = [(False, 0.9), (True, 0.2), (True, 0.4), (True, 0.4)]

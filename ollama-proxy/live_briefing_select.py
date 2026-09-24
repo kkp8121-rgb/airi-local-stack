@@ -16,6 +16,8 @@ import threading
 import unicodedata
 from typing import Awaitable, Callable
 
+from live_broadcast_runtime import BROADCAST_BRIEFING_HEADER
+
 
 LIVE_BRIEFING_CANDIDATES_ENV = "AIRI_LIVE_BRIEFING_CANDIDATES"
 LIVE_BRIEFING_COVERAGE_ENV = "AIRI_LIVE_BRIEFING_COVERAGE"
@@ -48,6 +50,29 @@ _VIEWER_CONGRATS_RE = re.compile(r"축하|ㅊㅋ")
 _MIRRORED_CONGRATS_RE = re.compile(r"축하해")
 _GUESSED_FEELING_RE = re.compile(r"(?:떨리|긴장되|설레|무섭|힘들)겠")
 _VIEWER_OWN_STATE_RE = re.compile(r"(?:^|\s)(?:나|내가|저|제가)(?:\s|도|는)")
+# AIRI is a virtual broadcaster with no body and no life outside the broadcast (user decision 2026-09-24:
+# only what happens on the broadcast and what earlier broadcasts left in memory). Asked about either, the
+# 2.3B generator made up a meal, sleep, exercise or a home in about 27 of 36 samples, and a canon sentence
+# in the situation note did not change that. Claims inside a question to the viewer, or about the viewer,
+# are not AIRI's.
+_BODILY_CLAIM_RE = re.compile(
+    r"먹었|마셨|잤|잠들|운동했|스트레칭|산책했|다녀왔|갔다\s*왔|살고\s*있|배고파|배불러|맛있었(?!겠)"
+    r"|음식을\s*좋아|좋아하는\s*음식은|밖에서\s*(?:따로\s*)?살"
+)
+_SECOND_PERSON_RE = re.compile(r"(?:^|\s)(?:너|넌|너는|너도|니가|네가)(?:\s|$)")
+_CHAT_SOURCE_RE = re.compile(r"^\[[^\]]+\]\s*")
+_QUESTION_RE = re.compile(r"[?？]|뭐|뭘|어디|언제|어때|냐고|냐\s*$|니\s*$")
+_ADDRESSES_AIRI_RE = re.compile(r"아이리|AIRI|(?:^|\s)(?:너|넌|너는|니가|네가)(?:\s|$)", re.IGNORECASE)
+_VIEWER_SUBJECT_RE = re.compile(r"^(?:나|난|내가|나는|저|전|제가|저는)\s")
+# Choosing what the viewer should eat is a menu question, not a question about AIRI.
+_MENU_CHOICE_RE = re.compile(r"먹을까|먹지\s*[?？]|먹을지|골라|추천(?!\s*말고)")
+_CANON_LINES = (
+    (re.compile(r"먹었|먹어|먹니|먹냐|마셨|밥|음식|간식|배고"), "나는 버추얼이라 밥은 못 먹어! 대신 너는 오늘 뭐 먹었어?"),
+    (re.compile(r"잤|잠|졸려"), "나는 버추얼이라 잠은 안 자! 너는 잘 잤어?"),
+    (re.compile(r"운동|헬스|산책|스트레칭"), "나는 버추얼이라 몸으로 하는 건 못 해! 너는 운동 좋아해?"),
+    (re.compile(r"어디\s*살|사는\s*곳|집이\s*어디|(?:주말|휴일|평소)에\s*뭐|방송\s*끝나고\s*뭐|어디\s*(?:갔|다녀)|다녀왔|여행"),
+     "나는 방송 밖 생활은 없어! 여기서 너희랑 이야기하는 게 내 하루야."),
+)
 
 
 def candidate_budget(value: object | None = None) -> int:
@@ -92,6 +117,28 @@ def speakable_line(say: str) -> str:
     return text if not text or text[-1] in ".!?~" else text + "."
 
 
+def canon_say_line(user_text: object) -> str:
+    """A say line for a viewer question that presupposes AIRI's body or offline life, else ''."""
+    if not isinstance(user_text, str):
+        return ""
+    text = _CHAT_SOURCE_RE.sub("", unicodedata.normalize("NFKC", user_text).strip())
+    if not _QUESTION_RE.search(text) or _MENU_CHOICE_RE.search(text):
+        return ""
+    if _VIEWER_SUBJECT_RE.search(text) and not _ADDRESSES_AIRI_RE.search(text):
+        return ""
+    return next((line for pattern, line in _CANON_LINES if pattern.search(text)), "")
+
+
+def with_canon_say_line(context_note: str, user_text: object) -> str:
+    """The context note with a canon say line added when the briefing names nothing to say."""
+    line = canon_say_line(user_text)
+    if not line or say_line(context_note):
+        return context_note
+    live_briefing_select_telemetry.canon_line_added()
+    header = "" if BROADCAST_BRIEFING_HEADER in context_note else "\n\n" + BROADCAST_BRIEFING_HEADER
+    return f"{context_note.rstrip()}{header}\n{SAY_LINE_PREFIX} {line}"
+
+
 def without_do_not_say(context_note: str) -> str:
     """The context note with the briefing's do-not-say lines removed."""
     return "\n".join(line for line in context_note.split("\n") if not line.startswith(DO_NOT_SAY_PREFIX))
@@ -123,6 +170,12 @@ def candidate_is_unfit(answer: object, say: str, previous_reply: str = "", user_
     if any(_HONORIFIC_END_RE.search(part) or _WRITTEN_END_RE.search(part) for part in sentences):
         return True
     if _LEAKED_LABEL_RE.search(text):
+        return True
+    if any(
+        _BODILY_CLAIM_RE.search(part) and not part.rstrip().endswith(("?", "？"))
+        and not _SECOND_PERSON_RE.search(part)
+        for part in sentences
+    ):
         return True
     if _UNEXECUTED_LOOKUP_RE.search(text) and not _UNEXECUTED_LOOKUP_RE.search(say):
         return True
@@ -210,6 +263,11 @@ class LiveBriefingSelectTelemetry:
         self._early = 0
         self._replaced = 0
         self._said_briefing = 0
+        self._canon_lines = 0
+
+    def canon_line_added(self) -> None:
+        with self._lock:
+            self._canon_lines += 1
 
     def record(self, *, draws: int, early: bool, replaced: bool, said_briefing: bool) -> None:
         with self._lock:
@@ -227,6 +285,7 @@ class LiveBriefingSelectTelemetry:
                 "early_accepts": self._early,
                 "first_draft_replaced": self._replaced,
                 "briefing_line_spoken": self._said_briefing,
+                "canon_lines_added": self._canon_lines,
             }
         return {"candidates": candidate_budget(), "coverage": coverage_threshold(), **counts}
 

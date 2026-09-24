@@ -8086,7 +8086,8 @@ class LiveBroadcastRouteTests(unittest.TestCase):
         })
 
     def _live_briefing_chat(self, action_id: str, drafts: list[str], stream: bool, env: dict[str, str],
-                            path: str = "/api/chat", patches: tuple = ()):
+                            path: str = "/api/chat", patches: tuple = (), briefing: str | None = None,
+                            user: str = "[YouTube] 그래서 오늘은 좀 나아짐?"):
         show_id = f"{action_id}-show"
         self.runtime.master_control({"action": "start", "show_id": show_id})
         capability = self.runtime.master_control({
@@ -8096,7 +8097,7 @@ class LiveBroadcastRouteTests(unittest.TestCase):
                 "schema_version": 1, "topic_title": "첫 방송", "segment_label": "목 이야기",
                 "situation": "인사가 끝났다.",
                 "briefing": BROADCAST_BRIEFING_HEADER + "\n- 이번 턴에 말할 것: 오늘은 통증이 왼쪽 귀까지 번져 있었어."
-                            "\n- 아직 말하지 말 것: 병원, 진료 결과",
+                            "\n- 아직 말하지 말 것: 병원, 진료 결과" if briefing is None else briefing,
                 "donation_continuation": False,
             },
         })
@@ -8119,7 +8120,7 @@ class LiveBroadcastRouteTests(unittest.TestCase):
                     path,
                     json.dumps({
                         "model": "exaone-airi:2.4b", "stream": stream,
-                        "messages": [{"role": "user", "content": "[YouTube] 그래서 오늘은 좀 나아짐?"}],
+                        "messages": [{"role": "user", "content": user}],
                     }, ensure_ascii=False).encode(),
                     {"x-airi-broadcast-turn-token": capability["turn_token"],
                      "x-airi-request-id": f"{action_id}-trace"},
@@ -8210,6 +8211,30 @@ class LiveBroadcastRouteTests(unittest.TestCase):
                 )
                 self.assertEqual(len(chat.requests), 2)
                 self.assertEqual(dialogue, "오늘은 통증이 왼쪽 귀까지 번져 있었어.")
+
+    def test_live_briefing_answers_a_question_about_airis_body_with_the_canon_line(self):
+        # 2026-09-24 series-01 broadcast 1: "아이리가 뭐 먹었냐고" -> "오늘 점심에는 김치찌개 먹었어."
+        drafts = ["오늘 점심에는 김치찌개 먹었어.", "오늘 점심은 아직 안 먹었어."]
+        canon = "나는 버추얼이라 밥은 못 먹어! 대신 너는 오늘 뭐 먹었어?"
+        user = "[YouTube] 아니 ㅋㅋ 추천 말고 아이리가 뭐 먹었냐고"
+        for path, stream in (("/v1/chat/completions", True), ("/api/chat", True), ("/api/chat", False)):
+            with self.subTest(path=path, stream=stream):
+                chat, dialogue = self._live_briefing_chat(
+                    f"brief-canon-{path.count('/')}-{int(stream)}", drafts, stream,
+                    {"AIRI_LIVE_BRIEFING_CANDIDATES": "2", "AIRI_BROADCAST_CONTRACT": "on"}, path=path,
+                    briefing="", user=user,
+                )
+                self.assertEqual(len(chat.requests), 2)
+                self.assertEqual(dialogue, canon)
+                self.assertIn(canon, json.dumps(chat.requests[0], ensure_ascii=False))
+        chat, dialogue = self._live_briefing_chat(
+            "brief-canon-off", drafts, True, {"AIRI_LIVE_BRIEFING_CANDIDATES": ""},
+            path="/v1/chat/completions", briefing="", user=user,
+            patches=((ollama_proxy, "needs_grounding_retry", lambda *a, **k: False),),
+        )
+        self.assertEqual(len(chat.requests), 1)
+        self.assertNotIn(canon, json.dumps(chat.requests[0], ensure_ascii=False))
+        self.assertEqual(dialogue, "오늘 점심에는 김치찌개 먹었어.")
 
     def test_live_briefing_drops_the_do_not_say_line_only_when_on(self):
         for budget, kept in (("", True), ("2", False)):

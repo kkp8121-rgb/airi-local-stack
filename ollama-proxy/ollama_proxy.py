@@ -111,6 +111,7 @@ from live_briefing_select import (
     live_briefing_select_telemetry,
     say_line,
     select_candidate,
+    with_canon_say_line,
     without_do_not_say,
 )
 from pickup_batch import (
@@ -9453,6 +9454,9 @@ async def proxy(path: str, request: Request):
     live_context_note = ""
     if broadcast_notes is not None:
         context_note = broadcast_notes.context_note
+        if candidate_budget() and not proactive_turn:
+            # Opt-in live briefing turns: a viewer question about AIRI's body or offline life gets a canon say line.
+            context_note = with_canon_say_line(context_note, last_user_text)
         if candidate_budget() and say_line(context_note):
             # Opt-in live briefing turns: a do-not-say list primes the generator to say it.
             context_note = without_do_not_say(context_note)
