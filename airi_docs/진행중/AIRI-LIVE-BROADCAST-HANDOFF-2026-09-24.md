@@ -20,7 +20,7 @@
 | TTS·STT | GPT-SoVITS·STT(faster-whisper) 설치본 없음 → TTS 포함 지연은 GPU PC 과제 |
 | Ollama | 0.34.2. `midm-airi:2.0-mini` digest `d297ee3db6f3380c4038d2cd7aa7d0076cdb1b76e4c9578499e459af428cfe11` (런처 고정값 `92a9ba2e…485f`와 manifest만 다르고 가중치 동일), 평가용 `midm-airi-evaltpl:2.0-mini` (`c1237f70…`, 제거 가능) |
 | 저장소 밖 자산 | `C:\AIRI-Models\gguf\` (midm-2.0-mini-instruct.Q4_K_M, A.X-4.0-Light-Q4_K_M, kanana-1.5-8b-instruct-2505.Q4_K_M, 평가용 템플릿 교체본 midm-2.0-mini-instruct.airi-template.Q4_K_M) · `C:\AIRI-Models\system1\` (judge-v1, contradiction-v1) · `C:\AIRI-Models\venvs\system1\` (학습 venv, gguf 0.19.0) · `C:\AIRI-Models\airi-human-eval\` (방송 대본·후보·평가 산출물 — 응답이 담긴 자료라 Git 밖) |
-| Git | `main` HEAD `4f278f18c98aad5d8b75ab5ad113ed3a02c5353e`, origin/main `2abe9e49e94d73721ba0a73a06957f7462704c45` 대비 **12커밋 앞섬, push 없음**. 커밋 author `kkp8121-rgb`. 이 문서를 포함한 현행화 문서 변경은 미커밋일 수 있다 |
+| Git | `main`은 코드 기준 `4f278f18c98aad5d8b75ab5ad113ed3a02c5353e`, 그 뒤 문서 커밋(`f022712` 09-24 현행화 — 이 문서 신설, 이어진 수치 정정). origin/main `2abe9e49e94d73721ba0a73a06957f7462704c45`보다 앞선 커밋은 **전부 push 없음**(정확한 HEAD·개수는 `git log --oneline 2abe9e4..HEAD`). 커밋 author `kkp8121-rgb` |
 | GPU PC 자산 위치 | `AIRI-CODEX-HANDOFF-2026-08-27.md` §0-A(그 문서의 M7 판정은 무효)와 `AIRI-GPU-PC-HANDOFF-2026-09-01-STAGE3.md`를 따른다 |
 
 ## 1. 09-23~24에 일어난 일
@@ -36,7 +36,8 @@
    편집은 미커밋일 수 있다 — 마지막 receipt는 `AIRI-WORKING-STATE.md`).
 5. 커밋(오래된 순, push 없음): 269e13d System1 판정 seam · d82c81e 라벨·학습 파이프라인 · d2d7c91 문서 ·
    9a3a0ed 후보 선택 기능 · 34f6fa6 v2 시나리오·판정 도구 · 1b073b5 문서 · 7e0b207 브리핑 문장 대체 · 50787d8 문서 ·
-   4ea23d0 긴급 안전 판정 수정 · 038fa00 선택 개선 · 462848b 시뮬레이터·모순 판정기 도구 · 4f278f1 문서.
+   4ea23d0 긴급 안전 판정 수정 · 038fa00 선택 개선 · 462848b 시뮬레이터·모순 판정기 도구 · 4f278f1 문서 ·
+   f022712 09-24 문서 현행화(이 문서 신설). 그 뒤 10회차 수치 정정 문서 커밋이 이어진다.
 
 ## 2. 현재 결과와 프록시에 들어간 것
 
@@ -53,7 +54,7 @@
 | 07 | 새 이야기(요리·지하철), 06 설정 | 약 8/14 | 「무슨 사고」 긴급 문장 오작동, 전제 따라 지어낸 소화기가 기록으로 이어짐 |
 | 08 | 새 이야기(화분·노래방), 기준 0.4 | 약 5~6/9 | 「아직 말하지 말 것」 누설, 「설거지는 아니고」 정정 무시 |
 | 09 | 새 이야기(헬스장·고양이 카페), 수정 전부, 방송 중 2건 추가 수정 | 최종 코드 턴 3 깨끗·2 부분·0 실패 | 「위험했겠다 다쳤어?」 긴급 오작동, 「ㅋㅋ」로 끝난 브리핑 문장 잘림·침묵 |
-| 10 | 새 이야기(자전거·라면), 커밋 `4f278f1` 그대로 | **10/11 + 작은 누락 1, 실패 0** | 대사 도착 중앙 0.64 s·최대 0.97 s, 브리핑 문장 7/11턴(대본 읽기처럼 들릴 수 있음 — 사람 판정 필요) |
+| 10 | 새 이야기(자전거·라면), 커밋 `4f278f1` 그대로 | **10/11 + 작은 누락 1, 실패 0** | 대사 도착 중앙 0.64 s·최대 0.97 s, 브리핑과 글자 그대로 같은 답 8/11턴(대체 7 + 후보가 그대로 옮긴 1, 대본 읽기처럼 들릴 수 있음 — 사람 판정 필요) |
 
 - 1~3회차와 재실행은 native /api/chat(캠페인 도구 경로)이었다. AIRI 앱 공급자는 `11435/v1`이며 방송 턴 토큰을
   보내는 앱 패치는 아직 없다. 대본은 저장소 밖 `C:\AIRI-Models\airi-human-eval\sim-*`에 있다.
@@ -187,7 +188,8 @@ $new = 'C:\AIRI-Models\airi-human-eval\sim-replay-<이름>'     # 새 ROOT
 ### 7-1. 남은 일 (우선순위 순)
 
 1. **사람 판정**: 10회차 대본 `C:\AIRI-Models\airi-human-eval\sim-fifth-story-10\transcript.md`의 자연스러움 —
-   브리핑 문장 7/11턴이 대본 읽기처럼 들리는지.
+   브리핑과 글자 그대로 같은 8/11턴이 대본 읽기처럼 들리는지. 검토 페이지 `C:\AIRI-Models\airi-human-eval\sim-fifth-story-10\review.html`(블라인드 — 판정 뒤
+   브리핑 공개, 결과는 JSON 저장, 자동으로 열지 않는다, live state `review10_page_receipt`).
 2. 기록을 따라 이어지는 지어내기(7회차 소화기) — 미해결.
 3. System1 재도전은 실제 방송 후보에 사람 정답을 매긴 데이터로 한다.
 4. GPU PC: TTS 포함 첫 음성 지연, 8 GB 동거 실측.
@@ -199,5 +201,5 @@ $new = 'C:\AIRI-Models\airi-human-eval\sim-replay-<이름>'     # 새 ROOT
 
 - `adoption_authorized=false` — 운영 채택 금지. 기본 꺼짐 기능을 운영에서 켜는 것도 사용자 결정이다.
 - 이 PC에서는 AIRI 앱을 설치·실행하지 않는다.
-- 커밋은 사용자 승인 뒤에만, push는 **매번** 승인을 받는다(현재 12커밋 미push).
+- 커밋은 사용자 승인 뒤에만, push는 **매번** 승인을 받는다(origin/main `2abe9e4` 이후 커밋 전부 미push).
 - 응답이 담긴 대본·후보·평가 산출물은 `C:\AIRI-Models\` 아래(Git 밖)에 두고, `secrets.json` 토큰·`.env` 값은 출력·기록하지 않는다.

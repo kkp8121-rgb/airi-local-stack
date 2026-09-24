@@ -1,5 +1,12 @@
 # AIRI 로드맵 갱신 로그 (최신이 위)
 
+- 2026-09-24 12:10 KST **10회차 수치 정정 + 사람 판정 검토 페이지(사용자 선택 「10회차만」), 로컬 미커밋.** 문서 현행화 커밋 `f022712`(사용자 승인,
+  push 없음) 뒤 `turns.jsonl`을 프록시 함수(`say_line`·`speakable_line`)로 다시 세어 보니 브리핑 문장과 글자 그대로 같은 답은 **8/11턴**
+  (T01·02·03·04·07·08·10·11)이었다. 기록의 7은 브리핑 문장 대체 횟수(`briefing_line_spoken`)이고 1턴은 후보가 브리핑을 그대로 옮겼다. 현재 상태
+  서술을 8/11로 고치고 과거 receipt는 그대로 두었다(live state `sim10_verbatim_correction`). 검토 페이지 `C:\AIRI-Models\airi-human-eval\sim-fifth-story-10\review.html`는
+  저장소 밖 블라인드 페이지(판정 뒤 브리핑 공개, 대사 원문 없는 JSON 저장)이고 헤드리스 Chromium 검사를 통과했다(화면에 열지 않음,
+  `review10_page_receipt`). 「12커밋 앞섬」 서술은 커밋 수에 묶이지 않는 표현으로 바꿨다.
+
 - 2026-09-24 11:37 KST **문서 현행화 — 실행 없음(사용자 요청 「문서들 모두 현행화」), 로컬 미커밋.** 11:32 KST 대조: main HEAD
   `4f278f1`(origin/main `2abe9e4` 대비 12커밋 앞섬, push 없음), 스택 포트 listener 0, ollama·llama-server·trainer 0. 정정한 문서:
   live state(frontmatter `git_head`·`worktree_state`·`authorization`·`active_phase`·`current_handoff`·`active_trainer_note`와

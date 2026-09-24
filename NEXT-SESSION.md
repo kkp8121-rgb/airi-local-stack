@@ -19,11 +19,12 @@
 
 - PC: **신규 PC**(RTX 5060 Ti 8 GiB, D: 없음) — GPU PC(Codex PC)가 아니다. 이 PC에서는 AIRI 데스크톱 앱을 설치·실행하지 않는다(사용자 지시).
   GPT-SoVITS·STT(faster-whisper) 설치본이 없어 TTS 포함 지연은 GPU PC 과제다.
-- Git: `main` HEAD `4f278f18c98aad5d8b75ab5ad113ed3a02c5353e`, origin/main `2abe9e4`보다 12커밋 앞섬, push 없음. 이후 문서 변경은 미커밋일 수 있다.
+- Git: `main`은 코드 기준 `4f278f1`, 그 뒤 문서 커밋(`f022712` 09-24 현행화, 이어진 수치 정정)이 있다. origin/main `2abe9e4`보다 앞선 커밋은 전부 push 없음 —
+  정확한 HEAD·개수는 `git log --oneline 2abe9e4..HEAD`와 live state `git_head`로 확인한다.
 - 목표(`goal_status=active`): 09-24 사용자 목표 「사실 뭐라 할지 모르겠지만 모든 수단을 동원해서 아이리의 성능을 향상시켜」.
 - 평가 방식: **라이브 방송 시뮬레이션** — 첫 방송부터 히스토리를 쌓으며 Claude가 시청자·쇼러너를 턴마다 연기한다. 09-23 대본형 평가는 사용자가 무효 판정했다.
 - 최신 10회차(새 이야기 자전거·라면, 커밋 `4f278f1` 그대로, `/v1` + 후보 3개 + 기준 0.4): 깨끗한 턴 10/11 + 작은 누락 1, 실패 0,
-  대사 도착 중앙 0.64 s·최대 0.97 s. 단 7/11턴이 브리핑 문장 그대로다. 1~10회차 모두 AI 판독이며 **사람 판정은 아직**이다.
+  대사 도착 중앙 0.64 s·최대 0.97 s. 단 8/11턴이 브리핑 문장과 글자 그대로 같다(모두 탈락해 브리핑 문장으로 대체 7 + 후보가 브리핑을 그대로 옮김 1). 1~10회차 모두 AI 판독이며 **사람 판정은 아직**이다.
 - 운영 프록시(커밋됨, 기본 꺼짐): `ollama-proxy/live_briefing_select.py` — `AIRI_LIVE_BRIEFING_CANDIDATES`(2~6, 권장 3)·`AIRI_LIVE_BRIEFING_COVERAGE`(기본 0.4).
   브리핑에 `- 이번 턴에 말할 것:` 줄이 있을 때만 작동하고, 후보가 모두 탈락하면 브리핑 문장을 말한다. `urgent_safety_context`는 모든 경로 기본 적용.
 - 앱 연결: AIRI 앱 공급자는 `11435/v1`이며 방송 턴 토큰을 보내는 앱 패치(B1b/B4)는 아직 없다.
@@ -37,7 +38,8 @@
 
 ### 다음 단계 (우선순위 순)
 
-1. **사람 판정**: 10회차 대본 `C:\AIRI-Models\airi-human-eval\sim-fifth-story-10\transcript.md`의 자연스러움 — 브리핑 문장 7/11턴이 대본 읽기처럼 들리는지.
+1. **사람 판정**: 10회차 대본 `C:\AIRI-Models\airi-human-eval\sim-fifth-story-10\transcript.md`의 자연스러움 — 브리핑과 글자 그대로 같은 8/11턴이 대본 읽기처럼 들리는지.
+   검토 페이지 `C:\AIRI-Models\airi-human-eval\sim-fifth-story-10\review.html`(블라인드, 판정 뒤 브리핑 공개, 결과 JSON 저장).
 2. 기록을 따라 이어지는 지어내기(7회차 소화기) — 미해결.
 3. System1 재도전은 실제 방송 후보에 사람 정답을 매긴 데이터로 한다.
 4. GPU PC: TTS 포함 첫 음성 지연, 8 GB 동거 실측.
