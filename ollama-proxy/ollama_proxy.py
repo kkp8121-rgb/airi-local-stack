@@ -111,6 +111,7 @@ from live_briefing_select import (
     live_briefing_select_telemetry,
     say_line,
     select_candidate,
+    without_do_not_say,
 )
 from pickup_batch import (
     PickupBatchDecision,
@@ -8415,6 +8416,7 @@ async def stream_local_with_ack(
                 previous_reply=prior_assistant_text,
                 budget=live_briefing_budget,
                 threshold=coverage_threshold(),
+                user_text=context.last_user_text,
             )
             for unchosen_terminal, _unchosen_boundary in unchosen_candidates:
                 if unchosen_terminal is not None:
@@ -9446,14 +9448,18 @@ async def proxy(path: str, request: Request):
         raise
     live_context_note = ""
     if broadcast_notes is not None:
+        context_note = broadcast_notes.context_note
+        if candidate_budget() and say_line(context_note):
+            # Opt-in live briefing turns: a do-not-say list primes the generator to say it.
+            context_note = without_do_not_say(context_note)
         body, injected = inject_live_broadcast_notes(
             body,
             broadcast_notes.arc_note,
             broadcast_notes.affect_note,
-            broadcast_notes.context_note,
+            context_note,
         )
         if injected and live_broadcast_runtime.confirm_injected(broadcast_turn_token):
-            live_context_note = broadcast_notes.context_note
+            live_context_note = context_note
         else:
             live_broadcast_runtime.cancel_turn(broadcast_turn_token)
     if is_chat_request:
@@ -10672,6 +10678,7 @@ async def proxy(path: str, request: Request):
             previous_reply=previous_assistant_text(original_messages),
             budget=live_briefing_budget,
             threshold=coverage_threshold(),
+            user_text=last_user_text,
         )
         for payload in unchosen:
             if payload.get("done"):

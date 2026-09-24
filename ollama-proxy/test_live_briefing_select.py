@@ -15,6 +15,8 @@ from live_briefing_select import (
     coverage_threshold,
     say_line,
     select_candidate,
+    speakable_line,
+    without_do_not_say,
 )
 
 CONTEXT_NOTE = (
@@ -51,6 +53,11 @@ class LiveBriefingSelectTests(unittest.TestCase):
         self.assertEqual(say_line("앞 글자 - 이번 턴에 말할 것: 안 됨"), "")
         self.assertEqual(say_line(None), "")
 
+    def test_do_not_say_lines_are_removed_and_nothing_else(self) -> None:
+        note = CONTEXT_NOTE + "\n- 아직 말하지 말 것: 병원, 진료 결과"
+        self.assertEqual(without_do_not_say(note), CONTEXT_NOTE)
+        self.assertEqual(without_do_not_say(CONTEXT_NOTE), CONTEXT_NOTE)
+
     def test_coverage_rewards_the_briefed_fact_over_the_presupposed_one(self) -> None:
         followed_briefing = "아니, 오히려 오늘 자고 일어나니까 왼쪽 귀 안쪽까지 번져 있었어."
         followed_chat = "응, 어제보다 훨씬 나아졌어! 물 자주 마시고 있어."
@@ -73,6 +80,27 @@ class LiveBriefingSelectTests(unittest.TestCase):
         self.assertTrue(candidate_is_unfit("응 어제 저녁에 마라탕을 먹었는데 먹는 동안은 아픈 걸 잊었거든!", SAY, previous))
         self.assertFalse(candidate_is_unfit("아, 그래서 오늘은 귀까지 번졌어.", SAY, previous))
         self.assertFalse(candidate_is_unfit("근데 오늘은 귀까지 번졌어.", SAY, previous))
+
+    def test_unfit_when_a_corrected_term_is_asserted_again(self) -> None:
+        say = "아 설거지는 아니고 ㅋㅋ 꼴찌가 떡볶이 쏘기로 했거든."
+        self.assertTrue(candidate_is_unfit("내가 설거지 벌칙 받았어! 그런데 친구가 떡볶이 사줬거든.", say))
+        self.assertFalse(candidate_is_unfit("설거지는 아니고 꼴찌가 떡볶이 쐈어!", say))
+        self.assertFalse(candidate_is_unfit(say, say))
+        cold = "감기는 아니고, 어제 집에서 녹음하다가 목 위쪽이 아프기 시작했어."
+        self.assertTrue(candidate_is_unfit("감기 기운도 있는 것 같아.", cold))
+        self.assertFalse(candidate_is_unfit("감기가 아니라 어제 녹음하다 목이 아팠어.", cold))
+        self.assertFalse(candidate_is_unfit("감기라기보다는 목이 좀 결린 느낌이야.", cold))
+        # A one-syllable term ("불은 안 났어") is too ambiguous to police.
+        self.assertFalse(candidate_is_unfit("불이 확 올라와서 놀랐어.", "아니 불은 안 났어 ㅋㅋ"))
+
+    def test_unfit_when_the_viewer_is_answered_with_their_own_role(self) -> None:
+        say = "고마워! 두 번째 방송인데 또 와 줘서 너무 반가워."
+        self.assertTrue(candidate_is_unfit("ㅎㅇ 축하해! 두 번째 방송까지 와줘서 고마워.", say, "", "[YouTube] 두번째 방송 축하"))
+        self.assertFalse(candidate_is_unfit("고마워! 또 와 줘서 반가워.", say, "", "[YouTube] 두번째 방송 축하"))
+        self.assertTrue(candidate_is_unfit("오 첫방이라니 진짜 떨리겠다!", say, "", "[YouTube] 오 첫방이다 ㅎㅇㅎㅇ"))
+        # A viewer who talks about their own state may be answered about it.
+        self.assertFalse(candidate_is_unfit("내일 면접이라니 떨리겠다! 잘할 거야.", say, "", "[YouTube] 나 내일 면접이야"))
+        self.assertFalse(candidate_is_unfit("합격 축하해!", say, "", "[YouTube] 나 합격했어"))
 
     def test_pick_prefers_fit_then_coverage_and_keeps_draw_order_on_ties(self) -> None:
         scores = [(False, 0.9), (True, 0.2), (True, 0.4), (True, 0.4)]
@@ -109,6 +137,15 @@ class LiveBriefingSelectTests(unittest.TestCase):
         self.assertEqual(text, SAY)
         # Both drawn payloads are accounted for: one may carry the metadata, the rest are unchosen.
         self.assertEqual(len(unchosen) + (payload is not None), 2)
+
+    def test_spoken_line_drops_trailing_laughter_and_gets_a_terminal_mark(self) -> None:
+        self.assertEqual(speakable_line("난간 잡고 게처럼 내려왔어 ㅋㅋ"), "난간 잡고 게처럼 내려왔어.")
+        self.assertEqual(speakable_line("후회는 없어 ㅋㅋㅋ ㅎㅎ"), "후회는 없어.")
+        self.assertEqual(speakable_line("진짜 반가워!"), "진짜 반가워!")
+        self.assertEqual(speakable_line("아 설거지는 아니고 ㅋㅋ 꼴찌가 쐈어"), "아 설거지는 아니고 ㅋㅋ 꼴찌가 쐈어.")
+        text, _, _, said = self._select("응, 좋아졌어.", ["물 마시고 있어."], say=SAY.rstrip(".") + " ㅋㅋ", budget=2)
+        self.assertTrue(said)
+        self.assertEqual(text, SAY)
 
     def test_select_never_reads_out_a_staff_note_line(self) -> None:
         staff_note = "오늘 자고 일어나니 통증이 왼쪽 귀 안쪽까지 번져 있었다."

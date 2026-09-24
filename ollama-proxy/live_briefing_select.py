@@ -20,8 +20,13 @@ from typing import Awaitable, Callable
 LIVE_BRIEFING_CANDIDATES_ENV = "AIRI_LIVE_BRIEFING_CANDIDATES"
 LIVE_BRIEFING_COVERAGE_ENV = "AIRI_LIVE_BRIEFING_COVERAGE"
 MAX_CANDIDATES = 6
-DEFAULT_COVERAGE = 0.3
+# 0.4 over 0.3 (2026-09-24, 3 candidates + briefing line, key-term checks on two stories): story 1
+# 19 -> 23/23 with the line spoken in 8 -> 14 of 23 turns, story 2 11 -> 12/14 with 2 -> 2 lines.
+DEFAULT_COVERAGE = 0.4
 SAY_LINE_PREFIX = "- 이번 턴에 말할 것:"
+# Listing what not to say yet makes the 2.3B generator say it: drafts naming a listed item went from 6/90
+# without the line to 15/90 with it (2026-09-24, two stories, 6 seeds per turn).
+DO_NOT_SAY_PREFIX = "- 아직 말하지 말 것:"
 # A candidate sharing this many characters with the previous reply is a repeat, not a new beat.
 REPEAT_RUN_CHARS = 20
 
@@ -32,6 +37,17 @@ _HONORIFIC_END_RE = re.compile(r"(?:요|습니다|세요|죠)\s*[.!?~]*\s*$")
 _WRITTEN_END_RE = re.compile(r"(?:었다|았다|였다|했다|한다|뗀다|는다|샀다|갔다)\s*[.!]*\s*$")
 _LEAKED_LABEL_RE = re.compile(r"이번 턴에|브리핑|스태프|\[")
 _UNEXECUTED_LOOKUP_RE = re.compile(r"(?:검색|찾아|확인|알아)\s?(?:해\s?)?봤|검색했")
+# A director correction in the say line ("설거지는 아니고", "감기가 아니라") names what AIRI must stop
+# asserting. On 2026-09-24 show 08 "내가 설거지 벌칙 받았어!" passed coverage right after the line
+# "아 설거지는 아니고 ㅋㅋ", because bigrams cannot see negation.
+_CORRECTED_TERM_RE = re.compile(r"([가-힣A-Za-z0-9]{2,})(?:은|는|이|가)\s*(?:아니|안\s)")
+_NEGATION_AFTER_RE = re.compile(r"^.{0,4}?(?:아니|안\s|않|없|라기보다|보다는)")
+# Role mirroring on the opening turns of every simulated show: "두번째 방송 축하" answered with "축하해!",
+# "첫방이다" answered with "떨리겠다!" (AIRI guessing a feeling the viewer never stated).
+_VIEWER_CONGRATS_RE = re.compile(r"축하|ㅊㅋ")
+_MIRRORED_CONGRATS_RE = re.compile(r"축하해")
+_GUESSED_FEELING_RE = re.compile(r"(?:떨리|긴장되|설레|무섭|힘들)겠")
+_VIEWER_OWN_STATE_RE = re.compile(r"(?:^|\s)(?:나|내가|저|제가)(?:\s|도|는)")
 
 
 def candidate_budget(value: object | None = None) -> int:
@@ -65,6 +81,22 @@ def say_line(context_note: object) -> str:
     return ""
 
 
+# Show 09 (2026-09-24): say lines ending "…내려왔어 ㅋㅋ" came out empty — the output boundary drops
+# the laughter and then withholds a long final clause with no terminal mark, so the fallback was silence.
+_TRAILING_LAUGH_RE = re.compile(r"(?:\s*(?:ㅋ+|ㅎ+|ㅠ+|ㅜ+))+\s*$")
+
+
+def speakable_line(say: str) -> str:
+    """The say line as it will be spoken: trailing laughter dropped, a terminal mark guaranteed."""
+    text = _TRAILING_LAUGH_RE.sub("", say.strip()).rstrip()
+    return text if not text or text[-1] in ".!?~" else text + "."
+
+
+def without_do_not_say(context_note: str) -> str:
+    """The context note with the briefing's do-not-say lines removed."""
+    return "\n".join(line for line in context_note.split("\n") if not line.startswith(DO_NOT_SAY_PREFIX))
+
+
 def _bigrams(text: str) -> set[str]:
     compact = _NON_TEXT_RE.sub("", unicodedata.normalize("NFKC", text))
     return {compact[index:index + 2] for index in range(len(compact) - 1)}
@@ -78,7 +110,7 @@ def briefing_coverage(answer: object, say: str) -> float:
     return len(target & _bigrams(answer)) / len(target)
 
 
-def candidate_is_unfit(answer: object, say: str, previous_reply: str = "") -> bool:
+def candidate_is_unfit(answer: object, say: str, previous_reply: str = "", user_text: str = "") -> bool:
     """Reject register slips, copied staff notes, invented lookups and repeats of the previous reply.
 
     A repeated two-word opener is deliberately not a rejection: on 2026-09-24 show 05 the generator
@@ -94,6 +126,14 @@ def candidate_is_unfit(answer: object, say: str, previous_reply: str = "") -> bo
         return True
     if _UNEXECUTED_LOOKUP_RE.search(text) and not _UNEXECUTED_LOOKUP_RE.search(say):
         return True
+    for term in {match.group(1) for match in _CORRECTED_TERM_RE.finditer(say)}:
+        for match in re.finditer(re.escape(term), text):
+            if not _NEGATION_AFTER_RE.search(text[match.end():match.end() + 12]):
+                return True
+    if user_text and _VIEWER_CONGRATS_RE.search(user_text) and _MIRRORED_CONGRATS_RE.search(text):
+        return True
+    if user_text and _GUESSED_FEELING_RE.search(text) and not _VIEWER_OWN_STATE_RE.search(user_text):
+        return True
     previous = unicodedata.normalize("NFKC", previous_reply or "").strip()
     if previous:
         match = difflib.SequenceMatcher(None, text, previous, autojunk=False).find_longest_match(
@@ -104,9 +144,11 @@ def candidate_is_unfit(answer: object, say: str, previous_reply: str = "") -> bo
     return False
 
 
-def candidate_score(answer: object, say: str, previous_reply: str = "") -> tuple[bool, float]:
+def candidate_score(
+    answer: object, say: str, previous_reply: str = "", user_text: str = "",
+) -> tuple[bool, float]:
     """(fit, coverage); tuples order fit candidates first, then by coverage."""
-    return (not candidate_is_unfit(answer, say, previous_reply), briefing_coverage(answer, say))
+    return (not candidate_is_unfit(answer, say, previous_reply, user_text), briefing_coverage(answer, say))
 
 
 def accept_early(score: tuple[bool, float], threshold: float) -> bool:
@@ -127,6 +169,7 @@ async def select_candidate(
     previous_reply: str,
     budget: int,
     threshold: float,
+    user_text: str = "",
 ) -> tuple[str, object | None, list[object], bool]:
     """Draw until a fit candidate covers the say line or the budget is spent.
 
@@ -138,20 +181,23 @@ async def select_candidate(
     """
     texts: list[str] = [first_text]
     payloads: list[object | None] = [None]
-    scores = [candidate_score(first_text, say, previous_reply)]
+    scores = [candidate_score(first_text, say, previous_reply, user_text)]
     while not accept_early(scores[-1], threshold) and len(texts) < budget:
         text, payload = await draw()
         texts.append(text)
         payloads.append(payload)
-        scores.append(candidate_score(text, say, previous_reply))
+        scores.append(candidate_score(text, say, previous_reply, user_text))
     chosen = best_index(scores)
-    said_briefing = not accept_early(scores[chosen], threshold) and not candidate_is_unfit(say, say, previous_reply)
+    line = speakable_line(say)
+    said_briefing = not accept_early(scores[chosen], threshold) and not candidate_is_unfit(
+        line, say, previous_reply, user_text,
+    )
     live_briefing_select_telemetry.record(
         draws=len(texts) - 1, early=accept_early(scores[-1], threshold), replaced=chosen != 0,
         said_briefing=said_briefing,
     )
     unchosen = [payload for index, payload in enumerate(payloads) if index != chosen and payload is not None]
-    return (say if said_briefing else texts[chosen]), payloads[chosen], unchosen, said_briefing
+    return (line if said_briefing else texts[chosen]), payloads[chosen], unchosen, said_briefing
 
 
 class LiveBriefingSelectTelemetry:

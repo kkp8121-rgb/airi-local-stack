@@ -8081,7 +8081,8 @@ class LiveBroadcastRouteTests(unittest.TestCase):
             "broadcast_context": {
                 "schema_version": 1, "topic_title": "첫 방송", "segment_label": "목 이야기",
                 "situation": "인사가 끝났다.",
-                "briefing": BROADCAST_BRIEFING_HEADER + "\n- 이번 턴에 말할 것: 오늘은 통증이 왼쪽 귀까지 번져 있었어.",
+                "briefing": BROADCAST_BRIEFING_HEADER + "\n- 이번 턴에 말할 것: 오늘은 통증이 왼쪽 귀까지 번져 있었어."
+                            "\n- 아직 말하지 말 것: 병원, 진료 결과",
                 "donation_continuation": False,
             },
         })
@@ -8195,6 +8196,18 @@ class LiveBroadcastRouteTests(unittest.TestCase):
                 )
                 self.assertEqual(len(chat.requests), 2)
                 self.assertEqual(dialogue, "오늘은 통증이 왼쪽 귀까지 번져 있었어.")
+
+    def test_live_briefing_drops_the_do_not_say_line_only_when_on(self):
+        for budget, kept in (("", True), ("2", False)):
+            with self.subTest(budget=budget):
+                chat, _ = self._live_briefing_chat(
+                    f"brief-dns-{budget or 'off'}", ["아니, 오늘은 통증이 왼쪽 귀까지 번져 있었어."], True,
+                    {"AIRI_LIVE_BRIEFING_CANDIDATES": budget}, path="/v1/chat/completions",
+                    patches=((ollama_proxy, "needs_grounding_retry", lambda *a, **k: False),),
+                )
+                prompt = json.dumps(chat.requests[0]["messages"], ensure_ascii=False)
+                self.assertIn("이번 턴에 말할 것", prompt)
+                self.assertEqual("아직 말하지 말 것" in prompt, kept)
 
     def test_s4_batched_chat_is_code_owned_and_skips_upstream(self):
         capability = self._issue_chat_turn("s4-batch")
