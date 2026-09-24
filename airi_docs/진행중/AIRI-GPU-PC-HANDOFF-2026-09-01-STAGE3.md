@@ -1,5 +1,13 @@
 # AIRI GPU PC 인계 — M8 Stage 3 (Mi:dm 교정 파인튜닝) (2026-09-01)
 
+> **2026-09-24 대체 주석:** 이 문서는 더 이상 GPU PC의 진입점이 아니다. 현행 인계는
+> `AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md`이고 읽는 순서도 그 문서 §0을 따른다. 이 문서는
+> GPU PC 자산 위치를 찾는 용도로만 유효하다(현행 인계 §0 표가 이 문서와
+> `AIRI-CODEX-HANDOFF-2026-08-27.md` §0-A를 가리킨다). Stage 3·M8-10·Stage 4는 이 문서 뒤에
+> 실행됐고 결과는 `AIRI-WORKING-STATE.md`의 `gpu_pc_stage3_*`·`m8_*`·`stage4_*` receipt에 있으므로
+> 아래 §9 Goal을 다시 제출하지 말 것. §7 미커밋 경고는 해소됐다 — 목록의 12개와 이 문서는
+> `e392a19`(코드 4)·`a648aa5`(문서 9)로 커밋돼 origin/main에 들어 있다(09-24 조상 관계 확인).
+
 이 문서가 GPU PC의 **단일 진입점**입니다. 먼저 `git pull --ff-only origin main`을 실행한 뒤
 `AGENTS.md` → `AIRI-WORKING-STATE.md` 전체 → 이 문서 →
 `AIRI-VOD-STORYLINE-CEILING-EVIDENCE-2026-08-28.md` →

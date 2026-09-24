@@ -1,5 +1,32 @@
 # AIRI 로드맵 갱신 로그 (최신이 위)
 
+- 2026-09-24 11:37 KST **문서 현행화 — 실행 없음(사용자 요청 「문서들 모두 현행화」), 로컬 미커밋.** 11:32 KST 대조: main HEAD
+  `4f278f1`(origin/main `2abe9e4` 대비 12커밋 앞섬, push 없음), 스택 포트 listener 0, ollama·llama-server·trainer 0. 정정한 문서:
+  live state(frontmatter `git_head`·`worktree_state`·`authorization`·`active_phase`·`current_handoff`·`active_trainer_note`와
+  §1~§4, 내용이 같은 중복 키 `active_phase`·`vod_storyline_run32_intent` 각 1줄 삭제, 이전 `authorization`은 `superseded_authorization`에 보존, checkpoint `20260924-doc-refresh`),
+  `AIRI-ROADMAP-STATUS.md` 사용자용 대시보드(11:33 KST 재파싱), `NEXT-SESSION.md` 시작 안내, `AIRI-CURRENT-DOCS-INDEX-2026-08-10.md`
+  현재 진입점, `진행중/AIRI-SYSTEM1-CANDIDATE-JUDGE-2026-09-23.md` §0·§6, `README.md` 현재 작업 절, `AGENTS.md` 구조·명령 설명.
+  신설: 현행 인계 `진행중/AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md`(live state `current_handoff`가 가리킴), `참조/claude-guide/`
+  6개(architecture·commands-and-tests·conventions·docs-map·goal-state-policy·patching — `CLAUDE.md`에서 분리했고 `CLAUDE.md`는
+  목차 형식으로 줄임). 로드맵 체크리스트·완료율 변경 없음(정상 74/112·진행 지수 91/112, M8 항목 아님), `adoption_authorized=false` 불변.
+  검증: 문서 계약 테스트 `test-airi-work-continuity.ps1`·`test-airi-roadmap-dashboard-contract.ps1` 둘 다 PASS(11:59 KST 최종 재실행, exit 0),
+  `git diff --check` exit 0, 미추적 새 문서 7개는 따로 검사(끝 공백 0, BOM 없음, CRLF 통일). 중앙 편집자가 동시 편집 파일의 diff를 전부 읽어
+  덮어쓰기·중복이 없음을 확인했다. 기록 live state `doc_refresh_receipt`.
+
+- 2026-09-24 11:13 KST **10회차 — 최종 커밋 코드(`4f278f1`) 그대로 다섯 번째 새 이야기.** 11턴 중 10턴 깨끗, 1턴 작은 누락, 실패 0.
+  긴급 오작동·침묵·역할 뒤바뀜·누설 0, 전제 질문 4개 모두 브리핑대로. 대사 도착 중앙 0.64 s·최대 0.97 s. 대가: 7/11턴이 브리핑 문장
+  그대로(대본 읽기처럼 들릴 수 있음 — 사람 판정 필요). 기록 live state `sim10_receipt`.
+
+- 2026-09-24 11:10 KST **전체 오프라인 스위트 재실행 + 4단위 커밋(사용자 승인 「전체 테스트 통과 후 4단위 커밋」, push 없음).** 11:04 KST
+  스택을 내리고 `python -m pytest -q ollama-proxy test_latency_trace.py test_start_airi_background.py latency-monitor` 실행(STT는 프록시
+  venv에 `av`가 없어 제외): 2445 passed, 16 skipped, 2055 subtests, 5 failed(258 s). 5개는 기존 기준선이다 — 이 PC의 PowerShell 실행
+  정책으로 막히는 `test_airi_session_header_patch` 4개, HEAD `d2d7c91`에서도 같은 해시로 실패하는 `test_synthesize_broadcast_continuity_v4`
+  1개. 새 실패 0. 이어서 커밋: `4ea23d0`(fix: `urgent_safety_context`, 임시 worktree에서 단독 검증 435 passed), `038fa00`(feat: 브리핑
+  후보 선택 — 기준 0.4, 정정 규칙, 「아직 말하지 말 것」 제거, 역할 뒤바뀜, 말할 수 있는 브리핑 문장), `462848b`(feat: `eval/live_broadcast_sim`
+  시뮬레이터 + 테스트 + CI 샤드, `training/system1` 모순 합성·판정기 학습), `4f278f1`(docs). author `kkp8121-rgb`, 임시 worktree 제거,
+  origin/main `2abe9e4` 대비 12커밋 앞섬. 03:18 항목에 남은 「전체 오프라인 스위트 미재실행」은 이 실행으로 해소됐다. 기록 live state
+  `full_suite_rerun_intent`·`full_suite_receipt_2`·`commit_receipt_batch3`.
+
 - 2026-09-24 03:18 KST **9회차(네 번째 새 이야기) + 방송 중 수정 2건, 로컬 미커밋.** 긴급 판정은 AIRI에게 묻거나 짐작하는 말(「위험했겠다
   다쳤어?」)도 제외, 「ㅋㅋ」로 끝나는 브리핑 문장은 말하기 전에 끝을 정리(잘림·침묵 해결), 역할 뒤바뀜(축하 되받기·감정 짐작) 거름,
   「아직 말하지 말 것」 줄 제거. 최종 코드 턴 깨끗 3·부분 2·실패 0. 시뮬레이터는 `ollama-proxy/eval/live_broadcast_sim/`로 이동.

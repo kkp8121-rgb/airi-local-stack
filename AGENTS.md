@@ -4,11 +4,13 @@
 
 This is a Windows-first local AIRI stack. Root PowerShell scripts start, stop, patch, and verify it. Core integration code lives in `ollama-proxy/` (chat, memory, and knowledge), `stt/`, `latency-monitor/`, and `gpt-sovits/`. Operational notes and byte-sensitive patches are under `airi_docs/`. Tests are generally colocated; root tests cover cross-component scripts. `chatterbox/`, `faster-qwen3-tts/`, and `Qwen3-TTS-Openai-Fastapi/` are upstream snapshots documented in `THIRD-PARTY-SOURCES.md`; keep changes to them easy to audit.
 
+Offline evaluation harnesses live in `ollama-proxy/eval/` and the local training scaffold in `ollama-proxy/training/`. The live-broadcast tuning track (2026-09-23~24) added `ollama-proxy/live_briefing_select.py` (briefing candidate selection, default off, active only when `AIRI_LIVE_BRIEFING_CANDIDATES` is set), the turn-by-turn simulator `ollama-proxy/eval/live_broadcast_sim/`, and the System1 labeling and judge-training tools in `ollama-proxy/training/system1/`, whose judges are not wired into the proxy. Results live in `airi_docs/진행중/AIRI-SYSTEM1-CANDIDATE-JUDGE-2026-09-23.md` §8 and `airi_docs/진행중/AIRI-WORKING-STATE.md`; none of it is operationally adopted. Show transcripts and candidates are response-bearing and stay outside Git under `C:\AIRI-Models\airi-human-eval\`.
+
 ## Build, Test, and Development Commands
 
-- `.\start-airi-local-stack.ps1` starts the local Ollama proxy, TTS, STT, and monitoring services.
+- `.\start-airi-local-stack.ps1` starts the local Ollama proxy, TTS, and monitoring services; STT starts only with `-Stt on`.
 - `.\stop-airi-local-stack.ps1` stops the stack cleanly.
-- `.\test-current-checkpoint.ps1` runs the offline patch-manifest, entrypoint, applicability, and Node contract checks used by CI.
+- `.\test-current-checkpoint.ps1` runs the offline work-continuity, roadmap-dashboard, training-durability, patch-manifest, entrypoint, applicability, ASAR, and Node/Python contract checks used by CI.
 - `python -m pytest -q ollama-proxy test_latency_trace.py test_start_airi_background.py latency-monitor stt` runs the core Python regression suite.
 - `node --test test-send-airi-local-text.mjs` runs the sender contract tests directly.
 

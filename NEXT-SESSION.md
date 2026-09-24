@@ -1,9 +1,77 @@
 # AIRI 다음 세션 안내
 
+## 시작 안내 (2026-09-24 기준)
+
+이 절이 현재 기준이다. 아래 「과거 기록 (시점 순)」은 당시 상태를 그대로 보존한 이력이라 현재 상태 판단에 쓰지 않는다.
+사실의 근거는 `airi_docs/진행중/AIRI-WORKING-STATE.md`의 receipt와 `git log`이며, 이 절과 어긋나면 live state와 실제 기계 상태가 이긴다.
+
+### 먼저 읽을 것 (순서대로)
+
+1. `AGENTS.md` — 저장소 계약.
+2. `airi_docs/진행중/AIRI-WORKING-STATE.md` — live SSoT. 머리말(`goal_status`·`git_head`·`worktree_state`)과 최신 receipt
+   (09-24 기준 `sim10_receipt`·`commit_receipt_batch3`·`full_suite_receipt_2`)를 `git status`·HEAD·실행 중 PID와 read-only로 대조한다.
+3. `airi_docs/진행중/AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` — 현행 인계(라이브 방송 시뮬레이션·브리핑 후보 선택).
+   상세 근거: `airi_docs/진행중/AIRI-SYSTEM1-CANDIDATE-JUDGE-2026-09-23.md` §0~§8(§0~§6 System1 계획, §7 시나리오 v2, §8 라이브 방송 시뮬레이션).
+4. `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md` — 로드맵. M8 체크리스트·완료율은 이번 작업으로 바뀌지 않았다(M8 항목 아님).
+5. 이 파일. 문서 지도는 `airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md`, 배치 이력은 `airi_docs/로드맵/AIRI-ROADMAP-LOG.md`(최신이 위).
+
+### 현재 상태
+
+- PC: **신규 PC**(RTX 5060 Ti 8 GiB, D: 없음) — GPU PC(Codex PC)가 아니다. 이 PC에서는 AIRI 데스크톱 앱을 설치·실행하지 않는다(사용자 지시).
+  GPT-SoVITS·STT(faster-whisper) 설치본이 없어 TTS 포함 지연은 GPU PC 과제다.
+- Git: `main` HEAD `4f278f18c98aad5d8b75ab5ad113ed3a02c5353e`, origin/main `2abe9e4`보다 12커밋 앞섬, push 없음. 이후 문서 변경은 미커밋일 수 있다.
+- 목표(`goal_status=active`): 09-24 사용자 목표 「사실 뭐라 할지 모르겠지만 모든 수단을 동원해서 아이리의 성능을 향상시켜」.
+- 평가 방식: **라이브 방송 시뮬레이션** — 첫 방송부터 히스토리를 쌓으며 Claude가 시청자·쇼러너를 턴마다 연기한다. 09-23 대본형 평가는 사용자가 무효 판정했다.
+- 최신 10회차(새 이야기 자전거·라면, 커밋 `4f278f1` 그대로, `/v1` + 후보 3개 + 기준 0.4): 깨끗한 턴 10/11 + 작은 누락 1, 실패 0,
+  대사 도착 중앙 0.64 s·최대 0.97 s. 단 7/11턴이 브리핑 문장 그대로다. 1~10회차 모두 AI 판독이며 **사람 판정은 아직**이다.
+- 운영 프록시(커밋됨, 기본 꺼짐): `ollama-proxy/live_briefing_select.py` — `AIRI_LIVE_BRIEFING_CANDIDATES`(2~6, 권장 3)·`AIRI_LIVE_BRIEFING_COVERAGE`(기본 0.4).
+  브리핑에 `- 이번 턴에 말할 것:` 줄이 있을 때만 작동하고, 후보가 모두 탈락하면 브리핑 문장을 말한다. `urgent_safety_context`는 모든 경로 기본 적용.
+- 앱 연결: AIRI 앱 공급자는 `11435/v1`이며 방송 턴 토큰을 보내는 앱 패치(B1b/B4)는 아직 없다.
+- 도구: 시뮬레이터 `ollama-proxy/eval/live_broadcast_sim/sim_broadcast.py`, System1 학습 `ollama-proxy/training/system1/`. judge-v1·contradiction-v1은 운영 미연결.
+- 미채택(측정 완료): 의미 모순 판정기(실제 후보 AUC 0.631), 첫 문장 조기 판정, Ollama 템플릿 교체(차이 없음), A.X-4.0-Light(단독 약 4.5 GB VRAM),
+  프롬프트 배치·머리말 변경(Mi:dm 무반응). 근거는 결과 문서 §8과 live state receipt(`contradiction_judge_v1`·`template_ab` 등).
+- Jev(System1): 후보 생성 + 빠른 결정 + 대체라는 구조는 효과가 크지만, 학습된 작은 판정기는 실제 방송에서 아직 규칙을 못 넘는다.
+- 테스트(09-24, 스택 내림): 전체 오프라인 스위트 2445 passed, 16 skipped, 5 failed — 5개 모두 기존 기준선(PowerShell 실행 정책으로 막히는
+  `test_airi_session_header_patch` 4개, `test_synthesize_broadcast_continuity_v4` 1개). STT 테스트는 프록시 venv에 `av`가 없어 제외.
+- 스택·PID: 지금 실행 중인지는 확인 필요 — 실행 중 PID의 명령줄을 확인하기 전에는 같은 프로세스를 새로 띄우지 않는다.
+
+### 다음 단계 (우선순위 순)
+
+1. **사람 판정**: 10회차 대본 `C:\AIRI-Models\airi-human-eval\sim-fifth-story-10\transcript.md`의 자연스러움 — 브리핑 문장 7/11턴이 대본 읽기처럼 들리는지.
+2. 기록을 따라 이어지는 지어내기(7회차 소화기) — 미해결.
+3. System1 재도전은 실제 방송 후보에 사람 정답을 매긴 데이터로 한다.
+4. GPU PC: TTS 포함 첫 음성 지연, 8 GB 동거 실측.
+5. 운영 반영 결정(사용자): `AIRI_LIVE_BRIEFING_CANDIDATES=3`을 켤지(현재 기본 꺼짐), 방송 턴을 보낼 앱 쪽 연결(B1b/B4) 구현.
+
+방송 시뮬레이션 브리핑 작성 규칙(측정 근거): ① 턴마다 지금 말할 사실 하나 ② 「이번 턴에 말할 것」은 AIRI 반말 문장으로(그대로 말해질 수 있다)
+③ 「아직 말하지 말 것」 목록 금지(누설 17% → 7%, 후보 선택을 켜면 프록시도 이 줄을 뺀다) ④ 정정은 「X는 아니고 …」.
+
+### 울타리
+
+- `adoption_authorized=false` — 운영 채택 금지. 기본 꺼짐 기능을 켜거나 운영 모델을 바꾸는 일은 사용자 결정 뒤에만 한다.
+- 이 PC에서 AIRI 데스크톱 앱 설치·실행 금지. 외부 chat/search/memory 공급자는 명시적 opt-in만.
+- commit·push는 매번 사용자 승인(승인은 1회성). 대본·후보·평가 산출물처럼 응답이 담긴 자료는 Git 밖(`C:\AIRI-Models\airi-human-eval\`)에 둔다.
+- `airi_docs/patches/*.patch`는 바이트 그대로 둔다.
+- 이 PC는 사용자도 함께 쓴다 — 메모리가 부족하면 긴 실행을 멈추고, 사용자가 요청하기 전에는 다시 시작하지 않는다(live state `suite_run3`).
+- 긴 실행·상태 변경 명령은 live state에 intent checkpoint를 먼저, receipt checkpoint를 나중에 남긴다.
+- 옛 E2 계약 표식(현재 작업 순서가 아님 — `test-airi-work-continuity.ps1`이 이 문자열을 확인한다):
+  `execution_order=P0_A>P0_B>E2_LAUNCH>E2_PROVENANCE>PACKAGE>T3_36>CAMPAIGN_3X500>USER_DECISION`
+- 운영 기본값은 이 파일 끝 「운영 기본값」 절, 작업 원칙은 「작업 원칙 (v3)」 절을 본다.
+
+## 과거 기록 (시점 순)
+
+아래는 당시 쓴 그대로의 기록이다(대체로 최신이 위, 나중에 덧붙인 주석은 「추기」·「과거 기록」으로 표시). 각 블록의 「현재」·「다음」·권한·진입점 서술은 그 시점 기준이며, 현재 판단에는 맨 위
+「시작 안내」와 live state를 쓴다. 09-23~24 블록의 「로컬 미커밋」 표기도 당시 기준이다 — 해당 변경은 이후 `7e0b207`·`4ea23d0`·`038fa00`·
+`462848b`·`4f278f1`로 커밋됐고(push 없음), 시뮬레이터는 세션 scratchpad에서 `ollama-proxy/eval/live_broadcast_sim/`로 옮겨졌다.
+
 > **2026-09-24 새벽 — 목표 「모든 수단으로 성능 향상」 진행분(로컬 미커밋).** 새 이야기 2개(7~8회차)로 일반화 점검 후 수정:
 > 되물은 「사고/위험」을 긴급으로 보지 않음(모든 경로), 통과 기준 0.4, 「X는 아니고」 정정 규칙, 라이브 턴의 「아직 말하지 말 것」
 > 제거(누설 17% → 7%), 역할 뒤바뀜 거름, 「ㅋㅋ」로 끝나는 브리핑 문장 정리(9회차). 시뮬레이터는 `ollama-proxy/eval/live_broadcast_sim/`로 이동. 모순 판정기(실제 AUC 0.63)·템플릿 교체
 > (효과 없음)는 미채택. **전체 오프라인 스위트 재실행 필요**(메모리 부족으로 중단됨). 근거: 결과 문서 §8, live state.
+
+(09-24 추기 — 위 블록의 사후 기록) 전체 오프라인 스위트는 사용자 요청으로 11:10 KST에 다시 돌려 새 실패 없이 끝났고
+(live state `full_suite_receipt_2`), 위 변경은 `4ea23d0`·`038fa00`·`462848b`·`4f278f1`로 커밋됐다(push 없음,
+`commit_receipt_batch3`). 이어진 10회차 결과는 맨 위 「시작 안내」에 있다.
 
 > **2026-09-24 새벽 — 라이브 방송 시뮬레이션 튜닝(사용자 지시: 실제 첫 방송을 시뮬레이션하며 히스토리를 쌓는 방식).**
 > Claude가 시청자·쇼러너를 맡아 턴마다 이어 가는 5회 방송. 앱 공급자 경로(`/v1` 스트리밍)는 첫 문장만 말하고 일대일용
@@ -436,6 +504,8 @@
 > `goal_status=paused-user-session-handoff`; `adoption_authorized=false`
 > `execution_order=P0_A>P0_B>E2_LAUNCH>E2_PROVENANCE>PACKAGE>T3_36>CAMPAIGN_3X500>USER_DECISION`
 
+### 2026-08-22 진입점 안내 (과거 기록 — 현재 진입점은 맨 위 「시작 안내」)
+
 **진입점은 네 개다** (2026-08-22 live-state 지속성 규칙 추가):
 
 1. `airi_docs/진행중/AIRI-WORKING-STATE.md` — **가장 먼저 읽는 live SSoT.**
@@ -489,6 +559,14 @@ E1/E2 merge/package → 36 T3 → 승자 3×500 →
 ## 운영 기본값 (변경 시 이 절 갱신)
 
 - Chat model: Mi:dm (`midm-airi:2.0-mini`) digest pin 유지 (사용자 결정 6)
+  - 신규 PC(2026-09-24): Ollama 0.34.2 태그 digest `d297ee3db6f3380c4038d2cd7aa7d0076cdb1b76e4c9578499e459af428cfe11`은
+    런처 고정값 `92a9ba2e…485f`와 manifest만 다르고 가중치는 같다. Ollama 0.34.2는 GGUF 내장 공식 템플릿을 쓰며,
+    템플릿 교체 비교(38~44%)는 차이가 없어 운영 변경이 필요 없다. 평가용 태그 `midm-airi-evaltpl:2.0-mini`는 제거 가능.
+- 라이브 브리핑 후보 선택(2026-09-24, 기본 꺼짐): `AIRI_LIVE_BRIEFING_CANDIDATES`(2~6, 권장 3)·
+  `AIRI_LIVE_BRIEFING_COVERAGE`(기본 0.4), `/health`의 `live_briefing_select`. 켤지는 사용자 결정이다.
+- `urgent_safety_context`(모든 경로, 기본 적용): 강한 단어(자살·자해·죽고 싶·크게 다쳤·응급·폭력)는 항상 긴급.
+  「사고·위험」은 본인 표시·도움 요청·서술형 피해면 긴급이고, AIRI 직전 답을 되묻거나 남에 대해 묻거나 짐작하면
+  긴급이 아니다(판정 수정 커밋 `4ea23d0`).
 - `num_ctx=4096` (2026-08-25 M2에서 2048→4096. 근거: 세 blind 라운드에서 전 arm 턴의
   ~34%가 Ollama 400 `exceed_context_size_error`로 죽었고 관측 `n_prompt_tokens`
   2,552~2,827; GGUF 내장 KT 프리앰블 ≈514토큰이 고정비라 실효 예산이 ~1,534였다.

@@ -1,6 +1,113 @@
 # AIRI Documentation Index
 
-최종 현행화 2026-09-01 15:40 KST (M8 Stage 1·2 소진, GPU PC 인계). 새 단일 진입점은
+최종 현행화 2026-09-24 KST (신규 PC — 09-23 System1 판정기 계획과 09-23 밤~09-24 라이브 방송
+시뮬레이션 튜닝 뒤 문서 현행화). 파일명의 날짜(2026-08-10)는 처음 만든 날일 뿐이며 이 파일이
+현재 색인이다. 지금 유효한 읽기 순서와 문서 상태는 바로 아래 「현재 진입점」 절이 정한다.
+그 아래의 현행화 머리말과 본문 항목은 각 시점의 기록이다.
+
+## 현재 진입점 (2026-09-24 기준)
+
+### 지금 상황
+
+- 작업 PC는 **신규 PC**(RTX 5060 Ti 8 GiB, D: 없음)이며 GPU PC(Codex PC)가 아니다. 이 PC에서는
+  AIRI 데스크톱 앱을 설치·실행하지 않는다(사용자 지시). GPT-SoVITS·STT(faster-whisper) 설치본이
+  없으므로 TTS 포함 지연 측정은 GPU PC 과제다.
+- 흐름: 09-23 System1 후보 판정기 계획(측정→데이터→학습→비교) 완료 → 같은 날 v2 시나리오(AIRI
+  1인칭 + 육하원칙)로 다시 짰으나 블라인드 검토에서 사용자가 대본형 평가를 무효 판정 → 09-23
+  밤~09-24 라이브 방송 시뮬레이션(첫 방송부터 히스토리를 쌓으며 Claude가 시청자·쇼러너를 턴마다
+  연기) 10회차 튜닝 → 09-24 사용자 목표 「모든 수단을 동원해서 아이리의 성능을 향상」(active).
+- 10회차(새 이야기, 커밋 `4f278f1` 그대로): AI 판독 10/11 깨끗 + 작은 누락 1, 실패 0, 대사 도착
+  중앙 0.64 s·최대 0.97 s. 브리핑 문장을 그대로 말한 턴이 7/11이라 대본 읽기처럼 들릴 수 있다.
+  **사람 판정은 아직 없다.**
+- Git: `main` HEAD `4f278f18c98aad5d8b75ab5ad113ed3a02c5353e`, origin/main `2abe9e4` 대비 12커밋
+  앞섬, push 없음(push는 매번 사용자 승인). 그 뒤 문서 변경은 미커밋일 수 있다.
+- 운영 채택 금지(`adoption_authorized=false`)는 그대로이며 새 프록시 기능은 모두 기본 꺼짐이다.
+  로드맵 M8 체크리스트·완료율은 이번 작업으로 바뀌지 않았다(M8 항목이 아니다).
+- 테스트(09-24, 스택 정지): 전체 오프라인 스위트 2445 passed, 16 skipped, 5 failed. 5개는 기존
+  기준선이다(이 PC의 PowerShell 실행 정책으로 막히는 `test_airi_session_header_patch` 4개,
+  HEAD `d2d7c91`에서도 같은 해시로 실패하는 `test_synthesize_broadcast_continuity_v4` 1개).
+  STT 테스트는 프록시 venv에 `av`가 없어 제외했다.
+
+### 새 세션 읽기 순서
+
+| 순서 | 문서 | 읽는 이유 |
+|---|---|---|
+| 1 | `AGENTS.md`(저장소 루트) | 기여 계약. 세션 시작·resume·compact 뒤 절차, active goal heartbeat 최대 120분(GPU 학습 등은 30분), intent/receipt checkpoint |
+| 2 | `진행중/AIRI-WORKING-STATE.md` | 가변 live SSoT. 머리말 `goal_status`·`git_head`·`current_handoff`와 마지막 receipt를 기계 상태와 read-only로 대조 |
+| 3 | `진행중/AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` | **현재 인계문**(09-24 신설). 09-23~24 경과, 결과와 프록시 반영분, 방송 시뮬레이션 실행법, 브리핑 작성 규칙, 다음 단계 |
+| 4 | `진행중/AIRI-SYSTEM1-CANDIDATE-JUDGE-2026-09-23.md` | 결과 문서. §0~§6 System1 계획 실행, §7 v2 시나리오, §8 라이브 방송 시뮬레이션 튜닝 |
+| 5 | `로드맵/AIRI-ROADMAP-STATUS.md` | 로드맵 v4 현황판(사용자용 대시보드, M8 체크리스트·완료율, v4 active 절) |
+| 6 | `NEXT-SESSION.md`(저장소 루트) | 다음 세션 요약 |
+
+저장소 루트 `CLAUDE.md`는 Claude Code용 목차형 요약이고 권위 계약은 `AGENTS.md`다. 09-24에
+CLAUDE.md에서 분리한 세부 가이드는 `참조/claude-guide/`에 있다: `architecture.md`,
+`commands-and-tests.md`, `conventions.md`, `docs-map.md`, `goal-state-policy.md`, `patching.md`.
+
+### 새 코드·도구 위치 (09-23~24 커밋)
+
+| 위치 | 내용 |
+|---|---|
+| `ollama-proxy/live_briefing_select.py`(+ `ollama_proxy.py`의 /v1 스트리밍·native /api/chat 연결) | 라이브 브리핑 후보 선택, 기본 꺼짐. `AIRI_LIVE_BRIEFING_CANDIDATES`(2~6, 권장 3), `AIRI_LIVE_BRIEFING_COVERAGE`(기본 0.4). 브리핑에 `- 이번 턴에 말할 것:` 줄이 있을 때만 작동하고, 후보가 모두 탈락하면 브리핑 문장을 말한다. `- 아직 말하지 말 것:` 줄은 모델에 넘기기 전 제거. `/health`의 `live_briefing_select` |
+| `ollama_proxy.py`의 `urgent_safety_context` | 긴급 안전 판정(모든 경로 기본 적용). 강한 단어는 항상 긴급, 「사고·위험」은 본인 표시·도움 요청·서술형 피해일 때만 긴급 |
+| `ollama-proxy/eval/live_broadcast_sim/` | `sim_broadcast.py` + `test_sim_broadcast.py`(CI 평가 샤드). 방송 제어·/v1 스트리밍·전달 확인·강제 히스토리 재실행 |
+| `ollama-proxy/training/system1/` | System1 라벨·학습 파이프라인, 모순 합성·판정기 학습(`README.md`). judge-v1·contradiction-v1은 **운영 미연결** |
+| 저장소 밖 `C:\AIRI-Models\` | `gguf\`(Mi:dm·A.X-4.0-Light·Kanana-1.5-8B GGUF), `system1\`(judge-v1, contradiction-v1), `venvs\system1\`(학습용 venv), `airi-human-eval\`(시뮬레이션 대본·후보·평가 산출물 — 응답이 담긴 자료라 Git 밖) |
+
+### 남은 일 (우선순위 순, 상세는 인계문)
+
+1. 사람 판정: 10회차 대본(`C:\AIRI-Models\airi-human-eval\sim-fifth-story-10\transcript.md`)의
+   자연스러움 — 브리핑 문장 7/11턴이 대본 읽기처럼 들리는지.
+2. 기록을 따라 이어지는 지어내기(7회차 소화기) — 미해결.
+3. System1 재도전은 실제 방송 후보에 사람 정답을 매긴 데이터로.
+4. GPU PC: TTS 포함 첫 음성 지연, 8 GB 동거 실측.
+5. 운영 반영 결정: `AIRI_LIVE_BRIEFING_CANDIDATES=3`을 켤지(현재 기본 꺼짐). 방송 턴을 보낼 앱 쪽
+   연결(B1b/B4)은 미구현.
+
+### `진행중/` 전체 파일과 09-24 기준 상태
+
+파일은 옮기지 않고 상태만 여기 표시한다. 상태 뜻: **현행** = 지금 읽고 따르는 문서, **대체됨** =
+이후 인계·작업이 대신함(여전히 유효한 일부 사실은 비고에 적음), **종결** = 그 트랙이 끝난 역사
+기록, **이력** = 결과·receipt 기록(수치 인용은 가능하나 현재 상태 판정에는 쓰지 않음), **확인
+필요** = 문서나 사실표로 판정할 수 없음. 08-20 이전 문서 2건은 아래 기존 항목 설명을 따른다.
+
+| 파일 | 09-24 기준 상태 | 근거·비고 |
+|---|---|---|
+| `AIRI-WORKING-STATE.md` | 현행 | 가변 live SSoT |
+| `AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` | 현행 | 현재 인계문(09-24 신설) |
+| `AIRI-SYSTEM1-CANDIDATE-JUDGE-2026-09-23.md` | 현행 | 결과 문서 §0~§8. §0~§6 수치는 사용자가 이후 무효 판정한 32턴 대본형 시나리오 위에서의 방식 간 상대 비교로만 유효(문서 §0 추가 주의) |
+| `AIRI-ROADMAP-DASHBOARD-CONTRACT.md` | 현행 | 사용자용 로드맵 대시보드 계약 |
+| `AIRI-LOCAL-TECH-SPECS.md` | 현행(갱신일 확인) | 머리말의 최종 확인일을 먼저 볼 것. 그 뒤의 변화(신규 PC, Ollama 0.34.2 등)는 WORKING-STATE·인계문을 따른다 |
+| `AIRI-GPU-PC-HANDOFF-2026-09-01-STAGE3.md` | 대체됨 | Stage 3·M8-10·Stage 4는 이 문서 뒤에 실행됐고 결과는 WORKING-STATE의 `m8_*`/`stage4_*` receipt에 있다. 이후 09-23 System1 문서 → 09-24 인계문으로 이어짐. GPU PC 자산 위치 서술은 유효(09-23 WORKING-STATE 기록). §7 미커밋 경고는 09-23 대조(local main = origin/main = `2abe9e4`, worktree clean) 시점에 해당 없음 |
+| `AIRI-METHOD-RESEARCH-2026-08-28.md` | 이력(배경 근거) | M8 레버의 리서치 근거 |
+| `AIRI-VOD-STORYLINE-CEILING-EVIDENCE-2026-08-28.md` | 이력(배경 근거) | validator 튜닝 트랙 종료·M8 개설의 근거 |
+| `AIRI-CLAUDE-HANDOFF-2026-08-28-VOD-STORYLINE.md` | 종결 | 문서 자체 종결 주석. §4 재개 명령은 실행하지 않는다 |
+| `AIRI-CODEX-HANDOFF-2026-08-27.md` | 대체됨 | 문서 자체 주석(08-28 10:11, VOD-STORYLINE 인계문으로 대체). §0-A 자산 위치는 유효(GPU PC 기준), M7 판정은 무효 |
+| `AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md` | 대체됨 | M7 S4 인계. M7은 08-28 종료(로드맵) |
+| `AIRI-EVAL-CONTRACT-AMENDMENT-PROPOSAL-2026-08-27.md` | 확인 필요 | 문서상 「사용자 승인 대기·발효 전」. 이후 승인 여부를 기록한 문서를 찾지 못함 |
+| `AIRI-EVAL-INPUT-CONTEXT-AUDIT-2026-08-27.md` | 이력 | 평가 입력 맥락 감사(content-free) |
+| `AIRI-RATING-PROVENANCE-AND-COMMENT-ANALYSIS-2026-08-27.md` | 이력 | M7 S2·S3 채점 출처 정정(AI 채점 + 사용자 승인) |
+| `AIRI-KNOWLEDGE-INGEST-CONTRACT-2026-08-27.md` | 확인 필요 | 지식 대량 적재 생성 계약. 현재 유효 여부는 문서로 판정할 수 없다. 신규 PC의 런타임 지식 DB `ollama-proxy/runtime/airi-knowledge.sqlite3`는 09-23 System1 1단계에서 저장소 배치 3개로 적재됨(`/health` 문서 144·청크 287, probe 6/6 — WORKING-STATE `system1_step1_env_receipt_a`·`_b`). 라이브 방송 시뮬레이션은 지식을 끄고 실행(`sim_broadcast_intent`·`sim_tuning_plan`·`sim04_receipt`·`show05_intent`) |
+| `AIRI-BREAKTHROUGH-PLAN-2026-08-26.md` | 대체됨 | M7 타계책 계획. M7은 08-28 종료되고 M8이 개설됨. 「한 회차 한 변수」 원칙은 M8 실행 원칙으로 이어짐(로드맵) |
+| `AIRI-M7-S0-S1-RECEIPT-2026-08-26.md` | 이력 | M7 S0·S1 receipt |
+| `AIRI-CODEX-HANDOFF-2026-08-26-M7.md` | 이력 | M7 증명·재현 명령 |
+| `AIRI-REAL-CHAT-REPLAY-RUN04-2026-08-26.md` · `AIRI-REAL-CHAT-REPLAY-RUN05-2026-08-26.md` | 이력 | 실제 채팅 재생 결과 |
+| `AIRI-REAL-DIALOGUE-HUMAN-EVAL-CONTRACT-2026-08-26.md` | 현행(범위 확인 필요) | 문서와 로드맵 대시보드가 유일한 채택 게이트로 인용한다. M8 판정은 32턴 수동 검토 7항목이며 M8-10 게이트 재정의는 사용자 결정 대기(`[D]`). 라이브 방송 시뮬레이션 사람 판정과의 관계는 확인 필요 |
+| `AIRI-REALITY-CHECK-AND-FINETUNE-REVIEW-2026-08-26.md` | 이력 | 08-26 실태 기록. 파인튜닝 중단 권고 뒤 M8 Stage 3(09-01 GPU PC)에서 교정 파인튜닝이 실행됨(로드맵 M8-7) |
+| `AIRI-CLAUDE-HANDOFF-2026-08-26-POST-M4.md` | 대체됨 | M5 진입점이었으며 step 4 이후 대체 |
+| `AIRI-CODEX-HANDOFF-2026-08-25-M4.md` | 이력 | M4 완료(9/9) 실행·결과 기록 |
+| `AIRI-D1-CODEX-HANDOFF-2026-08-25.md` | 대체됨 | d1v5 `winner=null` 뒤 M4 인계문으로 이어짐. D1 goal은 WORKING-STATE `authorization`에 superseded로 기록 |
+| `AIRI-D1-DETERMINISTIC-LAYER-CONTRACT-2026-08-25.md` | 종결 | D1 동결 계약(역사 기록). 결정론 계층 코드의 현재 사용 범위는 확인 필요 |
+| `AIRI-PARALLEL-HANDOFF-2026-08-25.md` | 이력 | 병렬 세션 인계(`9ccf870` 병합) |
+| `AIRI-E2-C1-FROZEN-CONTRACT-2026-08-24.md` | 종결 | E2-C1 no_winner. E2-C2 계약이 E2-C1 계약을 역사 기록으로 명시 |
+| `AIRI-E2-C2-FROZEN-CONTRACT-2026-08-24.md` | 종결 | E2-C1/E2-C2 연속 no_winner(D1 계약 §1) |
+| `AIRI-CODEX-HANDOFF-2026-08-21.md` | 대체됨 | 과거 코덱스 인계. CI 문서 계약(`test-airi-work-continuity.ps1`)이 검사하는 표식(`goal_status`, `adoption_authorized=false`, 옛 E2 `execution_order`)이 있으므로 표식을 지우거나 파일을 옮기지 않는다. 그 `execution_order`는 현재 작업 순서가 아니다 |
+| `AIRI-CODEX-BATCH-EVAL-2026-08-21.md` | 이력 | 08-21 코덱스 배치 검수·즉시 수리 6커밋. 문서가 남긴 대기 항목(코덱스 선결 목록·사용자 확인 1건)의 현재 상태는 확인 필요 |
+| `AIRI-CODEX-HANDOFF-2026-08-20.md` | 대체됨 | 08-21판이 대체 |
+| `AIRI-CODEX-SERENA-TOKEN-ORDER-2026-08-20.md` | 이력 | Serena 미사용 결정의 근거. 실행 지시가 아니다 |
+| `AIRI-BROADCAST-SIM-REVIEW-2026-08-18.md` | (08-20 이전) | 아래 기존 항목 참조 |
+| `AIRI-CLOUD-CHAT-LATENCY-MEASUREMENT-2026-08-12.md` | (08-20 이전) | 아래 기존 항목 참조 |
+
+직전 현행화 2026-09-01 15:40 KST (M8 Stage 1·2 소진, GPU PC 인계). 새 단일 진입점은
 `진행중/AIRI-GPU-PC-HANDOFF-2026-09-01-STAGE3.md`다. 수동 품질 통과 0/3이며 남은 단계는
 CUDA가 필요한 Stage 3(Mi:dm 교정 파인튜닝)뿐이다. 미커밋 12건이 남아 있어 승인된 push가
 선행 조건이다. 운영 flag OFF·adoption false·모델 태그 유지는 그대로다.
@@ -16,7 +123,7 @@ S4 `[P]`이며 S4 대표 r2 사람 채점 JSON을 기다린다. 새 단일 진�
 `진행중/AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md`다. 이번 문서 배치의 commit/push는
 사용자가 명시 승인했으며 운영 flag·S5·GPU·파인튜닝은 금지한다.
 
-최종 현행화 2026-08-26 11:45 KST (M6 — 사용자 4건 승인: 실제 대화 사람 채점을 유일한 채택 게이트로
+직전 현행화 2026-08-26 11:45 KST (M6 — 사용자 4건 승인: 실제 대화 사람 채점을 유일한 채택 게이트로
 (`진행중/AIRI-REAL-DIALOGUE-HUMAN-EVAL-CONTRACT-2026-08-26.md`), grounding 침묵 수리, step 2 commit `a9583c3`, 문서 다이어트·로드맵 v4.
 WORKING 이력은 `아카이브/AIRI-WORKING-STATE-HISTORY-2026-08-22-TO-2026-08-25.md`).
 직전 현행화 2026-08-26 11:29 KST (M5 피벗 — 사용자 결정 C로 blind v7·matrix·campaign 중단. 실태 파악과
@@ -58,7 +165,7 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
 |---|---|---|
 | `진행중/` | 현행 계약·미해결 게이트가 남은 문서 | 여기 있는 문서의 주장은 현재 브랜치 상태로 취급한다 |
 | `진행예정/` | 승인됐거나 제안된 계획 (미실행 분량 존재) | 착수 전 반드시 정독 |
-| `로드맵/` | 전체 로드맵 지도 (v3 현황판 + 로그 + 부속 3종) | **매 작업 배치마다 `AIRI-ROADMAP-LOG.md` 기록 의무** — STATUS 본문은 상태 변화 시에만 수정 |
+| `로드맵/` | 전체 로드맵 지도 (v4 현황판 + 로그 + 부속 3종) | **매 작업 배치마다 `AIRI-ROADMAP-LOG.md` 기록 의무** — STATUS 본문은 상태 변화 시에만 수정 |
 | `완료/` | 완료된 작업의 유효한 증거 기록 (실측·감사·구현 설계) | 수치 인용 가능. 단 이후 변경으로 stale해질 수 있으니 날짜 확인 |
 | `보류/` | 명시적으로 보류된 작업 흐름의 기록 | 재개 조건이 각 문서 또는 아래에 명시됨 |
 | `아카이브/` | 대체·과거 기록 | 현재 상태 검증에 사용 금지 (과거 해시·테스트 총계 포함) |
@@ -67,14 +174,24 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
 
 ## 진행중 — 현행 계약
 
-- `AIRI-GPU-PC-HANDOFF-2026-09-01-STAGE3.md` — **현재 단일 진입점(2026-09-01, GPU PC).** Stage 1·2 소진 사실, 폐기된 접근 4종(재시도 금지), 채점기 부풀림 경고, Stage 3 처방(Small Model Learnability Gap), 평가 환경 재현 함정(PowerShell 5.1·8초 마감·digest 불일치), 재사용 자산, 판정 프로토콜, 미커밋 12건, 금지선, 제출용 Goal.
+09-24 기준 상태는 맨 위 「`진행중/` 전체 파일과 09-24 기준 상태」 표가 정한다. 아래 항목 설명은
+각 문서를 등록한 시점의 기록이다.
+
+- `AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` — **현재 인계문(2026-09-24, 신규 PC).** 09-23~24
+  경과, 라이브 방송 시뮬레이션 결과와 프록시 반영분, 방송 시뮬레이션 실행법, 브리핑 작성 규칙,
+  테스트 상태, 다음 단계. GPU PC 자산 위치는 `AIRI-CODEX-HANDOFF-2026-08-27.md` §0-A와
+  `AIRI-GPU-PC-HANDOFF-2026-09-01-STAGE3.md`를 따른다고 적는다.
+- `AIRI-SYSTEM1-CANDIDATE-JUDGE-2026-09-23.md` — 09-23~24 결과 문서. §0~§6 System1 후보 판정기
+  계획(측정→데이터→학습→비교), §7 v2 시나리오(AIRI 1인칭 + 육하원칙), §8 라이브 방송 시뮬레이션
+  튜닝. judge-v1·contradiction-v1은 운영 미연결이다.
+- `AIRI-GPU-PC-HANDOFF-2026-09-01-STAGE3.md` — (대체됨 — 09-24 기준) 2026-09-01 GPU PC 단일 진입점이었다. Stage 1·2 소진 사실, 폐기된 접근 4종(재시도 금지), 채점기 부풀림 경고, Stage 3 처방(Small Model Learnability Gap), 평가 환경 재현 함정(PowerShell 5.1·8초 마감·digest 불일치), 재사용 자산, 판정 프로토콜, 미커밋 12건, 금지선, 제출용 Goal.
 - `AIRI-METHOD-RESEARCH-2026-08-28.md` — 대안 기법 리서치(논문·GitHub/HF, 링크 포함)와 권고 경로.
 - `AIRI-VOD-STORYLINE-CEILING-EVIDENCE-2026-08-28.md` — **한계 실증 근거 문서(2026-08-28).** VOD storyline validator 튜닝 트랙 종료의 측정 기반·채점기 부풀림 실증·결함 분류·소형 모델 한계 판단·남은 선택지 4종·살아남는 자산.
 - `AIRI-CLAUDE-HANDOFF-2026-08-28-VOD-STORYLINE.md` — (종결 주석 부착) 2026-08-28 인계문. "첫 실행"은 run-81/82로 이행 완료, §4 재개 명령은 더 이상 실행하지 않는다.
 - `AIRI-CLAUDE-HANDOFF-2026-08-27-M7-S4.md` — (대체됨) 2026-08-27 Claude 인계. S2/S3/S4 상태, S4 대표 평가표 대기, JSON 도착 시 검증 순서와 금지 경계를 기록한다.
 - `AIRI-CODEX-HANDOFF-2026-08-26-M7.md` — (이력) M7 증명 7건, replay 재현 명령·sha, 금지 목록.
 - `AIRI-M7-S0-S1-RECEIPT-2026-08-26.md` — M7 S0·S1 receipt: 복제 노이즈(n=1 무효), 되먹임 3채널 차단 시 붕괴 0/3, 채점 대상 06b-r3.
-- `AIRI-BREAKTHROUGH-PLAN-2026-08-26.md` — **현재 진입점(2026-08-26 타계책).** 이분법 대신 되먹임 고리·재료 수용·측정 규율; S0~S5 순서, 돌파 정의, 금지 목록.
+- `AIRI-BREAKTHROUGH-PLAN-2026-08-26.md` — (대체됨 — M7 계획, M7은 08-28 종료·M8 개설) 2026-08-26 타계책 진입점이었다. 이분법 대신 되먹임 고리·재료 수용·측정 규율; S0~S5 순서, 돌파 정의, 금지 목록.
 - `AIRI-REAL-CHAT-REPLAY-RUN05-2026-08-26.md` — 후보 A+B 적용 run 05 결과와 남은 모델 고유 결함(되묻기 붕괴), 다음 축 후보 D/E/F.
 - `AIRI-REAL-CHAT-REPLAY-RUN04-2026-08-26.md` — 첫 실제 채팅 재생 결과(run 04, 99턴)와 Claude 1차 참고 채점, 결함 패턴, 다음 후보.
 - `AIRI-REAL-DIALOGUE-HUMAN-EVAL-CONTRACT-2026-08-26.md` — **현재 채택 게이트 계약(2026-08-26).** 실제 대화 50~100턴
@@ -94,7 +211,8 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
   정규식 확장 → blind v6 저작·봉인(handle-주제 어휘 충돌 검사) → matrix exact-once → verdict
   분기), 환경 함정, 검증 명령, 금지선을 담는다.
 - `AIRI-ROADMAP-DASHBOARD-CONTRACT.md` — Codex와 Claude가 함께 따르는 사용자용 roadmap
-  dashboard 단일 원본. 상태 기호·완료율·14분 heartbeat·증거 대조·권한 경계를 정의하며
+  dashboard 단일 원본. 상태 기호·완료율·최대 30분 heartbeat(2026-08-26 사용자 승인으로 14분에서
+  완화)·증거 대조·권한 경계를 정의하며
   `.agents/skills/airi-roadmap-dashboard/SKILL.md`와
   `.claude/skills/airi-roadmap-dashboard/SKILL.md`가 같은 파일을 참조한다.
 - `AIRI-PARALLEL-HANDOFF-2026-08-25.md` — 병렬 오프라인 세션(branch
@@ -107,7 +225,8 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
 - `AIRI-WORKING-STATE.md` — **세션 시작·goal resume·재부팅·compact 직후 가장
   먼저 읽는 가변 live SSoT.** 실제 goal status·HEAD/worktree·PID·산출물과 대조한
   현재 행동, 권한, 마지막 receipt, 다음 한 동작을 보존한다. active goal은 최대
-  60분 heartbeat와 단계 전후 intent/receipt를 기록하고, milestone만 handoff와
+  120분(GPU 학습·merge/package·T3·장시간 campaign 중에는 30분) heartbeat와 단계 전후
+  intent/receipt를 기록하고, milestone만 handoff와
   roadmap에 승격한다. 자동 compact 직전 신호에 의존하지 않는다.
 - `AIRI-E2-C1-FROZEN-CONTRACT-2026-08-24.md` — **E2-C1 설계·데이터·retained blind·
   학습·평가의 동결 계약(§1-10, 불변) + 결과·진단·수정 receipt(§11-12, 계속 추가).**
@@ -213,7 +332,8 @@ continuity milestone 본체: `e822f9f` origin/main push, 독립 감사 P0/P1 0.
 
 ## 로드맵 — 지도와 현황판 (상태 폴더와 별개 관리)
 
-- `AIRI-ROADMAP-STATUS.md` — **최상위 SSoT (v3, 2026-08-19 전면 개편).**
+- `AIRI-ROADMAP-STATUS.md` — **최상위 SSoT (v4, 2026-08-26 재개편; v3는 2026-08-19 전면 개편).**
+  첫 절이 사용자용 현재 진행 대시보드(M8 체크리스트·완료율)이며 v4 active 절을 포함한다.
   북극성=방송 품질(발화 실질 더하기 지표), 돌파 3축(P1 쇼 러너 브리핑 /
   P2 결정론 발화 계층 / P3 조건부 생성 상한), 기존 트랙 매핑, 사용자
   결정 큐. 부속 문서와 충돌 시 이 문서가 우선한다. v2 원문은
@@ -601,6 +721,9 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 
 ## 참조
 
+- `claude-guide/` — 2026-09-24 루트 `CLAUDE.md`에서 분리한 Claude Code용 세부 가이드 6종
+  (`architecture.md`, `commands-and-tests.md`, `conventions.md`, `docs-map.md`,
+  `goal-state-policy.md`, `patching.md`). 권위 계약은 `AGENTS.md`다.
 - `AIRI-CLAUDE-REVIEW-2026-08-25.md` — 검토 PC(GPU 없음)에서 08-21 HEAD 기준으로 쓴
   파인튜닝 파이프라인 재검토의 **시점 고정 실측 기록**. §3/§9 파이프라인 상태는 시효
   만료. 유효한 발견은 §5 — Ollama 0.32.x는 GGUF 내장 Jinja가 Modelfile TEMPLATE보다
@@ -647,7 +770,8 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 - 과거 해시·테스트 총계·설치 절차로 현재 체크아웃을 검증하지 말 것.
 - `patch-airi-*.ps1` 개별 호출 예시를 따르지 말 것 — 지원 진입점은
   `apply-airi-patches.ps1` / `restore-airi-original.ps1`뿐.
-- **현 설치본 기준:** B3 후 `app.asar` SHA-256은
+- **당시 설치본 기준(2026-08-12~13 dev PC 기록 — 09-24 신규 PC에는 AIRI 앱을 설치하지 않으며,
+  GPU PC의 현재 설치본 SHA는 확인 필요):** B3 후 `app.asar` SHA-256은
   `1B68AE5ECB9DB998002AC7268DE707661EC0C81FC4BD90836F3C3E25719B88B0`이다.
   기본 런타임은 moderation off, Mi:dm pin, TTS cache 7/7로 복원됐다.
   아카이브의 과거 SHA-256은 현재 설치본 판정에 사용하지 말 것.
@@ -714,7 +838,10 @@ B4·I3이 이 자산을 소비한다): `AIRI-LOCAL-TOPIC-BOARD-DESIGN/
 전송, 원시 ID·대화 노출, default-render 신호를 물리 음압·자연 재생 종료로
 확대 해석하는 것은 금지한다.
 
-## 최신 검증 증거 (2026-08-13)
+## 검증 증거 (2026-08-13 기준 과거 기록)
+
+이 절의 「현재」·「최신」은 2026-08-13 시점이다. 09-24 테스트 상태는 맨 위 「현재 진입점」 절을
+따른다.
 
 - `완료/AIRI-B3C-INPUT-SCREENING-AND-LOCAL-CHAT-SPINE-2026-08-13.md` —
   default-OFF deterministic prefilter와 local screened delivery spine의 구현,
