@@ -4596,6 +4596,9 @@ _MEAL_CHOICE_QUESTION_RE = re.compile(
     r"(?:아침|점심|저녁|식사|밥).{0,24}(?:뭐|무엇|먹을까|먹지|골라)"
     r"|(?:뭐\s*먹을까|뭘\s*먹을까)",
 )
+# "점심 뭐 먹었어?" asks what someone ate, not which menu to pick. On 2026-09-24 (series-01 broadcast 1)
+# it got the code-owned menu recommendation because PAST_ACTION_QUESTION_RE only lists 했어/봤어 forms.
+_PAST_MEAL_QUESTION_RE = re.compile(r"(?:먹었|마셨)")
 _WEATHER_QUESTION_RE = re.compile(r"(?:날씨|기온|비|눈|미세먼지)")
 _WEATHER_CONDITION_RE = re.compile(r"(?:맑아|흐려|비가?\s*와|눈이?\s*와|덥다|추워)")
 _OPEN_RECOMMENDATION_REQUEST_RE = re.compile(
@@ -4647,6 +4650,7 @@ def grounding_open_question_turn(
         and (is_recommendation or not _GROUNDING_COMMAND_RE.search(text))
         and not ACTION_REQUEST_RE.search(text)
         and not PAST_ACTION_QUESTION_RE.search(text)
+        and not _PAST_MEAL_QUESTION_RE.search(text)
         and not requests_non_korean_dialogue(text)
         and not serious_pre_stream_dialogue(text)
     )

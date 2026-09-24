@@ -6866,6 +6866,20 @@ class ForegroundContextTests(unittest.TestCase):
             user, "별빛 여행이 최근 개봉해서 요즘 인기 많아."
         ))
 
+    def test_past_meal_question_is_personal_dialogue_not_a_menu_choice(self) -> None:
+        # 2026-09-24 series-01 broadcast 1: "뭐 먹었어?" got the code-owned menu recommendation.
+        for user in (
+            "오 버추얼이구나 ㅋㅋ 그럼 오늘 점심은 뭐 먹었어?",
+            "저녁 뭐 먹었어?",
+            "아침은 뭐 먹었냐고",
+            "점심에 뭐 마셨어?",
+        ):
+            with self.subTest(user=user):
+                self.assertFalse(ollama_proxy.grounding_open_question_turn(user))
+                self.assertEqual(ollama_proxy.grounded_question_fallback(user), "")
+        self.assertTrue(ollama_proxy.grounding_open_question_turn("오늘 점심 뭐 먹을까?"))
+        self.assertTrue(ollama_proxy.grounded_question_fallback("오늘 점심 뭐 먹을까?"))
+
     def test_rejected_mood_and_second_person_drafts_get_complete_conversation(self) -> None:
         def event(content: str) -> bytes:
             return (json.dumps(
