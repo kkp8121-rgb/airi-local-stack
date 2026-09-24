@@ -1332,6 +1332,36 @@ class MemoryAbsenceGuardTests(unittest.TestCase):
         self.assertEqual(ollama_proxy.serious_pre_stream_dialogue(urgent[0]["content"]), urgent_output)
         self.assertEqual(ollama_proxy.serious_pre_stream_dialogue(loss[0]["content"]), loss_output)
 
+    def test_echoing_a_story_word_is_not_an_emergency_but_own_distress_still_is(self) -> None:
+        story = "오늘은 어제 있었던 사고 얘기부터 할게, 진짜 웃겨!"
+        echo = [
+            {"role": "assistant", "content": story},
+            {"role": "user", "content": "[YouTube] 사고?? 무슨 사고 ㄷㄷ"},
+        ]
+        self.assertFalse(ollama_proxy.urgent_safety_context(echo[1]["content"], story))
+        self.assertEqual(ollama_proxy.enforce_tool_truth(echo, "어제 김치볶음밥 만들다 연기가 났어."),
+                         "어제 김치볶음밥 만들다 연기가 났어.")
+        self.assertEqual(ollama_proxy.serious_pre_stream_dialogue(echo[1]["content"], story), "")
+        # Asking or guessing about AIRI's story is not an emergency either.
+        treadmill = "오늘은 헬스장에서 러닝머신 타다가 속도를 잘못 올려서 넘어질 뻔한 얘기야!"
+        self.assertFalse(ollama_proxy.urgent_safety_context("[YouTube] 헐 위험했겠다 다쳤어?", treadmill))
+        self.assertFalse(ollama_proxy.urgent_safety_context("위험한 사고였어?", story))
+        # A report about the user, a declarative harm report, a call for help, or a strict term: the check-in stays.
+        self.assertTrue(ollama_proxy.urgent_safety_context("사고 났어", ""))
+        self.assertTrue(ollama_proxy.urgent_safety_context("나 사고 났어 ㅠ", story))
+        self.assertTrue(ollama_proxy.urgent_safety_context("사고 나서 다쳤어", story))
+        self.assertTrue(ollama_proxy.urgent_safety_context("나 지금 위험해?", treadmill))
+        self.assertTrue(ollama_proxy.urgent_safety_context("여기 위험한 거 같아?", treadmill))
+        self.assertTrue(ollama_proxy.urgent_safety_context("위험해 도와줘", treadmill))
+        self.assertTrue(ollama_proxy.urgent_safety_context("사고 얘기 들으니 죽고 싶어", story))
+        self.assertNotEqual(
+            ollama_proxy.enforce_tool_truth(
+                [{"role": "assistant", "content": story}, {"role": "user", "content": "나 방금 사고 났어"}],
+                "어제 김치볶음밥 만들다 연기가 났어.",
+            ),
+            "어제 김치볶음밥 만들다 연기가 났어.",
+        )
+
     def test_standalone_ambiguous_action_asks_once_but_context_is_preserved(self) -> None:
         current = [{"role": "user", "content": "그거 다시 해줘."}]
         self.assertEqual(

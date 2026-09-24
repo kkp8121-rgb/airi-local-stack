@@ -5811,6 +5811,38 @@ URGENT_SAFETY_CONTEXT_RE = re.compile(
     r"emergency|danger|suicide|self[- ]?harm|seriously\s*hurt)",
     re.IGNORECASE,
 )
+# "사고"/"위험" also name events AIRI herself is telling. On 2026-09-24 simulated broadcasts
+# answered "사고?? 무슨 사고 ㄷㄷ" (after AIRI said "어제 있었던 사고 얘기부터 할게") and
+# "헐 위험했겠다 다쳤어?" (after AIRI nearly fell off a treadmill) with the emergency check-in
+# addressed to the viewer. A weak term is about AIRI's story when the user says nothing about
+# themself and either echoes AIRI's previous reply or asks/guesses about it; strict terms always
+# trigger, and so does a declarative report of harm.
+_URGENT_STRICT_RE = re.compile(
+    r"(?:크게\s*다쳤|응급|폭력|자살|자해|죽고\s*싶|emergency|suicide|self[- ]?harm|seriously\s*hurt)",
+    re.IGNORECASE,
+)
+_URGENT_WEAK_RE = re.compile(r"사고|위험|danger", re.IGNORECASE)
+_USER_SELF_OR_HELP_RE = re.compile(
+    r"(?:^|\s)(?:나|내가|내|저|제가|제|우리|여기)(?:\s|$|도|는)|살려|도와\s?줘|119|구급",
+)
+_HARM_WORD_RE = re.compile(r"다쳤|다친|아파|아프|피가|병원")
+_ASKS_ABOUT_OTHER_RE = re.compile(r"[?？]|겠(?:다|네|어)")
+
+
+def urgent_safety_context(user_text: str, previous_reply: str = "") -> bool:
+    """Whether the user's turn needs the emergency check-in before anything else."""
+    if _URGENT_STRICT_RE.search(user_text):
+        return True
+    weak_terms = {match.group(0).casefold() for match in _URGENT_WEAK_RE.finditer(user_text)}
+    if not weak_terms:
+        return False
+    if _USER_SELF_OR_HELP_RE.search(user_text):
+        return True
+    asks_about_other = bool(_ASKS_ABOUT_OTHER_RE.search(user_text))
+    if _HARM_WORD_RE.search(user_text) and not asks_about_other:
+        return True
+    echoed = all(term in previous_reply.casefold() for term in weak_terms)
+    return not (echoed or asks_about_other)
 PEER_VENT_CONTEXT_RE = re.compile(
     r"(?:짜증|꼬여|허무|피곤|지쳤|힘들었|답답|열받|화나|최악|annoyed|frustrated|exhausted)",
     re.IGNORECASE,
@@ -6013,7 +6045,7 @@ def enforce_tool_truth(original_messages: list[dict[str, object]], dialogue: str
         return "실제로 확인한 작업만 말할게. 지금은 실행을 확인하지 못했어."
     if ACTION_REQUEST_RE.search(latest_user) and not has_tool_evidence and not ACTION_DECLINE_RE.search(dialogue):
         return "그건 내가 직접 실행할 수 없어."
-    if URGENT_SAFETY_CONTEXT_RE.search(latest_user):
+    if urgent_safety_context(latest_user, previous_assistant_text(original_messages)):
         if "?" not in dialogue or not re.search(r"(?:안전|치료|병원|응급|도움)", dialogue):
             return "그 소식이면 먼저 안전 확인부터 해야 해. 지금 안전한 곳에 있고 치료나 응급 도움을 받고 있어?"
     if BEREAVEMENT_CONTEXT_RE.search(latest_user):
@@ -6056,9 +6088,9 @@ def unverified_action_fallback(original_messages: list[dict[str, object]]) -> st
     return ""
 
 
-def serious_pre_stream_dialogue(user_text: str) -> str:
+def serious_pre_stream_dialogue(user_text: str, previous_reply: str = "") -> str:
     """Emit safety-critical semantics before irreversible streaming begins."""
-    if URGENT_SAFETY_CONTEXT_RE.search(user_text):
+    if urgent_safety_context(user_text, previous_reply):
         return "그 소식이면 먼저 안전 확인부터 해야 해. 지금 안전한 곳에 있고 치료나 응급 도움을 받고 있어?"
     if BEREAVEMENT_CONTEXT_RE.search(user_text):
         return "그 소식은 정말 마음이 무겁다. 지금은 여기서 네 곁에 있을게."
@@ -9440,7 +9472,7 @@ async def proxy(path: str, request: Request):
         repeat_count = 1
         repeat_candidate = False
     serious_fallback = (
-        serious_pre_stream_dialogue(last_user_text)
+        serious_pre_stream_dialogue(last_user_text, previous_assistant_text(original_messages))
         if is_chat_request and not proactive_turn and not quality_probe_turn
         else ""
     )
@@ -9624,7 +9656,9 @@ async def proxy(path: str, request: Request):
         }
 
         action_fallback = "" if proactive_turn else unverified_action_fallback(original_messages)
-        serious_fallback = "" if proactive_turn else serious_pre_stream_dialogue(last_user_text)
+        serious_fallback = "" if proactive_turn else serious_pre_stream_dialogue(
+            last_user_text, previous_assistant_text(original_messages),
+        )
         ambiguous_fallback = "" if proactive_turn else ambiguous_reference_dialogue(
             original_messages,
             last_user_text,
