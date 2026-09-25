@@ -56,6 +56,29 @@ def v4_row(identifier: str, split: str = "train", group: str = "group-a",
             ]}
 
 
+def persona_row(identifier: str, split: str = "train", thread_group: str = "thread-a",
+                 author: str = "narrator", messages: list[dict] | None = None) -> dict:
+    return {"id": identifier, "split": split,
+            "schema_version": "airi.persona-rp.v1",
+            "thread_group": thread_group, "behavior": "persona_banter", "author": author,
+            "review": {"user_aggregate_authorized": True, "adoption_authorized": False},
+            "messages": messages if messages is not None else [
+                {"role": "system", "content": "AIRI persona role-play"},
+                {"role": "user", "content": "hello"},
+                {"role": "assistant", "content": "hi there"},
+            ]}
+
+
+def persona_messages(count: int) -> list[dict]:
+    """A runtime-shaped message list of exactly `count` messages."""
+    messages = [{"role": "system", "content": "AIRI persona role-play"}]
+    while len(messages) < count - 2:
+        messages.append({"role": "user", "content": f"turn {len(messages)}"})
+    messages += [{"role": "user", "content": "final question"},
+                 {"role": "assistant", "content": "final answer"}]
+    return messages
+
+
 def pinned_payload(rows: list[dict]) -> tuple[bytes, str]:
     payload = ("\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\n").encode()
     return payload, hashlib.sha256(payload).hexdigest()
@@ -343,6 +366,61 @@ class ContractTests(unittest.TestCase):
         self.assertNotEqual([row["id"] for row in first],
                             [row["id"] for row in trainer.epoch_group_order(rows, 17, 1)])
         groups = [row["scenario_group"] for row in first]
+        self.assertEqual(1, sum(groups[index] != groups[index - 1]
+                                for index in range(1, len(groups))))
+
+    def test_persona_metadata_and_wide_message_bound_are_accepted(self) -> None:
+        for count in (17, 18):
+            with self.subTest(count=count):
+                row = persona_row(f"persona-{count}", messages=persona_messages(count))
+                payload, digest = pinned_payload([row])
+                with tempfile.TemporaryDirectory() as tmp:
+                    path = Path(tmp) / "persona.jsonl"
+                    path.write_bytes(payload)
+                    self.assertEqual(trainer.load_pinned_dataset(path, digest)[0]["id"], f"persona-{count}")
+
+    def test_persona_metadata_and_bound_violations_fail_closed(self) -> None:
+        cases = [[persona_row("persona-too-long", messages=persona_messages(19))]]
+        missing_thread_group = persona_row("persona-missing-thread")
+        del missing_thread_group["thread_group"]
+        cases.append([missing_thread_group])
+        missing_author = persona_row("persona-missing-author")
+        del missing_author["author"]
+        cases.append([missing_author])
+        missing_behavior = persona_row("persona-missing-behavior")
+        missing_behavior["behavior"] = ""
+        cases.append([missing_behavior])
+        wrong_review = persona_row("persona-review")
+        wrong_review["review"]["user_aggregate_authorized"] = False
+        cases.append([wrong_review])
+        adopted = persona_row("persona-adopted")
+        adopted["review"]["adoption_authorized"] = True
+        cases.append([adopted])
+        # Integers compare equal to booleans in Python; the review flags must be the booleans themselves.
+        integer_review = persona_row("persona-integer-review")
+        integer_review["review"] = {"user_aggregate_authorized": 1, "adoption_authorized": 0}
+        cases.append([integer_review])
+        cases.append([persona_row("persona-dup"), persona_row("persona-dup")])
+        cases.append([persona_row("persona-tg1", "train", "shared-thread"),
+                      persona_row("persona-tg2", "dev", "shared-thread")])
+        named = persona_row("persona-named")
+        named["messages"][0]["name"] = "airi_request_local"
+        cases.append([named])
+        cases.append([{"id": "plain-too-long", "split": "train", "behavior": "register",
+                       "messages": persona_messages(11)}])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bad-persona.jsonl"
+            for rows in cases:
+                payload, digest = pinned_payload(rows)
+                path.write_bytes(payload)
+                with self.assertRaises(trainer.BehaviorTrainingError):
+                    trainer.load_pinned_dataset(path, digest)
+
+    def test_persona_group_shuffle_keeps_thread_group_contiguous(self) -> None:
+        rows = [persona_row("pa1", thread_group="a"), persona_row("pa2", thread_group="a"),
+                persona_row("pb1", thread_group="b"), persona_row("pb2", thread_group="b")]
+        ordered = trainer.epoch_group_order(rows, 17, 0)
+        groups = [row["thread_group"] for row in ordered]
         self.assertEqual(1, sum(groups[index] != groups[index - 1]
                                 for index in range(1, len(groups))))
 

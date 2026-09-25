@@ -482,6 +482,14 @@ def is_v4_row(row: dict[str, Any]) -> bool:
     return row.get("schema_version") == V4_SCHEMA_VERSION
 
 
+PERSONA_SCHEMA_VERSION = "airi.persona-rp.v1"
+
+
+def is_persona_row(row: dict[str, Any]) -> bool:
+    """The schema version is the sole persona-rp marker; do not infer authorization."""
+    return row.get("schema_version") == PERSONA_SCHEMA_VERSION
+
+
 def _v4_tokens(row: dict[str, Any]) -> set[str]:
     """Return explicitly supplied fact/update/decoy tokens for leak checks."""
     tokens: set[str] = set()
@@ -536,14 +544,46 @@ def validate_v4_metadata(rows: list[dict[str, Any]]) -> None:
                 raise BehaviorTrainingError(f"{identifier}: v4 fact/update/decoy token crosses splits")
 
 
+def validate_persona_metadata(rows: list[dict[str, Any]]) -> None:
+    """Validate persona-rp export provenance and reject thread_group split leakage."""
+    id_counts = Counter(row.get("id") for row in rows if isinstance(row.get("id"), str))
+    group_splits: dict[str, str] = {}
+    for row in rows:
+        if not is_persona_row(row):
+            continue
+        identifier = row.get("id")
+        if not isinstance(identifier, str) or not identifier or id_counts[identifier] != 1:
+            raise BehaviorTrainingError("persona rows require globally unique non-empty string ids")
+        for field in ("thread_group", "behavior", "author"):
+            if not isinstance(row.get(field), str) or not row[field]:
+                raise BehaviorTrainingError(f"{identifier}: persona {field} must be a non-empty string")
+        review = row.get("review")
+        # Identity, not equality: 1 == True and 0 == False would otherwise pass as the review flags.
+        if not (isinstance(review, dict) and set(review) == {"user_aggregate_authorized", "adoption_authorized"}
+                and review["user_aggregate_authorized"] is True and review["adoption_authorized"] is False):
+            raise BehaviorTrainingError(
+                f"{identifier}: persona review must be aggregate-authorized and adoption false")
+        split = row["split"]
+        group = row["thread_group"]
+        previous = group_splits.setdefault(group, split)
+        if previous != split:
+            raise BehaviorTrainingError(f"{identifier}: thread_group crosses splits")
+
+
 def epoch_group_order(rows: list[dict[str, Any]], seed: int, epoch: int) -> list[dict[str, Any]]:
     """Deterministically shuffle groups, then their rows, for one epoch."""
     if epoch < 0:
         raise BehaviorTrainingError("epoch must be non-negative")
     groups: dict[str, list[dict[str, Any]]] = {}
     for index, row in enumerate(rows):
-        group = row.get("scenario_group") if is_v4_row(row) else None
-        group_key = f"v4:{group}" if group else f"row:{index}"
+        if is_v4_row(row):
+            group = row.get("scenario_group")
+            group_key = f"v4:{group}" if group else f"row:{index}"
+        elif is_persona_row(row):
+            group = row.get("thread_group")
+            group_key = f"persona:{group}" if group else f"row:{index}"
+        else:
+            group_key = f"row:{index}"
         groups.setdefault(group_key, []).append(row)
     rng = random.Random(f"airi-behavior-groups:{seed}")
     group_keys = sorted(groups)
@@ -660,7 +700,7 @@ def load_pinned_dataset(dataset_path: Path, expected_sha256: str) -> list[dict[s
         if row.get("split") not in {"train", "dev", "test"}:
             raise BehaviorTrainingError(f"{row.get('id')}: split must be train/dev/test")
         messages = row.get("messages")
-        max_messages = 16 if is_v4_row(row) else 10
+        max_messages = 16 if is_v4_row(row) else 18 if is_persona_row(row) else 10
         if not isinstance(messages, list) or not 3 <= len(messages) <= max_messages:
             raise BehaviorTrainingError(
                 f"{row.get('id')}: messages must be a bounded runtime conversation shape")
@@ -681,8 +721,8 @@ def load_pinned_dataset(dataset_path: Path, expected_sha256: str) -> list[dict[s
                 f"{row.get('id')}: messages must be a bounded runtime conversation shape")
         for message in messages:
             keys = set(message)
-            if is_v4_row(row) and keys != {"role", "content"}:
-                raise BehaviorTrainingError(f"{row.get('id')}: v4 native messages allow only role/content")
+            if (is_v4_row(row) or is_persona_row(row)) and keys != {"role", "content"}:
+                raise BehaviorTrainingError(f"{row.get('id')}: v4/persona native messages allow only role/content")
             if keys not in ({"role", "content"}, {"role", "name", "content"}):
                 raise BehaviorTrainingError(f"{row.get('id')}: message keys are outside the runtime schema")
             if "name" in message and (
@@ -698,6 +738,7 @@ def load_pinned_dataset(dataset_path: Path, expected_sha256: str) -> list[dict[s
             raise BehaviorTrainingError(
                 f"{row.get('id')}: affect message must be the request-local system note")
     validate_v4_metadata(rows)
+    validate_persona_metadata(rows)
     return rows
 
 
