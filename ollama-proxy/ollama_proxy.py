@@ -114,6 +114,7 @@ from live_briefing_select import (
     with_canon_say_line,
     without_do_not_say,
 )
+from persona_temperament import temperament_enabled, with_temperament
 from pickup_batch import (
     PickupBatchDecision,
     min_content_tokens,
@@ -7403,6 +7404,7 @@ async def health() -> dict[str, object]:
         "briefing_evidence": briefing_evidence_telemetry.health(),
         "opener_resample": opener_resample_telemetry.health(),
         "live_briefing_select": live_briefing_select_telemetry.health(),
+        "persona_temperament": {"enabled": temperament_enabled()},
         "pickup_batch": pickup_batch_telemetry.health(),
         "journal_completion": memory_journal_telemetry.health(),
         # A content-free count only: a rising value means some caller is
@@ -9454,6 +9456,8 @@ async def proxy(path: str, request: Request):
     live_context_note = ""
     if broadcast_notes is not None:
         context_note = broadcast_notes.context_note
+        if temperament_enabled():
+            context_note = with_temperament(context_note)
         if candidate_budget() and not proactive_turn:
             # Opt-in live briefing turns: a viewer question about AIRI's body or offline life gets a canon say line.
             context_note = with_canon_say_line(context_note, last_user_text)

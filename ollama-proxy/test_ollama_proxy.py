@@ -8248,6 +8248,23 @@ class LiveBroadcastRouteTests(unittest.TestCase):
                 self.assertIn("이번 턴에 말할 것", prompt)
                 self.assertEqual("아직 말하지 말 것" in prompt, kept)
 
+    def test_live_persona_temperament_card_is_added_only_when_on(self):
+        header = "[AIRI 기질 — 반응 규칙]"
+        for path in ("/v1/chat/completions", "/api/chat"):
+            with self.subTest(path=path):
+                chat, _ = self._live_briefing_chat(
+                    f"temper-on-{path.count('/')}", ["응, 알려줄게!"], True,
+                    {"AIRI_LIVE_BRIEFING_CANDIDATES": "", "AIRI_LIVE_PERSONA_TEMPERAMENT": "on"},
+                    path=path, patches=((ollama_proxy, "needs_grounding_retry", lambda *a, **k: False),),
+                )
+                self.assertIn(header, json.dumps(chat.requests[0], ensure_ascii=False))
+                chat, _ = self._live_briefing_chat(
+                    f"temper-off-{path.count('/')}", ["응, 알려줄게!"], True,
+                    {"AIRI_LIVE_BRIEFING_CANDIDATES": "", "AIRI_LIVE_PERSONA_TEMPERAMENT": ""},
+                    path=path, patches=((ollama_proxy, "needs_grounding_retry", lambda *a, **k: False),),
+                )
+                self.assertNotIn(header, json.dumps(chat.requests[0], ensure_ascii=False))
+
     def test_s4_batched_chat_is_code_owned_and_skips_upstream(self):
         capability = self._issue_chat_turn("s4-batch")
         body = {
