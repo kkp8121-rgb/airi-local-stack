@@ -216,6 +216,14 @@ $new = 'C:\AIRI-Models\airi-human-eval\sim-replay-<이름>'     # 새 ROOT
 
 ### 7-1. 남은 일 (우선순위 순)
 
+0. **(09-25 현재) 캐릭터 대화 데이터 persona-v2 사용자 검토 대기**: 사용자가 「재밌는 rp가 없네 … 단발성」이라 해 교정 데이터
+   canon-v1을 보류하고, 기질(밝고 당당·장난기·승부욕·칭찬에 당황, 따뜻한 진행자)과 여러 턴 깊이의 대화 88개(764턴, 시청자 이름 없음)를
+   만들었다. 첫 판본은 사용자가 「싸가지가 없는」 말투로 판정해 폐기(`review-v1-withdrawn-rude.html`), 따뜻한 진행자 말투로 다시 썼다.
+   검토 페이지 `C:\AIRI-Models\train\persona-v1\review-v2.html`, 데이터셋 `persona-v2.unauthorized.jsonl`(668 목표, 승인 전이라 트레이너가
+   거부). 사용자 승인 뒤 `user_aggregate_authorized` 를 켜서 다시 빌드하고 본 학습(`--max-seq-len 2464`, 학습 venv `C:\AIRI-Models\venvs\train-midm`,
+   가중치 `C:\AIRI-Models\hf\Midm-2.0-Mini-Instruct`, 형식 `airi.persona-rp.v1`). 기질 카드는 `AIRI_LIVE_PERSONA_TEMPERAMENT=on`(기본 꺼짐).
+   데이터 캡처 중 드러난 프록시 오작동 3건(「이불 밖은 위험해」→긴급 안전, 「안되 vs 안돼」→언어 판별 실패, 「연습 좀 시켜줘」→
+   「직접 실행할 수 없어」)은 테스트부터 작성해 고칠 차례다. 근거 live state `persona_*`·`rp_*` receipt.
 1. **교정 학습(본질안 — 사용자 선택 「단기 + 본질 병행」)**: 설정 밖 전제 질문에 설정대로, 여러 표현으로 답하는 교정 데이터로
    Mi:dm LoRA를 학습해 모델 버릇 자체를 고친다. 이 PC 가능 여부(09-24 조사): GPU PC도 8 GiB 카드였고 Stage 3 학습 최대
    CUDA 메모리는 약 5.3 GB(`gpu_pc_stage3_r2_receipt`)라 VRAM은 맞을 전망이다. 없는 것: Mi:dm 2.0 Mini HF 가중치
