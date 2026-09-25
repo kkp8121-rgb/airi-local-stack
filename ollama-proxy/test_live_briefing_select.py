@@ -137,6 +137,24 @@ class LiveBriefingSelectTests(unittest.TestCase):
         # A question to the viewer and a reaction to the viewer's own day are not AIRI's claims.
         self.assertFalse(candidate_is_unfit("너는 오늘 뭐 먹었어?", ""))
         self.assertFalse(candidate_is_unfit("너 떡볶이 먹었구나! 맛있었겠다.", ""))
+        # A reaction/guess about the viewer's own day ("구나", "겠다") is not AIRI's bodily claim either,
+        # even with no second-person word in the sentence (2026-09-25 false positive).
+        self.assertFalse(candidate_is_unfit("산책 다녀왔구나, 강아지도 기분 좋았겠다.", ""))
+        # Only the claim word itself running into 구나/겠 is a reaction; 죽겠다, 해야겠다 and 친구나 are not.
+        for claim in (
+            "아 배고파 죽겠다!", "배고파서 뭐 좀 먹어야겠다.", "나 어제 친구나 동생이랑 산책했어!",
+            "나도 아까 떡볶이 먹었는데, 진짜 맛있었겠다.",
+        ):
+            with self.subTest(claim=claim):
+                self.assertTrue(candidate_is_unfit(claim, ""))
+
+    def test_written_end_only_rejects_past_tense_narration(self) -> None:
+        # Spoken present-tense declaratives are AIRI's natural persona speech, not copied staff notes
+        # (2026-09-25 false positive found designing the competitive persona).
+        self.assertFalse(candidate_is_unfit("2회전에서 바로 복수한다.", SAY))
+        self.assertFalse(candidate_is_unfit("한 개파 반박 듣고 판결한다.", SAY))
+        # Past-tense staff-note narration stays unfit, also without a bodily word.
+        self.assertTrue(candidate_is_unfit("통증이 왼쪽 귀까지 번져 있었다.", SAY))
 
     def test_pick_prefers_fit_then_coverage_and_keeps_draw_order_on_ties(self) -> None:
         scores = [(False, 0.9), (True, 0.2), (True, 0.4), (True, 0.4)]

@@ -35,8 +35,10 @@ REPEAT_RUN_CHARS = 20
 _NON_TEXT_RE = re.compile(r"[^가-힣A-Za-z0-9]")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?~])\s+|\n+")
 _HONORIFIC_END_RE = re.compile(r"(?:요|습니다|세요|죠)\s*[.!?~]*\s*$")
-# Staff-note narration copied as speech ("마라탕을 먹었다.", "운만 뗀다.").
-_WRITTEN_END_RE = re.compile(r"(?:었다|았다|였다|했다|한다|뗀다|는다|샀다|갔다)\s*[.!]*\s*$")
+# Staff-note narration copied as speech ("마라탕을 먹었다.", "…번져 있었다."), past tense only. A
+# present-tense declarative ("2회전에서 바로 복수한다.") is the persona's own natural speech, not a
+# copied note (2026-09-25 false positive found designing the competitive persona).
+_WRITTEN_END_RE = re.compile(r"(?:었다|았다|였다|했다|샀다|갔다)\s*[.!]*\s*$")
 _LEAKED_LABEL_RE = re.compile(r"이번 턴에|브리핑|스태프|\[")
 _UNEXECUTED_LOOKUP_RE = re.compile(r"(?:검색|찾아|확인|알아)\s?(?:해\s?)?봤|검색했")
 # A director correction in the say line ("설거지는 아니고", "감기가 아니라") names what AIRI must stop
@@ -60,6 +62,10 @@ _BODILY_CLAIM_RE = re.compile(
     r"|음식을\s*좋아|좋아하는\s*음식은|밖에서\s*(?:따로\s*)?살"
 )
 _SECOND_PERSON_RE = re.compile(r"(?:^|\s)(?:너|넌|너는|너도|니가|네가)(?:\s|$)")
+# A claim word that runs straight into 구나 or 겠 ("다녀왔구나", "먹었겠다") reacts to or guesses about
+# the viewer's own day (2026-09-25 false positive: "산책 다녀왔구나, 강아지도 기분 좋았겠다." has no
+# second-person word). Elsewhere in the sentence 구나/겠 prove nothing: "배고파 죽겠다", "친구나".
+_REACTION_SUFFIXES = ("구나", "겠")
 _CHAT_SOURCE_RE = re.compile(r"^\[[^\]]+\]\s*")
 _QUESTION_RE = re.compile(r"[?？]|뭐|뭘|어디|언제|어때|냐고|냐\s*$|니\s*$")
 _ADDRESSES_AIRI_RE = re.compile(r"아이리|AIRI|(?:^|\s)(?:너|넌|너는|니가|네가)(?:\s|$)", re.IGNORECASE)
@@ -172,8 +178,8 @@ def candidate_is_unfit(answer: object, say: str, previous_reply: str = "", user_
     if _LEAKED_LABEL_RE.search(text):
         return True
     if any(
-        _BODILY_CLAIM_RE.search(part) and not part.rstrip().endswith(("?", "？"))
-        and not _SECOND_PERSON_RE.search(part)
+        not part.rstrip().endswith(("?", "？")) and not _SECOND_PERSON_RE.search(part)
+        and any(not part[match.end():].startswith(_REACTION_SUFFIXES) for match in _BODILY_CLAIM_RE.finditer(part))
         for part in sentences
     ):
         return True
