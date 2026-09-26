@@ -10,7 +10,8 @@
 1. `AGENTS.md` — 저장소 계약.
 2. `airi_docs/진행중/AIRI-WORKING-STATE.md` — live SSoT. 머리말(`goal_status`·`git_head`·`worktree_state`)과 최신 receipt
    (09-24 기준 `sim10_receipt`·`commit_receipt_batch3`·`full_suite_receipt_2`)를 `git status`·HEAD·실행 중 PID와 read-only로 대조한다.
-3. `airi_docs/진행중/AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` — 현행 인계(라이브 방송 시뮬레이션·브리핑 후보 선택).
+3. `airi_docs/진행중/AIRI-PERSONA-RP-HANDOFF-2026-09-26.md` — **현행 인계(09-26, 캐릭터 RP 트랙)**. 스택·시뮬레이터 실행법과 09-24까지의 결과는
+   `airi_docs/진행중/AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md`(§3·§4).
    상세 근거: `airi_docs/진행중/AIRI-SYSTEM1-CANDIDATE-JUDGE-2026-09-23.md` §0~§8(§0~§6 System1 계획, §7 시나리오 v2, §8 라이브 방송 시뮬레이션).
 4. `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md` — 로드맵. M8 체크리스트·완료율은 이번 작업으로 바뀌지 않았다(M8 항목 아님).
 5. 이 파일. 문서 지도는 `airi_docs/AIRI-CURRENT-DOCS-INDEX-2026-08-10.md`, 배치 이력은 `airi_docs/로드맵/AIRI-ROADMAP-LOG.md`(최신이 위).

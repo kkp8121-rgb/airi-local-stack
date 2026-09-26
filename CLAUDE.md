@@ -25,7 +25,8 @@ SHAs) **read-only**:
 1. `AGENTS.md`
 2. `airi_docs/진행중/AIRI-WORKING-STATE.md` — the mutable live SSoT (frontmatter carries
    `goal_status`, `git_head`, `worktree_state`, `active_trainer_count`, `current_handoff`)
-3. the current handoff: **`airi_docs/진행중/AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md`**
+3. the current handoff: **`airi_docs/진행중/AIRI-PERSONA-RP-HANDOFF-2026-09-26.md`** (character RP track; the stack and
+   simulator how-to stays in `AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` §3-§4)
 4. `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md`
 5. `NEXT-SESSION.md`
 

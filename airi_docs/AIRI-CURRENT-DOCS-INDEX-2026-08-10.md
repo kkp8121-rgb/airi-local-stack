@@ -35,7 +35,8 @@
 |---|---|---|
 | 1 | `AGENTS.md`(저장소 루트) | 기여 계약. 세션 시작·resume·compact 뒤 절차, active goal heartbeat 최대 120분(GPU 학습 등은 30분), intent/receipt checkpoint |
 | 2 | `진행중/AIRI-WORKING-STATE.md` | 가변 live SSoT. 머리말 `goal_status`·`git_head`·`current_handoff`와 마지막 receipt를 기계 상태와 read-only로 대조 |
-| 3 | `진행중/AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` | **현재 인계문**(09-24 신설). 09-23~24 경과, 결과와 프록시 반영분, 방송 시뮬레이션 실행법, 브리핑 작성 규칙, 다음 단계 |
+| 3 | `진행중/AIRI-PERSONA-RP-HANDOFF-2026-09-26.md` | **현재 인계문**(09-26 신설, 캐릭터 RP 트랙 — 사용자 결정, 코드·플래그, persona-v2 데이터, 재빌드·학습 명령, 다음 단계). |
+| 3-1 | `진행중/AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` | 09-24 인계문(스택·시뮬레이터 실행법 §3과 브리핑 규칙 §4는 계속 유효). 09-23~24 경과, 결과와 프록시 반영분, 방송 시뮬레이션 실행법, 브리핑 작성 규칙, 다음 단계 |
 | 4 | `진행중/AIRI-SYSTEM1-CANDIDATE-JUDGE-2026-09-23.md` | 결과 문서. §0~§6 System1 계획 실행, §7 v2 시나리오, §8 라이브 방송 시뮬레이션 튜닝 |
 | 5 | `로드맵/AIRI-ROADMAP-STATUS.md` | 로드맵 v4 현황판(사용자용 대시보드, M8 체크리스트·완료율, v4 active 절) |
 | 6 | `NEXT-SESSION.md`(저장소 루트) | 다음 세션 요약 |
@@ -74,7 +75,8 @@ CLAUDE.md에서 분리한 세부 가이드는 `참조/claude-guide/`에 있다: 
 | 파일 | 09-24 기준 상태 | 근거·비고 |
 |---|---|---|
 | `AIRI-WORKING-STATE.md` | 현행 | 가변 live SSoT |
-| `AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` | 현행 | 현재 인계문(09-24 신설) |
+| `AIRI-PERSONA-RP-HANDOFF-2026-09-26.md` | 현행 | 현재 인계문(09-26 신설, 캐릭터 RP 트랙) |
+| `AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` | 현행(부분) | 09-24 인계문, 실행법 §3·브리핑 규칙 §4 유효 |
 | `AIRI-SYSTEM1-CANDIDATE-JUDGE-2026-09-23.md` | 현행 | 결과 문서 §0~§8. §0~§6 수치는 사용자가 이후 무효 판정한 32턴 대본형 시나리오 위에서의 방식 간 상대 비교로만 유효(문서 §0 추가 주의) |
 | `AIRI-ROADMAP-DASHBOARD-CONTRACT.md` | 현행 | 사용자용 로드맵 대시보드 계약 |
 | `AIRI-LOCAL-TECH-SPECS.md` | 현행(갱신일 확인) | 머리말의 최종 확인일을 먼저 볼 것. 그 뒤의 변화(신규 PC, Ollama 0.34.2 등)는 WORKING-STATE·인계문을 따른다 |
