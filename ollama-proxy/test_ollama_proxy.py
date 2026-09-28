@@ -20,7 +20,8 @@ import broadcast_reply_act
 import broadcast_correction_target
 import broadcast_examples
 import pickup_batch
-from airi_memory import RetrievalResult
+import epistemic_confidence
+from airi_memory import CODE_OWNED_REPLIES, MEMORY_ABSENCE_REPLIES, RetrievalResult
 from live_broadcast_runtime import (
     BRIEFING_EVIDENCE_MARKER,
     BROADCAST_BRIEFING_HEADER,
@@ -1174,6 +1175,78 @@ class MemoryAbsenceGuardTests(unittest.TestCase):
         self.assertIsNone(result)
         memory.prepare_payload_context.assert_not_awaited()
 
+    def test_a_live_viewer_turn_keeps_journal_recall(self) -> None:
+        # 2026-09-28 user decision: a show recalls viewer chat except identity
+        # disclosures, and journal recall itself leaves those out
+        # (airi_memory.discloses_viewer_identity).  No question switches it off.
+        live_context = {"role": "system", "name": "airi_broadcast_context", "content": "[오늘 방송]"}
+        cases = (
+            ("[YouTube] 내 별명 뭐야?", ()),
+            ("[2026-09-28 21:05] [YouTube] 내 이름 기억나?", ()),
+            ("[YouTube] 우리 강아지 이름 기억나?", ()),
+            ("[YouTube] 내 생일 언제라고 했지?", ()),
+            ("[YouTube] 아까 내가 말한 게임 뭐였지?", ()),
+            ("내 별명 뭐야?", (live_context,)),
+            ("내 별명 뭐야?", ()),
+        )
+        knowledge = mock.Mock()
+        knowledge.retrieve = mock.AsyncMock(return_value=[])
+        for question, system in cases:
+            with self.subTest(question=question, live=bool(system)):
+                memory = mock.Mock()
+                memory.prepare_payload_context = mock.AsyncMock(
+                    side_effect=lambda payload, *args, **kwargs: (payload, RetrievalResult()))
+                messages = [*system, {"role": "user", "content": question}]
+                body = json.dumps({"messages": messages}, ensure_ascii=False).encode()
+                with mock.patch.object(ollama_proxy, "memory_runtime", memory), mock.patch.object(
+                    ollama_proxy, "knowledge_runtime", knowledge
+                ):
+                    asyncio.run(ollama_proxy.prepare_memory_body(
+                        body, [{"role": "user", "content": question}],
+                        session_id="show", question=question, trace_id="test",
+                    ))
+                self.assertIs(memory.prepare_payload_context.await_args.kwargs.get("journal_recall", True), True)
+
+    def test_any_ingress_tag_marks_a_live_viewer_turn(self) -> None:
+        # The identity rule accepts any transport tag, so the live note and the
+        # learned-fact switch must see the same turns as live.
+        for question in ("[YouTube] 안녕", "[Chzzk] 안녕", "[2026-09-28 21:05] [Twitch] 안녕"):
+            with self.subTest(question=question):
+                self.assertTrue(ollama_proxy.live_viewer_turn({}, question))
+        for question in ("안녕", "[공지] 안녕", "[YouTube]안녕"):
+            with self.subTest(question=question):
+                self.assertFalse(ollama_proxy.live_viewer_turn({}, question))
+
+    def test_a_live_turn_never_loads_a_user_fact_learned_in_the_show(self) -> None:
+        # A {{user}} fact a show taught may be any viewer's, whatever this
+        # viewer asks; outside a show the session has one user.
+        live_context = {"role": "system", "name": "airi_broadcast_context", "content": "[오늘 방송]"}
+        cases = (
+            ("[YouTube] 오늘 저녁 메뉴 추천해줘", (), False),
+            ("[2026-09-28 21:05] [YouTube] 오늘 저녁 메뉴 추천해줘", (), False),
+            ("오늘 저녁 메뉴 추천해줘", (live_context,), False),
+            ("[YouTube] 내 별명 뭐야?", (), False),
+            ("오늘 저녁 메뉴 추천해줘", (), True),
+            ("내 별명 뭐야?", (), True),
+        )
+        knowledge = mock.Mock()
+        knowledge.retrieve = mock.AsyncMock(return_value=[])
+        for question, system, learned in cases:
+            with self.subTest(question=question, live=bool(system)):
+                memory = mock.Mock()
+                memory.prepare_payload_context = mock.AsyncMock(
+                    side_effect=lambda payload, *args, **kwargs: (payload, RetrievalResult()))
+                messages = [*system, {"role": "user", "content": question}]
+                body = json.dumps({"messages": messages}, ensure_ascii=False).encode()
+                with mock.patch.object(ollama_proxy, "memory_runtime", memory), mock.patch.object(
+                    ollama_proxy, "knowledge_runtime", knowledge
+                ):
+                    asyncio.run(ollama_proxy.prepare_memory_body(
+                        body, [{"role": "user", "content": question}],
+                        session_id="show", question=question, trace_id="test",
+                    ))
+                self.assertIs(memory.prepare_payload_context.await_args.kwargs["learned_user_facts"], learned)
+
     def test_memory_absence_fallback_requires_no_matching_evidence(self) -> None:
         self.assertTrue(ollama_proxy.memory_absence_fallback_required(
             "내 별명 기억나?", mock.Mock(journal_count=0, block=""),
@@ -1187,6 +1260,125 @@ class MemoryAbsenceGuardTests(unittest.TestCase):
             "내 별명이 뭐였지?", mock.Mock(journal_count=0, block="[global canon] 아이리"),
             [{"role": "user", "content": "내 별명이 뭐였지?"}],
         ))
+
+    def test_a_passing_mention_of_a_memory_word_is_not_an_absence_question(self) -> None:
+        # 2026-09-28 persona-v3 capture (news-05 T3): a box story that said "이름" got the canned
+        # no-record line with no model call. Only a turn that asks gets that line or the guard note.
+        empty = mock.Mock(journal_count=0, block="")
+        for line in (
+            "[YouTube] 전 박스에 이름도 안 쓰고 그냥 막 넣음 ㅠ", "그 식당 이름 진짜 웃겼어",
+            "기억력이 요즘 안 좋아", "내 기억력이 요즘 안 좋아", "나 별명 많아 ㅋㅋ",
+            "[YouTube] 아까 그 노래 좋더라",
+        ):
+            with self.subTest(line=line):
+                self.assertFalse(ollama_proxy.memory_absence_fallback_required(
+                    line, empty, [{"role": "user", "content": line}],
+                ))
+                body = json.dumps({"messages": [{"role": "user", "content": line}]}).encode()
+                self.assertEqual(ollama_proxy.inject_memory_absence_guard(body, line, empty), body)
+
+    def test_a_viewer_statement_that_gives_the_fact_is_not_an_absence_question(self) -> None:
+        # 2026-09-28 live check: the statement got the canned no-record line with
+        # no model call, and that line was journaled and recalled later as evidence.
+        empty = mock.Mock(journal_count=0, block="")
+        for statement in (
+            "[YouTube] 내 별명은 감자야. 앞으로 감자라고 불러줘",
+            "내 이름은 민수야",
+            "나 고양이 키워 이름은 두부",
+            "내 별명은 새벽두시야, 기억해줘",
+            # A question or request elsewhere in the turn does not undo the fact it gives.
+            "내 별명은 감자야, 귀엽지?", "내 이름은 민수야, 너 이름은 뭐야?",
+            "내 별명은 감자야. 너 이름 알려줘", "제 이름은 민수예요, 기억해 주세요",
+            "내 별명은 감자야 기억해 놔", "내 별명은 감자야 꼭 기억해!",
+            "앞으로 내 별명 감자라 불러줘", "내 별명 감자라구 불러줘", "내 별명 감자라고  불러줘",
+            "나 고양이 키워 이름은 두부, 귀엽지?", "my name is minsu, remember it",
+            # Connective endings and a copula before a bare 기억해 still give the fact.
+            "내 별명은 감자인데 기억해?", "나 감자라고 해. 기억해?", "내 이름이 감자라니까?",
+            "[YouTube] 내 별명은 감자고 좋아하는 건 치킨이야", "내 별명은 감자인데 기억나?",
+            "내가 좋아하는 음식은 떡볶이야, 기억해", "내 생일은 3월 5일이야 기억해", "난 감자라고 해 기억해",
+            "내 별명 감자인데 기억해?", "내 별명 감자거든 기억나?", "내 이름은 민수라서 기억하기 쉬워",
+            # A value may start like a question word ("머라…", "모라…").
+            "내 이름은 머라이어야", "내 별명은 모라야",
+            # A value set with 로 and a verb, or after an adverb, gives the fact too.
+            "[YouTube] 내 별명 감자로 해줘", "별명 감자로 할게", "내 별명 감자로 정했어", "내 이름 민수로 바꿔줘",
+            "이름 감자로 기억해줘", "내 별명 이제 감자임", "내 별명을 앞으로 감자로 하자",
+            # Polite endings, a bare value before 기억해, and a reminder of a value given before.
+            "[YouTube] 내 별명 감자에요", "제 이름 민수에요", "제 별명은 감자에요 기억해주세요", "내 별명 감자요",
+            "나 떡볶이 좋아해. 기억해줘", "내 별명 감자니까 기억해", "별명 감자 기억해줘", "이름 민수 기억해",
+            "내 이름 민수. 기억해", "내 별명 감자였잖아", "내 별명 감자인 거 기억해?",
+        ):
+            with self.subTest(statement=statement):
+                self.assertFalse(ollama_proxy.memory_absence_fallback_required(
+                    statement, empty, [{"role": "user", "content": statement}],
+                ))
+                body = json.dumps({"messages": [{"role": "user", "content": statement}]}).encode()
+                self.assertEqual(ollama_proxy.inject_memory_absence_guard(body, statement, empty), body)
+        # A question or a request to recall with no record still gets the line and the
+        # note, with or without a '?': live chat questions often drop it.
+        for question in (
+            "[YouTube] 내 별명 기억나?", "내 별명이 뭐였지", "내 별명 기억해", "내 별명 말해봐",
+            "내 이름 불러줘", "내 이름 알아", "what is my nickname", "do you remember my name",
+            "내 별명 뭐임", "내 이름 기억함", "내 별명 기억남", "내 이름 뭐게", "내 이름 아냐",
+            "내 이름 알고 있어", "내 이름 기억하고 있지", "제 이름 기억하세요",
+            "do you know my name", "tell me my name", "say my name",
+            "내이름은뭐야", "내 별명으로 불러줘",
+            # Asking AIRI to remember gives no value: the honest answer asks for it.
+            "내 별명 기억해 두고 있어?", "내 별명 기억해 줄래?", "내 이름 기억해줘",
+            "내 별명 뭐야 기억해?", "내 이름 누구야 기억해", "내 이름은 뭐라고 해?",
+            # A question word before 불러/라고 asks for the value; a copula with '?' asks to confirm it.
+            "내 별명 뭐로 불러?", "내 별명 머로 불러?", "내 이름 뭐로 불러?", "내 이름 무엇으로 불러?",
+            "내 별명 무엇으로 불러?", "내 이름 어떤 걸로 불러?", "내 별명 뭐 라고 불러?",
+            "내 별명 머라고 했지?", "내 이름 모라고 했더라", "내 이름이 무엇이라고 해?",
+            "[YouTube] 나 뭐로 불러줄 거야? 내 별명 기억나?", "내 별명이 감자야?",
+            # 로 with no value, or after a question word, asks; so does a 로 value with '?'.
+            "내 별명으로 해줘", "내 이름으로 할게", "내 별명 뭐로 할까?", "내 이름 뭘로 바꿀까?",
+            "내 별명 무엇으로 정했더라", "내 별명 이제 뭐야", "내 별명 감자로 해?",
+            # An adverb or a particle before 기억해 is no value.
+            "내가 좋아하는 음식 기억나?", "내 이름 꼭 기억해줘", "내 이름 좀 기억해줘", "내 이름을 기억해줘",
+            "내 이름 앞으로 기억해줘", "내 이름으로 기억해줘", "내 별명 궁금해요", "내가 뭘 좋아해 기억해?",
+        ):
+            with self.subTest(question=question):
+                self.assertTrue(ollama_proxy.memory_absence_fallback_required(
+                    question, empty, [{"role": "user", "content": question}],
+                ))
+                body = json.dumps({"messages": [{"role": "user", "content": question}]}).encode()
+                self.assertNotEqual(ollama_proxy.inject_memory_absence_guard(body, question, empty), body)
+
+    def test_a_nickname_statement_reaches_the_model_on_the_stream_route(self) -> None:
+        statement = "[YouTube] 내 별명은 감자야. 앞으로 감자라고 불러줘"
+        chat = _CapturingChatClient("좋아, 앞으로 감자라고 부를게!")
+        with mock.patch.object(ollama_proxy, "client", chat):
+            response = post_stream(statement)
+        content = openai_sse_content(response.text)
+        self.assertIn("감자라고 부를게", content)
+        self.assertNotIn(ollama_proxy.memory_absence_dialogue(statement), content)
+        self.assertTrue(chat.requests)
+        self.assertNotIn("기억에서 일치하는 정보가 없으면", json.dumps(chat.requests[0], ensure_ascii=False))
+
+    def test_code_owned_replies_cover_the_proxys_fixed_non_answers(self) -> None:
+        # Journal recall drops these lines by exact text, so a reworded
+        # fallback must be updated in airi_memory.CODE_OWNED_REPLIES too.
+        absence = {
+            ollama_proxy.memory_absence_dialogue("내 별명 기억나?"),
+            ollama_proxy.memory_absence_dialogue("내가 좋아하는 음식 기억나?"),
+        }
+        self.assertEqual(absence, MEMORY_ABSENCE_REPLIES)
+        lines = {
+            *absence,
+            ollama_proxy.UPSTREAM_RAW_PROGRESS_TIMEOUT_DIALOGUE,
+            ollama_proxy.UPSTREAM_TIMEOUT_DIALOGUE,
+            ollama_proxy.LOCAL_ERROR_DIALOGUE,
+            ollama_proxy.PICKUP_SKIP_DIALOGUE,
+            *ollama_proxy.GROUNDING_SILENCE_FALLBACK_POOL,
+            ollama_proxy.ambiguous_reference_dialogue([{"role": "user", "content": "그거 다시 해줘"}], "그거 다시 해줘"),
+            epistemic_confidence.CURRENT_STATE_FALLBACK,
+            epistemic_confidence.UNRESOLVED_REFERENCE_FALLBACK,
+            ollama_proxy.MEMORY_CLAIM_GUARD_FALLBACK,
+            ollama_proxy.SEARCH_UNAVAILABLE_DIALOGUE,
+            ollama_proxy.deterministic_utterance_layer._RECALL_FALLBACK,
+        }
+        self.assertNotIn("", lines)
+        self.assertEqual(lines, CODE_OWNED_REPLIES)
 
     def test_memory_question_without_recall_gets_per_request_no_invention_note(self) -> None:
         body = json.dumps({"messages": [{"role": "user", "content": "내 별명 기억나?"}]}).encode()

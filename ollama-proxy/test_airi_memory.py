@@ -7,6 +7,7 @@ from airi_memory import (
     NameScanner,
     SQLITE_BUSY_TIMEOUT_MS,
     assemble_context,
+    needs_retrieval,
     pack_vector,
     render_memory_placeholders,
     unpack_vector,
@@ -322,6 +323,49 @@ class MemoryTests(unittest.TestCase):
         recalled = self.s.retrieve('room', '\ub0b4 \ubcc4\uba85 \uae30\uc5b5\ub098?', journal_retained_turns=())
         self.assertIn('\uc81c \ubcc4\uba85\uc740 \ubc18\uc9dd\uc774\uc57c', [message['content'] for message in recalled.journal_messages])
 
+    def test_learned_user_facts_can_be_left_out_while_canon_stays(self):
+        # A show's viewers share one session, so a {{user}} fact learned there
+        # may be another viewer's.  Canon about {{user}} was not learned there.
+        user = self.s.add_item(kind='entity', subtype='person', name='{{user}}', content='\ub300\ud654 \uc0c1\ub300', source='base')
+        self.s.add_item(kind='fact', subtype='trait', content='{{user}}\ub294 \uc544\uc774\ub9ac\uc758 \uc2dc\uccad\uc790\ub2e4', subject_ids=[user], source='base')
+        self.s.add_item(kind='fact', subtype='trait', content='{{user}}\uc758 \ubcc4\uba85\uc740 \uac10\uc790', subject_ids=[user],
+                        session_id='show', turn_range=(1, 1))
+        # A relation from {{user}} names a fact too; canon relations stay.
+        potato = self.s.add_item(kind='entity', subtype='object', name='\uac10\uc790', content='\ubcc4\uba85',
+                                 session_id='show', turn_range=(1, 1))
+        self.s.add_item(kind='relation', subtype='nickname', content='{{user}}\uc758 \ubcc4\uba85 \uad00\uacc4: \uac10\uc790',
+                        source_id=user, target_id=potato, session_id='show', turn_range=(1, 1))
+        airi = self.s.add_item(kind='entity', subtype='person', name='\uc544\uc774\ub9ac', content='AI \ubc29\uc1a1\uc778', source='base')
+        self.s.add_item(kind='relation', subtype='audience', content='{{user}}\uc640 \uc544\uc774\ub9ac\ub294 \uc2dc\uccad \uad00\uacc4',
+                        source_id=user, target_id=airi, source='base')
+        question = '[YouTube] \ub0b4 \ubcc4\uba85 \ubb50\uc57c?'
+        shared = self.s.retrieve('show', question, journal_retained_turns=())
+        own = self.s.retrieve('show', question, journal_retained_turns=(), learned_user_facts=False)
+        self.assertIn('{{user}}\uc758 \ubcc4\uba85\uc740 \uac10\uc790', shared.block)
+        self.assertNotIn('{{user}}\uc758 \ubcc4\uba85\uc740 \uac10\uc790', own.block)
+        self.assertIn('{{user}}\ub294 \uc544\uc774\ub9ac\uc758 \uc2dc\uccad\uc790\ub2e4', own.block)
+        self.assertIn('{{user}}\uc758 \ubcc4\uba85 \uad00\uacc4: \uac10\uc790', shared.block)
+        self.assertNotIn('{{user}}\uc758 \ubcc4\uba85 \uad00\uacc4: \uac10\uc790', own.block)
+        self.assertIn('{{user}}\uc640 \uc544\uc774\ub9ac\ub294 \uc2dc\uccad \uad00\uacc4', own.block)
+
+    def test_a_learned_user_fact_is_left_out_even_when_linked_only_to_airi(self):
+        # Extraction may file a viewer's fact under AIRI; its text still names {{user}}.
+        airi = self.s.add_item(kind='entity', subtype='person', name='아이리', content='AI 방송인', source='base')
+        potato = self.s.add_item(kind='entity', subtype='object', name='감자', content='별명', session_id='show', turn_range=(1, 1))
+        self.s.add_item(kind='fact', subtype='trait', content='{{user}}의 생일은 3월 5일', subject_ids=[airi],
+                        session_id='show', turn_range=(1, 1))
+        self.s.add_item(kind='relation', subtype='nickname', content='아이리는 {{user}}를 감자라고 부른다',
+                        source_id=airi, target_id=potato, session_id='show', turn_range=(1, 1))
+        self.s.add_item(kind='fact', subtype='trait', content='아이리는 방송을 좋아한다', subject_ids=[airi],
+                        session_id='show', turn_range=(1, 1))
+        question = '[YouTube] 아이리, 내 생일 기억나?'
+        shared = self.s.retrieve('show', question, journal_retained_turns=())
+        own = self.s.retrieve('show', question, journal_retained_turns=(), learned_user_facts=False)
+        for learned in ('{{user}}의 생일은 3월 5일', '아이리는 {{user}}를 감자라고 부른다'):
+            self.assertIn(learned, shared.block)
+            self.assertNotIn(learned, own.block)
+        self.assertIn('아이리는 방송을 좋아한다', own.block)
+
     def test_journal_recall_window_is_4096_messages(self):
         for turn in range(1, 2051):
             marker = 'outside-window' if turn == 1 else ('inside-window' if turn == 2050 else 'filler')
@@ -369,6 +413,217 @@ class MemoryTests(unittest.TestCase):
                          ['포지야 오늘 방송 재밌었어', '나도 즐거웠어'])
         self.assertTrue(any('BM25(' in query.upper() for query in queries))
         self.assertEqual(self.s.journal_recall('s', '라면 기억나?', ()), [])
+
+    def test_transport_prefix_is_neither_a_recall_term_nor_gate_length(self):
+        # 2026-09-28 live check: chat-ingress tags every viewer line "[YouTube] ",
+        # which pushed short chat over the 25-character active-retrieval gate.
+        plain = '오늘은 비가 와서 집에서 쉬는 중'
+        self.assertFalse(needs_retrieval(plain, []))
+        for prefix in ('[YouTube] ', '[2026-09-28 21:05] ', '[2026-09-28 21:05] [YouTube] '):
+            with self.subTest(prefix=prefix):
+                self.assertFalse(needs_retrieval(prefix + plain, []))
+                self.assertFalse(self.s.retrieve('room', prefix + plain, journal_retained_turns=()).gate)
+                self.assertEqual(MemoryStore._journal_tokens(prefix + plain), MemoryStore._journal_tokens(plain))
+
+    def test_stored_metadata_prefix_is_not_recall_evidence(self):
+        # A recalled pair is scored assistant-first, so the viewer line's prefix
+        # sat mid-string, and FTS indexes it raw: a digit or "youtube" in the
+        # question matched only that metadata and recalled unrelated turns.
+        self.s.append_turn('show', '[2026-09-28 21:05] [YouTube] 오늘 날씨 진짜 맑더라.', '산책하기 좋은 날이네.', 1)
+        self.s.append_turn('show', '[2026-09-28 21:07] [YouTube] 점심은 김밥 먹었어.', '김밥 맛있지.', 2)
+        for question in ('[2026-09-28 21:09] [YouTube] 나 28 살이라고 했던 거 기억나?', '[YouTube] 21 번 버스 얘기 기억나?',
+                         '[YouTube] youtube 알고리즘 얘기 기억나?', '[YouTube] 2 판 했던 거 기억나?',
+                         '[YouTube] 0 대 0 이었나?'):
+            with self.subTest(question=question):
+                self.assertEqual(self.s.journal_recall('show', question, ()), [])
+        # Content still recalls, by exact token and by FTS prefix alone.
+        self.assertEqual([message['content'] for message in self.s.journal_recall('show', '[YouTube] 김밥 기억나?', ())],
+                         ['[2026-09-28 21:07] [YouTube] 점심은 김밥 먹었어.', '김밥 맛있지.'])
+        self.assertEqual([message['content'] for message in self.s.journal_recall('show', '[YouTube] 산책 기억나?', ())],
+                         ['[2026-09-28 21:05] [YouTube] 오늘 날씨 진짜 맑더라.', '산책하기 좋은 날이네.'])
+
+    def test_a_code_owned_reply_does_not_make_a_journal_turn_relevant(self):
+        # The proxy's own fixed lines share words ("기억나지", "다시") with
+        # unrelated chat; only the viewer's line may make the turn relevant.
+        self.s.append_turn('show', '[YouTube] 점심 메뉴 추천해줘', '답이 너무 늦어서 잠깐 멈췄어. 다시 말해줘.', 1)
+        # Untagged: a live viewer's own nickname is never recalled at all.
+        self.s.append_turn('show', '내 별명은 감자야', '음… 그건 지금 확실하게 기억나지 않아. 한 번만 다시 알려줄래?', 2)
+        self.assertEqual([message['content'] for message in self.s.journal_recall('show', '내 별명 기억나?', ())],
+                         ['내 별명은 감자야', '음… 그건 지금 확실하게 기억나지 않아. 한 번만 다시 알려줄래?'])
+        self.assertEqual([message['content'] for message in self.s.journal_recall('show', '[YouTube] 점심 메뉴 뭐 먹지', ())],
+                         ['[YouTube] 점심 메뉴 추천해줘', '답이 너무 늦어서 잠깐 멈췄어. 다시 말해줘.'])
+        # Words only the canned lines hold recall nothing.
+        self.assertEqual(self.s.journal_recall('show', '[YouTube] 확실하게 다시 알려줄래?', ()), [])
+
+    def test_a_no_record_reply_drops_its_whole_turn_from_recall(self):
+        # The no-record line only answers a memory question that had nothing on
+        # record, so neither side is evidence.  A lone recalled viewer line still
+        # counted as journal evidence and switched off the proxy's absence guard.
+        # The unconfirmed-recall and timeout lines mean the same for a question.
+        self.s.append_turn('show', '[YouTube] 내 별명 기억나?', '아직 기록이 없어. 어떻게 부르면 돼?', 1)
+        self.s.append_turn('show', '[YouTube] 내가 좋아하는 음식 기억나?', '아직 그건 기록이 없어. 다시 알려줄래?', 2)
+        self.s.append_turn('show', '[YouTube] 내 별명은?', '음… 그건 확실하게 기억 안 나. 다시 알려줄래?', 3)
+        self.s.append_turn('show', '[YouTube] 내 별명 기억 안 나?', '답이 너무 늦어서 잠깐 멈췄어. 다시 말해줘.', 4)
+        # A filler word adds a term but not a fact; the line still only asks.
+        self.s.append_turn('show', '[YouTube] 혹시 내 별명 기억나?', '음… 그건 지금 확실하게 기억나지 않아. 한 번만 다시 알려줄래?', 5)
+        # Without a '?' a line that adds nothing to the question is not evidence either.
+        self.s.append_turn('show', '[YouTube] 내 별명!!', '아직 기록이 없어. 어떻게 부르면 돼?', 6)
+        # The no-record line answered a memory question, '?' or not, unless the line gave the fact.
+        self.s.append_turn('show', '[YouTube] 내 별명 말해봐', '아직 기록이 없어. 어떻게 부르면 돼?', 7)
+        self.s.append_turn('show', '[YouTube] 내 이름 알고 있어', '아직 기록이 없어. 어떻게 부르면 돼?', 8)
+        # The unconfirmed-recall lines answered a memory question just as the no-record
+        # line did.  Behind any canned line a memory-shaped line asks, '?' or not, and so
+        # does an ask for what was said.
+        unconfirmed = ('음… 그건 확실하게 기억 안 나. 다시 알려줄래?', '음… 그건 지금 확실하게 기억나지 않아. 한 번만 다시 알려줄래?')
+        timeout = '답이 너무 늦어서 잠깐 멈췄어. 다시 말해줘.'
+        turn = 9
+        for reply in (*unconfirmed, timeout):
+            for line in ('[YouTube] 내 별명 말해봐', '[YouTube] 내 이름 알아', '[YouTube] 내 별명 기억남',
+                         '[YouTube] 내 이름 알고 있어', '[YouTube] 내 생일 언제라고 했지?'):
+                self.s.append_turn('show', line, reply, turn)
+                turn += 1
+        self.s.append_turn('show', '[YouTube] 내 생일 좀 알려줘', unconfirmed[1], turn)
+        # A line that adds nothing to the question asks nothing new either.
+        self.s.append_turn('show', '[YouTube] 내 별명!!', timeout, turn + 1)
+        self.s.append_turn('show', '[YouTube] 점심 메뉴!!', timeout, turn + 2)
+        for question in ('[YouTube] 내 별명이 뭐였지?', '[YouTube] 내가 좋아하는 음식 뭐였지?', '[YouTube] 아직 방송 안 끝났어?',
+                         '[YouTube] 내 이름 뭐였지?', '[YouTube] 내 생일 기억나?', '[YouTube] 점심 메뉴 뭐였지?'):
+            with self.subTest(question=question):
+                self.assertEqual(self.s.journal_recall('show', question, ()), [])
+
+    def test_a_quiz_or_tell_me_line_behind_a_failed_reply_is_not_recall_evidence(self):
+        # These ask with no memory word.  Untagged: a live viewer's birthday or
+        # age line is never recalled at all, which would hide this check.
+        timeout = '답이 너무 늦어서 잠깐 멈췄어. 다시 말해줘.'
+        error = '답을 만들다가 문제가 생겼어. 다시 말해줘.'
+        clarify = '어떤 걸 다시 하면 되는지 한 가지만 말해줄래?'
+        for index, (line, reply, question) in enumerate((
+            ('내 생일 알려줘', timeout, '내 생일 기억나?'),
+            ('내 MBTI 맞혀봐', error, '내 MBTI 기억나?'),
+            ('내 최애 캐릭터 누구게', clarify, '내 최애 캐릭터 기억나?'),
+            ('내 생일 언제게', timeout, '내 생일 기억나?'),
+            ('내 나이 몇 살일까', error, '내 나이 기억나?'),
+        )):
+            with self.subTest(line=line):
+                self.s.append_turn(f'quiz-{index}', line, reply, 1)
+                self.assertEqual(self.s.journal_recall(f'quiz-{index}', question, ()), [])
+
+    def test_a_canned_reply_keeps_a_viewer_line_that_gives_a_fact(self):
+        # The proxy's fact regex misses some statements, which then got a canned
+        # line, and older journals hold such rows.  The canned line is not
+        # evidence, but the fact in the viewer line still is.  Untagged: a live
+        # viewer's own nickname is never recalled at all.
+        absent = '아직 기록이 없어. 어떻게 부르면 돼?'
+        self.s.append_turn('show', '내 별명 감자인데 기억해?', absent, 1)
+        self.s.append_turn('show', '내 별명은 감자고 좋아하는 건 치킨이야', absent, 2)
+        self.s.append_turn('show', '내 별명 감자거든 기억나?', '음… 그건 확실하게 기억 안 나. 다시 알려줄래?', 3)
+        self.s.append_turn('show', '내 별명 감자로 해줘', absent, 4)
+        recalled = [message['content'] for message in self.s.journal_recall('show', '감자 기억나?', ())]
+        self.assertEqual(recalled[0::2], ['내 별명 감자인데 기억해?', '내 별명은 감자고 좋아하는 건 치킨이야',
+                                          '내 별명 감자거든 기억나?', '내 별명 감자로 해줘'])
+
+    def test_a_failed_reply_keeps_a_viewer_line_that_ends_in_a_question(self):
+        # Live chat ends a statement with a question.  A timeout says nothing
+        # about the turn, but the viewer's line still tells the fact.
+        # The birthday line is untagged: a live viewer's birthday is never recalled at all.
+        timeout = '답이 너무 늦어서 잠깐 멈췄어. 다시 말해줘.'
+        self.s.append_turn('show', '나 오늘 생일인데 축하해줄래?', timeout, 1)
+        self.s.append_turn('show', '[YouTube] 나 다음주에 제주도 여행 가는데 추천 코스 있어?', timeout, 2)
+        for question, line in (('내 생일 언제라고 했지?', '나 오늘 생일인데 축하해줄래?'),
+                               ('[YouTube] 제주도 여행 얘기 기억나?', '[YouTube] 나 다음주에 제주도 여행 가는데 추천 코스 있어?')):
+            with self.subTest(question=question):
+                recalled = [message['content'] for message in self.s.journal_recall('show', question, ())]
+                self.assertEqual(recalled[0::2], [line])
+
+    def test_pronouns_and_memory_verbs_are_not_recall_terms(self):
+        # '내' and '기억나' sit in most viewer lines.  Matched exactly or as an
+        # FTS prefix ('내일', '내가', '기억나서') they recalled unrelated turns.
+        self.s.append_turn('show', '[YouTube] 내일 비 온대', '우산 꼭 챙겨!', 1)
+        self.s.append_turn('show', '[YouTube] 내 친구가 놀러 옴', '재밌게 놀아!', 2)
+        self.s.append_turn('show', '[YouTube] 내가 좋아하는 게임 신작 나옴', '오 무슨 게임이야?', 3)
+        self.s.append_turn('show', '[YouTube] 아까 그 장면 기억나서 웃김', '나도 웃겼어!', 4)
+        self.s.append_turn('show', '[YouTube] 이거 기억해둬야지', '응 기억해둘게!', 5)
+        # A particle stem is a recall term too: '기억이' must not bring back '기억'.
+        for question in ('[YouTube] 내 별명 기억나?', '[YouTube] 내 별명 기억해?', '[YouTube] 제 별명 뭐였지?',
+                         '[YouTube] 내 별명 기억이 나?', '[YouTube] 내 별명 기억은 해?'):
+            with self.subTest(question=question):
+                self.assertEqual(self.s.journal_recall('show', question, ()), [])
+
+    def test_a_one_syllable_question_word_needs_an_exact_match(self):
+        # As an FTS prefix one syllable starts too many words ('눈' -> '눈물').
+        self.s.append_turn('show', '[YouTube] 눈물 날 뻔했어', '무슨 일 있었어?', 1)
+        self.s.append_turn('show', '[YouTube] 어제 눈 왔어', '눈사람 만들었어?', 2)
+        self.assertEqual([message['content'] for message in self.s.journal_recall('show', '[YouTube] 눈 얘기 기억나?', ())],
+                         ['[YouTube] 어제 눈 왔어', '눈사람 만들었어?'])
+
+    def test_journal_recall_skips_earlier_asks_of_the_same_question(self):
+        # 2026-09-28 live check: earlier copies of the current question, with
+        # their unhelpful answers, took every recall slot and pushed the fact out.
+        self.s.append_turn('show', '[YouTube] 내 강아지 이름은 호두야.', '호두 귀엽다!', 1)
+        asks = ('[YouTube] 내 강아지 이름 기억나?', '[YouTube] 내 강아지 이름 기억나??',
+                '[YouTube]  내 강아지  이름, 기억나 ?', '[2026-09-28 21:05] [YouTube] 내 강아지 이름 기억나?',
+                '[YouTube] 내 강아지 이름 기억나!')
+        for turn, ask in enumerate(asks, start=2):
+            self.s.append_turn('show', ask, '음, 강아지 이름이 뭐였더라?', turn)
+        self.s.append_turn('show', '[YouTube] 내 강아지 이름 뭐였지?', '호두였잖아!', 7)
+        recalled = [message['content'] for message in self.s.journal_recall('show', '[YouTube] 내 강아지 이름 기억나?', ())]
+        self.assertEqual(recalled, ['[YouTube] 내 강아지 이름은 호두야.', '호두 귀엽다!',
+                                    '[YouTube] 내 강아지 이름 뭐였지?', '호두였잖아!'])
+
+    def test_a_live_viewers_identity_line_is_never_recalled(self):
+        # 2026-09-28 user decision: a show recalls viewer chat except identity
+        # disclosures.  Every viewer shares the show's session and journal rows
+        # name no viewer; an untagged desktop session has one user.
+        identity = (
+            '내 별명은 감자야. 앞으로 감자라고 불러줘', '제 이름은 민수예요', '내 이름 민수야', '나의 닉네임은 새벽두시야',
+            '제 본명은 김민수입니다', '감자라고 불러줘', '앞으로 날 감자로 불러', '나 감자라고 해', '저 스물다섯 살이에요',
+            '나 25살이야', '내 나이는 서른이야', '나 99년생이야', '내 생일은 3월 5일이야', '나 오늘 생일이야!',
+            '제 전화번호는 010-1234-5678이에요', '연락은 01012345678로 줘', '내 카톡 아이디는 potato99야',
+            '제 인스타 아이디 gamja_99예요', '내 디코 아이디 감자#1234', '연락은 gamja@example.com으로 줘',
+            '내 주소는 서울시 마포구야', '나 부산 살아', '저는 서울에 살아요', '제가 사는 곳은 대전이에요', '저 인천에 삽니다',
+            # Korean often drops the subject: an age or birth year stated as the whole sentence is the viewer's own.
+            '스물다섯 살이에요', '25살임', '99년생이야', '반가워요. 서른두 살입니다',
+            # 2026-09-28 review: self-introductions, subject-free values and handles that leaked.
+            '저는 민수예요', '전 민수에요 반가워요', '민수라고 합니다', '민수라고 해요~', '안녕하세요 민수입니다',
+            '이름은 민수예요', '닉네임 감자임', '내 닉넴은 감자', '감자로 불러주세요', '걍 감자라 불러',
+            '다들 나를 감자라고 불러', '친구들이 나 감자라고 불러', '나 감자임 ㅎㅎ', "I'm Minsu", 'call me potato',
+            '감자가 내 별명이야', '감자가 제 별명이에요', '민수가 제 이름이에요', '본명은 김민수', '나 감자야', '난 감자',
+            '민수예요', '저 민수',
+            '저 스물다섯이에요', '올해 25 됐어', '나이는 25', '제가 올해 스물다섯인데요', '25살 직장인이에요',
+            '1999년생이에요', '99년생ㅋㅋ', '99년에 태어났어요',
+            '오늘 생일이에요!', '생일이 3월 5일이야', '저 3월 5일생이에요', '3월 5일이 제 생일이에요', '생일은 3월 5일',
+            '오늘 내 생일이야', '내일 제 생일이에요',
+            '+82 10-1234-5678', '카톡 아이디 potato123', '인스타 potato_123 팔로우해주세요', '내 번호야 010-1234-5678',
+            '부산 살아요', '부산에 살아요', '사는 곳은 부산', '저희 집 부산이에요', '부산 사람이에요', '집이 해운대 근처야',
+            '저 부산 거주해요', '부산에서 보고 있어요', '난 부산 토박이야',
+            # Asking for one's own value: AIRI's reply states it.
+            '내 별명 뭐야', '내 생일 축하해줘',
+        )
+        others = (
+            '우리 집 강아지 이름은 호두야', '내 강아지 이름은 호두야', '그 게임 이름 진짜 길더라', '아까 그 노래 제목 좋더라',
+            '나 떡볶이 좋아해', '나 오늘 시험 봤어', '내 친구 생일 선물 샀어', '우리 강아지는 호두라고 불러',
+            '나 요즘 행복하게 살아', '나 치킨 사는 중', '나 세 살 때 부산 갔어', '아이리 이름 누가 지어줬어?',
+            '99년생 있어?', '세 살 때 얘기 해줄까', '동생이랑 5살 차이 나', '우리 강아지 3살이에요',
+            # A bare mention with no value, a way of living, a song request or someone else's day.
+            '내 생일 선물 뭐 받을까 고민이야', '내 나이 때는 다 그래', '나 3살 어린 동생 있어', '나 커피로 살아',
+            '나 게임 덕에 살아', '나 너 때문에 살아', '나 여기 살아도 돼?', '나 내일 생일인 친구 만나',
+            '내 번호 불렸다 이제 간다', '제 이름 들어간 굿즈 샀어요', '내 아이디 해킹당했어 ㅠㅠ', '내 메일 답장 왔다',
+            '영어로 불러줘', '그 노래 일본어 버전으로 불러줘', '나 감자튀김 먹고 싶어', '민수 형이 추천한 노래 좋더라',
+            '감자튀김 진짜 먹고 싶다', '부산 여행 가고 싶다', '부산에서 먹은 돼지국밥 최고였어', '생일 축하 노래 불러줘',
+            '오늘 친구 생일이야', '저 사람 이름 뭐였지?',
+            # "나 <word>(이)야" names only a name: a status or a predicate is not one.
+            '나 학생이야', '난 배고파', '나 졸려', '처음이에요',
+        )
+        for index, (line, disclosed) in enumerate([(line, True) for line in identity] + [(line, False) for line in others]):
+            for prefix in ('[YouTube] ', '[2026-09-28 21:05] [YouTube] ', '[Chzzk] ', ''):
+                with self.subTest(line=line, prefix=prefix):
+                    session = f'show-{index}-{len(prefix)}'
+                    self.s.append_turn(session, prefix + line, '그렇구나!', 1)
+                    recalled = [message['content'] for message in self.s.journal_recall(session, f'{line} 기억나?', ())]
+                    self.assertEqual(recalled, [] if disclosed and prefix else [prefix + line, '그렇구나!'])
+        # The whole pair is left out, so it never counts as journal evidence either.
+        self.s.append_turn('counted', '[YouTube] 내 별명은 감자야', '좋아 감자!', 1)
+        self.assertEqual(self.s.retrieve('counted', '[YouTube] 감자 기억나?', journal_retained_turns=()).journal_count, 0)
 
     def test_retention_bounds_session_journal_and_memory_without_base_deletion(self):
         self.s.add_item(kind='entity', subtype='person', name='base', content='base', source='base')

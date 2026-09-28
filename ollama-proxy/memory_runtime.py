@@ -14,21 +14,24 @@ import os
 import time
 import threading
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Optional
 from urllib.parse import urlsplit
 
 from airi_memory import (
+    CODE_OWNED_REPLIES,
     JOURNAL_RECALL_WINDOW_MESSAGES,
     MemoryStore,
     RetrievalResult,
     assemble_context,
     render_memory_placeholders,
+    strip_journal_metadata_prefix,
 )
 from benchmark_memory_track import (
     parse_stage_a, parse_stage_a_span, stage_a_prompt_for_contract, stage_a_user_input,
 )
+from foreground_context import filter_journal_recall
 from memory_prompts import STAGE_A_SCHEMA, STAGE_A_SPAN_SCHEMA, STAGE_B_DECISION_SYSTEM_PROMPT
 from memory_stage_b import compile_decisions, decision_schema_for_items, format_stage_b_input, parse_stage_b_decisions
 from memory_taxonomy import AliasResolver, apply_taxonomy_gate
@@ -64,6 +67,36 @@ def _decorate_snapshot_messages(raw_messages: Iterable[dict[str, Any]], latest_t
         item["id"] = turn if turn else 1
         decorated.append(item)
     return decorated
+
+
+def _drop_forwarded_recall(result: RetrievalResult, forwarded: Iterable[dict[str, Any]]) -> RetrievalResult:
+    """Drop recalled pairs whose exchange the foreground already forwards.
+
+    Turn-id exclusion assumes the client history and the journal number turns
+    alike.  A journaled turn the client lacks (a regenerate at latest+1, or a
+    turn it never kept) shifts every derived id by one, so compare content too.
+    A pair that asked exactly the current message is an earlier attempt at
+    this same turn (a regenerate); its answer was rejected, so drop it too.
+    """
+    def key(user: Any, assistant: Any) -> tuple[str, str]:
+        return (strip_journal_metadata_prefix(str(user or "")).strip(),
+                MemoryStore._canonical_history_assistant(str(assistant or "")).strip())
+
+    messages = list(forwarded)
+    shown = {key(user.get("content"), assistant.get("content"))
+             for user, assistant in zip(messages, messages[1:])
+             if user.get("role") == "user" and assistant.get("role") == "assistant"}
+    current = (strip_journal_metadata_prefix(str(messages[-1].get("content") or "")).strip()
+               if messages and messages[-1].get("role") == "user" else None)
+    recalled = result.journal_messages
+    kept: list[dict[str, str]] = []
+    for user, assistant in zip(recalled[0::2], recalled[1::2]):
+        pair = key(user.get("content"), assistant.get("content"))
+        if pair not in shown and pair[0] != current:
+            kept.extend((user, assistant))
+    if len(kept) == len(recalled):
+        return result
+    return replace(result, journal_messages=kept, journal_count=len(kept) // 2)
 
 
 def assemble_payload_context_from_snapshot(
@@ -302,7 +335,9 @@ class NullMemoryRuntime:
     async def schedule_completed_turn(self, *args: Any, **kwargs: Any) -> str: return "disabled"
     async def prepare_payload_context(self, payload: dict[str, Any], original_messages: Iterable[dict[str, Any]],
                                       session: str | None = None, question: str = "", current_turn: int = 0,
-                                      trace_id: str = "", projected_message_count: int | None = None) -> tuple[dict[str, Any], RetrievalResult]:
+                                      trace_id: str = "", projected_message_count: int | None = None,
+                                      journal_recall: bool = True,
+                                      learned_user_facts: bool = True) -> tuple[dict[str, Any], RetrievalResult]:
         return copy.deepcopy(payload), RetrievalResult()
     async def health(self) -> dict[str, int | bool | str]: return {"enabled": False, "ready": False, "embedder": False, "extraction_enabled": False, "extraction_isolated": False, "extraction_ready": False, "extraction_availability": "unconfigured", "extraction_retrying": False, "extraction_retry_sessions": 0, "provider": "ollama", "external_approved": False, "configured": False, "schema": 0, "data_version": 0, "pending": 0}
     status = health
@@ -530,7 +565,7 @@ class MemoryRuntime:
     async def retrieve(self, session: str | None, question: str, current_turn: int = 0,
                        attendees: Optional[Iterable[str]] = None, trace_id: str = "",
                        journal_retained_turns: Optional[Iterable[int]] = None,
-                       journal_recall_allowed: bool = True) -> RetrievalResult:
+                       journal_recall_allowed: bool = True, learned_user_facts: bool = True) -> RetrievalResult:
         if not self.store:
             return RetrievalResult()
         if self._stopping:
@@ -557,7 +592,7 @@ class MemoryRuntime:
         worker = asyncio.create_task(asyncio.to_thread(
             self.store.retrieve, sid, question, current_turn, attendees,
             journal_retained_turns, journal_recall_allowed,
-            deadline=deadline, cancel_event=cancel_event,
+            deadline=deadline, cancel_event=cancel_event, learned_user_facts=learned_user_facts,
         ))
         self._retrieval_tasks[worker] = cancel_event
 
@@ -613,8 +648,16 @@ class MemoryRuntime:
 
     async def prepare_payload_context(self, payload: dict[str, Any], original_messages: Iterable[dict[str, Any]],
                                       session: str | None = None, question: str = "", current_turn: int = 0,
-                                      trace_id: str = "", projected_message_count: int | None = None) -> tuple[dict[str, Any], RetrievalResult]:
-        """Fail-soft facade for proxies; callers never need to access the store."""
+                                      trace_id: str = "", projected_message_count: int | None = None,
+                                      journal_recall: bool = True,
+                                      learned_user_facts: bool = True) -> tuple[dict[str, Any], RetrievalResult]:
+        """Fail-soft facade for proxies; callers never need to access the store.
+
+        Every viewer of a show shares its session, so what one viewer said may
+        answer another.  ``journal_recall=False`` skips unextracted journal
+        turns, and ``learned_user_facts=False`` (any live turn) leaves out the
+        {{user}} facts a conversation taught; canon memory items still load.
+        """
         if not self.store:
             return copy.deepcopy(payload), RetrievalResult()
         # Upstream history does not carry journal ids.  Derive the same stable
@@ -630,17 +673,38 @@ class MemoryRuntime:
             eligible = [item for item in original if int(item.get("id", 0)) > int(state["extracted_up_to_msg"])]
             # Always tell journal recall which turns are already forwarded.
             # A client can legitimately send only the current turn while this
-            # stable session has much older pending journal evidence.
-            retained_turns = [int(item["id"]) for item in eligible[-60:]]
+            # stable session has much older pending journal evidence.  When
+            # the proxy projects a shorter foreground, only that suffix is
+            # forwarded; older client turns it dropped must stay recallable.
+            forwarded = eligible
+            if projected_message_count is not None:
+                kept = max(0, min(int(projected_message_count), len(original)))
+                forwarded = [item for item in (original[-kept:] if kept else [])
+                             if int(item.get("id", 0)) > int(state["extracted_up_to_msg"])]
+            retained_turns = [int(item["id"]) for item in forwarded[-60:]]
             result = await self.retrieve(sid, question, max(current_turn, latest_turn + 1),
                                          attendees=None, trace_id=trace_id,
                                          journal_retained_turns=retained_turns,
-                                         journal_recall_allowed=bool(retained_turns))
+                                         journal_recall_allowed=journal_recall and bool(eligible),
+                                         learned_user_facts=learned_user_facts)
             # A failed/deadline-bound retrieval must never be reinterpreted as
             # successful absence. Keep the proxy's projected foreground bytes
             # untouched; callers can inspect the explicit result state.
             if result.failed:
                 return copy.deepcopy(payload), result
+            result = _drop_forwarded_recall(result, forwarded[-60:])
+            # A code-owned reply was never AIRI's answer to the recalled turn;
+            # keep only the viewer line.  The projection hides self-feedback
+            # AIRI turns under hygiene; do not let recall re-show them either
+            # (same filter as the replay seam).
+            recalled = list(filter_journal_recall([
+                message for message in result.journal_messages
+                if not (message.get("role") == "assistant"
+                        and str(message.get("content") or "").strip() in CODE_OWNED_REPLIES)
+            ]))
+            if recalled != result.journal_messages:
+                result = replace(result, journal_messages=recalled,
+                                 journal_count=sum(message.get("role") == "user" for message in recalled))
             return assemble_payload_context_from_snapshot(
                 payload, raw_messages, latest_turn=latest_turn,
                 extraction_watermark=int(state["extracted_up_to_msg"]),

@@ -35,7 +35,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from latency_trace import elapsed_ms, emit_latency_event, request_id
 from foreground_context import FEEDBACK_HYGIENE_MODE, filter_journal_recall, project_foreground_context
-from airi_memory import ACTIVE_CARD_MESSAGE_NAME
+from airi_memory import ACTIVE_CARD_MESSAGE_NAME, JOURNAL_RECALL_HEADER, MEMORY_FACT_STATEMENT_RE
 from continuity_ledger import (
     CONTINUITY_LEDGER_MESSAGE_NAME,
     ContinuityLedgerRuntime,
@@ -5911,6 +5911,16 @@ PERSONAL_MEMORY_QUERY_RE = re.compile(
     r"(?:내|내가|나는|제|제가|저의).{0,48}(?:기억|뭐였|뭔지|어떤|좋아하|싫어하|선호|별명|이름)",
     re.IGNORECASE,
 )
+# chat-ingress/airi-event.mjs sends every viewer line as "[YouTube] {text}", with no author; any
+# platform tag counts, the same shape airi_memory's identity rule accepts.
+_LIVE_VIEWER_LINE_RE = re.compile(r"^\s*(?:\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\]\s*)?\[[A-Za-z]{2,16}\]\s")
+# Journal rows name no viewer, so a live turn's recalled chat line may be anyone's.
+LIVE_RECALL_NOTE = "방송 채팅 기록은 누가 한 말인지 알 수 없어. 시청자를 단정하지 말고 '아까 누가 ~라고 했지'처럼 내용으로만 말해."
+
+
+def live_viewer_turn(payload: object, question: str) -> bool:
+    """Whether a live show's viewer sent this turn: broadcast context or the ingress tag."""
+    return has_live_broadcast_context(payload) or bool(_LIVE_VIEWER_LINE_RE.match(question or ""))
 
 
 def response_mode_note(user_text: str) -> str:
@@ -6140,13 +6150,29 @@ def ambiguous_reference_dialogue(
     return "어떤 걸 다시 하면 되는지 한 가지만 말해줄래?"
 
 
+# A memory word alone is not a question: "전 박스에 이름도 안 쓰고 그냥 막 넣음" (2026-09-28 persona-v3
+# capture) got the canned no-record line.  The line and the guard note need a turn that asks.
+_MEMORY_ASK_RE = re.compile(
+    r"[?？]|뭐|뭔|뭘|무엇|무슨|누구|언제|어디|몇|어떤|어떻게"
+    r"|기억\s*(?:나|해|하|함|남|안)|말해|알려|맞혀|맞춰|불러|알아|알고|아냐|아니\s*[?？]|궁금|해\s*줘|할게|하자"
+    r"|했지|였지|했더라|였더라"
+    r"|\b(?:what|who|remember|know|tell|say)\b",
+    re.IGNORECASE,
+)
+
+
 def memory_absence_fallback_required(
     question: str,
     result: object,
     original_messages: list[dict[str, object]],
 ) -> bool:
     """Return true only when a memory-shaped question has no evidence."""
-    if not question or not MEMORY_QUERY_RE.search(question):
+    if (
+        not question
+        or not MEMORY_QUERY_RE.search(question)
+        or MEMORY_FACT_STATEMENT_RE.search(question)
+        or not _MEMORY_ASK_RE.search(question)
+    ):
         return False
     if not memory_retrieval_successful(result):
         return False
@@ -6208,6 +6234,8 @@ def inject_memory_absence_guard(body: bytes, question: str, result: object) -> b
     if (
         not question
         or not MEMORY_QUERY_RE.search(question)
+        or MEMORY_FACT_STATEMENT_RE.search(question)
+        or not _MEMORY_ASK_RE.search(question)
         or not memory_retrieval_successful(result)
         or int(getattr(result, "journal_count", 0) or 0) > 0
     ):
@@ -6241,6 +6269,7 @@ async def prepare_memory_body(
             1 for message in payload.get("messages", [])
             if isinstance(message, dict) and message.get("role") != "system"
         )
+        live = live_viewer_turn(payload, question)
         prepared, result = await memory_runtime.prepare_payload_context(
             payload,
             original_messages,
@@ -6249,7 +6278,13 @@ async def prepare_memory_body(
             current_turn=completed_user_turn_count(original_messages),
             trace_id=trace_id,
             projected_message_count=projected_message_count,
+            # A show's viewers share one session: a {{user}} fact it taught
+            # may be any viewer's, whatever this turn asks.
+            learned_user_facts=not live,
         )
+        for message in prepared.get("messages", []) if live else ():
+            if isinstance(message, dict) and message.get("content") == JOURNAL_RECALL_HEADER:
+                message["content"] = f"{JOURNAL_RECALL_HEADER} {LIVE_RECALL_NOTE}"
         prepared_bytes = json.dumps(prepared, ensure_ascii=False).encode("utf-8")
         prepared_bytes = inject_memory_absence_guard(prepared_bytes, question, result)
         prepared_bytes = await prepare_knowledge_body(prepared_bytes, question, trace_id=trace_id)
