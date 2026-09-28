@@ -16,6 +16,7 @@ from affect_state import AffectStateRuntime, AffectValidationError, EVENT_SCHEMA
 from broadcast_affect_event_mapper import BROADCAST_AFFECT_OUTCOME_CANDIDATE_SCHEMA_VERSION, BroadcastAffectMappingError, map_broadcast_outcome_candidate
 from broadcast_arc_ledger import BroadcastArcLedger, render_open_arcs
 from deterministic_utterance_layer import BRIEFING_EVIDENCE_MARKER
+from show_carryover import ShowCarryoverStore, has_carryover_line, memo_items, merge_items, select_items
 
 _ID = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$')
 _TRACE_ID = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$')
@@ -88,6 +89,7 @@ class _Capability:
     preview_state: dict[str, Any] | None = None
     context_note: str = ''
     deterministic_context_note: str = ''
+    memo_items: tuple = ()
 
 
 class BroadcastNotes(NamedTuple):
@@ -97,9 +99,13 @@ class BroadcastNotes(NamedTuple):
     context_note: str
 
 
-def render_broadcast_context(value: object, *, briefing_evidence_marker: bool = False) -> str:
+def render_broadcast_context(
+    value: object, *, briefing_evidence_marker: bool = False, carryover_line: str = '',
+) -> str:
     """Validate the closed v1 wire shape and produce bounded model context."""
     if type(briefing_evidence_marker) is not bool:
+        raise _invalid()
+    if type(carryover_line) is not str or '\n' in carryover_line:
         raise _invalid()
     if type(value) is not dict or set(value) != _BROADCAST_CONTEXT_KEYS:
         raise _invalid()
@@ -116,6 +122,10 @@ def render_broadcast_context(value: object, *, briefing_evidence_marker: bool = 
     briefing = value['briefing']
     if briefing and briefing.splitlines()[0] != BROADCAST_BRIEFING_HEADER:
         raise _invalid()
+    if carryover_line and not has_carryover_line(briefing):
+        # The server-owned last-show line sits right under the header; a line
+        # the director already wrote stays the only one.
+        briefing = BROADCAST_BRIEFING_HEADER + '\n' + carryover_line + briefing[len(BROADCAST_BRIEFING_HEADER):]
     note = (
         '[오늘 방송]\n'
         f"- 주제: {value['topic_title']}\n"
@@ -148,6 +158,7 @@ class LiveBroadcastRuntime:
         observer_token: str | None = None,
         *,
         evaluation_clock: bool = False,
+        carryover: ShowCarryoverStore | None = None,
     ) -> None:
         self.enabled = (
             enabled
@@ -170,18 +181,29 @@ class LiveBroadcastRuntime:
         self._tombstones: OrderedDict[tuple[str, str], None] = OrderedDict()
         self._lock = threading.RLock()
         self._counters = {key: 0 for key in ('seeds', 'reads', 'injections', 'callback_hits', 'callback_misses', 'rejected_controls', 'rejected_receipts', 'errors', 'affect_events', 'mapped_outcomes', 'rejected_outcomes', 'snapshots_injected', 'expressions_injected', 'missing_snapshots', 'issued', 'claimed', 'injected', 'terminal', 'expired')}
+        # Opt-in (AIRI_LIVE_SHOW_CARRYOVER): the last closed show's memo line,
+        # pinned per show at start; without a store every note is unchanged.
+        self._carryover = carryover if self.enabled else None
+        self._carryover_lines: dict[str, str] = {}
+        self._carryover_pending: dict[str, list[tuple[str, str]]] = {}
+        self._carryover_delivered: dict[str, int] = {}
+        self._carryover_counters = {key: 0 for key in ('captured', 'rejected', 'turns_with_line', 'director_owned', 'absence_bypasses')}
 
     @classmethod
     def from_env(cls) -> 'LiveBroadcastRuntime':
         master = os.environ.pop('AIRI_LIVE_BROADCAST_MASTER_TOKEN', None)
         observer = os.environ.pop('AIRI_LIVE_BROADCAST_OBSERVER_TOKEN', None)
         evaluation_clock = os.environ.pop('AIRI_LIVE_BROADCAST_EVAL_CLOCK', 'off') == 'on'
-        return cls(
+        runtime = cls(
             os.getenv('AIRI_LIVE_BROADCAST_ENABLED') == 'on',
             master,
             observer,
             evaluation_clock=evaluation_clock,
         )
+        if runtime.enabled:
+            # Built only for an enabled runtime, so a disabled one never reads the file.
+            runtime._carryover = ShowCarryoverStore.from_env()
+        return runtime
 
     @property
     def ready(self) -> bool:
@@ -275,6 +297,10 @@ class LiveBroadcastRuntime:
                         raise _invalid()
                     self._shows[show_id] = 0
                     self._clock_offsets[show_id] = 0
+                    if self._carryover is not None:
+                        self._carryover_lines[show_id] = self._carryover.line()
+                        self._carryover_pending[show_id] = []
+                        self._carryover_delivered[show_id] = 0
                     self._apply_start(show_id)
                     return {}
                 if action == 'seed_arc' and set(payload) == {'action', 'show_id', 'topic_key', 'event_type', 'setup_summary'}:
@@ -336,10 +362,12 @@ class LiveBroadcastRuntime:
         arc_id = payload.get('arc_id') if turn_type in _ARC_TURNS else None
         context_note = ''
         deterministic_context_note = ''
+        carryover_line = self._carryover_lines.get(show_id, '')
         if 'broadcast_context' in payload:
-            context_note = render_broadcast_context(payload['broadcast_context'])
+            context_note = render_broadcast_context(payload['broadcast_context'], carryover_line=carryover_line)
             deterministic_context_note = render_broadcast_context(
                 payload['broadcast_context'], briefing_evidence_marker=True,
+                carryover_line=carryover_line,
             )
         if turn_type in _ARC_TURNS:
             if not isinstance(arc_id, str) or not any(
@@ -347,11 +375,22 @@ class LiveBroadcastRuntime:
                 for arc in self._ledger.read_open(show_id, now_minute=self._now_minute(show_id))
             ):
                 raise _invalid()
+        memo: list[tuple[str, str]] = []
+        if self._carryover is not None and 'broadcast_context' in payload:
+            # Only the director's validated briefing is harvested; it is kept
+            # on the capability until a delivered receipt.
+            briefing = payload['broadcast_context']['briefing']
+            if carryover_line:
+                owned = has_carryover_line(briefing)
+                self._carryover_counters['director_owned' if owned else 'turns_with_line'] += 1
+            memo, rejected = memo_items(briefing)
+            self._carryover_counters['rejected'] += rejected
         turn_token, delivery_token = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         cap = _Capability(
             show_id, action_id, turn_type, delivery, arc_id, delivery_token,
             'issued', time.monotonic(), context_note=context_note,
             deterministic_context_note=deterministic_context_note,
+            memo_items=tuple(memo),
         )
         self._turn_tokens[turn_token], self._delivery_tokens[delivery_token] = cap, cap
         self._counters['issued'] += 1
@@ -490,6 +529,13 @@ class LiveBroadcastRuntime:
             self._counters['callback_hits'] += 1
         elif cap.turn_type == 'callback_miss':
             self._counters['callback_misses'] += 1
+        if self._carryover is not None and cap.show_id in self._carryover_delivered:
+            self._carryover_delivered[cap.show_id] += 1
+            if cap.memo_items:
+                self._carryover_pending[cap.show_id] = merge_items(
+                    self._carryover_pending[cap.show_id], cap.memo_items,
+                )
+                self._carryover_counters['captured'] += len(cap.memo_items)
 
     def _close(self, show_id: str) -> None:
         self._ledger.close_show(show_id)
@@ -502,6 +548,38 @@ class LiveBroadcastRuntime:
         for key in tuple(self._tombstones):
             if key[0] == show_id:
                 del self._tombstones[key]
+        self._carryover_lines.pop(show_id, None)
+        pending = self._carryover_pending.pop(show_id, [])
+        delivered = self._carryover_delivered.pop(show_id, 0)
+        if self._carryover is not None and delivered:
+            # Even an empty selection is written, so a memory lasts exactly
+            # one show; a failed write is counted by the store and kept silent.
+            self._carryover.finalize(select_items(pending))
+
+    @property
+    def carryover_enabled(self) -> bool:
+        return self._carryover is not None
+
+    def record_carryover_absence_bypass(self) -> None:
+        with self._lock:
+            self._carryover_counters['absence_bypasses'] += 1
+
+    def carryover_health(self) -> dict[str, int | bool]:
+        """Content-free carryover telemetry with the same keys whether on or off."""
+        with self._lock:
+            store = self._carryover
+            stored = store.health() if store is not None else {}
+            counters = self._carryover_counters
+            return {
+                'enabled': store is not None,
+                'ready': store is not None and store.path.parent.is_dir(),
+                'carried_items': stored.get('carried_items', 0),
+                'pending_items': sum(len(items) for items in self._carryover_pending.values()),
+                'captured': counters['captured'], 'rejected': counters['rejected'],
+                'turns_with_line': counters['turns_with_line'], 'director_owned': counters['director_owned'],
+                'finalized': stored.get('finalized', 0), 'load_errors': stored.get('load_errors', 0),
+                'write_errors': stored.get('write_errors', 0), 'absence_bypasses': counters['absence_bypasses'],
+            }
 
     def health(self) -> dict[str, int | bool]:
         with self._lock:

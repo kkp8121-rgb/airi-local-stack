@@ -48,6 +48,7 @@ moss-tts-nano/
 **/output/
 **/generated/
 ollama-proxy/runtime/
+airi-show-carryover.json
 ollama-proxy/x
 ollama-proxy/bench-results/
 ollama-proxy/eval/results/

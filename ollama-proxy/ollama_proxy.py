@@ -124,6 +124,7 @@ from pickup_batch import (
 import deterministic_utterance_layer
 import handle_grounding_guard
 from live_broadcast_runtime import LiveBroadcastRuntime, BroadcastControlError
+from show_carryover import carryover_answers
 
 
 def emit_substantive_content(trace_id: str, request_started: float) -> None:
@@ -6253,8 +6254,13 @@ async def prepare_memory_body(
     session_id: str | None,
     question: str,
     trace_id: str,
+    absence_guard: bool = True,
 ) -> tuple[bytes, object]:
-    """Add a local memory block and watermark-pruned history, always fail-soft."""
+    """Add a local memory block and watermark-pruned history, always fail-soft.
+
+    ``absence_guard=False`` leaves out the no-invention note, for a turn whose
+    answer the caller already holds (the show carryover line).
+    """
     if TOPIC_RESET_RE.search(question):
         # Do not immediately recall the topic the user just closed. This skip
         # affects only the outbound request; the completed turn is still
@@ -6286,7 +6292,8 @@ async def prepare_memory_body(
             if isinstance(message, dict) and message.get("content") == JOURNAL_RECALL_HEADER:
                 message["content"] = f"{JOURNAL_RECALL_HEADER} {LIVE_RECALL_NOTE}"
         prepared_bytes = json.dumps(prepared, ensure_ascii=False).encode("utf-8")
-        prepared_bytes = inject_memory_absence_guard(prepared_bytes, question, result)
+        if absence_guard:
+            prepared_bytes = inject_memory_absence_guard(prepared_bytes, question, result)
         prepared_bytes = await prepare_knowledge_body(prepared_bytes, question, trace_id=trace_id)
         return inject_response_mode(prepared_bytes, question), result
     except Exception:
@@ -7459,6 +7466,7 @@ async def health() -> dict[str, object]:
         "opener_resample": opener_resample_telemetry.health(),
         "live_briefing_select": live_briefing_select_telemetry.health(),
         "persona_temperament": {"enabled": temperament_enabled()},
+        "show_carryover": live_broadcast_runtime.carryover_health(),
         "pickup_batch": pickup_batch_telemetry.health(),
         "journal_completion": memory_journal_telemetry.health(),
         # A content-free count only: a rising value means some caller is
@@ -7939,6 +7947,9 @@ async def stream_local_with_ack(
     live_briefing_budget = (
         candidate_budget() if live_briefing_say and not context.proactive_turn else 0
     )
+    carryover_answered = live_broadcast_runtime.carryover_enabled and carryover_answers(
+        context.live_context_note, context.memory_question
+    )
     try:
         emit_latency_event(
             "llm",
@@ -8027,6 +8038,7 @@ async def stream_local_with_ack(
                 session_id=context.memory_session_id,
                 question=context.memory_question,
                 trace_id=context.trace_id,
+                absence_guard=not carryover_answered,
             )
         # Computed once and reused at every real-dialogue emission point
         # below: with the guard's env flag off this is a single boolean
@@ -8065,6 +8077,11 @@ async def stream_local_with_ack(
             # 그 자리는 폴백이 검사하는 히스토리 바깥이라 프록시에는 보이지
             # 않으므로, 신호가 있으면 선점하지 않고 모델이 답하게 둔다.
             briefing_evidence_telemetry.absence_bypass()
+            absence_required = False
+        if absence_required and carryover_answered:
+            # Opt-in (AIRI_LIVE_SHOW_CARRYOVER): the server-owned last-show
+            # line in this turn's note holds the last-show topic asked about.
+            live_broadcast_runtime.record_carryover_absence_bypass()
             absence_required = False
         if absence_required and live_briefing_budget:
             # The briefing names what AIRI says this turn; a missing viewer

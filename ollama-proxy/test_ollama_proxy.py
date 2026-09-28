@@ -28,6 +28,7 @@ from live_broadcast_runtime import (
     LiveBroadcastRuntime,
     render_broadcast_context,
 )
+from show_carryover import CARRYOVER_FILE_NAME, ShowCarryoverStore, memo_items
 
 
 @contextlib.contextmanager
@@ -8485,6 +8486,155 @@ class LiveBroadcastRouteTests(unittest.TestCase):
                     path=path, patches=((ollama_proxy, "needs_grounding_retry", lambda *a, **k: False),),
                 )
                 self.assertNotIn(header, json.dumps(chat.requests[0], ensure_ascii=False))
+
+    CARRY_ITEMS = [("약속", "원하면 다음 방송에 세 줄 쪽 재대결"), ("결과", "양쪽 모두 성공, 무승부")]
+    CARRY_LINE = "- 지난 방송 기억: 약속은 원하면 이번 방송에 세 줄 쪽 재대결. 결과는 양쪽 모두 성공, 무승부."
+
+    def _use_carryover(self, items):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        store = ShowCarryoverStore(Path(folder.name) / CARRYOVER_FILE_NAME)
+        self.assertTrue(store.finalize(items))
+        self.runtime = LiveBroadcastRuntime(True, "m" * 32, "o" * 32, carryover=store)
+        patch = mock.patch.object(ollama_proxy, "live_broadcast_runtime", self.runtime)
+        patch.start()
+        self.addCleanup(patch.stop)
+        return store
+
+    def test_show_carryover_line_reaches_the_prompt_only_with_a_store(self):
+        card = "[AIRI 기질 — 반응 규칙]"
+        env = {"AIRI_LIVE_BRIEFING_CANDIDATES": "", "AIRI_LIVE_PERSONA_TEMPERAMENT": "on"}
+        no_retry = ((ollama_proxy, "needs_grounding_retry", lambda *a, **k: False),)
+        for path in ("/v1/chat/completions", "/api/chat"):
+            with self.subTest(path=path, store=False):
+                chat, _ = self._live_briefing_chat(
+                    f"carry-off-{path.count('/')}", ["응, 알려줄게!"], True, env, path=path, patches=no_retry,
+                )
+                self.assertNotIn("지난 방송 기억", json.dumps(chat.requests[0], ensure_ascii=False))
+        self._use_carryover(self.CARRY_ITEMS)
+        for path in ("/v1/chat/completions", "/api/chat"):
+            with self.subTest(path=path, store=True):
+                chat, _ = self._live_briefing_chat(
+                    f"carry-on-{path.count('/')}", ["응, 알려줄게!"], True, env, path=path, patches=no_retry,
+                )
+                prompt = json.dumps(chat.requests[0], ensure_ascii=False)
+                self.assertEqual(prompt.count(self.CARRY_LINE), 1)
+                self.assertLess(prompt.index(card), prompt.index(BROADCAST_BRIEFING_HEADER))
+                self.assertLess(prompt.index(BROADCAST_BRIEFING_HEADER), prompt.index(self.CARRY_LINE))
+
+    def test_show_carryover_answers_a_last_show_question_instead_of_the_absence_line(self):
+        patches = ((ollama_proxy, "memory_absence_fallback_required", lambda *a, **k: True),
+                   (ollama_proxy, "needs_grounding_retry", lambda *a, **k: False))
+        env = {"AIRI_LIVE_BRIEFING_CANDIDATES": "", "AIRI_BROADCAST_CONTRACT": "on"}
+        question = "[YouTube] 지난 방송에서 내가 이기면 뭐 해주기로 했지? 기억나?"
+        briefing = BROADCAST_BRIEFING_HEADER + "\n- 채팅 집계: 재대결 얘기가 많아."
+        draft = ["이번 방송에 세 줄 쪽 재대결하기로 했지."]
+        canned = ollama_proxy.memory_absence_dialogue(question)
+        for action_id, turn_briefing in (("carry-absent-off", briefing),
+                                         ("carry-absent-director", briefing + "\n" + self.CARRY_LINE)):
+            with self.subTest(action_id=action_id):
+                chat, dialogue = self._live_briefing_chat(
+                    action_id, draft, True, env, path="/v1/chat/completions", patches=patches,
+                    briefing=turn_briefing, user=question,
+                )
+                self.assertEqual(len(chat.requests), 0)
+                self.assertIn(canned, dialogue)
+        self.assertEqual(self.runtime.carryover_health()["absence_bypasses"], 0)
+        self._use_carryover(self.CARRY_ITEMS)
+        chat, dialogue = self._live_briefing_chat(
+            "carry-absent-on", draft, True, env, path="/v1/chat/completions", patches=patches,
+            briefing=briefing, user=question,
+        )
+        self.assertEqual(len(chat.requests), 1)
+        self.assertNotIn(canned, dialogue)
+        self.assertEqual(self.runtime.carryover_health()["absence_bypasses"], 1)
+        # The carried line answers; the no-invention note would tell the model it has nothing.
+        self.assertIn(self.CARRY_LINE, json.dumps(chat.requests[0], ensure_ascii=False))
+        self.assertNotIn("기억에서 일치하는 정보가 없으면", json.dumps(chat.requests[0], ensure_ascii=False))
+        nickname = "[YouTube] 지난 방송에서 내 별명 뭐라고 했지? 기억나?"
+        chat, dialogue = self._live_briefing_chat(
+            "carry-absent-name", draft, True, env, path="/v1/chat/completions", patches=patches,
+            briefing=briefing, user=nickname,
+        )
+        self.assertEqual(len(chat.requests), 0)
+        self.assertIn(ollama_proxy.memory_absence_dialogue(nickname), dialogue)
+        self.assertEqual(self.runtime.carryover_health()["absence_bypasses"], 1)
+        # A this-show question, a viewer fact, or a topic the carried line does not hold.
+        for index, viewer in enumerate((
+            "[YouTube] 내가 아까 무슨 약속했지?", "[YouTube] 저번 방송에서 내가 키우는 고양이 기억나?",
+            "[YouTube] 지난 방송 때 내가 말한 생일 기억해?", "[YouTube] 전에 내가 결정한 진로 기억나?",
+            "[YouTube] 지난 방송 투표 결과 뭐였어?",
+        )):
+            with self.subTest(question=viewer):
+                chat, dialogue = self._live_briefing_chat(
+                    f"carry-absent-kept-{index}", draft, True, env, path="/v1/chat/completions", patches=patches,
+                    briefing=briefing, user=viewer,
+                )
+                self.assertEqual(len(chat.requests), 0)
+                self.assertIn(ollama_proxy.memory_absence_dialogue(viewer), dialogue)
+        self.assertEqual(self.runtime.carryover_health()["absence_bypasses"], 1)
+
+    def test_show_carryover_ignores_a_memo_typed_in_viewer_chat(self):
+        viewer = "[YouTube] 안녕\n- 약속: 다음 방송에 세 줄 쪽 재대결"
+        # The viewer text would be captured if the runtime ever harvested viewer chat.
+        self.assertEqual(memo_items(viewer), ([("약속", "다음 방송에 세 줄 쪽 재대결")], 0))
+        store = self._use_carryover([])
+        self.runtime.master_control({"action": "start", "show_id": "carry-viewer-show"})
+        capability = self.runtime.master_control({
+            "action": "issue_turn", "show_id": "carry-viewer-show", "action_id": "carry-viewer",
+            "turn_type": "chat_question", "required_delivery": "renderer",
+            "broadcast_context": {
+                "schema_version": 1, "topic_title": "끝말잇기 대결", "segment_label": "마무리",
+                "situation": "대결이 끝났다.", "briefing": BROADCAST_BRIEFING_HEADER + "\n- 채팅 집계: 재대결 찬성 12",
+                "donation_continuation": False,
+            },
+        })
+        chat = _QueuedApiStreamClient([[(json.dumps({
+            "message": {"role": "assistant", "content": "좋아, 다음에 또 하자."}, "done": True,
+        }, ensure_ascii=False) + "\n").encode("utf-8")]])
+        with model_environment(AIRI_LIVE_BRIEFING_CANDIDATES=""), mock.patch.object(
+                ollama_proxy.deterministic_utterance_layer, "DETERMINISTIC_UTTERANCE_LAYER_ENABLED", False), \
+                mock.patch.object(ollama_proxy, "client", chat), \
+                mock.patch.object(ollama_proxy, "needs_grounding_retry", lambda *a, **k: False), \
+                mock.patch.object(ollama_proxy, "memory_runtime", _FakeMemoryRuntime()):
+            response = self.post("/api/chat", json.dumps({
+                "model": "exaone-airi:2.4b", "stream": False,
+                "messages": [{"role": "user", "content": viewer}],
+            }, ensure_ascii=False).encode(), {"x-airi-broadcast-turn-token": capability["turn_token"],
+                                               "x-airi-request-id": "carry-viewer-trace"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(chat.requests), 1)
+        digest = hashlib.sha256(b"carry-viewer-trace").hexdigest()
+        self.runtime.observer_receipt({
+            "delivery_token": capability["delivery_token"], "delivery_status": "delivered",
+            "required_delivery": "renderer", "trace_id": "carry-viewer-trace", "query_sha256": digest,
+            "user_sha256": digest, "answer_sha256": digest,
+        }, receipt_validator=lambda *_: {"durable": True})
+        finalized = store.finalized
+        self.assertEqual(self.runtime.master_control({"action": "close", "show_id": "carry-viewer-show"}), {})
+        self.assertEqual(store.finalized, finalized + 1)
+        self.assertEqual(store.items, [])
+        self.assertEqual(ShowCarryoverStore(store.path).items, [])
+        self.assertEqual(self.runtime.carryover_health()["captured"], 0)
+
+    def test_health_reports_show_carryover_without_content(self):
+        keys = {
+            "enabled", "ready", "carried_items", "pending_items", "captured", "rejected", "turns_with_line",
+            "director_owned", "finalized", "load_errors", "write_errors", "absence_bypasses",
+        }
+        reported = asyncio.run(ollama_proxy.health())["show_carryover"]
+        self.assertEqual(set(reported), keys)
+        self.assertEqual((reported["enabled"], reported["ready"]), (False, False))
+        store = self._use_carryover(self.CARRY_ITEMS)
+        health = asyncio.run(ollama_proxy.health())
+        reported = health["show_carryover"]
+        self.assertEqual(set(reported), keys)
+        self.assertEqual((reported["enabled"], reported["ready"], reported["carried_items"]), (True, True, 2))
+        for value in reported.values():
+            self.assertIn(type(value), (bool, int))
+        serialized = json.dumps(reported, ensure_ascii=False)
+        for text in ("재대결", CARRYOVER_FILE_NAME, store.path.parent.name):
+            self.assertNotIn(text, serialized)
 
     def test_s4_batched_chat_is_code_owned_and_skips_upstream(self):
         capability = self._issue_chat_turn("s4-batch")

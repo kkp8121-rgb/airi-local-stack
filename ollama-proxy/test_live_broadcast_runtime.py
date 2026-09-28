@@ -1,18 +1,24 @@
 import os
 import hashlib
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import show_carryover
+from deterministic_utterance_layer import system_briefing_evidence
 from live_broadcast_runtime import (
     BRIEFING_EVIDENCE_MARKER,
     BROADCAST_BRIEFING_HEADER,
+    DONATION_CONTINUATION_CONTRACT,
     BroadcastControlError,
     LiveBroadcastRuntime,
     render_broadcast_context,
 )
+from show_carryover import CARRYOVER_FILE_NAME, ShowCarryoverStore
 
 
 MASTER = 'm' * 32
@@ -357,6 +363,215 @@ class LiveBroadcastRuntimeTests(unittest.TestCase):
         for index in range(10_500):
             runtime._tombstone(f'show-{index % 16}', f'action-{index}')
         self.assertEqual(runtime.health()['tombstones'], 10_240)
+
+
+CARRY_LINE = '- 지난 방송 기억: 약속은 원하면 이번 방송에 세 줄 쪽 재대결. 결과는 양쪽 모두 성공, 무승부.'
+
+
+class ShowCarryoverRuntimeTests(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.path = Path(folder.name) / CARRYOVER_FILE_NAME
+        self.trace_counter = 0
+
+    def runtime(self):
+        return LiveBroadcastRuntime(True, MASTER, OBSERVER, carryover=ShowCarryoverStore(self.path))
+
+    @staticmethod
+    def context(*lines, briefing=None, donation=False):
+        if briefing is None:
+            briefing = '\n'.join((BROADCAST_BRIEFING_HEADER,) + lines)
+        return {
+            'schema_version': 1, 'topic_title': '끝말잇기 대결', 'segment_label': '마무리',
+            'situation': '대결이 끝났다.', 'briefing': briefing, 'donation_continuation': donation,
+        }
+
+    def turn(self, runtime, show_id, context=None, status='delivered', deterministic_layer=False):
+        self.trace_counter += 1
+        request = {
+            'action': 'issue_turn', 'show_id': show_id, 'action_id': f'carry-{self.trace_counter}',
+            'turn_type': 'chat_question', 'required_delivery': 'renderer',
+        }
+        if context is not None:
+            request['broadcast_context'] = context
+        capability = runtime.master_control(request)
+        trace = f'carry-trace-{self.trace_counter}'
+        notes = runtime.claim_turn(
+            capability['turn_token'], screening_ready=True, trace_id=trace,
+            deterministic_layer=deterministic_layer,
+        )
+        self.assertIsNotNone(notes)
+        if status is None:
+            runtime.cancel_turn(capability['turn_token'])
+            return notes
+        self.assertTrue(runtime.confirm_injected(capability['turn_token']))
+        digest = hashlib.sha256(trace.encode('utf-8')).hexdigest()
+        runtime.observer_receipt({
+            'delivery_token': capability['delivery_token'], 'delivery_status': status,
+            'required_delivery': 'renderer', 'trace_id': trace, 'query_sha256': digest,
+            'user_sha256': digest, 'answer_sha256': digest,
+        }, receipt_validator=lambda *_: {'trace_id': trace, 'durable': True})
+        return notes
+
+    def seed(self, items):
+        self.assertTrue(ShowCarryoverStore(self.path).finalize(items))
+
+    def test_without_a_store_notes_are_byte_identical_and_health_is_off(self):
+        runtime = LiveBroadcastRuntime(True, MASTER, OBSERVER)
+        self.seed([('결과', '양쪽 모두 성공, 무승부')])
+        before = self.path.read_bytes()
+        runtime.master_control({'action': 'start', 'show_id': 'plain'})
+        context = self.context('- 약속: 원하면 다음 방송에 세 줄 쪽 재대결')
+        for deterministic in (False, True):
+            notes = self.turn(runtime, 'plain', context, deterministic_layer=deterministic)
+            self.assertEqual(
+                notes.context_note,
+                render_broadcast_context(context, briefing_evidence_marker=deterministic),
+            )
+        self.assertEqual(runtime.master_control({'action': 'close', 'show_id': 'plain'}), {})
+        self.assertEqual(self.path.read_bytes(), before)
+        self.assertFalse(runtime.carryover_enabled)
+        health = runtime.carryover_health()
+        self.assertFalse(health['enabled'])
+        self.assertEqual((health['captured'], health['finalized'], health['turns_with_line']), (0, 0, 0))
+        self.assertNotIn('show_carryover', runtime.health())
+        disabled = LiveBroadcastRuntime(False, MASTER, OBSERVER, carryover=ShowCarryoverStore(self.path))
+        self.assertFalse(disabled.carryover_enabled)
+
+    def test_from_env_builds_the_store_only_when_both_flags_are_on(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ['AIRI_MEMORY_DB'] = str(self.path.parent / 'memory.sqlite3')
+            for enabled, carryover, expected in (('on', 'on', True), ('on', '', False), ('', 'on', False)):
+                with self.subTest(enabled=enabled, carryover=carryover):
+                    os.environ['AIRI_LIVE_BROADCAST_ENABLED'] = enabled
+                    os.environ['AIRI_LIVE_SHOW_CARRYOVER'] = carryover
+                    os.environ['AIRI_LIVE_BROADCAST_MASTER_TOKEN'] = MASTER
+                    os.environ['AIRI_LIVE_BROADCAST_OBSERVER_TOKEN'] = OBSERVER
+                    self.assertIs(LiveBroadcastRuntime.from_env().carryover_enabled, expected)
+
+    def test_a_show_carries_its_promises_and_results_across_a_restart(self):
+        runtime = self.runtime()
+        runtime.master_control({'action': 'start', 'show_id': 'ep1'})
+        self.turn(runtime, 'ep1', self.context(
+            '- 약속: 원하면 다음 방송에 세 줄 쪽 재대결', '- 약속: 방송 끝에 판정',
+            '- 결정: 다음 방송 첫 코너는 끝말잇기', '- 스코어: AIRI 1승',
+        ))
+        self.turn(runtime, 'ep1', self.context('- 스코어: AIRI 2승', '- 결과: 감자님 우승'))
+        self.assertEqual(runtime.carryover_health()['pending_items'], 3)
+        self.assertEqual(runtime.master_control({'action': 'close', 'show_id': 'ep1'}), {})
+        expected = '- 지난 방송 기억: 약속은 원하면 이번 방송에 세 줄 쪽 재대결. 결정은 이번 방송 첫 코너는 끝말잇기. 스코어는 AIRI 2승.'
+
+        restarted = self.runtime()
+        restarted.master_control({'action': 'start', 'show_id': 'ep2'})
+        for deterministic in (False, True):
+            note = self.turn(restarted, 'ep2', self.context('- 채팅 집계: 재대결 찬성 12'),
+                             deterministic_layer=deterministic).context_note
+            lines = note.splitlines()
+            self.assertEqual(lines[lines.index(BROADCAST_BRIEFING_HEADER) + 1], expected)
+            self.assertEqual(note.count('- 지난 방송 기억:'), 1)
+            for leaked in ('감자님', '방송 끝에 판정'):
+                self.assertNotIn(leaked, note)
+        self.assertIn(BRIEFING_EVIDENCE_MARKER + '\n' + BROADCAST_BRIEFING_HEADER + '\n' + expected, note)
+        self.assertIn(expected, system_briefing_evidence(note))
+        health = restarted.carryover_health()
+        self.assertEqual((health['carried_items'], health['turns_with_line']), (3, 2))
+        self.assertEqual(restarted.master_control({'action': 'close', 'show_id': 'ep2'}), {})
+
+        third = self.runtime()
+        third.master_control({'action': 'start', 'show_id': 'ep3'})
+        note = self.turn(third, 'ep3', self.context('- 채팅 집계: 재대결 찬성 12')).context_note
+        self.assertNotIn('- 지난 방송 기억:', note)
+        self.assertEqual(ShowCarryoverStore(self.path).items, [])
+
+    def test_only_delivered_turns_are_harvested(self):
+        runtime = self.runtime()
+        runtime.master_control({'action': 'start', 'show_id': 'ep1'})
+        for index, status in enumerate(('failed', 'partial', 'cancelled', 'unknown', None)):
+            self.turn(runtime, 'ep1', self.context(f'- 결과: {index}판 무승부'), status=status)
+        self.turn(runtime, 'ep1', self.context('- 결과: 양쪽 모두 성공, 무승부'))
+        self.assertEqual(runtime.carryover_health()['captured'], 1)
+        runtime.master_control({'action': 'close', 'show_id': 'ep1'})
+        self.assertEqual(ShowCarryoverStore(self.path).items, [('결과', '양쪽 모두 성공, 무승부')])
+
+    def test_a_show_without_a_delivered_turn_leaves_the_file_alone(self):
+        self.seed([('결과', '양쪽 모두 성공, 무승부')])
+        before = self.path.read_bytes()
+        runtime = self.runtime()
+        runtime.master_control({'action': 'start', 'show_id': 'ep1'})
+        self.turn(runtime, 'ep1', self.context('- 결과: 셋째 판 무승부'), status='failed')
+        self.assertEqual(runtime.master_control({'action': 'close', 'show_id': 'ep1'}), {})
+        self.assertEqual(self.path.read_bytes(), before)
+        self.assertEqual(runtime.carryover_health()['finalized'], 0)
+
+    def test_the_line_is_pinned_when_a_show_starts(self):
+        self.seed([('결과', '첫 판 무승부')])
+        old = '- 지난 방송 기억: 결과는 첫 판 무승부.'
+        runtime = self.runtime()
+        runtime.master_control({'action': 'start', 'show_id': 'show-a'})
+        runtime.master_control({'action': 'start', 'show_id': 'show-b'})
+        self.turn(runtime, 'show-a', self.context('- 결과: 둘째 판 AIRI 승'))
+        runtime.master_control({'action': 'close', 'show_id': 'show-a'})
+        self.assertIn(old, self.turn(runtime, 'show-b', self.context()).context_note)
+        runtime.master_control({'action': 'start', 'show_id': 'show-c'})
+        self.assertIn('- 지난 방송 기억: 결과는 둘째 판 AIRI 승.',
+                      self.turn(runtime, 'show-c', self.context()).context_note)
+
+    def test_an_empty_briefing_gets_the_header_and_line_before_the_donation_contract(self):
+        self.seed([('약속', '원하면 다음 방송에 세 줄 쪽 재대결'), ('결과', '양쪽 모두 성공, 무승부')])
+        runtime = self.runtime()
+        runtime.master_control({'action': 'start', 'show_id': 'ep2'})
+        context = self.context(briefing='', donation=True)
+        note = self.turn(runtime, 'ep2', context).context_note
+        self.assertIn(
+            BROADCAST_BRIEFING_HEADER + '\n' + CARRY_LINE + '\n\n' + DONATION_CONTINUATION_CONTRACT, note,
+        )
+        marked = self.turn(runtime, 'ep2', context, deterministic_layer=True).context_note
+        self.assertIn(BRIEFING_EVIDENCE_MARKER + '\n' + BROADCAST_BRIEFING_HEADER + '\n' + CARRY_LINE, marked)
+
+    def test_a_director_owned_line_is_kept_once(self):
+        self.seed([('결과', '양쪽 모두 성공, 무승부')])
+        runtime = self.runtime()
+        runtime.master_control({'action': 'start', 'show_id': 'ep2'})
+        note = self.turn(runtime, 'ep2', self.context('- 지난 방송 기억: 스태프가 직접 쓴 메모.')).context_note
+        self.assertEqual(note.count('- 지난 방송 기억:'), 1)
+        self.assertIn('스태프가 직접 쓴 메모.', note)
+        health = runtime.carryover_health()
+        self.assertEqual((health['director_owned'], health['turns_with_line']), (1, 0))
+
+    def test_a_turn_without_broadcast_context_gets_no_line(self):
+        self.seed([('결과', '양쪽 모두 성공, 무승부')])
+        runtime = self.runtime()
+        runtime.master_control({'action': 'start', 'show_id': 'ep2'})
+        self.assertEqual(self.turn(runtime, 'ep2').context_note, '')
+
+    def test_the_largest_context_with_a_full_line_stays_in_bounds(self):
+        context = {
+            'schema_version': 1, 'topic_title': '가' * 120, 'segment_label': '나' * 120,
+            'situation': '다' * 300,
+            'briefing': BROADCAST_BRIEFING_HEADER + '\n' + '라' * (2048 - len(BROADCAST_BRIEFING_HEADER) - 1),
+            'donation_continuation': True,
+        }
+        line = '- 지난 방송 기억: ' + '마' * (300 - len('- 지난 방송 기억: '))
+        self.assertEqual(len(line), 300)
+        for marker in (False, True):
+            note = render_broadcast_context(context, briefing_evidence_marker=marker, carryover_line=line)
+            self.assertLessEqual(len(note), 4096)
+            self.assertIn(BROADCAST_BRIEFING_HEADER + '\n' + line + '\n', note)
+        for bad in (None, 1, 'a\nb'):
+            with self.assertRaises(BroadcastControlError):
+                render_broadcast_context(context, carryover_line=bad)
+
+    def test_a_failed_write_at_close_still_closes_and_the_next_show_starts(self):
+        self.seed([('결과', '첫 판 무승부')])
+        runtime = self.runtime()
+        runtime.master_control({'action': 'start', 'show_id': 'ep1'})
+        self.turn(runtime, 'ep1', self.context('- 결과: 둘째 판 AIRI 승'))
+        with mock.patch.object(show_carryover.os, 'replace', side_effect=PermissionError('locked')):
+            self.assertEqual(runtime.master_control({'action': 'close', 'show_id': 'ep1'}), {})
+        self.assertEqual(runtime.carryover_health()['write_errors'], 1)
+        self.assertEqual(runtime.master_control({'action': 'start', 'show_id': 'ep2'}), {})
+        self.assertIn('- 지난 방송 기억: 결과는 첫 판 무승부.', self.turn(runtime, 'ep2', self.context()).context_note)
 
 
 if __name__ == '__main__':
