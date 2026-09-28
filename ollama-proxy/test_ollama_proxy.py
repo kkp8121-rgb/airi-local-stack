@@ -1362,6 +1362,35 @@ class MemoryAbsenceGuardTests(unittest.TestCase):
             "어제 김치볶음밥 만들다 연기가 났어.",
         )
 
+    def test_stay_in_bed_meme_is_not_an_emergency_but_a_real_report_still_is(self) -> None:
+        # 2026-09-25 persona capture (body-02 T4): the meme got the emergency check-in.
+        tip = "폰을 반대편에 두는 거 진짜 똑똑하다! 다섯 번 쪽은 이 방법 어때?"
+        meme = "[YouTube] 그건 못함 이불 밖은 위험해"
+        messages = [{"role": "assistant", "content": tip}, {"role": "user", "content": meme}]
+        self.assertFalse(ollama_proxy.urgent_safety_context(meme, tip))
+        self.assertEqual(ollama_proxy.serious_pre_stream_dialogue(meme, tip), "")
+        self.assertNotIn("긴급", ollama_proxy.response_mode_note(meme))
+        light = "ㅋㅋ 그 마음 알아, 알람 재판은 무죄다!"
+        self.assertEqual(ollama_proxy.enforce_tool_truth(messages, light), light)
+        self.assertTrue(ollama_proxy.urgent_safety_context("이불 밖은 위험해 근데 나 사고 났어", tip))
+        self.assertTrue(ollama_proxy.urgent_safety_context("이불 밖은 위험해 죽고 싶어", tip))
+
+    def test_asking_to_be_drilled_is_not_a_device_command(self) -> None:
+        # 2026-09-25 persona capture (games-11 T2): "시켜줘" (drill me) matched "켜줘" (turn on).
+        practice = [{"role": "user", "content": "[YouTube] 말 끝마다 그래서 결론이 뭔데 함 ㅠ 연습 좀 시켜줘"}]
+        self.assertEqual(ollama_proxy.unverified_action_fallback(practice), "")
+        reply = "연습 상대 할게! 오늘 한 일 편하게 말해 줄래?"
+        self.assertEqual(ollama_proxy.enforce_tool_truth(practice, reply), reply)
+        lamp = [{"role": "user", "content": "거실 불 켜줘"}]
+        self.assertEqual(ollama_proxy.unverified_action_fallback(lamp), "그건 내가 직접 실행할 수 없어.")
+        self.assertEqual(ollama_proxy.enforce_tool_truth(lamp, "알겠어!"), "그건 내가 직접 실행할 수 없어.")
+        # "시켜줘" as "order it for me" is still an action AIRI cannot take.
+        for order in ("치킨 시켜줘", "[YouTube] 피자 좀 시켜줘", "배달 시켜줘"):
+            with self.subTest(order=order):
+                ordered = [{"role": "user", "content": order}]
+                self.assertEqual(ollama_proxy.unverified_action_fallback(ordered), "그건 내가 직접 실행할 수 없어.")
+                self.assertEqual(ollama_proxy.enforce_tool_truth(ordered, "주문했어!"), "그건 내가 직접 실행할 수 없어.")
+
     def test_standalone_ambiguous_action_asks_once_but_context_is_preserved(self) -> None:
         current = [{"role": "user", "content": "그거 다시 해줘."}]
         self.assertEqual(

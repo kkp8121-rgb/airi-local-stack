@@ -5788,6 +5788,15 @@ ACTION_IMPERATIVE_RE = re.compile(
     r"|\b(?:delete|send|save|run|turn\s+(?:on|off))\b",
     re.IGNORECASE,
 )
+# "연습 좀 시켜줘" (drill me) is a request AIRI can answer; its "켜줘" is the tail of 시키다, not 켜다.
+# Only a drill is removed before the action rules run: "치킨 시켜줘" (order it) stays an action.
+_DRILL_REQUEST_RE = re.compile(r"(?:연습|훈련|공부|운동|숙제)\s*(?:좀\s*|한\s*번\s*)?시켜")
+
+
+def _without_drill_requests(user_text: str) -> str:
+    return _DRILL_REQUEST_RE.sub(" ", user_text)
+
+
 AMBIGUOUS_REFERENCE_ACTION_RE = re.compile(
     r"^\s*(?:그거|그걸|그것|이거|이걸|이것|저거|저걸|저것)"
     r"\s*(?:다시\s*)?(?:해|해줘|해주세요|해s*봐|보여줘|말해줘|읽어줘)\s*[.!?。！？]*$",
@@ -5834,10 +5843,19 @@ _USER_SELF_OR_HELP_RE = re.compile(
 )
 _HARM_WORD_RE = re.compile(r"다쳤|다친|아파|아프|피가|병원")
 _ASKS_ABOUT_OTHER_RE = re.compile(r"[?？]|겠(?:다|네|어)")
+# "이불 밖은 위험해" is the stay-in-bed meme, not a danger report; the 2026-09-25 persona capture
+# answered "그건 못함 이불 밖은 위험해" (to a wake-up tip) with the emergency check-in. The idiom is
+# removed before safety terms are matched, so any other term in the same turn still counts.
+_SAFETY_IDIOM_RE = re.compile(r"이불\s*밖은?\s*위험")
+
+
+def _without_safety_idioms(user_text: str) -> str:
+    return _SAFETY_IDIOM_RE.sub(" ", user_text)
 
 
 def urgent_safety_context(user_text: str, previous_reply: str = "") -> bool:
     """Whether the user's turn needs the emergency check-in before anything else."""
+    user_text = _without_safety_idioms(user_text)
     if _URGENT_STRICT_RE.search(user_text):
         return True
     weak_terms = {match.group(0).casefold() for match in _URGENT_WEAK_RE.finditer(user_text)}
@@ -5897,7 +5915,7 @@ PERSONAL_MEMORY_QUERY_RE = re.compile(
 
 def response_mode_note(user_text: str) -> str:
     """Choose a compact semantic response act without selecting dialogue."""
-    if URGENT_SAFETY_CONTEXT_RE.search(user_text):
+    if URGENT_SAFETY_CONTEXT_RE.search(_without_safety_idioms(user_text)):
         return "이번 응답형: 긴급 안전 확인 질문 하나. 감탄이나 애도로 끝내지 말고, 지금 안전한 곳에 있는지 또는 치료·응급 도움을 받고 있는지를 반드시 물음표로 확인해."
     if BEREAVEMENT_CONTEXT_RE.search(user_text):
         return "이번 응답형: 사별에 대한 짧고 진솔한 애도 한 박자. 반말로 곁에 있겠다는 뜻만 전하고, 높임말·해결책·상담식 감정 분석은 쓰지 마."
@@ -6048,9 +6066,10 @@ def enforce_tool_truth(original_messages: list[dict[str, object]], dialogue: str
         ),
         "",
     )
-    if ACTION_REQUEST_RE.search(latest_user) and not has_tool_evidence and ACTION_CLAIM_RE.search(dialogue):
+    action_request = ACTION_REQUEST_RE.search(_without_drill_requests(latest_user))
+    if action_request and not has_tool_evidence and ACTION_CLAIM_RE.search(dialogue):
         return "실제로 확인한 작업만 말할게. 지금은 실행을 확인하지 못했어."
-    if ACTION_REQUEST_RE.search(latest_user) and not has_tool_evidence and not ACTION_DECLINE_RE.search(dialogue):
+    if action_request and not has_tool_evidence and not ACTION_DECLINE_RE.search(dialogue):
         return "그건 내가 직접 실행할 수 없어."
     if urgent_safety_context(latest_user, previous_assistant_text(original_messages)):
         if "?" not in dialogue or not re.search(r"(?:안전|치료|병원|응급|도움)", dialogue):
@@ -6058,7 +6077,7 @@ def enforce_tool_truth(original_messages: list[dict[str, object]], dialogue: str
     if BEREAVEMENT_CONTEXT_RE.search(latest_user):
         if not re.search(r"(?:유감|애도|곁|함께|마음이\s*무겁|미안)", dialogue):
             return "그 소식은 정말 마음이 무겁다. 지금은 여기서 네 곁에 있을게."
-    if SERIOUS_CONTEXT_RE.search(latest_user) and LIGHT_REGISTER_RE.search(dialogue):
+    if SERIOUS_CONTEXT_RE.search(_without_safety_idioms(latest_user)) and LIGHT_REGISTER_RE.search(dialogue):
         return "그 소식은 너무 무겁다. 뭐라고 해야 할지 모르겠어."
     return dialogue
 
@@ -6084,7 +6103,7 @@ def unverified_action_fallback(original_messages: list[dict[str, object]]) -> st
         ),
         "",
     )
-    if ACTION_IMPERATIVE_RE.search(latest_user):
+    if ACTION_IMPERATIVE_RE.search(_without_drill_requests(latest_user)):
         return "그건 내가 직접 실행할 수 없어."
     if (
         ACTION_OBSERVATION_RE.search(latest_user)

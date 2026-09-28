@@ -211,6 +211,13 @@ class ScreeningTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertTrue(self.runtime.inspect(text).allowed)
 
+    def test_korean_versus_quiz_is_not_held_as_another_language(self) -> None:
+        # 2026-09-25 persona capture (games-09 T0): the Latin "vs" held a Korean spelling quiz.
+        self.assertTrue(self.runtime.inspect("맞춤법 퀴즈 ㄱ 안되 vs 안돼 뭐가 맞음").allowed)
+        for text in ("cats vs dogs", "방송 vs you are trash"):
+            with self.subTest(text=text):
+                self.assertEqual(self.runtime.inspect(text).category, "unsupported_language")
+
     def test_fixed_reactions_do_not_trigger_the_output_dictionary(self) -> None:
         output = output_moderation.OutputModerator(output_moderation.load_moderation_policy())
         for category in self.runtime.health()["categories"]:
