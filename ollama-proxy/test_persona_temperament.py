@@ -31,6 +31,17 @@ class PersonaTemperamentTests(unittest.TestCase):
             with self.subTest(rule=rule):
                 self.assertIn(rule, TEMPERAMENT_CARD)
 
+    def test_card_sets_a_calm_baseline_with_a_range_of_feelings(self) -> None:
+        # 2026-09-28: "밝고 당당, 좋은 소식에 크게 기뻐하고 묻는다" produced lines that were all peaks and a question
+        # after every answer; the user called the character shallow ("하이하이하이하이의 반복").
+        for gone in ("크게 기뻐하고", "한 걸음 더 묻는다"):
+            with self.subTest(gone=gone):
+                self.assertNotIn(gone, TEMPERAMENT_CARD)
+        for rule in ("느긋하고 담백", "느낌표와 감탄은 아껴", "감정에 결이 있다", "칭찬을 남발하지 않는다",
+                     "캐묻지 않고 곁에 있어 준다"):
+            with self.subTest(rule=rule):
+                self.assertIn(rule, TEMPERAMENT_CARD)
+
     def test_with_temperament_prefixes_a_non_empty_context_note(self) -> None:
         note = "[오늘 방송]\n- 주제: 첫 방송"
         self.assertEqual(with_temperament(note), TEMPERAMENT_CARD + "\n\n" + note)
