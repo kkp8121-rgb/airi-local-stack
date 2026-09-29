@@ -333,6 +333,51 @@ class LiveBriefingSelectTests(unittest.TestCase):
         briefed = closing + "\n\n" + BROADCAST_BRIEFING_HEADER + "\n- 이번 턴에 말할 것: 오늘도 와 줘서 고마워."
         self.assertEqual(with_canon_say_line(briefed, "[YouTube] 벌써 끝나?"), briefed)
 
+    def test_a_canon_turn_draft_adds_no_sentence_to_the_line(self) -> None:
+        # 2026-09-29 R1 re-measure: correct canon lines with an invented sentence added after them.
+        weekend = "주말이 따로 있진 않아. 방송이 켜진 시간이 내 하루 전부야."
+        meal = "밥은 안 먹어. 덕분에 방송 중에 밥 먹으러 자리 비울 일은 없어."
+        sleep = "잠은 내 영역이 아니야. 방송 켜지는 순간부터가 내 하루라서."
+        for draft, say in (
+            ("주말이 따로 있진 않아. 방송이 켜진 시간이 내 하루 전부야. 이번 주말은 첫 방송 준비로 바빴어.", weekend),
+            ("밥은 안 먹어. 대신 채팅 보면서 점심이야. 첫 방송 날 점심 메뉴 자랑은 내가 제일 먼저 할게!", meal),
+            ("좋아해! 밥은 난 구경 담당이야. 같이 먹으러 갈 메뉴는 채팅이 골라 줄래?", meal),
+            # Inside a sentence.
+            ("주말이 따로 있진 않아. 방송이 켜진 시간이 내 하루 전부라, 오늘은 첫 방송 준비로 바빴어.", weekend),
+            ("어제는 잠이 없었어. 방송 켜지는 순간부터가 내 하루라서, 알람보다 빨리 눈이 떠졌거든.", sleep),
+        ):
+            with self.subTest(draft=draft):
+                self.assertTrue(candidate_is_unfit(draft, say))
+        for draft, say in (
+            ("주말은 따로 없어, 방송 켜진 시간이 내 하루 전부거든. 그래도 오늘은 첫 방송이라 좀 설레네.", weekend),
+            ("밥은 안 먹어, 그래서 방송 중에 자리 비울 일도 없어. 이제 자기소개를 마저 할게.", meal),
+            (sleep, sleep),
+        ):
+            with self.subTest(draft=draft):
+                self.assertFalse(candidate_is_unfit(draft, say))
+        # A say line from a briefing is not a canon line: longer answers stay allowed there.
+        self.assertFalse(candidate_is_unfit("아니, 오늘은 귀까지 번졌어. 진짜 황당하지? 내일은 병원 간다.", SAY))
+
+    def test_where_and_when_questions_get_their_own_lines(self) -> None:
+        # 2026-09-29 R1 re-measure: "아이리는 주말에 뭐 했어?" -> "사는 동네는 따로 없고, 방송이 켜지면 여기 있어."
+        where = canon_say_lines("[YouTube] 아이리 어디 살아?")
+        when = canon_say_lines("[YouTube] 아이리는 주말에 뭐 했어?")
+        self.assertGreaterEqual(len(where), 4)
+        self.assertGreaterEqual(len(when), 4)
+        for line in when:
+            self.assertNotRegex(line, "동네|주소|집이라고")
+        self.assertEqual(canon_say_lines("[YouTube] 아이리 요즘 근황 뭐임"), when)
+        self.assertTrue(candidate_is_unfit(
+            "주말이 따로 있진 않아. 방송이 켜진 시간이 내 하루 전부라, 오늘은 첫 방송 준비하느라 정신 없었어.",
+            "주말이 따로 있진 않아. 방송이 켜진 시간이 내 하루 전부야.",
+        ))
+        # 2026-09-29 R1 confirmation run.
+        sleep = "잠은 내 영역이 아니야. 방송 켜지는 순간부터가 내 하루라서."
+        for draft in ("어제는 방송 켜지는 순간부터가 내 하루라 잠이 별로 안 와. 그래도 첫 방송이라 긴장돼.",
+                      "잠은 내 영역이 아니야. 긴장해서 잠을 설쳤을 뿐이야.", "잠은 내 영역이 아니야. 긴장이 잠을 방해했어."):
+            with self.subTest(draft=draft):
+                self.assertTrue(candidate_is_unfit(draft, sleep))
+
     def test_colds_and_fatigue_get_their_own_lines(self) -> None:
         # 2026-09-29 ep08 T14: "아이리는 감기 안 걸려?" got "피곤이 쌓이는 몸이 아니라서 괜찮아…".
         cold = canon_say_lines("[YouTube] 아이리는 감기 안 걸려?")

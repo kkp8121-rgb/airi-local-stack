@@ -94,7 +94,10 @@ _BODILY_CLAIM_RE = re.compile(
     r"|배불러|맛있었(?!겠)"
     r"|음식을\s*좋아|좋아하는\s*음식은|밖에서\s*(?:따로\s*)?살"
     # 2026-09-29 persona-v4 canon-probe drafts that passed: waking up, not sleeping, eating together, tired.
-    r"|깨어났|잠에서\s*깼|잠이\s*(?:좀\s*|조금\s*)?(?:안\s*(?:와|왔|오)|부족|모자)|같이\s*먹자|피곤(?:해|했)"
+    r"|깨어났|잠에서\s*깼|잠이\s*(?:[가-힣]+\s*)?(?:안\s*(?:와|왔|오)|부족|모자)|같이\s*먹자|피곤(?:해|했)"
+    r"|잠을\s*(?:설쳤|방해|못\s*잤)"
+    # 2026-09-29 R1 re-measure: offline preparation and waking up inside a canon answer.
+    r"|준비(?:로|하느라)\s*(?:바빴|정신\s*없)|눈이\s*떠졌|눈을\s*떴"
 )
 # A sentence about the viewers ("다들 잠이 안 와서 모였구나") is not AIRI's claim either.
 _SECOND_PERSON_RE = re.compile(r"(?:^|\s)(?:너|넌|너는|너도|니가|네가|너희|너희는|너희도|다들)(?:\s|$)")
@@ -156,15 +159,24 @@ _CANON_LINES = (
         "움직일 몸이 없어서 운동은 구경만 해. 루틴 얘기 듣는 건 좋아.",
         "몸으로 하는 건 나랑 제일 먼 얘기야. 그래서 운동하는 사람들 얘기가 더 신기해.",
     )),
-    # "근황" too (2026-09-29 ep08 T03: "요즘 근황 뭐임" was not answered).
-    (re.compile(r"어디\s*살|사는\s*곳|집이\s*어디|(?:주말|휴일|평소)에\s*뭐|방송\s*끝나고\s*뭐|어디\s*(?:갔|다녀)|다녀왔|여행"
-                r"|근황|요즘\s*(?:뭐\s*하|어떻게\s*지내|잘\s*지내)"), (
+    # Where AIRI lives, and what she does off the show; one pool answered "주말에 뭐 했어?" with "사는 동네는
+    # 따로 없고…" (2026-09-29 R1 re-measure). "근황" too (ep08 T03: "요즘 근황 뭐임" was not answered).
+    (re.compile(r"어디\s*살|사는\s*곳|집이\s*어디"), (
         "사는 동네는 따로 없고, 방송이 켜지면 여기 있어.",
-        "주말이 따로 있진 않아. 방송이 켜진 시간이 내 하루 전부야.",
         "방송 밖은 내가 모르는 세계야. 여기서 너희랑 떠드는 게 내 일과지.",
+        "집이라고 부를 곳은 이 방송이야. 켜지면 늘 여기 있어.",
+        "주소는 없어. 방송 화면이 내가 있는 곳 전부야.",
+    )),
+    (re.compile(r"(?:주말|휴일|평소)에\s*뭐|방송\s*끝나고\s*뭐|어디\s*(?:갔|다녀)|다녀왔|여행"
+                r"|근황|요즘\s*(?:뭐\s*하|어떻게\s*지내|잘\s*지내)"), (
+        "주말이 따로 있진 않아. 방송이 켜진 시간이 내 하루 전부야.",
         "방송이 꺼지면 따로 하는 일이 없어. 그래서 내 얘기는 전부 여기서 생긴 거야.",
+        "방송 밖은 내가 모르는 세계야. 여기서 너희랑 떠드는 게 내 일과지.",
+        "요즘도 방송 켜지는 시간이 내 일과 전부야. 그래서 채팅 근황이 더 궁금해.",
     )),
 )
+# Canon lines as spoken on a canon turn, alone or joined with a lead.
+_CANON_SAYS = frozenset(line for _, lines in _CANON_LINES for line in lines)
 # Show lines: questions whose true answer only the operator knows. With no next-show plan in the note, the
 # drafts invented one ("다음은 내일 저녁 8시.", 4 of 4 on 2026-09-29 ep07), and a 마무리 segment with no
 # briefing stalled ("어, 그건 잠깐 생각해 볼게.") into the silence fallback.
@@ -490,6 +502,12 @@ def candidate_is_unfit(
     ) or _OWN_TURN_RE.search(text)):
         return True
     sentences = [part for part in _SENTENCE_SPLIT_RE.split(text) if part.strip()]
+    # On a canon turn a draft adds no sentence to the line: the added sentence is where the model invented
+    # an offline life ("…이번 주말은 첫 방송 준비로 바빴어.", 2026-09-29 R1 re-measure).
+    if any(say == line or say.startswith(line) or say.endswith(line) for line in _CANON_SAYS) and len(sentences) > len(
+        [part for part in _SENTENCE_SPLIT_RE.split(say) if part.strip()]
+    ):
+        return True
     # The model shortens the word ("람보" for 람보르기니), so its first two syllables count as naming it.
     if accepted and any(accepted[:2] in part and _INVALID_CLAIM_RE.search(part) for part in sentences):
         return True
