@@ -186,6 +186,14 @@ _SCHEDULE_QUESTION_RE = re.compile(
     r"(?:다음\s*방송|담방)\s*(?:은|는|엔|에는|도|때|때는|때엔)?\s*(?:언제|몇\s*시|뭐|무슨)"
     r"|방송\s*(?:은\s*)?언제\s*(?:또\s*)?(?:해|켜|함|하)"
 )
+# A question about today's show gets the order the operator wrote as "오늘 순서는 …다." in the situation
+# (2026-09-29 ep16 T02 "아이리 오늘 방송 뭐 해?" -> "첫 방송이라 순서가 다 안 떠올랐어."). Past tense ("뭐 했어")
+# and a viewer's own plan ("나 오늘 뭐 하지") are not asked.
+_TODAY_PLAN_QUESTION_RE = re.compile(
+    r"오늘\s*(?:방송\s*)?(?:은|는|에는)?\s*(?:뭐|뭘)\s*(?:해|할|하는|함|하냐|하니|해요|하나요)|(?:오늘|방송)\s*순서"
+)
+_TODAY_ORDER_RE = re.compile(r"오늘\s*순서는\s*(.+?)(?:이다|다)\s*(?:\.|$)")
+_SITUATION_LINE_PREFIX = "- 상황:"
 # Chat is matched before NFKC too: NFKC turns compatibility jamo such as "ㅂㅂ" into conjoining jamo
 # (2026-09-29 ep08 T17 "다음에 2판 꼭 이긴다 ㅂㅂ" got no closing line).
 _CLOSING_CHAT_RE = re.compile(
@@ -199,17 +207,19 @@ _SHOW_CONGRATS_RE = re.compile(r"(?:방송|번째|회차|첫방|\d+\s*회).{0,12
 # "열한 번째면 벌써 11번이나 왔네.").
 _SHOW_COUNT_RE = re.compile(r"(?:\d+|[가-힣]{1,3})\s*(?:번째|회차)")
 _GREETING_RE = re.compile(r"ㅎㅇ|하이|안녕|ㅂㅇ|반가|왔다|왔어|출첵|출석")
+# No "오늘도" in these pools: on a first show it claims an earlier one (2026-09-29 ep16 T01 "첫방 축하해!!" ->
+# "축하 고마워! 오늘도 끝까지 같이 가자.").
 _SHOW_GREETING_LINES = (
-    "반가워! 오늘도 와 줘서 고마워.",
-    "어서 와, 반가워! 오늘도 같이 재밌게 놀자.",
-    "왔구나, 반가워! 오늘 방송도 잘 부탁해.",
-    "반가워, 오늘도 끝까지 같이 가자!",
+    "반가워! 오늘 와 줘서 고마워.",
+    "어서 와, 반가워! 오늘 같이 재밌게 놀자.",
+    "왔구나, 반가워! 오늘 방송 잘 부탁해.",
+    "반가워, 오늘 끝까지 같이 가자!",
 )
 _SHOW_THANKS_LINES = (
     "고마워! 축하받으니까 오늘 방송이 더 신난다.",
     "와 줘서 고마워, 축하까지 받으니 힘이 난다!",
-    "축하 고마워! 오늘도 끝까지 같이 가자.",
-    "축하 받으니 기분 좋다, 고마워. 오늘도 같이 재밌게 놀자!",
+    "축하 고마워! 오늘 끝까지 같이 가자.",
+    "축하 받으니 기분 좋다, 고마워. 오늘 같이 재밌게 놀자!",
 )
 _UNSCHEDULED_LINES = (
     "다음 방송은 아직 안 정해졌어. 정해지면 제일 먼저 알려 줄게.",
@@ -220,7 +230,7 @@ _UNSCHEDULED_LINES = (
 _CLOSING_LINES = (
     "오늘은 여기까지야. 끝까지 함께해 줘서 고마워!",
     "벌써 마무리할 시간이네. 오늘 와 줘서 정말 고마워!",
-    "오늘도 같이 놀아 줘서 고마워. 다음 방송에서 또 보자!",
+    "오늘 같이 놀아 줘서 고마워. 다음 방송에서 또 보자!",
     "오늘은 여기서 끝! 재밌게 놀아 줘서 고마워.",
 )
 # Leads: a line put before AIRI's answer when the viewer's news calls for one and her answer has none.
@@ -248,8 +258,11 @@ _CARE_LINES = (
     "아프다니 속상하다, 얼른 괜찮아지길 바랄게.",
 )
 # A viewer who is down hears comfort (2026-09-29 ep09 T14: "회사에서 혼나서 좀 우울해 ㅠ" -> "혼난 날이면
-# 끝말잇기도 안 되겠네."). Laughing chat ("이 단어 너무 힘들어 ㅋㅋ") is banter, not news.
-_DOWN_RE = re.compile(r"우울|속상|서러|슬퍼|슬프|힘들어|힘들다|힘듦|혼났|혼나서|잘렸|헤어졌|떨어졌")
+# 끝말잇기도 안 되겠네."). Laughing chat ("이 단어 너무 힘들어 ㅋㅋ") is banter, not news. A day that went wrong
+# counts too (ep16 T03: "면접 보고 왔는데 망한 것 같아 ㅠ" -> "면접 결과가 아직 안 나왔구나."), but only '망' as its
+# own word (희망한, 도망쳤) and not "망한 줄 알았는데".
+_DOWN_RE = re.compile(r"우울|속상|서러|슬퍼|슬프|힘들어|힘들다|힘듦|혼났|혼나서|잘렸|헤어졌|떨어졌"
+                      r"|(?:^|\s)망(?:했|한|함|친|쳤|쳐|침)(?!\s*줄)")
 _LAUGH_JAMO_RE = re.compile(r"[ㅋㅎ]{2,}")
 _COMFORTED_RE = re.compile(r"속상|저런|힘들었|토닥|괜찮|위로|고생|마음")
 _COMFORT_LINES = (
@@ -359,14 +372,32 @@ def _rotated_line(lines: tuple[str, ...], user_text: object) -> str:
     return line
 
 
+def _today_order_line(context_note: str) -> str:
+    """"오늘은 … 순서야. 지금은 … 중이야." from the order written in the situation, else ''."""
+    situation = next((line[len(_SITUATION_LINE_PREFIX):] for line in context_note.splitlines()
+                      if line.startswith(_SITUATION_LINE_PREFIX)), "")
+    match = _TODAY_ORDER_RE.search(situation)
+    if not match:
+        return ""
+    segment = next((line[len(_SEGMENT_LINE_PREFIX):].strip() for line in context_note.splitlines()
+                    if line.startswith(_SEGMENT_LINE_PREFIX)), "")
+    line = f"오늘은 {match.group(1).strip()} 순서야."
+    return f"{line} 지금은 {segment} 중이야." if segment else line
+
+
 def show_say_lines(context_note: object, user_text: object) -> tuple[str, ...]:
-    """The say lines for a next-show question the note has no plan for, or a closing chat in 마무리, else ()."""
+    """The say lines for a next-show question the note has no plan for, a question about today's show the note
+    has the order for, show congratulations, a show-count greeting, or a closing chat in 마무리, else ()."""
     if not isinstance(context_note, str) or not isinstance(user_text, str):
         return ()
     text = _CHAT_SOURCE_RE.sub("", unicodedata.normalize("NFKC", user_text).strip())
     raw = _CHAT_SOURCE_RE.sub("", user_text.strip())
     if _SCHEDULE_QUESTION_RE.search(text) and not _NEXT_SHOW_RE.search(context_note):
         return _UNSCHEDULED_LINES
+    if _TODAY_PLAN_QUESTION_RE.search(text):
+        order = _today_order_line(context_note)
+        if order:
+            return (order,)
     if _SHOW_CONGRATS_RE.search(raw) and not _VIEWER_OWN_STATE_RE.search(raw):
         return _SHOW_THANKS_LINES
     if _SHOW_COUNT_RE.search(raw) and _GREETING_RE.search(raw):

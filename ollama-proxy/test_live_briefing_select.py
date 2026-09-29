@@ -434,6 +434,35 @@ class LiveBriefingSelectTests(unittest.TestCase):
         self.assertEqual(show_say_lines(opening, "[YouTube] ㅎㅇ"), ())
         self.assertIn("고마", show_say_lines(opening, "[YouTube] 11번째 방송 축하")[0])
 
+    def test_show_lines_do_not_presume_an_earlier_show(self) -> None:
+        # 2026-09-29 ep16 T01 on a first show: "첫방 축하해!! 기다렸어" -> "축하 고마워! 오늘도 끝까지 같이 가자."
+        pools = (live_briefing_select._SHOW_GREETING_LINES, live_briefing_select._SHOW_THANKS_LINES,
+                 live_briefing_select._CLOSING_LINES)
+        for line in (line for pool in pools for line in pool):
+            with self.subTest(line=line):
+                self.assertNotIn("오늘도", line)
+
+    def test_a_question_about_today_gets_the_order_the_operator_gave(self) -> None:
+        # 2026-09-29 ep16 T02 "아이리 오늘 방송 뭐 해?" with the order in the situation -> "오늘은 오프닝이야. 첫 방송이라
+        # 순서가 다 안 떠올랐어. …"; draft-probe "오늘은 뭐 해?" also got "어디서부터 시작할지 아직 못 정했어."
+        live_briefing_select._recent_canon_lines.clear()
+        order = " 오늘 순서는 오프닝, 근황 토크, 끝말잇기, 마무리다."
+        note = ("[오늘 방송]\n- 주제: AIRI 첫 방송\n- 지금 구간: 오프닝\n- 상황: AIRI가 첫 방송을 시작하며 인사하는 구간이다."
+                + order + " 첫 방송이라 지난 방송 기억은 없다.")
+        for chat in ("[YouTube] 아이리 오늘 방송 뭐 해?", "[YouTube] 오늘은 뭐 해?", "[YouTube] 오늘 순서 어떻게 돼?",
+                     "[YouTube] 오늘 뭐 할 거야?"):
+            with self.subTest(chat=chat):
+                line = say_line(with_canon_say_line(note, chat))
+                self.assertEqual(line, "오늘은 오프닝, 근황 토크, 끝말잇기, 마무리 순서야. 지금은 오프닝 중이야.")
+                self.assertFalse(candidate_is_unfit(line, line, "", chat))
+        # No order in the note: the model answers as before.
+        bare = note.replace(order, "")
+        self.assertEqual(with_canon_say_line(bare, "[YouTube] 오늘은 뭐 해?"), bare)
+        for chat in ("[YouTube] 아이리 오늘 뭐 했어?", "[YouTube] 오늘 뭐 먹었어?", "[YouTube] 나 오늘 뭐 하지",
+                     "[YouTube] 다음 방송 때는 뭐 해?", "[YouTube] 오늘 방송 끝나고 뭐 해?"):
+            with self.subTest(chat=chat):
+                self.assertNotIn("순서야", say_line(with_canon_say_line(note, chat)))
+
     def test_loss_news_gets_condolence_after_the_answer(self) -> None:
         # 2026-09-29 ep11 T10: "사실 어제 할머니가 돌아가셔서 좀 멍해" -> "할머니가 가셨구나."
         live_briefing_select._recent_canon_lines.clear()
@@ -506,6 +535,19 @@ class LiveBriefingSelectTests(unittest.TestCase):
         answer = "혼난 날이면 끝말잇기도 안 되겠네."
         self.assertEqual(with_lead(answer, spoken[0]), f"{spoken[0]} {answer}")
         self.assertEqual(with_lead("오늘 고생 많았네.", spoken[0]), "오늘 고생 많았네.")
+
+    def test_a_viewer_whose_day_went_wrong_hears_comfort(self) -> None:
+        # 2026-09-29 ep16 T03: "나 오늘 면접 보고 왔는데 망한 것 같아 ㅠ" -> "면접 결과가 아직 안 나왔구나."
+        comfort = lead_lines("[YouTube] 오늘 너무 속상하다")
+        for chat in ("[YouTube] 나 오늘 면접 보고 왔는데 망한 것 같아 ㅠ", "[YouTube] 시험 망했어",
+                     "[YouTube] 발표 망쳤다 ㅠㅠ", "[YouTube] 오늘 면접 완전 망함"):
+            with self.subTest(chat=chat):
+                self.assertEqual(lead_lines(chat), comfort)
+        for chat in ("[YouTube] 이번 판 망했다 ㅋㅋ", "[YouTube] 희망한 대로 됐어", "[YouTube] 고양이가 도망쳤어",
+                     "[YouTube] 아이리 망했어?"):
+            with self.subTest(chat=chat):
+                self.assertEqual(lead_lines(chat), ())
+        self.assertEqual(lead_lines("[YouTube] 면접 망한 줄 알았는데 붙었어!"), lead_lines("[YouTube] 시험 붙었어"))
 
     def test_a_viewer_who_is_ill_hears_concern_before_the_answer(self) -> None:
         # 2026-09-29 ep07 T20: "나 오늘 감기 걸려서 목소리가 안 나와" -> "목소리가 안 나오면 끝말잇기는 잠시 쉬자."
