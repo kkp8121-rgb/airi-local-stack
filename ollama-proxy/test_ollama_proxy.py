@@ -30,6 +30,7 @@ from live_broadcast_runtime import (
 )
 import live_briefing_select
 from show_carryover import CARRYOVER_FILE_NAME, ShowCarryoverStore, memo_items
+from word_chain_referee import WordChainReferee
 
 
 @contextlib.contextmanager
@@ -8654,6 +8655,173 @@ class LiveBroadcastRouteTests(unittest.TestCase):
         serialized = json.dumps(reported, ensure_ascii=False)
         for text in ("재대결", CARRYOVER_FILE_NAME, store.path.parent.name):
             self.assertNotIn(text, serialized)
+
+    class _RawClient(_QueuedApiStreamClient):
+        """Keep the exact upstream bytes of every attempt."""
+        def __init__(self, chunks_per_request: list[list[bytes]]) -> None:
+            super().__init__(chunks_per_request)
+            self.raw: list[bytes] = []
+
+        async def send(self, request: bytes, *args: object, **kwargs: object) -> object:
+            self.raw.append(request)
+            return await super().send(request, *args, **kwargs)
+
+    WORD_CHAIN_CONTEXT = {
+        "schema_version": 1, "topic_title": "두 번째 방송", "segment_label": "끝말잇기 1라운드",
+        "situation": "끝말잇기 대결 중이다.", "briefing": BROADCAST_BRIEFING_HEADER + "\n- 채팅 집계: 참여 5",
+        "donation_continuation": False,
+    }
+
+    def _word_chain_referee(self, words: list[str]) -> WordChainReferee:
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        path = Path(folder.name) / "words.tsv"
+        rows = "".join(f"{word}\t{index + 1}\tA\n" for index, word in enumerate(words))
+        path.write_text("word\trank\tlevel\n" + rows, encoding="utf-8")
+        referee = WordChainReferee.from_path(path)
+        self.assertTrue(referee.enabled)
+        return referee
+
+    def _start_shows(self, *show_ids: str) -> None:
+        for show_id in show_ids:
+            self.assertEqual(self.runtime.master_control({"action": "start", "show_id": show_id}), {})
+
+    def _word_chain_turn(self, show_id: str, action_id: str, user: str, referee: WordChainReferee,
+                         context: dict[str, object] | None = None, path: str = "/api/chat",
+                         candidates: str = "") -> tuple[bytes, str]:
+        """One live turn; returns the upstream request bytes and the broadcast context it carried."""
+        capability = self.runtime.master_control({
+            "action": "issue_turn", "show_id": show_id, "action_id": action_id,
+            "turn_type": "chat_question", "required_delivery": "renderer",
+            "broadcast_context": dict(self.WORD_CHAIN_CONTEXT if context is None else context),
+        })
+        chat = self._RawClient([[(json.dumps({
+            "message": {"role": "assistant", "content": "좋아, 받았어."}, "done": True,
+        }, ensure_ascii=False) + "\n").encode("utf-8")]])
+        try:
+            with model_environment(AIRI_LIVE_BRIEFING_CANDIDATES=candidates, AIRI_LIVE_PERSONA_TEMPERAMENT=""), \
+                    mock.patch.object(ollama_proxy.deterministic_utterance_layer,
+                                      "DETERMINISTIC_UTTERANCE_LAYER_ENABLED", False), \
+                    mock.patch.object(ollama_proxy, "client", chat), \
+                    mock.patch.object(ollama_proxy, "needs_grounding_retry", lambda *a, **k: False), \
+                    mock.patch.object(ollama_proxy, "memory_runtime", _FakeMemoryRuntime()), \
+                    mock.patch.object(ollama_proxy, "character_state_runtime",
+                                      ollama_proxy.CharacterStateRuntime(clock=lambda: 1_790_000_000.0)), \
+                    mock.patch.object(ollama_proxy, "word_chain_referee", referee):
+                response = self.post(path, json.dumps({
+                    "model": "exaone-airi:2.4b", "stream": True,
+                    "messages": [{"role": "user", "content": user}],
+                }, ensure_ascii=False).encode(), {"x-airi-broadcast-turn-token": capability["turn_token"],
+                                                   "x-airi-request-id": "word-chain-trace"})
+        finally:
+            self.runtime.cancel_turn(capability["turn_token"])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(chat.raw), 1)
+        contexts = [message["content"] for message in json.loads(chat.raw[0])["messages"]
+                    if "[오늘 방송]" in str(message.get("content", ""))]
+        self.assertEqual(len(contexts), 1)
+        return chat.raw[0], contexts[0]
+
+    def test_word_chain_referee_off_leaves_the_upstream_bytes_identical(self):
+        user = "[YouTube] 내가 먼저 한다 기차"
+        lines = "\n- 심판 판정: 기차 유효, AIRI 차례\n- AIRI 낼 단어: 차표"
+        referee = self._word_chain_referee(["기차", "차표"])
+        for path in ("/api/chat", "/v1/chat/completions"):
+            with self.subTest(path=path):
+                tag = path.count("/")
+                self._start_shows(f"wc-off-{tag}", f"wc-base-{tag}", f"wc-on-{tag}")
+                off_bytes, off_context = self._word_chain_turn(
+                    f"wc-off-{tag}", "wc-off", user, WordChainReferee(), path=path,
+                )
+                # The pre-referee path: the segment is never recognised, so nothing is consulted.
+                with mock.patch.object(ollama_proxy, "word_chain_segment", lambda _note: False):
+                    base_bytes, _ = self._word_chain_turn(f"wc-base-{tag}", "wc-base", user, referee, path=path)
+                on_bytes, on_context = self._word_chain_turn(f"wc-on-{tag}", "wc-on", user, referee, path=path)
+                self.assertEqual(off_bytes, base_bytes)
+                self.assertEqual(off_context, render_broadcast_context(self.WORD_CHAIN_CONTEXT))
+                self.assertEqual(on_context, off_context + lines)
+                self.assertNotEqual(on_bytes, off_bytes)
+
+    def test_word_chain_referee_briefs_only_word_chain_segments(self):
+        referee = self._word_chain_referee(["기차", "차표", "분위기"])
+        self._start_shows("wc-show", "wc-candidates")
+        # Ordinary chat is never judged, even when it holds a list noun.
+        _, context = self._word_chain_turn("wc-show", "wc-0", "[YouTube] ㅋㅋㅋ 분위기 왜 이럼", referee)
+        self.assertEqual(context, render_broadcast_context(self.WORD_CHAIN_CONTEXT))
+        _, context = self._word_chain_turn("wc-show", "wc-1", "[YouTube] 내가 먼저 한다 기차", referee)
+        self.assertTrue(context.endswith(
+            BROADCAST_BRIEFING_HEADER + "\n- 채팅 집계: 참여 5\n- 심판 판정: 기차 유효, AIRI 차례\n- AIRI 낼 단어: 차표"
+        ))
+        _, context = self._word_chain_turn("wc-show", "wc-2", "[YouTube] 사과", referee, path="/v1/chat/completions")
+        self.assertTrue(context.endswith("\n- 채팅 집계: 참여 5\n- 심판 판정: 사과 무효(끝 글자와 안 이어짐), 다시"))
+        # A note without a briefing gets the header.
+        bare = {**self.WORD_CHAIN_CONTEXT, "segment_label": "끝말잇기 2라운드", "briefing": ""}
+        _, context = self._word_chain_turn("wc-show", "wc-3", "[YouTube] 표범", referee, context=bare)
+        self.assertEqual(context, render_broadcast_context(bare) + "\n\n" + BROADCAST_BRIEFING_HEADER
+                         + "\n- 심판 판정: 표범 유효, AIRI 차례\n- 심판 판정: 범으로 이을 단어 없음, AIRI 패")
+        # Independent of the briefing candidate flag.
+        _, context = self._word_chain_turn("wc-candidates", "wc-4", "[YouTube] 기차", referee, candidates="3")
+        self.assertTrue(context.endswith("\n- 심판 판정: 기차 유효, AIRI 차례\n- AIRI 낼 단어: 차표"))
+        # Another segment is untouched, even when the situation or the show topic names the game.
+        turns = referee.health()["turns"]
+        for index, other in enumerate((
+            {**self.WORD_CHAIN_CONTEXT, "segment_label": "오프닝 잡담", "situation": "끝말잇기 얘기가 나왔다."},
+            {**self.WORD_CHAIN_CONTEXT, "topic_title": "끝말잇기 대결", "segment_label": "마무리"},
+        )):
+            with self.subTest(segment=other["segment_label"]):
+                self._start_shows(f"wc-other-on-{index}", f"wc-other-off-{index}")
+                on_bytes, context = self._word_chain_turn(
+                    f"wc-other-on-{index}", "wc-5", "[YouTube] 기차", referee, context=other,
+                )
+                off_bytes, _ = self._word_chain_turn(
+                    f"wc-other-off-{index}", "wc-6", "[YouTube] 기차", WordChainReferee(), context=other,
+                )
+                self.assertEqual(context, render_broadcast_context(other))
+                self.assertEqual(on_bytes, off_bytes)
+                self.assertEqual(referee.health()["turns"], turns)
+
+    def test_word_chain_round_clears_when_the_show_closes(self):
+        referee = self._word_chain_referee(["기차", "차기"])
+        accepted = "\n- 심판 판정: 기차 유효, AIRI 차례\n- AIRI 낼 단어: 차기"
+        repeated = "\n- 심판 판정: 기차 무효(이미 나옴), 다시"
+
+        def control(action: str, show_id: str) -> None:
+            with mock.patch.object(ollama_proxy, "word_chain_referee", referee):
+                response = self.post("/v1/airi/broadcast/control",
+                                     json.dumps({"action": action, "show_id": show_id}).encode(),
+                                     {"x-airi-broadcast-master-token": "m" * 32})
+            self.assertEqual(response.status_code, 200)
+
+        control("start", "wc-close")
+        control("start", "wc-keep")
+        for show_id in ("wc-close", "wc-keep"):
+            _, context = self._word_chain_turn(show_id, f"{show_id}-1", "[YouTube] 기차", referee)
+            self.assertTrue(context.endswith(accepted))
+        control("close", "wc-close")
+        control("start", "wc-close")
+        _, context = self._word_chain_turn("wc-close", "wc-close-2", "[YouTube] 기차", referee)
+        self.assertTrue(context.endswith(accepted))
+        _, context = self._word_chain_turn("wc-keep", "wc-keep-2", "[YouTube] 기차", referee)
+        self.assertTrue(context.endswith(repeated))
+
+    def test_health_reports_word_chain_without_content(self):
+        keys = {"enabled", "words", "load_error", "turns", "accepted", "rejected", "airi_losses"}
+        self.assertEqual(set(asyncio.run(ollama_proxy.health())["word_chain"]), keys)
+        with mock.patch.object(ollama_proxy, "word_chain_referee", WordChainReferee()):
+            reported = asyncio.run(ollama_proxy.health())["word_chain"]
+        self.assertEqual(reported, {
+            "enabled": False, "words": 0, "load_error": 0, "turns": 0, "accepted": 0, "rejected": 0,
+            "airi_losses": 0,
+        })
+        referee = self._word_chain_referee(["기차", "차표"])
+        referee.judge("show-a", "[YouTube] 기차")
+        with mock.patch.object(ollama_proxy, "word_chain_referee", referee):
+            reported = asyncio.run(ollama_proxy.health())["word_chain"]
+        self.assertEqual(reported, {
+            "enabled": True, "words": 2, "load_error": 0, "turns": 1, "accepted": 1, "rejected": 0,
+            "airi_losses": 0,
+        })
+        self.assertNotIn("기차", json.dumps(reported, ensure_ascii=False))
 
     def test_s4_batched_chat_is_code_owned_and_skips_upstream(self):
         capability = self._issue_chat_turn("s4-batch")

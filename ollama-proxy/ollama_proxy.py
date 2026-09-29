@@ -125,6 +125,7 @@ import deterministic_utterance_layer
 import handle_grounding_guard
 from live_broadcast_runtime import LiveBroadcastRuntime, BroadcastControlError
 from show_carryover import carryover_answers
+from word_chain_referee import WordChainReferee, with_referee_lines, word_chain_segment
 
 
 def emit_substantive_content(trace_id: str, request_started: float) -> None:
@@ -408,6 +409,8 @@ affect_continuity_lock = threading.RLock()
 evaluation_runtime: EvaluationStore | NullEvaluationStore = NullEvaluationStore()
 input_screening_runtime = build_input_screening_runtime()
 live_broadcast_runtime = LiveBroadcastRuntime.from_env()
+# Opt-in (AIRI_LIVE_WORD_CHAIN_WORDS): off, and never consulted, without a readable word list.
+word_chain_referee = WordChainReferee.from_env()
 memory_journal_tasks: set[asyncio.Task[None]] = set()
 EVALUATION_REQUEST_MAX_BYTES = 128_000
 TOPIC_BOARD_PATH = os.environ.get("AIRI_TOPIC_BOARD_PATH", "").strip()
@@ -5122,6 +5125,27 @@ def inject_live_broadcast_notes(
         return body, False
 
 
+def live_context_note_for_turn(
+    context_note: str, show_id: str | None, user_text: str, *, proactive_turn: bool,
+) -> str:
+    note = context_note
+    if temperament_enabled():
+        note = with_temperament(note)
+    if candidate_budget() and not proactive_turn:
+        # Opt-in live briefing turns: a viewer question about AIRI's body or offline life gets a canon say line.
+        note = with_canon_say_line(note, user_text)
+    if candidate_budget() and say_line(note):
+        # Opt-in live briefing turns: a do-not-say list primes the generator to say it.
+        note = without_do_not_say(note)
+    if (
+        word_chain_referee.enabled and not proactive_turn
+        and word_chain_segment(context_note) and show_id is not None
+    ):
+        # Opt-in 끝말잇기 referee: the 2.3B model cannot find a valid next word, so staff name it.
+        note = with_referee_lines(note, word_chain_referee.judge(show_id, user_text))
+    return note
+
+
 def inject_response_language(body: bytes, language: str) -> bytes:
     """Repeat an explicit per-request language choice near the model boundary."""
     if not language or len(language) > 32 or not re.fullmatch(r"[가-힣A-Za-z -]+", language):
@@ -7469,6 +7493,7 @@ async def health() -> dict[str, object]:
         "live_briefing_select": live_briefing_select_telemetry.health(),
         "persona_temperament": {"enabled": temperament_enabled()},
         "show_carryover": live_broadcast_runtime.carryover_health(),
+        "word_chain": word_chain_referee.health(),
         "pickup_batch": pickup_batch_telemetry.health(),
         "journal_completion": memory_journal_telemetry.health(),
         # A content-free count only: a rising value means some caller is
@@ -9364,6 +9389,8 @@ async def _broadcast_endpoint(request: Request, *, receipt: bool, trailing: bool
             result = live_broadcast_runtime.observer_receipt(payload, receipt_validator=validate_broadcast_receipt)
         else:
             result = live_broadcast_runtime.master_control(payload)
+            if payload.get('action') == 'close':
+                word_chain_referee.close_show(payload['show_id'])
         return JSONResponse(result)
     except (BroadcastControlError, json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
         # Runtime action paths count their own rejections; parser paths do not.
@@ -9528,15 +9555,10 @@ async def proxy(path: str, request: Request):
         raise
     live_context_note = ""
     if broadcast_notes is not None:
-        context_note = broadcast_notes.context_note
-        if temperament_enabled():
-            context_note = with_temperament(context_note)
-        if candidate_budget() and not proactive_turn:
-            # Opt-in live briefing turns: a viewer question about AIRI's body or offline life gets a canon say line.
-            context_note = with_canon_say_line(context_note, last_user_text)
-        if candidate_budget() and say_line(context_note):
-            # Opt-in live briefing turns: a do-not-say list primes the generator to say it.
-            context_note = without_do_not_say(context_note)
+        context_note = live_context_note_for_turn(
+            broadcast_notes.context_note, live_broadcast_runtime.turn_show_id(broadcast_turn_token),
+            last_user_text, proactive_turn=proactive_turn,
+        )
         body, injected = inject_live_broadcast_notes(
             body,
             broadcast_notes.arc_note,

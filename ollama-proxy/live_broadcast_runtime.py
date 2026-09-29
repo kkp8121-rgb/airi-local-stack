@@ -443,6 +443,14 @@ class LiveBroadcastRuntime:
                 cap.deterministic_context_note if deterministic_layer else cap.context_note,
             )
 
+    def turn_show_id(self, token: object) -> str | None:
+        """The show a claimed or injected turn belongs to, else None."""
+        if not isinstance(token, str):
+            return None
+        with self._lock:
+            cap = self._turn_tokens.get(token)
+            return cap.show_id if cap is not None and cap.state in {'claimed', 'injected'} else None
+
     def confirm_injected(self, token: object) -> bool:
         if not isinstance(token, str):
             return False
