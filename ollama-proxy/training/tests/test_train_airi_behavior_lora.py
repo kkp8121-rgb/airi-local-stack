@@ -591,6 +591,37 @@ class ContractTests(unittest.TestCase):
         with self.assertRaisesRegex(trainer.BehaviorTrainingError, "without truncating"):
             trainer.encode_example(BareTokenizer(), messages, len(full) - 1)
 
+    def test_assistant_end_text_replaces_the_turn_end(self) -> None:
+        # 2026-09-29: persona-v4 ends its turns with a NUL byte (token 191) where the labels had <|eot_id|>;
+        # the base model ends an answer with <|end_of_text|>, which every runtime stops on.
+        class TemplateTokenizer:
+            chat_template = "stub"
+
+            def apply_chat_template(self, messages, tokenize=False, add_generation_prompt=False):
+                text = "".join(f"<{m['role']}>{m['content'].strip()}<|eot_id|>" for m in messages)
+                return text + ("<assistant>" if add_generation_prompt else "")
+
+        messages = [{"role": "user", "content": "질문"}, {"role": "assistant", "content": "답변"}]
+        prompt, full = trainer.render_pair(TemplateTokenizer(), messages)
+        self.assertTrue(full.endswith("<assistant>답변<|eot_id|>"))
+        prompt, full = trainer.render_pair(TemplateTokenizer(), messages, end_text="<|end_of_text|>")
+        self.assertEqual(full, prompt + "답변<|end_of_text|>")
+
+        class BareTokenizer:
+            chat_template = None
+
+        prompt, full = trainer.render_pair(BareTokenizer(), messages, end_text="<|end_of_text|>")
+        self.assertEqual(full, prompt + "답변<|end_of_text|>")
+        # An answer the template does not render verbatim cannot have its turn end replaced.
+        with self.assertRaisesRegex(trainer.BehaviorTrainingError, "verbatim"):
+            trainer.render_pair(TemplateTokenizer(), [{"role": "user", "content": "질문"},
+                                                      {"role": "assistant", "content": " 답변 "}],
+                                end_text="<|end_of_text|>")
+        args = trainer.build_parser().parse_args([
+            "--dataset", "d.jsonl", "--dataset-sha256", "0" * 64, "--model-dir", "m", "--output", "o",
+            "--mode", "cpu-smoke"])
+        self.assertEqual(args.assistant_end_text, "")
+
 
 @unittest.skipUnless(TORCH_STACK, "torch/peft/transformers unavailable on this runner")
 class CpuSmokeTests(unittest.TestCase):

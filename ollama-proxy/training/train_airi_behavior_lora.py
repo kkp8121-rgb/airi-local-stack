@@ -742,8 +742,13 @@ def load_pinned_dataset(dataset_path: Path, expected_sha256: str) -> list[dict[s
     return rows
 
 
-def render_pair(tokenizer: Any, messages: list[dict[str, str]]) -> tuple[str, str]:
-    """Return (prompt_text, full_text); labels later mask the prompt part."""
+def render_pair(tokenizer: Any, messages: list[dict[str, str]], end_text: str = "") -> tuple[str, str]:
+    """Return (prompt_text, full_text); labels later mask the prompt part.
+
+    ``end_text`` replaces the template's turn end after the assistant target. persona-v4 (2026-09-29) ended
+    its turns with a NUL byte where the labels had <|eot_id|>, which it could not learn, while the base
+    model ends an answer with <|end_of_text|>, which every runtime stops on.
+    """
     if getattr(tokenizer, "chat_template", None):
         prompt = tokenizer.apply_chat_template(
             messages[:-1], tokenize=False, add_generation_prompt=True)
@@ -754,11 +759,18 @@ def render_pair(tokenizer: Any, messages: list[dict[str, str]]) -> tuple[str, st
     if not full.startswith(prompt):
         # 템플릿이 접두 관계를 깨면 마스킹 경계를 신뢰할 수 없다.
         raise BehaviorTrainingError("chat template does not render prompt as a prefix of full text")
+    if end_text:
+        answer = messages[-1]["content"]
+        if not full[len(prompt):].startswith(answer):
+            raise BehaviorTrainingError("assistant target is not rendered verbatim; cannot replace its turn end")
+        full = prompt + answer + end_text
     return prompt, full
 
 
-def encode_example(tokenizer: Any, messages: list[dict[str, str]], max_seq_len: int) -> dict[str, list[int]]:
-    prompt, full = render_pair(tokenizer, messages)
+def encode_example(
+    tokenizer: Any, messages: list[dict[str, str]], max_seq_len: int, end_text: str = "",
+) -> dict[str, list[int]]:
+    prompt, full = render_pair(tokenizer, messages, end_text)
     prompt_ids = tokenizer(prompt, add_special_tokens=False)["input_ids"]
     full_ids = tokenizer(full, add_special_tokens=False)["input_ids"]
     if len(full_ids) > max_seq_len:
@@ -924,9 +936,10 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
     pins["initialization"] = {key: value for key, value in initialization.items()
                                if key not in {"path", "files"}}
 
-    encoded = [encode_example(tokenizer, row["messages"], args.max_seq_len) for row in rows]
+    end_text = getattr(args, "assistant_end_text", "")
+    encoded = [encode_example(tokenizer, row["messages"], args.max_seq_len, end_text) for row in rows]
     dev_rows = [row for row in all_rows if row["split"] == "dev"]
-    encoded_dev = [encode_example(tokenizer, row["messages"], args.max_seq_len)
+    encoded_dev = [encode_example(tokenizer, row["messages"], args.max_seq_len, end_text)
                    for row in dev_rows]
     pad_id = tokenizer.pad_token_id
 
@@ -1193,6 +1206,7 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
         "determinism": pins["determinism"],
         "order_strategy": "seeded-scenario-group-then-row-shuffle",
         "order_seed": args.seed,
+        "assistant_end_text": getattr(args, "assistant_end_text", ""),
         "dev_loss_history": dev_loss_history,
         "selected_dev_step": best_state["step"] if best_state is not None else None,
         "selected_dev_epoch": best_state["epoch"] if best_state is not None else None,
@@ -1277,6 +1291,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--init-adapter-artifact-manifest-sha256", default="",
                         help="exact artifact-manifest.json SHA-256")
     parser.set_defaults(init_mode="fresh-lora")
+    parser.add_argument("--assistant-end-text", default="",
+                        help="text that ends the assistant target instead of the template's turn end "
+                             "(e.g. <|end_of_text|>)")
     parser.add_argument("--deterministic-validation", action="store_true",
                         help="fail closed on nondeterministic CUDA operations for equivalence proof")
     for key, value in DEFAULTS.items():
