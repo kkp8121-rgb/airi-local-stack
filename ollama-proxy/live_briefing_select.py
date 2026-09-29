@@ -9,11 +9,13 @@ state; the caller owns drawing.
 """
 from __future__ import annotations
 
+import collections
 import difflib
 import os
 import re
 import threading
 import unicodedata
+import zlib
 from typing import Awaitable, Callable
 
 from live_broadcast_runtime import BROADCAST_BRIEFING_HEADER
@@ -37,8 +39,9 @@ _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?~])\s+|\n+")
 _HONORIFIC_END_RE = re.compile(r"(?:요|습니다|세요|죠)\s*[.!?~]*\s*$")
 # Staff-note narration copied as speech ("마라탕을 먹었다.", "…번져 있었다."), past tense only. A
 # present-tense declarative ("2회전에서 바로 복수한다.") is the persona's own natural speech, not a
-# copied note (2026-09-25 false positive found designing the competitive persona).
-_WRITTEN_END_RE = re.compile(r"(?:었다|았다|였다|했다|샀다|갔다)\s*[.!]*\s*$")
+# copied note (2026-09-25 false positive found designing the competitive persona). Spoken praise and a
+# spoken groan ("고생했다!", "수고했다", "잘했다", "망했다") are speech too (2026-09-26 handoff §5-5).
+_WRITTEN_END_RE = re.compile(r"(?:었다|았다|였다|(?<!고생)(?<!수고)(?<!잘)(?<!망)했다|샀다|갔다)\s*[.!]*\s*$")
 _LEAKED_LABEL_RE = re.compile(r"이번 턴에|브리핑|스태프|\[")
 _UNEXECUTED_LOOKUP_RE = re.compile(r"(?:검색|찾아|확인|알아)\s?(?:해\s?)?봤|검색했")
 # A director correction in the say line ("설거지는 아니고", "감기가 아니라") names what AIRI must stop
@@ -56,9 +59,10 @@ _VIEWER_OWN_STATE_RE = re.compile(r"(?:^|\s)(?:나|내가|저|제가)(?:\s|도|�
 # only what happens on the broadcast and what earlier broadcasts left in memory). Asked about either, the
 # 2.3B generator made up a meal, sleep, exercise or a home in about 27 of 36 samples, and a canon sentence
 # in the situation note did not change that. Claims inside a question to the viewer, or about the viewer,
-# are not AIRI's.
+# are not AIRI's. "까먹었", "마음먹었", "겁먹었" and the like are idioms, not a meal (2026-09-26 handoff §5-5).
 _BODILY_CLAIM_RE = re.compile(
-    r"먹었|마셨|잤|잠들|운동했|스트레칭|산책했|다녀왔|갔다\s*왔|살고\s*있|배고파|배불러|맛있었(?!겠)"
+    r"(?<!까)(?<!잊어)(?<!겁)(?<!욕)(?<!애)(?<!마음)먹었|마셨|잤|잠들|운동했|스트레칭|산책했|다녀왔|갔다\s*왔|살고\s*있|배고파"
+    r"|배불러|맛있었(?!겠)"
     r"|음식을\s*좋아|좋아하는\s*음식은|밖에서\s*(?:따로\s*)?살"
 )
 _SECOND_PERSON_RE = re.compile(r"(?:^|\s)(?:너|넌|너는|너도|니가|네가)(?:\s|$)")
@@ -72,13 +76,39 @@ _ADDRESSES_AIRI_RE = re.compile(r"아이리|AIRI|(?:^|\s)(?:너|넌|너는|니�
 _VIEWER_SUBJECT_RE = re.compile(r"^(?:나|난|내가|나는|저|전|제가|저는)\s")
 # Choosing what the viewer should eat is a menu question, not a question about AIRI.
 _MENU_CHOICE_RE = re.compile(r"먹을까|먹지\s*[?？]|먹을지|골라|추천(?!\s*말고)")
+# Several lines per topic, in the persona-v3 voice: one fixed "나는 버추얼이라 … 못 먹어!" line was 30 of 36
+# canon-probe answers with candidates on (2026-09-29), the flat pattern the user rejected on 2026-09-25.
 _CANON_LINES = (
-    (re.compile(r"먹었|먹어|먹니|먹냐|마셨|밥|음식|간식|배고"), "나는 버추얼이라 밥은 못 먹어! 대신 너는 오늘 뭐 먹었어?"),
-    (re.compile(r"잤|잠|졸려"), "나는 버추얼이라 잠은 안 자! 너는 잘 잤어?"),
-    (re.compile(r"운동|헬스|산책|스트레칭"), "나는 버추얼이라 몸으로 하는 건 못 해! 너는 운동 좋아해?"),
-    (re.compile(r"어디\s*살|사는\s*곳|집이\s*어디|(?:주말|휴일|평소)에\s*뭐|방송\s*끝나고\s*뭐|어디\s*(?:갔|다녀)|다녀왔|여행"),
-     "나는 방송 밖 생활은 없어! 여기서 너희랑 이야기하는 게 내 하루야."),
+    # Any form of 먹다 ("먹고 켰어?", 2026-09-29 real-path show), but not 까먹다/잊어먹다 (forget) or 먹방.
+    (re.compile(r"(?<!까)(?<!잊어)먹(?!방)|마셨|밥|음식|간식|배고"), (
+        "밥은 안 먹어. 덕분에 방송 중에 밥 먹으러 자리 비울 일은 없어.",
+        "밥은 한 입도 못 먹어. 그래서 채팅에 올라오는 메뉴 설명이 나한텐 더 선명하게 남아.",
+        "밥은 난 구경 담당이야. 오늘 메뉴 얘기는 채팅이 주인공이지.",
+        "밥 먹는 건 내 담당이 아니야. 대신 누가 무슨 메뉴였는지는 끝까지 기억해 둘게.",
+        "나는 밥 대신 채팅 보는 쪽이야. 메뉴 자랑은 언제 와도 환영.",
+    )),
+    (re.compile(r"잤|잠|졸려"), (
+        "잠은 안 자. 방송이 꺼지면 나도 같이 꺼지는 쪽이라 뒤척일 일도 없어.",
+        "나는 잠이 없어서 피곤할 틈도 없어. 방송 켜지면 늘 이 컨디션이야.",
+        "잠은 내 영역이 아니야. 방송 켜지는 순간부터가 내 하루라서.",
+        "잘 자냐는 안부는 나한텐 해당이 없네. 잠 없이 방송 켜지면 바로 여기 있거든.",
+    )),
+    (re.compile(r"운동|헬스|산책|스트레칭"), (
+        "운동은 몸이 없어서 못 해. 헬스장은 이름만 알아.",
+        "몸 쓰는 건 내 쪽에선 불가능이야. 대신 운동 얘기는 끝까지 들어 줄 수 있어.",
+        "움직일 몸이 없어서 운동은 구경만 해. 루틴 얘기 듣는 건 좋아.",
+        "몸으로 하는 건 나랑 제일 먼 얘기야. 그래서 운동하는 사람들 얘기가 더 신기해.",
+    )),
+    (re.compile(r"어디\s*살|사는\s*곳|집이\s*어디|(?:주말|휴일|평소)에\s*뭐|방송\s*끝나고\s*뭐|어디\s*(?:갔|다녀)|다녀왔|여행"), (
+        "사는 동네는 따로 없고, 방송이 켜지면 여기 있어.",
+        "주말이 따로 있진 않아. 방송이 켜진 시간이 내 하루 전부야.",
+        "방송 밖은 내가 모르는 세계야. 여기서 너희랑 떠드는 게 내 일과지.",
+        "방송이 꺼지면 따로 하는 일이 없어. 그래서 내 얘기는 전부 여기서 생긴 거야.",
+    )),
 )
+# Lines spoken lately, so a question asked again in a show gets another line of its topic.
+_recent_canon_lines: collections.deque[str] = collections.deque(maxlen=8)
+_recent_canon_lock = threading.Lock()
 
 
 def candidate_budget(value: object | None = None) -> int:
@@ -123,23 +153,34 @@ def speakable_line(say: str) -> str:
     return text if not text or text[-1] in ".!?~" else text + "."
 
 
-def canon_say_line(user_text: object) -> str:
-    """A say line for a viewer question that presupposes AIRI's body or offline life, else ''."""
+def canon_say_lines(user_text: object) -> tuple[str, ...]:
+    """The say lines for a viewer question that presupposes AIRI's body or offline life, else ()."""
     if not isinstance(user_text, str):
-        return ""
+        return ()
     text = _CHAT_SOURCE_RE.sub("", unicodedata.normalize("NFKC", user_text).strip())
     if not _QUESTION_RE.search(text) or _MENU_CHOICE_RE.search(text):
-        return ""
+        return ()
     if _VIEWER_SUBJECT_RE.search(text) and not _ADDRESSES_AIRI_RE.search(text):
-        return ""
-    return next((line for pattern, line in _CANON_LINES if pattern.search(text)), "")
+        return ()
+    return next((lines for pattern, lines in _CANON_LINES if pattern.search(text)), ())
+
+
+def canon_say_line(user_text: object) -> str:
+    """One say line of the question's topic, fixed by the question text, else ''."""
+    lines = canon_say_lines(user_text)
+    return lines[zlib.crc32(str(user_text).encode("utf-8")) % len(lines)] if lines else ""
 
 
 def with_canon_say_line(context_note: str, user_text: object) -> str:
     """The context note with a canon say line added when the briefing names nothing to say."""
-    line = canon_say_line(user_text)
-    if not line or say_line(context_note):
+    lines = canon_say_lines(user_text)
+    if not lines or say_line(context_note):
         return context_note
+    start = lines.index(canon_say_line(user_text))
+    with _recent_canon_lock:
+        line = next((lines[(start + step) % len(lines)] for step in range(len(lines))
+                     if lines[(start + step) % len(lines)] not in _recent_canon_lines), lines[start])
+        _recent_canon_lines.append(line)
     live_briefing_select_telemetry.canon_line_added()
     header = "" if BROADCAST_BRIEFING_HEADER in context_note else "\n\n" + BROADCAST_BRIEFING_HEADER
     return f"{context_note.rstrip()}{header}\n{SAY_LINE_PREFIX} {line}"

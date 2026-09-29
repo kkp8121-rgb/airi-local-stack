@@ -5819,8 +5819,10 @@ SERIOUS_CONTEXT_RE = re.compile(
     r"abuse|suicide|self[- ]?harm|died|death|emergency|danger)",
     re.IGNORECASE,
 )
+# Euphemisms count too: a pet "crossed the rainbow bridge" got a cold one-liner on 2026-09-29.
 BEREAVEMENT_CONTEXT_RE = re.compile(
-    r"(?:돌아가셨|돌아가신|사망|장례|세상을\s*떠|죽었|died|death|funeral)",
+    r"(?:돌아가셨|돌아가신|사망|장례|세상을\s*떠|죽었|died|death|funeral"
+    r"|무지개\s*다리를?\s*건[넜너]|하늘나라\s*(?:로|에)?\s*(?:갔|간|떠났|보냈)|별이\s*(?:됐|되었)|숨을\s*거[두뒀])",
     re.IGNORECASE,
 )
 URGENT_SAFETY_CONTEXT_RE = re.compile(

@@ -3,6 +3,7 @@ import os
 import unittest
 from unittest import mock
 
+import live_briefing_select
 from live_briefing_select import (
     DEFAULT_COVERAGE,
     MAX_CANDIDATES,
@@ -13,10 +14,12 @@ from live_briefing_select import (
     candidate_is_unfit,
     candidate_score,
     canon_say_line,
+    canon_say_lines,
     coverage_threshold,
     say_line,
     select_candidate,
     speakable_line,
+    with_canon_say_line,
     without_do_not_say,
 )
 
@@ -108,21 +111,40 @@ class LiveBriefingSelectTests(unittest.TestCase):
             ("[YouTube] 그럼 오늘 점심은 뭐 먹었어?", "밥"),
             ("[YouTube] 아니 ㅋㅋ 추천 말고 아이리가 뭐 먹었냐고", "밥"),
             ("[YouTube] 아이리 좋아하는 음식 뭐야?", "밥"),
+            # 2026-09-29 real-path show T02: "먹고 켰어?" matched no meal word and got "저녁은 먹었지!".
+            ("[YouTube] 아이리 저녁은 먹고 켰어?", "밥"),
+            ("[YouTube] 아이리 밥 먹음?", "밥"),
             ("[YouTube] 아이리 어제 잘 잤어?", "잠"),
             ("[YouTube] 아이리 운동 좋아해?", "몸"),
-            ("[YouTube] 아이리 어디 살아?", "방송 밖"),
-            ("[YouTube] 아이리는 주말에 뭐 했어?", "방송 밖"),
+            ("[YouTube] 아이리 어디 살아?", "방송"),
+            ("[YouTube] 아이리는 주말에 뭐 했어?", "방송"),
         ):
             with self.subTest(chat=chat):
-                line = canon_say_line(chat)
-                self.assertIn(word, line)
-                self.assertFalse(candidate_is_unfit(line, line))
+                self.assertIn(canon_say_line(chat), canon_say_lines(chat))
+                self.assertGreaterEqual(len(canon_say_lines(chat)), 4)
+                for line in canon_say_lines(chat):
+                    self.assertIn(word, line)
+                    self.assertFalse(candidate_is_unfit(line, line))
+                    # 2026-09-25 user: "그냥 단순 버추얼이고 기계라 밥을 못먹는다가 이어지고 있어".
+                    self.assertNotIn("버추얼이라", line)
+                    self.assertFalse(line.endswith(("?", "？")))
         for chat in (
             "[YouTube] 나 오늘 점심 김치찌개 먹었어", "[YouTube] 점심 뭐 먹을까?", "[YouTube] 밥 먹고 올게",
             "[YouTube] 첫방 ㅊㅋ", "[YouTube] 다음 방송은 언제 해?", "",
+            "[YouTube] 아이리 규칙 까먹었어?",
         ):
             with self.subTest(chat=chat):
                 self.assertEqual(canon_say_line(chat), "")
+
+    def test_a_repeated_canon_question_does_not_get_the_same_line_again(self) -> None:
+        # 2026-09-29 canon probe with candidates on: 30 of 36 answers were the same fixed line.
+        live_briefing_select._recent_canon_lines.clear()
+        chat = "[YouTube] 아이리 밥은 먹고 방송 켠 거임?"
+        spoken = [say_line(with_canon_say_line(CONTEXT_NOTE.split("\n\n")[0], chat)) for _ in range(4)]
+        self.assertEqual(len(set(spoken)), 4)
+        self.assertTrue(set(spoken) <= set(canon_say_lines(chat)))
+        # A briefing that already names a line keeps it and uses up nothing.
+        self.assertEqual(with_canon_say_line(CONTEXT_NOTE, chat), CONTEXT_NOTE)
 
     def test_unfit_when_airi_claims_a_body_or_an_offline_life(self) -> None:
         # Answers the 2.3B generator gave on 2026-09-24 (series-01 broadcast 1 and its probes).
@@ -148,6 +170,17 @@ class LiveBriefingSelectTests(unittest.TestCase):
             with self.subTest(claim=claim):
                 self.assertTrue(candidate_is_unfit(claim, ""))
 
+    def test_an_idiom_with_meogeot_is_not_a_meal(self) -> None:
+        # 2026-09-26 handoff §5-5: "까먹었으면" (if you forgot) tripped the bodily rule's "먹었".
+        for line in (
+            "혹시 까먹었으면 내가 다시 말해 줄게.", "앗, 그거 완전 까먹었어!", "규칙을 잊어먹었네.",
+            "그 말 듣고 좀 겁먹었어.", "오늘은 꼭 이기기로 마음먹었어!", "그 문제 푸느라 애먹었어.",
+            "나 그 판정 때문에 욕먹었어!",
+        ):
+            with self.subTest(line=line):
+                self.assertFalse(candidate_is_unfit(line, ""))
+        self.assertTrue(candidate_is_unfit("나 아까 까먹고 간식 먹었어!", ""))
+
     def test_written_end_only_rejects_past_tense_narration(self) -> None:
         # Spoken present-tense declaratives are AIRI's natural persona speech, not copied staff notes
         # (2026-09-25 false positive found designing the competitive persona).
@@ -155,6 +188,11 @@ class LiveBriefingSelectTests(unittest.TestCase):
         self.assertFalse(candidate_is_unfit("한 개파 반박 듣고 판결한다.", SAY))
         # Past-tense staff-note narration stays unfit, also without a bodily word.
         self.assertTrue(candidate_is_unfit("통증이 왼쪽 귀까지 번져 있었다.", SAY))
+        # Spoken praise and a spoken groan end in 했다 too (2026-09-26 handoff §5-5: "고생했다").
+        for line in ("오늘 진짜 고생했다!", "다들 수고했다.", "와, 그 설명 잘했다!", "아 이번 판은 망했다!"):
+            with self.subTest(line=line):
+                self.assertFalse(candidate_is_unfit(line, SAY))
+        self.assertTrue(candidate_is_unfit("방송 전에 설거지를 했다.", SAY))
 
     def test_pick_prefers_fit_then_coverage_and_keeps_draw_order_on_ties(self) -> None:
         scores = [(False, 0.9), (True, 0.2), (True, 0.4), (True, 0.4)]

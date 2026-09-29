@@ -28,6 +28,7 @@ from live_broadcast_runtime import (
     LiveBroadcastRuntime,
     render_broadcast_context,
 )
+import live_briefing_select
 from show_carryover import CARRYOVER_FILE_NAME, ShowCarryoverStore, memo_items
 
 
@@ -1524,6 +1525,21 @@ class MemoryAbsenceGuardTests(unittest.TestCase):
         self.assertNotIn("해결", loss_output)
         self.assertEqual(ollama_proxy.serious_pre_stream_dialogue(urgent[0]["content"]), urgent_output)
         self.assertEqual(ollama_proxy.serious_pre_stream_dialogue(loss[0]["content"]), loss_output)
+
+    def test_a_pet_passing_away_is_a_loss_too(self) -> None:
+        # 2026-09-29 series-01 ep02 (persona-v3-r1) T11: the pet-death euphemism got a cold
+        # "오늘은 좀 무거워 보인다." because no loss word matched.
+        for text in (
+            "[YouTube] 나는 오늘 좀 우울함.. 키우던 햄스터가 아침에 무지개다리 건넜어",
+            "강아지가 어제 무지개 다리를 건넜어요", "우리 고양이 하늘나라 갔어 ㅠ",
+            "15년 같이 산 강아지가 별이 됐어", "할머니가 오늘 새벽에 숨을 거두셨어",
+        ):
+            with self.subTest(text=text):
+                self.assertIn("사별", ollama_proxy.response_mode_note(text))
+                self.assertIn("곁", ollama_proxy.serious_pre_stream_dialogue(text))
+        for text in ("무지개 떴다 다리 위에서 봄 ㅋㅋ", "하늘 나라 이름 같다", "별이 되고 싶다 아이돌 별"):
+            with self.subTest(text=text):
+                self.assertEqual(ollama_proxy.serious_pre_stream_dialogue(text), "")
 
     def test_echoing_a_story_word_is_not_an_emergency_but_own_distress_still_is(self) -> None:
         story = "오늘은 어제 있었던 사고 얘기부터 할게, 진짜 웃겨!"
@@ -8437,8 +8453,9 @@ class LiveBroadcastRouteTests(unittest.TestCase):
     def test_live_briefing_answers_a_question_about_airis_body_with_the_canon_line(self):
         # 2026-09-24 series-01 broadcast 1: "아이리가 뭐 먹었냐고" -> "오늘 점심에는 김치찌개 먹었어."
         drafts = ["오늘 점심에는 김치찌개 먹었어.", "오늘 점심은 아직 안 먹었어."]
-        canon = "나는 버추얼이라 밥은 못 먹어! 대신 너는 오늘 뭐 먹었어?"
         user = "[YouTube] 아니 ㅋㅋ 추천 말고 아이리가 뭐 먹었냐고"
+        pool = live_briefing_select.canon_say_lines(user)
+        live_briefing_select._recent_canon_lines.clear()
         for path, stream in (("/v1/chat/completions", True), ("/api/chat", True), ("/api/chat", False)):
             with self.subTest(path=path, stream=stream):
                 chat, dialogue = self._live_briefing_chat(
@@ -8447,15 +8464,17 @@ class LiveBroadcastRouteTests(unittest.TestCase):
                     briefing="", user=user,
                 )
                 self.assertEqual(len(chat.requests), 2)
-                self.assertEqual(dialogue, canon)
-                self.assertIn(canon, json.dumps(chat.requests[0], ensure_ascii=False))
+                # The spoken fallback is one of the topic's lines, the one this turn's briefing named.
+                self.assertIn(dialogue, pool)
+                self.assertIn(dialogue, json.dumps(chat.requests[0], ensure_ascii=False))
         chat, dialogue = self._live_briefing_chat(
             "brief-canon-off", drafts, True, {"AIRI_LIVE_BRIEFING_CANDIDATES": ""},
             path="/v1/chat/completions", briefing="", user=user,
             patches=((ollama_proxy, "needs_grounding_retry", lambda *a, **k: False),),
         )
         self.assertEqual(len(chat.requests), 1)
-        self.assertNotIn(canon, json.dumps(chat.requests[0], ensure_ascii=False))
+        for line in pool:
+            self.assertNotIn(line, json.dumps(chat.requests[0], ensure_ascii=False))
         self.assertEqual(dialogue, "오늘 점심에는 김치찌개 먹었어.")
 
     def test_live_briefing_drops_the_do_not_say_line_only_when_on(self):
