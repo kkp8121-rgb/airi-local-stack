@@ -6,6 +6,7 @@ import zlib
 from pathlib import Path
 from unittest import mock
 
+from live_briefing_select import accepted_word
 from live_broadcast_runtime import BROADCAST_BRIEFING_HEADER, DONATION_CONTINUATION_CONTRACT
 from word_chain_referee import (
     MAX_SHOWS,
@@ -14,7 +15,9 @@ from word_chain_referee import (
     chain_starts,
     load_words,
     parse_move,
+    referee_say_line,
     ro_particle,
+    verdict_asked,
     with_referee_lines,
     word_chain_segment,
 )
@@ -119,6 +122,39 @@ class MoveParsingTests(unittest.TestCase):
         ):
             with self.subTest(chat=chat):
                 self.assertEqual(parse_move(chat, "", self.NOUNS), expected)
+
+
+class RefereeSayLineTests(unittest.TestCase):
+    def test_airi_word_becomes_a_line_she_can_say(self) -> None:
+        accepted = "- 심판 판정: 기차 유효, AIRI 차례"
+        for word, expected in (("차표", "차표로 받을게."), ("기억", "기억으로 받을게."), ("연필", "연필로 받을게.")):
+            with self.subTest(word=word):
+                self.assertEqual(referee_say_line((accepted, f"- AIRI 낼 단어: {word}")), expected)
+        for lines in ((), (accepted, "- 심판 판정: 차로 이을 단어 없음, AIRI 패"),
+                      ("- 심판 판정: 사과 무효(끝 글자와 안 이어짐), 다시",)):
+            with self.subTest(lines=lines):
+                self.assertEqual(referee_say_line(lines), "")
+
+    def test_a_viewer_who_asks_for_a_ruling_hears_it(self) -> None:
+        # 2026-09-29 ep07 T15: "션샤인 이거 되냐? 판정 ㄱ" was answered "인물로 받을게." with no ruling.
+        lines = ("- 심판 판정: 기차 유효, AIRI 차례", "- AIRI 낼 단어: 차표")
+        self.assertEqual(referee_say_line(lines, asked=True), "기차 인정! 차표로 받을게.")
+        self.assertEqual(referee_say_line(lines), "차표로 받을게.")
+        self.assertEqual(referee_say_line(("- 심판 판정: 사과 무효(끝 글자와 안 이어짐), 다시",), asked=True), "")
+        for chat in ("[YouTube] 션샤인 이거 되냐? 판정 ㄱ", "[YouTube] 람보르기니 되나?", "[YouTube] 기차 돼?",
+                     "[YouTube] 이거 인정?", "[YouTube] 기차 되는 거 맞지?"):
+            with self.subTest(chat=chat):
+                self.assertTrue(verdict_asked(chat))
+        for chat in ("[YouTube] 기차", "[YouTube] 리본은 저번에 나왔으니까 ㅋㅋ 리모컨", "[YouTube] 되게 어렵다", None):
+            with self.subTest(chat=chat):
+                self.assertFalse(verdict_asked(chat))
+        # "판정" asks for a ruling; it is never the move, even at a round's start.
+        self.assertEqual(parse_move("[YouTube] 기차 되냐? 판정 ㄱ", "", {"기차", "판정"}), "기차")
+
+    def test_the_selector_reads_the_word_the_referee_accepted(self) -> None:
+        referee = WordChainReferee({"기차": 1, "차표": 2})
+        self.assertEqual(accepted_word("\n".join(referee.judge("s", "[YouTube] 기차"))), "기차")
+        self.assertEqual(accepted_word("\n".join(referee.judge("s", "[YouTube] 기차"))), "")
 
 
 class BriefingPlacementTests(unittest.TestCase):

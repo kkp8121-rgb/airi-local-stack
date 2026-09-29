@@ -222,6 +222,20 @@ class TagContextTests(unittest.TestCase):
                 self.assertEqual(self.control({"action": "clear_tag_context", "show_id": "show-on"}).json(), {})
                 self.assertEqual(self.tag_raw(path=path, stream=stream), baseline)
 
+    def test_a_tag_turn_drops_caller_system_messages_like_an_issued_turn(self):
+        # The persona model is trained on issued-turn prompts, where the runtime is the only source of
+        # system context; AIRI desktop's own system messages would make real-show prompts differ.
+        desktop = {"role": "system", "content": "DESKTOP CARD: 너는 데스크톱 캐릭터야."}
+        self.start("show-sys")
+        self.set_context("show-sys")
+        tagged = self.tag_raw([desktop, {"role": "user", "content": TAGGED}]).decode("utf-8")
+        self.assertNotIn("DESKTOP CARD", tagged)
+        self.assertEqual(_contexts(tagged.encode("utf-8")), [render_broadcast_context(CONTEXT)])
+        untagged = self.tag_raw([desktop, {"role": "user", "content": "오늘 뭐 해?"}]).decode("utf-8")
+        self.assertIn("DESKTOP CARD", untagged)
+        self._use_runtime(tag_context=False)
+        self.assertIn("DESKTOP CARD", self.tag_raw([desktop, {"role": "user", "content": TAGGED}]).decode("utf-8"))
+
     def test_a_tagged_viewer_turn_gets_the_operator_context_on_both_endpoints(self):
         self.start("show-a")
         self.set_context("show-a")

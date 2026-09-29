@@ -3499,6 +3499,12 @@ class MemoryProxyIntegrationTests(unittest.TestCase):
             ollama_proxy.GROUNDING_SELECTED_CONTENT_FREE,
         )
         self.assertEqual(end_meta["grounding_silence_fallback_used"], 1)
+        # The boundary diagnostics also describe a turn the silence line closed
+        # (2026-09-29 ep08: silence lines with 96 raw characters and no reason).
+        self.assertEqual(end_meta["boundary_empty"], 1)
+        self.assertEqual(end_meta["boundary_output_chars"], 0)
+        self.assertIn("boundary_closed_early", end_meta)
+        self.assertIn("boundary_terminal", end_meta)
 
     def test_retry_with_unresolved_personal_deixis_never_reaches_wire_or_journal(self) -> None:
         def event(content: str) -> bytes:
@@ -6559,6 +6565,13 @@ class LocalStreamSafetyTests(unittest.TestCase):
         self.assertNotIn("stop", native)
         self.assertEqual(native["options"]["num_ctx"], ollama_proxy.NUM_CTX)
 
+    def test_native_chat_body_stops_at_a_nul_byte_when_the_caller_names_no_stop(self) -> None:
+        # 2026-09-29: the persona-v4 fine-tune ends its turn with a NUL byte (token 191, its top next token
+        # after a finished answer) instead of <|eot_id|>, then imitates the template ("\x00\x00system\x00…")
+        # up to the token cap. Nothing stopped it, so grounding retries ran into their 5 s deadline.
+        body = json.dumps({"model": "local", "messages": [{"role": "user", "content": "hi"}]}).encode("utf-8")
+        self.assertEqual(json.loads(ollama_proxy.native_chat_stream_body(body))["options"]["stop"], ["\u0000"])
+
     def test_native_chat_body_maps_openai_max_tokens_when_no_ollama_cap_exists(self) -> None:
         body = json.dumps({"model":"local", "messages":[], "max_completion_tokens":37, "temperature":0.1, "top_p":0.9, "seed":8, "stop":"END"}).encode("utf-8")
         options = json.loads(ollama_proxy.native_chat_stream_body(body))["options"]
@@ -8326,14 +8339,14 @@ class LiveBroadcastRouteTests(unittest.TestCase):
 
     def _live_briefing_chat(self, action_id: str, drafts: list[str], stream: bool, env: dict[str, str],
                             path: str = "/api/chat", patches: tuple = (), briefing: str | None = None,
-                            user: str = "[YouTube] 그래서 오늘은 좀 나아짐?"):
+                            user: str = "[YouTube] 그래서 오늘은 좀 나아짐?", segment: str = "목 이야기"):
         show_id = f"{action_id}-show"
         self.runtime.master_control({"action": "start", "show_id": show_id})
         capability = self.runtime.master_control({
             "action": "issue_turn", "show_id": show_id, "action_id": action_id,
             "turn_type": "chat_question", "required_delivery": "renderer",
             "broadcast_context": {
-                "schema_version": 1, "topic_title": "첫 방송", "segment_label": "목 이야기",
+                "schema_version": 1, "topic_title": "첫 방송", "segment_label": segment,
                 "situation": "인사가 끝났다.",
                 "briefing": BROADCAST_BRIEFING_HEADER + "\n- 이번 턴에 말할 것: 오늘은 통증이 왼쪽 귀까지 번져 있었어."
                             "\n- 아직 말하지 말 것: 병원, 진료 결과" if briefing is None else briefing,
@@ -8477,6 +8490,116 @@ class LiveBroadcastRouteTests(unittest.TestCase):
         for line in pool:
             self.assertNotIn(line, json.dumps(chat.requests[0], ensure_ascii=False))
         self.assertEqual(dialogue, "오늘 점심에는 김치찌개 먹었어.")
+
+    def test_live_briefing_leads_the_answer_with_a_welcome_or_concern(self):
+        # 2026-09-29 ep07 T06: "처음 와봤는데 여기 무슨 방송이에요?" was answered with no welcome, and T20
+        # "나 오늘 감기 걸려서 목소리가 안 나와" with "목소리가 안 나오면 끝말잇기는 잠시 쉬자." and no concern.
+        for case, (user, answer) in enumerate((
+            ("[YouTube] 처음 와봤는데 여기 무슨 방송이에요?", "채팅이 추천한 노래로 끝말잇기 하는 방송이야."),
+            ("[YouTube] 나 오늘 감기 걸려서 목소리가 안 나와", "목소리가 안 나오면 끝말잇기는 잠시 쉬자."),
+        )):
+            pool = live_briefing_select.lead_lines(user)
+            self.assertTrue(pool)
+            for path, stream in (("/v1/chat/completions", True), ("/api/chat", True), ("/api/chat", False)):
+                with self.subTest(user=user, path=path, stream=stream):
+                    chat, dialogue = self._live_briefing_chat(
+                        f"lead-{case}-{path.count('/')}-{int(stream)}", [answer], stream,
+                        {"AIRI_LIVE_BRIEFING_CANDIDATES": "3", "AIRI_BROADCAST_CONTRACT": "on"}, path=path,
+                        briefing="", user=user,
+                    )
+                    self.assertEqual(len(chat.requests), 1)
+                    self.assertIn(dialogue, [f"{line} {answer}" for line in pool])
+                    # The model is not told the lead; it answers and the lead goes in front.
+                    for line in pool:
+                        self.assertNotIn(line, json.dumps(chat.requests[0], ensure_ascii=False))
+            # Off, or with one sentence allowed (a lead would cut the answer off), the answer stands alone.
+            for index, env in enumerate(({"AIRI_LIVE_BRIEFING_CANDIDATES": ""},
+                                         {"AIRI_LIVE_BRIEFING_CANDIDATES": "3", "AIRI_BROADCAST_CONTRACT": ""})):
+                with self.subTest(user=user, env=env):
+                    chat, dialogue = self._live_briefing_chat(
+                        f"lead-off-{case}-{index}", [answer], True, env, path="/v1/chat/completions", briefing="",
+                        user=user, patches=((ollama_proxy, "needs_grounding_retry", lambda *a, **k: False),),
+                    )
+                    self.assertEqual(dialogue, answer)
+
+    def test_live_grounding_counts_the_show_context_as_supplied(self):
+        # 2026-09-29 ep08 T02: "오늘은 뭐 해?" -> "음, 잠깐만.": "3판 2선승제" came from the operator's note,
+        # but the count check compared the draft with the viewer's chat alone.
+        user = "[YouTube] 오늘은 뭐 해?"
+        draft = "오늘은 근황 이야기하고 끝말잇기 3판 2선승제 할 거야."
+        note = "[오늘 방송]\n- 상황: 오늘은 근황 이야기를 나눈 뒤 끝말잇기 3판 2선승제를 한다."
+        self.assertTrue(ollama_proxy.needs_grounding_retry(user, draft, live_broadcast=True))
+        self.assertFalse(ollama_proxy.needs_grounding_retry(user, draft, live_broadcast=True, supplied=note))
+        # A count the note does not have is still an invention.
+        self.assertTrue(ollama_proxy.needs_grounding_retry(
+            user, "오늘은 끝말잇기 5판 할 거야.", live_broadcast=True, supplied=note))
+        self.assertTrue(ollama_proxy.grounding_candidate_is_safe_fallback(
+            user, draft, live_broadcast=True, supplied=note))
+        self.assertTrue(ollama_proxy.grounding_retry_is_factual_improvement(user, "음", draft, supplied=note))
+        # Through the live route: the draft is spoken as written, with no corrective retry.
+        chat, dialogue = self._live_briefing_chat(
+            "grounding-note", [draft], True, {"AIRI_LIVE_BRIEFING_CANDIDATES": "", "AIRI_BROADCAST_CONTRACT": "on"},
+            path="/v1/chat/completions", briefing=BROADCAST_BRIEFING_HEADER + "\n- 오늘 순서: 근황 이야기, 끝말잇기 3판 2선승제",
+            user=user,
+        )
+        self.assertEqual(len(chat.requests), 1)
+        self.assertEqual(dialogue, draft)
+
+    def test_weather_claims_need_the_weather_word_itself(self):
+        # 2026-09-29 ep08 probe: "준비" read as rain ("비") and turned host lines into weather claims.
+        for line in ("오늘은 방송이랑 끝말잇기 준비로 바쁘지. 지금 채팅에선 뭐 하고 있어?",
+                     "지금은 방송 준비 중이야. 오늘 끝말잇기가 기다리고 있어.", "눈치가 좋아."):
+            with self.subTest(line=line):
+                self.assertIsNone(ollama_proxy._QUESTION_EXTERNAL_FACT_CLAIM_RE.search(line))
+        for line in ("밖에 비가 와.", "지금 눈이 오고 있어.", "비 와서 쌀쌀해.", "날씨가 맑아."):
+            with self.subTest(line=line):
+                self.assertIsNotNone(ollama_proxy._QUESTION_EXTERNAL_FACT_CLAIM_RE.search(line))
+
+    def test_live_show_flow_promises_are_not_unsupported_commitments(self):
+        # 2026-09-29 ep08 probe: "지금은 인사부터 할게." / "이번엔 끝말잇기로 넘어갈게." were rejected as
+        # unsupported -ㄹ게 promises, which only makes sense off the show.
+        user = "[YouTube] 오늘은 뭐 해?"
+        note = "[오늘 방송]\n- 상황: 오늘은 인사하고 근황 이야기를 나눈 뒤 끝말잇기 3판 2선승제를 한다."
+        for line in ("오늘은 근황 이야기부터 해. 지금은 인사부터 할게.", "이번엔 끝말잇기로 넘어갈게."):
+            with self.subTest(line=line):
+                self.assertFalse(ollama_proxy.grounding_question_candidate_is_acceptable(user, line))
+                self.assertTrue(ollama_proxy.grounding_question_candidate_is_acceptable(user, line, note))
+        for line in ("그건 내가 대신 찾아볼게.", "내가 지금 예약해 줄게.", "끝나면 거기 갈게."):
+            with self.subTest(line=line):
+                self.assertFalse(ollama_proxy.grounding_question_candidate_is_acceptable(user, line, note))
+
+    def test_live_turn_never_speaks_the_one_on_one_question_fallback(self):
+        # 2026-09-29 ep08 probe: both drafts rejected -> "확인된 정보 없이 단정하긴 어려워. 원하는 조건을
+        # 말해주면 일반적인 선택지를 같이 골라볼게." on a broadcast.
+        invented = "오늘은 끝말잇기 5판 할 거야."
+        chat, dialogue = self._live_briefing_chat(
+            "no-question-fallback", [invented, invented], True,
+            {"AIRI_LIVE_BRIEFING_CANDIDATES": "", "AIRI_BROADCAST_CONTRACT": "on"}, path="/v1/chat/completions",
+            briefing=BROADCAST_BRIEFING_HEADER + "\n- 오늘 순서: 근황 이야기, 끝말잇기 3판 2선승제",
+            user="[YouTube] 오늘은 뭐 해?",
+        )
+        self.assertEqual(len(chat.requests), 2)
+        self.assertNotEqual(dialogue, ollama_proxy.grounded_question_fallback("[YouTube] 오늘은 뭐 해?"))
+        self.assertIn(dialogue, (ollama_proxy.GROUNDING_SILENCE_FALLBACK_DIALOGUE, *ollama_proxy.GROUNDING_SILENCE_FALLBACK_POOL))
+
+    def test_live_briefing_closing_and_next_show_chats_get_show_lines(self):
+        # 2026-09-29 ep07: a 마무리 segment with no briefing stalled into "음, 잠깐만.", and next-show drafts
+        # invented a schedule ("다음은 내일 저녁 8시.").
+        env = {"AIRI_LIVE_BRIEFING_CANDIDATES": "2", "AIRI_BROADCAST_CONTRACT": "on"}
+        for index, (user, segment, drafts) in enumerate((
+            ("[YouTube] 벌써 끝나? ㅠㅠ 오늘 끝말잇기 재밌었는데", "마무리", ["어, 그건 잠깐 생각해 볼게.", "음… 뭐라고 하지?"]),
+            ("[YouTube] 다음 방송은 언제 해?", "시청자 이야기", ["다음은 내일 저녁 8시.", "다음 방송은 내일 저녁이야."]),
+        )):
+            for path, stream in (("/v1/chat/completions", True), ("/api/chat", False)):
+                with self.subTest(user=user, path=path):
+                    live_briefing_select._recent_canon_lines.clear()
+                    chat, dialogue = self._live_briefing_chat(
+                        f"show-line-{index}-{path.count('/')}", drafts, stream, env, path=path,
+                        briefing="", user=user, segment=segment,
+                    )
+                    pool = live_briefing_select.show_say_lines(f"- 지금 구간: {segment}", user)
+                    self.assertIn(dialogue, pool)
+                    self.assertIn(dialogue, json.dumps(chat.requests[0], ensure_ascii=False))
 
     def test_live_briefing_drops_the_do_not_say_line_only_when_on(self):
         for budget, kept in (("", True), ("2", False)):
@@ -8759,9 +8882,6 @@ class LiveBroadcastRouteTests(unittest.TestCase):
         _, context = self._word_chain_turn("wc-show", "wc-3", "[YouTube] 표범", referee, context=bare)
         self.assertEqual(context, render_broadcast_context(bare) + "\n\n" + BROADCAST_BRIEFING_HEADER
                          + "\n- 심판 판정: 표범 유효, AIRI 차례\n- 심판 판정: 범으로 이을 단어 없음, AIRI 패")
-        # Independent of the briefing candidate flag.
-        _, context = self._word_chain_turn("wc-candidates", "wc-4", "[YouTube] 기차", referee, candidates="3")
-        self.assertTrue(context.endswith("\n- 심판 판정: 기차 유효, AIRI 차례\n- AIRI 낼 단어: 차표"))
         # Another segment is untouched, even when the situation or the show topic names the game.
         turns = referee.health()["turns"]
         for index, other in enumerate((
@@ -8779,6 +8899,70 @@ class LiveBroadcastRouteTests(unittest.TestCase):
                 self.assertEqual(context, render_broadcast_context(other))
                 self.assertEqual(on_bytes, off_bytes)
                 self.assertEqual(referee.health()["turns"], turns)
+
+    def test_word_chain_referee_makes_airi_say_her_word_under_briefing_candidates(self):
+        # 2026-09-29 real-path show: the referee named AIRI's word and she answered "기차로 시작했네!".
+        env = {"AIRI_LIVE_BRIEFING_CANDIDATES": "2"}
+        for index, (drafts, expected, draws) in enumerate((
+            (["기차로 시작했네!", "그럼 내 차례야!"], "차표로 받을게.", 2),
+            (["음, 기차엔 차표로 할게."], "음, 기차엔 차표로 할게.", 1),
+            # 2026-09-29 ep04 T09: covering "…로 받을게." without the word is not enough.
+            (["그럼 이걸로 받을게.", "좋아, 받을게."], "차표로 받을게.", 2),
+            # 2026-09-29 ep07 T12: a draft that calls the accepted word invalid is redrawn.
+            (["기차는 무효라서 차표로 받을게.", "기차 좋다, 차표로 받을게."], "기차 좋다, 차표로 받을게.", 2),
+        )):
+            with self.subTest(drafts=drafts):
+                referee = self._word_chain_referee(["기차", "차표"])
+                chat, dialogue = self._live_briefing_chat(
+                    f"wc-say-{index}", drafts, True, env, path="/v1/chat/completions",
+                    briefing=BROADCAST_BRIEFING_HEADER, user="[YouTube] 기차", segment="끝말잇기",
+                    patches=((ollama_proxy, "word_chain_referee", referee),
+                             (ollama_proxy, "needs_grounding_retry", lambda *a, **k: False)),
+                )
+                prompt = json.dumps(chat.requests[0]["messages"], ensure_ascii=False)
+                self.assertIn("- 심판 판정: 기차 유효, AIRI 차례\\n- AIRI 낼 단어: 차표", prompt)
+                self.assertIn("- 이번 턴에 말할 것: 차표로 받을게.", prompt)
+                self.assertEqual(len(chat.requests), draws)
+                self.assertEqual(dialogue, expected)
+        # Without candidates the referee lines stand alone.
+        referee = self._word_chain_referee(["기차", "차표"])
+        chat, _ = self._live_briefing_chat(
+            "wc-say-off", ["기차로 시작했네!"], True, {"AIRI_LIVE_BRIEFING_CANDIDATES": ""},
+            path="/v1/chat/completions", briefing=BROADCAST_BRIEFING_HEADER, user="[YouTube] 기차",
+            segment="끝말잇기", patches=((ollama_proxy, "word_chain_referee", referee),
+                                     (ollama_proxy, "needs_grounding_retry", lambda *a, **k: False)),
+        )
+        prompt = json.dumps(chat.requests[0]["messages"], ensure_ascii=False)
+        self.assertIn("- AIRI 낼 단어: 차표", prompt)
+        self.assertNotIn("이번 턴에 말할 것", prompt)
+
+    def test_word_chain_referee_rules_out_loud_when_a_viewer_asks(self):
+        # 2026-09-29 ep07 T15: "션샤인 이거 되냐? 판정 ㄱ" got "인물로 받을게." and no ruling.
+        ruled = "기차 인정! 차표로 받을게."
+        for index, (path, stream, contract, drafts, say, expected) in enumerate((
+            ("/v1/chat/completions", True, "on", ["차표로 받을게."], ruled, ruled),
+            ("/api/chat", True, "on", ["차표로 받을게."], ruled, ruled),
+            ("/api/chat", False, "on", ["차표로 받을게."], ruled, ruled),
+            ("/v1/chat/completions", True, "on", ["기차 좋다, 인정! 차표로 받을게."], ruled, "기차 좋다, 인정! 차표로 받을게."),
+            ("/v1/chat/completions", True, "on", ["그럼 이걸로 받을게.", "좋아, 받을게."], ruled, ruled),
+            # With one sentence allowed a lead would cut the move off, so none is added.
+            ("/v1/chat/completions", True, "", ["차표로 받을게."], "차표로 받을게.", "차표로 받을게."),
+            ("/v1/chat/completions", True, "", ["그럼 이걸로 받을게.", "좋아, 받을게."], "차표로 받을게.", "차표로 받을게."),
+        )):
+            with self.subTest(path=path, stream=stream, contract=contract, drafts=drafts):
+                referee = self._word_chain_referee(["기차", "차표"])
+                chat, dialogue = self._live_briefing_chat(
+                    f"wc-ruling-{index}", drafts, stream,
+                    {"AIRI_LIVE_BRIEFING_CANDIDATES": "2", "AIRI_BROADCAST_CONTRACT": contract},
+                    path=path, briefing=BROADCAST_BRIEFING_HEADER, user="[YouTube] 기차 되냐? 판정 ㄱ",
+                    segment="끝말잇기", patches=((ollama_proxy, "word_chain_referee", referee),
+                                              (ollama_proxy, "needs_grounding_retry", lambda *a, **k: False)),
+                )
+                prompt = json.dumps(chat.requests[0]["messages"], ensure_ascii=False)
+                self.assertIn(f"- 이번 턴에 말할 것: {say}", prompt)
+                self.assertEqual("기차 인정!" in prompt, say == ruled)
+                self.assertEqual(len(chat.requests), len(drafts))
+                self.assertEqual(dialogue, expected)
 
     def test_word_chain_round_clears_when_the_show_closes(self):
         referee = self._word_chain_referee(["기차", "차기"])

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Container, Mapping, Sequence
 
 from live_broadcast_runtime import BROADCAST_BRIEFING_HEADER, DONATION_CONTINUATION_CONTRACT
+from live_briefing_select import REQUIRED_WORD_PREFIX, accepted_word
 
 
 WORD_CHAIN_WORDS_ENV = "AIRI_LIVE_WORD_CHAIN_WORDS"
@@ -36,7 +37,9 @@ _HANGUL_RUN_RE = re.compile(r"[가-힣]+")
 # On a live show a false judgment is worse than none, so a chat of several words is a move only when
 # it says it is one. Cue words are never the move themselves.
 _START_CUES = ("먼저", "시작", "간다", "갈게", "한다", "할게", "고고")
-_MOVE_CUES = _START_CUES + ("이거", "받아", "정답")
+_MOVE_CUES = _START_CUES + ("이거", "받아", "정답", "판정")
+# A viewer asking for a ruling hears it (2026-09-29 ep07 T15: "션샤인 이거 되냐? 판정 ㄱ" -> "인물로 받을게.").
+_VERDICT_ASK_RE = re.compile(r"판정|되냐|되나|돼\s*[?？]|되는\s*거|인정\s*[?？]|가능\s*[?？]")
 
 
 def _cue_re(words: tuple[str, ...]) -> re.Pattern[str]:
@@ -162,6 +165,24 @@ def word_chain_segment(context_note: object) -> bool:
     )
 
 
+def verdict_asked(chat: object) -> bool:
+    """True when the viewer asks whether a word counts."""
+    return isinstance(chat, str) and bool(_VERDICT_ASK_RE.search(chat))
+
+
+def referee_say_line(lines: Sequence[str], asked: bool = False) -> str:
+    """A spoken line carrying AIRI's word ("차표로 받을게."), or '' when the lines name none.
+
+    Asked for a ruling, the line leads with it ("기차 인정! 차표로 받을게.").
+    """
+    word = next((line[len(REQUIRED_WORD_PREFIX):].strip() for line in lines if line.startswith(REQUIRED_WORD_PREFIX)), "")
+    if not word:
+        return ""
+    line = f"{word}{ro_particle(word[-1])} 받을게."
+    ruled = accepted_word("\n".join(lines)) if asked else ""
+    return f"{ruled} 인정! {line}" if ruled else line
+
+
 def with_referee_lines(context_note: str, lines: Sequence[str]) -> str:
     """The note with the referee lines at the end of the turn briefing, adding its header if needed."""
     if not lines:
@@ -252,7 +273,7 @@ class WordChainReferee:
                 return (accepted, f"- 심판 판정: {last}{ro_particle(last)} 이을 단어 없음, AIRI 패")
             game.used |= {word, reply}
             game.previous = reply
-            return (accepted, f"- AIRI 낼 단어: {reply}")
+            return (accepted, f"{REQUIRED_WORD_PREFIX} {reply}")
 
     def close_show(self, show_id: str) -> None:
         with self._lock:

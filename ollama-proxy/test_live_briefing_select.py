@@ -4,10 +4,12 @@ import unittest
 from unittest import mock
 
 import live_briefing_select
+from live_broadcast_runtime import BROADCAST_BRIEFING_HEADER
 from live_briefing_select import (
     DEFAULT_COVERAGE,
     MAX_CANDIDATES,
     accept_early,
+    accepted_word,
     best_index,
     briefing_coverage,
     candidate_budget,
@@ -16,10 +18,16 @@ from live_briefing_select import (
     canon_say_line,
     canon_say_lines,
     coverage_threshold,
+    required_word,
     say_line,
     select_candidate,
+    show_say_lines,
     speakable_line,
+    lead_line,
+    lead_lines,
     with_canon_say_line,
+    with_ruling,
+    with_lead,
     without_do_not_say,
 )
 
@@ -115,6 +123,15 @@ class LiveBriefingSelectTests(unittest.TestCase):
             ("[YouTube] 아이리 저녁은 먹고 켰어?", "밥"),
             ("[YouTube] 아이리 밥 먹음?", "밥"),
             ("[YouTube] 아이리 어제 잘 잤어?", "잠"),
+            # 2026-09-29 ep06: "몇 시에 일어났어?" matched no category and ended in a silence fallback.
+            ("[YouTube] 아이리 오늘 몇 시에 일어났어?", "잠"),
+            # 2026-09-29 ep04 T16: "피곤하지 않아?" had no line and ended in "음, 잠깐만.".
+            ("[YouTube] 아이리는 오늘 어땠어? 피곤하지 않아?", ""),
+            ("[YouTube] 아이리 감기 안 걸렸어?", ""),
+            # 2026-09-29 ep05: advice to AIRI is no question but presupposes a body just the same
+            # ("감기는 몸이 먼저 알아서 막아주니까 걱정하지 마.").
+            ("[YouTube] 아이리 감기 조심해 요즘 유행이래", ""),
+            ("[YouTube] 아이리 밥 꼭 챙겨 먹어", "밥"),
             ("[YouTube] 아이리 운동 좋아해?", "몸"),
             ("[YouTube] 아이리 어디 살아?", "방송"),
             ("[YouTube] 아이리는 주말에 뭐 했어?", "방송"),
@@ -131,10 +148,71 @@ class LiveBriefingSelectTests(unittest.TestCase):
         for chat in (
             "[YouTube] 나 오늘 점심 김치찌개 먹었어", "[YouTube] 점심 뭐 먹을까?", "[YouTube] 밥 먹고 올게",
             "[YouTube] 첫방 ㅊㅋ", "[YouTube] 다음 방송은 언제 해?", "",
-            "[YouTube] 아이리 규칙 까먹었어?",
+            "[YouTube] 아이리 규칙 까먹었어?", "[YouTube] 아이리 나 밥 먹었어", "[YouTube] 감기 조심해 다들",
         ):
             with self.subTest(chat=chat):
                 self.assertEqual(canon_say_line(chat), "")
+
+    def test_a_referee_word_is_required_in_the_answer(self) -> None:
+        # 2026-09-29 ep04 T09: "말으로 받을게." covered "…로 받을게." without the referee's word.
+        note = BROADCAST_BRIEFING_HEADER + "\n- 심판 판정: 양말 유효, AIRI 차례\n- AIRI 낼 단어: 말씀\n- 이번 턴에 말할 것: 말씀으로 받을게."
+        self.assertEqual(required_word(note), "말씀")
+        self.assertEqual(required_word(CONTEXT_NOTE), "")
+        say = say_line(note)
+        self.assertTrue(candidate_is_unfit("말으로 받을게.", say, required="말씀"))
+        self.assertFalse(candidate_is_unfit("양말 다음은 말씀으로 받을게.", say, required="말씀"))
+        self.assertFalse(candidate_is_unfit("말으로 받을게.", say))
+        # 2026-09-29 recheck: the word said as a refusal is not a move ("기차로는 차이로 못 넘어가겠다.").
+        for line in ("기차로는 차이로 못 넘어가겠다. 이번엔 네 차례야.", "차이로는 막히네.", "차이는 안 되겠다."):
+            with self.subTest(line=line):
+                self.assertTrue(candidate_is_unfit(line, "차이로 받을게.", required="차이"))
+        for line in ("기차 다음은 차이! 이로 이어 봐.", "음, 기차엔 차이로 할게. 이건 못 받겠지?"):
+            with self.subTest(line=line):
+                self.assertFalse(candidate_is_unfit(line, "차이로 받을게.", required="차이"))
+        # 2026-09-29 ep06: the word hidden inside a longer word is no move ("본격적으로 받아 볼게").
+        self.assertTrue(candidate_is_unfit("리본이면, 나는 본격적으로 받아 볼게.", "본격으로 받을게.", required="본격"))
+        for line in ("리본엔 본격! 격으로 이어 봐.", "그럼 본격으로 받을게.", "본격이다, 격 차례야."):
+            with self.subTest(line=line):
+                self.assertFalse(candidate_is_unfit(line, "본격으로 받을게.", required="본격"))
+
+        async def run(drafts: list[str]) -> tuple[str, bool]:
+            queue = list(drafts[1:])
+
+            async def draw() -> tuple[str, object | None]:
+                return queue.pop(0), {"draw": len(queue)}
+
+            dialogue, _, _, said = await select_candidate(
+                drafts[0], draw, say=say, previous_reply="", budget=3, threshold=DEFAULT_COVERAGE, required="말씀",
+            )
+            return dialogue, said
+
+        self.assertEqual(asyncio.run(run(["말으로 받을게.", "그럼 이걸로 받을게.", "음, 받을게."])), ("말씀으로 받을게.", True))
+        self.assertEqual(asyncio.run(run(["말으로 받을게.", "양말엔 말씀으로 받을게!"])), ("양말엔 말씀으로 받을게!", False))
+
+    def test_a_draft_that_refuses_the_word_the_referee_accepted_is_unfit(self) -> None:
+        # 2026-09-29 ep07 T12: referee "람보르기니 유효", AIRI "람보로는 안 돼. 이번으로 받을게, 이제 네 차례다."
+        note = (BROADCAST_BRIEFING_HEADER + "\n- 심판 판정: 람보르기니 유효, AIRI 차례\n- AIRI 낼 단어: 이번"
+                "\n- 이번 턴에 말할 것: 이번으로 받을게.")
+        self.assertEqual(accepted_word(note), "람보르기니")
+        self.assertEqual(accepted_word(CONTEXT_NOTE), "")
+        self.assertEqual(accepted_word(BROADCAST_BRIEFING_HEADER + "\n- 심판 판정: 기차 무효(이미 나옴), 다시"), "")
+        say = say_line(note)
+        for line in ("람보로는 안 돼. 이번으로 받을게, 이제 네 차례다.", "람보르기니는 무효야! 이번으로 받을게."):
+            with self.subTest(line=line):
+                self.assertTrue(candidate_is_unfit(line, say, required="이번", accepted="람보르기니"))
+                self.assertFalse(candidate_is_unfit(line, say, required="이번"))
+        for line in ("람보르기니 인정! 이번으로 받을게.", "람보르기니라니 어렵게 왔네. 이번으로 받을게.",
+                     "이번으로 받을게. 이건 안 되겠지?"):
+            with self.subTest(line=line):
+                self.assertFalse(candidate_is_unfit(line, say, required="이번", accepted="람보르기니"))
+
+    def test_a_ruling_asked_for_leads_the_answer(self) -> None:
+        # 2026-09-29 ep07 T15: "션샤인 이거 되냐? 판정 ㄱ" was answered "인물로 받을게." with no ruling.
+        self.assertEqual(with_ruling("인물로 받을게.", "션샤인"), "션샤인 인정! 인물로 받을게.")
+        for ruled in ("션샤인 인정! 인물로 받을게.", "션샤인 유효야, 인물로 받을게.", "통과! 인물로 받을게."):
+            with self.subTest(ruled=ruled):
+                self.assertEqual(with_ruling(ruled, "션샤인"), ruled)
+        self.assertEqual(with_ruling("인물로 받을게.", ""), "인물로 받을게.")
 
     def test_a_repeated_canon_question_does_not_get_the_same_line_again(self) -> None:
         # 2026-09-29 canon probe with candidates on: 30 of 36 answers were the same fixed line.
@@ -145,6 +223,119 @@ class LiveBriefingSelectTests(unittest.TestCase):
         self.assertTrue(set(spoken) <= set(canon_say_lines(chat)))
         # A briefing that already names a line keeps it and uses up nothing.
         self.assertEqual(with_canon_say_line(CONTEXT_NOTE, chat), CONTEXT_NOTE)
+
+    def test_a_first_time_viewer_is_welcomed_before_the_answer(self) -> None:
+        # 2026-09-29 ep07 T06: "처음 와봤는데 여기 무슨 방송이에요?" got the show's topic and no welcome.
+        # A welcome say line then made AIRI say the welcome alone (newcomer probe), so it goes in front instead.
+        live_briefing_select._recent_canon_lines.clear()
+        chats = (
+            "[YouTube] 처음 와봤는데 여기 무슨 방송이에요?", "[YouTube] 안녕하세요 처음 왔어요",
+            "[YouTube] 뉴비입니다 ㅎㅇ", "[YouTube] 처음 뵙겠습니다",
+        )
+        spoken = [lead_line(chat) for chat in chats]
+        self.assertEqual(len(set(spoken)), 4)
+        for line in spoken:
+            self.assertIn(line, lead_lines(chats[0]))
+            self.assertFalse(candidate_is_unfit(line, line))
+        for chat in ("[YouTube] 이 노래 처음 들어봐", "[YouTube] 저번에 처음 왔었는데 또 왔어", "[YouTube] 처음 보는 노래네", ""):
+            with self.subTest(chat=chat):
+                self.assertEqual(lead_lines(chat), ())
+                self.assertEqual(lead_line(chat), "")
+        # The note names nothing to say: the model answers the question itself.
+        base = CONTEXT_NOTE.split("\n\n")[0]
+        self.assertEqual(with_canon_say_line(base, chats[0]), base)
+        answer = "채팅이 추천하는 노래로 끝말잇기를 하는 방송이야."
+        self.assertEqual(with_lead(answer, "처음 왔구나, 반가워!"), "처음 왔구나, 반가워! " + answer)
+        for welcomed in ("반가워, 첫 방문이네.", "뉴비구나, 반가워!", "어서 와! 여긴 끝말잇기 방송이야.", "와 줘서 고마워!"):
+            with self.subTest(welcomed=welcomed):
+                self.assertEqual(with_lead(welcomed, "처음 왔구나, 반가워!"), welcomed)
+        self.assertEqual(with_lead("", "처음 왔구나, 반가워!"), "처음 왔구나, 반가워!")
+        self.assertEqual(with_lead(answer, ""), answer)
+        # A newcomer's question about AIRI's body keeps its canon line.
+        chat = "[YouTube] 처음 왔는데 아이리 밥은 먹었어?"
+        self.assertIn(say_line(with_canon_say_line(base, chat)), canon_say_lines(chat))
+
+    def test_closing_and_next_show_chats_get_a_line_the_show_stands_behind(self) -> None:
+        # 2026-09-29 ep07 closing with no briefing: "벌써 끝나?" ended in "음, 잠깐만." (grounding-off drafts
+        # stalled: "어, 그건 잠깐 생각해 볼게.") and "다음 방송은 언제 해?" drafts invented "내일 저녁 8시" 4/4.
+        live_briefing_select._recent_canon_lines.clear()
+        closing = "[오늘 방송]\n- 주제: AIRI 일곱 번째 방송\n- 지금 구간: 마무리\n- 상황: 방송을 마무리한다."
+        opening = "[오늘 방송]\n- 주제: AIRI 일곱 번째 방송\n- 지금 구간: 오프닝\n- 상황: 방송이 막 시작됐다."
+        spoken = set()
+        for chat in ("[YouTube] 벌써 끝나? ㅠㅠ 오늘 끝말잇기 재밌었는데", "[YouTube] 오늘 방송 여기까지야?",
+                     "[YouTube] 오늘 재밌었다 담방 때 봐 ㅂㅂ", "[YouTube] 수고했어 아이리"):
+            with self.subTest(chat=chat):
+                line = say_line(with_canon_say_line(closing, chat))
+                self.assertIn(line, show_say_lines(closing, chat))
+                spoken.add(line)
+                self.assertEqual(with_canon_say_line(opening, chat), opening)
+        self.assertEqual(len(spoken), 4)
+        for chat in ("[YouTube] 다음 방송은 언제 해?", "[YouTube] 담방 언제임?", "[YouTube] 다음 방송엔 뭐 해?",
+                     "[YouTube] 방송 언제 또 해?"):
+            for note in (opening, closing):
+                with self.subTest(chat=chat, note=note[-12:]):
+                    line = say_line(with_canon_say_line(note, chat))
+                    self.assertIn("안 정해", line)
+                    self.assertNotRegex(line, r"\d|내일|저녁|시에")
+                    # A plan the operator gave is left to the model.
+                    given = note + " 다음 방송은 금요일 저녁 8시에 한다."
+                    self.assertEqual(with_canon_say_line(given, chat), given)
+        for chat in ("[YouTube] 다음 방송 때 봐", "[YouTube] 오늘 방송 재밌다", "[YouTube] 끝말잇기 끝나면 뭐 해?"):
+            with self.subTest(chat=chat):
+                self.assertEqual(show_say_lines(opening, chat), ())
+        for line in (*show_say_lines(closing, "[YouTube] 벌써 끝나?"), *show_say_lines(opening, "[YouTube] 담방 언제임?")):
+            with self.subTest(line=line):
+                self.assertFalse(candidate_is_unfit(line, line))
+                self.assertFalse(line.endswith(("?", "？")))
+        # The operator's own closing line stays.
+        briefed = closing + "\n\n" + BROADCAST_BRIEFING_HEADER + "\n- 이번 턴에 말할 것: 오늘도 와 줘서 고마워."
+        self.assertEqual(with_canon_say_line(briefed, "[YouTube] 벌써 끝나?"), briefed)
+
+    def test_a_viewer_who_is_ill_hears_concern_before_the_answer(self) -> None:
+        # 2026-09-29 ep07 T20: "나 오늘 감기 걸려서 목소리가 안 나와" -> "목소리가 안 나오면 끝말잇기는 잠시 쉬자."
+        live_briefing_select._recent_canon_lines.clear()
+        chats = (
+            "[YouTube] 잠깐 끝말잇기 쉬고 ㅠ 나 오늘 감기 걸려서 목소리가 안 나와", "[YouTube] 머리 아파서 오늘은 눈팅만 할게",
+            "[YouTube] 몸살 났어 ㅠ", "[YouTube] 어제 넘어져서 다쳤어",
+        )
+        spoken = [lead_line(chat) for chat in chats]
+        self.assertEqual(len(set(spoken)), 4)
+        for line in spoken:
+            self.assertIn(line, lead_lines(chats[0]))
+            self.assertNotIn(line, lead_lines("[YouTube] 처음 왔어요"))
+            self.assertFalse(candidate_is_unfit(line, line))
+        for chat in (
+            "[YouTube] 감기 조심해 다들", "[YouTube] 이제 안 아파 다 나았어", "[YouTube] 아이리 아파?",
+            "[YouTube] 우리 아파트 앞에 눈 왔어", "[YouTube] 아이리는 감기 안 걸려?",
+        ):
+            with self.subTest(chat=chat):
+                self.assertEqual(lead_lines(chat), ())
+        care = spoken[0]
+        answer = "목소리가 안 나오면 끝말잇기는 잠시 쉬자."
+        self.assertEqual(with_lead(answer, care), f"{care} {answer}")
+        for cared in ("저런, 푹 쉬어.", "괜찮아? 오늘은 채팅만 해도 돼.", "아이고, 얼른 나아."):
+            with self.subTest(cared=cared):
+                self.assertEqual(with_lead(cared, care), cared)
+        # A lead that is in no pool is never added.
+        self.assertEqual(with_lead(answer, "아무 줄"), answer)
+
+    def test_with_no_say_line_the_first_fit_draft_is_kept(self) -> None:
+        async def run(drafts: list[str]) -> tuple[str, bool, int]:
+            queue = list(drafts[1:])
+
+            async def draw() -> tuple[str, object | None]:
+                return queue.pop(0), {"draw": len(queue)}
+
+            dialogue, _, _, said = await select_candidate(
+                drafts[0], draw, say="", previous_reply="", budget=3, threshold=DEFAULT_COVERAGE,
+            )
+            return dialogue, said, len(queue)
+
+        self.assertEqual(asyncio.run(run(["끝말잇기 하는 방송이야.", "안 쓰일 후보야."])), ("끝말잇기 하는 방송이야.", False, 1))
+        self.assertEqual(
+            asyncio.run(run(["끝말잇기 하는 방송이에요.", "끝말잇기 하는 방송이야.", "안 쓰일 후보야."])),
+            ("끝말잇기 하는 방송이야.", False, 1),
+        )
 
     def test_unfit_when_airi_claims_a_body_or_an_offline_life(self) -> None:
         # Answers the 2.3B generator gave on 2026-09-24 (series-01 broadcast 1 and its probes).
@@ -166,9 +357,15 @@ class LiveBriefingSelectTests(unittest.TestCase):
         for claim in (
             "아 배고파 죽겠다!", "배고파서 뭐 좀 먹어야겠다.", "나 어제 친구나 동생이랑 산책했어!",
             "나도 아까 떡볶이 먹었는데, 진짜 맛있었겠다.",
+            # 2026-09-29 v4 canon probe drafts that passed the filter.
+            "이제 막 깨어났는데 채팅이 벌써 열렸네.", "어제는 잠이 안 왔어.", "잠이 좀 부족했어.",
+            "그래도 오늘 점심은 같이 먹자!", "오늘은 좀 피곤해.",
         ):
             with self.subTest(claim=claim):
                 self.assertTrue(candidate_is_unfit(claim, ""))
+        for line in ("피곤하면 푹 쉬어도 돼.", "너 오늘 피곤해 보여.", "다들 잠이 안 와서 모였구나."):
+            with self.subTest(line=line):
+                self.assertFalse(candidate_is_unfit(line, ""))
 
     def test_an_idiom_with_meogeot_is_not_a_meal(self) -> None:
         # 2026-09-26 handoff §5-5: "까먹었으면" (if you forgot) tripped the bodily rule's "먹었".

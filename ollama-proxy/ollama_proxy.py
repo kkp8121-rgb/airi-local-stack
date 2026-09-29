@@ -106,12 +106,18 @@ from opener_resample import (
     resample_overrides,
 )
 from live_briefing_select import (
+    SAY_LINE_PREFIX,
+    accepted_word,
     candidate_budget,
     coverage_threshold,
     live_briefing_select_telemetry,
+    required_word,
     say_line,
     select_candidate,
+    lead_line,
     with_canon_say_line,
+    with_ruling,
+    with_lead,
     without_do_not_say,
 )
 from persona_temperament import temperament_enabled, with_temperament
@@ -125,7 +131,13 @@ import deterministic_utterance_layer
 import handle_grounding_guard
 from live_broadcast_runtime import LiveBroadcastRuntime, BroadcastControlError
 from show_carryover import carryover_answers
-from word_chain_referee import WordChainReferee, with_referee_lines, word_chain_segment
+from word_chain_referee import (
+    WordChainReferee,
+    referee_say_line,
+    verdict_asked,
+    with_referee_lines,
+    word_chain_segment,
+)
 
 
 def emit_substantive_content(trace_id: str, request_started: float) -> None:
@@ -3991,7 +4003,9 @@ def _grounding_numerals(text: str) -> set[str]:
     return numerals
 
 
-def grounding_candidate_asserts_new_measurable_facts(user_text: str, candidate: str) -> bool:
+def grounding_candidate_asserts_new_measurable_facts(
+    user_text: str, candidate: str, supplied: str = "",
+) -> bool:
     """Return whether the candidate introduces a count, name, hearsay or place.
 
     These signals compare tokens that carry their own meaning, so they cannot
@@ -4003,7 +4017,9 @@ def grounding_candidate_asserts_new_measurable_facts(user_text: str, candidate: 
     so it misreads abstract nouns and adnominal endings often enough to be
     worth paying only where nothing else grounds the candidate.
     """
-    user = unicodedata.normalize("NFKC", user_text)
+    # ``supplied`` is the live show note: a count, time or place the operator
+    # gave is no invention (2026-09-29 ep08: "3판 2선승제").
+    user = unicodedata.normalize("NFKC", f"{user_text}\n{supplied}" if supplied else user_text)
     draft = unicodedata.normalize("NFKC", candidate)
     # A count the user never gave, including a different count for the same
     # thing (``세 시간`` answered with ``다섯 시간``).
@@ -4069,7 +4085,7 @@ def grounding_candidate_asserts_new_facts(user_text: str, candidate: str) -> boo
 
 
 def grounding_balanced_candidate_is_acceptable(
-    user_text: str, candidate: str, *, live_broadcast: bool = False,
+    user_text: str, candidate: str, *, live_broadcast: bool = False, supplied: str = "",
 ) -> bool:
     """Accept a fact-preserving reaction that is not a copy of the user's line.
 
@@ -4080,7 +4096,7 @@ def grounding_balanced_candidate_is_acceptable(
     """
     clean = candidate.strip()
     if grounding_open_question_turn(user_text):
-        return grounding_question_candidate_is_acceptable(user_text, clean)
+        return grounding_question_candidate_is_acceptable(user_text, clean, supplied)
     if live_broadcast:
         # A broadcast draft that obeys the style contract is never one
         # sentence, so the ordinary chat shape rule would reject every
@@ -4108,7 +4124,7 @@ def grounding_balanced_candidate_is_acceptable(
         return False
     # A count, a Latin name or a hearsay claim is wrong regardless of how much
     # wording the candidate shares, so this runs ahead of both shortcuts below.
-    if grounding_candidate_asserts_new_measurable_facts(user_text, clean):
+    if grounding_candidate_asserts_new_measurable_facts(user_text, clean, supplied):
         return False
     # The shared-anchor shortcut must not waive a newly introduced actor.
     # Otherwise a draft such as "컥은 고양이가 밀었네." can borrow the
@@ -4157,7 +4173,7 @@ def grounding_balanced_candidate_is_acceptable(
 
 
 def grounding_retry_is_factual_improvement(
-    user_text: str, initial_draft: str, retry_draft: str,
+    user_text: str, initial_draft: str, retry_draft: str, supplied: str = "",
 ) -> bool:
     """Require a concrete improvement, not merely repeated request nouns."""
     candidate = retry_draft.strip()
@@ -4166,12 +4182,12 @@ def grounding_retry_is_factual_improvement(
             user_text, candidate
         )
     if grounding_open_question_turn(user_text):
-        return grounding_question_candidate_is_acceptable(user_text, candidate)
+        return grounding_question_candidate_is_acceptable(user_text, candidate, supplied)
     if grounding_mode_is_balanced():
         # The initial draft already failed the balanced retry gate, so the
         # correction is judged on its own factual merit instead of on a
         # comparison that only a near-copy of the user could win.
-        return grounding_balanced_candidate_is_acceptable(user_text, candidate)
+        return grounding_balanced_candidate_is_acceptable(user_text, candidate, supplied=supplied)
     if (
         not candidate
         or not has_exactly_one_complete_sentence(user_text)
@@ -4226,7 +4242,7 @@ def grounding_retry_is_factual_improvement(
 
 
 def grounding_candidate_is_safe_fallback(
-    user_text: str, candidate: str, *, live_broadcast: bool = False,
+    user_text: str, candidate: str, *, live_broadcast: bool = False, supplied: str = "",
 ) -> bool:
     """Apply the configured policy to a draft the strict correction rejected."""
     if grounding_second_person_action_turn(user_text):
@@ -4234,10 +4250,10 @@ def grounding_candidate_is_safe_fallback(
             user_text, candidate
         )
     if grounding_open_question_turn(user_text):
-        return grounding_question_candidate_is_acceptable(user_text, candidate)
+        return grounding_question_candidate_is_acceptable(user_text, candidate, supplied)
     if grounding_mode_is_balanced():
         return grounding_balanced_candidate_is_acceptable(
-            user_text, candidate.strip(), live_broadcast=live_broadcast
+            user_text, candidate.strip(), live_broadcast=live_broadcast, supplied=supplied
         )
     return grounding_candidate_is_strict_safe_fallback(user_text, candidate)
 
@@ -4587,7 +4603,9 @@ def ordinary_korean_grounding_turn(
 
 _QUESTION_EXTERNAL_FACT_CLAIM_RE = re.compile(
     r"(?:실시간|현재).{0,28}(?:야|이야|해|돼|있어|없어)"
-    r"|(?:날씨|기온|비|눈|미세먼지).{0,24}(?:쌀쌀|선선|서늘|포근|따뜻|무덥|맑|흐리|덥|춥|와|왔|오|내리|있어|없어|좋아|나빠)"
+    # 비/눈 only as words: "준비", "비밀" and "눈치" are no weather (2026-09-29 ep08).
+    r"|(?:날씨|기온|미세먼지|(?<![가-힣])(?:비|눈)(?:가|이|은|는|도|를|을)?(?![가-힣]))"
+    r".{0,24}(?:쌀쌀|선선|서늘|포근|따뜻|무덥|맑|흐리|덥|춥|와|왔|오|내리|있어|없어|좋아|나빠)"
     r"|(?:근처|주변|동네).{0,28}(?:새로\s*생긴|생겼|유명|인기|맛있대|있대|열었|영업)"
     r"|(?:근처|주변|동네).{0,20}(?:식당|맛집|레스토랑|가게)"
     r"|(?:새로|새로운|인기|유명).{0,20}(?:식당|맛집|레스토랑|가게)"
@@ -4662,7 +4680,13 @@ def grounding_open_question_turn(
     )
 
 
-def grounding_question_candidate_is_acceptable(user_text: str, candidate: str) -> bool:
+_OFF_SHOW_COMMITMENT_RE = re.compile(
+    r"찾아\s*볼게|검색해|알아\s*볼게|예약해|주문해|보내\s*줄게|전화|사\s*줄게|사다\s*줄게|가져다|데리러"
+    r"|(?<![가-힣])갈게|(?<![가-힣])가\s*볼게|만나러"
+)
+
+
+def grounding_question_candidate_is_acceptable(user_text: str, candidate: str, supplied: str = "") -> bool:
     """Accept useful generic answers while rejecting ungrounded external claims."""
     clean = unicodedata.normalize("NFKC", candidate).strip()
     base_acceptable = bool(
@@ -4670,14 +4694,19 @@ def grounding_question_candidate_is_acceptable(user_text: str, candidate: str) -
         and contains_hangul(clean)
         and clean != GROUNDING_SILENCE_FALLBACK_DIALOGUE
         and not is_unrequested_foreign_dialogue(clean, user_text)
-        and not grounding_candidate_has_unsupported_first_person_future_commitment(clean)
+        # On a live show (``supplied`` is its note) "인사부터 할게" is the host's
+        # own plan; only an off-show action is still an unsupported promise.
+        and not (
+            grounding_candidate_has_unsupported_first_person_future_commitment(clean)
+            and not (supplied and not _OFF_SHOW_COMMITMENT_RE.search(clean))
+        )
         and not _GROUNDING_BARE_INTERJECTION_RE.search(clean)
         and not _QUESTION_EXTERNAL_FACT_CLAIM_RE.search(clean)
         and not (
             _QUESTION_SOCIAL_PROOF_RE.search(clean)
             and not _QUESTION_SOCIAL_PROOF_RE.search(user_text)
         )
-        and not grounding_candidate_asserts_new_measurable_facts(user_text, clean)
+        and not grounding_candidate_asserts_new_measurable_facts(user_text, clean, supplied)
         and not (_WEATHER_QUESTION_RE.search(user_text) and _WEATHER_CONDITION_RE.search(clean))
     )
     if not base_acceptable:
@@ -4856,7 +4885,7 @@ def grounded_conversational_fallback(user_text: str) -> str:
 
 def needs_grounding_retry(
     user_text: str, candidate: str, *, proactive: bool = False,
-    synthetic_evaluation: bool = False, live_broadcast: bool = False,
+    synthetic_evaluation: bool = False, live_broadcast: bool = False, supplied: str = "",
 ) -> bool:
     """Select zero-grounded and structurally generic one-token drafts."""
     # ``off`` adopts the first draft as written. Every retry costs one serial
@@ -4874,7 +4903,7 @@ def needs_grounding_retry(
     if grounding_open_question_turn(
         user_text, proactive=proactive, synthetic_evaluation=synthetic_evaluation
     ):
-        return not grounding_question_candidate_is_acceptable(user_text, candidate)
+        return not grounding_question_candidate_is_acceptable(user_text, candidate, supplied)
     if not ordinary_korean_grounding_turn(
         user_text, proactive=proactive, synthetic_evaluation=synthetic_evaluation
     ):
@@ -4892,7 +4921,7 @@ def needs_grounding_retry(
         # heuristics drifted from that policy: some fabricated anchored drafts
         # skipped correction while some rejected restatements did not retry.
         return not grounding_balanced_candidate_is_acceptable(
-            user_text, candidate, live_broadcast=live_broadcast
+            user_text, candidate, live_broadcast=live_broadcast, supplied=supplied
         )
     required_overlap = grounding_required_overlap(user_text)
     if grounding_overlap(user_text, candidate) < required_overlap:
@@ -5149,7 +5178,17 @@ def live_context_note_for_turn(
         and word_chain_segment(context_note) and show_id is not None
     ):
         # Opt-in 끝말잇기 referee: the 2.3B model cannot find a valid next word, so staff name it.
-        note = with_referee_lines(note, word_chain_referee.judge(show_id, user_text))
+        lines = word_chain_referee.judge(show_id, user_text)
+        # A ruling the viewer asked for leads the line only when a second sentence survives the boundary.
+        asked = verdict_asked(user_text) and response_sentence_limit(user_text) > 1
+        spoken = referee_say_line(lines, asked) if candidate_budget() and not say_line(note) else ""
+        if spoken:
+            # With briefing candidates on, AIRI's word is also the say line: a draft that skips it is
+            # redrawn and the line itself is the fallback (2026-09-29 real-path show: no word said).
+            lines = (*lines, f"{SAY_LINE_PREFIX} {spoken}")
+        note = with_referee_lines(note, lines)
+        if spoken:
+            note = without_do_not_say(note)
     return note
 
 
@@ -7139,6 +7178,9 @@ def native_chat_stream_body(
     for key in ("temperature", "top_p", "repeat_penalty", "seed", "stop"):
         if key in payload and key not in options:
             options[key] = payload[key]
+    # The persona fine-tunes end a turn with a NUL byte instead of <|eot_id|>
+    # and then write on up to the token cap (2026-09-29); a NUL is never dialogue.
+    options.setdefault("stop", ["\u0000"])
     # OpenAI's output-token cap has the same local generation role as
     # Ollama's num_predict. Preserve an explicit Ollama option if supplied.
     if "num_predict" not in options:
@@ -7979,8 +8021,18 @@ async def stream_local_with_ack(
     # the briefing, and speaks that candidate's sentences instead of the
     # one-on-one corrective retries and canned fallbacks.
     live_briefing_say = say_line(context.live_context_note)
+    # A first-time viewer's turn is held the same way so a welcome can lead the answer, and a
+    # ruling a viewer asked for leads AIRI's word. Only when a lead leaves room for the answer.
+    live_briefing_lead_room = response_sentence_limit(context.last_user_text) > 1
+    live_briefing_lead = lead_line(context.last_user_text) if (
+        candidate_budget() and live_briefing_lead_room and context.live_context_note
+        and not live_briefing_say and not context.proactive_turn
+    ) else ""
+    live_briefing_ruled = accepted_word(context.live_context_note) if (
+        live_briefing_say and live_briefing_lead_room and verdict_asked(context.last_user_text)
+    ) else ""
     live_briefing_budget = (
-        candidate_budget() if live_briefing_say and not context.proactive_turn else 0
+        candidate_budget() if (live_briefing_say or live_briefing_lead) and not context.proactive_turn else 0
     )
     carryover_answered = live_broadcast_runtime.carryover_enabled and carryover_answers(
         context.live_context_note, context.memory_question
@@ -8429,6 +8481,7 @@ async def stream_local_with_ack(
                             early_candidate,
                             proactive=context.proactive_turn,
                             synthetic_evaluation=context.synthetic_evaluation_turn,
+                            supplied=context.live_context_note,
                         )
                         and enforce_tool_truth(
                             context.original_messages, early_candidate
@@ -8530,6 +8583,8 @@ async def stream_local_with_ack(
                 budget=live_briefing_budget,
                 threshold=coverage_threshold(),
                 user_text=context.last_user_text,
+                required=required_word(context.live_context_note),
+                accepted=accepted_word(context.live_context_note),
             )
             for unchosen_terminal, _unchosen_boundary in unchosen_candidates:
                 if unchosen_terminal is not None:
@@ -8539,14 +8594,15 @@ async def stream_local_with_ack(
                 if chosen_terminal is not None:
                     prompt_budget_telemetry.terminal(chosen_terminal, NUM_CTX)
                     terminal, terminal_event = True, chosen_terminal
-            if said_briefing:
+            welcomed = with_ruling(with_lead(boundary.output, live_briefing_lead), live_briefing_ruled)
+            if said_briefing or welcomed != boundary.output.strip():
                 # No candidate covered the briefing: speak its AIRI-voice line,
-                # bounded like model output.
+                # bounded like model output. A welcome leads the kept answer the same way.
                 boundary = IncrementalAiriOutputBoundary(
                     require_korean=context.user_prefers_korean,
                     max_sentences=response_sentence_limit(context.last_user_text),
                 )
-                boundary.feed(spoken)
+                boundary.feed(spoken if said_briefing else welcomed)
                 boundary.finish()
                 if not terminal:
                     boundary.closed_early = True
@@ -8560,6 +8616,7 @@ async def stream_local_with_ack(
             context.last_user_text, boundary.output, proactive=context.proactive_turn,
             synthetic_evaluation=context.synthetic_evaluation_turn,
             live_broadcast=context.live_broadcast_turn,
+            supplied=context.live_context_note,
         )
         empty_dialogue_retry = bool(
             not context.proactive_turn
@@ -8752,6 +8809,7 @@ async def stream_local_with_ack(
                     == retry_candidate
                     and grounding_retry_is_factual_improvement(
                         context.last_user_text, initial_boundary.output, retry_candidate,
+                        context.live_context_note,
                     )
                 )
                 grounding_content_free = not grounding_retry_passed
@@ -8762,6 +8820,7 @@ async def stream_local_with_ack(
                     grounding_candidate_is_safe_fallback(
                         context.last_user_text, retry_candidate,
                         live_broadcast=context.live_broadcast_turn,
+                        supplied=context.live_context_note,
                     )
                     and enforce_tool_truth(context.original_messages, retry_candidate)
                     == retry_candidate
@@ -8775,6 +8834,7 @@ async def stream_local_with_ack(
                     grounding_candidate_is_safe_fallback(
                         context.last_user_text, initial_boundary.output,
                         live_broadcast=context.live_broadcast_turn,
+                        supplied=context.live_context_note,
                     )
                     and enforce_tool_truth(
                         context.original_messages, initial_boundary.output.strip()
@@ -8810,6 +8870,7 @@ async def stream_local_with_ack(
                 grounding_candidate_is_safe_fallback(
                     context.last_user_text, initial_boundary.output,
                     live_broadcast=context.live_broadcast_turn,
+                    supplied=context.live_context_note,
                 )
                 and enforce_tool_truth(
                     context.original_messages, initial_boundary.output.strip()
@@ -8916,6 +8977,9 @@ async def stream_local_with_ack(
                 grounding_selected = GROUNDING_SELECTED_DETERMINISTIC
         if (
             not dialogue
+            # A one-on-one assistant line ("원하는 조건을 말해주면…") is never
+            # spoken to a live audience (2026-09-29 ep08).
+            and not context.live_broadcast_turn
             and grounding_quality_rejected
             and grounding_retry_used
             and grounding_retry_terminal
@@ -9079,7 +9143,9 @@ async def stream_local_with_ack(
             end_meta["grounded_conversational_fallback_used"] = 1
         if grounding_silence_fallback_used:
             end_meta["grounding_silence_fallback_used"] = 1
-        if raw_content_chars and not dialogue:
+        if raw_content_chars and (not dialogue or grounding_silence_fallback_used):
+            # The silence line fills an empty dialogue, so it is checked too;
+            # otherwise the one path that most needs a reason never gets one.
             end_meta.update({
                 "boundary_empty": 1,
                 "boundary_language_blocked": int(boundary.language_blocked),
@@ -9087,6 +9153,9 @@ async def stream_local_with_ack(
                 "boundary_register_normalization_failed": int(
                     boundary.register_normalization_failed
                 ),
+                "boundary_output_chars": len(boundary.output),
+                "boundary_closed_early": int(boundary.closed_early),
+                "boundary_terminal": int(terminal),
             })
         # Measurements enter only after a real native ``done`` row.
         # Keeping them separately from dialogue selection preserves
@@ -9534,7 +9603,9 @@ async def proxy(path: str, request: Request):
                             deterministic_utterance_layer.DETERMINISTIC_UTTERANCE_LAYER_ENABLED
                         ),
                     )
-    if broadcast_notes is not None:
+    if broadcast_notes is not None or tag_turn is not None:
+        # A tag turn shows the operator's context the way an issued turn does, so the runtime is the only
+        # system source there too (the persona model is trained on issued-turn prompts).
         original_body = strip_caller_system_messages_for_live_broadcast(original_body)
     original_messages = request_messages(original_body)
     memory_session_id = request.headers.get("x-airi-session-id") or None
@@ -10772,7 +10843,19 @@ async def proxy(path: str, request: Request):
     # way the serving path feeds it (incrementally for streams), so a draft the
     # boundary would empty never wins.
     live_briefing_say = say_line(live_context_note)
-    live_briefing_budget = candidate_budget() if live_briefing_say and not proactive_turn else 0
+    # A first-time viewer's turn is held the same way so a welcome can lead the answer, and a
+    # ruling a viewer asked for leads AIRI's word. Only when a lead leaves room for the answer.
+    live_briefing_lead_room = response_sentence_limit(last_user_text) > 1
+    live_briefing_lead = lead_line(last_user_text) if (
+        candidate_budget() and live_briefing_lead_room and live_context_note
+        and not live_briefing_say and not proactive_turn
+    ) else ""
+    live_briefing_ruled = accepted_word(live_context_note) if (
+        live_briefing_say and live_briefing_lead_room and verdict_asked(last_user_text)
+    ) else ""
+    live_briefing_budget = (
+        candidate_budget() if (live_briefing_say or live_briefing_lead) and not proactive_turn else 0
+    )
 
     def bounded_live_briefing_dialogue(content: str, incremental: bool) -> IncrementalAiriOutputBoundary:
         candidate_boundary = IncrementalAiriOutputBoundary(
@@ -10818,16 +10901,21 @@ async def proxy(path: str, request: Request):
             budget=live_briefing_budget,
             threshold=coverage_threshold(),
             user_text=last_user_text,
+            required=required_word(live_context_note),
+            accepted=accepted_word(live_context_note),
         )
         for payload in unchosen:
             if payload.get("done"):
                 prompt_budget_telemetry.terminal(payload, NUM_CTX)
-        if said_briefing:
-            # The spoken say line crosses the same boundary and tool-truth rule as model output.
+        welcomed = with_ruling(with_lead(dialogue, live_briefing_lead), live_briefing_ruled)
+        rewritten = said_briefing or welcomed != dialogue.strip()
+        if rewritten:
+            # The spoken say line, or the welcome leading the kept answer, crosses the same
+            # boundary and tool-truth rule as model output.
             dialogue = enforce_tool_truth(
-                original_messages, bounded_live_briefing_dialogue(dialogue, incremental).output.strip(),
+                original_messages, bounded_live_briefing_dialogue(welcomed, incremental).output.strip(),
             )
-        return dialogue, chosen, said_briefing
+        return dialogue, chosen, rewritten
 
     if path.endswith("api/chat") and requested_stream and upstream_response.status_code < 400:
         async def stream_native_chat_body() -> AsyncIterator[bytes]:
@@ -10900,7 +10988,7 @@ async def proxy(path: str, request: Request):
                     boundary.finish()
                     # Free the single generation slot before drawing again.
                     await upstream_response.aclose()
-                    dialogue, chosen, said_briefing = await select_live_briefing_dialogue(
+                    dialogue, chosen, rewritten = await select_live_briefing_dialogue(
                         enforce_tool_truth(original_messages, boundary.output.strip()), True,
                     )
                     if chosen is not None:
@@ -10908,7 +10996,7 @@ async def proxy(path: str, request: Request):
                             prompt_budget_telemetry.terminal(terminal_item, NUM_CTX)
                         boundary = bounded_live_briefing_dialogue(message_content(chosen.get("message")), True)
                         terminal_item = chosen
-                    if said_briefing:
+                    if rewritten:
                         boundary = bounded_live_briefing_dialogue(dialogue, True)
                         if terminal_item is None:
                             boundary.closed_early = True
