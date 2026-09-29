@@ -24,8 +24,9 @@ filename.
 
 - Live SSoT: `airi_docs/진행중/AIRI-WORKING-STATE.md` (frontmatter `goal_status`, `git_head`,
   `worktree_state`, `active_trainer_count`, `current_handoff`; receipts such as `sim10_receipt`).
-- Current handoff: `airi_docs/진행중/AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` — the live-broadcast
-  simulation tuning track.
+- Current handoff: `airi_docs/진행중/AIRI-BROADCAST-READINESS-HANDOFF-2026-09-29.md` — the
+  broadcast-readiness round with persona-v4 (earlier: `AIRI-PERSONA-RP-HANDOFF-2026-09-26.md`,
+  `AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` for the stack and simulator how-to).
 - System1 (Jev) candidate-judge plan and results: `airi_docs/진행중/AIRI-SYSTEM1-CANDIDATE-JUDGE-2026-09-23.md`
   (§0-§6 the 2026-09-23 plan, §7 the v2 scenarios, §8 the live-broadcast simulations).
 - Roadmap: `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md` (user dashboard and M8 checklist; the

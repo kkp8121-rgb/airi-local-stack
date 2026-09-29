@@ -25,8 +25,9 @@ SHAs) **read-only**:
 1. `AGENTS.md`
 2. `airi_docs/진행중/AIRI-WORKING-STATE.md` — the mutable live SSoT (frontmatter carries
    `goal_status`, `git_head`, `worktree_state`, `active_trainer_count`, `current_handoff`)
-3. the current handoff: **`airi_docs/진행중/AIRI-PERSONA-RP-HANDOFF-2026-09-26.md`** (character RP track; the stack and
-   simulator how-to stays in `AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` §3-§4)
+3. the current handoff: **`airi_docs/진행중/AIRI-BROADCAST-READINESS-HANDOFF-2026-09-29.md`** (broadcast-readiness
+   round with persona-v4; RP decisions stay in `AIRI-PERSONA-RP-HANDOFF-2026-09-26.md`, the stack and simulator
+   how-to in `AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` §3-§4)
 4. `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md`
 5. `NEXT-SESSION.md`
 
@@ -36,14 +37,14 @@ checking the exact command line of any running PID. Heartbeat cadence (120 minut
 work or long campaigns), intent/receipt checkpoints, and redaction:
 [goal-state-policy.md](airi_docs/참조/claude-guide/goal-state-policy.md).
 
-## Current context (2026-09-24)
+## Current context (2026-09-29)
 
 - This is the **new PC** (RTX 5060 Ti 8 GiB, no D: drive), not the GPU PC. **Do not install or
   launch the AIRI desktop app here** (user instruction). GPT-SoVITS and STT are not installed, so
   latency including TTS is a GPU-PC task.
-- Active track: live-broadcast simulation tuning — default-off briefing candidate selection in the
-  proxy, the repository simulator, System1 judges kept evaluation-only. Results, remaining work, and
-  open decisions are in the current handoff and the `AIRI-WORKING-STATE.md` receipts.
+- Active track: broadcast readiness with the persona-v4 fine-tune — real-app-path show simulations,
+  default-off live-path features in the proxy, evaluation tools outside Git. Results, remaining work,
+  and open decisions are in the current handoff and the `AIRI-WORKING-STATE.md` receipts.
 - Operational adoption stays forbidden (`adoption_authorized=false`); new proxy behavior stays
   default-off until the user decides.
 
