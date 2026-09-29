@@ -772,6 +772,23 @@ def encode_example(tokenizer: Any, messages: list[dict[str, str]], max_seq_len: 
     return {"input_ids": full_ids, "labels": labels}
 
 
+def target_logits_loss(model: Any, input_ids: Any, labels: Any, attention: Any) -> Any:
+    """The causal-LM loss over the assistant targets, with logits only from the earliest target onward.
+
+    Same value as ``model(..., labels=labels).loss``. The prompt positions carry no loss, and their
+    full-vocabulary logits (~2,400 tokens x 131k) pushed the 8 GB card past its dedicated memory on
+    2026-09-29 (one Mi:dm step: peak 6.84 GB full, 3.66 GB target-only).
+    """
+    import torch  # noqa: PLC0415 — heavy import stays inside the training path
+
+    first = max(1, int((labels != -100).any(dim=0).nonzero()[0]))
+    logits = model(input_ids=input_ids, attention_mask=attention,
+                   num_logits_to_keep=input_ids.shape[1] - first + 1).logits
+    shifted = logits[:, :-1, :].float()
+    return torch.nn.functional.cross_entropy(
+        shifted.reshape(-1, shifted.shape[-1]), labels[:, first:].reshape(-1), ignore_index=-100)
+
+
 def run_training(args: argparse.Namespace) -> dict[str, Any]:
     _prepare_deterministic_validation(args.deterministic_validation)
     import torch  # noqa: PLC0415 — heavy import stays inside the entrypoint
@@ -939,9 +956,9 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
         total_tokens = 0
         with torch.no_grad():
             for input_ids, labels, attention in batches(encoded_dev):
-                result = model(input_ids=input_ids, labels=labels, attention_mask=attention)
+                loss = target_logits_loss(model, input_ids, labels, attention)
                 tokens = int((labels != -100).sum().item())
-                total_loss += float(result.loss.detach()) * tokens
+                total_loss += float(loss.detach()) * tokens
                 total_tokens += tokens
         if was_training:
             model.train()
@@ -1098,7 +1115,7 @@ def run_training(args: argparse.Namespace) -> dict[str, Any]:
             if step >= max_steps:
                 completed_epoch = False
                 break
-            loss = model(input_ids=input_ids, labels=labels, attention_mask=attention).loss
+            loss = target_logits_loss(model, input_ids, labels, attention)
             (loss / args.gradient_accumulation).backward()
             step += 1
             pending_microbatches += 1

@@ -627,6 +627,23 @@ class CpuSmokeTests(unittest.TestCase):
     def tearDownClass(cls) -> None:
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
+    def test_target_logits_loss_equals_the_full_pass_loss(self) -> None:
+        # 2026-09-29: full-vocabulary logits for ~2,400 prompt tokens pushed the 8 GB card past its dedicated
+        # memory (peak 6.84 -> 3.66 GB with target-only logits on Mi:dm); the loss itself must not change.
+        import torch
+        from transformers import LlamaForCausalLM
+        torch.manual_seed(0)
+        model = LlamaForCausalLM.from_pretrained(str(self.model_dir))
+        input_ids = torch.randint(3, model.config.vocab_size, (2, 12))
+        labels = torch.full_like(input_ids, -100)
+        labels[0, 7:] = input_ids[0, 7:]
+        labels[1, 5:9] = input_ids[1, 5:9]  # the second row is shorter: padding after its target
+        attention = torch.ones_like(input_ids)
+        attention[1, 9:] = 0
+        full = model(input_ids=input_ids, labels=labels, attention_mask=attention).loss
+        sliced = trainer.target_logits_loss(model, input_ids, labels, attention)
+        self.assertTrue(torch.allclose(full, sliced, atol=1e-6), (float(full), float(sliced)))
+
     def test_cpu_smoke_trains_saves_and_reports_honestly(self) -> None:
         args = trainer.build_parser().parse_args([
             "--dataset", str(self.dataset), "--dataset-sha256", self.sha,
