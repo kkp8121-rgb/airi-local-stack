@@ -99,6 +99,21 @@ class BroadcastNotes(NamedTuple):
     context_note: str
 
 
+@dataclass(slots=True, frozen=True)
+class _TagContext:
+    show_id: str
+    context_note: str
+    deterministic_context_note: str
+    memo_items: tuple
+
+
+class TagTurn(NamedTuple):
+    """The operator's active show context for one tagged viewer turn; it grants no capability."""
+    show_id: str
+    context_note: str
+    source: object
+
+
 def render_broadcast_context(
     value: object, *, briefing_evidence_marker: bool = False, carryover_line: str = '',
 ) -> str:
@@ -159,6 +174,7 @@ class LiveBroadcastRuntime:
         *,
         evaluation_clock: bool = False,
         carryover: ShowCarryoverStore | None = None,
+        tag_context: bool = False,
     ) -> None:
         self.enabled = (
             enabled
@@ -188,6 +204,11 @@ class LiveBroadcastRuntime:
         self._carryover_pending: dict[str, list[tuple[str, str]]] = {}
         self._carryover_delivered: dict[str, int] = {}
         self._carryover_counters = {key: 0 for key in ('captured', 'rejected', 'turns_with_line', 'director_owned', 'absence_bypasses')}
+        # Opt-in (AIRI_LIVE_TAG_CONTEXT): one operator-set show context shown to
+        # "[YouTube] " viewer turns that carry no turn token (a real show).
+        self.tag_context_enabled = self.enabled and tag_context is True
+        self._tag_context: _TagContext | None = None
+        self._tag_turns = 0
 
     @classmethod
     def from_env(cls) -> 'LiveBroadcastRuntime':
@@ -199,6 +220,7 @@ class LiveBroadcastRuntime:
             master,
             observer,
             evaluation_clock=evaluation_clock,
+            tag_context=os.getenv('AIRI_LIVE_TAG_CONTEXT') == 'on',
         )
         if runtime.enabled:
             # Built only for an enabled runtime, so a disabled one never reads the file.
@@ -336,6 +358,23 @@ class LiveBroadcastRuntime:
                 if action == 'close' and set(payload) == {'action', 'show_id'}:
                     self._close(self._show(payload['show_id']))
                     return {}
+                if (
+                    action == 'set_tag_context' and self.tag_context_enabled
+                    and set(payload) == {'action', 'show_id', 'broadcast_context'}
+                ):
+                    show_id = self._show(payload['show_id'])
+                    context_note, deterministic_context_note = self._context_notes(show_id, payload['broadcast_context'])
+                    # Replaces any earlier context; a set the validation above rejects leaves it in place.
+                    self._tag_context = _TagContext(
+                        show_id, context_note, deterministic_context_note,
+                        self._harvest_memo(show_id, payload['broadcast_context']['briefing']),
+                    )
+                    return {}
+                if action == 'clear_tag_context' and self.tag_context_enabled and set(payload) == {'action', 'show_id'}:
+                    show_id = self._show(payload['show_id'])
+                    if self._tag_context is not None and self._tag_context.show_id == show_id:
+                        self._tag_context = None
+                    return {}
                 raise _invalid()
         except BroadcastControlError:
             self._counters['rejected_controls'] += 1
@@ -362,39 +401,77 @@ class LiveBroadcastRuntime:
         arc_id = payload.get('arc_id') if turn_type in _ARC_TURNS else None
         context_note = ''
         deterministic_context_note = ''
-        carryover_line = self._carryover_lines.get(show_id, '')
         if 'broadcast_context' in payload:
-            context_note = render_broadcast_context(payload['broadcast_context'], carryover_line=carryover_line)
-            deterministic_context_note = render_broadcast_context(
-                payload['broadcast_context'], briefing_evidence_marker=True,
-                carryover_line=carryover_line,
-            )
+            context_note, deterministic_context_note = self._context_notes(show_id, payload['broadcast_context'])
         if turn_type in _ARC_TURNS:
             if not isinstance(arc_id, str) or not any(
                 arc.arc_id == arc_id
                 for arc in self._ledger.read_open(show_id, now_minute=self._now_minute(show_id))
             ):
                 raise _invalid()
-        memo: list[tuple[str, str]] = []
-        if self._carryover is not None and 'broadcast_context' in payload:
-            # Only the director's validated briefing is harvested; it is kept
-            # on the capability until a delivered receipt.
-            briefing = payload['broadcast_context']['briefing']
-            if carryover_line:
-                owned = has_carryover_line(briefing)
-                self._carryover_counters['director_owned' if owned else 'turns_with_line'] += 1
-            memo, rejected = memo_items(briefing)
-            self._carryover_counters['rejected'] += rejected
+        memo: tuple = ()
+        if 'broadcast_context' in payload:
+            # Kept on the capability until a delivered receipt.
+            memo = self._harvest_memo(show_id, payload['broadcast_context']['briefing'])
         turn_token, delivery_token = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         cap = _Capability(
             show_id, action_id, turn_type, delivery, arc_id, delivery_token,
             'issued', time.monotonic(), context_note=context_note,
             deterministic_context_note=deterministic_context_note,
-            memo_items=tuple(memo),
+            memo_items=memo,
         )
         self._turn_tokens[turn_token], self._delivery_tokens[delivery_token] = cap, cap
         self._counters['issued'] += 1
         return {'turn_token': turn_token, 'delivery_token': delivery_token}
+
+    def _context_notes(self, show_id: str, broadcast_context: object) -> tuple[str, str]:
+        """The validated context note and its evidence-marked twin, with the show's pinned carryover line."""
+        carryover_line = self._carryover_lines.get(show_id, '')
+        return (
+            render_broadcast_context(broadcast_context, carryover_line=carryover_line),
+            render_broadcast_context(
+                broadcast_context, briefing_evidence_marker=True, carryover_line=carryover_line,
+            ),
+        )
+
+    def _harvest_memo(self, show_id: str, briefing: str) -> tuple:
+        """The memo items of a validated director briefing; () without a carryover store."""
+        if self._carryover is None:
+            return ()
+        # Only the director's validated briefing is harvested.
+        if self._carryover_lines.get(show_id, ''):
+            owned = has_carryover_line(briefing)
+            self._carryover_counters['director_owned' if owned else 'turns_with_line'] += 1
+        memo, rejected = memo_items(briefing)
+        self._carryover_counters['rejected'] += rejected
+        return tuple(memo)
+
+    def tag_turn(self, *, screening_ready: bool, deterministic_layer: bool = False) -> TagTurn | None:
+        """The active operator context for a tagged viewer turn, else None; no token, receipt or capability."""
+        if not self.tag_context_enabled or not self.ready_for_chat(screening_ready) or type(deterministic_layer) is not bool:
+            return None
+        with self._lock:
+            context = self._tag_context
+            if context is None:
+                return None
+            return TagTurn(
+                context.show_id,
+                context.deterministic_context_note if deterministic_layer else context.context_note,
+                context,
+            )
+
+    def record_tag_turn(self, turn: TagTurn) -> None:
+        """Count an injected tag turn; with no receipt on this path, injection is its delivery."""
+        with self._lock:
+            self._tag_turns += 1
+            # A context replaced or cleared mid-turn no longer speaks for the show.
+            if isinstance(turn.source, _TagContext) and turn.source is self._tag_context:
+                self._carry_delivered(turn.show_id, turn.source.memo_items)
+
+    def tag_context_health(self) -> dict[str, int | bool]:
+        """Content-free: no show id and no context text."""
+        with self._lock:
+            return {'enabled': self.tag_context_enabled, 'active': self._tag_context is not None, 'turns': self._tag_turns}
 
     def claim_turn(self, token: object, *, screening_ready: bool, trace_id: str,
                    knowledge_required: bool = False,
@@ -537,13 +614,14 @@ class LiveBroadcastRuntime:
             self._counters['callback_hits'] += 1
         elif cap.turn_type == 'callback_miss':
             self._counters['callback_misses'] += 1
-        if self._carryover is not None and cap.show_id in self._carryover_delivered:
-            self._carryover_delivered[cap.show_id] += 1
-            if cap.memo_items:
-                self._carryover_pending[cap.show_id] = merge_items(
-                    self._carryover_pending[cap.show_id], cap.memo_items,
-                )
-                self._carryover_counters['captured'] += len(cap.memo_items)
+        self._carry_delivered(cap.show_id, cap.memo_items)
+
+    def _carry_delivered(self, show_id: str, items: tuple) -> None:
+        if self._carryover is not None and show_id in self._carryover_delivered:
+            self._carryover_delivered[show_id] += 1
+            if items:
+                self._carryover_pending[show_id] = merge_items(self._carryover_pending[show_id], items)
+                self._carryover_counters['captured'] += len(items)
 
     def _close(self, show_id: str) -> None:
         self._ledger.close_show(show_id)
@@ -556,6 +634,8 @@ class LiveBroadcastRuntime:
         for key in tuple(self._tombstones):
             if key[0] == show_id:
                 del self._tombstones[key]
+        if self._tag_context is not None and self._tag_context.show_id == show_id:
+            self._tag_context = None
         self._carryover_lines.pop(show_id, None)
         pending = self._carryover_pending.pop(show_id, [])
         delivered = self._carryover_delivered.pop(show_id, 0)

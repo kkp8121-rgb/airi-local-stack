@@ -5088,13 +5088,18 @@ def inject_request_local_system_note(
 
 
 def inject_live_broadcast_notes(
-    body: bytes, arc_note: str, affect_note: str, context_note: str = '',
+    body: bytes, arc_note: str, affect_note: str, context_note: str = '', *, context_only: bool = False,
 ) -> tuple[bytes, bool]:
-    """Add authenticated broadcast records immediately before the final user."""
+    """Add authenticated broadcast records immediately before the final user.
+
+    ``context_only`` is a tag-context turn: the operator's context note alone,
+    with no arc or affect record.
+    """
     try:
         payload = json.loads(body)
         messages = payload.get("messages") if isinstance(payload, dict) else None
-        if not isinstance(messages, list) or not isinstance(arc_note, str) or not affect_note or not isinstance(context_note, str):
+        shape_ok = (not arc_note and not affect_note and bool(context_note)) if context_only else bool(affect_note)
+        if not isinstance(messages, list) or not isinstance(arc_note, str) or not shape_ok or not isinstance(context_note, str):
             return body, False
         insert_at = next((
             index for index in range(len(messages) - 1, -1, -1)
@@ -5103,7 +5108,8 @@ def inject_live_broadcast_notes(
         notes = []
         if arc_note:
             notes.append({"role": "system", "name": "airi_broadcast_arc", "content": arc_note})
-        notes.append({"role": "system", "name": "airi_broadcast_affect", "content": affect_note})
+        if affect_note:
+            notes.append({"role": "system", "name": "airi_broadcast_affect", "content": affect_note})
         if context_note:
             notes.append({"role": "system", "name": "airi_broadcast_context", "content": context_note})
         messages[insert_at:insert_at] = notes
@@ -5111,7 +5117,7 @@ def inject_live_broadcast_notes(
         verified = json.loads(rendered).get("messages")
         if not isinstance(verified, list):
             return body, False
-        expected = [("airi_broadcast_affect", affect_note)]
+        expected = [("airi_broadcast_affect", affect_note)] if affect_note else []
         if arc_note:
             expected.insert(0, ("airi_broadcast_arc", arc_note))
         if context_note:
@@ -5128,6 +5134,7 @@ def inject_live_broadcast_notes(
 def live_context_note_for_turn(
     context_note: str, show_id: str | None, user_text: str, *, proactive_turn: bool,
 ) -> str:
+    """The opt-in steps every injected show context note takes, for issued turns and tag turns alike."""
     note = context_note
     if temperament_enabled():
         note = with_temperament(note)
@@ -7494,6 +7501,7 @@ async def health() -> dict[str, object]:
         "persona_temperament": {"enabled": temperament_enabled()},
         "show_carryover": live_broadcast_runtime.carryover_health(),
         "word_chain": word_chain_referee.health(),
+        "tag_context": live_broadcast_runtime.tag_context_health(),
         "pickup_batch": pickup_batch_telemetry.health(),
         "journal_completion": memory_journal_telemetry.health(),
         # A content-free count only: a rising value means some caller is
@@ -9494,6 +9502,7 @@ async def proxy(path: str, request: Request):
     # session headers and briefing evidence cannot select any server state.
     broadcast_notes = None
     broadcast_turn_token = None
+    tag_turn = None
     if is_chat_request and not nonmutating_turn and not proactive_turn:
         peer = request.client.host if request.client is not None else ""
         screening_ready = (
@@ -9510,6 +9519,21 @@ async def proxy(path: str, request: Request):
                     deterministic_utterance_layer.DETERMINISTIC_UTTERANCE_LAYER_ENABLED
                 ),
             )
+            if broadcast_turn_token is None and live_broadcast_runtime.tag_context_enabled:
+                # Opt-in (AIRI_LIVE_TAG_CONTEXT): a real show's viewer turn arrives from AIRI
+                # desktop with only its ingress tag. The tag selects the operator's context and
+                # grants nothing else.
+                latest_user = next((
+                    message.get("content") for message in reversed(request_messages(original_body))
+                    if message.get("role") == "user"
+                ), "")
+                if isinstance(latest_user, str) and live_viewer_turn(None, latest_user):
+                    tag_turn = live_broadcast_runtime.tag_turn(
+                        screening_ready=screening_ready,
+                        deterministic_layer=(
+                            deterministic_utterance_layer.DETERMINISTIC_UTTERANCE_LAYER_ENABLED
+                        ),
+                    )
     if broadcast_notes is not None:
         original_body = strip_caller_system_messages_for_live_broadcast(original_body)
     original_messages = request_messages(original_body)
@@ -9569,6 +9593,14 @@ async def proxy(path: str, request: Request):
             live_context_note = context_note
         else:
             live_broadcast_runtime.cancel_turn(broadcast_turn_token)
+    elif tag_turn is not None:
+        context_note = live_context_note_for_turn(
+            tag_turn.context_note, tag_turn.show_id, last_user_text, proactive_turn=proactive_turn,
+        )
+        body, injected = inject_live_broadcast_notes(body, "", "", context_note, context_only=True)
+        if injected:
+            live_broadcast_runtime.record_tag_turn(tag_turn)
+            live_context_note = context_note
     if is_chat_request:
         # The launcher owns the foreground model. A desktop build or provider
         # that still sends a rolled-back tag must not silently load a second
