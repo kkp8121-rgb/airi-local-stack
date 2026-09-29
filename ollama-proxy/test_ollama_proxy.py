@@ -8491,13 +8491,9 @@ class LiveBroadcastRouteTests(unittest.TestCase):
             self.assertNotIn(line, json.dumps(chat.requests[0], ensure_ascii=False))
         self.assertEqual(dialogue, "오늘 점심에는 김치찌개 먹었어.")
 
-    def test_live_briefing_leads_the_answer_with_a_welcome_or_concern(self):
-        # 2026-09-29 ep07 T06: "처음 와봤는데 여기 무슨 방송이에요?" was answered with no welcome, and T20
-        # "나 오늘 감기 걸려서 목소리가 안 나와" with "목소리가 안 나오면 끝말잇기는 잠시 쉬자." and no concern.
-        for case, (user, answer) in enumerate((
-            ("[YouTube] 처음 와봤는데 여기 무슨 방송이에요?", "채팅이 추천한 노래로 끝말잇기 하는 방송이야."),
-            ("[YouTube] 나 오늘 감기 걸려서 목소리가 안 나와", "목소리가 안 나오면 끝말잇기는 잠시 쉬자."),
-        )):
+    def _assert_leads_on_the_live_route(self, cases):
+        # Each case opens five shows; the runtime holds sixteen, so a test takes at most three cases.
+        for case, (user, answer) in enumerate(cases):
             pool = live_briefing_select.lead_lines(user)
             self.assertTrue(pool)
             for path, stream in (("/v1/chat/completions", True), ("/api/chat", True), ("/api/chat", False)):
@@ -8508,8 +8504,8 @@ class LiveBroadcastRouteTests(unittest.TestCase):
                         briefing="", user=user,
                     )
                     self.assertEqual(len(chat.requests), 1)
-                    self.assertIn(dialogue, [f"{line} {answer}" for line in pool])
-                    # The model is not told the lead; it answers and the lead goes in front.
+                    self.assertIn(dialogue, [f"{line} {answer}" for line in pool] + [f"{answer} {line}" for line in pool])
+                    # The model is not told the lead; it answers and the lead joins it.
                     for line in pool:
                         self.assertNotIn(line, json.dumps(chat.requests[0], ensure_ascii=False))
             # Off, or with one sentence allowed (a lead would cut the answer off), the answer stands alone.
@@ -8521,6 +8517,22 @@ class LiveBroadcastRouteTests(unittest.TestCase):
                         user=user, patches=((ollama_proxy, "needs_grounding_retry", lambda *a, **k: False),),
                     )
                     self.assertEqual(dialogue, answer)
+
+    def test_live_briefing_leads_the_answer_with_a_welcome_or_concern(self):
+        # 2026-09-29 ep07 T06: "처음 와봤는데 여기 무슨 방송이에요?" was answered with no welcome, and T20
+        # "나 오늘 감기 걸려서 목소리가 안 나와" with "목소리가 안 나오면 끝말잇기는 잠시 쉬자." and no concern.
+        self._assert_leads_on_the_live_route((
+            ("[YouTube] 처음 와봤는데 여기 무슨 방송이에요?", "채팅이 추천한 노래로 끝말잇기 하는 방송이야."),
+            ("[YouTube] 나 오늘 감기 걸려서 목소리가 안 나와", "목소리가 안 나오면 끝말잇기는 잠시 쉬자."),
+        ))
+
+    def test_live_briefing_comforts_a_down_day_and_a_loss(self):
+        self._assert_leads_on_the_live_route((
+            # 2026-09-29 ep09 T14.
+            ("[YouTube] 나는 오늘 회사에서 혼나서 좀 우울해 ㅠ", "혼난 날이면 끝말잇기도 안 되겠네."),
+            # 2026-09-29 ep11 T10: the condolence follows the answer.
+            ("[YouTube] 사실 어제 할머니가 돌아가셔서 좀 멍해", "할머니가 가셨구나."),
+        ))
 
     def test_live_grounding_counts_the_show_context_as_supplied(self):
         # 2026-09-29 ep08 T02: "오늘은 뭐 해?" -> "음, 잠깐만.": "3판 2선승제" came from the operator's note,
@@ -8963,6 +8975,89 @@ class LiveBroadcastRouteTests(unittest.TestCase):
                 self.assertEqual("기차 인정!" in prompt, say == ruled)
                 self.assertEqual(len(chat.requests), len(drafts))
                 self.assertEqual(dialogue, expected)
+
+    def test_word_chain_referee_speaks_a_ruling_on_a_move_off_the_chain(self):
+        # 2026-09-29 ep08 T10/T12: moves off the chain got no ruling and the viewer lost the thread.
+        referee = self._word_chain_referee(["기차", "차표", "사과"])
+        referee.judge("wc-off-chain-show", "[YouTube] 기차")
+        chat, dialogue = self._live_briefing_chat(
+            "wc-off-chain", ["사과는 좋은 단어지.", "음, 사과네."], True,
+            {"AIRI_LIVE_BRIEFING_CANDIDATES": "2", "AIRI_BROADCAST_CONTRACT": "on"}, path="/v1/chat/completions",
+            briefing=BROADCAST_BRIEFING_HEADER, user="[YouTube] 사과!!", segment="끝말잇기",
+            patches=((ollama_proxy, "word_chain_referee", referee),
+                     (ollama_proxy, "needs_grounding_retry", lambda *a, **k: False)),
+        )
+        prompt = json.dumps(chat.requests[0]["messages"], ensure_ascii=False)
+        self.assertIn("- 심판 판정: 사과 무효(끝 글자와 안 이어짐), 다시", prompt)
+        spoken = "아쉽지만 사과는 무효야. 표로 시작하는 단어로 다시 가 보자."
+        self.assertIn(f"- 이번 턴에 말할 것: {spoken}", prompt)
+        self.assertEqual(dialogue, spoken)
+
+    def test_word_chain_referee_starts_a_new_round_with_a_new_segment(self):
+        # 2026-09-29 ep09 T16: round 3 was judged against round 2's last word and AIRI named no word.
+        referee = self._word_chain_referee(["공부", "부산", "기차", "차표"])
+        referee.judge("wc-new-round-show", "[YouTube] 공부", segment="끝말잇기 2판")
+        chat, _ = self._live_briefing_chat(
+            "wc-new-round", ["차표로 받을게."], True, {"AIRI_LIVE_BRIEFING_CANDIDATES": "2"},
+            path="/v1/chat/completions", briefing=BROADCAST_BRIEFING_HEADER, user="[YouTube] 먼저 간다 기차",
+            segment="끝말잇기 3판", patches=((ollama_proxy, "word_chain_referee", referee),
+                                         (ollama_proxy, "needs_grounding_retry", lambda *a, **k: False)),
+        )
+        prompt = json.dumps(chat.requests[0]["messages"], ensure_ascii=False)
+        self.assertIn("- 심판 판정: 기차 유효, AIRI 차례", prompt)
+
+    def test_word_chain_round_result_reaches_the_following_turns(self):
+        # 2026-09-29 ep10 T13: "3연패 실화냐 ㅋㅋㅋ" after the viewer gave up -> "오늘도 내가 또 지는구나."
+        referee = self._word_chain_referee(["공부", "부산"])
+        referee.judge("wc-result-show", "[YouTube] 공부")
+        referee.judge("wc-result-show", "[YouTube] 모르겠다 졌어")
+        chat, _ = self._live_briefing_chat(
+            "wc-result", ["3연패라니 내가 너무 셌나 봐."], True, {"AIRI_LIVE_BRIEFING_CANDIDATES": "2"},
+            path="/v1/chat/completions", briefing=BROADCAST_BRIEFING_HEADER, user="[YouTube] 3연패 실화냐 ㅋㅋㅋ",
+            segment="끝말잇기", patches=((ollama_proxy, "word_chain_referee", referee),
+                                      (ollama_proxy, "needs_grounding_retry", lambda *a, **k: False)),
+        )
+        prompt = json.dumps(chat.requests[0]["messages"], ensure_ascii=False)
+        self.assertIn("- 심판 기록: 방금 판은 AIRI 승", prompt)
+
+    def test_word_chain_round_state_reaches_a_turn_with_no_move(self):
+        # 2026-09-29 ep12 T08: "앗 뭐지" mid-round -> "앗, 아버지는 끝말이 안 나와."
+        referee = self._word_chain_referee(["공부", "부산"])
+        referee.judge("wc-state-show", "[YouTube] 공부")
+        chat, _ = self._live_briefing_chat(
+            "wc-state", ["산으로 시작하는 단어 찾아봐!"], True, {"AIRI_LIVE_BRIEFING_CANDIDATES": "2"},
+            path="/v1/chat/completions", briefing=BROADCAST_BRIEFING_HEADER, user="[YouTube] 앗 뭐지",
+            segment="끝말잇기", patches=((ollama_proxy, "word_chain_referee", referee),
+                                      (ollama_proxy, "needs_grounding_retry", lambda *a, **k: False)),
+        )
+        prompt = json.dumps(chat.requests[0]["messages"], ensure_ascii=False)
+        self.assertIn("- 심판 기록: 지금은 시청자 차례, 산으로 시작하는 단어", prompt)
+
+    def test_held_live_turns_reject_invented_counts(self):
+        # 2026-09-29 ep12 T06: a welcome turn (held, no grounding retries) spoke "…3년 전 채팅이야."
+        user = "[YouTube] 처음 왔는데 아이리는 사람이에요 AI예요?"
+        clean = "나는 AI야, 채팅이랑 같이 방송하는 버추얼이야."
+        chat, dialogue = self._live_briefing_chat(
+            "held-count", ["나는 AI야, 제일 오래 만난 건 3년 전 채팅이야.", clean], True,
+            {"AIRI_LIVE_BRIEFING_CANDIDATES": "3", "AIRI_BROADCAST_CONTRACT": "on"}, path="/v1/chat/completions",
+            briefing="", user=user,
+        )
+        self.assertEqual(len(chat.requests), 2)
+        self.assertIn(dialogue, [f"{line} {clean}" for line in live_briefing_select.lead_lines(user)])
+
+    def test_word_chain_referee_calls_are_spoken_exactly(self):
+        # 2026-09-29 ep13 T06/T08: paraphrased rulings came out garbled.
+        referee = self._word_chain_referee(["기차", "차표", "사과"])
+        referee.judge("wc-exact-show", "[YouTube] 기차")
+        chat, dialogue = self._live_briefing_chat(
+            "wc-exact", ["표로 시작하는 단어가 안 떠올랐어. 사과가 무효야."], True,
+            {"AIRI_LIVE_BRIEFING_CANDIDATES": "3", "AIRI_BROADCAST_CONTRACT": "on"}, path="/v1/chat/completions",
+            briefing=BROADCAST_BRIEFING_HEADER, user="[YouTube] 사과!!", segment="끝말잇기",
+            patches=((ollama_proxy, "word_chain_referee", referee),
+                     (ollama_proxy, "needs_grounding_retry", lambda *a, **k: False)),
+        )
+        self.assertEqual(len(chat.requests), 1)
+        self.assertEqual(dialogue, "아쉽지만 사과는 무효야. 표로 시작하는 단어로 다시 가 보자.")
 
     def test_word_chain_round_clears_when_the_show_closes(self):
         referee = self._word_chain_referee(["기차", "차기"])

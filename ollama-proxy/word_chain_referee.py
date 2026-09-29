@@ -54,6 +54,7 @@ _REACTIONS = frozenset((
     "오케이", "에바", "웃겨", "개웃겨", "맞아", "그치", "그렇지", "아니", "뭐야", "뭐임", "우와", "와우", "나이스",
     "좋아", "좋다", "헐랭", "킹받네", "귀엽다", "천재", "천재네", "잘한다", "화이팅", "파이팅",
 ))
+_PREDICATE_ENDINGS = ("다", "요", "네", "죠", "지")
 # One trailing particle, longest first; dropped only when a list noun of 2+ syllables remains.
 _PARTICLES = ("으로", "이야", "이요", "로", "야", "요", "임", "은", "는", "이", "가", "을", "를")
 
@@ -110,7 +111,8 @@ def _noun_form(token: str, nouns: Container[str]) -> str:
 
 def parse_move(chat: object, previous: str, nouns: Container[str]) -> str:
     """The viewer's word in one chat, or '' when the chat names none."""
-    if not isinstance(chat, str):
+    # A concession ("항복", "졌어") is never itself a move.
+    if not isinstance(chat, str) or _CONCEDE_RE.search(chat):
         return ""
     text = _PUNCTUATION_RE.sub(" ", _LAUGH_RE.sub(" ", _SOURCE_TAGS_RE.sub("", chat)))
     tokens = [
@@ -123,6 +125,9 @@ def parse_move(chat: object, previous: str, nouns: Container[str]) -> str:
         if pieces[0] in _REACTIONS:
             return ""
         lone = _noun_form(pieces[0], nouns)
+        # An off-list predicate ("어렵다", "아쉽네") is a reaction; a spoken ruling on it would be heard.
+        if lone not in nouns and lone.endswith(_PREDICATE_ENDINGS):
+            return ""
         # A lone cue word ("시작!", "고고") is a move only when it chains.
         return lone if tokens or lone[0] in starts else ""
     if not previous:
@@ -130,7 +135,19 @@ def parse_move(chat: object, previous: str, nouns: Container[str]) -> str:
             return ""
         return next((token for token in reversed(tokens) if token in nouns), "")
     last = next((token for token in reversed(tokens) if token[0] in starts), "")
-    return last if last and (last in nouns or _MOVE_CUE_RE.search(text)) else ""
+    if last and (last in nouns or _MOVE_CUE_RE.search(text)):
+        return last
+    # Mid-round, a chat whose one real word is a list noun ("금…? 금요일!") is a move, and so is the named
+    # noun when the viewer asks for a ruling ("본드 이거 되냐? 판정 ㄱ"), chaining or not (2026-09-29 ep08).
+    words = [piece for piece in pieces if _HANGUL_RUN_RE.fullmatch(piece) and len(piece) >= 2]
+    # Off the list too, like a lone word ("늘…? 늘보!", ep14), unless it reads as a predicate.
+    if len(words) == 1 and tokens == [_noun_form(words[0], nouns)] and (
+        tokens[0] in nouns or not tokens[0].endswith(_PREDICATE_ENDINGS)
+    ):
+        return tokens[0]
+    if verdict_asked(chat):
+        return next((token for token in reversed(tokens) if token in nouns), "")
+    return ""
 
 
 def load_words(path: str | Path) -> dict[str, int]:
@@ -155,6 +172,14 @@ def load_words(path: str | Path) -> dict[str, int]:
     return words
 
 
+def segment_label(context_note: object) -> str:
+    """The note's "지금 구간" label, or ''."""
+    if not isinstance(context_note, str):
+        return ""
+    return next((line[len(_SEGMENT_LINE_PREFIX):].strip() for line in context_note.splitlines()
+                 if line.startswith(_SEGMENT_LINE_PREFIX)), "")
+
+
 def word_chain_segment(context_note: object) -> bool:
     """True when the note's segment line names the game."""
     if not isinstance(context_note, str):
@@ -170,17 +195,60 @@ def verdict_asked(chat: object) -> bool:
     return isinstance(chat, str) and bool(_VERDICT_ASK_RE.search(chat))
 
 
-def referee_say_line(lines: Sequence[str], asked: bool = False) -> str:
-    """A spoken line carrying AIRI's word ("차표로 받을게."), or '' when the lines name none.
+def topic_particle(syllable: str) -> str:
+    """"은" after a final consonant, else "는"."""
+    code = ord(syllable) - _HANGUL_BASE if syllable else -1
+    return "은" if 0 <= code <= _HANGUL_LAST - _HANGUL_BASE and code % 28 else "는"
 
-    Asked for a ruling, the line leads with it ("기차 인정! 차표로 받을게.").
+
+def _start_phrase(starts: Sequence[str]) -> str:
+    """"년이나 연으로" for the syllables the next word may start with."""
+    options = [syllable for syllable in starts if syllable]
+    if not options:
+        return ""
+    joined = options[0] + "".join(
+        f"{'이나' if topic_particle(previous) == '은' else '나'} {syllable}"
+        for previous, syllable in zip(options, options[1:])
+    )
+    return f"{joined}{ro_particle(options[-1])}"
+
+
+# A viewer giving up mid-round ("모르겠다 졌어", "항복"); "떨어졌어" and "아이리 졌어" are not concessions.
+_CONCEDE_RE = re.compile(r"(?<![가-힣])(?:내가\s*)?졌(?:어|다|네|음|습니다)|항복|포기|못\s*하겠|ㅈㅈ|(?<![A-Za-z])gg(?![A-Za-z])",
+                         re.IGNORECASE)
+VIEWER_LOSS_LINE = "- 심판 판정: 시청자 패, AIRI 승"
+_INVALID_LINE_RE = re.compile(r"^- 심판 판정: ([가-힣]+) 무효\((끝 글자와 안 이어짐|이미 나옴)\)")
+_LOSS_LINE_RE = re.compile(r"^- 심판 판정: ([가-힣])(?:으로|로) 이을 단어 없음, AIRI 패")
+
+
+def referee_say_line(lines: Sequence[str], asked: bool = False, starts: Sequence[str] = ()) -> str:
+    """A spoken line for the referee's call, or '' when the lines make none.
+
+    AIRI's word ("차표로 받을게."; asked for a ruling, "기차 인정! 차표로 받을게."), a move off the chain
+    with the syllables it should start with (``starts``), a repeated word, or AIRI's loss.
     """
     word = next((line[len(REQUIRED_WORD_PREFIX):].strip() for line in lines if line.startswith(REQUIRED_WORD_PREFIX)), "")
-    if not word:
-        return ""
-    line = f"{word}{ro_particle(word[-1])} 받을게."
-    ruled = accepted_word("\n".join(lines)) if asked else ""
-    return f"{ruled} 인정! {line}" if ruled else line
+    if word:
+        line = f"{word}{ro_particle(word[-1])} 받을게."
+        ruled = accepted_word("\n".join(lines)) if asked else ""
+        return f"{ruled} 인정! {line}" if ruled else line
+    if VIEWER_LOSS_LINE in lines:
+        return "이번 판은 내가 이겼다! 다음 판도 재밌게 가 보자."
+    for line in lines:
+        invalid = _INVALID_LINE_RE.match(line)
+        if invalid:
+            move, reason = invalid.groups()
+            subject = f"{move}{topic_particle(move[-1])}"
+            if reason == "이미 나옴":
+                return f"{subject} 이미 나왔어. 다른 단어로 다시 가 보자."
+            phrase = _start_phrase(starts)
+            target = f"{phrase} 시작하는 단어로" if phrase else "끝 글자로 이어지는 단어로"
+            return f"아쉽지만 {subject} 무효야. {target} 다시 가 보자."
+        loss = _LOSS_LINE_RE.match(line)
+        if loss:
+            last = loss.group(1)
+            return f"{last}{ro_particle(last)} 이을 단어가 없네. 이번 판은 내가 졌어!"
+    return ""
 
 
 def with_referee_lines(context_note: str, lines: Sequence[str]) -> str:
@@ -194,11 +262,13 @@ def with_referee_lines(context_note: str, lines: Sequence[str]) -> str:
 
 
 class _Round:
-    __slots__ = ("previous", "used")
+    __slots__ = ("previous", "used", "segment", "result")
 
-    def __init__(self) -> None:
+    def __init__(self, segment: str = "") -> None:
         self.previous = ""
         self.used: set[str] = set()
+        self.segment = segment
+        self.result = ""
 
 
 class WordChainReferee:
@@ -234,28 +304,37 @@ class WordChainReferee:
         return bool(self._words)
 
     def _airi_word(self, show_id: str, word: str, used: set[str]) -> str:
+        # No "-적" nouns: "본격적으로 받아 볼게" read as "seriously", not a move (2026-09-29 ep08 T09).
         ranked = sorted(
             entry for start in chain_starts(word) for entry in self._by_start.get(start, ())
-            if entry[1] not in used
+            if entry[1] not in used and not (len(entry[1]) >= 3 and entry[1].endswith("적"))
         )[:AIRI_CHOICES]
         if not ranked:
             return ""
         return ranked[zlib.crc32((show_id + word).encode("utf-8")) % len(ranked)][1]
 
-    def judge(self, show_id: str, chat: object) -> tuple[str, ...]:
-        """The referee lines for one viewer chat in a 끝말잇기 segment; () when there is no move."""
+    def judge(self, show_id: str, chat: object, segment: str = "") -> tuple[str, ...]:
+        """The referee lines for one viewer chat in a 끝말잇기 segment; () when there is no move.
+
+        A new ``segment`` label ("끝말잇기 3판") starts a new round (2026-09-29 ep09: round 3 was judged
+        against round 2's last word), and a viewer who gives up mid-round hands AIRI the round.
+        """
         if not self.enabled:
             return ()
         with self._lock:
             self._counters["turns"] += 1
             game = self._rounds.get(show_id)
-            if game is None:
-                game = self._rounds[show_id] = _Round()
+            if game is None or (segment and game.segment and game.segment != segment):
+                game = self._rounds[show_id] = _Round(segment)
                 while len(self._rounds) > MAX_SHOWS:
                     self._rounds.popitem(last=False)
+            game.segment = segment or game.segment
             self._rounds.move_to_end(show_id)
             word = parse_move(chat, game.previous, self._words)
             if not word:
+                if game.previous and isinstance(chat, str) and _CONCEDE_RE.search(chat) and "아이리" not in chat:
+                    game.previous, game.used, game.result = "", set(), "AIRI 승"
+                    return (VIEWER_LOSS_LINE,)
                 return ()
             if game.previous and word[0] not in chain_starts(game.previous):
                 self._counters["rejected"] += 1
@@ -264,16 +343,44 @@ class WordChainReferee:
                 self._counters["rejected"] += 1
                 return (f"- 심판 판정: {word} 무효(이미 나옴), 다시",)
             self._counters["accepted"] += 1
+            if not game.previous:
+                game.result = ""
             accepted = f"- 심판 판정: {word} 유효, AIRI 차례"
             reply = self._airi_word(show_id, word, game.used | {word})
             if not reply:
                 self._counters["airi_losses"] += 1
-                game.previous, game.used = "", set()
+                game.previous, game.used, game.result = "", set(), "AIRI 패"
                 last = word[-1]
                 return (accepted, f"- 심판 판정: {last}{ro_particle(last)} 이을 단어 없음, AIRI 패")
             game.used |= {word, reply}
             game.previous = reply
             return (accepted, f"{REQUIRED_WORD_PREFIX} {reply}")
+
+    def result_line(self, show_id: str) -> str:
+        """The finished round's result, kept for the turns after it until a new round starts, or ''.
+
+        2026-09-29 ep10 T13: after the viewer gave up, "3연패 실화냐" was answered "오늘도 내가 또 지는구나."
+        """
+        with self._lock:
+            game = self._rounds.get(show_id)
+            return f"- 심판 기록: 방금 판은 {game.result}" if game is not None and game.result else ""
+
+    def state_line(self, show_id: str) -> str:
+        """For a turn with no call: whose turn it is mid-round, or the finished round's result, or ''.
+
+        2026-09-29 ep12 T08: "앗 뭐지" mid-round was answered "앗, 아버지는 끝말이 안 나와."
+        """
+        phrase = _start_phrase(self.expected_starts(show_id))
+        return f"- 심판 기록: 지금은 시청자 차례, {phrase} 시작하는 단어" if phrase else self.result_line(show_id)
+
+    def expected_starts(self, show_id: str) -> tuple[str, ...]:
+        """The syllables the next viewer word may start with, the word's own last syllable first."""
+        with self._lock:
+            game = self._rounds.get(show_id)
+            previous = game.previous if game is not None else ""
+        if not previous:
+            return ()
+        return tuple(sorted(chain_starts(previous), key=lambda syllable: syllable != previous[-1]))
 
     def close_show(self, show_id: str) -> None:
         with self._lock:

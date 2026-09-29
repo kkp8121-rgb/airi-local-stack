@@ -110,7 +110,9 @@ from live_briefing_select import (
     accepted_word,
     candidate_budget,
     coverage_threshold,
+    exact_say_line,
     live_briefing_select_telemetry,
+    rejected_word,
     required_word,
     say_line,
     select_candidate,
@@ -134,6 +136,7 @@ from show_carryover import carryover_answers
 from word_chain_referee import (
     WordChainReferee,
     referee_say_line,
+    segment_label,
     verdict_asked,
     with_referee_lines,
     word_chain_segment,
@@ -5178,10 +5181,15 @@ def live_context_note_for_turn(
         and word_chain_segment(context_note) and show_id is not None
     ):
         # Opt-in 끝말잇기 referee: the 2.3B model cannot find a valid next word, so staff name it.
-        lines = word_chain_referee.judge(show_id, user_text)
+        lines = word_chain_referee.judge(show_id, user_text, segment=segment_label(context_note))
+        if not lines and word_chain_referee.state_line(show_id):
+            lines = (word_chain_referee.state_line(show_id),)
         # A ruling the viewer asked for leads the line only when a second sentence survives the boundary.
         asked = verdict_asked(user_text) and response_sentence_limit(user_text) > 1
-        spoken = referee_say_line(lines, asked) if candidate_budget() and not say_line(note) else ""
+        spoken = (
+            referee_say_line(lines, asked, word_chain_referee.expected_starts(show_id))
+            if candidate_budget() and not say_line(note) else ""
+        )
         if spoken:
             # With briefing candidates on, AIRI's word is also the say line: a draft that skips it is
             # redrawn and the line itself is the fallback (2026-09-29 real-path show: no word said).
@@ -8585,6 +8593,11 @@ async def stream_local_with_ack(
                 user_text=context.last_user_text,
                 required=required_word(context.live_context_note),
                 accepted=accepted_word(context.live_context_note),
+                rejected=rejected_word(context.live_context_note),
+                unfit=lambda text: grounding_candidate_asserts_new_measurable_facts(
+                    context.last_user_text, text, context.live_context_note,
+                ),
+                exact=exact_say_line(context.live_context_note),
             )
             for unchosen_terminal, _unchosen_boundary in unchosen_candidates:
                 if unchosen_terminal is not None:
@@ -10903,6 +10916,11 @@ async def proxy(path: str, request: Request):
             user_text=last_user_text,
             required=required_word(live_context_note),
             accepted=accepted_word(live_context_note),
+            rejected=rejected_word(live_context_note),
+            unfit=lambda text: grounding_candidate_asserts_new_measurable_facts(
+                last_user_text, text, live_context_note,
+            ),
+            exact=exact_say_line(live_context_note),
         )
         for payload in unchosen:
             if payload.get("done"):

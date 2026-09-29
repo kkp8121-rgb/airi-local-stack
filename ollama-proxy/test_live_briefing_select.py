@@ -18,6 +18,8 @@ from live_briefing_select import (
     canon_say_line,
     canon_say_lines,
     coverage_threshold,
+    exact_say_line,
+    rejected_word,
     required_word,
     say_line,
     select_candidate,
@@ -128,6 +130,8 @@ class LiveBriefingSelectTests(unittest.TestCase):
             # 2026-09-29 ep04 T16: "피곤하지 않아?" had no line and ended in "음, 잠깐만.".
             ("[YouTube] 아이리는 오늘 어땠어? 피곤하지 않아?", ""),
             ("[YouTube] 아이리 감기 안 걸렸어?", ""),
+            # 2026-09-29 ep08 T03: "요즘 근황 뭐임" was not answered.
+            ("[YouTube] 아이리 요즘 근황 뭐임", "방송"),
             # 2026-09-29 ep05: advice to AIRI is no question but presupposes a body just the same
             # ("감기는 몸이 먼저 알아서 막아주니까 걱정하지 마.").
             ("[YouTube] 아이리 감기 조심해 요즘 유행이래", ""),
@@ -206,6 +210,44 @@ class LiveBriefingSelectTests(unittest.TestCase):
             with self.subTest(line=line):
                 self.assertFalse(candidate_is_unfit(line, say, required="이번", accepted="람보르기니"))
 
+    def test_a_move_draft_keeps_the_turn_order_straight(self) -> None:
+        # 2026-09-29 ep10 T06: "무대로 받아. 이번엔 내 차례다." (and ep07 T09 "…차이로 바로 받아. 이번엔 내 차례야.")
+        say = "무대로 받을게."
+        for line in ("무대로 받아. 이번엔 내 차례다.", "무대로 받을게. 이번엔 내 차례야.", "무대로 받아!"):
+            with self.subTest(line=line):
+                self.assertTrue(candidate_is_unfit(line, say, required="무대"))
+                self.assertFalse(candidate_is_unfit(line, say))
+        for line in ("무대로 받을게. 이제 네 차례야.", "무대로 받을게!", "나무 다음은 무대! 대로 이어 봐."):
+            with self.subTest(line=line):
+                self.assertFalse(candidate_is_unfit(line, say, required="무대"))
+
+    def test_preference_questions_get_a_warm_no_favourite_line(self) -> None:
+        # 2026-09-29 ep10 T16: "아이리는 좋아하는 노래 있어?" -> "좋아하는 노래는 없어." (flat).
+        for chat in ("[YouTube] 아이리는 좋아하는 노래 있어?", "[YouTube] 아이리 최애 영화 뭐야", "[YouTube] 아이리 취향이 뭐야?"):
+            with self.subTest(chat=chat):
+                lines = canon_say_lines(chat)
+                self.assertGreaterEqual(len(lines), 4)
+                for line in lines:
+                    self.assertFalse(candidate_is_unfit(line, line))
+                    self.assertFalse(line.endswith(("?", "？")))
+                    self.assertNotIn("밥", line)
+        self.assertIn("밥", canon_say_line("[YouTube] 아이리 좋아하는 음식 뭐야?"))
+
+    def test_a_draft_that_accepts_the_word_the_referee_rejected_is_unfit(self) -> None:
+        # The other direction of ep07 T12: the referee said 무효 and the draft calls the word good.
+        note = (BROADCAST_BRIEFING_HEADER + "\n- 심판 판정: 본드 무효(끝 글자와 안 이어짐), 다시"
+                "\n- 이번 턴에 말할 것: 아쉽지만 본드는 무효야. 적으로 시작하는 단어로 다시 가 보자.")
+        self.assertEqual(rejected_word(note), "본드")
+        self.assertEqual(rejected_word(BROADCAST_BRIEFING_HEADER + "\n- 심판 판정: 기차 유효, AIRI 차례"), "")
+        say = say_line(note)
+        for line in ("본드 인정! 드라마로 받을게.", "본드는 유효야."):
+            with self.subTest(line=line):
+                self.assertTrue(candidate_is_unfit(line, say, rejected="본드"))
+                self.assertFalse(candidate_is_unfit(line, say))
+        for line in ("본드는 아쉽게 무효야, 적으로 가 보자.", "적으로 시작하는 단어로 다시 가 보자."):
+            with self.subTest(line=line):
+                self.assertFalse(candidate_is_unfit(line, say, rejected="본드"))
+
     def test_a_ruling_asked_for_leads_the_answer(self) -> None:
         # 2026-09-29 ep07 T15: "션샤인 이거 되냐? 판정 ㄱ" was answered "인물로 받을게." with no ruling.
         self.assertEqual(with_ruling("인물로 받을게.", "션샤인"), "션샤인 인정! 인물로 받을게.")
@@ -271,7 +313,7 @@ class LiveBriefingSelectTests(unittest.TestCase):
                 self.assertEqual(with_canon_say_line(opening, chat), opening)
         self.assertEqual(len(spoken), 4)
         for chat in ("[YouTube] 다음 방송은 언제 해?", "[YouTube] 담방 언제임?", "[YouTube] 다음 방송엔 뭐 해?",
-                     "[YouTube] 방송 언제 또 해?"):
+                     "[YouTube] 방송 언제 또 해?", "[YouTube] 다음 방송 때는 뭐 해?"):
             for note in (opening, closing):
                 with self.subTest(chat=chat, note=note[-12:]):
                     line = say_line(with_canon_say_line(note, chat))
@@ -290,6 +332,135 @@ class LiveBriefingSelectTests(unittest.TestCase):
         # The operator's own closing line stays.
         briefed = closing + "\n\n" + BROADCAST_BRIEFING_HEADER + "\n- 이번 턴에 말할 것: 오늘도 와 줘서 고마워."
         self.assertEqual(with_canon_say_line(briefed, "[YouTube] 벌써 끝나?"), briefed)
+
+    def test_colds_and_fatigue_get_their_own_lines(self) -> None:
+        # 2026-09-29 ep08 T14: "아이리는 감기 안 걸려?" got "피곤이 쌓이는 몸이 아니라서 괜찮아…".
+        cold = canon_say_lines("[YouTube] 아이리는 감기 안 걸려?")
+        tired = canon_say_lines("[YouTube] 아이리는 오늘 어땠어? 피곤하지 않아?")
+        self.assertGreaterEqual(len(cold), 4)
+        self.assertGreaterEqual(len(tired), 4)
+        self.assertFalse(set(cold) & set(tired))
+        for line in cold:
+            self.assertRegex(line, "감기|아플|아프")
+        for line in tired:
+            self.assertRegex(line, "피곤|지칠|지치")
+
+    def test_jamo_chat_survives_normalization(self) -> None:
+        # 2026-09-29 ep08 T17: "다음에 2판 꼭 이긴다 ㅂㅂ" in 마무리 got no closing line — NFKC turns the
+        # compatibility jamo ㅂ (U+3142) into U+1107, so "ㅂㅂ" never matched.
+        closing = "[오늘 방송]\n- 주제: AIRI 여덟 번째 방송\n- 지금 구간: 마무리\n- 상황: 방송을 마무리한다."
+        for chat in ("[YouTube] 다음에 2판 꼭 이긴다 ㅂㅂ", "[YouTube] ㅃㅃ"):
+            with self.subTest(chat=chat):
+                self.assertTrue(show_say_lines(closing, chat))
+
+    def test_a_congratulated_show_gets_thanks_with_no_invented_history(self) -> None:
+        # 2026-09-29 ep08 T01 "여덟번째 방송 ㅊㅋㅊㅋ 왔다" -> "여덟 번째면 벌써 한 달이 지났네." (attempts 1-2:
+        # "벌써 세 번이나 왔네") — greeting turns are not grounding-checked, so the drafts invent history.
+        live_briefing_select._recent_canon_lines.clear()
+        opening = "[오늘 방송]\n- 주제: AIRI 여덟 번째 방송\n- 지금 구간: 오프닝\n- 상황: 방송이 막 시작됐다."
+        spoken = set()
+        for chat in ("[YouTube] 여덟번째 방송 ㅊㅋㅊㅋ 왔다", "[YouTube] 8번째 방송 축하해!!", "[YouTube] 첫방 ㅊㅋ",
+                     "[YouTube] 방송 축하합니다"):
+            with self.subTest(chat=chat):
+                line = say_line(with_canon_say_line(opening, chat))
+                self.assertIn(line, show_say_lines(opening, chat))
+                self.assertIn("고마", line)
+                self.assertNotRegex(line, r"\d|번째|한 달|번이나")
+                # The line must survive the rule that rejects a mirrored "축하해".
+                self.assertFalse(candidate_is_unfit(line, line, "", chat))
+                spoken.add(line)
+        self.assertEqual(len(spoken), 4)
+        for chat in ("[YouTube] 나 합격했어 축하해줘", "[YouTube] 축하할 일 있어?", "[YouTube] 방송 재밌다"):
+            with self.subTest(chat=chat):
+                self.assertEqual(show_say_lines(opening, chat), ())
+
+    def test_a_show_count_greeting_gets_a_greeting_with_no_invented_history(self) -> None:
+        # 2026-09-29 ep11 T01 "ㅎㅇㅎㅇ 11번째 방송이네" -> "열한 번째면 벌써 11번이나 왔네."
+        opening = "[오늘 방송]\n- 주제: AIRI 열한 번째 방송\n- 지금 구간: 오프닝\n- 상황: 방송이 막 시작됐다."
+        for chat in ("[YouTube] ㅎㅇㅎㅇ 11번째 방송이네", "[YouTube] 안녕 아이리 열한번째 방송 왔다",
+                     "[YouTube] 하이 오늘 11회차네"):
+            with self.subTest(chat=chat):
+                lines = show_say_lines(opening, chat)
+                self.assertTrue(lines)
+                for line in lines:
+                    self.assertIn("반가", line)
+                    self.assertNotRegex(line, r"\d|번째|번이나|한 달")
+                    self.assertFalse(candidate_is_unfit(line, line, "", chat))
+        self.assertEqual(show_say_lines(opening, "[YouTube] ㅎㅇ"), ())
+        self.assertIn("고마", show_say_lines(opening, "[YouTube] 11번째 방송 축하")[0])
+
+    def test_loss_news_gets_condolence_after_the_answer(self) -> None:
+        # 2026-09-29 ep11 T10: "사실 어제 할머니가 돌아가셔서 좀 멍해" -> "할머니가 가셨구나."
+        live_briefing_select._recent_canon_lines.clear()
+        chats = ("[YouTube] 사실 어제 할머니가 돌아가셔서 좀 멍해", "[YouTube] 키우던 강아지가 무지개다리 건넜어",
+                 "[YouTube] 오늘 아빠 장례식 다녀왔어", "[YouTube] 할머니가 아프시다가 돌아가셨어")
+        spoken = [lead_line(chat) for chat in chats]
+        self.assertEqual(len(set(spoken)), 4)
+        for line in spoken:
+            self.assertIn(line, lead_lines(chats[0]))
+            self.assertFalse(candidate_is_unfit(line, line))
+        self.assertEqual(lead_lines("[YouTube] 게임에서 캐릭터 죽었어 ㅋㅋ"), ())
+        # The condolence follows AIRI's own acknowledgement.
+        self.assertEqual(with_lead("할머니가 가셨구나.", spoken[0]), f"할머니가 가셨구나. {spoken[0]}")
+        self.assertEqual(with_lead("마음 깊이 위로할게.", spoken[0]), "마음 깊이 위로할게.")
+
+    def test_good_news_hears_congratulations_before_the_answer(self) -> None:
+        # 2026-09-29 ep13 T12: "그래도 오늘 첫 월급 받았어요!!" -> "첫 월급이면 오늘은 좀 괜찮아 보이네."
+        live_briefing_select._recent_canon_lines.clear()
+        chats = ("[YouTube] 그래도 오늘 첫 월급 받았어요!!", "[YouTube] 나 오늘 자격증 시험 합격했어!!",
+                 "[YouTube] 오늘 내 생일이야", "[YouTube] 드디어 취업했다!!")
+        spoken = [lead_line(chat) for chat in chats]
+        self.assertEqual(len(set(spoken)), 4)
+        for line in spoken:
+            self.assertIn(line, lead_lines(chats[0]))
+            self.assertIn("축하", line)
+            self.assertFalse(candidate_is_unfit(line, line))
+        for chat in ("[YouTube] 아이리 생일 언제야?", "[YouTube] 합격 축하해 아이리"):
+            with self.subTest(chat=chat):
+                self.assertEqual(lead_lines(chat), ())
+        self.assertNotIn(spoken[0], lead_lines("[YouTube] 시험 떨어졌어 ㅠ"))
+        answer = "첫 월급이면 오늘은 좀 괜찮아 보이네."
+        self.assertEqual(with_lead(answer, spoken[0]), f"{spoken[0]} {answer}")
+        self.assertEqual(with_lead("합격 축하해!", spoken[0]), "합격 축하해!")
+
+    def test_a_lead_joins_a_canon_or_show_say_line(self) -> None:
+        # 2026-09-29 ep14 T10: "벌써 끝이네 오늘 생일인데 축하 좀 해줘" got the closing line and no congratulation.
+        live_briefing_select._recent_canon_lines.clear()
+        closing = "[오늘 방송]\n- 주제: AIRI 열네 번째 방송\n- 지금 구간: 마무리\n- 상황: 방송을 마무리한다."
+        chat = "[YouTube] 벌써 끝이네 오늘 생일인데 축하 좀 해줘"
+        line = say_line(with_canon_say_line(closing, chat))
+        self.assertTrue(any(line.startswith(lead) for lead in lead_lines(chat)))
+        self.assertTrue(any(line.endswith(show) for show in show_say_lines(closing, chat)))
+        chat = "[YouTube] 처음 왔는데 아이리 어제 잘 잤어?"
+        line = say_line(with_canon_say_line(closing, chat))
+        self.assertTrue(any(line.startswith(lead) for lead in lead_lines(chat)))
+        self.assertTrue(any(line.endswith(canon) for canon in canon_say_lines(chat)))
+        # Asking to be congratulated is good news of one's own; congratulating someone else is not.
+        self.assertTrue(lead_lines("[YouTube] 오늘 생일인데 축하 좀 해줘"))
+        self.assertTrue(lead_lines("[YouTube] 나 합격했어 축하해줘"))
+        # 2026-09-29 ep15 T05.
+        self.assertTrue(lead_lines("[YouTube] 벌써 끝이야? 나 오늘 생일인데 축하 한 번만 더 해줘"))
+        self.assertEqual(lead_lines("[YouTube] 합격 축하해 아이리"), ())
+
+    def test_a_viewer_who_is_down_hears_comfort_before_the_answer(self) -> None:
+        # 2026-09-29 ep09 T14: "나는 오늘 회사에서 혼나서 좀 우울해 ㅠ" -> "혼난 날이면 끝말잇기도 안 되겠네."
+        live_briefing_select._recent_canon_lines.clear()
+        chats = (
+            "[YouTube] 나는 오늘 회사에서 혼나서 좀 우울해 ㅠ", "[YouTube] 오늘 너무 속상하다",
+            "[YouTube] 시험 떨어졌어 ㅠㅠ", "[YouTube] 요즘 너무 힘들어",
+        )
+        spoken = [lead_line(chat) for chat in chats]
+        self.assertEqual(len(set(spoken)), 4)
+        for line in spoken:
+            self.assertIn(line, lead_lines(chats[0]))
+            self.assertNotIn(line, lead_lines("[YouTube] 몸살 났어 ㅠ"))
+            self.assertFalse(candidate_is_unfit(line, line))
+        for chat in ("[YouTube] 이 단어 너무 힘들어 ㅋㅋ", "[YouTube] 아이리 우울해?", "[YouTube] 오늘 너무 신난다"):
+            with self.subTest(chat=chat):
+                self.assertEqual(lead_lines(chat), ())
+        answer = "혼난 날이면 끝말잇기도 안 되겠네."
+        self.assertEqual(with_lead(answer, spoken[0]), f"{spoken[0]} {answer}")
+        self.assertEqual(with_lead("오늘 고생 많았네.", spoken[0]), "오늘 고생 많았네.")
 
     def test_a_viewer_who_is_ill_hears_concern_before_the_answer(self) -> None:
         # 2026-09-29 ep07 T20: "나 오늘 감기 걸려서 목소리가 안 나와" -> "목소리가 안 나오면 끝말잇기는 잠시 쉬자."
@@ -318,6 +489,50 @@ class LiveBriefingSelectTests(unittest.TestCase):
                 self.assertEqual(with_lead(cared, care), cared)
         # A lead that is in no pool is never added.
         self.assertEqual(with_lead(answer, "아무 줄"), answer)
+
+    def test_a_caller_rule_can_make_a_draft_unfit(self) -> None:
+        # 2026-09-29 ep12 T06: a held welcome turn skipped the grounding retries and spoke "…3년 전 채팅이야."
+        async def run(drafts: list[str], say: str = "") -> tuple[str, bool, int]:
+            queue = list(drafts[1:])
+
+            async def draw() -> tuple[str, object | None]:
+                return queue.pop(0), {"draw": len(queue)}
+
+            dialogue, _, _, said = await select_candidate(
+                drafts[0], draw, say=say, previous_reply="", budget=3, threshold=DEFAULT_COVERAGE,
+                unfit=lambda text: "3년" in text,
+            )
+            return dialogue, said, len(queue)
+
+        self.assertEqual(asyncio.run(run(["3년 전 채팅이야.", "나는 AI야.", "안 쓰일 후보야."])), ("나는 AI야.", False, 1))
+        # A say line the rule rejects is never spoken either.
+        self.assertEqual(asyncio.run(run(["음.", "어.", "아."], say="3년 전 일이야."))[1], False)
+
+    def test_a_referee_call_is_spoken_exactly(self) -> None:
+        # 2026-09-29 ep13 T06/T08: paraphrased rulings came out garbled ("방으로 시작하는 단어가 없으니까 무효야.
+        # 다시로 갈게.") while the say line itself was right.
+        say = "아쉽지만 이불은 무효야. 번으로 시작하는 단어로 다시 가 보자."
+        for note in ("- 심판 판정: 이불 무효(끝 글자와 안 이어짐), 다시", "- 심판 판정: 리본 무효(이미 나옴), 다시",
+                     "- 심판 판정: 시청자 패, AIRI 승", "- 심판 판정: 차로 이을 단어 없음, AIRI 패"):
+            with self.subTest(note=note):
+                self.assertTrue(exact_say_line(BROADCAST_BRIEFING_HEADER + "\n" + note))
+        self.assertFalse(exact_say_line(BROADCAST_BRIEFING_HEADER + "\n- 심판 판정: 기차 유효, AIRI 차례\n- AIRI 낼 단어: 차표"))
+        self.assertFalse(exact_say_line(CONTEXT_NOTE))
+        drawn = []
+
+        async def draw() -> tuple[str, object | None]:
+            drawn.append(1)
+            return "안 쓰일 후보야.", {}
+
+        async def run() -> tuple[str, bool]:
+            dialogue, _, _, said = await select_candidate(
+                "아쉽지만 이불은 무효야, 번으로 가 보자.", draw, say=say, previous_reply="", budget=3,
+                threshold=DEFAULT_COVERAGE, exact=True,
+            )
+            return dialogue, said
+
+        self.assertEqual(asyncio.run(run()), (say, True))
+        self.assertEqual(drawn, [])
 
     def test_with_no_say_line_the_first_fit_draft_is_kept(self) -> None:
         async def run(drafts: list[str]) -> tuple[str, bool, int]:

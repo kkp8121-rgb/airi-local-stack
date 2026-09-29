@@ -106,6 +106,13 @@ class MoveParsingTests(unittest.TestCase):
         self.assertEqual(parse_move("[YouTube] 사과!!", "기차", self.NOUNS), "사과")
         self.assertEqual(parse_move("[YouTube] 사과 먹고 싶다", "기차", self.NOUNS), "")
 
+    def test_a_lone_predicate_off_the_list_is_no_move(self) -> None:
+        # With spoken rulings a reaction such as "ㅋㅋ 어렵다" would be heard as "어렵다는 무효야" (2026-09-29).
+        for chat in ("[YouTube] ㅋㅋ 어렵다", "[YouTube] 좋아요", "[YouTube] 아쉽네", "[YouTube] 그렇죠", "[YouTube] 어렵지"):
+            with self.subTest(chat=chat):
+                self.assertEqual(parse_move(chat, "기차", self.NOUNS), "")
+        self.assertEqual(parse_move("[YouTube] 바다!", "기차", self.NOUNS | {"바다"}), "바다")
+
     def test_round_start_chatter_is_no_move_even_with_list_nouns(self) -> None:
         for chat in ("[YouTube] ㅋㅋㅋ 분위기 왜 이럼", "[YouTube] 안녕 아이리 오늘 뭐해"):
             with self.subTest(chat=chat):
@@ -113,6 +120,23 @@ class MoveParsingTests(unittest.TestCase):
         for chat in ("[YouTube] ㅋㅋㅋㅋ", "[YouTube] ?!", "", None, 3, "[YouTube] 차 차표로시작하는거"):
             with self.subTest(chat=chat):
                 self.assertEqual(parse_move(chat, "기차", self.NOUNS), "")
+
+    def test_a_chat_that_is_one_list_noun_is_a_move_even_with_fragments(self) -> None:
+        # 2026-09-29 ep08 T12: "금…? 금요일!" after 금년 was no move, so nobody ruled on it.
+        nouns = self.NOUNS | {"금요일", "금년"}
+        self.assertEqual(parse_move("[YouTube] 금…? 금요일!", "금년", nouns), "금요일")
+        self.assertEqual(parse_move("[YouTube] 사과 먹고 싶다", "기차", self.NOUNS), "")
+        # A round start still needs a start cue.
+        self.assertEqual(parse_move("[YouTube] 금…? 금요일!", "", nouns), "")
+        # Off the list too, like a lone word (2026-09-29 ep14 T05 "늘…? 늘보!" was no move), unless a predicate.
+        self.assertEqual(parse_move("[YouTube] 늘…? 늘보!", "늘푸른나무", self.NOUNS), "늘보")
+        self.assertEqual(parse_move("[YouTube] 아… 어렵다", "늘푸른나무", self.NOUNS), "")
+
+    def test_an_asked_ruling_names_the_move_even_off_the_chain(self) -> None:
+        # 2026-09-29 ep08 T10: "본…? 본드 이거 되냐? 판정 ㄱ" after 본격적 got no ruling.
+        nouns = self.NOUNS | {"본드", "본격적"}
+        self.assertEqual(parse_move("[YouTube] 본…? 본드 이거 되냐? 판정 ㄱ", "본격적", nouns), "본드")
+        self.assertEqual(parse_move("[YouTube] 본드 좋아하는 사람 있어?", "본격적", nouns), "")
 
     def test_one_trailing_particle_is_dropped_only_to_reach_a_list_noun(self) -> None:
         for chat, expected in (
@@ -130,17 +154,38 @@ class RefereeSayLineTests(unittest.TestCase):
         for word, expected in (("차표", "차표로 받을게."), ("기억", "기억으로 받을게."), ("연필", "연필로 받을게.")):
             with self.subTest(word=word):
                 self.assertEqual(referee_say_line((accepted, f"- AIRI 낼 단어: {word}")), expected)
-        for lines in ((), (accepted, "- 심판 판정: 차로 이을 단어 없음, AIRI 패"),
-                      ("- 심판 판정: 사과 무효(끝 글자와 안 이어짐), 다시",)):
-            with self.subTest(lines=lines):
-                self.assertEqual(referee_say_line(lines), "")
+        self.assertEqual(referee_say_line(()), "")
+
+    def test_invalid_repeated_and_lost_moves_become_lines_she_can_say(self) -> None:
+        # 2026-09-29 ep08: moves off the chain got no spoken ruling and viewers lost the thread.
+        self.assertEqual(
+            referee_say_line(("- 심판 판정: 금요일 무효(끝 글자와 안 이어짐), 다시",), starts=("년", "연")),
+            "아쉽지만 금요일은 무효야. 년이나 연으로 시작하는 단어로 다시 가 보자.",
+        )
+        self.assertEqual(
+            referee_say_line(("- 심판 판정: 본드 무효(끝 글자와 안 이어짐), 다시",), starts=("적",)),
+            "아쉽지만 본드는 무효야. 적으로 시작하는 단어로 다시 가 보자.",
+        )
+        self.assertEqual(
+            referee_say_line(("- 심판 판정: 사과 무효(끝 글자와 안 이어짐), 다시",)),
+            "아쉽지만 사과는 무효야. 끝 글자로 이어지는 단어로 다시 가 보자.",
+        )
+        self.assertEqual(referee_say_line(("- 심판 판정: 리본 무효(이미 나옴), 다시",)),
+                         "리본은 이미 나왔어. 다른 단어로 다시 가 보자.")
+        self.assertEqual(
+            referee_say_line(("- 심판 판정: 기차 유효, AIRI 차례", "- 심판 판정: 차로 이을 단어 없음, AIRI 패")),
+            "차로 이을 단어가 없네. 이번 판은 내가 졌어!",
+        )
 
     def test_a_viewer_who_asks_for_a_ruling_hears_it(self) -> None:
         # 2026-09-29 ep07 T15: "션샤인 이거 되냐? 판정 ㄱ" was answered "인물로 받을게." with no ruling.
         lines = ("- 심판 판정: 기차 유효, AIRI 차례", "- AIRI 낼 단어: 차표")
         self.assertEqual(referee_say_line(lines, asked=True), "기차 인정! 차표로 받을게.")
         self.assertEqual(referee_say_line(lines), "차표로 받을게.")
-        self.assertEqual(referee_say_line(("- 심판 판정: 사과 무효(끝 글자와 안 이어짐), 다시",), asked=True), "")
+        self.assertEqual(
+            referee_say_line(("- 심판 판정: 사과 무효(끝 글자와 안 이어짐), 다시",), asked=True, starts=("표",)),
+            "아쉽지만 사과는 무효야. 표로 시작하는 단어로 다시 가 보자.",
+        )
         for chat in ("[YouTube] 션샤인 이거 되냐? 판정 ㄱ", "[YouTube] 람보르기니 되나?", "[YouTube] 기차 돼?",
                      "[YouTube] 이거 인정?", "[YouTube] 기차 되는 거 맞지?"):
             with self.subTest(chat=chat):
@@ -193,6 +238,71 @@ class BriefingPlacementTests(unittest.TestCase):
 
 
 class RefereeTests(unittest.TestCase):
+    def test_airi_never_takes_a_word_that_reads_as_an_adverb(self) -> None:
+        # 2026-09-29 ep08 T09: AIRI's word 본격적 came out as "본격적으로 받아 볼게" ("seriously").
+        referee = WordChainReferee({"리본": 1, "본격적": 2, "본보기": 3})
+        self.assertEqual(referee.judge("s", "[YouTube] 리본"),
+                         ("- 심판 판정: 리본 유효, AIRI 차례", "- AIRI 낼 단어: 본보기"))
+
+    def test_a_new_segment_starts_a_new_round(self) -> None:
+        # 2026-09-29 ep09: after round 2 the referee still expected "업", so round 3's "먼저 간다 기차" was no move.
+        referee = WordChainReferee({"공부": 1, "부산": 2, "기차": 3, "차표": 4})
+        referee.judge("s", "[YouTube] 공부", segment="끝말잇기 2판")
+        self.assertEqual(referee.expected_starts("s"), ("산",))
+        self.assertEqual(referee.judge("s", "[YouTube] 먼저 간다 기차", segment="끝말잇기 3판"),
+                         ("- 심판 판정: 기차 유효, AIRI 차례", "- AIRI 낼 단어: 차표"))
+        # The same segment, or no segment at all, keeps the round.
+        self.assertEqual(referee.judge("s", "[YouTube] 기차", segment="끝말잇기 3판"),
+                         ("- 심판 판정: 기차 무효(끝 글자와 안 이어짐), 다시",))
+        self.assertEqual(referee.expected_starts("s"), ("표",))
+        self.assertEqual(referee.judge("s", "[YouTube] 기차"), ("- 심판 판정: 기차 무효(끝 글자와 안 이어짐), 다시",))
+
+    def test_a_viewer_who_gives_up_hands_airi_the_round(self) -> None:
+        # 2026-09-29 ep09 T11: "업으로 뭐가 있지 모르겠다 졌어 ㅠ" -> "업으로 할 말이 없네." (sounded like AIRI lost).
+        referee = WordChainReferee({"공부": 1, "부산": 2, "기차": 3})
+        referee.judge("s", "[YouTube] 공부")
+        for chat in ("[YouTube] ㅋㅋ 어렵다", "[YouTube] 아이리 졌어 ㅋㅋ", "[YouTube] 음 뭐가 있지"):
+            with self.subTest(chat=chat):
+                self.assertEqual(referee.judge("s", chat), ())
+        self.assertEqual(referee.judge("s", "[YouTube] 산…? 뭐가 있지 모르겠다 졌어 ㅠ"), ("- 심판 판정: 시청자 패, AIRI 승",))
+        self.assertEqual(referee.expected_starts("s"), ())
+        self.assertEqual(referee.judge("s", "[YouTube] 항복"), ())
+        self.assertEqual(referee_say_line(("- 심판 판정: 시청자 패, AIRI 승",)), "이번 판은 내가 이겼다! 다음 판도 재밌게 가 보자.")
+
+    def test_the_last_round_result_stays_until_a_new_round(self) -> None:
+        # 2026-09-29 ep10 T13: after the viewer gave up, "3연패 실화냐" -> "오늘도 내가 또 지는구나."
+        referee = WordChainReferee({"공부": 1, "부산": 2, "기차": 3, "차표": 4})
+        self.assertEqual(referee.result_line("s"), "")
+        referee.judge("s", "[YouTube] 공부")
+        referee.judge("s", "[YouTube] 모르겠다 졌어")
+        self.assertEqual(referee.result_line("s"), "- 심판 기록: 방금 판은 AIRI 승")
+        self.assertEqual(referee.judge("s", "[YouTube] 3연패 실화냐 ㅋㅋㅋ"), ())
+        self.assertEqual(referee.result_line("s"), "- 심판 기록: 방금 판은 AIRI 승")
+        referee.judge("s", "[YouTube] 기차 먼저 간다")
+        self.assertEqual(referee.result_line("s"), "")
+        lost = WordChainReferee({"기차": 1})
+        lost.judge("t", "[YouTube] 기차")
+        self.assertEqual(lost.result_line("t"), "- 심판 기록: 방금 판은 AIRI 패")
+
+    def test_a_round_in_progress_tells_whose_turn_it_is(self) -> None:
+        # 2026-09-29 ep12 T08: a non-move chat mid-round ("앗 뭐지") -> "앗, 아버지는 끝말이 안 나와."
+        referee = WordChainReferee({"공부": 1, "부산": 2, "기차": 3})
+        self.assertEqual(referee.state_line("s"), "")
+        referee.judge("s", "[YouTube] 공부")
+        self.assertEqual(referee.state_line("s"), "- 심판 기록: 지금은 시청자 차례, 산으로 시작하는 단어")
+        referee.judge("s", "[YouTube] 모르겠다 졌어")
+        self.assertEqual(referee.state_line("s"), "- 심판 기록: 방금 판은 AIRI 승")
+
+    def test_the_next_start_syllables_follow_the_round(self) -> None:
+        referee = WordChainReferee({"기차": 1, "차표": 2, "표범": 3, "사과": 4})
+        referee.judge("s", "[YouTube] 기차")
+        self.assertEqual(referee.expected_starts("s"), ("표",))
+        self.assertEqual(referee.judge("s", "[YouTube] 사과!!"), ("- 심판 판정: 사과 무효(끝 글자와 안 이어짐), 다시",))
+        self.assertEqual(referee.expected_starts("s"), ("표",))
+        self.assertEqual(referee.expected_starts("other"), ())
+        referee.judge("t", "[YouTube] 표범")
+        self.assertEqual(referee.expected_starts("t"), ())
+
     def referee(self, words: list[str]) -> WordChainReferee:
         folder = tempfile.TemporaryDirectory()
         self.addCleanup(folder.cleanup)

@@ -41,9 +41,20 @@ def _says_word(text: str, word: str) -> bool:
 
 
 _REFUSAL_RE = re.compile(r"못(?:\s|해|하|넘|받|잇)|안\s*(?:되|돼)|막히|막혔|막혀|졌|패배|어렵")
+# After AIRI's move it is the viewer's turn, and "…로 받아." orders the viewer (2026-09-29 ep10 T06:
+# "무대로 받아. 이번엔 내 차례다.").
+_OWN_TURN_RE = re.compile(r"내\s*차례")
+_ORDER_TO_TAKE_RE = re.compile(r"받아(?:라)?\s*[.!~]*$")
 # The referee's line for a viewer word it accepted; a draft that calls that word invalid contradicts the
 # verdict (2026-09-29 ep07 T12: "람보르기니 유효" -> "람보로는 안 돼. 이번으로 받을게.").
 _ACCEPTED_VERDICT_RE = re.compile(r"^- 심판 판정: ([가-힣]+) 유효", re.MULTILINE)
+# ...and the other direction: the referee said 무효 and a draft calls the word good.
+_REJECTED_VERDICT_RE = re.compile(r"^- 심판 판정: ([가-힣]+) 무효", re.MULTILINE)
+# The referee's own calls — a move off the chain, a repeat, a round won or lost — are spoken as written:
+# paraphrased they came out garbled (2026-09-29 ep13: "방으로 시작하는 단어가 없으니까 무효야. 다시로 갈게.").
+_EXACT_CALL_RE = re.compile(
+    r"^- 심판 판정: (?:[가-힣]+ 무효\(|시청자 패, AIRI 승|[가-힣](?:으로|로) 이을 단어 없음, AIRI 패)", re.MULTILINE,
+)
 _INVALID_CLAIM_RE = re.compile(r"안\s*(?:되|돼)|무효|탈락|반칙|인정\s*(?:못|안)|못\s*(?:인정|받)")
 _RULED_RE = re.compile(r"인정|유효|통과")
 # Listing what not to say yet makes the 2.3B generator say it: drafts naming a listed item went from 6/90
@@ -117,12 +128,27 @@ _CANON_LINES = (
         "잠은 내 영역이 아니야. 방송 켜지는 순간부터가 내 하루라서.",
         "잘 자냐는 안부는 나한텐 해당이 없네. 잠 없이 방송 켜지면 바로 여기 있거든.",
     )),
-    # Tired or sick (2026-09-29 ep04: "피곤하지 않아?" had no line and ended in the silence fallback).
-    (re.compile(r"피곤|지쳤|지치|지친|아파|아프|아픈|감기|컨디션"), (
-        "피곤이 쌓이는 몸이 아니라서 괜찮아. 오히려 채팅이 많을수록 말이 잘 나와.",
+    # Sick, then tired (2026-09-29 ep04: "피곤하지 않아?" had no line and ended in the silence fallback;
+    # ep08 T14: "감기 안 걸려?" got a fatigue line while both shared one pool).
+    (re.compile(r"아파|아프|아픈|감기|몸살"), (
         "아플 몸이 없어서 그런 걱정은 넣어 둬도 돼. 걱정해 줘서 고마워.",
-        "지칠 틈이 없어. 방송 켜져 있는 동안은 늘 이 컨디션이야.",
         "감기는 나한테 못 와. 걱정은 채팅 쪽에 더 필요할 것 같아.",
+        "몸이 없으니 감기도 비켜 가. 대신 아픈 사람 얘기는 잘 들어 줄 수 있어.",
+        "나는 아플 일이 없어. 그러니까 아픈 쪽은 채팅이 먼저 챙겼으면 좋겠어.",
+    )),
+    (re.compile(r"피곤|지쳤|지치|지친|컨디션"), (
+        "피곤이 쌓이는 몸이 아니라서 괜찮아. 오히려 채팅이 많을수록 말이 잘 나와.",
+        "지칠 틈이 없어. 방송 켜져 있는 동안은 늘 이 컨디션이야.",
+        "피곤할 몸이 없어서 방송 내내 이 텐션이야.",
+        "지치는 건 내 쪽 일이 아니야. 채팅이 지칠까 봐 그게 더 걱정이지.",
+    )),
+    # A favourite AIRI does not have (the temperament card: no pretended tastes), said warmly
+    # (2026-09-29 ep10 T16: "좋아하는 노래 있어?" -> "좋아하는 노래는 없어.").
+    (re.compile(r"좋아하는\s*(?:노래|곡|가수|영화|드라마|게임|색|계절|동물|책|만화|애니|장르)|최애|취향"), (
+        "딱 정해 둔 건 없어. 대신 채팅이 추천해 주는 걸 듣는 게 제일 재밌어.",
+        "내 취향은 아직 빈칸이야. 좋아하는 걸 알려 주면 거기서부터 채워 볼게.",
+        "하나를 고르진 못하겠어. 대신 추천받은 건 잘 기억해 둘게.",
+        "좋아하는 걸 딱 정하진 않았어. 채팅 취향 듣는 쪽이 더 재밌거든.",
     )),
     (re.compile(r"운동|헬스|산책|스트레칭"), (
         "운동은 몸이 없어서 못 해. 헬스장은 이름만 알아.",
@@ -130,7 +156,9 @@ _CANON_LINES = (
         "움직일 몸이 없어서 운동은 구경만 해. 루틴 얘기 듣는 건 좋아.",
         "몸으로 하는 건 나랑 제일 먼 얘기야. 그래서 운동하는 사람들 얘기가 더 신기해.",
     )),
-    (re.compile(r"어디\s*살|사는\s*곳|집이\s*어디|(?:주말|휴일|평소)에\s*뭐|방송\s*끝나고\s*뭐|어디\s*(?:갔|다녀)|다녀왔|여행"), (
+    # "근황" too (2026-09-29 ep08 T03: "요즘 근황 뭐임" was not answered).
+    (re.compile(r"어디\s*살|사는\s*곳|집이\s*어디|(?:주말|휴일|평소)에\s*뭐|방송\s*끝나고\s*뭐|어디\s*(?:갔|다녀)|다녀왔|여행"
+                r"|근황|요즘\s*(?:뭐\s*하|어떻게\s*지내|잘\s*지내)"), (
         "사는 동네는 따로 없고, 방송이 켜지면 여기 있어.",
         "주말이 따로 있진 않아. 방송이 켜진 시간이 내 하루 전부야.",
         "방송 밖은 내가 모르는 세계야. 여기서 너희랑 떠드는 게 내 일과지.",
@@ -143,12 +171,33 @@ _CANON_LINES = (
 _SEGMENT_LINE_PREFIX = "- 지금 구간:"
 _NEXT_SHOW_RE = re.compile(r"다음\s*방송|담방")
 _SCHEDULE_QUESTION_RE = re.compile(
-    r"(?:다음\s*방송|담방)\s*(?:은|는|엔|에는|도)?\s*(?:언제|몇\s*시|뭐|무슨)"
+    r"(?:다음\s*방송|담방)\s*(?:은|는|엔|에는|도|때|때는|때엔)?\s*(?:언제|몇\s*시|뭐|무슨)"
     r"|방송\s*(?:은\s*)?언제\s*(?:또\s*)?(?:해|켜|함|하)"
 )
+# Chat is matched before NFKC too: NFKC turns compatibility jamo such as "ㅂㅂ" into conjoining jamo
+# (2026-09-29 ep08 T17 "다음에 2판 꼭 이긴다 ㅂㅂ" got no closing line).
 _CLOSING_CHAT_RE = re.compile(
     r"끝나|끝났|끝남|끝이(?:야|네|지|구나)|끝\s*[?？]|여기까지|ㅂㅂ|ㅃㅃ|바이바이|잘\s*가|담방\s*때\s*봐"
     r"|다음에\s*(?:또\s*)?봐|수고(?:했|하셨|해|요)"
+)
+# A viewer congratulating the show itself gets thanks (2026-09-29 ep08 T01 "여덟번째 방송 ㅊㅋㅊㅋ 왔다" ->
+# "벌써 한 달이 지났네."; greeting drafts invented history). No "축하해" in the lines: it is the viewer's.
+_SHOW_CONGRATS_RE = re.compile(r"(?:방송|번째|회차|첫방|\d+\s*회).{0,12}(?:축하|ㅊㅋ)|(?:축하|ㅊㅋ).{0,12}(?:방송|번째|첫방)")
+# A greeting that names the show count gets a greeting with no count (ep11 T01 "ㅎㅇㅎㅇ 11번째 방송이네" ->
+# "열한 번째면 벌써 11번이나 왔네.").
+_SHOW_COUNT_RE = re.compile(r"(?:\d+|[가-힣]{1,3})\s*(?:번째|회차)")
+_GREETING_RE = re.compile(r"ㅎㅇ|하이|안녕|ㅂㅇ|반가|왔다|왔어|출첵|출석")
+_SHOW_GREETING_LINES = (
+    "반가워! 오늘도 와 줘서 고마워.",
+    "어서 와, 반가워! 오늘도 같이 재밌게 놀자.",
+    "왔구나, 반가워! 오늘 방송도 잘 부탁해.",
+    "반가워, 오늘도 끝까지 같이 가자!",
+)
+_SHOW_THANKS_LINES = (
+    "고마워! 축하받으니까 오늘 방송이 더 신난다.",
+    "와 줘서 고마워, 축하까지 받으니 힘이 난다!",
+    "축하 고마워! 오늘도 끝까지 같이 가자.",
+    "축하 받으니 기분 좋다, 고마워. 오늘도 같이 재밌게 놀자!",
 )
 _UNSCHEDULED_LINES = (
     "다음 방송은 아직 안 정해졌어. 정해지면 제일 먼저 알려 줄게.",
@@ -186,8 +235,42 @@ _CARE_LINES = (
     "걱정된다, 푹 쉬고 얼른 낫길 바랄게.",
     "아프다니 속상하다, 얼른 괜찮아지길 바랄게.",
 )
+# A viewer who is down hears comfort (2026-09-29 ep09 T14: "회사에서 혼나서 좀 우울해 ㅠ" -> "혼난 날이면
+# 끝말잇기도 안 되겠네."). Laughing chat ("이 단어 너무 힘들어 ㅋㅋ") is banter, not news.
+_DOWN_RE = re.compile(r"우울|속상|서러|슬퍼|슬프|힘들어|힘들다|힘듦|혼났|혼나서|잘렸|헤어졌|떨어졌")
+_LAUGH_JAMO_RE = re.compile(r"[ㅋㅎ]{2,}")
+_COMFORTED_RE = re.compile(r"속상|저런|힘들었|토닥|괜찮|위로|고생|마음")
+_COMFORT_LINES = (
+    "저런, 오늘 많이 속상했겠다.",
+    "토닥토닥, 오늘 고생 많았어.",
+    "그런 날도 있지. 여기서는 마음 편하게 있어도 돼.",
+    "얘기해 줘서 고마워. 오늘 하루 정말 고생 많았어.",
+)
+# Good news hears congratulations (2026-09-29 ep13 T12: "첫 월급 받았어요!!" -> "첫 월급이면 오늘은 좀
+# 괜찮아 보이네.").
+_GOOD_NEWS_RE = re.compile(r"합격|붙었|첫\s*월급|월급\s*받|취업|승진|당첨|우승|생일")
+_CELEBRATED_RE = re.compile(r"축하|잘됐|대박|멋지|최고")
+# Congratulating someone else, not asking to be congratulated ("축하 좀 해줘").
+_CONGRATULATING_RE = re.compile(r"(?:축하|ㅊㅋ)(?!.{0,10}?해\s*(?:줘|주세요|주라|줄래))")
+_CELEBRATE_LINES = (
+    "우와, 축하해!",
+    "축하해! 진짜 잘됐다.",
+    "대박, 축하해!",
+    "축하해! 오늘은 기분 좋은 날이네.",
+)
+# Loss news gets condolence after AIRI's own acknowledgement (2026-09-29 ep11 T10: "할머니가 돌아가셔서
+# 좀 멍해" -> "할머니가 가셨구나.").
+_LOSS_RE = re.compile(r"돌아가셨|돌아가셔|세상을\s*떠|떠나보냈|장례|부고|무지개\s*다리|하늘나라|별이\s*됐")
+_CONDOLED_RE = re.compile(r"위로|명복|애도|힘들었|힘들겠|힘들\s*텐데|마음이\s*(?:아프|무거)|슬프|슬펐")
+_CONDOLENCE_LINES = (
+    "마음 깊이 위로를 보낼게.",
+    "얘기해 줘서 고마워. 많이 힘들었겠다.",
+    "많이 힘들 텐데 여기 와 줘서 고마워.",
+    "오늘은 여기서 마음 편하게 있어도 돼. 위로를 보낼게.",
+)
 # Each lead pool with the words that show the answer already does its job.
-_LEADS = ((_WELCOME_LINES, _WELCOMED_RE), (_CARE_LINES, _CARED_RE))
+_LEADS = ((_WELCOME_LINES, _WELCOMED_RE), (_CONDOLENCE_LINES, _CONDOLED_RE), (_CARE_LINES, _CARED_RE),
+          (_COMFORT_LINES, _COMFORTED_RE), (_CELEBRATE_LINES, _CELEBRATED_RE))
 # Lines spoken lately, so a question asked again in a show gets another line of its topic.
 _recent_canon_lines: collections.deque[str] = collections.deque(maxlen=8)
 _recent_canon_lock = threading.Lock()
@@ -269,12 +352,17 @@ def show_say_lines(context_note: object, user_text: object) -> tuple[str, ...]:
     if not isinstance(context_note, str) or not isinstance(user_text, str):
         return ()
     text = _CHAT_SOURCE_RE.sub("", unicodedata.normalize("NFKC", user_text).strip())
+    raw = _CHAT_SOURCE_RE.sub("", user_text.strip())
     if _SCHEDULE_QUESTION_RE.search(text) and not _NEXT_SHOW_RE.search(context_note):
         return _UNSCHEDULED_LINES
+    if _SHOW_CONGRATS_RE.search(raw) and not _VIEWER_OWN_STATE_RE.search(raw):
+        return _SHOW_THANKS_LINES
+    if _SHOW_COUNT_RE.search(raw) and _GREETING_RE.search(raw):
+        return _SHOW_GREETING_LINES
     closing = any(
         line.startswith(_SEGMENT_LINE_PREFIX) and "마무리" in line for line in context_note.splitlines()
     )
-    return _CLOSING_LINES if closing and _CLOSING_CHAT_RE.search(text) else ()
+    return _CLOSING_LINES if closing and (_CLOSING_CHAT_RE.search(text) or _CLOSING_CHAT_RE.search(raw)) else ()
 
 
 def with_canon_say_line(context_note: str, user_text: object) -> str:
@@ -283,23 +371,34 @@ def with_canon_say_line(context_note: str, user_text: object) -> str:
     if not lines or say_line(context_note):
         return context_note
     line = _rotated_line(lines, user_text)
+    # A lead joins the line (2026-09-29 ep14 T10: "벌써 끝이네 오늘 생일인데 축하 좀 해줘" got the closing line
+    # alone); leads are otherwise added only to turns with no say line.
+    lead = lead_line(user_text)
+    if lead:
+        line = with_lead(line, lead)
     live_briefing_select_telemetry.canon_line_added()
     header = "" if BROADCAST_BRIEFING_HEADER in context_note else "\n\n" + BROADCAST_BRIEFING_HEADER
     return f"{context_note.rstrip()}{header}\n{SAY_LINE_PREFIX} {line}"
 
 
 def lead_lines(user_text: object) -> tuple[str, ...]:
-    """The lead pool for a first visit or illness news, else ()."""
+    """The lead pool for a first visit, loss news, illness news, a down day or good news, else ()."""
     if not isinstance(user_text, str):
         return ()
     text = _CHAT_SOURCE_RE.sub("", unicodedata.normalize("NFKC", user_text).strip())
+    raw = _CHAT_SOURCE_RE.sub("", user_text.strip())
     if _NEWCOMER_RE.search(text):
         return _WELCOME_LINES
-    if (
-        _ILLNESS_RE.search(text) and not _RECOVERED_RE.search(text) and not _ADVICE_RE.search(text)
-        and not (_QUESTION_RE.search(text) and _ADDRESSES_AIRI_RE.search(text))
-    ):
+    if _LOSS_RE.search(text):
+        return _CONDOLENCE_LINES
+    asks_airi = bool(_QUESTION_RE.search(text) and _ADDRESSES_AIRI_RE.search(text))
+    if _ILLNESS_RE.search(text) and not _RECOVERED_RE.search(text) and not _ADVICE_RE.search(text) and not asks_airi:
         return _CARE_LINES
+    if _DOWN_RE.search(text) and not _LAUGH_JAMO_RE.search(raw) and not asks_airi:
+        return _COMFORT_LINES
+    # A viewer congratulating someone else ("합격 축하해 아이리") is no news of their own.
+    if _GOOD_NEWS_RE.search(text) and not asks_airi and not _CONGRATULATING_RE.search(raw):
+        return _CELEBRATE_LINES
     return ()
 
 
@@ -316,7 +415,8 @@ def with_lead(dialogue: str, lead: str) -> str:
     if not lead or done is None or done.search(text):
         return text
     live_briefing_select_telemetry.lead_added()
-    return f"{lead} {text}".strip()
+    # Condolence follows AIRI's acknowledgement; the others lead it.
+    return f"{text} {lead}".strip() if lead in _CONDOLENCE_LINES else f"{lead} {text}".strip()
 
 
 def with_ruling(dialogue: str, word: str) -> str:
@@ -360,9 +460,21 @@ def accepted_word(context_note: object) -> str:
     return match.group(1) if match else ""
 
 
+def exact_say_line(context_note: object) -> bool:
+    """True when the note carries a referee call that is spoken exactly as its say line."""
+    return isinstance(context_note, str) and bool(_EXACT_CALL_RE.search(context_note))
+
+
+def rejected_word(context_note: object) -> str:
+    """The viewer's word the referee rejected this turn, or ''."""
+    match = _REJECTED_VERDICT_RE.search(context_note) if isinstance(context_note, str) else None
+    return match.group(1) if match else ""
+
+
 def candidate_is_unfit(
     answer: object, say: str, previous_reply: str = "", user_text: str = "", required: str = "",
     accepted: str = "",
+    rejected: str = "",
 ) -> bool:
     """Reject register slips, copied staff notes, invented lookups and repeats of the previous reply.
 
@@ -373,12 +485,15 @@ def candidate_is_unfit(
         return True
     text = unicodedata.normalize("NFKC", answer).strip()
     if required and (not _says_word(text, required) or any(
-        _says_word(part, required) and _REFUSAL_RE.search(part) for part in _SENTENCE_SPLIT_RE.split(text)
-    )):
+        _says_word(part, required) and (_REFUSAL_RE.search(part) or _ORDER_TO_TAKE_RE.search(part.strip()))
+        for part in _SENTENCE_SPLIT_RE.split(text)
+    ) or _OWN_TURN_RE.search(text)):
         return True
     sentences = [part for part in _SENTENCE_SPLIT_RE.split(text) if part.strip()]
     # The model shortens the word ("람보" for 람보르기니), so its first two syllables count as naming it.
     if accepted and any(accepted[:2] in part and _INVALID_CLAIM_RE.search(part) for part in sentences):
+        return True
+    if rejected and any(rejected[:2] in part and _RULED_RE.search(part) for part in sentences):
         return True
     if any(_HONORIFIC_END_RE.search(part) or _WRITTEN_END_RE.search(part) for part in sentences):
         return True
@@ -413,10 +528,11 @@ def candidate_is_unfit(
 def candidate_score(
     answer: object, say: str, previous_reply: str = "", user_text: str = "", required: str = "",
     accepted: str = "",
+    rejected: str = "",
 ) -> tuple[bool, float]:
     """(fit, coverage); tuples order fit candidates first, then by coverage."""
     return (
-        not candidate_is_unfit(answer, say, previous_reply, user_text, required, accepted),
+        not candidate_is_unfit(answer, say, previous_reply, user_text, required, accepted, rejected),
         briefing_coverage(answer, say),
     )
 
@@ -442,6 +558,9 @@ async def select_candidate(
     user_text: str = "",
     required: str = "",
     accepted: str = "",
+    rejected: str = "",
+    unfit: Callable[[str], bool] | None = None,
+    exact: bool = False,
 ) -> tuple[str, object | None, list[object], bool]:
     """Draw until a fit candidate covers the say line or the budget is spent.
 
@@ -451,22 +570,31 @@ async def select_candidate(
     the say line itself is spoken.  The say line is only spoken when it passes the same fitness rules,
     so a staff-note briefing ("…먹었다.") is never read out; the kept candidate then carries the metadata.
     With no say line (a welcome turn) there is nothing to cover, so the first fit candidate is kept.
+    ``unfit`` is the caller's own rule (the proxy's invented-fact check: held turns skip its grounding
+    retries, and on 2026-09-29 ep12 a welcome turn spoke "…3년 전 채팅이야.").
     """
     if not say:
         threshold = 0.0
+
+    def score(text: str) -> tuple[bool, float]:
+        fit, coverage = candidate_score(text, say, previous_reply, user_text, required, accepted, rejected)
+        return (fit and not (unfit is not None and unfit(text)), coverage)
+
+    line = speakable_line(say)
+    if exact and line and score(line)[0]:
+        # ``exact``: the say line is spoken as written, with no further draws.
+        live_briefing_select_telemetry.record(draws=0, early=False, replaced=False, said_briefing=True)
+        return line, None, [], True
     texts: list[str] = [first_text]
     payloads: list[object | None] = [None]
-    scores = [candidate_score(first_text, say, previous_reply, user_text, required, accepted)]
+    scores = [score(first_text)]
     while not accept_early(scores[-1], threshold) and len(texts) < budget:
         text, payload = await draw()
         texts.append(text)
         payloads.append(payload)
-        scores.append(candidate_score(text, say, previous_reply, user_text, required, accepted))
+        scores.append(score(text))
     chosen = best_index(scores)
-    line = speakable_line(say)
-    said_briefing = not accept_early(scores[chosen], threshold) and not candidate_is_unfit(
-        line, say, previous_reply, user_text, required, accepted,
-    )
+    said_briefing = not accept_early(scores[chosen], threshold) and bool(line) and score(line)[0]
     live_briefing_select_telemetry.record(
         draws=len(texts) - 1, early=accept_early(scores[-1], threshold), replaced=chosen != 0,
         said_briefing=said_briefing,
