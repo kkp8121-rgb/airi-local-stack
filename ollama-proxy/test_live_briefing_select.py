@@ -221,6 +221,20 @@ class LiveBriefingSelectTests(unittest.TestCase):
             with self.subTest(line=line):
                 self.assertFalse(candidate_is_unfit(line, say, required="무대"))
 
+    def test_a_move_draft_makes_one_move(self) -> None:
+        # 2026-09-29 ep16 T08: "사과면 과거로 받아볼게. 지금은 시대로 가자." — a second word after AIRI's move.
+        say = "과거로 받을게."
+        for line in ("사과면 과거로 받아볼게. 지금은 시대로 가자.", "과거로 받을게! 아니다, 거울로 갈게."):
+            with self.subTest(line=line):
+                self.assertTrue(candidate_is_unfit(line, say, required="과거"))
+                self.assertFalse(candidate_is_unfit(line, say))
+        for line in ("사과면 과거로 받아볼게.", "사과로 시작했구나. 과거로 받을게.", "과거로 받을게. 이제 거로 이어 봐.",
+                     "그럼 과거로 가자!"):
+            with self.subTest(line=line):
+                self.assertFalse(candidate_is_unfit(line, say, required="과거"))
+        # "관심으로" names 관심, not "관심으".
+        self.assertFalse(candidate_is_unfit("현관엔 관심으로 받을게.", "관심으로 받을게.", required="관심"))
+
     def test_preference_questions_get_a_warm_no_favourite_line(self) -> None:
         # 2026-09-29 ep10 T16: "아이리는 좋아하는 노래 있어?" -> "좋아하는 노래는 없어." (flat).
         for chat in ("[YouTube] 아이리는 좋아하는 노래 있어?", "[YouTube] 아이리 최애 영화 뭐야", "[YouTube] 아이리 취향이 뭐야?"):

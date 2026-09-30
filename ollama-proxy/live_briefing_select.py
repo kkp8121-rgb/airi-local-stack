@@ -45,6 +45,11 @@ _REFUSAL_RE = re.compile(r"못(?:\s|해|하|넘|받|잇)|안\s*(?:되|돼)|막�
 # "무대로 받아. 이번엔 내 차례다.").
 _OWN_TURN_RE = re.compile(r"내\s*차례")
 _ORDER_TO_TAKE_RE = re.compile(r"받아(?:라)?\s*[.!~]*$")
+# A move names one word: a second one after AIRI's move reads as another move (2026-09-29 ep16 T08: "사과면 과거로
+# 받아볼게. 지금은 시대로 가자."). Lazy so "관심으로" names 관심.
+_MOVE_PHRASE_RE = re.compile(
+    r"(?<![가-힣])([가-힣]{2,5}?)(?:으로|로)\s*(?:가자|갈게|받을게|받아\s*볼게|이을게|이어\s*볼게|간다|받는다)"
+)
 # The referee's line for a viewer word it accepted; a draft that calls that word invalid contradicts the
 # verdict (2026-09-29 ep07 T12: "람보르기니 유효" -> "람보로는 안 돼. 이번으로 받을게.").
 _ACCEPTED_VERDICT_RE = re.compile(r"^- 심판 판정: ([가-힣]+) 유효", re.MULTILINE)
@@ -530,7 +535,7 @@ def candidate_is_unfit(
     if required and (not _says_word(text, required) or any(
         _says_word(part, required) and (_REFUSAL_RE.search(part) or _ORDER_TO_TAKE_RE.search(part.strip()))
         for part in _SENTENCE_SPLIT_RE.split(text)
-    ) or _OWN_TURN_RE.search(text)):
+    ) or _OWN_TURN_RE.search(text) or any(match.group(1) != required for match in _MOVE_PHRASE_RE.finditer(text))):
         return True
     sentences = [part for part in _SENTENCE_SPLIT_RE.split(text) if part.strip()]
     # On a canon turn a draft adds no sentence to the line: the added sentence is where the model invented
