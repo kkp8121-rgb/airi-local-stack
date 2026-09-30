@@ -328,6 +328,21 @@ class TagContextTests(unittest.TestCase):
                         self.assertEqual(spoken, "응, 훨씬 나아졌어!")
                         self.assertIn("아직 말하지 말 것", prompt)
 
+    def test_a_next_show_question_does_not_speak_an_invented_hour(self):
+        # 2026-09-30 ep18: the operator wrote "다음 방송은 토요일 저녁이다." and AIRI said "토요일 저녁 8시".
+        self.start("show-plan")
+        self.set_context("show-plan", {**CONTEXT, "segment_label": "마무리",
+                                       "situation": "방송을 마무리하는 구간이다. 다음 방송은 토요일 저녁이다."})
+        client, response = self.chat(
+            "[YouTube] 다음 방송 언제 함?", stream=False, env={"AIRI_LIVE_BRIEFING_CANDIDATES": "2"},
+            drafts=("토요일 저녁 8시, 그때까지 연습할게.", "다음 방송은 토요일 저녁이야! 그때 또 보자."),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(client.raw), 2)
+        spoken = [json.loads(line) for line in response.text.splitlines() if line.strip()][-1]["message"]["content"]
+        self.assertEqual(spoken, "다음 방송은 토요일 저녁이야!")
+        self.assertNotIn("8", spoken)
+
     def test_untagged_and_ineligible_turns_are_untouched(self):
         cases = (
             ("untagged", "오늘 뭐 해?"),
