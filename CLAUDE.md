@@ -25,9 +25,10 @@ SHAs) **read-only**:
 1. `AGENTS.md`
 2. `airi_docs/진행중/AIRI-WORKING-STATE.md` — the mutable live SSoT (frontmatter carries
    `goal_status`, `git_head`, `worktree_state`, `active_trainer_count`, `current_handoff`)
-3. the current handoff: **`airi_docs/진행중/AIRI-BROADCAST-READINESS-HANDOFF-2026-09-29.md`** (broadcast-readiness
-   round with persona-v4; RP decisions stay in `AIRI-PERSONA-RP-HANDOFF-2026-09-26.md`, the stack and simulator
-   how-to in `AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` §3-§4)
+3. the current handoff: **`airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-09-30.md`** (end of the 2026-09-30 session:
+   state, rules and pitfalls, next steps), then its detail doc `AIRI-BROADCAST-READINESS-HANDOFF-2026-09-29.md`
+   (§7 operator formats, §8-7 v6, §8-8 ep19; RP decisions stay in `AIRI-PERSONA-RP-HANDOFF-2026-09-26.md`, the stack
+   and simulator how-to in `AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` §3-§4)
 4. `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md`
 5. `NEXT-SESSION.md`
 

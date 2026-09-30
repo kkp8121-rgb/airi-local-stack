@@ -1,6 +1,16 @@
 # AIRI 다음 세션 안내
 
-## 시작 안내 (2026-09-24 기준)
+## 시작 안내 (2026-09-30 기준 — 이 절이 현재 기준)
+
+1. `AGENTS.md`, 이어서 `airi_docs/진행중/AIRI-WORKING-STATE.md`(live SSoT)를 기계 상태와 read-only로 대조한다.
+2. **`airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-09-30.md`** — 2026-09-30 세션 종료 인계(Codex용): 상태, 규칙과 함정,
+   다음 첫 일. 상세는 `AIRI-BROADCAST-READINESS-HANDOFF-2026-09-29.md` §7·§8-7·§8-8·§9.
+3. 목표는 그대로 `goal_status=active`, `adoption_authorized=false`(채택 보류). 방송 모델은 persona-v4 NUL GGUF, persona-v6는 후보 아님.
+   2026-09-30 세션은 사용자 지시로 끝났고 스택·학습은 모두 꺼져 있다.
+
+아래 09-24 절은 당시 기준이다.
+
+## 시작 안내 (2026-09-24 기준 — 2026-09-30 절로 대체됨)
 
 이 절이 현재 기준이다. 아래 「과거 기록 (시점 순)」은 당시 상태를 그대로 보존한 이력이라 현재 상태 판단에 쓰지 않는다.
 사실의 근거는 `airi_docs/진행중/AIRI-WORKING-STATE.md`의 receipt와 `git log`이며, 이 절과 어긋나면 live state와 실제 기계 상태가 이긴다.
