@@ -117,6 +117,7 @@ from live_briefing_select import (
     say_line,
     select_candidate,
     lead_line,
+    loss_news_line,
     start_show,
     with_canon_say_line,
     with_ruling,
@@ -5927,8 +5928,15 @@ _HARM_WORD_RE = re.compile(r"다쳤|다친|아파|아프|피가|병원")
 _ASKS_ABOUT_OTHER_RE = re.compile(r"[?？]|겠(?:다|네|어)")
 # "이불 밖은 위험해" is the stay-in-bed meme, not a danger report; the 2026-09-25 persona capture
 # answered "그건 못함 이불 밖은 위험해" (to a wake-up tip) with the emergency check-in. The idiom is
-# removed before safety terms are matched, so any other term in the same turn still counts.
-_SAFETY_IDIOM_RE = re.compile(r"이불\s*밖은?\s*위험")
+# removed before safety terms are matched, so any other term in the same turn still counts. Dying in a game, being
+# "dead" to a parent or a teacher, or a dead phone is no loss either (independent review 2026-09-30: "[YouTube] 방금
+# 보스한테 죽었어 ㅋㅋ" got the condolence). Killed by an animal or a person is a death ("우리 햄스터가 고양이한테
+# 죽었어 ㅠㅠ"), and laughter alone proves nothing ("우리 강아지 죽었어 ㅋㅋ 아직도 실감이 안 나").
+_SAFETY_IDIOM_RE = re.compile(
+    r"이불\s*밖은?\s*위험|(?:엄마|아빠|형|누나|언니|오빠|선생님|쌤|보스|몹)\s*(?:한테|에게)\s*죽었"
+    r"|(?:배터리|폰|핸드폰|휴대폰|노트북|컴퓨터|서버|와이파이|인터넷|게임|캐릭터|캐릭|보스|몹)\s*(?:이|가|은|는|도|에서)?"
+    r"\s*(?:또\s*|다\s*)?죽었"
+)
 
 
 def _without_safety_idioms(user_text: str) -> str:
@@ -6009,7 +6017,7 @@ def response_mode_note(user_text: str) -> str:
     """Choose a compact semantic response act without selecting dialogue."""
     if URGENT_SAFETY_CONTEXT_RE.search(_without_safety_idioms(user_text)):
         return "이번 응답형: 긴급 안전 확인 질문 하나. 감탄이나 애도로 끝내지 말고, 지금 안전한 곳에 있는지 또는 치료·응급 도움을 받고 있는지를 반드시 물음표로 확인해."
-    if BEREAVEMENT_CONTEXT_RE.search(user_text):
+    if BEREAVEMENT_CONTEXT_RE.search(_without_safety_idioms(user_text)):
         return "이번 응답형: 사별에 대한 짧고 진솔한 애도 한 박자. 반말로 곁에 있겠다는 뜻만 전하고, 높임말·해결책·상담식 감정 분석은 쓰지 마."
     if FOREIGN_PHRASE_REQUEST_RE.search(user_text) and requests_non_korean_dialogue(user_text):
         return "이번 응답형: 요청받은 외국어 문구 자체만 한 문장으로 말하고 후속 질문이나 해설을 붙이지 마."
@@ -6039,7 +6047,7 @@ def response_sentence_limit(
         return 4
     return 2 if (
         URGENT_SAFETY_CONTEXT_RE.search(user_text)
-        or BEREAVEMENT_CONTEXT_RE.search(user_text)
+        or BEREAVEMENT_CONTEXT_RE.search(_without_safety_idioms(user_text))
         or grounding_open_question_turn(user_text)
     ) else 1
 
@@ -6166,7 +6174,7 @@ def enforce_tool_truth(original_messages: list[dict[str, object]], dialogue: str
     if urgent_safety_context(latest_user, previous_assistant_text(original_messages)):
         if "?" not in dialogue or not re.search(r"(?:안전|치료|병원|응급|도움)", dialogue):
             return "그 소식이면 먼저 안전 확인부터 해야 해. 지금 안전한 곳에 있고 치료나 응급 도움을 받고 있어?"
-    if BEREAVEMENT_CONTEXT_RE.search(latest_user):
+    if BEREAVEMENT_CONTEXT_RE.search(_without_safety_idioms(latest_user)):
         if not re.search(r"(?:유감|애도|곁|함께|마음이\s*무겁|미안)", dialogue):
             return "그 소식은 정말 마음이 무겁다. 지금은 여기서 네 곁에 있을게."
     if SERIOUS_CONTEXT_RE.search(_without_safety_idioms(latest_user)) and LIGHT_REGISTER_RE.search(dialogue):
@@ -6206,12 +6214,13 @@ def unverified_action_fallback(original_messages: list[dict[str, object]]) -> st
     return ""
 
 
-def serious_pre_stream_dialogue(user_text: str, previous_reply: str = "") -> str:
+def serious_pre_stream_dialogue(user_text: str, previous_reply: str = "", live_show: bool = False) -> str:
     """Emit safety-critical semantics before irreversible streaming begins."""
     if urgent_safety_context(user_text, previous_reply):
         return "그 소식이면 먼저 안전 확인부터 해야 해. 지금 안전한 곳에 있고 치료나 응급 도움을 받고 있어?"
-    if BEREAVEMENT_CONTEXT_RE.search(user_text):
-        return "그 소식은 정말 마음이 무겁다. 지금은 여기서 네 곁에 있을게."
+    if BEREAVEMENT_CONTEXT_RE.search(_without_safety_idioms(user_text)):
+        # In a live show with the opt-in selection, a condolence not spoken in this show yet.
+        return loss_news_line(user_text) if live_show else "그 소식은 정말 마음이 무겁다. 지금은 여기서 네 곁에 있을게."
     return ""
 
 
@@ -9705,7 +9714,10 @@ async def proxy(path: str, request: Request):
         repeat_count = 1
         repeat_candidate = False
     serious_fallback = (
-        serious_pre_stream_dialogue(last_user_text, previous_assistant_text(original_messages))
+        serious_pre_stream_dialogue(
+            last_user_text, previous_assistant_text(original_messages),
+            live_show=bool(live_context_note and candidate_budget()),
+        )
         if is_chat_request and not proactive_turn and not quality_probe_turn
         else ""
     )

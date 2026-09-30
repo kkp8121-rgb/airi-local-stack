@@ -74,8 +74,9 @@ _HONORIFIC_END_RE = re.compile(r"(?:요|습니다|세요|죠)\s*[.!?~]*\s*$")
 # Staff-note narration copied as speech ("마라탕을 먹었다.", "…번져 있었다."), past tense only. A
 # present-tense declarative ("2회전에서 바로 복수한다.") is the persona's own natural speech, not a
 # copied note (2026-09-25 false positive found designing the competitive persona). Spoken praise and a
-# spoken groan ("고생했다!", "수고했다", "잘했다", "망했다") are speech too (2026-09-26 handoff §5-5).
-_WRITTEN_END_RE = re.compile(r"(?:었다|았다|였다|(?<!고생)(?<!수고)(?<!잘)(?<!망)했다|샀다|갔다)\s*[.!]*\s*$")
+# spoken groan ("고생했다!", "수고했다", "잘했다", "망했다") are speech too (2026-09-26 handoff §5-5). A staff
+# note never ends in an exclamation mark, so a cheer ("3장 넘어갔다!") is speech (2026-09-30 v6 data review).
+_WRITTEN_END_RE = re.compile(r"(?:었다|았다|였다|(?<!고생)(?<!수고)(?<!잘)(?<!망)했다|샀다|갔다)\s*\.*\s*$")
 _LEAKED_LABEL_RE = re.compile(r"이번 턴에|브리핑|스태프|\[")
 _UNEXECUTED_LOOKUP_RE = re.compile(r"(?:검색|찾아|확인|알아)\s?(?:해\s?)?봤|검색했")
 # A director correction in the say line ("설거지는 아니고", "감기가 아니라") names what AIRI must stop
@@ -112,6 +113,17 @@ _SECOND_PERSON_RE = re.compile(r"(?:^|\s)(?:너|넌|너는|너도|니가|네가|
 # the viewer's own day (2026-09-25 false positive: "산책 다녀왔구나, 강아지도 기분 좋았겠다." has no
 # second-person word). Elsewhere in the sentence 구나/겠 prove nothing: "배고파 죽겠다", "친구나".
 _REACTION_SUFFIXES = ("구나", "겠")
+# Two more forms right after a claim word are about the viewer (2026-09-30 v6 data review): a permission or
+# reassurance in the same clause after 잠들어도 ("틀어 둔 채로 잠들어도 괜찮아", "이제 잠들어도 놓칠 걱정은 없겠다")
+# and news passed on ("김밥 두 줄 먹었다는 얘기"). Not with AIRI as the subject ("나도 잠들어도 괜찮아", "내가 … 먹었다는
+# 얘기"). A past tense before 어도 ("먹었어도"), 되게/되더라 or a later clause after 잠들어도, a story AIRI is about to
+# tell ("먹었다는 얘기부터 할게") and 다는 before anything else ("잤다는 게", "잤다는 말이야") stay AIRI's claims
+# (two independent reviews, 2026-09-30).
+_ABOUT_THE_VIEWER_RE = re.compile(
+    r"(?<=잠들)어도[^.!?,]{0,8}?(?:괜찮|돼(?![가-힣])|된다|되니까|좋아|상관\s*없|걱정\s*(?:마|없|은\s*없))"
+    r"|다는\s*(?:얘기|이야기|소식)(?!\s*(?:부터|를|을|들려|해\s*줄|할게))"
+)
+_FIRST_PERSON_RE = re.compile(r"(?:^|\s)(?:나|나도|나두|나는|난|내가)(?=\s|$|[,.!?~])")
 _CHAT_SOURCE_RE = re.compile(r"^\[[^\]]+\]\s*")
 _QUESTION_RE = re.compile(r"[?？]|뭐|뭘|어디|언제|어때|냐고|냐\s*$|니\s*$")
 _ADDRESSES_AIRI_RE = re.compile(r"아이리|AIRI|(?:^|\s)(?:너|넌|너는|니가|네가)(?:\s|$)", re.IGNORECASE)
@@ -384,6 +396,16 @@ _CONDOLENCE_LINES = (
     "많이 힘들 텐데 여기 와 줘서 고마워.",
     "오늘은 여기서 마음 편하게 있어도 돼. 위로를 보낼게.",
 )
+# The proxy answers loss news itself, before the model (serious_pre_stream_dialogue). In a live show that answer takes
+# a line of this pool not spoken in the show yet (2026-09-30: ollama01 turns 14 and 40, two viewers' pets, heard the
+# same sentence, and the v6 capture's funeral follow-up heard it right after itself). The first line is the proxy's
+# answer outside a show; none repeats a condolence lead's sentence.
+_LOSS_NEWS_LINES = (
+    "그 소식은 정말 마음이 무겁다. 지금은 여기서 네 곁에 있을게.",
+    "마음이 많이 아프겠다. 서두르지 않아도 되니까, 나는 여기서 네 곁에 있을게.",
+    "정말 슬픈 소식이다. 하고 싶은 얘기가 생기면 언제든 곁에서 들을게.",
+    "소중한 존재를 떠나보냈구나. 지금은 여기서 네 곁을 지킬게.",
+)
 # A nervous viewer hears a cheer (2026-09-30 ep18: "기능시험 다음주라 벌써 떨림 ㅠ" -> "떨리는 건 당연해.").
 _NERVOUS_RE = re.compile(r"떨려|떨림|떨린다|떨리네|긴장(?:돼|된다|됨|되네)|걱정(?:돼|된다|됨|되네)")
 _ENCOURAGED_RE = re.compile(r"응원|파이팅|화이팅|힘내|잘\s*(?:할|될|하고)")
@@ -470,16 +492,25 @@ def canon_say_line(user_text: object) -> str:
     return lines[zlib.crc32(str(user_text).encode("utf-8")) % len(lines)] if lines else ""
 
 
-def _rotated_line(lines: tuple[str, ...], user_text: object) -> str:
-    """The text's line of the pool, or the next one not spoken in this show; the pool spent, the oldest spoken."""
+def _spoken(line: str) -> None:
+    """Count the line as spoken in this show, newest last (the caller holds _recent_canon_lock)."""
+    _recent_canon_lines.pop(line, None)
+    _recent_canon_lines[line] = None
+
+
+def _rotated_line(lines: tuple[str, ...], user_text: object, spoken: bool = True) -> str:
+    """The text's line of the pool, or the next one not spoken in this show; the pool spent, the oldest spoken.
+
+    spoken=False only picks it: a lead is spoken once it joins the answer (with_lead).
+    """
     start = zlib.crc32(str(user_text).encode("utf-8")) % len(lines)
     with _recent_canon_lock:
         line = next((lines[(start + step) % len(lines)] for step in range(len(lines))
                      if lines[(start + step) % len(lines)] not in _recent_canon_lines), None)
         if line is None:
-            line = next(spoken for spoken in _recent_canon_lines if spoken in lines)
-        _recent_canon_lines.pop(line, None)
-        _recent_canon_lines[line] = None
+            line = next(said for said in _recent_canon_lines if said in lines)
+        if spoken:
+            _spoken(line)
     return line
 
 
@@ -614,9 +645,15 @@ def lead_lines(user_text: object) -> tuple[str, ...]:
 
 
 def lead_line(user_text: object) -> str:
-    """One lead for this turn, else ''."""
+    """One lead for this turn, else ''. It counts as spoken only once it joins the answer (2026-09-30 long-show
+    replay: a lead the answer did not need was counted, and a later turn heard an earlier turn's lead again)."""
     lines = lead_lines(user_text)
-    return _rotated_line(lines, user_text) if lines else ""
+    return _rotated_line(lines, user_text, spoken=False) if lines else ""
+
+
+def loss_news_line(user_text: object) -> str:
+    """The proxy's condolence for loss news in a live show: a line of the pool not spoken in this show yet."""
+    return _rotated_line(_LOSS_NEWS_LINES, user_text)
 
 
 def with_lead(dialogue: str, lead: str) -> str:
@@ -626,6 +663,8 @@ def with_lead(dialogue: str, lead: str) -> str:
     if not lead or done is None or done.search(text):
         return text
     live_briefing_select_telemetry.lead_added()
+    with _recent_canon_lock:
+        _spoken(lead)
     # Condolence follows AIRI's acknowledgement; the others lead it.
     return f"{text} {lead}".strip() if lead in _CONDOLENCE_LINES else f"{lead} {text}".strip()
 
@@ -720,7 +759,9 @@ def candidate_is_unfit(
         return True
     if any(
         not part.rstrip().endswith(("?", "？")) and not _SECOND_PERSON_RE.search(part)
-        and any(not part[match.end():].startswith(_REACTION_SUFFIXES) for match in _BODILY_CLAIM_RE.finditer(part))
+        and any(not part[match.end():].startswith(_REACTION_SUFFIXES)
+                and not (_ABOUT_THE_VIEWER_RE.match(part, match.end()) and not _FIRST_PERSON_RE.search(part))
+                for match in _BODILY_CLAIM_RE.finditer(part))
         for part in sentences
     ):
         return True

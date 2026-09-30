@@ -1617,6 +1617,39 @@ class MemoryAbsenceGuardTests(unittest.TestCase):
             "",
         )
 
+    def test_loss_news_in_a_live_show_rotates_but_the_default_stays_fixed(self) -> None:
+        # 2026-09-30 ollama01 turns 14 and 40: two viewers' losses heard the same condolence in one show.
+        live_briefing_select.start_show()
+        loss = "오늘 가족이 돌아가셨어."
+        fixed = "그 소식은 정말 마음이 무겁다. 지금은 여기서 네 곁에 있을게."
+        self.assertEqual([ollama_proxy.serious_pre_stream_dialogue(loss) for _ in range(2)], [fixed, fixed])
+        first = ollama_proxy.serious_pre_stream_dialogue(loss, live_show=True)
+        second = ollama_proxy.serious_pre_stream_dialogue(loss, live_show=True)
+        self.assertNotEqual(first, second)
+        self.assertIn("곁", second)
+        # An emergency keeps its safety question in a show too.
+        urgent = ollama_proxy.serious_pre_stream_dialogue("친구가 크게 다쳤다는 연락을 받았어.", live_show=True)
+        self.assertIn("응급 도움", urgent)
+
+    def test_a_figurative_death_is_not_a_loss(self) -> None:
+        # Independent review, 2026-09-30: "[YouTube] 방금 보스한테 죽었어 ㅋㅋ" got the condolence. Dying in a game, being
+        # "dead" to someone, or a dead phone is not a loss; a pet's death stays one, laughter or not.
+        for text in ("[YouTube] 방금 보스한테 죽었어 ㅋㅋ", "나 엄마한테 죽었다", "게임에서 또 죽었어 ㅋㅋㅋ",
+                     "폰 배터리 죽었어 ㅠㅠ", "서버 죽었다"):
+            with self.subTest(text=text):
+                self.assertEqual(ollama_proxy.serious_pre_stream_dialogue(text), "")
+                self.assertNotIn("사별", ollama_proxy.response_mode_note(text))
+                self.assertEqual(ollama_proxy.response_sentence_limit(text, broadcast_mode=False), 1)
+        self.assertEqual(ollama_proxy.enforce_tool_truth(
+            [{"role": "user", "content": "게임에서 또 죽었어 ㅋㅋㅋ"}], "ㅋㅋ 보스가 세구나!"), "ㅋㅋ 보스가 세구나!")
+        # Killed by an animal or a person is a death (second review): only 엄마/보스/… make 한테 죽었 figurative.
+        for text in ("우리 햄스터 죽었어 ㅠㅠ", "강아지가 어제 죽었어", "우리 강아지 죽었어 ㅋㅋ 아직도 실감이 안 나",
+                     "우리 햄스터가 고양이한테 죽었어 ㅠㅠ", "키우던 병아리가 들고양이한테 죽었어", "친구가 괴한에게 죽었어"):
+            with self.subTest(text=text):
+                self.assertIn("곁", ollama_proxy.serious_pre_stream_dialogue(text))
+                self.assertIn("사별", ollama_proxy.response_mode_note(text))
+                self.assertEqual(ollama_proxy.response_sentence_limit(text, broadcast_mode=False), 2)
+
     def test_serious_context_cannot_be_answered_with_light_register(self) -> None:
         messages = [{"role": "user", "content": "오늘 가족이 돌아가셨어."}]
         self.assertEqual(
@@ -8394,6 +8427,48 @@ class LiveBroadcastRouteTests(unittest.TestCase):
                 )
                 self.assertEqual(len(chat.requests), 1)
                 self.assertEqual(dialogue, "응, 훨씬 나아졌어!")
+
+    def test_live_loss_news_rotates_the_condolence_when_selection_is_on(self):
+        # 2026-09-30: ollama01 turns 14 and 40 heard the fixed condolence word for word, and the v6 capture's funeral
+        # follow-up heard it again right after itself. Both are answered before the model; off keeps the fixed line.
+        fixed = "그 소식은 정말 마음이 무겁다. 지금은 여기서 네 곁에 있을게."
+        chats = ("[YouTube] 우리 강아지가 오늘 하늘나라 갔어 ㅠ", "[YouTube] 장례식장에선 정신없었는데 집에 오니까 그냥 멍해요")
+        routes = (("3", "/api/chat", True), ("3", "/api/chat", False), ("3", "/v1/chat/completions", True),
+                  ("", "/api/chat", True))
+        for case, (budget, path, stream) in enumerate(routes):
+            live_briefing_select.start_show()
+            spoken = []
+            for index, user in enumerate(chats):
+                with self.subTest(budget=budget, path=path, stream=stream, user=user):
+                    chat, dialogue = self._live_briefing_chat(
+                        f"loss-{case}-{index}", [], stream, {"AIRI_LIVE_BRIEFING_CANDIDATES": budget}, path=path,
+                        briefing="", user=user,
+                    )
+                    self.assertEqual(chat.requests, [])
+                    self.assertIn("곁", dialogue)
+                    spoken.append(dialogue)
+            if budget:
+                self.assertNotEqual(spoken[0], spoken[1])
+            else:
+                self.assertEqual(spoken, [fixed, fixed])
+
+    def test_loss_news_outside_a_live_turn_keeps_the_fixed_condolence(self):
+        # The rotation belongs to a live show: a plain chat on a proxy with the selection on hears the fixed line.
+        fixed = "그 소식은 정말 마음이 무겁다. 지금은 여기서 네 곁에 있을게."
+        live_briefing_select.start_show()
+        chat = _QueuedApiStreamClient([])
+        with model_environment(AIRI_LIVE_BRIEFING_CANDIDATES="3"), mock.patch.object(
+                ollama_proxy.deterministic_utterance_layer, "DETERMINISTIC_UTTERANCE_LAYER_ENABLED", False), \
+                mock.patch.object(ollama_proxy, "client", chat), \
+                mock.patch.object(ollama_proxy, "memory_runtime", _FakeMemoryRuntime()):
+            for _ in range(2):
+                response = self.post("/api/chat", json.dumps({
+                    "model": "exaone-airi:2.4b", "stream": False,
+                    "messages": [{"role": "user", "content": "[YouTube] 우리 강아지가 오늘 하늘나라 갔어 ㅠ"}],
+                }, ensure_ascii=False).encode())
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["message"]["content"], fixed)
+        self.assertEqual(chat.requests, [])
 
     def test_live_briefing_selection_draws_until_the_briefing_is_covered(self):
         for stream in (True, False):

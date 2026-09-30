@@ -27,6 +27,7 @@ from live_briefing_select import (
     speakable_line,
     lead_line,
     lead_lines,
+    loss_news_line,
     with_canon_say_line,
     with_ruling,
     with_lead,
@@ -41,6 +42,16 @@ CONTEXT_NOTE = (
     "- 이미 말한 것: 어제 녹음하다 목이 아팠다."
 )
 SAY = "나아지긴커녕 오늘 자고 일어나니까 통증이 왼쪽 귀 안쪽까지 번져 있었어."
+
+
+def _joined_leads(chats: tuple[str, ...]) -> list[str]:
+    """Each chat's lead, joined to an answer that does not do its job yet: how the proxy speaks a lead."""
+    spoken = []
+    for chat in chats:
+        lead = lead_line(chat)
+        with_lead("그랬구나.", lead)
+        spoken.append(lead)
+    return spoken
 
 
 class LiveBriefingSelectTests(unittest.TestCase):
@@ -314,7 +325,7 @@ class LiveBriefingSelectTests(unittest.TestCase):
             "[YouTube] 처음 와봤는데 여기 무슨 방송이에요?", "[YouTube] 안녕하세요 처음 왔어요",
             "[YouTube] 뉴비입니다 ㅎㅇ", "[YouTube] 처음 뵙겠습니다",
         )
-        spoken = [lead_line(chat) for chat in chats]
+        spoken = _joined_leads(chats)
         self.assertEqual(len(set(spoken)), 4)
         for line in spoken:
             self.assertIn(line, lead_lines(chats[0]))
@@ -625,7 +636,7 @@ class LiveBriefingSelectTests(unittest.TestCase):
         live_briefing_select._recent_canon_lines.clear()
         chats = ("[YouTube] 사실 어제 할머니가 돌아가셔서 좀 멍해", "[YouTube] 키우던 강아지가 무지개다리 건넜어",
                  "[YouTube] 오늘 아빠 장례식 다녀왔어", "[YouTube] 할머니가 아프시다가 돌아가셨어")
-        spoken = [lead_line(chat) for chat in chats]
+        spoken = _joined_leads(chats)
         self.assertEqual(len(set(spoken)), 4)
         for line in spoken:
             self.assertIn(line, lead_lines(chats[0]))
@@ -640,7 +651,7 @@ class LiveBriefingSelectTests(unittest.TestCase):
         live_briefing_select._recent_canon_lines.clear()
         chats = ("[YouTube] 그래도 오늘 첫 월급 받았어요!!", "[YouTube] 나 오늘 자격증 시험 합격했어!!",
                  "[YouTube] 오늘 내 생일이야", "[YouTube] 드디어 취업했다!!")
-        spoken = [lead_line(chat) for chat in chats]
+        spoken = _joined_leads(chats)
         self.assertEqual(len(set(spoken)), 4)
         for line in spoken:
             self.assertIn(line, lead_lines(chats[0]))
@@ -680,7 +691,7 @@ class LiveBriefingSelectTests(unittest.TestCase):
             "[YouTube] 나는 오늘 회사에서 혼나서 좀 우울해 ㅠ", "[YouTube] 오늘 너무 속상하다",
             "[YouTube] 시험 떨어졌어 ㅠㅠ", "[YouTube] 요즘 너무 힘들어",
         )
-        spoken = [lead_line(chat) for chat in chats]
+        spoken = _joined_leads(chats)
         self.assertEqual(len(set(spoken)), 4)
         for line in spoken:
             self.assertIn(line, lead_lines(chats[0]))
@@ -698,7 +709,7 @@ class LiveBriefingSelectTests(unittest.TestCase):
         live_briefing_select.start_show()
         chats = ("[YouTube] 근데 기능시험 다음주라 벌써 떨림 ㅠ", "[YouTube] 내일 면접이라 긴장돼",
                  "[YouTube] 발표 걱정된다", "[YouTube] 떨려요 ㅠㅠ")
-        spoken = [lead_line(chat) for chat in chats]
+        spoken = _joined_leads(chats)
         self.assertEqual(len(set(spoken)), 4)
         for line in spoken:
             self.assertIn(line, lead_lines(chats[0]))
@@ -710,6 +721,39 @@ class LiveBriefingSelectTests(unittest.TestCase):
         answer = "떨리는 건 당연해."
         self.assertEqual(with_lead(answer, spoken[0]), f"{spoken[0]} {answer}")
         self.assertEqual(with_lead("다 잘될 거야, 응원할게.", spoken[0]), "다 잘될 거야, 응원할게.")
+
+    def test_loss_news_never_hears_the_same_condolence_twice_in_a_show(self) -> None:
+        # 2026-09-30: ollama01 turns 14 and 40 (two viewers' pets) heard the proxy's fixed condolence word for word,
+        # and the v6 capture's funeral follow-up ("장례식장에선 …") heard it again right after itself.
+        live_briefing_select.start_show()
+        chats = ("[YouTube] 우리 강아지가 오늘 하늘나라 갔어 ㅠ", "[YouTube] 장례식장에선 정신없었는데 집에 오니까 그냥 멍해요",
+                 "[YouTube] 사연인데요 저번 주에 키우던 햄스터가 무지개다리 건넜어요", "[YouTube] 할머니가 오늘 새벽에 숨을 거두셨어")
+        spoken = [loss_news_line(chat) for chat in chats]
+        self.assertEqual(len(set(spoken)), 4)
+        for line in spoken:
+            with self.subTest(line=line):
+                self.assertIn("곁", line)
+                self.assertFalse(candidate_is_unfit(line, line))
+        # The pool spent, the line spoken longest ago comes back; a new show starts over.
+        self.assertEqual(loss_news_line("[YouTube] 삼촌이 돌아가셨어"), spoken[0])
+        live_briefing_select.start_show()
+        self.assertEqual(loss_news_line(chats[0]), spoken[0])
+
+    def test_a_lead_counts_as_spoken_only_once_it_joins_the_answer(self) -> None:
+        # 2026-09-30 long-show replay (persona-v4): a care lead picked for a turn whose answer already cared was
+        # never said, yet the show counted it, so the pool ran out and T32 heard T20's lead again.
+        live_briefing_select.start_show()
+        chats = ("[YouTube] 할머니가 입원하셔서 좀 걱정돼", "[YouTube] 아 1판 졌네 ㅠ 근데 나 요즘 감기 걸려서 목이 너무 아파",
+                 "[YouTube] 몸살 기운 있어서 오늘 일찍 잘 듯", "[YouTube] 헐 나도 요즘 몸살 기운 있어서 약 먹고 누워서 보는 중 ㅠ",
+                 "[YouTube] 아 그리고 오늘 강아지가 아파서 병원 다녀왔어")
+        self.assertEqual(len(lead_lines(chats[0])), 4)
+        joined = _joined_leads(chats[:3])
+        self.assertEqual(len(set(joined)), 3)
+        unsaid = lead_line(chats[3])
+        self.assertNotIn(unsaid, joined)
+        answer = "몸살이면 푹 쉬고 얼른 나았으면 좋겠다."
+        self.assertEqual(with_lead(answer, unsaid), answer)
+        self.assertEqual(lead_line(chats[4]), unsaid)
 
     def test_a_cheer_is_not_followed_by_an_invented_body(self) -> None:
         # 2026-09-30 ep18b: the cheer lead, then "나도 시험 볼 때마다 심장이 쿵쾅거리거든." from the model.
@@ -767,7 +811,7 @@ class LiveBriefingSelectTests(unittest.TestCase):
             "[YouTube] 잠깐 끝말잇기 쉬고 ㅠ 나 오늘 감기 걸려서 목소리가 안 나와", "[YouTube] 머리 아파서 오늘은 눈팅만 할게",
             "[YouTube] 몸살 났어 ㅠ", "[YouTube] 어제 넘어져서 다쳤어",
         )
-        spoken = [lead_line(chat) for chat in chats]
+        spoken = _joined_leads(chats)
         self.assertEqual(len(set(spoken)), 4)
         for line in spoken:
             self.assertIn(line, lead_lines(chats[0]))
@@ -866,6 +910,25 @@ class LiveBriefingSelectTests(unittest.TestCase):
         # A reaction/guess about the viewer's own day ("구나", "겠다") is not AIRI's bodily claim either,
         # even with no second-person word in the sentence (2026-09-25 false positive).
         self.assertFalse(candidate_is_unfit("산책 다녀왔구나, 강아지도 기분 좋았겠다.", ""))
+        # A permission or reassurance after 잠들어도 is not AIRI's claim (2026-09-30 v6 data review: a care line for
+        # a sick viewer, "틀어 둔 채로 잠들어도 괜찮아", would have been dropped on a held care turn).
+        for line in ("오늘은 네 몸이 먼저야. 틀어 둔 채로 잠들어도 괜찮아, 그것도 같이 본 거야.",
+                     "이제 잠들어도 놓칠 걱정은 없겠다."):
+            with self.subTest(line=line):
+                self.assertFalse(candidate_is_unfit(line, ""))
+        # Passing on a viewer's news ("-다는 얘기/소식") is not AIRI's claim either (2026-09-30 v6 data review: an
+        # episode-2 recap of what the first show left in memory).
+        self.assertFalse(candidate_is_unfit("1회에서 남은 건 면접 붙었다는 소식, 김밥 두 줄 먹었다는 얘기야.", ""))
+        # AIRI as the subject, a past tense before 어도, 잠들어도 without a permission, or 다는 before anything but news
+        # still tells what AIRI did (independent review of the first cut, 2026-09-30).
+        for claim in ("아까 김밥 먹었어도 또 당기네.", "일찍 잠들었어도 아직 졸려.", "나도 잠들어도 괜찮아.",
+                      "나도 요즘은 잠들어도 금방 깨.", "나는 잠들어도 꿈을 안 꿔.", "요즘은 잠들어도 자꾸 깨더라.",
+                      "나도 아침에 김밥 먹었다는 사실!", "나 오늘 드디어 운동했다는 거!", "어제 한숨도 못 잤다는 게 제일 커.",
+                      "나 아까 산책했다는 거 비밀이야.", "내가 김밥 두 줄 먹었다는 얘기는 비밀이야.",
+                      "요즘은 잠들어도 되게 금방 깨.", "요즘은 잠들어도 금방 깨게 되더라.", "잠들어도 금방 깨, 그래도 괜찮아.",
+                      "오늘은 어제 마라탕 먹었다는 얘기부터 할게.", "그러니까 어제 한숨도 못 잤다는 말이야.", "나두 잠들어도 괜찮아."):
+            with self.subTest(claim=claim):
+                self.assertTrue(candidate_is_unfit(claim, ""))
         # Only the claim word itself running into 구나/겠 is a reaction; 죽겠다, 해야겠다 and 친구나 are not.
         for claim in (
             "아 배고파 죽겠다!", "배고파서 뭐 좀 먹어야겠다.", "나 어제 친구나 동생이랑 산책했어!",
@@ -903,6 +966,11 @@ class LiveBriefingSelectTests(unittest.TestCase):
             with self.subTest(line=line):
                 self.assertFalse(candidate_is_unfit(line, SAY))
         self.assertTrue(candidate_is_unfit("방송 전에 설거지를 했다.", SAY))
+        # A staff note never ends in an exclamation mark, so a cheer is speech (2026-09-30 v6 data review; the
+        # persona-v4 targets hold "…했다!" cheers too).
+        for line in ("3장 넘어갔다!", "숟가락 하나로 제일 센 근거를 막았다!", "명예 회복했다!"):
+            with self.subTest(line=line):
+                self.assertFalse(candidate_is_unfit(line, SAY))
 
     def test_pick_prefers_fit_then_coverage_and_keeps_draw_order_on_ties(self) -> None:
         scores = [(False, 0.9), (True, 0.2), (True, 0.4), (True, 0.4)]
