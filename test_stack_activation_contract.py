@@ -5,6 +5,7 @@ Ollama process is not a deterministic CI operation.
 """
 import json
 import pathlib
+import re
 import shutil
 import subprocess
 import tempfile
@@ -76,6 +77,50 @@ class StackActivationContractTests(unittest.TestCase):
         self.assertIn('[switch]$LiveBroadcastEvalClock', STACK_START)
         self.assertIn('LiveBroadcastEvalClock requires LiveBroadcast.', STACK_START)
         self.assertEqual(STACK_START.count('-LiveBroadcastEvalClock:$LiveBroadcastEvalClock'), 2)
+
+    def test_proxy_supervision_is_a_default_off_switch_that_wraps_the_same_launch(self) -> None:
+        self.assertIn('[switch]$SuperviseProxy,', PROXY_START)
+        self.assertNotIn('$SuperviseProxy = $true', PROXY_START)
+        # Off: the plain python launch of ollama_proxy.py with the unchanged arguments.
+        self.assertEqual(PROXY_START.count('Start-Process'), 1)
+        self.assertIn(
+            "$proxyLaunchArguments = @($server, '--host', '127.0.0.1', '--port', '11435', "
+            "'--upstream', 'http://127.0.0.1:11434', '--num-ctx', $NumCtx, '--num-gpu', $NumGpu)",
+            PROXY_START,
+        )
+        launch = PROXY_START[PROXY_START.index('$process = Start-Process'):PROXY_START.index('-PassThru')]
+        self.assertIn('-FilePath $python', launch)
+        self.assertIn('-ArgumentList $proxyLaunchArguments', launch)
+        # On: proxy_supervisor.py in front of the same arguments, so its own command line keeps the
+        # proxy path and port the stop scripts match, plus the show-state file under runtime\.
+        supervised = PROXY_START[PROXY_START.index('if ($SuperviseProxy) {\n    $proxyRuntimeDir'):
+                                 PROXY_START.index('$memoryEnvironment = @')]
+        self.assertIn("Join-Path $repo 'runtime'", supervised)
+        self.assertIn('New-Item -ItemType Directory -Path $proxyRuntimeDir', supervised)
+        self.assertIn("$liveShowStateFile = Join-Path $proxyRuntimeDir 'live-show-state.json'", supervised)
+        self.assertIn("$liveShowStateFile = ''", PROXY_START)
+        self.assertIn('AIRI_LIVE_SHOW_STATE_FILE = $liveShowStateFile', PROXY_START)
+        self.assertIn(
+            "$proxyLaunchArguments = @((Join-Path $repo 'proxy_supervisor.py'), '--') + $proxyLaunchArguments",
+            PROXY_START,
+        )
+        self.assertLess(PROXY_START.index("'proxy_supervisor.py'), '--')"), PROXY_START.index('$process = Start-Process'))
+        self.assertNotIn('AIRI_LIVE_RESTORE_SHOW_STATE', PROXY_START)
+        self.assertIn('Started AIRI Ollama compatibility proxy (PID $($process.Id), ', PROXY_START)
+        self.assertIn('supervised=$([bool]$SuperviseProxy))."', PROXY_START)
+        reuse = PROXY_START[PROXY_START.index('if ($listener) {'):PROXY_START.index('$memoryEnvironment = @')]
+        self.assertIn('Existing proxy cannot be reused with SuperviseProxy', reuse)
+
+    def test_root_launcher_forwards_proxy_supervision_to_every_proxy_start(self) -> None:
+        self.assertIn('[switch]$SuperviseProxy,', STACK_START)
+        self.assertNotIn('$SuperviseProxy = $true', STACK_START)
+        commands = re.findall(r"start-local-ollama-proxy\.ps1'\)(?:[^\n]*`\r?\n)*[^\n]*", STACK_START)
+        starting = [command for command in commands if '-VerifyExtractionGateOnly' not in command]
+        self.assertGreaterEqual(len(starting), 2)
+        for command in starting:
+            with self.subTest(command=command[:80]):
+                self.assertIn('-SuperviseProxy:$SuperviseProxy', command)
+        self.assertEqual(STACK_START.count('-SuperviseProxy:$SuperviseProxy'), len(starting))
 
     def test_root_launcher_confirms_live_broadcast_health_state(self) -> None:
         for token in (

@@ -2,11 +2,15 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
+import json
 import os
+from pathlib import Path
 import re
 import secrets
+import sys
+import tempfile
 import threading
 import time
 from typing import Any, NamedTuple
@@ -24,6 +28,10 @@ _TOKEN = re.compile(r'^[A-Za-z0-9_-]{32,128}$')
 _OPAQUE_AUDIT_MARKER = re.compile(r'기억표식[가-힣]+\d{6}')
 _MAX_SHOWS, _MAX_CAPABILITIES, _MAX_TOMBSTONES, _CAPABILITY_TTL_SECONDS = 16, 256, 10_240, 300
 _MAX_CLOCK_STEP_MINUTES = 60
+# Opt-in (AIRI_LIVE_SHOW_STATE_FILE): the started shows and the active tag context, replayed
+# after a supervised restart (AIRI_LIVE_RESTORE_SHOW_STATE=on). Never holds a token.
+SHOW_STATE_SCHEMA_VERSION = 1
+_MAX_SHOW_STATE_BYTES = 256 * 1024
 _TERMINAL_STATUSES = frozenset(('delivered', 'failed', 'partial', 'cancelled', 'unknown'))
 _ARC_TURNS = frozenset(('callback_hit', 'callback_miss'))
 _TURN_TYPES = frozenset(('donation', 'subscription', 'selected_chat', 'batched_chat', 'screen_event', 'greeting', 'topic_transition', 'game_success', 'game_failure', 'chat_question', 'chat_teasing', 'chat_correction', 'chat_concern', 'moderation', 'safety', 'callback_hit', 'callback_miss', 'silence', 'response_repair'))
@@ -105,6 +113,8 @@ class _TagContext:
     context_note: str
     deterministic_context_note: str
     memo_items: tuple
+    # The accepted wire context, kept only to save the show state; a dict, so never hashed.
+    broadcast_context: dict[str, Any] = field(compare=False)
 
 
 class TagTurn(NamedTuple):
@@ -164,6 +174,43 @@ def render_broadcast_context(
 _render_broadcast_context = render_broadcast_context
 
 
+def _show_state_log(message: str) -> None:
+    """One content-free stderr line: counts and reasons only, no show id, context or token."""
+    print(f'[live show state] {message}', file=sys.stderr, flush=True)
+
+
+def _read_show_state(path: Path) -> list[tuple[str, object]] | None:
+    """The saved (show_id, tag_context) entries in start order, or None when nothing can be restored."""
+    try:
+        with path.open('rb') as handle:
+            data = handle.read(_MAX_SHOW_STATE_BYTES + 1)
+    except FileNotFoundError:
+        _show_state_log('no saved state to restore; starting with no shows')
+        return None
+    except OSError as exc:
+        _show_state_log(f'read failed ({type(exc).__name__}); starting with no shows')
+        return None
+    try:
+        value = json.loads(data) if len(data) <= _MAX_SHOW_STATE_BYTES else None
+    except (ValueError, RecursionError):
+        value = None
+    shows = value.get('shows') if (
+        type(value) is dict and set(value) == {'schema_version', 'shows'}
+        and type(value['schema_version']) is int and value['schema_version'] == SHOW_STATE_SCHEMA_VERSION
+    ) else None
+    if (
+        type(shows) is not dict or len(shows) > _MAX_SHOWS
+        or any(
+            type(entry) is not dict or set(entry) != {'tag_context'}
+            or not (entry['tag_context'] is None or type(entry['tag_context']) is dict)
+            for entry in shows.values()
+        )
+    ):
+        _show_state_log('saved state is malformed; starting with no shows')
+        return None
+    return [(show_id, entry['tag_context']) for show_id, entry in shows.items()]
+
+
 class LiveBroadcastRuntime:
     """Server-owned shows and bounded one-shot turn/delivery capabilities."""
     def __init__(
@@ -175,6 +222,7 @@ class LiveBroadcastRuntime:
         evaluation_clock: bool = False,
         carryover: ShowCarryoverStore | None = None,
         tag_context: bool = False,
+        show_state_file: str | os.PathLike[str] | None = None,
     ) -> None:
         self.enabled = (
             enabled
@@ -209,6 +257,10 @@ class LiveBroadcastRuntime:
         self.tag_context_enabled = self.enabled and tag_context is True
         self._tag_context: _TagContext | None = None
         self._tag_turns = 0
+        # Opt-in (AIRI_LIVE_SHOW_STATE_FILE): rewritten after every accepted
+        # start, set/clear_tag_context and close; without a path nothing is written.
+        self._show_state_path = Path(show_state_file) if self.enabled and show_state_file else None
+        self._restoring = False
 
     @classmethod
     def from_env(cls) -> 'LiveBroadcastRuntime':
@@ -221,11 +273,82 @@ class LiveBroadcastRuntime:
             observer,
             evaluation_clock=evaluation_clock,
             tag_context=os.getenv('AIRI_LIVE_TAG_CONTEXT') == 'on',
+            show_state_file=os.getenv('AIRI_LIVE_SHOW_STATE_FILE') or None,
         )
         if runtime.enabled:
             # Built only for an enabled runtime, so a disabled one never reads the file.
             runtime._carryover = ShowCarryoverStore.from_env()
+            if runtime._show_state_path is not None:
+                # Only a supervised restart restores; a fresh start then saves no
+                # shows, so stale state never survives it.
+                if os.getenv('AIRI_LIVE_RESTORE_SHOW_STATE') == 'on':
+                    runtime._restore_show_state()
+                runtime._save_show_state()
         return runtime
+
+    def _save_show_state(self) -> None:
+        """Atomically replace the show-state file; a failed write is logged and never fails a control."""
+        path = self._show_state_path
+        if path is None or self._restoring:
+            return
+        context = self._tag_context
+        shows = {
+            show_id: {
+                'tag_context': dict(context.broadcast_context)
+                if context is not None and context.show_id == show_id else None,
+            }
+            for show_id in self._shows
+        }
+        temp: Path | None = None
+        try:
+            data = json.dumps(
+                {'schema_version': SHOW_STATE_SCHEMA_VERSION, 'shows': shows}, separators=(',', ':'),
+            ).encode('utf-8')
+            with tempfile.NamedTemporaryFile(
+                'wb', dir=path.parent, prefix=f'.{path.name}.', suffix='.tmp', delete=False,
+            ) as handle:
+                temp = Path(handle.name)
+                handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp, path)
+            temp = None
+        except (OSError, ValueError, TypeError) as exc:
+            _show_state_log(f'write failed ({type(exc).__name__}); the live show state was not saved')
+        finally:
+            if temp is not None:
+                try:
+                    temp.unlink()
+                except OSError:
+                    pass
+
+    def _restore_show_state(self) -> None:
+        """Replay the saved shows through master_control, so the same validation applies."""
+        entries = _read_show_state(self._show_state_path)
+        if entries is None:
+            return
+        restored = skipped = 0
+        self._restoring = True
+        try:
+            for show_id, context in entries:
+                try:
+                    self.master_control({'action': 'start', 'show_id': show_id})
+                except BroadcastControlError:
+                    skipped += 1
+                    continue
+                restored += 1
+                if context is not None and self.tag_context_enabled:
+                    try:
+                        self.master_control({
+                            'action': 'set_tag_context', 'show_id': show_id, 'broadcast_context': context,
+                        })
+                    except BroadcastControlError:
+                        skipped += 1
+        finally:
+            self._restoring = False
+        _show_state_log(
+            f'restored {restored} show(s)' + (f', skipped {skipped} invalid entries' if skipped else ''),
+        )
 
     @property
     def ready(self) -> bool:
@@ -324,6 +447,7 @@ class LiveBroadcastRuntime:
                         self._carryover_pending[show_id] = []
                         self._carryover_delivered[show_id] = 0
                     self._apply_start(show_id)
+                    self._save_show_state()
                     return {}
                 if action == 'seed_arc' and set(payload) == {'action', 'show_id', 'topic_key', 'event_type', 'setup_summary'}:
                     show_id = self._show(payload['show_id'])
@@ -357,6 +481,7 @@ class LiveBroadcastRuntime:
                     return self._issue(payload)
                 if action == 'close' and set(payload) == {'action', 'show_id'}:
                     self._close(self._show(payload['show_id']))
+                    self._save_show_state()
                     return {}
                 if (
                     action == 'set_tag_context' and self.tag_context_enabled
@@ -368,12 +493,16 @@ class LiveBroadcastRuntime:
                     self._tag_context = _TagContext(
                         show_id, context_note, deterministic_context_note,
                         self._harvest_memo(show_id, payload['broadcast_context']['briefing']),
+                        dict(payload['broadcast_context']),
                     )
+                    self._save_show_state()
                     return {}
                 if action == 'clear_tag_context' and self.tag_context_enabled and set(payload) == {'action', 'show_id'}:
                     show_id = self._show(payload['show_id'])
                     if self._tag_context is not None and self._tag_context.show_id == show_id:
                         self._tag_context = None
+                    # Saved too, or a restart would bring back a context the operator cleared.
+                    self._save_show_state()
                     return {}
                 raise _invalid()
         except BroadcastControlError:

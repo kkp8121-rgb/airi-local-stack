@@ -1,3 +1,6 @@
+import contextlib
+import io
+import json
 import os
 import hashlib
 import sys
@@ -8,6 +11,7 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import live_broadcast_runtime
 import show_carryover
 from deterministic_utterance_layer import system_briefing_evidence
 from live_broadcast_runtime import (
@@ -572,6 +576,185 @@ class ShowCarryoverRuntimeTests(unittest.TestCase):
         self.assertEqual(runtime.carryover_health()['write_errors'], 1)
         self.assertEqual(runtime.master_control({'action': 'start', 'show_id': 'ep2'}), {})
         self.assertIn('- 지난 방송 기억: 결과는 첫 판 무승부.', self.turn(runtime, 'ep2', self.context()).context_note)
+
+
+class ShowStatePersistenceTests(unittest.TestCase):
+    """Default-off show state (AIRI_LIVE_SHOW_STATE_FILE) that a supervised restart replays."""
+
+    CONTEXT = {
+        'schema_version': 1, 'topic_title': '두 번째 방송', 'segment_label': '오프닝 잡담',
+        'situation': '인사가 끝났다.', 'briefing': BROADCAST_BRIEFING_HEADER + '\n- 채팅 집계: 참여 5',
+        'donation_continuation': False,
+    }
+    EMPTY = {'schema_version': 1, 'shows': {}}
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.folder = Path(folder.name)
+        self.path = self.folder / 'live-show-state.json'
+
+    def runtime(self):
+        return LiveBroadcastRuntime(True, MASTER, OBSERVER, tag_context=True, show_state_file=self.path)
+
+    def saved(self):
+        return json.loads(self.path.read_text(encoding='utf-8'))
+
+    def crashed_with(self, context_show='show-a'):
+        """A runtime that saved two shows and one active tag context, then stopped."""
+        runtime = self.runtime()
+        for show_id in ('show-a', 'show-b'):
+            runtime.master_control({'action': 'start', 'show_id': show_id})
+        runtime.master_control({'action': 'set_tag_context', 'show_id': context_show, 'broadcast_context': self.CONTEXT})
+        return self.saved()
+
+    def from_env(self, restore, *, tag_context='on', enabled='on', state_file=None):
+        env = {
+            'AIRI_LIVE_BROADCAST_ENABLED': enabled, 'AIRI_LIVE_BROADCAST_MASTER_TOKEN': MASTER,
+            'AIRI_LIVE_BROADCAST_OBSERVER_TOKEN': OBSERVER, 'AIRI_LIVE_TAG_CONTEXT': tag_context,
+            'AIRI_LIVE_SHOW_CARRYOVER': '', 'AIRI_LIVE_RESTORE_SHOW_STATE': restore,
+            'AIRI_LIVE_SHOW_STATE_FILE': str(self.path) if state_file is None else state_file,
+        }
+        stderr = io.StringIO()
+        with mock.patch.dict(os.environ, env), contextlib.redirect_stderr(stderr):
+            runtime = LiveBroadcastRuntime.from_env()
+        log = stderr.getvalue()
+        for secret in (MASTER, OBSERVER, 'show-a', 'show-b', self.CONTEXT['topic_title']):
+            self.assertNotIn(secret, log)
+        return runtime, log
+
+    def test_each_accepted_control_rewrites_the_file_without_any_token(self):
+        runtime = self.runtime()
+        self.assertFalse(self.path.exists())
+        runtime.master_control({'action': 'start', 'show_id': 'show-a'})
+        self.assertEqual(self.saved(), {'schema_version': 1, 'shows': {'show-a': {'tag_context': None}}})
+        runtime.master_control({'action': 'set_tag_context', 'show_id': 'show-a', 'broadcast_context': self.CONTEXT})
+        self.assertEqual(self.saved()['shows'], {'show-a': {'tag_context': self.CONTEXT}})
+        runtime.master_control({'action': 'start', 'show_id': 'show-b'})
+        second = {**self.CONTEXT, 'segment_label': '끝말잇기 1라운드'}
+        runtime.master_control({'action': 'set_tag_context', 'show_id': 'show-b', 'broadcast_context': second})
+        # Only the active context is kept, so a replay can never revive a replaced one.
+        self.assertEqual(self.saved()['shows'], {'show-a': {'tag_context': None}, 'show-b': {'tag_context': second}})
+        before = self.path.read_bytes()
+        with self.assertRaises(BroadcastControlError):
+            runtime.master_control({'action': 'set_tag_context', 'show_id': 'show-b',
+                                    'broadcast_context': {**second, 'schema_version': 2}})
+        capability = runtime.master_control({
+            'action': 'issue_turn', 'show_id': 'show-b', 'action_id': 'turn-1',
+            'turn_type': 'chat_question', 'required_delivery': 'renderer',
+        })
+        self.assertEqual(self.path.read_bytes(), before)
+        runtime.master_control({'action': 'clear_tag_context', 'show_id': 'show-b'})
+        self.assertEqual(self.saved()['shows'], {'show-a': {'tag_context': None}, 'show-b': {'tag_context': None}})
+        runtime.master_control({'action': 'close', 'show_id': 'show-a'})
+        self.assertEqual(self.saved()['shows'], {'show-b': {'tag_context': None}})
+        data = self.path.read_bytes()
+        for token in (MASTER, OBSERVER, capability['turn_token'], capability['delivery_token']):
+            self.assertNotIn(token.encode('utf-8'), data)
+        self.assertEqual([item.name for item in self.folder.iterdir()], [self.path.name])
+
+    def test_without_the_file_setting_nothing_is_written(self):
+        runtime = LiveBroadcastRuntime(True, MASTER, OBSERVER, tag_context=True)
+        runtime.master_control({'action': 'start', 'show_id': 'show-a'})
+        runtime.master_control({'action': 'set_tag_context', 'show_id': 'show-a', 'broadcast_context': self.CONTEXT})
+        runtime.master_control({'action': 'close', 'show_id': 'show-a'})
+        for restore in ('on', ''):
+            with self.subTest(restore=restore):
+                runtime, log = self.from_env(restore, state_file='')
+                runtime.master_control({'action': 'start', 'show_id': 'show-a'})
+                self.assertEqual(log, '')
+        # A disabled live runtime never reads or writes the file.
+        self.path.write_bytes(b'kept')
+        runtime, log = self.from_env('on', enabled='off')
+        self.assertEqual((runtime.ready, log, self.path.read_bytes()), (False, '', b'kept'))
+        self.assertEqual([item.name for item in self.folder.iterdir()], [self.path.name])
+
+    def test_a_restart_restores_the_shows_and_the_active_tag_context(self):
+        saved = self.crashed_with('show-a')
+        runtime, log = self.from_env('on')
+        self.assertEqual(runtime.health()['active_shows'], 2)
+        turn = runtime.tag_turn(screening_ready=True)
+        self.assertEqual((turn.show_id, turn.context_note), ('show-a', render_broadcast_context(self.CONTEXT)))
+        self.assertEqual(self.saved(), saved)
+        self.assertIn('restored 2 show(s)', log)
+        # Restored shows take the same controls as started ones and are saved again.
+        self.assertEqual(runtime.master_control({'action': 'close', 'show_id': 'show-a'}), {})
+        self.assertEqual(self.saved()['shows'], {'show-b': {'tag_context': None}})
+        with self.assertRaises(BroadcastControlError):
+            runtime.master_control({'action': 'start', 'show_id': 'show-b'})
+
+    def test_a_fresh_start_resets_the_file(self):
+        for restore in ('', 'off', '1', 'true', 'ON'):
+            with self.subTest(restore=restore):
+                self.crashed_with()
+                runtime, _log = self.from_env(restore)
+                self.assertEqual(runtime.health()['active_shows'], 0)
+                self.assertFalse(runtime.tag_context_health()['active'])
+                self.assertEqual(self.saved(), self.EMPTY)
+        # Without a file a fresh start creates the empty one.
+        self.path.unlink()
+        self.from_env('')
+        self.assertEqual(self.saved(), self.EMPTY)
+
+    def test_a_restore_without_tag_context_restores_only_the_shows(self):
+        self.crashed_with('show-b')
+        runtime, log = self.from_env('on', tag_context='')
+        self.assertEqual(runtime.health()['active_shows'], 2)
+        self.assertFalse(runtime.tag_context_health()['active'])
+        self.assertEqual(self.saved()['shows'], {'show-a': {'tag_context': None}, 'show-b': {'tag_context': None}})
+        self.assertIn('restored 2 show(s)', log)
+
+    def test_a_missing_or_malformed_file_starts_with_no_shows(self):
+        entry = {'tag_context': None}
+        cases = {
+            'missing': None, 'empty': b'', 'not json': b'{"shows":', 'not utf-8': b'\xff\xfe\xfa',
+            'list': b'[]', 'oversized': b' ' * (1024 * 1024) + json.dumps(self.EMPTY).encode('utf-8'),
+        }
+        for name, value in {
+            'schema 2': {'schema_version': 2, 'shows': {}}, 'schema bool': {'schema_version': True, 'shows': {}},
+            'no shows': {'schema_version': 1}, 'extra key': {'schema_version': 1, 'shows': {}, 'tokens': 'x'},
+            'shows list': {'schema_version': 1, 'shows': ['show-a']},
+            'entry not dict': {'schema_version': 1, 'shows': {'show-a': None}},
+            'entry keys': {'schema_version': 1, 'shows': {'show-a': {}}},
+            'context type': {'schema_version': 1, 'shows': {'show-a': {'tag_context': 'text'}}},
+            'too many shows': {'schema_version': 1, 'shows': {f'show-{index}': entry for index in range(17)}},
+        }.items():
+            cases[name] = json.dumps(value).encode('utf-8')
+        for name, data in cases.items():
+            with self.subTest(case=name):
+                if data is None:
+                    self.path.unlink(missing_ok=True)
+                else:
+                    self.path.write_bytes(data)
+                runtime, log = self.from_env('on')
+                self.assertEqual(runtime.health()['active_shows'], 0)
+                self.assertIn('starting with no shows', log)
+                self.assertEqual(self.saved(), self.EMPTY)
+                self.assertEqual(runtime.master_control({'action': 'start', 'show_id': 'show-a'}), {})
+
+    def test_entries_the_runtime_rejects_are_skipped(self):
+        self.path.write_text(json.dumps({'schema_version': 1, 'shows': {
+            'bad id!': {'tag_context': None},
+            'show-a': {'tag_context': {**self.CONTEXT, 'situation': ''}},
+            'show-b': {'tag_context': self.CONTEXT},
+        }}), encoding='utf-8')
+        runtime, log = self.from_env('on')
+        self.assertEqual(runtime.health()['active_shows'], 2)
+        self.assertEqual(runtime.tag_turn(screening_ready=True).show_id, 'show-b')
+        self.assertIn('restored 2 show(s), skipped 2 invalid entries', log)
+        self.assertEqual(self.saved()['shows'], {'show-a': {'tag_context': None}, 'show-b': {'tag_context': self.CONTEXT}})
+
+    def test_a_failed_write_never_fails_the_control(self):
+        runtime = self.runtime()
+        stderr = io.StringIO()
+        with mock.patch.object(live_broadcast_runtime.os, 'replace', side_effect=PermissionError('locked')), \
+                contextlib.redirect_stderr(stderr):
+            self.assertEqual(runtime.master_control({'action': 'start', 'show_id': 'show-a'}), {})
+        self.assertIn('write failed', stderr.getvalue())
+        self.assertEqual(runtime.health()['active_shows'], 1)
+        self.assertEqual(list(self.folder.iterdir()), [])
+        runtime.master_control({'action': 'set_tag_context', 'show_id': 'show-a', 'broadcast_context': self.CONTEXT})
+        self.assertEqual(self.saved()['shows'], {'show-a': {'tag_context': self.CONTEXT}})
 
 
 if __name__ == '__main__':

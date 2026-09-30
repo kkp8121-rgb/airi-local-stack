@@ -64,6 +64,9 @@ param(
     # Test-only logical time is a second explicit opt-in. Production launches
     # must never gain the ability to manufacture long continuity gaps.
     [switch]$LiveBroadcastEvalClock,
+    # Default off. On: the proxy runs under proxy_supervisor.py, which starts it
+    # again after a crash, and the restarted proxy restores the live shows.
+    [switch]$SuperviseProxy,
     # A same-process evaluation wrapper may supply fresh capabilities so it
     # can start the proxy and immediately run the campaign without printing
     # or persisting either secret. Supplying only one always fails closed.
@@ -428,6 +431,7 @@ if ([string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
         -AffectContinuity $AffectContinuity `
         -LiveBroadcast:$LiveBroadcast `
         -LiveBroadcastEvalClock:$LiveBroadcastEvalClock `
+        -SuperviseProxy:$SuperviseProxy `
         -LiveBroadcastMasterToken $liveBroadcastMasterToken `
         -LiveBroadcastObserverToken $liveBroadcastObserverToken `
         -ChatModelPreflighted `
@@ -500,6 +504,7 @@ elseif ($MemoryExtractionProvider -eq 'ollama') {
             -AffectContinuity $AffectContinuity `
             -LiveBroadcast:$LiveBroadcast `
             -LiveBroadcastEvalClock:$LiveBroadcastEvalClock `
+            -SuperviseProxy:$SuperviseProxy `
             -LiveBroadcastMasterToken $liveBroadcastMasterToken `
             -LiveBroadcastObserverToken $liveBroadcastObserverToken `
             -AllowExternalSearch $AllowExternalSearch -TopicBoardPath $TopicBoardPath -EnableEvaluation $EnableEvaluation `

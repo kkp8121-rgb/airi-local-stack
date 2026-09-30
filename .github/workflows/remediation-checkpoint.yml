@@ -96,6 +96,7 @@ jobs:
               ollama-proxy/test_show_carryover.py
               ollama-proxy/test_word_chain_referee.py
               ollama-proxy/test_live_tag_context.py
+              ollama-proxy/test_proxy_supervisor.py
               ollama-proxy/test_continuity_ledger.py
               ollama-proxy/test_benchmark_cloud_chat_latency.py
               ollama-proxy/test_cloud_chat_provider.py

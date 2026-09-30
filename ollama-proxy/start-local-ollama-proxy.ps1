@@ -73,6 +73,10 @@ param(
     # campaign harness uses server-attested advances instead of claiming that
     # a fast run spent literal wall-clock hours on air.
     [switch]$LiveBroadcastEvalClock,
+    # Default off: a proxy that exits stays down until it is started again.
+    # On: proxy_supervisor.py starts it again and the proxy replays the live
+    # shows saved in runtime\live-show-state.json (tokens are never saved).
+    [switch]$SuperviseProxy,
     # 선반응 ACK 모드 — 2026-08-19 사용자 결정(C안): 운영 기본은 표정 마커만
     # 남기는 marker다. audible은 구 동작 롤백용, off는 완전 무반응.
     [ValidateSet('audible', 'marker', 'off')]
@@ -366,6 +370,10 @@ if ($listener) {
         # launcher invocation can only hand off safely by restarting.
         throw 'Existing proxy cannot be reused with LiveBroadcast; stop it and restart so fresh control tokens take effect.'
     }
+    if ($SuperviseProxy) {
+        # Health does not say whether a supervisor owns the running proxy.
+        throw 'Existing proxy cannot be reused with SuperviseProxy; stop it and restart so the supervisor owns the new process.'
+    }
     if (-not [string]::IsNullOrWhiteSpace($MemoryExtractionModel)) {
         throw 'Existing proxy cannot be reused for memory extraction.'
     }
@@ -516,6 +524,19 @@ if ($listener) {
     return
 }
 
+$proxyLaunchArguments = @($server, '--host', '127.0.0.1', '--port', '11435', '--upstream', 'http://127.0.0.1:11434', '--num-ctx', $NumCtx, '--num-gpu', $NumGpu)
+$liveShowStateFile = ''
+if ($SuperviseProxy) {
+    $proxyRuntimeDir = Join-Path $repo 'runtime'
+    if (-not (Test-Path -LiteralPath $proxyRuntimeDir -PathType Container)) {
+        New-Item -ItemType Directory -Path $proxyRuntimeDir | Out-Null
+    }
+    $liveShowStateFile = Join-Path $proxyRuntimeDir 'live-show-state.json'
+    # The supervisor's own command line keeps the proxy path and --port 11435,
+    # so the stop scripts that match either one stop both processes.
+    $proxyLaunchArguments = @((Join-Path $repo 'proxy_supervisor.py'), '--') + $proxyLaunchArguments
+}
+
 $memoryEnvironment = @{
     AIRI_MEMORY_ENABLED = if ($EnableMemory) { '1' } else { '0' }
     AIRI_KNOWLEDGE_ENABLED = if ($EnableKnowledge) { '1' } else { '0' }
@@ -563,6 +584,8 @@ $memoryEnvironment = @{
     AIRI_LIVE_BROADCAST_MASTER_TOKEN = if ($LiveBroadcast) { $LiveBroadcastMasterToken } else { '' }
     AIRI_LIVE_BROADCAST_OBSERVER_TOKEN = if ($LiveBroadcast) { $LiveBroadcastObserverToken } else { '' }
     AIRI_LIVE_BROADCAST_EVAL_CLOCK = if ($LiveBroadcastEvalClock) { 'on' } else { 'off' }
+    # Empty (off) removes the variable, so an unsupervised proxy saves no show state.
+    AIRI_LIVE_SHOW_STATE_FILE = $liveShowStateFile
     AIRI_IMMEDIATE_ACK = $ImmediateAck
     AIRI_SILENCE_FALLBACK_POOL = $SilenceFallbackPool
     AIRI_BROADCAST_CONTRACT = $BroadcastContract
@@ -609,7 +632,7 @@ foreach ($name in $memoryEnvironment.Keys) {
 try {
     $process = Start-Process `
         -FilePath $python `
-        -ArgumentList $server, '--host', '127.0.0.1', '--port', '11435', '--upstream', 'http://127.0.0.1:11434', '--num-ctx', $NumCtx, '--num-gpu', $NumGpu `
+        -ArgumentList $proxyLaunchArguments `
         -WorkingDirectory $repo `
         -WindowStyle Hidden `
         -RedirectStandardOutput $stdoutLog `
@@ -622,4 +645,4 @@ finally {
     }
 }
 
-Write-Output "Started AIRI Ollama compatibility proxy (PID $($process.Id), memory=$EnableMemory, extraction=$MemoryExtractionProvider/$([bool]$MemoryExtractionModel), chat=$ChatProvider/$effectiveChatModel, liveBroadcast=$([bool]$LiveBroadcast), externalSearch=$AllowExternalSearch, evaluation=$EnableEvaluation, characterEvaluator=$EnableCharacterEvaluator/$effectiveEvaluatorModel)."
+Write-Output "Started AIRI Ollama compatibility proxy (PID $($process.Id), memory=$EnableMemory, extraction=$MemoryExtractionProvider/$([bool]$MemoryExtractionModel), chat=$ChatProvider/$effectiveChatModel, liveBroadcast=$([bool]$LiveBroadcast), externalSearch=$AllowExternalSearch, evaluation=$EnableEvaluation, characterEvaluator=$EnableCharacterEvaluator/$effectiveEvaluatorModel, supervised=$([bool]$SuperviseProxy))."
