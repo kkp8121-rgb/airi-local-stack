@@ -280,6 +280,26 @@ class LiveBriefingSelectTests(unittest.TestCase):
         # A briefing that already names a line keeps it and uses up nothing.
         self.assertEqual(with_canon_say_line(CONTEXT_NOTE, chat), CONTEXT_NOTE)
 
+    def test_a_show_does_not_repeat_a_line_until_its_pool_is_spent(self) -> None:
+        # 2026-09-30 R1 criterion (user): the same line never twice in one show. Only the last eight lines were
+        # remembered, so a question asked again after eight other say lines got its first line back.
+        note = CONTEXT_NOTE.split("\n\n")[0]
+        meal = "[YouTube] 아이리 밥은 먹고 방송 켠 거임?"
+        pool = canon_say_lines(meal)
+        live_briefing_select.start_show()
+        # Asked first in other words, whose own line is not the meal question's own line.
+        spoken = [say_line(with_canon_say_line(note, "[YouTube] 아이리 밥 먹었어?"))]
+        self.assertNotEqual(spoken[0], canon_say_line(meal))
+        for chat in ("[YouTube] 아이리 어제 잘 잤어?", "[YouTube] 아이리 어디 살아?", "[YouTube] 아이리는 주말에 뭐 했어?",
+                     "[YouTube] 아이리 운동 좋아해?", "[YouTube] 아이리는 감기 안 걸려?") * 2:
+            say_line(with_canon_say_line(note, chat))
+        spoken += [say_line(with_canon_say_line(note, meal)) for _ in range(len(pool) - 1)]
+        self.assertEqual(sorted(spoken), sorted(pool))
+        # The pool spent, the line said longest ago comes back first; a new show starts afresh.
+        self.assertEqual(say_line(with_canon_say_line(note, meal)), spoken[0])
+        live_briefing_select.start_show()
+        self.assertEqual(say_line(with_canon_say_line(note, meal)), canon_say_line(meal))
+
     def test_a_first_time_viewer_is_welcomed_before_the_answer(self) -> None:
         # 2026-09-29 ep07 T06: "처음 와봤는데 여기 무슨 방송이에요?" got the show's topic and no welcome.
         # A welcome say line then made AIRI say the welcome alone (newcomer probe), so it goes in front instead.

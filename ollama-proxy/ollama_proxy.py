@@ -117,6 +117,7 @@ from live_briefing_select import (
     say_line,
     select_candidate,
     lead_line,
+    start_show,
     with_canon_say_line,
     with_ruling,
     with_lead,
@@ -9481,6 +9482,9 @@ async def _broadcast_endpoint(request: Request, *, receipt: bool, trailing: bool
             result = live_broadcast_runtime.master_control(payload)
             if payload.get('action') == 'close':
                 word_chain_referee.close_show(payload['show_id'])
+            elif payload.get('action') == 'start':
+                # Say lines are not repeated within a show (R1 criterion 2026-09-30); a new show starts afresh.
+                start_show()
         return JSONResponse(result)
     except (BroadcastControlError, json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
         # Runtime action paths count their own rejections; parser paths do not.

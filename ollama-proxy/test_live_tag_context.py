@@ -5,6 +5,8 @@ with no broadcast turn token. The operator sets the current show context once pe
 viewer turn then gets the same context note an issued turn would, and nothing else.
 """
 import asyncio
+import contextlib
+import io
 import json
 import os
 import sys
@@ -17,6 +19,7 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import live_briefing_select
 import ollama_proxy
 from live_broadcast_runtime import BROADCAST_BRIEFING_HEADER, LiveBroadcastRuntime, render_broadcast_context
 from memory_runtime import NullMemoryRuntime
@@ -465,6 +468,42 @@ class TagContextTests(unittest.TestCase):
                 self.assertEqual(runtime.tag_context_health()["enabled"], enabled)
         # A disabled live runtime never enables it.
         self.assertFalse(LiveBroadcastRuntime(False, MASTER, OBSERVER, tag_context=True).tag_context_health()["enabled"])
+
+    def test_a_show_start_forgets_the_lines_of_the_previous_show(self):
+        # 2026-09-30 R1 criterion: no line twice in one show, so the spoken lines are kept per show.
+        live_briefing_select.start_show()
+        live_briefing_select.with_canon_say_line("[오늘 방송]\n- 지금 구간: 오프닝", "[YouTube] 아이리 밥은 먹었어?")
+        self.assertTrue(live_briefing_select._recent_canon_lines)
+        response = self.control({"action": "start", "show_id": "show-next"})
+        self.assertEqual((response.status_code, response.json()), (200, {}))
+        self.assertFalse(live_briefing_select._recent_canon_lines)
+
+    def test_a_restarted_proxy_gives_tagged_turns_the_restored_context(self):
+        # Default-off AIRI_LIVE_SHOW_STATE_FILE: the supervisor restarts a crashed proxy with
+        # AIRI_LIVE_RESTORE_SHOW_STATE=on, and viewer turns keep the operator's context.
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        path = Path(folder.name) / "live-show-state.json"
+
+        def serve(runtime: LiveBroadcastRuntime) -> None:
+            patch = mock.patch.object(ollama_proxy, "live_broadcast_runtime", runtime)
+            patch.start()
+            self.addCleanup(patch.stop)
+            self.runtime = runtime
+
+        serve(LiveBroadcastRuntime(True, MASTER, OBSERVER, tag_context=True, show_state_file=path))
+        self.start("show-live")
+        self.set_context("show-live")
+        env = {"AIRI_LIVE_BROADCAST_ENABLED": "on", "AIRI_LIVE_BROADCAST_MASTER_TOKEN": MASTER,
+               "AIRI_LIVE_BROADCAST_OBSERVER_TOKEN": OBSERVER, "AIRI_LIVE_TAG_CONTEXT": "on",
+               "AIRI_LIVE_SHOW_CARRYOVER": "", "AIRI_LIVE_SHOW_STATE_FILE": str(path),
+               "AIRI_LIVE_RESTORE_SHOW_STATE": "on"}
+        with mock.patch.dict("os.environ", env), contextlib.redirect_stderr(io.StringIO()):
+            serve(LiveBroadcastRuntime.from_env())
+        self.assertEqual(_contexts(self.tag_raw()), [render_broadcast_context(CONTEXT)])
+        response = self.control({"action": "close", "show_id": "show-live"})
+        self.assertEqual((response.status_code, response.json()), (200, {}))
+        self.assertEqual(json.loads(path.read_text(encoding="utf-8")), {"schema_version": 1, "shows": {}})
 
 
 if __name__ == "__main__":

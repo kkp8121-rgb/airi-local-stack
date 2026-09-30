@@ -301,9 +301,16 @@ _CONDOLENCE_LINES = (
 # Each lead pool with the words that show the answer already does its job.
 _LEADS = ((_WELCOME_LINES, _WELCOMED_RE), (_CONDOLENCE_LINES, _CONDOLED_RE), (_CARE_LINES, _CARED_RE),
           (_COMFORT_LINES, _COMFORTED_RE), (_CELEBRATE_LINES, _CELEBRATED_RE))
-# Lines spoken lately, so a question asked again in a show gets another line of its topic.
-_recent_canon_lines: collections.deque[str] = collections.deque(maxlen=8)
+# Lines spoken in this show, oldest first, so a question asked again gets another line of its topic until the pool
+# is spent (R1 criterion 2026-09-30: no line twice in one show; the last-eight memory let a line come back).
+_recent_canon_lines: collections.OrderedDict[str, None] = collections.OrderedDict()
 _recent_canon_lock = threading.Lock()
+
+
+def start_show() -> None:
+    """Forget the lines spoken in the previous show."""
+    with _recent_canon_lock:
+        _recent_canon_lines.clear()
 
 
 def candidate_budget(value: object | None = None) -> int:
@@ -368,12 +375,15 @@ def canon_say_line(user_text: object) -> str:
 
 
 def _rotated_line(lines: tuple[str, ...], user_text: object) -> str:
-    """The text's line of the pool, or the next one not spoken lately."""
+    """The text's line of the pool, or the next one not spoken in this show; the pool spent, the oldest spoken."""
     start = zlib.crc32(str(user_text).encode("utf-8")) % len(lines)
     with _recent_canon_lock:
         line = next((lines[(start + step) % len(lines)] for step in range(len(lines))
-                     if lines[(start + step) % len(lines)] not in _recent_canon_lines), lines[start])
-        _recent_canon_lines.append(line)
+                     if lines[(start + step) % len(lines)] not in _recent_canon_lines), None)
+        if line is None:
+            line = next(spoken for spoken in _recent_canon_lines if spoken in lines)
+        _recent_canon_lines.pop(line, None)
+        _recent_canon_lines[line] = None
     return line
 
 
