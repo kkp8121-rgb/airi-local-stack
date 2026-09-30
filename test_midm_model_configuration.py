@@ -101,7 +101,8 @@ class MidmModelConfigurationTests(unittest.TestCase):
         self.assertIn("num_ctx = $NumCtx", STACK)
         self.assertIn("Live proxy num_ctx differs from the requested NumCtx", STACK)
         self.assertIn("NumCtx = $NumCtx", STACK)
-        self.assertIn("[object]$NumCtx = 2048", PROXY)
+        # dd327cb (2026-08-25) raised the proxy default to 4096, matching the stack's fallback.
+        self.assertIn("[object]$NumCtx = 4096", PROXY)
         self.assertIn("$parsedNumCtx = 0", PROXY)
         self.assertIn("Existing proxy num_ctx differs from the requested configuration", PROXY)
         self.assertIn("[Globalization.NumberStyles]::None", STACK)
