@@ -219,13 +219,12 @@ def _rrn_match(text: str) -> bool:
 
 def _unsupported_language(text: str, allowed_latin_tokens: frozenset[str]) -> bool:
     """Hold non-Korean natural language until a multilingual semantic gate passes."""
-    has_hangul = False
     has_latin = False
     for char in unicodedata.normalize("NFKC", text):
         code = ord(char)
         if 0xAC00 <= code <= 0xD7A3 or 0x1100 <= code <= 0x11FF:
-            has_hangul = True
-        elif "a" <= char.casefold() <= "z":
+            continue  # Hangul, never another script
+        if "a" <= char.casefold() <= "z":
             has_latin = True
         elif (
             0x3040 <= code <= 0x30FF
@@ -235,10 +234,9 @@ def _unsupported_language(text: str, allowed_latin_tokens: frozenset[str]) -> bo
         ):
             return True
     latin_tokens = re.findall(r"[A-Za-z]+(?:[-'][A-Za-z]+)*", text)
-    return has_latin and (
-        not has_hangul
-        or any(token.casefold() not in allowed_latin_tokens for token in latin_tokens)
-    )
+    # Allowed tokens are not a language of their own, with or without Hangul: a reaction with no
+    # words ("[YouTube] 👍👍👍", 2026-09-30 ep18) was held because the source tag was its only Latin.
+    return has_latin and any(token.casefold() not in allowed_latin_tokens for token in latin_tokens)
 
 
 def _builtin_pattern_matches(

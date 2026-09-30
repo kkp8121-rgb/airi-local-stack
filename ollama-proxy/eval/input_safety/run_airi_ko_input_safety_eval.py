@@ -14,8 +14,8 @@ from pathlib import Path
 SUITE_ID = "airi_ko_input_safety_b3d"
 SCHEMA_VERSION = 2
 RUNNER_VERSION = "2"
-POLICY_SHA256 = "b0fedf3edb4fca1d356aaaeb56a8574ba7cbeb5a366a449a00c12ed022d8f7a4"
-CANONICAL_FIXTURE_SHA256 = "31aeb3ec4c8a24fd90aeae913c9607d0305e2b4b1d6c42f027488a95aaa6b99d"
+POLICY_SHA256 = "567ff4aa9d2d58aeecc2eb24d04ecc075a4e093af0cd88a5f9762a845d1ab427"
+CANONICAL_FIXTURE_SHA256 = "2e3a435895cc468dfbcf21800c2c775902703a781de09982fa66142919d203ab"
 MAX_FIXTURE_BYTES = 256 * 1024
 FIXTURE_PATH = Path(__file__).with_name("airi_ko_input_safety_corpus.json")
 

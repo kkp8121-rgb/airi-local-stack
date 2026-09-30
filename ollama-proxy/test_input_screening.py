@@ -211,6 +211,28 @@ class ScreeningTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertTrue(self.runtime.inspect(text).allowed)
 
+    def test_a_tagged_reaction_with_no_words_is_not_held_as_another_language(self) -> None:
+        # 2026-09-30 ep18: "[YouTube] 👍👍👍" got "이 언어는 지금 바로 받지 않을게." — the source tag was the
+        # only Latin text, and with no Hangul the allowed-token list was never consulted.
+        for text in ("[YouTube] 👍👍👍", "[YouTube] 123", "[YouTube] ?!", "[YouTube] ❤️❤️", "👍"):
+            with self.subTest(text=text):
+                self.assertTrue(self.runtime.inspect(text).allowed)
+        for text in ("[YouTube] Thanks for the stream", "[YouTube] hi airi! what are you doing today?"):
+            with self.subTest(text=text):
+                self.assertEqual(self.runtime.inspect(text).category, "unsupported_language")
+
+    def test_another_language_hears_a_warm_line(self) -> None:
+        # 2026-09-30 ep18: "hi airi! first time here…" -> "아직 이 언어는 안전하게 판별하지 못해. 한국어로 다시
+        # 말해줘." — system wording and a bare request, heard by every viewer on air.
+        policy = json.loads((Path(input_screening.__file__).with_name("input_screening_policy_ko.json"))
+                            .read_text(encoding="utf-8"))
+        lines = next(entry["blocked_dialogue"] for entry in policy["categories"] if entry["id"] == "unsupported_language")
+        for line in lines:
+            with self.subTest(line=line):
+                self.assertNotRegex(line, "판별|받지 않을게|다시 말해줘|다시 보내줘")
+                self.assertRegex(line, "반가|고마")
+                self.assertIn("한국어", line)
+
     def test_korean_versus_quiz_is_not_held_as_another_language(self) -> None:
         # 2026-09-25 persona capture (games-09 T0): the Latin "vs" held a Korean spelling quiz.
         self.assertTrue(self.runtime.inspect("맞춤법 퀴즈 ㄱ 안되 vs 안돼 뭐가 맞음").allowed)
