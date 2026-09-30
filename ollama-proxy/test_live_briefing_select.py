@@ -388,6 +388,96 @@ class LiveBriefingSelectTests(unittest.TestCase):
         given = closing + " 다음 방송은 금요일 저녁 8시에 한다."
         self.assertEqual(with_canon_say_line(given, chat), given)
 
+    def test_a_request_to_be_congratulated_later_is_not_show_congratulations(self) -> None:
+        # 2026-09-30 series02 ep01: "결과 나오면 다음 방송 때 알려줄게 붙으면 축하해줘야 함" -> "와 줘서 고마워,
+        # 축하까지 받으니 힘이 난다!" ("방송" and "축하" twelve characters apart).
+        note = "[오늘 방송]\n- 주제: AIRI 첫 방송\n- 지금 구간: 수다\n- 상황: 시청자와 근황을 나눈다."
+        for chat in ("[YouTube] 결과 나오면 다음 방송 때 알려줄게 붙으면 축하해줘야 함",
+                     "[YouTube] 다음 방송에서 나 합격하면 축하해달라고"):
+            with self.subTest(chat=chat):
+                self.assertEqual(show_say_lines(note, chat), ())
+        self.assertTrue(show_say_lines(note, "[YouTube] 첫방 축하해!! 기다렸어"))
+
+    def test_a_closing_line_carries_the_next_show_plan(self) -> None:
+        # 2026-09-30 series02: the closing line dropped the plan the operator wrote ("다음 방송은 금요일 저녁이다."),
+        # and a closing with no line lost the thanks ("응, 오늘은 여기서 마무리하자. 다음 방송 때 또 놀자.").
+        closing = "[오늘 방송]\n- 주제: AIRI 첫 방송\n- 지금 구간: 마무리\n- 상황: 방송을 마무리한다. 다음 방송은 일요일 오후다."
+        chat = "[YouTube] 벌써 끝이야? 재밌었다"
+        briefed = (closing + "\n\n" + BROADCAST_BRIEFING_HEADER + "\n와 줘서 고맙다는 인사와 다음 방송 계획 한 줄."
+                   "\n- 약속: 다음 방송에서 밸런스 게임 3탄을 한다")
+        for note in (closing, briefed):
+            lines = show_say_lines(note, chat)
+            self.assertEqual(len(lines), 4)
+            for line in lines:
+                with self.subTest(line=line):
+                    self.assertTrue(line.endswith(" 다음 방송은 일요일 오후야!"))
+                    self.assertIn("고마워", line)
+                    self.assertEqual(line.count("다음 방송"), 1)
+                    self.assertFalse(candidate_is_unfit(line, line, "", chat))
+        # The operator's own words for the turn still win.
+        said = briefed + "\n- 이번 턴에 말할 것: 오늘 고마웠어! 다음엔 밸런스 게임 3탄 하자!"
+        self.assertEqual(with_canon_say_line(said, chat), said)
+
+    def test_a_question_about_last_show_news_is_not_good_news(self) -> None:
+        # 2026-09-30 series02 ep03: "저번 방송에 누구 합격 소식 있지 않았어?" -> "대박, 축하해! 응, …".
+        for chat in ("[YouTube] 저번 방송에 누구 합격 소식 있지 않았어?", "[YouTube] 지난번에 합격한 사람 누구였지?"):
+            with self.subTest(chat=chat):
+                self.assertEqual(lead_lines(chat), ())
+        for chat in ("[YouTube] 나 합격했어!!", "[YouTube] 아이리!! 나 저번에 말한 정보처리기사 실기 붙었어!!"):
+            with self.subTest(chat=chat):
+                self.assertTrue(lead_lines(chat))
+
+    def test_a_balance_game_goes_to_the_viewers_and_airi_judges_their_reasons(self) -> None:
+        # 2026-09-30 series02: "밸런스 게임! 평생 여름만 vs 평생 겨울만" -> "평생 여름만, 평생 겨울만." (no pick), then
+        # "…아이리 너는 뭐 고를래?" -> "여름은 여름대로 매력이 있지.". Canon (2026-09-25): a "만약에" goes to the viewers
+        # and AIRI judges their reasons, never her own taste — a first try that picked "평생 라면만 먹기" for her broke it.
+        live_briefing_select.start_show()
+        note = "[오늘 방송]\n- 주제: AIRI 첫 방송\n- 지금 구간: 밸런스 게임\n- 상황: 시청자가 둘 중 하나를 고르는 질문을 낸다."
+        chat = "[YouTube] 밸런스 게임 3탄! 평생 라면만 먹기 vs 평생 떡볶이만 먹기"
+        for line in show_say_lines(note, chat):
+            with self.subTest(line=line):
+                self.assertIn("평생 라면만 먹기", line)
+                self.assertIn("평생 떡볶이만 먹기", line)
+                self.assertRegex(line, "판정|손 들어")
+                self.assertNotRegex(line, "갈게|한 표|난 ")
+                self.assertFalse(candidate_is_unfit(line, line, "", chat))
+        say_line(with_canon_say_line(note, chat))
+        # Asked for her call, AIRI backs the side the asker argued for first.
+        ask = "[YouTube] 난 떡볶이 ㅋㅋ 라면은 질림 아이리는 뭐 고를래?"
+        for line in show_say_lines(note, ask):
+            with self.subTest(line=line):
+                self.assertIn("평생 떡볶이만 먹기", line)
+                self.assertIn("이유", line)
+                self.assertFalse(candidate_is_unfit(line, line, "", ask))
+        say_line(with_canon_say_line(note, ask))
+        # A counter-argument is taken as a reason (live: "라면은 종류가 많잖아" -> "…나한테는 안 통하네."), and a final
+        # ask naming no side goes to the side argued last (live: "최종 뭐 골라?" -> "아직은 판정 보류!").
+        argue = "[YouTube] 라면파도 있다고!! 라면은 종류가 많잖아"
+        for line in show_say_lines(note, argue):
+            with self.subTest(line=line):
+                self.assertIn("평생 라면만 먹기", line)
+                self.assertRegex(line, "이유|반론")
+                self.assertFalse(candidate_is_unfit(line, line, "", argue))
+        say_line(with_canon_say_line(note, argue))
+        for line in show_say_lines(note, "[YouTube] 아이리 그래서 최종 뭐 골라?"):
+            with self.subTest(line=line):
+                self.assertIn("평생 라면만 먹기", line)
+                self.assertRegex(line, "인정|그럴듯")
+        # With no side argued yet, AIRI asks for reasons instead of choosing.
+        live_briefing_select.start_show()
+        say_line(with_canon_say_line(note, chat))
+        for line in show_say_lines(note, "[YouTube] 아이리는 뭐 고를래?"):
+            with self.subTest(line=line):
+                self.assertIn("이유", line)
+                self.assertNotRegex(line, "인정|손 들어")
+        self.assertEqual(show_say_lines(note, "[YouTube] ㅋㅋㅋ 재밌다"), ())
+        # Other show lines still work inside the segment.
+        self.assertTrue(show_say_lines(note, "[YouTube] 첫방 축하해!! 기다렸어"))
+        # Outside the balance segment, or before any question, nothing changes.
+        self.assertEqual(show_say_lines(note.replace("밸런스 게임", "수다"), chat), ())
+        live_briefing_select.start_show()
+        self.assertEqual(show_say_lines(note, "[YouTube] 아이리 너는 뭐 고를래?"), ())
+
     def test_a_canon_turn_draft_adds_no_sentence_to_the_line(self) -> None:
         # 2026-09-29 R1 re-measure: correct canon lines with an invented sentence added after them.
         weekend = "주말이 따로 있진 않아. 방송이 켜진 시간이 내 하루 전부야."
