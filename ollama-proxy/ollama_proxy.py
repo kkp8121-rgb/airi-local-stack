@@ -111,6 +111,7 @@ from live_briefing_select import (
     candidate_budget,
     coverage_threshold,
     exact_say_line,
+    jumps_to_another_segment,
     live_briefing_select_telemetry,
     rejected_word,
     required_word,
@@ -5934,8 +5935,12 @@ _ASKS_ABOUT_OTHER_RE = re.compile(r"[?？]|겠(?:다|네|어)")
 # 죽었어 ㅠㅠ"), and laughter alone proves nothing ("우리 강아지 죽었어 ㅋㅋ 아직도 실감이 안 나").
 _SAFETY_IDIOM_RE = re.compile(
     r"이불\s*밖은?\s*위험|(?:엄마|아빠|형|누나|언니|오빠|선생님|쌤|보스|몹)\s*(?:한테|에게)\s*죽었"
-    r"|(?:배터리|폰|핸드폰|휴대폰|노트북|컴퓨터|서버|와이파이|인터넷|게임|캐릭터|캐릭|보스|몹)\s*(?:이|가|은|는|도|에서)?"
+    r"|(?:배터리|폰|핸드폰|휴대폰|노트북|컴퓨터|서버|와이파이|인터넷|캐릭터|캐릭|보스|몹)\s*(?:이|가|은|는|도|에서)?"
     r"\s*(?:또\s*|다\s*)?죽었"
+    # A game names where one died, never who: 에서, or 하다가/하면서 with a repeat (ep19 review 2026-09-30: "우리
+    # 메이플이 죽었어", "캐롤이 죽었어" and "게임하다가 죽었어" alone may be real deaths).
+    r"|(?:게임|롤|배그|오버워치|발로란트|메이플|피파|던전|레이드)\s*"
+    r"(?:에서\s*(?:또\s*|다\s*|계속\s*|자꾸\s*)?|(?:하다가|하면서)\s*(?:또|계속|자꾸)\s*)죽었"
 )
 
 
@@ -8606,7 +8611,7 @@ async def stream_local_with_ack(
                 rejected=rejected_word(context.live_context_note),
                 unfit=lambda text: grounding_candidate_asserts_new_measurable_facts(
                     context.last_user_text, text, context.live_context_note,
-                ),
+                ) or jumps_to_another_segment(text, context.live_context_note, context.last_user_text),
                 exact=exact_say_line(context.live_context_note),
             )
             for unchosen_terminal, _unchosen_boundary in unchosen_candidates:
@@ -10935,7 +10940,7 @@ async def proxy(path: str, request: Request):
             rejected=rejected_word(live_context_note),
             unfit=lambda text: grounding_candidate_asserts_new_measurable_facts(
                 last_user_text, text, live_context_note,
-            ),
+            ) or jumps_to_another_segment(text, live_context_note, last_user_text),
             exact=exact_say_line(live_context_note),
         )
         for payload in unchosen:

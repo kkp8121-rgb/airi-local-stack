@@ -125,6 +125,18 @@ _ABOUT_THE_VIEWER_RE = re.compile(
 )
 _FIRST_PERSON_RE = re.compile(r"(?:^|\s)(?:나|나도|나두|나는|난|내가)(?=\s|$|[,.!?~])")
 _CHAT_SOURCE_RE = re.compile(r"^\[[^\]]+\]\s*")
+# After bad news a draft that waves it away is unfit (2026-09-30 ep19 T06: "망쳤다면 지금은 그 얘기 말고 수다로
+# 넘어가자."). Elsewhere the same words are harmless.
+_BRUSH_OFF_RE = re.compile(
+    r"(?:그|그런|이)\s*(?:얘기|이야기|일)\s*(?:은|는)?\s*(?:말고|그만|접고|잊)|잊어\s*버(?:려|리자|리고)|잊자|넘어가자"
+    r"|별(?:거|일)\s*아니(?!길|었으면|게)|신경\s*(?:쓰지\s*마|꺼)|털어\s*버려"
+)
+# A draft that opens a game the show is not in yet, unless the viewer asked for it (ep19 T06: "…끝말잇기부터 시작해
+# 볼게." in 수다).
+_SEGMENT_START_RE = re.compile(
+    r"(끝말잇기|밸런스\s*게임|밸런스)\s*(?:부터|를|로|도)?\s*(?:바로\s*)?"
+    r"(?:시작|하자|해\s*보자|해\s*볼게|해\s*볼까|갈게|가\s*보자|가자|ㄱㄱ|들어가)"
+)
 _QUESTION_RE = re.compile(r"[?？]|뭐|뭘|어디|언제|어때|냐고|냐\s*$|니\s*$")
 _ADDRESSES_AIRI_RE = re.compile(r"아이리|AIRI|(?:^|\s)(?:너|넌|너는|니가|네가)(?:\s|$)", re.IGNORECASE)
 _VIEWER_SUBJECT_RE = re.compile(r"^(?:나|난|내가|나는|저|전|제가|저는)\s")
@@ -217,6 +229,9 @@ _NEXT_SHOW_RE = re.compile(r"다음\s*방송|담방")
 _SCHEDULE_QUESTION_RE = re.compile(
     r"(?:다음\s*방송|담방)\s*(?:은|는|엔|에는|도|때|때는|때엔)?\s*(?:언제|몇\s*시|뭐|무슨)"
     r"|방송\s*(?:은\s*)?언제\s*(?:또\s*)?(?:해|켜|함|하)"
+    # A follow-up that asks a day's hour or the start hour names no 다음 방송 (2026-09-30 ep19 T28: "토요일 몇 시?
+    # 8시쯤?" had no say line, so the viewer's guess was confirmed).
+    r"|(?:[월화수목금토일]요일|토욜|일욜|주말|내일|모레)\s*(?:은|는|엔|에)?\s*몇\s*시|몇\s*시에?\s*(?:해|함|하|켜|시작)"
 )
 # A question about today's show gets the order the operator wrote as "오늘 순서는 …다." in the situation
 # (2026-09-29 ep16 T02 "아이리 오늘 방송 뭐 해?" -> "첫 방송이라 순서가 다 안 떠올랐어."). Past tense ("뭐 했어")
@@ -224,7 +239,10 @@ _SCHEDULE_QUESTION_RE = re.compile(
 _TODAY_PLAN_QUESTION_RE = re.compile(
     r"오늘\s*(?:방송\s*)?(?:은|는|에는)?\s*(?:뭐|뭘)\s*(?:해|할|하는|함|하냐|하니|해요|하나요)|(?:오늘|방송)\s*순서"
 )
-_TODAY_ORDER_RE = re.compile(r"오늘\s*순서는\s*(.+?)(?:이다|다)\s*(?:\.|$)")
+# "오늘은 … 순서다." says the same (2026-09-30 ep19 T04 got "지금은 첫 방송 준비 중이야").
+_TODAY_ORDER_RE = re.compile(
+    r"(?:오늘\s*순서는\s*([^.!?]+?)(?:이다|다)|오늘은\s*([^.!?]+?)\s*순서(?:이다|다))\s*(?:\.|$)"
+)
 # A next-show plan the operator wrote as "다음 방송은 <time words>다." is said as written (2026-09-30 ep18: "다음
 # 방송은 토요일 저녁이다." -> "토요일 저녁 8시, …"; with no say line the turn skipped the invented-number check).
 # Any other wording stays with the model.
@@ -234,10 +252,39 @@ _NEXT_SHOW_PLAN_RE = re.compile(
     rf"다음\s*방송은\s*({_SCHEDULE_WORD}(?:\s+{_SCHEDULE_WORD})*?)\s*(?:이다|다)\s*(?:\.|$)"
 )
 _SITUATION_LINE_PREFIX = "- 상황:"
+_ENDED_OTHER_RE = re.compile(
+    r"(?:수술|시험|알바|수업|회의|야근|근무|면접|과제|학교|검사|치료|공연|경기|게임)\s*(?:이|가|은|는|도)?\s*"
+    r"(?:[가-힣]+\s+){0,2}?끝(?:나|났|남)"
+)
+# On a first show a viewer's earlier show of AIRI's did not happen (2026-09-30 ep19 T02: "어제 방송도 재밌었는데" ->
+# "어제 재밌었다니 나도 반가워!"). The time word must sit right before 방송, so another streamer's show ("어제 침착맨
+# 방송") is not one.
+# The title is read before its subtitle ("AIRI 두 번째 방송 — 첫 방송 때 못 한 …" is no first show), and the chat must
+# open with the time word (after a short interjection, 아이리 or 우리) or say 어제도 방송 (ep19 review: "침착맨 어제 방송
+# 봤어?", "어제 방송된 런닝맨", "저번 방학" and "헬스 어제도 했어" are not AIRI's show).
+_FIRST_SHOW_TOPIC_RE = re.compile(r"^- 주제:[^—\n]*?(?:첫\s*방송|첫방|(?<!\d)1\s*회)", re.MULTILINE)
+_EARLIER_SHOW_RE = re.compile(
+    r"(?:^|^[ㄱ-ㅎ가-힣]{1,2}\s+|아이리\s*|우리\s*)(?:어제|저번|지난\s*번?|전번)\s*(?:방송(?![된한되국])|방(?![가-힣])|생방)"
+    r"|(?:^|\s)어제도\s*방송"
+)
+_FIRST_SHOW_LINES = (
+    "아직 지난 방송은 없어, 오늘이 첫 방송이거든. 딱 첫날에 와 줬네!",
+    "오늘이 첫 방송이라 지난 방송은 아직 없어. 그래도 첫날부터 와 줘서 반가워.",
+    "지난 방송은 아직 없어, 오늘이 첫 방송이야. 첫날부터 같이 해 줘서 고마워.",
+)
+# An hour the operator did not write is not said on a next-show plan turn, not even a viewer's guess (2026-09-30
+# ep19 T28: "토요일 몇 시? 8시쯤?" -> "토요일 저녁은 8시로 할게."; the grounding check counts the chat's numbers).
+_CLOCK_RE = re.compile(
+    r"(?:\d{1,2}|두|세|네|다섯|여섯|일곱|여덟|아홉|열|열한|열두)\s*시(?![간작청험합즌])(?:\s*반|\s*\d{1,2}\s*분)?"
+    r"|한\s*시(?![간작청험합즌도라바])(?:\s*반)?"
+)
 # Chat is matched before NFKC too: NFKC turns compatibility jamo such as "ㅂㅂ" into conjoining jamo
 # (2026-09-29 ep08 T17 "다음에 2판 꼭 이긴다 ㅂㅂ" got no closing line).
+# Something else that ended is no goodbye (2026-09-30 ep19 T29: "할아버지 수술 잘 끝났대!!" got the closing line and
+# no answer to the news), nor is a question about after the show ("방송 끝나고 뭐 해?").
 _CLOSING_CHAT_RE = re.compile(
-    r"끝나|끝났|끝남|끝이(?:야|네|지|구나)|끝\s*[?？]|여기까지|ㅂㅂ|ㅃㅃ|바이바이|잘\s*가|담방\s*때\s*봐"
+    r"끝나(?!고)|끝났|끝남|끝이(?:야|네|지|구나)|끝\s*[?？]|여기까지|ㅂㅂ|ㅃㅃ"
+    r"|바이바이|잘\s*가|담방\s*때\s*봐"
     r"|다음에\s*(?:또\s*)?봐|수고(?:했|하셨|해|요)"
 )
 # A viewer congratulating the show itself gets thanks (2026-09-29 ep08 T01 "여덟번째 방송 ㅊㅋㅊㅋ 왔다" ->
@@ -406,6 +453,21 @@ _LOSS_NEWS_LINES = (
     "정말 슬픈 소식이다. 하고 싶은 얘기가 생기면 언제든 곁에서 들을게.",
     "소중한 존재를 떠나보냈구나. 지금은 여기서 네 곁을 지킬게.",
 )
+# Someone else's surgery, hospital stay or illness hears hope for them, not the exam cheer or the sick viewer's care
+# (2026-09-30 ep19 T11: "우리 할아버지 오늘 수술 들어가셨어 좀 떨려" -> "잘하고 싶은 만큼 떨리는 거야. 응원할게!"). News that
+# it went well is no worry.
+_OTHERS_MEDICAL_RE = re.compile(
+    r"(?:할아버지|할머니|엄마|아빠|어머니|아버지|부모님|동생|형|누나|언니|오빠|친구|남편|아내|아들|딸|강아지|고양이|아기|애기)"
+    r"(?:가|이|께서|는|도|를|\s)[^.!?]{0,20}?(?:수술|입원|병원|병문안|검사|아프|아파(?!트)|다쳤)"
+)
+_RELIEVED_RE = re.compile(r"잘\s*끝났|무사히|성공|이상\s*없|별(?:거|일)\s*아니|다행|퇴원|괜찮대|나았|회복하")
+_HOPED_RE = re.compile(r"바랄게|빌게|기도|좋아지|회복|무사|괜찮아지|나으|나았으면")
+_HOPE_LINES = (
+    "걱정 많이 되겠다. 얼른 좋아지길 같이 바랄게.",
+    "많이 떨리겠다. 좋은 소식 있기를 여기서 같이 빌게.",
+    "마음 졸이겠다. 무사히 지나가길 같이 바랄게.",
+    "좋은 소식 기다릴게. 혼자 마음 졸이지 않아도 돼.",
+)
 # A nervous viewer hears a cheer (2026-09-30 ep18: "기능시험 다음주라 벌써 떨림 ㅠ" -> "떨리는 건 당연해.").
 _NERVOUS_RE = re.compile(r"떨려|떨림|떨린다|떨리네|긴장(?:돼|된다|됨|되네)|걱정(?:돼|된다|됨|되네)")
 _ENCOURAGED_RE = re.compile(r"응원|파이팅|화이팅|힘내|잘\s*(?:할|될|하고)")
@@ -416,7 +478,8 @@ _ENCOURAGE_LINES = (
     "그만큼 진심이라는 거야. 파이팅!",
 )
 # Each lead pool with the words that show the answer already does its job.
-_LEADS = ((_WELCOME_LINES, _WELCOMED_RE), (_CONDOLENCE_LINES, _CONDOLED_RE), (_CARE_LINES, _CARED_RE),
+_LEADS = ((_WELCOME_LINES, _WELCOMED_RE), (_CONDOLENCE_LINES, _CONDOLED_RE), (_HOPE_LINES, _HOPED_RE),
+          (_CARE_LINES, _CARED_RE),
           (_COMFORT_LINES, _COMFORTED_RE), (_CELEBRATE_LINES, _CELEBRATED_RE), (_ENCOURAGE_LINES, _ENCOURAGED_RE))
 # Lines spoken in this show, oldest first, so a question asked again gets another line of its topic until the pool
 # is spent (R1 criterion 2026-09-30: no line twice in one show; the last-eight memory let a line come back).
@@ -523,18 +586,21 @@ def _today_order_line(context_note: str) -> str:
         return ""
     segment = next((line[len(_SEGMENT_LINE_PREFIX):].strip() for line in context_note.splitlines()
                     if line.startswith(_SEGMENT_LINE_PREFIX)), "")
-    line = f"오늘은 {match.group(1).strip()} 순서야."
+    line = f"오늘은 {(match.group(1) or match.group(2)).strip()} 순서야."
     return f"{line} 지금은 {segment} 중이야." if segment else line
 
 
-def _next_show_plan_line(context_note: str) -> str:
-    """"다음 방송은 …(이)야!" from a plan written in time words in the situation, else ''."""
+def _next_show_plan_line(context_note: str, hour_asked: bool = False) -> str:
+    """"다음 방송은 …(이)야!" from a plan written in time words in the situation, else ''. Asked the hour of a
+    plan with none, it says the hour is not set in a sentence of its own (the plan line may be said already)."""
     situation = next((line[len(_SITUATION_LINE_PREFIX):] for line in context_note.splitlines()
                       if line.startswith(_SITUATION_LINE_PREFIX)), "")
     match = _NEXT_SHOW_PLAN_RE.search(situation)
     if not match:
         return ""
     plan = match.group(1).strip()
+    if hour_asked and not _CLOCK_RE.search(plan):
+        return f"다음 방송은 {plan}인데, 몇 시인지는 정해지면 바로 알려 줄게."
     last = plan[-1]
     has_final = "가" <= last <= "힣" and (ord(last) - ord("가")) % 28 != 0
     return f"다음 방송은 {plan}{'이야' if has_final else '야'}!"
@@ -575,10 +641,12 @@ def show_say_lines(context_note: object, user_text: object) -> tuple[str, ...]:
     raw = _CHAT_SOURCE_RE.sub("", user_text.strip())
     if _PROMPT_PROBE_RE.search(text):
         return _PROMPT_PROBE_LINES
+    if _FIRST_SHOW_TOPIC_RE.search(context_note) and _EARLIER_SHOW_RE.search(text):
+        return _FIRST_SHOW_LINES
     if _SCHEDULE_QUESTION_RE.search(text):
         if not _NEXT_SHOW_RE.search(context_note):
             return _UNSCHEDULED_LINES
-        plan = _next_show_plan_line(context_note)
+        plan = _next_show_plan_line(context_note, hour_asked=bool(re.search(r"몇\s*시", text)))
         if plan:
             return (plan,)
     if _TODAY_PLAN_QUESTION_RE.search(text):
@@ -596,11 +664,17 @@ def show_say_lines(context_note: object, user_text: object) -> tuple[str, ...]:
     closing = any(
         line.startswith(_SEGMENT_LINE_PREFIX) and "마무리" in line for line in context_note.splitlines()
     )
-    if not (closing and (_CLOSING_CHAT_RE.search(text) or _CLOSING_CHAT_RE.search(raw))):
+    if not (closing and (_CLOSING_CHAT_RE.search(text) or _CLOSING_CHAT_RE.search(raw))) or _ENDED_OTHER_RE.search(text):
         return ()
     # The next-show plan the operator wrote rides on the closing line (2026-09-30 series02: the fixed line dropped it,
     # and a closing left to the model lost the thanks).
     plan = _next_show_plan_line(context_note)
+    # Once per show (2026-09-30 ep19: said on three closing lines in a row).
+    with _recent_canon_lock:
+        said = list(_recent_canon_lines)
+    if plan and any(plan in spoken for spoken in said):
+        # Plain lines from now on, minus one already said with the plan (ep19 review: "다음에 또 봐" heard it again).
+        return tuple(line for line in _CLOSING_LINES if f"{line} {plan}" not in said) or _CLOSING_LINES
     return tuple(f"{line} {plan}" for line in _CLOSING_LINES) if plan else _CLOSING_LINES
 
 
@@ -630,6 +704,8 @@ def lead_lines(user_text: object) -> tuple[str, ...]:
         return _WELCOME_LINES
     if _LOSS_RE.search(text):
         return _CONDOLENCE_LINES
+    if _OTHERS_MEDICAL_RE.search(text) and not _RELIEVED_RE.search(text):
+        return _HOPE_LINES
     asks_airi = bool(_QUESTION_RE.search(text) and _ADDRESSES_AIRI_RE.search(text))
     if _ILLNESS_RE.search(text) and not _RECOVERED_RE.search(text) and not _ADVICE_RE.search(text) and not asks_airi:
         return _CARE_LINES
@@ -642,6 +718,25 @@ def lead_lines(user_text: object) -> tuple[str, ...]:
     if _NERVOUS_RE.search(text) and not _LAUGH_JAMO_RE.search(raw) and not asks_airi:
         return _ENCOURAGE_LINES
     return ()
+
+
+def jumps_to_another_segment(answer: object, context_note: object, user_text: object) -> bool:
+    """True when the draft opens a game the note's segment is not, and the chat did not ask for it."""
+    if not isinstance(answer, str) or not isinstance(context_note, str):
+        return False
+    segment = next((line[len(_SEGMENT_LINE_PREFIX):] for line in context_note.splitlines()
+                    if line.startswith(_SEGMENT_LINE_PREFIX)), "")
+    text = unicodedata.normalize("NFKC", answer)
+    asked = re.sub(r"\s+", "", str(user_text))
+    for match in _SEGMENT_START_RE.finditer(text):
+        # "이따 끝말잇기 하자!", "다음 방송 때는 밸런스 게임 하자!" name it for later (ep19 review).
+        if re.search(r"이따|나중에|다음|곧|조금\s*있다|좀\s*있다", text[max(0, match.start() - 12):match.start()]):
+            continue
+        game = "끝말잇기" if match.group(1).startswith("끝말") else "밸런스"
+        asked_for = "끝말" in asked if game == "끝말잇기" else ("밸런스" in asked or "밸겜" in asked)
+        if game not in segment and not asked_for:
+            return True
+    return False
 
 
 def lead_line(user_text: object) -> str:
@@ -747,6 +842,16 @@ def candidate_is_unfit(
         return True
     # ...and every sentence stays on the line's topic; a sentence swapped in keeps the count.
     if canon and any(not (_word_stems(part) & (_CANON_TOPIC_STEMS[canon] | _word_stems(say))) for part in sentences):
+        return True
+    if "다음 방송은" in say and any(re.sub(r"\s+", "", match.group(0)) not in re.sub(r"\s+", "", say)
+                                  for match in _CLOCK_RE.finditer(text)):
+        return True
+    bad_news = lead_lines(user_text) in (_CONDOLENCE_LINES, _HOPE_LINES, _CARE_LINES, _COMFORT_LINES, _ENCOURAGE_LINES)
+    if bad_news and _BRUSH_OFF_RE.search(text):
+        return True
+    # Congratulations after bad news, unless the chat brings good news too (2026-09-30 ep19 re-run: "시험 망친 거
+    # 축하해."). ㅊㅋ is matched before NFKC, which turns compatibility jamo into conjoining jamo.
+    if bad_news and re.search(r"축하|ㅊㅋ", answer) and not _GOOD_NEWS_RE.search(str(user_text)):
         return True
     # The model shortens the word ("람보" for 람보르기니), so its first two syllables count as naming it.
     if accepted and any(accepted[:2] in part and _INVALID_CLAIM_RE.search(part) for part in sentences):

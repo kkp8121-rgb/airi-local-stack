@@ -1634,8 +1634,11 @@ class MemoryAbsenceGuardTests(unittest.TestCase):
     def test_a_figurative_death_is_not_a_loss(self) -> None:
         # Independent review, 2026-09-30: "[YouTube] 방금 보스한테 죽었어 ㅋㅋ" got the condolence. Dying in a game, being
         # "dead" to someone, or a dead phone is not a loss; a pet's death stays one, laughter or not.
+        # ep19 T12 (2026-09-30): "롤 하다가 계속 죽었어 ㅋㅋ 오늘 게임 망함" still got a condolence.
         for text in ("[YouTube] 방금 보스한테 죽었어 ㅋㅋ", "나 엄마한테 죽었다", "게임에서 또 죽었어 ㅋㅋㅋ",
-                     "폰 배터리 죽었어 ㅠㅠ", "서버 죽었다"):
+                     "폰 배터리 죽었어 ㅠㅠ", "서버 죽었다", "[YouTube] 롤 하다가 계속 죽었어 ㅋㅋ 오늘 게임 망함",
+                     "배그 하다가 또 죽었다", "메이플 하면서 자꾸 죽었어", "게임에서 죽었어 ㅋㅋ",
+                     "미니게임에서 또 죽었어 ㅋㅋ"):
             with self.subTest(text=text):
                 self.assertEqual(ollama_proxy.serious_pre_stream_dialogue(text), "")
                 self.assertNotIn("사별", ollama_proxy.response_mode_note(text))
@@ -1643,8 +1646,11 @@ class MemoryAbsenceGuardTests(unittest.TestCase):
         self.assertEqual(ollama_proxy.enforce_tool_truth(
             [{"role": "user", "content": "게임에서 또 죽었어 ㅋㅋㅋ"}], "ㅋㅋ 보스가 세구나!"), "ㅋㅋ 보스가 세구나!")
         # Killed by an animal or a person is a death (second review): only 엄마/보스/… make 한테 죽었 figurative.
+        # A pet named after a game, a name ending in 롤, or a death while gaming stays a loss (ep19 review).
         for text in ("우리 햄스터 죽었어 ㅠㅠ", "강아지가 어제 죽었어", "우리 강아지 죽었어 ㅋㅋ 아직도 실감이 안 나",
-                     "우리 햄스터가 고양이한테 죽었어 ㅠㅠ", "키우던 병아리가 들고양이한테 죽었어", "친구가 괴한에게 죽었어"):
+                     "우리 햄스터가 고양이한테 죽었어 ㅠㅠ", "키우던 병아리가 들고양이한테 죽었어", "친구가 괴한에게 죽었어",
+                     "[YouTube] 우리 메이플이 죽었어 ㅠㅠ", "캐롤이 죽었어 ㅠㅠ 12년 키웠는데",
+                     "우리 삼촌이 PC방에서 게임하다가 죽었어"):
             with self.subTest(text=text):
                 self.assertIn("곁", ollama_proxy.serious_pre_stream_dialogue(text))
                 self.assertIn("사별", ollama_proxy.response_mode_note(text))
@@ -8451,6 +8457,21 @@ class LiveBroadcastRouteTests(unittest.TestCase):
                 self.assertNotEqual(spoken[0], spoken[1])
             else:
                 self.assertEqual(spoken, [fixed, fixed])
+
+    def test_live_briefing_holds_back_a_segment_the_show_has_not_reached(self):
+        # 2026-09-30 ep19 T06: in 수다, after the comfort lead, "…끝말잇기부터 시작해 볼게." opened a game the operator
+        # had not opened. The draft is redrawn; the next one already comforts, so no lead is needed.
+        user = "[YouTube] 나 오늘 기말고사 봤는데 완전 망쳤어.. 재수강각"
+        for case, (path, stream) in enumerate((("/api/chat", True), ("/api/chat", False), ("/v1/chat/completions", True))):
+            with self.subTest(path=path, stream=stream):
+                live_briefing_select.start_show()
+                chat, dialogue = self._live_briefing_chat(
+                    f"jump-{case}", ["망쳤다면 끝말잇기부터 시작해 볼게.", "재수강이면 더 속상하겠다."], stream,
+                    {"AIRI_LIVE_BRIEFING_CANDIDATES": "3", "AIRI_BROADCAST_CONTRACT": "on"}, path=path, briefing="",
+                    user=user, segment="수다",
+                )
+                self.assertEqual(len(chat.requests), 2)
+                self.assertEqual(dialogue, "재수강이면 더 속상하겠다.")
 
     def test_loss_news_outside_a_live_turn_keeps_the_fixed_condolence(self):
         # The rotation belongs to a live show: a plain chat on a proxy with the selection on hears the fixed line.
