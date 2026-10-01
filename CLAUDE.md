@@ -38,11 +38,12 @@ checking the exact command line of any running PID. Heartbeat cadence (120 minut
 work or long campaigns), intent/receipt checkpoints, and redaction:
 [goal-state-policy.md](airi_docs/참조/claude-guide/goal-state-policy.md).
 
-## Current context (2026-09-29)
+## Current context (2026-10-01)
 
-- This is the **new PC** (RTX 5060 Ti 8 GiB, no D: drive), not the GPU PC. **Do not install or
-  launch the AIRI desktop app here** (user instruction). GPT-SoVITS and STT are not installed, so
-  latency including TTS is a GPU-PC task.
+- This is the **new PC** (RTX 5060 Ti 8 GiB, no D: drive), not the earlier GPU PC (Codex PC). **Do not
+  install or launch the AIRI desktop app here** (user instruction). Its GPU is for model improvement
+  and training only (fine-tunes, evaluation stacks, simulated shows); **never run TTS here** (user,
+  2026-10-01), so latency including TTS is a task for the other PC.
 - Active track: broadcast readiness with the persona-v4 fine-tune — real-app-path show simulations,
   default-off live-path features in the proxy, evaluation tools outside Git. Results, remaining work,
   and open decisions are in the current handoff and the `AIRI-WORKING-STATE.md` receipts.

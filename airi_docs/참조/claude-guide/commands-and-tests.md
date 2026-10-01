@@ -59,15 +59,22 @@ git diff --check -- . ':(exclude)airi_docs/patches/*.patch'            # whitesp
   (chat-ingress >= 47, broadcast rehearsal >= 37, input safety >= 16, affect evaluator fence >= 11);
   raise the floor when you add tests there.
 
-## Known local test baseline (recorded 2026-09-24)
+## Known local test baseline (recorded 2026-10-01)
 
-Source: `full_suite_receipt_2` in `airi_docs/진행중/AIRI-WORKING-STATE.md` (stack stopped).
+Source: `wc_referee_receipt_20261001` and `precommit_checks_wc_referee_20261001` in
+`airi_docs/진행중/AIRI-WORKING-STATE.md` (stack stopped).
 
-- `python -m pytest -q ollama-proxy test_latency_trace.py test_start_airi_background.py latency-monitor`
-  → 2445 passed, 16 skipped, 5 failed. The 5 failures are the known baseline: 4
+- `ollama-proxy\.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider ollama-proxy test_latency_trace.py test_start_airi_background.py latency-monitor`
+  → 2684 passed, 17 skipped, 5 failed. The 5 failures are the known baseline: 4
   `test_airi_session_header_patch` tests blocked by this PC's PowerShell execution policy, and 1
-  `test_synthesize_broadcast_continuity_v4` test that fails with the same hash at HEAD `d2d7c91`.
+  `test_synthesize_broadcast_continuity_v4` test. System Python 3.12 has no httpx; use the repo venv.
 - `stt` is excluded on this PC because the proxy venv has no `av` module.
+- `test-current-checkpoint.ps1` on this PC: run it from Windows PowerShell with the machine module path and
+  `C:\AIRI-Models\venvs\llamacpp-convert\Scripts` first on `PATH` (its training-durability step needs a
+  Python with torch; it sometimes times out at 30 seconds — run it again). Every step then passes up to
+  B4c, which fails only because that venv has no httpx; run B4c with the repo venv
+  (`-m unittest -v ollama-proxy/eval/broadcast_chat/test_run_broadcast_rehearsal.py`, 85 tests, floor 37)
+  and the three Node groups after it (chat-ingress 47, broadcast-director 24, latency dashboard 5).
 - The document contract tests `test-airi-work-continuity.ps1` and
   `test-airi-roadmap-dashboard-contract.ps1` passed before and after the 2026-09-24 documentation
   refresh (final rerun 11:59 KST, exit 0); rerun them after any edit to `NEXT-SESSION.md`, `airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-08-21.md`,

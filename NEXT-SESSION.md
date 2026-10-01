@@ -1,6 +1,16 @@
 # AIRI 다음 세션 안내
 
-## 시작 안내 (2026-09-30 기준 — 이 절이 현재 기준)
+## 시작 안내 (2026-10-01 기준 — 이 절이 현재 기준)
+
+1. `AGENTS.md`, 이어서 `airi_docs/진행중/AIRI-WORKING-STATE.md`(live SSoT)를 기계 상태와 read-only로 대조한다.
+   최신 receipt: `wc_referee_receipt_20261001`, `precommit_checks_wc_referee_20261001`.
+2. 현재 인계문은 그대로 **`airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-09-30.md`**(10-01 갱신 — §6 다음 첫 일, §8 10-01 작업).
+   상세는 `AIRI-BROADCAST-READINESS-HANDOFF-2026-09-29.md` §7·§8-7~§8-9·§9.
+3. 10-01: 끝말잇기 심판 판정 문장이 한 방송에서 반복되던 문제를 고쳤다(판정마다 변형 4개, 같은 채팅 재실행에서 반복 문장
+   4+2 → 0). **미커밋** — 커밋·push는 각각 사용자 승인. 스택·학습은 모두 꺼져 있다.
+4. 목표는 그대로 `goal_status=active`, `adoption_authorized=false`(채택 보류). 다음 작업 후보는 인계문 §6.
+
+## 시작 안내 (2026-09-30 기준 — 2026-10-01 절로 대체됨)
 
 1. `AGENTS.md`, 이어서 `airi_docs/진행중/AIRI-WORKING-STATE.md`(live SSoT)를 기계 상태와 read-only로 대조한다.
 2. **`airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-09-30.md`** — 2026-09-30 세션 종료 인계(Codex용): 상태, 규칙과 함정,
