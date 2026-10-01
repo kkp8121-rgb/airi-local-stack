@@ -59,13 +59,13 @@ git diff --check -- . ':(exclude)airi_docs/patches/*.patch'            # whitesp
   (chat-ingress >= 47, broadcast rehearsal >= 37, input safety >= 16, affect evaluator fence >= 11);
   raise the floor when you add tests there.
 
-## Known local test baseline (recorded 2026-10-01)
+## Known local test baseline (recorded 2026-10-01 evening)
 
-Source: `wc_referee_receipt_20261001` and `precommit_checks_wc_referee_20261001` in
+Source: the pre-commit receipt of the 2026-10-01 evening fix commit in
 `airi_docs/진행중/AIRI-WORKING-STATE.md` (stack stopped).
 
 - `ollama-proxy\.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider ollama-proxy test_latency_trace.py test_start_airi_background.py latency-monitor`
-  → 2684 passed, 17 skipped, 5 failed. The 5 failures are the known baseline: 4
+  → 2688 passed, 17 skipped, 5 failed (about 11 minutes). The 5 failures are the known baseline: 4
   `test_airi_session_header_patch` tests blocked by this PC's PowerShell execution policy, and 1
   `test_synthesize_broadcast_continuity_v4` test. System Python 3.12 has no httpx; use the repo venv.
 - `stt` is excluded on this PC because the proxy venv has no `av` module.

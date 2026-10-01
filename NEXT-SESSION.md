@@ -1,13 +1,25 @@
 # AIRI 다음 세션 안내
 
-## 시작 안내 (2026-10-01 기준 — 이 절이 현재 기준)
+## 시작 안내 (2026-10-01 저녁 기준 — 이 절이 현재 기준)
+
+1. `AGENTS.md`, 이어서 `airi_docs/진행중/AIRI-WORKING-STATE.md`(live SSoT, 900KB 넘음 — 머리말 키와 최근 receipt만 파이썬으로
+   꺼내 읽는다)를 기계 상태와 read-only로 대조한다. 최신 receipt: `heldout_judge_result_20261001`과 그 뒤 push receipt.
+2. 현재 인계문은 **`airi_docs/진행중/AIRI-HANDOFF-2026-10-01.md`**(§6 다음 첫 일). 스택 띄우기·규칙과 함정은
+   `AIRI-CODEX-HANDOFF-2026-09-30.md` §4·§5, 측정 방법·결과는 `AIRI-HELDOUT-BENCHMARK-2026-10-01.md`.
+3. 10-01: 심판 판정 반복 수정(`1a8db25`), 앞말 안전 수정·두 번째 모의 방송 결함 5건 수정, 보관용 측정 v1(기준선 결함 턴 약 35/100),
+   판정 모델 후보 고르기 실험(잡음 폭 안 — 방송 경로에 붙이지 않고 코드는 저장소 밖 패치)을 모두 커밋·push했다. 스택·학습·판정
+   서버는 모두 꺼져 있다. 이 PC의 GPU는 모델 개선·학습 전용, TTS 금지, RAM은 사용자 작업과 같이 쓴다.
+4. 목표는 그대로 `goal_status=active`, `adoption_authorized=false`(채택 보류). 다음 방향은 사용자 결정 대기(인계문 §6-2).
+
+## 시작 안내 (2026-10-01 낮 기준 — 2026-10-01 저녁 절로 대체됨)
 
 1. `AGENTS.md`, 이어서 `airi_docs/진행중/AIRI-WORKING-STATE.md`(live SSoT)를 기계 상태와 read-only로 대조한다.
    최신 receipt: `wc_referee_receipt_20261001`, `precommit_checks_wc_referee_20261001`.
 2. 현재 인계문은 그대로 **`airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-09-30.md`**(10-01 갱신 — §6 다음 첫 일, §8 10-01 작업).
    상세는 `AIRI-BROADCAST-READINESS-HANDOFF-2026-09-29.md` §7·§8-7~§8-9·§9.
-3. 10-01: 끝말잇기 심판 판정 문장이 한 방송에서 반복되던 문제를 고쳤다(판정마다 변형 4개, 같은 채팅 재실행에서 반복 문장
-   4+2 → 0). **미커밋** — 커밋·push는 각각 사용자 승인. 스택·학습은 모두 꺼져 있다.
+3. 10-01: 끝말잇기 심판 판정 반복 수정은 커밋 `1a8db25`·`d204d3a`(push 없음). 이어서 앞말 안전 수정과 두 번째 모의
+   방송(series03) 결함 5건 수정은 **미커밋**(인계 §8-10) — 커밋·push는 각각 사용자 승인. 스택·학습은 모두 꺼져 있다.
+   이 PC의 GPU는 모델 개선·학습 전용, TTS 금지.
 4. 목표는 그대로 `goal_status=active`, `adoption_authorized=false`(채택 보류). 다음 작업 후보는 인계문 §6.
 
 ## 시작 안내 (2026-09-30 기준 — 2026-10-01 절로 대체됨)

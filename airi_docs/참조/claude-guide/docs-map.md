@@ -24,11 +24,14 @@ filename.
 
 - Live SSoT: `airi_docs/진행중/AIRI-WORKING-STATE.md` (frontmatter `goal_status`, `git_head`,
   `worktree_state`, `active_trainer_count`, `current_handoff`; receipts such as `sim10_receipt`).
-- Current handoff: `airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-09-30.md` — state, rules and pitfalls,
-  next steps (updated 2026-10-01). Its detail doc is
-  `airi_docs/진행중/AIRI-BROADCAST-READINESS-HANDOFF-2026-09-29.md` (the broadcast-readiness round with
-  persona-v4, §8-1 to §8-9); earlier: `AIRI-PERSONA-RP-HANDOFF-2026-09-26.md` for the RP decisions,
-  `AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` for the stack and simulator how-to.
+- Current handoff: `airi_docs/진행중/AIRI-HANDOFF-2026-10-01.md` — state, held-out benchmark and
+  candidate-judge results, new pitfalls, next steps. The previous handoff
+  `airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-09-30.md` keeps the stack how-to (§4) and the standing rules and
+  pitfalls (§5); its detail doc `airi_docs/진행중/AIRI-BROADCAST-READINESS-HANDOFF-2026-09-29.md` covers the
+  broadcast-readiness rounds with persona-v4 (§8-1 to §8-11); earlier: `AIRI-PERSONA-RP-HANDOFF-2026-09-26.md`
+  for the RP decisions, `AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` for the simulator how-to.
+- Held-out benchmark (how improvements are judged): `airi_docs/진행중/AIRI-HELDOUT-BENCHMARK-2026-10-01.md`;
+  decision-model (Jev-style, Ollama `/v1/systemone`) comparison: `airi_docs/진행중/AIRI-DECISION-MODEL-EVAL-2026-10-01.md`.
 - System1 (Jev) candidate-judge plan and results: `airi_docs/진행중/AIRI-SYSTEM1-CANDIDATE-JUDGE-2026-09-23.md`
   (§0-§6 the 2026-09-23 plan, §7 the v2 scenarios, §8 the live-broadcast simulations).
 - Roadmap: `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md` (user dashboard and M8 checklist; the
@@ -38,6 +41,8 @@ filename.
 
 ## Handoff lineage
 
+- `airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-09-30.md` — end of the 2026-09-30 session (written for Codex),
+  superseded as the current handoff on 2026-10-01 evening; §4 and §5 stay valid.
 - `airi_docs/진행중/AIRI-GPU-PC-HANDOFF-2026-09-01-STAGE3.md` — M8 Stage 3 on the GPU PC. Stage 3,
   M8-10 and Stage 4 ran after it; their results live in the `m8_*` / `stage4_*` receipts of
   `AIRI-WORKING-STATE.md`. Its asset locations remain valid.

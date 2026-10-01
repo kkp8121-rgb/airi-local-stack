@@ -25,10 +25,10 @@ SHAs) **read-only**:
 1. `AGENTS.md`
 2. `airi_docs/진행중/AIRI-WORKING-STATE.md` — the mutable live SSoT (frontmatter carries
    `goal_status`, `git_head`, `worktree_state`, `active_trainer_count`, `current_handoff`)
-3. the current handoff: **`airi_docs/진행중/AIRI-CODEX-HANDOFF-2026-09-30.md`** (end of the 2026-09-30 session:
-   state, rules and pitfalls, next steps), then its detail doc `AIRI-BROADCAST-READINESS-HANDOFF-2026-09-29.md`
-   (§7 operator formats, §8-7 v6, §8-8 ep19; RP decisions stay in `AIRI-PERSONA-RP-HANDOFF-2026-09-26.md`, the stack
-   and simulator how-to in `AIRI-LIVE-BROADCAST-HANDOFF-2026-09-24.md` §3-§4)
+3. the current handoff: **`airi_docs/진행중/AIRI-HANDOFF-2026-10-01.md`** (end of the 2026-10-01 session: state,
+   held-out benchmark and candidate-judge results, new pitfalls, next steps); the stack how-to and standing rules
+   stay in `AIRI-CODEX-HANDOFF-2026-09-30.md` §4-§5, the measurement method in `AIRI-HELDOUT-BENCHMARK-2026-10-01.md`,
+   operator formats in `AIRI-BROADCAST-READINESS-HANDOFF-2026-09-29.md` §7
 4. `airi_docs/로드맵/AIRI-ROADMAP-STATUS.md`
 5. `NEXT-SESSION.md`
 
@@ -49,6 +49,10 @@ work or long campaigns), intent/receipt checkpoints, and redaction:
   and open decisions are in the current handoff and the `AIRI-WORKING-STATE.md` receipts.
 - Operational adoption stays forbidden (`adoption_authorized=false`); new proxy behavior stays
   default-off until the user decides.
+- Claims of improvement are judged on the held-out benchmark (unseen shows, version-blind judges;
+  baseline about 35 defective turns per 100). Whoever writes rules never reads its cards or transcripts.
+- RAM is shared with the user's other work: put heavy models on the GPU and check that nothing in the
+  stack was pushed out of VRAM (`AIRI-HANDOFF-2026-10-01.md` §5).
 
 ## Load-bearing rules
 
