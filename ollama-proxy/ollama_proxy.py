@@ -111,6 +111,7 @@ from live_briefing_select import (
     candidate_budget,
     coverage_threshold,
     exact_say_line,
+    fresh_line,
     jumps_to_another_segment,
     live_briefing_select_telemetry,
     rejected_word,
@@ -138,7 +139,7 @@ from live_broadcast_runtime import LiveBroadcastRuntime, BroadcastControlError
 from show_carryover import carryover_answers
 from word_chain_referee import (
     WordChainReferee,
-    referee_say_line,
+    referee_say_lines,
     segment_label,
     verdict_asked,
     with_referee_lines,
@@ -5189,10 +5190,12 @@ def live_context_note_for_turn(
             lines = (word_chain_referee.state_line(show_id),)
         # A ruling the viewer asked for leads the line only when a second sentence survives the boundary.
         asked = verdict_asked(user_text) and response_sentence_limit(user_text) > 1
-        spoken = (
-            referee_say_line(lines, asked, word_chain_referee.expected_starts(show_id))
-            if candidate_budget() and not say_line(note) else ""
+        # A call's variant with no sentence spoken in this show (R1 criterion 2026-09-30).
+        calls = (
+            referee_say_lines(lines, asked, word_chain_referee.expected_starts(show_id))
+            if candidate_budget() and not say_line(note) else ()
         )
+        spoken = fresh_line(calls) if calls else ""
         if spoken:
             # With briefing candidates on, AIRI's word is also the say line: a draft that skips it is
             # redrawn and the line itself is the fallback (2026-09-29 real-path show: no word said).

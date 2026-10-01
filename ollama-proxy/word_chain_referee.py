@@ -219,36 +219,69 @@ _CONCEDE_RE = re.compile(r"(?<![가-힣])(?:내가\s*)?졌(?:어|다|네|음|습
 VIEWER_LOSS_LINE = "- 심판 판정: 시청자 패, AIRI 승"
 _INVALID_LINE_RE = re.compile(r"^- 심판 판정: ([가-힣]+) 무효\((끝 글자와 안 이어짐|이미 나옴)\)")
 _LOSS_LINE_RE = re.compile(r"^- 심판 판정: ([가-힣])(?:으로|로) 이을 단어 없음, AIRI 패")
+# Each call's variants, the usual line first. No two share a sentence or a run long enough to read as a repeat of the
+# previous reply (2026-09-30 ep19 re-run: a viewer missing again on 학 heard "학으로 시작하는 단어로 다시 가 보자." four
+# times, and right after itself the line was unfit, so the model improvised "이번엔 다시 학으로 갈게." instead).
+_OFF_CHAIN_LINES = (
+    "아쉽지만 {s} 무효야. {t}로 다시 가 보자.",
+    "앗, {s} 끝 글자랑 안 이어져서 무효! 다음은 {t}가 올 차례야.",
+    "{s} 아깝게 무효야~ {t}면 바로 받아 줄게!",
+    "음, {s} 이어지지 않아서 무효야. 한 번 더, {t}를 기다릴게!",
+)
+_REPEATED_LINES = (
+    "{s} 이미 나왔어. 다른 단어로 다시 가 보자.",
+    "앗, {s} 아까 나온 단어라 무효! 아직 안 나온 걸로 하나 더 떠올려 보자.",
+    "{s} 벌써 나왔던 단어야~ 다른 단어로 한 번 더 가 보자!",
+    "음, {s} 이번 판에 이미 있었어. 새 단어를 기다릴게!",
+)
+_VIEWER_LOSS_LINES = (
+    "이번 판은 내가 이겼다! 다음 판도 재밌게 가 보자.",
+    "이번 판은 내 승리! 끝까지 같이 해 줘서 재밌었어.",
+    "내가 이겼다~ 다음 판에서 또 붙어 보자!",
+    "이번 판은 내가 가져갈게! 다음 판도 기대하고 있을게.",
+)
+_AIRI_LOSS_LINES = (
+    "{l} 이을 단어가 없네. 이번 판은 내가 졌어!",
+    "으, {l} 시작하는 단어가 안 떠올라. 이번 판은 채팅이 이겼어!",
+    "{l} 이어지는 말이 바닥났어~ 이번 판은 내 패배야!",
+    "{l} 시작하는 단어를 못 찾겠어. 졌다, 다음 판엔 꼭 이길 거야!",
+)
 
 
-def referee_say_line(lines: Sequence[str], asked: bool = False, starts: Sequence[str] = ()) -> str:
-    """A spoken line for the referee's call, or '' when the lines make none.
+def referee_say_lines(lines: Sequence[str], asked: bool = False, starts: Sequence[str] = ()) -> tuple[str, ...]:
+    """The spoken lines for the referee's call, the usual one first, or () when the lines make none.
 
     AIRI's word ("차표로 받을게."; asked for a ruling, "기차 인정! 차표로 받을게."), a move off the chain
-    with the syllables it should start with (``starts``), a repeated word, or AIRI's loss.
+    with the syllables it should start with (``starts``), a repeated word, or a round won or lost. A call
+    other than AIRI's word has variants, so the show can say one it has not said yet.
     """
     word = next((line[len(REQUIRED_WORD_PREFIX):].strip() for line in lines if line.startswith(REQUIRED_WORD_PREFIX)), "")
     if word:
         line = f"{word}{ro_particle(word[-1])} 받을게."
         ruled = accepted_word("\n".join(lines)) if asked else ""
-        return f"{ruled} 인정! {line}" if ruled else line
+        return (f"{ruled} 인정! {line}" if ruled else line,)
     if VIEWER_LOSS_LINE in lines:
-        return "이번 판은 내가 이겼다! 다음 판도 재밌게 가 보자."
+        return _VIEWER_LOSS_LINES
     for line in lines:
         invalid = _INVALID_LINE_RE.match(line)
         if invalid:
             move, reason = invalid.groups()
             subject = f"{move}{topic_particle(move[-1])}"
             if reason == "이미 나옴":
-                return f"{subject} 이미 나왔어. 다른 단어로 다시 가 보자."
+                return tuple(variant.format(s=subject) for variant in _REPEATED_LINES)
             phrase = _start_phrase(starts)
-            target = f"{phrase} 시작하는 단어로" if phrase else "끝 글자로 이어지는 단어로"
-            return f"아쉽지만 {subject} 무효야. {target} 다시 가 보자."
+            target = f"{phrase} 시작하는 단어" if phrase else "끝 글자로 이어지는 단어"
+            return tuple(variant.format(s=subject, t=target) for variant in _OFF_CHAIN_LINES)
         loss = _LOSS_LINE_RE.match(line)
         if loss:
             last = loss.group(1)
-            return f"{last}{ro_particle(last)} 이을 단어가 없네. 이번 판은 내가 졌어!"
-    return ""
+            return tuple(variant.format(l=f"{last}{ro_particle(last)}") for variant in _AIRI_LOSS_LINES)
+    return ()
+
+
+def referee_say_line(lines: Sequence[str], asked: bool = False, starts: Sequence[str] = ()) -> str:
+    """The usual spoken line for the referee's call, or '' when the lines make none."""
+    return next(iter(referee_say_lines(lines, asked, starts)), "")
 
 
 def with_referee_lines(context_note: str, lines: Sequence[str]) -> str:

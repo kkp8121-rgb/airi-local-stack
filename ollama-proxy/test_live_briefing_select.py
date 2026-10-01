@@ -19,6 +19,7 @@ from live_briefing_select import (
     canon_say_lines,
     coverage_threshold,
     exact_say_line,
+    fresh_line,
     rejected_word,
     required_word,
     say_line,
@@ -317,6 +318,36 @@ class LiveBriefingSelectTests(unittest.TestCase):
         self.assertEqual(say_line(with_canon_say_line(note, meal)), spoken[0])
         live_briefing_select.start_show()
         self.assertEqual(say_line(with_canon_say_line(note, meal)), canon_say_line(meal))
+
+    def test_a_pool_line_sharing_a_sentence_spoken_in_the_show_is_skipped(self) -> None:
+        # 2026-09-30 ep19 re-run: rulings on two words shared "학으로 시작하는 단어로 다시 가 보자.", so a memory of
+        # whole lines let the sentence come back (R1: no sentence twice in one show).
+        live_briefing_select.start_show()
+        mirror = ("아쉽지만 거울은 무효야. 학으로 시작하는 단어로 다시 가 보자.", "앗, 거울은 무효! 다음은 학 차례야.")
+        jewel = ("아쉽지만 보석은 무효야. 학으로 시작하는 단어로 다시 가 보자.", "앗, 보석은 무효! 다음은 학 차례야.",
+                 "보석은 아깝게 무효야~ 학이면 받아 줄게!")
+        self.assertEqual(fresh_line(mirror), mirror[0])
+        self.assertEqual(fresh_line(jewel), jewel[1])
+        self.assertEqual(fresh_line(jewel), jewel[2])
+        # No line is new any more: the first line's sentences not spoken yet are said alone (2026-10-01 ep19 replay:
+        # seven misses on 학 in a row ran through the variants).
+        self.assertEqual(fresh_line(jewel), "아쉽지만 보석은 무효야.")
+        # Every sentence spoken, the line whose sentences were spoken longest ago comes back first.
+        self.assertEqual(fresh_line(jewel), jewel[1])
+        # mirror[1] was never picked, but its "다음은 학 차례야." was just spoken in jewel[1].
+        self.assertEqual(fresh_line(mirror), "앗, 거울은 무효!")
+        self.assertEqual(fresh_line(("차표로 받을게.",)), "차표로 받을게.")
+        self.assertEqual(fresh_line(("차표로 받을게.",)), "차표로 받을게.")
+        # A line with no variants stays whole: dropping "차표로 받을게." drops AIRI's word.
+        self.assertEqual(fresh_line(("기차 인정! 차표로 받을게.",)), "기차 인정! 차표로 받을게.")
+        live_briefing_select.start_show()
+        self.assertEqual(fresh_line(jewel), jewel[0])
+        # A variant whose first sentence, the call itself, was spoken is never cut down to its hint (independent review
+        # 2026-10-01: the same word missed under a new start syllable each time).
+        called = ("거울은 무효야. 학으로 가 보자.", "거울은 안 돼! 학 차례야.")
+        again = ("거울은 무효야. 유로 가 보자.", "거울은 안 돼! 유 차례야.")
+        self.assertEqual([fresh_line(called), fresh_line(called)], list(called))
+        self.assertEqual(fresh_line(again), again[0])
 
     def test_a_first_time_viewer_is_welcomed_before_the_answer(self) -> None:
         # 2026-09-29 ep07 T06: "처음 와봤는데 여기 무슨 방송이에요?" got the show's topic and no welcome.

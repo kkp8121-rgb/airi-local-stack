@@ -9155,6 +9155,38 @@ class LiveBroadcastRouteTests(unittest.TestCase):
         self.assertEqual(len(chat.requests), 1)
         self.assertEqual(dialogue, "아쉽지만 사과는 무효야. 표로 시작하는 단어로 다시 가 보자.")
 
+    def test_word_chain_referee_does_not_repeat_a_ruling_within_a_show(self):
+        # 2026-09-30 ep19 re-run T18-T24: a viewer missing again on 학 heard "학으로 시작하는 단어로 다시 가 보자." each
+        # time; right after itself that line was a repeat of the previous reply, so every other turn the model said
+        # "이번엔 다시 학으로 갈게." instead.
+        referee = self._word_chain_referee(["사과", "과학", "거울", "보석"])
+        referee.judge("wc-again", "[YouTube] 사과")
+        self._start_shows("wc-again")
+        live_briefing_select.start_show()
+        # Off, or under the operator's own say line, no variant is picked and the show memory stays empty.
+        briefed = {**self.WORD_CHAIN_CONTEXT,
+                   "briefing": self.WORD_CHAIN_CONTEXT["briefing"] + "\n- 이번 턴에 말할 것: 잠깐 쉬었다 가자!"}
+        for index, (context, candidates) in enumerate(((None, ""), (briefed, "2"))):
+            _, note = self._word_chain_turn("wc-again", f"wc-again-quiet-{index}", "[YouTube] 거울", referee,
+                                            context=context, candidates=candidates)
+            self.assertNotIn("무효야", note)
+        self.assertEqual(list(live_briefing_select._recent_canon_lines), [])
+        spoken = []
+        # Past the four variants too (2026-10-01 ep19 replay: seven misses on 학 in a row).
+        words = ("거울", "보석", "거울", "사자", "상자", "신발")
+        for index, word in enumerate(words):
+            _, context = self._word_chain_turn("wc-again", f"wc-again-{index}", f"[YouTube] {word}", referee,
+                                               candidates="2")
+            self.assertTrue(live_briefing_select.exact_say_line(context))
+            spoken.append(live_briefing_select.say_line(context))
+            self.assertIn(word, spoken[-1])
+        sentences = [part for line in spoken for part in re.split(r"(?<=[.!?…~])\s+", line)]
+        self.assertEqual(len(sentences), len(set(sentences)), spoken)
+        for previous, line, word in zip(spoken, spoken[1:], words[1:]):
+            self.assertFalse(live_briefing_select.candidate_is_unfit(
+                line, line, previous, f"[YouTube] {word}", rejected=word,
+            ))
+
     def test_word_chain_round_clears_when_the_show_closes(self):
         referee = self._word_chain_referee(["기차", "차기"])
         accepted = "\n- 심판 판정: 기차 유효, AIRI 차례\n- AIRI 낼 단어: 차기"

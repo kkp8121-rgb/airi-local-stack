@@ -1,4 +1,6 @@
+import itertools
 import os
+import re
 import tempfile
 import threading
 import unittest
@@ -6,7 +8,7 @@ import zlib
 from pathlib import Path
 from unittest import mock
 
-from live_briefing_select import accepted_word
+from live_briefing_select import accepted_word, candidate_is_unfit
 from live_broadcast_runtime import BROADCAST_BRIEFING_HEADER, DONATION_CONTINUATION_CONTRACT
 from word_chain_referee import (
     MAX_SHOWS,
@@ -16,6 +18,7 @@ from word_chain_referee import (
     load_words,
     parse_move,
     referee_say_line,
+    referee_say_lines,
     ro_particle,
     verdict_asked,
     with_referee_lines,
@@ -176,6 +179,32 @@ class RefereeSayLineTests(unittest.TestCase):
             referee_say_line(("- 심판 판정: 기차 유효, AIRI 차례", "- 심판 판정: 차로 이을 단어 없음, AIRI 패")),
             "차로 이을 단어가 없네. 이번 판은 내가 졌어!",
         )
+
+    def test_each_call_has_variants_that_share_no_sentence(self) -> None:
+        # 2026-09-30 ep19 re-run T18-T24: a viewer missing again on 학 heard "학으로 시작하는 단어로 다시 가 보자." each
+        # time (R1: no sentence twice in one show), and right after itself the line was a repeat of the previous reply,
+        # so every other turn the model improvised "이번엔 다시 학으로 갈게.". Long words and two start syllables are
+        # the worst case for the shared run.
+        calls = (
+            (("- 심판 판정: 람보르기니 무효(끝 글자와 안 이어짐), 다시",), ("년", "연"), {"rejected": "람보르기니"}),
+            (("- 심판 판정: 사과 무효(끝 글자와 안 이어짐), 다시",), (), {"rejected": "사과"}),
+            (("- 심판 판정: 람보르기니 무효(이미 나옴), 다시",), (), {"rejected": "람보르기니"}),
+            (("- 심판 판정: 시청자 패, AIRI 승",), (), {}),
+            (("- 심판 판정: 능력 유효, AIRI 차례", "- 심판 판정: 력으로 이을 단어 없음, AIRI 패"), (), {"accepted": "능력"}),
+        )
+        for lines, starts, words in calls:
+            pool = referee_say_lines(lines, starts=starts)
+            with self.subTest(call=lines[-1]):
+                self.assertEqual(len(pool), 4)
+                self.assertEqual(pool[0], referee_say_line(lines, starts=starts))
+                for line in pool:
+                    self.assertFalse(candidate_is_unfit(line, line, user_text="[YouTube] 거울", **words))
+                for first, second in itertools.permutations(pool, 2):
+                    self.assertFalse(set(re.split(r"(?<=[.!?…~])\s+", first)) & set(re.split(r"(?<=[.!?…~])\s+", second)))
+                    self.assertFalse(candidate_is_unfit(second, second, previous_reply=first, user_text="[YouTube] 거울",
+                                                        **words))
+        self.assertEqual(referee_say_lines(("- 심판 판정: 기차 유효, AIRI 차례", "- AIRI 낼 단어: 차표")), ("차표로 받을게.",))
+        self.assertEqual(referee_say_lines(()), ())
 
     def test_a_viewer_who_asks_for_a_ruling_hears_it(self) -> None:
         # 2026-09-29 ep07 T15: "션샤인 이거 되냐? 판정 ㄱ" was answered "인물로 받을게." with no ruling.

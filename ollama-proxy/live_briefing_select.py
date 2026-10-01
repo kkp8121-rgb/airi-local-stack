@@ -577,6 +577,30 @@ def _rotated_line(lines: tuple[str, ...], user_text: object, spoken: bool = True
     return line
 
 
+def fresh_line(lines: tuple[str, ...]) -> str:
+    """The first line of the pool with no sentence spoken in this show; else, among variants, the first one whose first
+    sentence (the call itself) is new, said with its new sentences only; else the line whose sentences were spoken
+    longest ago. It counts as spoken.
+
+    By sentence, not line: two rulings on different words shared "학으로 시작하는 단어로 다시 가 보자." (2026-09-30 ep19
+    re-run), and seven misses on 학 in a row ran through the variants, while the sentence naming the word was still
+    new (2026-10-01 ep19 replay). A line with no variants stays whole ("기차 인정! 차표로 받을게." keeps AIRI's word).
+    """
+    with _recent_canon_lock:
+        # Each spoken sentence with the position of the newest line that said it.
+        last_said = {sentence: index for index, said in enumerate(_recent_canon_lines)
+                     for sentence in _SENTENCE_SPLIT_RE.split(said)}
+        parts = [_SENTENCE_SPLIT_RE.split(line) for line in lines]
+        line = next((line for line, split in zip(lines, parts) if not any(part in last_said for part in split)), "")
+        if not line and len(lines) > 1:
+            line = next((" ".join(part for part in split if part not in last_said)
+                         for split in parts if split[0] not in last_said), "")
+        line = line or min(lines, key=lambda line: max(last_said.get(part, -1)
+                                                       for part in _SENTENCE_SPLIT_RE.split(line)))
+        _spoken(line)
+    return line
+
+
 def _today_order_line(context_note: str) -> str:
     """"오늘은 … 순서야. 지금은 … 중이야." from the order written in the situation, else ''."""
     situation = next((line[len(_SITUATION_LINE_PREFIX):] for line in context_note.splitlines()
