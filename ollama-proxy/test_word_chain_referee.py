@@ -298,6 +298,38 @@ class RefereeTests(unittest.TestCase):
         self.assertEqual(referee.judge("s", "[YouTube] 항복"), ())
         self.assertEqual(referee_say_line(("- 심판 판정: 시청자 패, AIRI 승",)), "이번 판은 내가 이겼다! 다음 판도 재밌게 가 보자.")
 
+    def test_series03_show2_moves_and_concessions(self) -> None:
+        # 2026-10-01 second simulated show T13: "드디어 재대결 ㄱㄱ 아까 사과 했으니까 다시 사과부터!" was read as "다시"
+        # (an adverb the list holds; "부터" was not a particle) and AIRI said "시대로 받을게.".
+        nouns = {"다시", "사과", "아까", "방금", "이제", "바다", "재대결"}
+        self.assertEqual(parse_move("[YouTube] 드디어 재대결 ㄱㄱ 아까 사과 했으니까 다시 사과부터!", "", nouns), "사과")
+        self.assertEqual(parse_move("[YouTube] 사과 다시 ㄱㄱ", "", nouns), "사과")
+        self.assertEqual(parse_move("[YouTube] 사과부터 ㄱㄱ", "", nouns), "사과")
+        for chat in ("[YouTube] 다시 ㄱㄱ", "[YouTube] 방금 시작!"):
+            with self.subTest(chat=chat):
+                self.assertEqual(parse_move(chat, "", nouns), "")
+        self.assertEqual(parse_move("[YouTube] 다시!", "바다", nouns), "")
+        self.assertEqual(parse_move("[YouTube] 이제!", "바다", nouns), "")
+        # T23: "…졌어 ㅠㅠ 아이리 또 이김" gave up; only AIRI as the one who lost blocks a concession.
+        referee = WordChainReferee({"공부": 1, "부산": 2, "체육": 3})
+        referee.judge("s", "[YouTube] 공부")
+        self.assertEqual(referee.judge("s", "[YouTube] 체..? 체..? 아 모르겠다 졌어 ㅠㅠ 아이리 또 이김"),
+                         ("- 심판 판정: 시청자 패, AIRI 승",))
+        for chat in ("[YouTube] 아이리한테 졌어", "[YouTube] 아이리 이김 나 졌어", "[YouTube] 아이리가 지는 줄 알았네 졌어"):
+            fresh = WordChainReferee({"공부": 1, "부산": 2})
+            fresh.judge("t", "[YouTube] 공부")
+            with self.subTest(chat=chat):
+                self.assertEqual(fresh.judge("t", chat), ("- 심판 판정: 시청자 패, AIRI 승",))
+        # AIRI losing, words to AIRI, or not giving up at all (fourth review 2026-10-01).
+        for chat in ("[YouTube] 아이리 졌어 ㅋㅋ", "[YouTube] 아이리가 졌네", "[YouTube] 아이리 또 졌어?", "[YouTube] 아이리 졌다 ㅋㅋ 나 이김",
+                     "[YouTube] 아이리 포기하지 마", "[YouTube] 아이리 항복해", "[YouTube] 아이리 포기해 ㅋㅋ",
+                     "[YouTube] 아이리 ㅈㅈ?", "[YouTube] 아이리 안 졌어 아직", "[YouTube] 아직 안 졌어",
+                     "[YouTube] 포기 안 해!", "[YouTube] 항복은 없다"):
+            fresh = WordChainReferee({"공부": 1, "부산": 2})
+            fresh.judge("t", "[YouTube] 공부")
+            with self.subTest(chat=chat):
+                self.assertEqual(fresh.judge("t", chat), ())
+
     def test_the_last_round_result_stays_until_a_new_round(self) -> None:
         # 2026-09-29 ep10 T13: after the viewer gave up, "3연패 실화냐" -> "오늘도 내가 또 지는구나."
         referee = WordChainReferee({"공부": 1, "부산": 2, "기차": 3, "차표": 4})

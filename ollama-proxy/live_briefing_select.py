@@ -43,7 +43,8 @@ def _says_word(text: str, word: str) -> bool:
 _REFUSAL_RE = re.compile(r"못(?:\s|해|하|넘|받|잇)|안\s*(?:되|돼)|막히|막혔|막혀|졌|패배|어렵")
 # After AIRI's move it is the viewer's turn, and "…로 받아." orders the viewer (2026-09-29 ep10 T06:
 # "무대로 받아. 이번엔 내 차례다.").
-_OWN_TURN_RE = re.compile(r"내\s*차례|(?:나한테|나에게)\s*넘[기길겨겼]")  # ep18 "다음은 나한테 넘길래?"
+# ep18 "다음은 나한테 넘길래?"; 2026-10-01 show 2 T21 "…이제 나 차례야." (not "누구나 차례로").
+_OWN_TURN_RE = re.compile(r"(?<![가-힣])(?:내|나)\s*차례|(?:나한테|나에게)\s*넘[기길겨겼]")
 _ORDER_TO_TAKE_RE = re.compile(r"받아(?:라)?\s*[.!~]*$")
 # A move names one word: a second one after AIRI's move reads as another move (2026-09-29 ep16 T08: "사과면 과거로
 # 받아볼게. 지금은 시대로 가자."). Lazy so "관심으로" names 관심.
@@ -67,6 +68,8 @@ _RULED_RE = re.compile(r"인정|유효|통과")
 DO_NOT_SAY_PREFIX = "- 아직 말하지 말 것:"
 # A candidate sharing this many characters with the previous reply is a repeat, not a new beat.
 REPEAT_RUN_CHARS = 20
+# A lead sharing this many letters with the answer ("여기서같이") would say them twice.
+LEAD_ECHO_CHARS = 5
 
 _NON_TEXT_RE = re.compile(r"[^가-힣A-Za-z0-9]")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?~])\s+|\n+")
@@ -239,6 +242,16 @@ _SCHEDULE_QUESTION_RE = re.compile(
 _TODAY_PLAN_QUESTION_RE = re.compile(
     r"오늘\s*(?:방송\s*)?(?:은|는|에는)?\s*(?:뭐|뭘)\s*(?:해|할|하는|함|하냐|하니|해요|하나요)|(?:오늘|방송)\s*순서"
 )
+# ...and so does a question when a part of today's show comes (2026-10-01 show 2 T04: "재대결 언제 함? 바로 해?" -> "응, 바로
+# 할게." although the talk came first). Past ("했지"), the viewer's own plan ("언제 하지") and another show are not asked.
+_SEGMENT_WHEN_RE = re.compile(
+    r"(?:끝말잇기|끝말|재대결|밸런스\s*게임|밸런스|밸겜|수다|마무리)\s*(?:은|는|도)?\s*언제\s*(?:시작\s*)?"
+    r"(?:해|할|하는|함|하냐|하니|해요|하나요)"
+    r"|언제\s*(?:끝말잇기|끝말|재대결|밸런스\s*게임|밸런스|밸겜)\s*(?:을|를|은|는|도)?\s*(?:시작\s*)?"
+    r"(?:해|할|하는|함|하냐|하니|해요|하나요)"
+)
+# "게임" alone is any game ("롤 게임 언제 해?"), so only the show's own segments count.
+_NOT_TODAY_RE = re.compile(r"다음\s*(?:에|번|방송|주)|담방|내일|저번|지난|이번\s*주|주말")
 # "오늘은 … 순서다." says the same (2026-09-30 ep19 T04 got "지금은 첫 방송 준비 중이야").
 _TODAY_ORDER_RE = re.compile(
     r"(?:오늘\s*순서는\s*([^.!?]+?)(?:이다|다)|오늘은\s*([^.!?]+?)\s*순서(?:이다|다))\s*(?:\.|$)"
@@ -412,6 +425,8 @@ _CARE_LINES = (
 _DOWN_RE = re.compile(r"우울|속상|서러|슬퍼|슬프|힘들어|힘들다|힘듦|혼났|혼나서|잘렸|헤어졌|떨어졌"
                       r"|(?:^|\s)망(?:했|한|함|친|쳤|쳐|침)(?!\s*줄)")
 _LAUGH_JAMO_RE = re.compile(r"[ㅋㅎ]{2,}")
+# Right after an event ("잘렸던", "떨어졌던"); a feeling of today stays ("오늘 우울했던 하루야").
+_PAST_ATTRIBUTIVE_RE = re.compile(r"던")
 _COMFORTED_RE = re.compile(r"속상|저런|힘들었|토닥|괜찮|위로|고생|마음")
 _COMFORT_LINES = (
     "저런, 오늘 많이 속상했겠다.",
@@ -460,7 +475,19 @@ _OTHERS_MEDICAL_RE = re.compile(
     r"(?:할아버지|할머니|엄마|아빠|어머니|아버지|부모님|동생|형|누나|언니|오빠|친구|남편|아내|아들|딸|강아지|고양이|아기|애기)"
     r"(?:가|이|께서|는|도|를|\s)[^.!?]{0,20}?(?:수술|입원|병원|병문안|검사|아프|아파(?!트)|다쳤)"
 )
-_RELIEVED_RE = re.compile(r"잘\s*끝났|무사히|성공|이상\s*없|별(?:거|일)\s*아니|다행|퇴원|괜찮대|나았|회복하")
+_RELIEVED_RE = re.compile(r"잘\s*끝(?:났|나서)|무사히|성공|이상\s*없|별(?:거|일)\s*아니|다행|퇴원|괜찮대|나았|회복하")
+# Health news that hints at a death the loss words miss gets no health lead: hope ("얼른 좋아지길 같이 바랄게") or care
+# there would hurt (adversarial review 2026-10-01: 22 of 23 such chats got the hope lead — "할아버지가 병원에서 결국 가셨어",
+# "별세하셨어", "못 깨어나셨어"). A lead left out costs little; the wrong one costs a lot, so the hints are broad. Not
+# "들어가셨어" (into surgery), "병원/집에 가셨어" (third review: that took ordinary leads and made a congratulation on
+# good news unfit), "죽겠어"/"죽을 것 같아" (an ache) or "숨이 차" (urgent safety answers that).
+_DEATH_HINT_RE = re.compile(
+    r"(?:결국|편히|편하게|먼저|멀리|좋은\s*곳(?:으로|에))\s*(?:가셨|가셔서|갔)|돌아가시|돌아가신|떠나|떠났"
+    r"|세상\s*(?:을\s*)?(?:떠|뜨|떴|버리)|하늘(?:로|나라|에)|별세|소천|영면|운명하|임종|장례|고인|사망|안락사"
+    r"|숨을?\s*거두|숨지|죽(?!겠|을\s*것|을것)|못\s*깨어나|깨어나지\s*(?:못|않)|무지개|보내\s*드렸|별\s*(?:이\s*)?됐"
+    r"|못\s*버티셨|못\s*일어나셨|영영|눈\s*(?:을\s*)?감(?:으셨|았)|유명을\s*달리|생을\s*마감|돌아오지\s*못|마지막\s*인사"
+    r"|발인|빈소|조문|납골|사십구재|49재|이별"
+)
 _HOPED_RE = re.compile(r"바랄게|빌게|기도|좋아지|회복|무사|괜찮아지|나으|나았으면")
 _HOPE_LINES = (
     "걱정 많이 되겠다. 얼른 좋아지길 같이 바랄게.",
@@ -673,7 +700,7 @@ def show_say_lines(context_note: object, user_text: object) -> tuple[str, ...]:
         plan = _next_show_plan_line(context_note, hour_asked=bool(re.search(r"몇\s*시", text)))
         if plan:
             return (plan,)
-    if _TODAY_PLAN_QUESTION_RE.search(text):
+    if _TODAY_PLAN_QUESTION_RE.search(text) or (_SEGMENT_WHEN_RE.search(text) and not _NOT_TODAY_RE.search(text)):
         order = _today_order_line(context_note)
         if order:
             return (order,)
@@ -718,6 +745,11 @@ def with_canon_say_line(context_note: str, user_text: object) -> str:
     return f"{context_note.rstrip()}{header}\n{SAY_LINE_PREFIX} {line}"
 
 
+def _hints_at_a_death(text: str) -> bool:
+    """True for health news with a death hint (``text`` normalized as in lead_lines)."""
+    return bool((_OTHERS_MEDICAL_RE.search(text) or _ILLNESS_RE.search(text)) and _DEATH_HINT_RE.search(text))
+
+
 def lead_lines(user_text: object) -> tuple[str, ...]:
     """The lead pool for a first visit, loss news, illness news, a down day, good news or nerves, else ()."""
     if not isinstance(user_text, str):
@@ -728,12 +760,16 @@ def lead_lines(user_text: object) -> tuple[str, ...]:
         return _WELCOME_LINES
     if _LOSS_RE.search(text):
         return _CONDOLENCE_LINES
+    if _hints_at_a_death(text):
+        return ()
     if _OTHERS_MEDICAL_RE.search(text) and not _RELIEVED_RE.search(text):
         return _HOPE_LINES
     asks_airi = bool(_QUESTION_RE.search(text) and _ADDRESSES_AIRI_RE.search(text))
     if _ILLNESS_RE.search(text) and not _RECOVERED_RE.search(text) and not _ADVICE_RE.search(text) and not asks_airi:
         return _CARE_LINES
-    if _DOWN_RE.search(text) and not _LAUGH_JAMO_RE.search(raw) and not asks_airi:
+    # A bad day in the past ("지난번에 알바 잘렸던 사람인데 오늘 새 알바 붙었어!!") is no news of today (2026-10-01 show 2 T11).
+    down = any(not _PAST_ATTRIBUTIVE_RE.match(text, match.end()) for match in _DOWN_RE.finditer(text))
+    if down and not _LAUGH_JAMO_RE.search(raw) and not asks_airi:
         return _COMFORT_LINES
     # A viewer congratulating someone else ("합격 축하해 아이리") is no news of their own.
     asks_past = bool(_QUESTION_RE.search(text) and _PAST_NEWS_RE.search(text))
@@ -775,12 +811,34 @@ def loss_news_line(user_text: object) -> str:
     return _rotated_line(_LOSS_NEWS_LINES, user_text)
 
 
+def _echoes(line: str, said: str) -> bool:
+    """True when the line shares LEAD_ECHO_CHARS letters in a row with the answer's letters (``said``).
+
+    Letters only: spaces around a shared "오늘은" are no echo.
+    """
+    letters = _NON_TEXT_RE.sub("", line)
+    match = difflib.SequenceMatcher(None, letters, said, autojunk=False).find_longest_match(0, len(letters), 0, len(said))
+    return match.size >= LEAD_ECHO_CHARS
+
+
 def with_lead(dialogue: str, lead: str) -> str:
-    """The dialogue led by the lead, unless it already does the lead's job."""
+    """The dialogue led by the lead, unless it already does the lead's job.
+
+    A lead saying the answer's words is swapped for a line of its pool that does not and is not spoken in this show,
+    else left out (2026-10-01 ep19 replay T11: "많이 떨리겠다. 좋은 소식 있기를 여기서 같이 빌게. … 여기서 같이
+    있을게." said "여기서 같이" twice).
+    """
     text = dialogue.strip()
-    done = next((marks for lines, marks in _LEADS if lead in lines), None)
+    pool, done = next(((lines, marks) for lines, marks in _LEADS if lead in lines), ((), None))
     if not lead or done is None or done.search(text):
         return text
+    said = _NON_TEXT_RE.sub("", text)
+    if _echoes(lead, said):
+        with _recent_canon_lock:
+            spoken = set(_recent_canon_lines)
+        lead = next((line for line in pool if line not in spoken and not _echoes(line, said)), "")
+        if not lead:
+            return text
     live_briefing_select_telemetry.lead_added()
     with _recent_canon_lock:
         _spoken(lead)
@@ -870,7 +928,9 @@ def candidate_is_unfit(
     if "다음 방송은" in say and any(re.sub(r"\s+", "", match.group(0)) not in re.sub(r"\s+", "", say)
                                   for match in _CLOCK_RE.finditer(text)):
         return True
-    bad_news = lead_lines(user_text) in (_CONDOLENCE_LINES, _HOPE_LINES, _CARE_LINES, _COMFORT_LINES, _ENCOURAGE_LINES)
+    bad_news = lead_lines(user_text) in (_CONDOLENCE_LINES, _HOPE_LINES, _CARE_LINES, _COMFORT_LINES, _ENCOURAGE_LINES) or (
+        _hints_at_a_death(_CHAT_SOURCE_RE.sub("", unicodedata.normalize("NFKC", str(user_text)).strip()))
+    )
     if bad_news and _BRUSH_OFF_RE.search(text):
         return True
     # Congratulations after bad news, unless the chat brings good news too (2026-09-30 ep19 re-run: "시험 망친 거

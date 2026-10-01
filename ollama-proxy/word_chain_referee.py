@@ -54,9 +54,12 @@ _REACTIONS = frozenset((
     "오케이", "에바", "웃겨", "개웃겨", "맞아", "그치", "그렇지", "아니", "뭐야", "뭐임", "우와", "와우", "나이스",
     "좋아", "좋다", "헐랭", "킹받네", "귀엽다", "천재", "천재네", "잘한다", "화이팅", "파이팅",
 ))
+# Adverbs the list holds as nouns are never the move (2026-10-01 show 2 T13: "…아까 사과 했으니까 다시 사과부터!" was
+# read as "다시" and AIRI said "시대로 받을게.").
+_NOT_MOVES = frozenset(("다시", "아까", "방금", "이제"))
 _PREDICATE_ENDINGS = ("다", "요", "네", "죠", "지")
 # One trailing particle, longest first; dropped only when a list noun of 2+ syllables remains.
-_PARTICLES = ("으로", "이야", "이요", "로", "야", "요", "임", "은", "는", "이", "가", "을", "를")
+_PARTICLES = ("으로", "이야", "이요", "부터", "로", "야", "요", "임", "은", "는", "이", "가", "을", "를")
 
 _HANGUL_BASE, _HANGUL_LAST = 0xAC00, 0xD7A3
 _INITIAL_NIEUN, _INITIAL_RIEUL, _INITIAL_IEUNG = 2, 5, 11
@@ -112,12 +115,14 @@ def _noun_form(token: str, nouns: Container[str]) -> str:
 def parse_move(chat: object, previous: str, nouns: Container[str]) -> str:
     """The viewer's word in one chat, or '' when the chat names none."""
     # A concession ("항복", "졌어") is never itself a move.
-    if not isinstance(chat, str) or _CONCEDE_RE.search(chat):
+    if not isinstance(chat, str) or _CONCEDE_WORDS_RE.search(chat):
         return ""
     text = _PUNCTUATION_RE.sub(" ", _LAUGH_RE.sub(" ", _SOURCE_TAGS_RE.sub("", chat)))
     tokens = [
-        _noun_form(run, nouns) for run in _HANGUL_RUN_RE.findall(_MOVE_CUE_RE.sub(" ", text))
-        if _WORD_RE.fullmatch(run) and run not in _REACTIONS
+        token for token in (
+            _noun_form(run, nouns) for run in _HANGUL_RUN_RE.findall(_MOVE_CUE_RE.sub(" ", text))
+            if _WORD_RE.fullmatch(run) and run not in _REACTIONS
+        ) if token not in _NOT_MOVES
     ]
     starts = chain_starts(previous) if previous else set()
     pieces = text.split()
@@ -125,6 +130,8 @@ def parse_move(chat: object, previous: str, nouns: Container[str]) -> str:
         if pieces[0] in _REACTIONS:
             return ""
         lone = _noun_form(pieces[0], nouns)
+        if lone in _NOT_MOVES:
+            return ""
         # An off-list predicate ("어렵다", "아쉽네") is a reaction; a spoken ruling on it would be heard.
         if lone not in nouns and lone.endswith(_PREDICATE_ENDINGS):
             return ""
@@ -213,9 +220,27 @@ def _start_phrase(starts: Sequence[str]) -> str:
     return f"{joined}{ro_particle(options[-1])}"
 
 
-# A viewer giving up mid-round ("모르겠다 졌어", "항복"); "떨어졌어" and "아이리 졌어" are not concessions.
-_CONCEDE_RE = re.compile(r"(?<![가-힣])(?:내가\s*)?졌(?:어|다|네|음|습니다)|항복|포기|못\s*하겠|ㅈㅈ|(?<![A-Za-z])gg(?![A-Za-z])",
-                         re.IGNORECASE)
+# Talk of giving up or losing is never a move, even "포기 안 해!" (2026-10-01: read as the word 포기).
+_CONCEDE_WORDS_RE = re.compile(r"(?<![가-힣])(?:내가\s*)?졌(?:어|다|네|음|습니다)|항복|포기|못\s*하겠|ㅈㅈ|(?<![A-Za-z])gg(?![A-Za-z])",
+                               re.IGNORECASE)
+# A viewer giving up mid-round ("모르겠다 졌어", "항복"); "떨어졌어", "아직 안 졌어" and "포기 안 해!" are not concessions.
+_OWN_LOSS = r"(?<![가-힣])(?<!안\s)(?:내가\s*)?졌(?:어|다|네|음|습니다)"
+_CONCEDE_RE = re.compile(
+    _OWN_LOSS + r"|항복(?!\s*(?:은|는)?\s*(?:안|못|없|하지\s*마))|포기(?!\s*(?:는|란)?\s*(?:안|못|없|하지\s*마))|못\s*하겠|ㅈㅈ"
+    r"|(?<![A-Za-z])gg(?![A-Za-z])",
+    re.IGNORECASE,
+)
+# With 아이리 in the chat only "(내가) 졌어" gives up, and not with AIRI as the one who lost: "…졌어 ㅠㅠ 아이리 또 이김"
+# does (2026-10-01 show 2 T23: any 아이리 blocked it); "아이리 졌어", "아이리 항복해", "아이리 ㅈㅈ?" do not (fourth review).
+_OWN_LOSS_RE = re.compile(_OWN_LOSS)
+_AIRI_LOST_RE = re.compile(r"아이리\s*(?:가|는|도)?\s*(?:또\s*)?(?:졌|패)")
+
+
+def conceded(chat: str) -> bool:
+    """True when the viewer gives up the round."""
+    if not _CONCEDE_RE.search(chat):
+        return False
+    return "아이리" not in chat or bool(_OWN_LOSS_RE.search(chat) and not _AIRI_LOST_RE.search(chat))
 VIEWER_LOSS_LINE = "- 심판 판정: 시청자 패, AIRI 승"
 _INVALID_LINE_RE = re.compile(r"^- 심판 판정: ([가-힣]+) 무효\((끝 글자와 안 이어짐|이미 나옴)\)")
 _LOSS_LINE_RE = re.compile(r"^- 심판 판정: ([가-힣])(?:으로|로) 이을 단어 없음, AIRI 패")
@@ -365,7 +390,7 @@ class WordChainReferee:
             self._rounds.move_to_end(show_id)
             word = parse_move(chat, game.previous, self._words)
             if not word:
-                if game.previous and isinstance(chat, str) and _CONCEDE_RE.search(chat) and "아이리" not in chat:
+                if game.previous and isinstance(chat, str) and conceded(chat):
                     game.previous, game.used, game.result = "", set(), "AIRI 승"
                     return (VIEWER_LOSS_LINE,)
                 return ()
